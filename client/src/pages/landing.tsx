@@ -1,0 +1,87 @@
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Truck, FileText, Users, DollarSign } from "lucide-react";
+
+export default function Landing() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-16">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <div className="flex items-center justify-center space-x-3 mb-6">
+            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+              <Truck className="text-white text-xl" />
+            </div>
+            <h1 className="text-4xl font-bold text-secondary">FreightFlow</h1>
+          </div>
+          <p className="text-xl text-gray-600 mb-8">
+            Streamline your freight factoring workflow with our comprehensive invoice processing system
+          </p>
+          <Button size="lg" onClick={() => window.location.href = '/api/login'}>
+            Sign In to Get Started
+          </Button>
+        </div>
+
+        {/* Features */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+          <Card>
+            <CardContent className="p-6 text-center">
+              <FileText className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Document Management</h3>
+              <p className="text-gray-600 text-sm">
+                Upload and manage rate confirmations, bills of lading, and driver documents
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6 text-center">
+              <DollarSign className="w-12 h-12 text-success mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Invoice Processing</h3>
+              <p className="text-gray-600 text-sm">
+                Streamlined workflow for creating, submitting, and tracking invoices
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6 text-center">
+              <Users className="w-12 h-12 text-warning mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Client Management</h3>
+              <p className="text-gray-600 text-sm">
+                Comprehensive client database with search and reporting capabilities
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6 text-center">
+              <Truck className="w-12 h-12 text-secondary mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Load Tracking</h3>
+              <p className="text-gray-600 text-sm">
+                Track loads from pickup to delivery with real-time status updates
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Call to Action */}
+        <div className="text-center">
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="p-8">
+              <h2 className="text-2xl font-bold text-secondary mb-4">
+                Ready to streamline your freight factoring?
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Join hundreds of freight companies already using FreightFlow to manage their invoice processing workflow.
+              </p>
+              <Button size="lg" onClick={() => window.location.href = '/api/login'}>
+                Sign In Now
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

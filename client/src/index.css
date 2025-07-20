@@ -1,0 +1,277 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 96.1%);
+  --foreground: hsl(210, 20%, 20%);
+  --muted: hsl(210, 40%, 98%);
+  --muted-foreground: hsl(215, 13.8%, 34.1%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(210, 20%, 20%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(210, 20%, 20%);
+  --border: hsl(214.3, 31.8%, 91.4%);
+  --input: hsl(214.3, 31.8%, 91.4%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --primary-dark: hsl(208, 100%, 35%);
+  --secondary: hsl(210, 14%, 31%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(210, 40%, 96%);
+  --accent-foreground: hsl(215, 13.8%, 34.1%);
+  --destructive: hsl(0, 73%, 48%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --success: hsl(142, 69%, 32%);
+  --success-foreground: hsl(0, 0%, 98%);
+  --warning: hsl(32, 100%, 48%);
+  --warning-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(215, 13.8%, 34.1%);
+  --radius: 0.5rem;
+  --surface: hsl(0, 0%, 100%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --primary-dark: hsl(208, 100%, 35%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --success: hsl(142, 69%, 32%);
+  --success-foreground: hsl(0, 0%, 98%);
+  --warning: hsl(32, 100%, 48%);
+  --warning-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --surface: hsl(240, 10%, 3.9%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply antialiased bg-background text-foreground;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* Custom utility classes for the freight factoring system */
+.drag-over {
+  border-color: hsl(207, 90%, 54%) !important;
+  background-color: hsl(207, 90%, 95%) !important;
+}
+
+.file-item {
+  transition: all 0.2s ease-in-out;
+}
+
+.file-item:hover {
+  transform: translateY(-1px);
+}
+
+.sidebar-active {
+  background-color: hsl(207, 90%, 95%);
+  border-right: 3px solid hsl(207, 90%, 54%);
+}
+
+/* Custom color classes to match the design */
+.text-primary {
+  color: hsl(207, 90%, 54%);
+}
+
+.text-primary-dark {
+  color: hsl(208, 100%, 35%);
+}
+
+.text-secondary {
+  color: hsl(210, 14%, 31%);
+}
+
+.text-success {
+  color: hsl(142, 69%, 32%);
+}
+
+.text-warning {
+  color: hsl(32, 100%, 48%);
+}
+
+.text-error {
+  color: hsl(0, 73%, 48%);
+}
+
+.bg-primary {
+  background-color: hsl(207, 90%, 54%);
+}
+
+.bg-primary-dark {
+  background-color: hsl(208, 100%, 35%);
+}
+
+.bg-secondary {
+  background-color: hsl(210, 14%, 31%);
+}
+
+.bg-success {
+  background-color: hsl(142, 69%, 32%);
+}
+
+.bg-warning {
+  background-color: hsl(32, 100%, 48%);
+}
+
+.bg-error {
+  background-color: hsl(0, 73%, 48%);
+}
+
+.bg-surface {
+  background-color: hsl(0, 0%, 100%);
+}
+
+.bg-background {
+  background-color: hsl(0, 0%, 96.1%);
+}
+
+/* Hover states */
+.hover\:bg-primary:hover {
+  background-color: hsl(207, 90%, 54%);
+}
+
+.hover\:bg-primary-dark:hover {
+  background-color: hsl(208, 100%, 35%);
+}
+
+.hover\:text-primary:hover {
+  color: hsl(207, 90%, 54%);
+}
+
+.hover\:text-primary-dark:hover {
+  color: hsl(208, 100%, 35%);
+}
+
+.hover\:text-secondary:hover {
+  color: hsl(210, 14%, 31%);
+}
+
+/* Focus states for better accessibility */
+.focus\:ring-primary:focus {
+  box-shadow: 0 0 0 3px hsla(207, 90%, 54%, 0.1);
+}
+
+.focus\:border-primary:focus {
+  border-color: hsl(207, 90%, 54%);
+}
+
+/* Professional shadows and transitions */
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.transition-colors {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+.transition-shadow {
+  transition-property: box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Loading spinner */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Status badges with proper contrast */
+.status-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.status-processed {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-processing {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-approved {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-rejected {
+  @apply bg-red-100 text-red-800;
+}
+
+.status-failed {
+  @apply bg-red-100 text-red-800;
+}
+
+.status-active {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-inactive {
+  @apply bg-gray-100 text-gray-800;
+}
+
+/* Professional table styles */
+.table-hover tbody tr:hover {
+  background-color: hsl(210, 40%, 98%);
+}
+
+/* Custom scrollbar for webkit browsers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(210, 40%, 98%);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(215, 13.8%, 34.1%);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(210, 14%, 31%);
+}
