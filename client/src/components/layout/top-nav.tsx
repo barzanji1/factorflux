@@ -112,7 +112,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     "/admin"
   ];
   
-  const showHomeButton = pagesWithHomeButton.includes(location);
+  const showHomeButton = pagesWithHomeButton.some(page => location.startsWith(page));
 
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
