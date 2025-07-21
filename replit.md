@@ -123,6 +123,11 @@ The system is designed as a full-stack application with clear separation between
   - Updated subtitle from "Freight Factoring" to "Trucking Pros Financial"
   - Modified landing page description to emphasize Trucking Pros Financial branding
   - Updated project documentation to reflect new company identity
+  - **Freight Factoring Context Integration**: Added freight factoring terminology in strategic locations
+    - Dashboard subtitle now includes "freight factoring workflow" for clear service context
+    - Landing page description emphasizes "freight factoring operations"
+    - Added secondary branding line: "Trucking Pros Financial - Your trusted partner in freight factoring solutions"
+    - Created clear branding hierarchy: QuantumCore (app) → Trucking Pros Financial (company) → Freight Factoring (service)
 - **Profile Image Upload Fix**: Resolved profile picture upload and display functionality
   - Added static file serving for uploaded images at `/uploads` endpoint
   - Fixed profile image display in both profile page and navigation components
