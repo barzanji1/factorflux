@@ -118,6 +118,12 @@ The system is designed as a full-stack application with clear separation between
 ## Recent Changes
 
 ### January 21, 2025
+- **TPF Fuel Card Services**: Implemented comprehensive fuel card application system with three complimentary tiers
+  - Created TPF Base, Fleet, and Premium cards with escalating benefits (2¢, 4¢, 6¢ per gallon discounts)
+  - Removed monthly fees to make all cards complimentary services for TPF carriers
+  - Added comprehensive application form with company details, fleet size, and fuel spend tracking
+  - Integrated fuel card navigation with dedicated page and status tracking
+  - Implemented backend API for application management and activity logging
 - **Global Search Implementation**: Successfully implemented comprehensive search functionality across the entire system
   - Created global `/api/search` endpoint that searches clients, invoices, and loads simultaneously
   - Added `searchLoads` method to storage interface with proper field references (pickupLocation/deliveryLocation)

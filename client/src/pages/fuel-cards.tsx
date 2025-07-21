@@ -75,15 +75,15 @@ type FuelCardApplication = z.infer<typeof fuelCardApplicationSchema>;
 const cardTypes = [
   {
     id: "base",
-    name: "EllaFlow Base Card",
+    name: "TPF Base Card",
     monthlyFee: 0,
-    description: "Essential fuel savings for small operations",
+    description: "Essential fuel savings for small carriers",
     perks: [
       "2¢/gallon discount at 5,000+ locations",
       "Basic purchase controls",
       "Monthly spending reports",
       "24/7 customer support",
-      "No monthly fees"
+      "Complimentary service - no fees"
     ],
     color: "bg-blue-50 border-blue-200",
     iconBg: "bg-blue-100",
@@ -91,9 +91,9 @@ const cardTypes = [
   },
   {
     id: "fleet",
-    name: "EllaFlow Fleet Card",
-    monthlyFee: 15,
-    description: "Advanced features for growing fleets",
+    name: "TPF Fleet Card",
+    monthlyFee: 0,
+    description: "Advanced features for growing carriers",
     perks: [
       "4¢/gallon discount at 8,000+ locations",
       "Advanced purchase controls & limits",
@@ -101,7 +101,8 @@ const cardTypes = [
       "Detailed reporting & analytics",
       "Driver ID verification",
       "Maintenance tracking integration",
-      "10% discount on lodging at partner hotels"
+      "10% discount on lodging at partner hotels",
+      "Complimentary service - no fees"
     ],
     color: "bg-green-50 border-green-200",
     iconBg: "bg-green-100",
@@ -110,9 +111,9 @@ const cardTypes = [
   },
   {
     id: "premium",
-    name: "EllaFlow Premium Card",
-    monthlyFee: 35,
-    description: "Premium benefits for large operations",
+    name: "TPF Premium Card",
+    monthlyFee: 0,
+    description: "Premium benefits for established carriers",
     perks: [
       "6¢/gallon discount at 12,000+ locations",
       "Comprehensive fleet management tools",
@@ -122,7 +123,8 @@ const cardTypes = [
       "15% discount on lodging",
       "Free roadside assistance",
       "Advanced fraud protection",
-      "Custom reporting & API access"
+      "Custom reporting & API access",
+      "Complimentary service - no fees"
     ],
     color: "bg-purple-50 border-purple-200",
     iconBg: "bg-purple-100",
@@ -201,9 +203,9 @@ export default function FuelCards() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fuel Card Services</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">TPF Fuel Card Services</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Get better fuel savings and fleet management with our partner fuel card programs
+          Complimentary fuel cards for our carriers with exclusive savings and fleet management benefits
         </p>
       </div>
 
@@ -240,7 +242,7 @@ export default function FuelCards() {
 
       {/* Card Selection */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Choose Your Fuel Card</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Choose Your TPF Fuel Card</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {cardTypes.map((card) => (
             <Card key={card.id} className={`relative ${card.color} hover:shadow-lg transition-shadow cursor-pointer`}>
@@ -257,8 +259,8 @@ export default function FuelCards() {
                 </div>
                 <CardTitle className="text-xl">{card.name}</CardTitle>
                 <CardDescription className="text-sm">{card.description}</CardDescription>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {card.monthlyFee === 0 ? "Free" : `$${card.monthlyFee}/mo`}
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  Complimentary
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -292,6 +294,9 @@ export default function FuelCards() {
               <CreditCard className="w-5 h-5" />
               Apply for {selectedCard && cardTypes.find(c => c.id === selectedCard)?.name}
             </DialogTitle>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              This complimentary fuel card service is exclusively available to TPF carriers
+            </p>
           </DialogHeader>
           
           <Form {...form}>
