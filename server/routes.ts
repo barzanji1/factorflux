@@ -822,6 +822,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Time tracking routes
+  app.get('/api/time-tracking/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const currentEntry = await storage.getCurrentTimeEntry(userId);
+      const todayEntries = await storage.getTodayTimeEntries(userId);
+      
+      res.json({
+        isClocked: !!currentEntry,
+        currentEntry,
+        todayEntries,
+        todayHours: todayEntries
+          .filter(entry => entry.status === 'clocked_out')
+          .reduce((total, entry) => total + parseFloat(entry.totalHours || '0'), 0),
+      });
+    } catch (error) {
+      console.error("Error fetching time tracking status:", error);
+      res.status(500).json({ message: "Failed to fetch time tracking status" });
+    }
+  });
+
+  app.post('/api/time-tracking/clock-in', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { notes } = req.body;
+      
+      const timeEntry = await storage.clockIn(userId, notes);
+      res.json(timeEntry);
+    } catch (error) {
+      console.error("Error clocking in:", error);
+      res.status(400).json({ message: error.message || "Failed to clock in" });
+    }
+  });
+
+  app.post('/api/time-tracking/clock-out', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { notes } = req.body;
+      
+      const timeEntry = await storage.clockOut(userId, notes);
+      res.json(timeEntry);
+    } catch (error) {
+      console.error("Error clocking out:", error);
+      res.status(400).json({ message: error.message || "Failed to clock out" });
+    }
+  });
+
+  app.get('/api/time-tracking/entries', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { period } = req.query;
+      
+      let entries;
+      if (period === 'today') {
+        entries = await storage.getTodayTimeEntries(userId);
+      } else if (period === 'week') {
+        entries = await storage.getWeekTimeEntries(userId);
+      } else {
+        entries = await storage.getTimeEntries(userId);
+      }
+      
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -6,8 +6,11 @@ import {
   documents,
   activities,
   fuelCardApplications,
+  timeEntries,
   type User,
   type UpsertUser,
+  type TimeEntry,
+  type InsertTimeEntry,
   type Client,
   type InsertClient,
   type Load,
@@ -85,6 +88,15 @@ export interface IStorage {
   getFuelCardApplication(id: number): Promise<FuelCardApplication | undefined>;
   createFuelCardApplication(application: InsertFuelCardApplication): Promise<FuelCardApplication>;
   updateFuelCardApplication(id: number, application: Partial<InsertFuelCardApplication>): Promise<FuelCardApplication>;
+
+  // Time tracking operations
+  getTimeEntries(userId: string): Promise<TimeEntry[]>;
+  getCurrentTimeEntry(userId: string): Promise<TimeEntry | undefined>;
+  clockIn(userId: string, notes?: string): Promise<TimeEntry>;
+  clockOut(userId: string, notes?: string): Promise<TimeEntry>;
+  getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
+  getTodayTimeEntries(userId: string): Promise<TimeEntry[]>;
+  getWeekTimeEntries(userId: string): Promise<TimeEntry[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -387,6 +399,133 @@ export class DatabaseStorage implements IStorage {
       totalRevenue: totalRevenueResult.sum || '0',
       activeClients: activeClientsResult.count,
     };
+  }
+
+  // Time tracking operations
+  async getTimeEntries(userId: string): Promise<TimeEntry[]> {
+    return await db
+      .select()
+      .from(timeEntries)
+      .where(eq(timeEntries.userId, userId))
+      .orderBy(desc(timeEntries.clockInTime));
+  }
+
+  async getCurrentTimeEntry(userId: string): Promise<TimeEntry | undefined> {
+    const [entry] = await db
+      .select()
+      .from(timeEntries)
+      .where(
+        and(
+          eq(timeEntries.userId, userId),
+          eq(timeEntries.status, 'clocked_in')
+        )
+      )
+      .orderBy(desc(timeEntries.clockInTime))
+      .limit(1);
+    return entry;
+  }
+
+  async clockIn(userId: string, notes?: string): Promise<TimeEntry> {
+    // Check if user is already clocked in
+    const existingEntry = await this.getCurrentTimeEntry(userId);
+    if (existingEntry) {
+      throw new Error("User is already clocked in");
+    }
+
+    const [timeEntry] = await db
+      .insert(timeEntries)
+      .values({
+        userId,
+        clockInTime: new Date(),
+        status: 'clocked_in',
+        notes: notes || null,
+      })
+      .returning();
+
+    // Log activity
+    await this.createActivity({
+      userId,
+      type: 'clock_in',
+      description: `Clocked in at ${new Date().toLocaleTimeString()}`,
+      entityType: 'time_entry',
+      entityId: timeEntry.id,
+    });
+
+    return timeEntry;
+  }
+
+  async clockOut(userId: string, notes?: string): Promise<TimeEntry> {
+    const currentEntry = await this.getCurrentTimeEntry(userId);
+    if (!currentEntry) {
+      throw new Error("No active clock-in found");
+    }
+
+    const clockOutTime = new Date();
+    const totalHours = (clockOutTime.getTime() - currentEntry.clockInTime.getTime()) / (1000 * 60 * 60);
+
+    const [timeEntry] = await db
+      .update(timeEntries)
+      .set({
+        clockOutTime,
+        totalHours: totalHours.toFixed(2),
+        status: 'clocked_out',
+        notes: notes || currentEntry.notes,
+        updatedAt: new Date(),
+      })
+      .where(eq(timeEntries.id, currentEntry.id))
+      .returning();
+
+    // Log activity
+    await this.createActivity({
+      userId,
+      type: 'clock_out',
+      description: `Clocked out at ${clockOutTime.toLocaleTimeString()} (${totalHours.toFixed(2)} hours)`,
+      entityType: 'time_entry',
+      entityId: timeEntry.id,
+    });
+
+    return timeEntry;
+  }
+
+  async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {
+    const [entry] = await db
+      .select()
+      .from(timeEntries)
+      .where(eq(timeEntries.id, id));
+    return entry;
+  }
+
+  async getTodayTimeEntries(userId: string): Promise<TimeEntry[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return await db
+      .select()
+      .from(timeEntries)
+      .where(
+        and(
+          eq(timeEntries.userId, userId),
+          sql`DATE(${timeEntries.clockInTime}) = CURRENT_DATE`
+        )
+      )
+      .orderBy(desc(timeEntries.clockInTime));
+  }
+
+  async getWeekTimeEntries(userId: string): Promise<TimeEntry[]> {
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    return await db
+      .select()
+      .from(timeEntries)
+      .where(
+        and(
+          eq(timeEntries.userId, userId),
+          sql`${timeEntries.clockInTime} >= ${startOfWeek}`
+        )
+      )
+      .orderBy(desc(timeEntries.clockInTime));
   }
 }
 

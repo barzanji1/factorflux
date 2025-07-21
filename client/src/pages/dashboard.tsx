@@ -8,6 +8,7 @@ import DocumentUpload from "@/components/dashboard/document-upload";
 import QuickActions from "@/components/dashboard/quick-actions";
 import RecentActivity from "@/components/dashboard/recent-activity";
 import RecentInvoices from "@/components/dashboard/recent-invoices";
+import TimeClock from "@/components/time-tracking/time-clock";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -58,6 +59,7 @@ export default function Dashboard() {
             </div>
             
             <div className="space-y-6">
+              <TimeClock />
               <QuickActions />
               <RecentActivity />
             </div>
