@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, FilePlus, Eye, Download, Calendar } from "lucide-react";
@@ -28,7 +28,7 @@ export default function Documents() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: documents, isLoading: documentsLoading } = useQuery({
+  const { data: documents = [], isLoading: documentsLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
     enabled: isAuthenticated,
   });
@@ -87,14 +87,22 @@ export default function Documents() {
     return null;
   }
 
+  const handleViewDocument = (documentId: number) => {
+    window.open(`/api/documents/${documentId}/view`, '_blank');
+  };
+
+  const handleDownloadDocument = (documentId: number) => {
+    window.location.href = `/api/documents/${documentId}/download`;
+  };
+
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
+        <TopNav 
           title="Documents" 
-          subtitle="Manage your uploaded documents"
+          subtitle="Manage uploaded documents and files"
         />
         
         <main className="flex-1 overflow-auto p-6">
@@ -103,8 +111,14 @@ export default function Documents() {
               <div className="col-span-full flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
+            ) : documents.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-12">
+                <FileText className="w-16 h-16 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No documents uploaded</h3>
+                <p className="text-gray-500 dark:text-gray-400">Upload your first document to get started</p>
+              </div>
             ) : (
-              documents?.map((document: Document) => (
+              documents.map((document: Document) => (
                 <Card key={document.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -149,10 +163,18 @@ export default function Documents() {
                     
                     <div className="flex items-center justify-between pt-2 border-t">
                       <div className="flex space-x-2">
-                        <button className="p-1 text-gray-400 hover:text-primary transition-colors">
+                        <button 
+                          onClick={() => handleViewDocument(document.id)}
+                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                          title="View document"
+                        >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="p-1 text-gray-400 hover:text-secondary transition-colors">
+                        <button 
+                          onClick={() => handleDownloadDocument(document.id)}
+                          className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
+                          title="Download document"
+                        >
                           <Download className="w-4 h-4" />
                         </button>
                       </div>
@@ -163,17 +185,7 @@ export default function Documents() {
             )}
           </div>
 
-          {documents?.length === 0 && !documentsLoading && (
-            <Card>
-              <CardContent className="text-center py-12">
-                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-secondary mb-2">No documents found</h3>
-                <p className="text-gray-500 mb-4">
-                  Start by uploading your first document from the dashboard
-                </p>
-              </CardContent>
-            </Card>
-          )}
+
         </main>
       </div>
     </div>

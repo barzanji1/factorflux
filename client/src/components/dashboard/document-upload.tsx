@@ -180,7 +180,8 @@ export default function DocumentUpload() {
             Drop files here or click to browse
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            Supported formats: PDF, JPG, PNG (Max 10MB each)
+            Supported formats: PDF, JPG, PNG (Max 10MB each)<br/>
+            <span className="text-blue-600 dark:text-blue-400 font-medium">JPEG images will be automatically converted to PDF</span>
           </p>
           
           <div className="flex flex-wrap justify-center gap-3 text-sm">

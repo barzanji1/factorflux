@@ -10,7 +10,9 @@ import {
 } from "@shared/schema";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 import { z } from "zod";
+import { jsPDF } from "jspdf";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -339,6 +341,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to convert JPEG to PDF using jsPDF
+  async function convertImageToPdf(inputPath: string, outputPath: string): Promise<void> {
+    try {
+      // Read the image file as base64
+      const imageBuffer = fs.readFileSync(inputPath);
+      const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+      
+      // Create PDF with standard letter size
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Add image to PDF - fit to page with margins
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const maxWidth = pageWidth - (margin * 2);
+      const maxHeight = pageHeight - (margin * 2);
+      
+      pdf.addImage(base64Image, 'JPEG', margin, margin, maxWidth, maxHeight);
+      
+      // Save PDF to file
+      const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
+      fs.writeFileSync(outputPath, pdfBuffer);
+    } catch (error) {
+      console.error('Error converting image to PDF:', error);
+      throw error;
+    }
+  }
+
   app.post('/api/documents/upload', isAuthenticated, upload.single('document'), async (req: any, res) => {
     try {
       if (!req.file) {
@@ -346,11 +380,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { documentType, loadId, invoiceId } = req.body;
+      let processedFilename = req.file.filename;
+      let processedMimeType = req.file.mimetype;
+      let processedOriginalName = req.file.originalname;
+
+      // Convert JPEG/JPG to PDF automatically
+      if (req.file.mimetype.includes('jpeg') || req.file.mimetype.includes('jpg')) {
+        try {
+          const pdfFilename = req.file.filename.replace(/\.[^/.]+$/, '.pdf');
+          const pdfPath = path.join('uploads', pdfFilename);
+          
+          await convertImageToPdf(req.file.path, pdfPath);
+          
+          // Remove original image file
+          fs.unlinkSync(req.file.path);
+          
+          // Update file info to reflect PDF conversion
+          processedFilename = pdfFilename;
+          processedMimeType = 'application/pdf';
+          processedOriginalName = req.file.originalname.replace(/\.[^/.]+$/, '.pdf');
+          
+          console.log(`Converted ${req.file.originalname} to PDF: ${pdfFilename}`);
+        } catch (conversionError) {
+          console.error('Failed to convert image to PDF:', conversionError);
+          // Continue with original file if conversion fails
+        }
+      }
       
       const documentData = {
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
+        filename: processedFilename,
+        originalName: processedOriginalName,
+        mimeType: processedMimeType,
         size: req.file.size,
         documentType: documentType || 'other',
         loadId: loadId && loadId !== 'undefined' ? parseInt(loadId) : null,
@@ -383,6 +443,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error uploading document:", error);
       res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Document download/view routes
+  app.get('/api/documents/:id/download', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const document = await storage.getDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      const filePath = path.join('uploads', document.filename);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found on disk" });
+      }
+
+      res.setHeader('Content-Type', document.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      res.status(500).json({ message: "Failed to download document" });
+    }
+  });
+
+  app.get('/api/documents/:id/view', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const document = await storage.getDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      const filePath = path.join('uploads', document.filename);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found on disk" });
+      }
+
+      res.setHeader('Content-Type', document.mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${document.originalName}"`);
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error viewing document:", error);
+      res.status(500).json({ message: "Failed to view document" });
     }
   });
 
