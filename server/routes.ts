@@ -467,10 +467,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.setHeader('Content-Type', document.mimeType);
+      // Get file stats for Content-Length
+      const stats = fs.statSync(filePath);
+      
+      res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
+      res.setHeader('Content-Length', stats.size.toString());
+      res.setHeader('Cache-Control', 'no-cache');
       
       const fileStream = fs.createReadStream(filePath);
+      fileStream.on('error', (error) => {
+        console.error('Error streaming file:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error streaming file' });
+        }
+      });
       fileStream.pipe(res);
     } catch (error) {
       console.error("Error downloading document:", error);

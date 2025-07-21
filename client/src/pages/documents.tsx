@@ -91,8 +91,44 @@ export default function Documents() {
     window.open(`/api/documents/${documentId}/view`, '_blank');
   };
 
-  const handleDownloadDocument = (documentId: number) => {
-    window.location.href = `/api/documents/${documentId}/download`;
+  const handleDownloadDocument = async (documentId: number) => {
+    try {
+      const response = await fetch(`/api/documents/${documentId}/download`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `document-${documentId}`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: "Failed to download document. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
