@@ -56,7 +56,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = req.body;
       
       // Validate input
-      const validUpdates = ['firstName', 'lastName', 'phone', 'jobTitle', 'department'];
+      const validUpdates = [
+        'firstName', 'lastName', 'phone', 'jobTitle', 'department',
+        'bio', 'location', 'timezone', 'language',
+        'emailNotifications', 'smsNotifications', 'desktopNotifications',
+        'startTime', 'endTime', 'workDays',
+        'theme', 'dateFormat', 'timeFormat'
+      ];
       const filteredUpdates = Object.keys(updates)
         .filter(key => validUpdates.includes(key))
         .reduce((obj: any, key) => {

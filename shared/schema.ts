@@ -36,6 +36,23 @@ export const users = pgTable("users", {
   department: varchar("department"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role", { enum: ["employee", "manager"] }).default("employee").notNull(),
+  // Personal settings
+  bio: text("bio"),
+  location: varchar("location"),
+  timezone: varchar("timezone").default("America/New_York"),
+  language: varchar("language").default("en"),
+  // Notification preferences
+  emailNotifications: boolean("email_notifications").default(true),
+  smsNotifications: boolean("sms_notifications").default(false),
+  desktopNotifications: boolean("desktop_notifications").default(true),
+  // Work preferences
+  startTime: varchar("start_time").default("09:00"),
+  endTime: varchar("end_time").default("17:00"),
+  workDays: varchar("work_days").default("monday,tuesday,wednesday,thursday,friday"),
+  // Theme preferences
+  theme: varchar("theme", { enum: ["light", "dark", "system"] }).default("system"),
+  dateFormat: varchar("date_format").default("MM/dd/yyyy"),
+  timeFormat: varchar("time_format", { enum: ["12h", "24h"] }).default("12h"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

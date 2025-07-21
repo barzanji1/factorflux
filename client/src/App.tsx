@@ -17,6 +17,7 @@ import Reports from "@/pages/reports";
 import FuelCards from "@/pages/fuel-cards";
 import FuelCardAdmin from "@/pages/fuel-card-admin";
 import Profile from "@/pages/profile";
+import Settings from "@/pages/settings";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -38,6 +39,7 @@ function Router() {
           <Route path="/fuel-cards" component={FuelCards} />
           <Route path="/fuel-card-admin" component={FuelCardAdmin} />
           <Route path="/profile" component={Profile} />
+          <Route path="/settings" component={Settings} />
         </>
       )}
       <Route component={NotFound} />

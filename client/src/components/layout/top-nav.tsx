@@ -279,7 +279,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                 <UserIcon className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation('/profile')} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => setLocation('/settings')} className="cursor-pointer">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
