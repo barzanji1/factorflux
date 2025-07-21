@@ -352,9 +352,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
-        documentType,
-        loadId: loadId ? parseInt(loadId) : undefined,
-        invoiceId: invoiceId ? parseInt(invoiceId) : undefined,
+        documentType: documentType || 'other',
+        loadId: loadId && loadId !== 'undefined' ? parseInt(loadId) : null,
+        invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId) : null,
         uploadedBy: req.user.claims.sub,
         status: 'processing' as const,
       };

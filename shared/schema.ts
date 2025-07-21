@@ -8,6 +8,7 @@ import {
   serial,
   decimal,
   boolean,
+  integer,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -54,7 +55,7 @@ export const clients = pgTable("clients", {
 export const loads = pgTable("loads", {
   id: serial("id").primaryKey(),
   loadNumber: varchar("load_number").unique().notNull(),
-  clientId: serial("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
   pickupLocation: text("pickup_location"),
   deliveryLocation: text("delivery_location"),
   pickupDate: timestamp("pickup_date"),
@@ -72,8 +73,8 @@ export const loads = pgTable("loads", {
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   invoiceNumber: varchar("invoice_number").unique().notNull(),
-  loadId: serial("load_id").references(() => loads.id).notNull(),
-  clientId: serial("client_id").references(() => clients.id).notNull(),
+  loadId: integer("load_id").references(() => loads.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { 
     enum: ["draft", "submitted", "approved", "rejected", "paid"] 
@@ -93,12 +94,12 @@ export const documents = pgTable("documents", {
   filename: varchar("filename").notNull(),
   originalName: varchar("original_name").notNull(),
   mimeType: varchar("mime_type").notNull(),
-  size: serial("size").notNull(),
+  size: integer("size").notNull(),
   documentType: varchar("document_type", { 
     enum: ["rate_confirmation", "bill_of_lading", "driver_id", "carrier_setup", "other"] 
   }).notNull(),
-  loadId: serial("load_id").references(() => loads.id),
-  invoiceId: serial("invoice_id").references(() => invoices.id),
+  loadId: integer("load_id").references(() => loads.id),
+  invoiceId: integer("invoice_id").references(() => invoices.id),
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
   status: varchar("status", { enum: ["processing", "processed", "failed"] }).default("processing").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -111,7 +112,7 @@ export const activities = pgTable("activities", {
   type: varchar("type").notNull(),
   description: text("description").notNull(),
   entityType: varchar("entity_type"),
-  entityId: serial("entity_id"),
+  entityId: integer("entity_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
