@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
-import type { User } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import type { User, Client, Invoice, Load } from "@shared/schema";
 import { 
   Bell, 
   Plus, 
@@ -34,6 +35,8 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   const { user } = useAuth() as { user: User | undefined };
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
   
   // Mock notifications - in real app would come from API
   const notifications = [
@@ -46,6 +49,48 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
+  };
+
+  // Search functionality
+  const { data: searchResults } = useQuery({
+    queryKey: ["/api/search", { q: searchQuery }],
+    enabled: searchQuery.length > 2,
+  });
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Show search results when there's a query
+  useEffect(() => {
+    setShowSearchResults(searchQuery.length > 2 && !!searchResults);
+  }, [searchQuery, searchResults]);
+
+  const handleSearchItemClick = (type: string, id: number) => {
+    setSearchQuery("");
+    setShowSearchResults(false);
+    
+    switch (type) {
+      case 'client':
+        setLocation(`/clients`);
+        break;
+      case 'invoice':
+        setLocation(`/invoices`);
+        break;
+      case 'load':
+        setLocation(`/loads`);
+        break;
+      default:
+        break;
+    }
   };
 
   const quickActions = [
@@ -67,15 +112,84 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
           </div>
           
           {/* Search bar */}
-          <div className="relative hidden md:block">
+          <div className="relative hidden md:block" ref={searchRef}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search loads, invoices, clients..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchQuery.length > 2 && setShowSearchResults(true)}
               className="pl-10 pr-4 py-2 w-80 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500"
             />
+            
+            {/* Search Results Dropdown */}
+            {showSearchResults && searchResults && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                {(searchResults as any).clients && (searchResults as any).clients.length > 0 && (
+                  <div className="p-2">
+                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Clients</h4>
+                    {(searchResults as any).clients.slice(0, 3).map((client: Client) => (
+                      <div
+                        key={`client-${client.id}`}
+                        onClick={() => handleSearchItemClick('client', client.id)}
+                        className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer"
+                      >
+                        <Users className="w-4 h-4 text-blue-500 mr-3" />
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">{client.name}</div>
+                          <div className="text-sm text-gray-500">{client.contactPerson}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {(searchResults as any).invoices && (searchResults as any).invoices.length > 0 && (
+                  <div className="p-2 border-t border-gray-100 dark:border-gray-700">
+                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Invoices</h4>
+                    {(searchResults as any).invoices.slice(0, 3).map((invoice: Invoice) => (
+                      <div
+                        key={`invoice-${invoice.id}`}
+                        onClick={() => handleSearchItemClick('invoice', invoice.id)}
+                        className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-green-500 mr-3" />
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">Invoice #{invoice.invoiceNumber}</div>
+                          <div className="text-sm text-gray-500">Load #{invoice.loadId} • ${invoice.amount}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {(searchResults as any).loads && (searchResults as any).loads.length > 0 && (
+                  <div className="p-2 border-t border-gray-100 dark:border-gray-700">
+                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Loads</h4>
+                    {(searchResults as any).loads.slice(0, 3).map((load: Load) => (
+                      <div
+                        key={`load-${load.id}`}
+                        onClick={() => handleSearchItemClick('load', load.id)}
+                        className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer"
+                      >
+                        <FolderOpen className="w-4 h-4 text-orange-500 mr-3" />
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">Load #{load.id}</div>
+                          <div className="text-sm text-gray-500">{load.pickupLocation} → {load.deliveryLocation}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {(!(searchResults as any).clients?.length && !(searchResults as any).invoices?.length && !(searchResults as any).loads?.length) && (
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                    No results found for "{searchQuery}"
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -254,6 +254,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Global search endpoint
+  app.get('/api/search', isAuthenticated, async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+      
+      const [clients, invoices, loads] = await Promise.all([
+        storage.searchClients(q),
+        storage.searchInvoices(q),
+        storage.searchLoads(q)
+      ]);
+      
+      res.json({
+        clients,
+        invoices,
+        loads
+      });
+    } catch (error) {
+      console.error("Error performing global search:", error);
+      res.status(500).json({ message: "Failed to perform search" });
+    }
+  });
+
   app.get('/api/invoices/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

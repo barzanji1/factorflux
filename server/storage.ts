@@ -41,6 +41,7 @@ export interface IStorage {
   createLoad(load: InsertLoad): Promise<Load>;
   updateLoad(id: number, load: Partial<InsertLoad>): Promise<Load>;
   deleteLoad(id: number): Promise<void>;
+  searchLoads(query: string): Promise<Load[]>;
   
   // Invoice operations
   getInvoices(): Promise<Invoice[]>;
@@ -169,6 +170,21 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLoad(id: number): Promise<void> {
     await db.delete(loads).where(eq(loads.id, id));
+  }
+
+  async searchLoads(query: string): Promise<Load[]> {
+    return await db
+      .select()
+      .from(loads)
+      .where(
+        or(
+          like(loads.loadNumber, `%${query}%`),
+          like(loads.pickupLocation, `%${query}%`),
+          like(loads.deliveryLocation, `%${query}%`),
+          like(loads.driverName, `%${query}%`)
+        )
+      )
+      .orderBy(desc(loads.createdAt));
   }
 
   // Invoice operations
