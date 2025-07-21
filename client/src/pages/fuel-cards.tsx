@@ -53,7 +53,11 @@ import {
   Truck, 
   Star,
   Check,
-  Plus
+  Plus,
+  Eye,
+  Clock,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 
 const fuelCardApplicationSchema = z.object({
@@ -135,6 +139,8 @@ const cardTypes = [
 export default function FuelCards() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [showApplication, setShowApplication] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [showApplicationDetails, setShowApplicationDetails] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -199,6 +205,22 @@ export default function FuelCards() {
     submitApplication.mutate(data);
   };
 
+  const handleViewApplication = (application: any) => {
+    setSelectedApplication(application);
+    setShowApplicationDetails(true);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'rejected':
+        return <XCircle className="w-4 h-4 text-red-600" />;
+      default:
+        return <Clock className="w-4 h-4 text-yellow-600" />;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -222,17 +244,31 @@ export default function FuelCards() {
             <div className="space-y-3">
               {typedApplications.map((app) => (
                 <div key={app.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="font-medium">{cardTypes.find(c => c.id === app.cardType)?.name}</p>
-                    <p className="text-sm text-gray-500">Applied {new Date(app.createdAt).toLocaleDateString()}</p>
+                  <div className="flex items-center gap-3">
+                    {getStatusIcon(app.status)}
+                    <div>
+                      <p className="font-medium">{cardTypes.find(c => c.id === app.cardType)?.name}</p>
+                      <p className="text-sm text-gray-500">Applied {new Date(app.createdAt).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                  <Badge variant={
-                    app.status === 'approved' ? 'default' : 
-                    app.status === 'rejected' ? 'destructive' : 
-                    'secondary'
-                  }>
-                    {app.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={
+                      app.status === 'approved' ? 'default' : 
+                      app.status === 'rejected' ? 'destructive' : 
+                      'secondary'
+                    }>
+                      {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewApplication(app)}
+                      className="h-8 px-2 text-xs"
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -470,6 +506,143 @@ export default function FuelCards() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Application Details Dialog */}
+      <Dialog open={showApplicationDetails} onOpenChange={setShowApplicationDetails}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {selectedApplication && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Application Details
+                </DialogTitle>
+              </DialogHeader>
+              
+              <div className="space-y-6">
+                {/* Status */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    {getStatusIcon(selectedApplication.status)}
+                    <div>
+                      <p className="font-medium">Application Status</p>
+                      <p className="text-sm text-gray-500">
+                        {selectedApplication.status === 'pending' && 'Under review by our team'}
+                        {selectedApplication.status === 'approved' && 'Congratulations! Your application has been approved'}
+                        {selectedApplication.status === 'rejected' && 'Application was not approved at this time'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={
+                    selectedApplication.status === 'approved' ? 'default' : 
+                    selectedApplication.status === 'rejected' ? 'destructive' : 
+                    'secondary'
+                  }>
+                    {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                  </Badge>
+                </div>
+
+                {/* Card Type */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Requested Card</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <CreditCard className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">
+                          {cardTypes.find(c => c.id === selectedApplication.cardType)?.name}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {cardTypes.find(c => c.id === selectedApplication.cardType)?.description}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Application Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Company Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Company Name</label>
+                        <p className="text-sm">{selectedApplication.companyName}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Business Type</label>
+                        <p className="text-sm">{selectedApplication.businessType}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Years in Business</label>
+                        <p className="text-sm">{selectedApplication.yearsInBusiness}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Fleet Size</label>
+                        <p className="text-sm">{selectedApplication.fleetSize}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Monthly Fuel Spend</label>
+                        <p className="text-sm">{selectedApplication.monthlyFuelSpend}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Contact Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Contact Name</label>
+                        <p className="text-sm">{selectedApplication.contactName}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Email</label>
+                        <p className="text-sm">{selectedApplication.email}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Phone</label>
+                        <p className="text-sm">{selectedApplication.phone}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Application Date</label>
+                        <p className="text-sm">{new Date(selectedApplication.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Review Notes (if any) */}
+                {selectedApplication.notes && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Review Notes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                        {selectedApplication.notes}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button variant="outline" onClick={() => setShowApplicationDetails(false)}>
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

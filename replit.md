@@ -165,3 +165,9 @@ The system is designed as a full-stack application with clear separation between
   - Added proper error handling and success notifications for activity log deletions
   - Enhanced activity log UI with side-by-side View/Delete buttons for better document management
   - Integrated with existing DELETE endpoint and activity logging system
+- **Enhanced Fuel Card Application Viewing**: Improved user experience for viewing submitted applications
+  - Added comprehensive "View" button for each submitted application with detailed information dialog
+  - Enhanced application status display with color-coded icons (pending, approved, rejected)
+  - Created detailed application view showing company info, contact details, requested card type, and review notes
+  - Added status-specific messaging to guide users on next steps
+  - Improved UI layout with better visual hierarchy and status indicators
