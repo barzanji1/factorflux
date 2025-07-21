@@ -387,7 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Convert JPEG/JPG to PDF automatically
       if (req.file.mimetype.includes('jpeg') || req.file.mimetype.includes('jpg')) {
         try {
-          const pdfFilename = req.file.filename.replace(/\.[^/.]+$/, '.pdf');
+          const pdfFilename = req.file.filename + '.pdf';
           const pdfPath = path.join('uploads', pdfFilename);
           
           await convertImageToPdf(req.file.path, pdfPath);
@@ -456,10 +456,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      const filePath = path.join('uploads', document.filename);
-      
+      // Check for file with and without extension
+      let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ message: "File not found on disk" });
+        // Try with .pdf extension for converted files
+        filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
+        if (!fs.existsSync(filePath)) {
+          console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
+          return res.status(404).json({ message: "File not found on disk" });
+        }
       }
 
       res.setHeader('Content-Type', document.mimeType);
@@ -482,10 +487,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      const filePath = path.join('uploads', document.filename);
-      
+      // Check for file with and without extension
+      let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ message: "File not found on disk" });
+        // Try with .pdf extension for converted files
+        filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
+        if (!fs.existsSync(filePath)) {
+          console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
+          return res.status(404).json({ message: "File not found on disk" });
+        }
       }
 
       res.setHeader('Content-Type', document.mimeType);

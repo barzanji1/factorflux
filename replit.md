@@ -8,6 +8,8 @@ EllaFlow is a comprehensive freight factoring workflow application designed to s
 
 Preferred communication style: Simple, everyday language.
 
+Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients, Invoices, Docs, Reports), top navigation bar (User menu, Notifications), and main content area with Invoice Summary, Load Details, Upload Zone, and Recent Activity/Payment Status sections.
+
 ## System Architecture
 
 ### Frontend Architecture
