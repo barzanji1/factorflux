@@ -122,24 +122,38 @@ export default function DocumentUpload() {
   ];
 
   return (
-    <Card>
+    <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl">Quick Document Upload</CardTitle>
-          <Button variant="outline">
-            <ExpandIcon className="w-4 h-4 mr-2" />
-            Full Upload
-          </Button>
+          <div>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">Document Upload</CardTitle>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Upload rate confirmations, bills of lading, and supporting documents
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <span className={`text-sm font-medium px-3 py-1 rounded-full ${
+              uploadMutation.isPending 
+                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" 
+                : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+            }`}>
+              {uploadMutation.isPending ? "Processing..." : "Ready"}
+            </span>
+            <Button variant="outline">
+              <ExpandIcon className="w-4 h-4 mr-2" />
+              Full Upload
+            </Button>
+          </div>
         </div>
       </CardHeader>
       
       <CardContent className="space-y-6">
         {/* Drag & Drop Zone */}
         <div
-          className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+          className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 ${
             isDragOver
-              ? "border-primary bg-blue-50"
-              : "border-gray-300 hover:border-primary"
+              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10 scale-105 shadow-lg"
+              : "border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -155,21 +169,24 @@ export default function DocumentUpload() {
             className="hidden"
           />
           
-          <div className="w-16 h-16 bg-primary bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CloudUpload className="text-primary text-2xl" />
+          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <CloudUpload className="text-white w-8 h-8" />
           </div>
           
-          <h4 className="text-lg font-medium text-secondary mb-2">
-            Drop files here or click to browse
+          <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+            + Add Files
           </h4>
-          <p className="text-gray-500 mb-4">
+          <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">
+            Drop files here or click to browse
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
             Supported formats: PDF, JPG, PNG (Max 10MB each)
           </p>
           
-          <div className="flex flex-wrap justify-center gap-2 text-sm text-gray-600">
-            <span className="px-3 py-1 bg-gray-100 rounded-full">Rate Confirmations</span>
-            <span className="px-3 py-1 bg-gray-100 rounded-full">Bills of Lading</span>
-            <span className="px-3 py-1 bg-gray-100 rounded-full">Driver Documents</span>
+          <div className="flex flex-wrap justify-center gap-3 text-sm">
+            <span className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full font-medium">Rate Confirmations</span>
+            <span className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full font-medium">Bills of Lading</span>
+            <span className="px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full font-medium">Driver Documents</span>
           </div>
         </div>
 

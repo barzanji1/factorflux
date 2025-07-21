@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+import TopNav from "@/components/layout/top-nav";
 import StatsCards from "@/components/dashboard/stats-cards";
 import DocumentUpload from "@/components/dashboard/document-upload";
 import QuickActions from "@/components/dashboard/quick-actions";
@@ -40,11 +40,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
+        <TopNav 
           title="Dashboard" 
           subtitle="Welcome back, manage your invoice processing workflow"
         />
