@@ -562,13 +562,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/documents/:id', isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid document ID" });
+      }
+      
       const document = await storage.getDocument(id);
       
       if (!document) {
         return res.status(404).json({ message: "Document not found" });
       }
 
+      // Delete the document from database
       await storage.deleteDocument(id);
+      
+      // Try to delete the physical file (optional - don't fail if file doesn't exist)
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const filePath = path.join('uploads', document.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fileError) {
+        console.warn("Could not delete physical file:", fileError);
+        // Continue anyway - database record is more important
+      }
       
       // Log activity
       await storage.createActivity({

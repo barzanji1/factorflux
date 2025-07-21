@@ -91,13 +91,25 @@ export default function Activities() {
     mutationFn: async (documentId: number) => {
       const response = await fetch(`/api/documents/${documentId}`, { method: "DELETE" });
       if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error("Document not found - it may have already been deleted");
+        }
         throw new Error(`Failed to delete document: ${response.statusText}`);
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, documentId) => {
+      // Immediately update the activities list to reflect the deletion
+      queryClient.setQueryData(["/api/activities"], (oldData: ActivityType[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.filter(activity => 
+          !(activity.entityType === 'document' && activity.entityId === documentId)
+        );
+      });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      
       toast({
         title: "Success",
         description: "Document deleted successfully",
@@ -115,7 +127,11 @@ export default function Activities() {
   const handleDeleteDocument = async (activity: ActivityType) => {
     if (!activity.entityId || activity.entityType !== 'document') return;
     
-    if (window.confirm(`Are you sure you want to delete this document? This action cannot be undone.`)) {
+    // Prevent multiple deletion attempts
+    if (deleteDocument.isPending) return;
+    
+    const confirmMessage = `Are you sure you want to delete this document? This action cannot be undone.`;
+    if (window.confirm(confirmMessage)) {
       deleteDocument.mutate(activity.entityId);
     }
   };
@@ -215,7 +231,7 @@ export default function Activities() {
                                       disabled={deleteDocument.isPending}
                                     >
                                       <Trash2 className="w-3 h-3 mr-1" />
-                                      Delete
+                                      {deleteDocument.isPending ? "Deleting..." : "Delete"}
                                     </Button>
                                   )}
                                 </div>
