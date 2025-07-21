@@ -153,3 +153,9 @@ The system is designed as a full-stack application with clear separation between
   - Integrated DocumentViewer component with activity entries
   - Enhanced activity log with clickable document access for better audit trail functionality
   - Resolved issue where uploaded documents in activity log were not viewable
+- **Document Management Enhancements**: Added document deletion functionality
+  - Added delete button to DocumentViewer component with confirmation dialog
+  - Implemented DELETE endpoint for removing documents from the system
+  - Added activity logging for document deletion actions
+  - Enhanced document management with complete CRUD operations (Create, Read, Update, Delete)
+  - Fixed fuel card application document viewing integration

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +20,8 @@ import {
   Eye,
   Calendar,
   User,
-  File
+  File,
+  Trash2
 } from "lucide-react";
 import type { Document } from "@shared/schema";
 
@@ -31,10 +34,36 @@ interface DocumentViewerProps {
 
 export default function DocumentViewer({ isOpen, onClose, entityType, entityId }: DocumentViewerProps) {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ["/api/documents", { entityType, entityId }],
     enabled: isOpen && !!entityType && !!entityId,
+  });
+
+  const deleteDocument = useMutation({
+    mutationFn: async (documentId: number) => {
+      const response = await fetch(`/api/documents/${documentId}`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(`Failed to delete document: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      toast({
+        title: "Success",
+        description: "Document deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete document",
+        variant: "destructive",
+      });
+    },
   });
 
   const typedDocuments = (documents as Document[]) || [];
@@ -52,6 +81,12 @@ export default function DocumentViewer({ isOpen, onClose, entityType, entityId }
     window.document.body.appendChild(link);
     link.click();
     window.document.body.removeChild(link);
+  };
+
+  const handleDeleteDocument = (doc: Document) => {
+    if (window.confirm(`Are you sure you want to delete "${doc.originalName}"? This action cannot be undone.`)) {
+      deleteDocument.mutate(doc.id);
+    }
   };
 
   const getDocumentIcon = (type: string) => {
@@ -150,6 +185,15 @@ export default function DocumentViewer({ isOpen, onClose, entityType, entityId }
                     >
                       <Download className="w-3 h-3 mr-1" />
                       Download
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteDocument(document)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={deleteDocument.isPending}
+                    >
+                      <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>

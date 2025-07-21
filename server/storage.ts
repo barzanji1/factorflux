@@ -265,8 +265,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocumentsByEntity(entityType: string, entityId: number): Promise<Document[]> {
-    // For now, return all documents since we don't have entity-specific document relationships yet
-    // This could be enhanced later to filter by specific entity types
+    // For fuel card applications, we'll return all documents since we don't have
+    // a direct relationship table yet. In the future, this could be enhanced
+    // to filter by specific entity types and relationships
     return await db.select().from(documents).orderBy(desc(documents.createdAt));
   }
 
