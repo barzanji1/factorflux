@@ -186,7 +186,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoicesByStatus(status: string): Promise<Invoice[]> {
-    return await db.select().from(invoices).where(eq(invoices.status, status)).orderBy(desc(invoices.createdAt));
+    return await db.select().from(invoices).where(eq(invoices.status, status as any)).orderBy(desc(invoices.createdAt));
   }
 
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
@@ -257,12 +257,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Activity operations
-  async getActivities(limit: number = 50): Promise<Activity[]> {
-    return await db
+  async getActivities(limit?: number): Promise<Activity[]> {
+    const query = db
       .select()
       .from(activities)
-      .orderBy(desc(activities.createdAt))
-      .limit(limit);
+      .orderBy(desc(activities.createdAt));
+    
+    return limit ? await query.limit(limit) : await query;
   }
 
   async createActivity(activity: InsertActivity): Promise<Activity> {

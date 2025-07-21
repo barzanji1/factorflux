@@ -12,6 +12,7 @@ import Clients from "@/pages/clients";
 import Documents from "@/pages/documents";
 import CreditChecks from "@/pages/credit-checks";
 import Admin from "@/pages/admin";
+import Activities from "@/pages/activities";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -28,6 +29,7 @@ function Router() {
           <Route path="/documents" component={Documents} />
           <Route path="/credit-checks" component={CreditChecks} />
           <Route path="/admin" component={Admin} />
+          <Route path="/activities" component={Activities} />
         </>
       )}
       <Route component={NotFound} />

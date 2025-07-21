@@ -70,6 +70,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // All activities endpoint
+  app.get('/api/activities', isAuthenticated, async (req, res) => {
+    try {
+      const activities = await storage.getActivities();
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching all activities:", error);
+      res.status(500).json({ message: "Failed to fetch activities" });
+    }
+  });
+
   // Client routes
   app.get('/api/clients', isAuthenticated, async (req, res) => {
     try {

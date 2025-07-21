@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { Activity } from "@shared/schema";
 
 export default function RecentActivity() {
-  const { data: activities, isLoading } = useQuery({
+  const { data: activities = [], isLoading } = useQuery<Activity[]>({
     queryKey: ["/api/dashboard/recent-activities"],
   });
 
@@ -69,7 +69,12 @@ export default function RecentActivity() {
           )}
         </div>
         
-        <Button variant="outline" className="w-full mt-4" size="sm">
+        <Button 
+          variant="outline" 
+          className="w-full mt-4" 
+          size="sm"
+          onClick={() => window.location.href = '/activities'}
+        >
           View All Activity
         </Button>
       </CardContent>
