@@ -47,7 +47,7 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav 
           title="Dashboard" 
-          subtitle="Welcome back, manage your invoice processing workflow"
+          subtitle="Welcome back, manage your freight factoring workflow"
         />
         
         <main className="flex-1 overflow-auto p-6">

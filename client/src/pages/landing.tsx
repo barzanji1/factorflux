@@ -15,7 +15,10 @@ export default function Landing() {
             <h1 className="text-4xl font-bold text-secondary">QuantumCore</h1>
           </div>
           <p className="text-xl text-gray-600 mb-8">
-            Streamline your trucking operations with our comprehensive invoice processing system - Trucking Pros Financial
+            Streamline your freight factoring operations with our comprehensive invoice processing system
+          </p>
+          <p className="text-lg text-gray-500 mb-8">
+            Trucking Pros Financial - Your trusted partner in freight factoring solutions
           </p>
           <Button size="lg" onClick={() => window.location.href = '/api/login'}>
             Sign In to Get Started
