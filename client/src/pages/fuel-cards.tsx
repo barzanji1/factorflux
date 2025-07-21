@@ -140,18 +140,16 @@ const cardTypes = [
 ];
 
 export default function FuelCards() {
-  // Authentication hooks first
+  // All hooks must be called in the same order every time
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  // State hooks
+  
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [showApplication, setShowApplication] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<any>(null);
   const [showApplicationDetails, setShowApplicationDetails] = useState(false);
 
-  // Form hook
   const form = useForm<FuelCardApplication>({
     resolver: zodResolver(fuelCardApplicationSchema),
     defaultValues: {
@@ -171,7 +169,6 @@ export default function FuelCards() {
     queryKey: ["/api/fuel-card-applications"],
   });
 
-  // Authentication check effect
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       toast({
@@ -194,16 +191,13 @@ export default function FuelCards() {
     createdAt: string;
   }> | undefined;
 
-  if (isLoading) {
+  // Early returns after all hooks are called
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    return null;
   }
 
   if (applicationsLoading) {
