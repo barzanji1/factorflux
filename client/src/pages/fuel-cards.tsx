@@ -259,9 +259,7 @@ export default function FuelCards() {
                 </div>
                 <CardTitle className="text-xl">{card.name}</CardTitle>
                 <CardDescription className="text-sm">{card.description}</CardDescription>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  Complimentary
-                </div>
+                <div className="h-8"></div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Separator />
