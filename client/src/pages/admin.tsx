@@ -4,6 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import Sidebar from "@/components/layout/sidebar";
+import TopNav from "@/components/layout/top-nav";
 import {
   Card,
   CardContent,
@@ -112,10 +114,16 @@ export default function Admin() {
 
   if (isLoading || isLoadingUsers) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNav title="Admin Panel" subtitle="Loading..." />
+          <main className="flex-1 overflow-auto p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+              <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+          </main>
         </div>
       </div>
     );
@@ -123,34 +131,50 @@ export default function Admin() {
 
   if (!user || (user as any).role !== 'manager') {
     return (
-      <div className="container mx-auto p-6">
-        <Card className="max-w-md mx-auto">
-          <CardHeader className="text-center">
-            <Shield className="w-12 h-12 mx-auto text-red-500 mb-4" />
-            <CardTitle className="text-red-600">Access Denied</CardTitle>
-            <CardDescription>
-              You don't have permission to access the admin panel. Manager role required.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNav title="Admin Panel" subtitle="Access Denied" />
+          <main className="flex-1 overflow-auto p-6">
+            <Card className="max-w-md mx-auto">
+              <CardHeader className="text-center">
+                <Shield className="w-12 h-12 mx-auto text-red-500 mb-4" />
+                <CardTitle className="text-red-600">Access Denied</CardTitle>
+                <CardDescription>
+                  You don't have permission to access the admin panel. Manager role required.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Manage user roles and permissions
-          </p>
-        </div>
-        <div className="flex items-center space-x-2 text-blue-600">
-          <UserCog className="w-5 h-5" />
-          <span className="font-medium">Manager Dashboard</span>
-        </div>
-      </div>
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopNav 
+          title="Admin Panel" 
+          subtitle="Manage user roles and permissions"
+        />
+        
+        <main className="flex-1 overflow-auto p-6">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">
+                  Manage user roles and permissions
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 text-blue-600">
+                <UserCog className="w-5 h-5" />
+                <span className="font-medium">Manager Dashboard</span>
+              </div>
+            </div>
 
       <Card>
         <CardHeader>
@@ -257,8 +281,11 @@ export default function Admin() {
               No users found
             </div>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
