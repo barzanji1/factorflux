@@ -384,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  app.post('/api/documents/upload', isAuthenticated, upload.single('document'), async (req: any, res) => {
+  app.post('/api/documents/upload', isAuthenticated, upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
