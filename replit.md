@@ -159,3 +159,9 @@ The system is designed as a full-stack application with clear separation between
   - Added activity logging for document deletion actions
   - Enhanced document management with complete CRUD operations (Create, Read, Update, Delete)
   - Fixed fuel card application document viewing integration
+- **Activity Log Document Deletion**: Added direct document deletion from activity log
+  - Added "Delete" button next to "View Documents" in activity log for document upload activities  
+  - Implemented confirmation dialog for safety ("Are you sure you want to delete this document?")
+  - Added proper error handling and success notifications for activity log deletions
+  - Enhanced activity log UI with side-by-side View/Delete buttons for better document management
+  - Integrated with existing DELETE endpoint and activity logging system

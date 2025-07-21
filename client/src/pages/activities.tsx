@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
@@ -7,7 +8,7 @@ import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Activity, Clock, FileText, UserPlus, Upload, CheckCircle, Eye } from "lucide-react";
+import { Activity, Clock, FileText, UserPlus, Upload, CheckCircle, Eye, Trash2 } from "lucide-react";
 import DocumentViewer from "@/components/document-viewer";
 import type { Activity as ActivityType } from "@shared/schema";
 
@@ -17,6 +18,7 @@ export default function Activities() {
   const [showDocuments, setShowDocuments] = useState(false);
   const [selectedEntityType, setSelectedEntityType] = useState<string>("");
   const [selectedEntityId, setSelectedEntityId] = useState<number | undefined>();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -83,6 +85,39 @@ export default function Activities() {
 
   const isDocumentActivity = (type: string) => {
     return type === "document_uploaded" || type.includes("document");
+  };
+
+  const deleteDocument = useMutation({
+    mutationFn: async (documentId: number) => {
+      const response = await fetch(`/api/documents/${documentId}`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(`Failed to delete document: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      toast({
+        title: "Success",
+        description: "Document deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete document",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteDocument = async (activity: ActivityType) => {
+    if (!activity.entityId || activity.entityType !== 'document') return;
+    
+    if (window.confirm(`Are you sure you want to delete this document? This action cannot be undone.`)) {
+      deleteDocument.mutate(activity.entityId);
+    }
   };
 
   if (isLoading) {
@@ -161,15 +196,29 @@ export default function Activities() {
                                 </span>
                               </div>
                               {isDocumentActivity(activity.type) && activity.entityType && activity.entityId && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleViewDocuments(activity)}
-                                  className="h-8 px-2 text-xs"
-                                >
-                                  <Eye className="w-3 h-3 mr-1" />
-                                  View Documents
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleViewDocuments(activity)}
+                                    className="h-8 px-2 text-xs"
+                                  >
+                                    <Eye className="w-3 h-3 mr-1" />
+                                    View Documents
+                                  </Button>
+                                  {activity.entityType === 'document' && activity.type === 'document_uploaded' && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDeleteDocument(activity)}
+                                      className="h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      disabled={deleteDocument.isPending}
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Delete
+                                    </Button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
