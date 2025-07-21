@@ -13,6 +13,7 @@ import Documents from "@/pages/documents";
 import CreditChecks from "@/pages/credit-checks";
 import Admin from "@/pages/admin";
 import Activities from "@/pages/activities";
+import Reports from "@/pages/reports";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -30,6 +31,7 @@ function Router() {
           <Route path="/credit-checks" component={CreditChecks} />
           <Route path="/admin" component={Admin} />
           <Route path="/activities" component={Activities} />
+          <Route path="/reports" component={Reports} />
         </>
       )}
       <Route component={NotFound} />
