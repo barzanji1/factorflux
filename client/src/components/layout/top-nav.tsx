@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
 import { 
   Bell, 
@@ -31,6 +32,7 @@ interface TopNavProps {
 
 export default function TopNav({ title, subtitle }: TopNavProps) {
   const { user } = useAuth() as { user: User | undefined };
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   
   // Mock notifications - in real app would come from API
@@ -47,9 +49,9 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   };
 
   const quickActions = [
-    { label: "New Invoice", icon: FileText, action: () => console.log("Create invoice") },
-    { label: "Add Client", icon: Users, action: () => console.log("Add client") },
-    { label: "Upload Document", icon: FolderOpen, action: () => console.log("Upload document") },
+    { label: "New Invoice", icon: FileText, action: () => setLocation("/invoices") },
+    { label: "Add Client", icon: Users, action: () => setLocation("/clients") },
+    { label: "Upload Document", icon: FolderOpen, action: () => setLocation("/documents") },
   ];
 
   return (
