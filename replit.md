@@ -118,6 +118,23 @@ The system is designed as a full-stack application with clear separation between
 ## Recent Changes
 
 ### January 21, 2025
+- **Profile Image Upload Fix**: Resolved profile picture upload and display functionality
+  - Added static file serving for uploaded images at `/uploads` endpoint
+  - Fixed profile image display in both profile page and navigation components
+  - Enhanced image upload validation with proper file type and size checks
+  - Images now properly display after upload with immediate UI updates
+- **Admin Role Management System**: Implemented comprehensive admin panel for user management
+  - Created Admin page accessible only to managers with role-based access control
+  - Added user role management functionality (employee/manager roles)
+  - Implemented role change API endpoints with proper authorization checks
+  - Added activity logging for role changes with detailed audit trail
+  - Enhanced database schema with role column and proper user management
+  - Managers can view all users and change roles but cannot modify their own role
+  - Updated user account to manager role for testing admin features
+- **Navigation Enhancement**: Fixed profile navigation links in TopNav
+  - Profile and Settings menu items now properly navigate to `/profile` page
+  - Enhanced user menu with working navigation instead of placeholder actions
+  - Improved user experience with consistent navigation behavior
 - **TPF Fuel Card Services**: Implemented comprehensive fuel card application system with three complimentary tiers
   - Created TPF Base, Fleet, and Premium cards with escalating benefits (2¢, 4¢, 6¢ per gallon discounts)
   - Removed monthly fees to make all cards complimentary services for TPF carriers
