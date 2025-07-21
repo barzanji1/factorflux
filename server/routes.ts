@@ -429,10 +429,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Document routes
   app.get('/api/documents', isAuthenticated, async (req, res) => {
     try {
-      const { load, invoice } = req.query;
+      const { load, invoice, entityType, entityId } = req.query;
       let documents;
       
-      if (load) {
+      if (entityType && entityId) {
+        documents = await storage.getDocumentsByEntity(
+          entityType as string, 
+          parseInt(entityId as string)
+        );
+      } else if (load) {
         const loadId = parseInt(load as string);
         documents = await storage.getDocumentsByLoad(loadId);
       } else if (invoice) {

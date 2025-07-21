@@ -148,3 +148,8 @@ The system is designed as a full-stack application with clear separation between
   - TopNav Quick Actions dropdown now uses real navigation instead of console.log
   - Enhanced Quick Actions UI with better icons, colors, and descriptions
   - Fixed upload field name from 'document' to 'file' to resolve MulterError
+- **Activity Log Document Viewing**: Fixed document viewing functionality in activity log
+  - Added "View Documents" button for document-related activities (document uploads, etc.)
+  - Integrated DocumentViewer component with activity entries
+  - Enhanced activity log with clickable document access for better audit trail functionality
+  - Resolved issue where uploaded documents in activity log were not viewable

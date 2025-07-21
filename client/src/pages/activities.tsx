@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -6,12 +6,17 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Clock, FileText, UserPlus, Upload, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Activity, Clock, FileText, UserPlus, Upload, CheckCircle, Eye } from "lucide-react";
+import DocumentViewer from "@/components/document-viewer";
 import type { Activity as ActivityType } from "@shared/schema";
 
 export default function Activities() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
+  const [showDocuments, setShowDocuments] = useState(false);
+  const [selectedEntityType, setSelectedEntityType] = useState<string>("");
+  const [selectedEntityId, setSelectedEntityId] = useState<number | undefined>();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -66,6 +71,18 @@ export default function Activities() {
     return type.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  const handleViewDocuments = (activity: ActivityType) => {
+    if (activity.entityType && activity.entityId) {
+      setSelectedEntityType(activity.entityType);
+      setSelectedEntityId(activity.entityId);
+      setShowDocuments(true);
+    }
+  };
+
+  const isDocumentActivity = (type: string) => {
+    return type === "document_uploaded" || type.includes("document");
   };
 
   if (isLoading) {
@@ -136,11 +153,24 @@ export default function Activities() {
                               </div>
                             </div>
                             
-                            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                              <Clock className="w-4 h-4 mr-1" />
-                              <span>
-                                {new Date(activity.createdAt!).toLocaleString()}
-                              </span>
+                            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                              <div className="flex items-center">
+                                <Clock className="w-4 h-4 mr-1" />
+                                <span>
+                                  {new Date(activity.createdAt!).toLocaleString()}
+                                </span>
+                              </div>
+                              {isDocumentActivity(activity.type) && activity.entityType && activity.entityId && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleViewDocuments(activity)}
+                                  className="h-8 px-2 text-xs"
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  View Documents
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -153,6 +183,14 @@ export default function Activities() {
           </div>
         </main>
       </div>
+
+      {/* Document Viewer */}
+      <DocumentViewer
+        isOpen={showDocuments}
+        onClose={() => setShowDocuments(false)}
+        entityType={selectedEntityType}
+        entityId={selectedEntityId}
+      />
     </div>
   );
 }
