@@ -1,27 +1,42 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
-import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import type { User } from "@shared/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, 
-  Settings, 
-  Shield, 
-  Activity,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Clock
-} from "lucide-react";
+import { Users, Shield, UserCog } from "lucide-react";
+import { User } from "@shared/schema";
 
 export default function Admin() {
   const { toast } = useToast();
-  const { user, isAuthenticated, isLoading } = useAuth() as { user: User | undefined, isAuthenticated: boolean, isLoading: boolean };
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
 
+  // Redirect to home if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       toast({
@@ -36,239 +51,214 @@ export default function Admin() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
+  // Check if user is manager
   useEffect(() => {
-    if (!isLoading && isAuthenticated && user?.role !== "manager") {
+    if (user && (user as any).role !== 'manager') {
       toast({
         title: "Access Denied",
         description: "You don't have permission to access this page.",
         variant: "destructive",
       });
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 1000);
-      return;
     }
-  }, [user, isAuthenticated, isLoading, toast]);
+  }, [user, toast]);
 
-  if (isLoading) {
+  const { data: users, isLoading: isLoadingUsers } = useQuery({
+    queryKey: ["/api/admin/users"],
+    enabled: !!user && (user as any).role === 'manager',
+  });
+
+  const updateUserRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const response = await apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Role Updated",
+        description: data.message,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user role",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRoleChange = (userId: string, newRole: string) => {
+    setSelectedRoles(prev => ({ ...prev, [userId]: newRole }));
+  };
+
+  const handleUpdateRole = (userId: string) => {
+    const newRole = selectedRoles[userId];
+    if (!newRole) return;
+
+    updateUserRole.mutate({ userId, role: newRole });
+  };
+
+  if (isLoading || isLoadingUsers) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="container mx-auto p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
       </div>
     );
   }
 
-  if (!isAuthenticated || user?.role !== "manager") {
-    return null;
+  if (!user || (user as any).role !== 'manager') {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="max-w-md mx-auto">
+          <CardHeader className="text-center">
+            <Shield className="w-12 h-12 mx-auto text-red-500 mb-4" />
+            <CardTitle className="text-red-600">Access Denied</CardTitle>
+            <CardDescription>
+              You don't have permission to access the admin panel. Manager role required.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
   }
 
-  // Mock data for admin dashboard
-  const systemStats = {
-    totalUsers: 24,
-    activeUsers: 18,
-    pendingInvoices: 12,
-    systemHealth: "Good"
-  };
-
-  const recentActivity = [
-    {
-      id: 1,
-      user: "John Smith",
-      action: "Approved invoice #12345",
-      timestamp: "2 minutes ago",
-      type: "approval"
-    },
-    {
-      id: 2,
-      user: "Sarah Johnson",
-      action: "Uploaded new document",
-      timestamp: "15 minutes ago",
-      type: "upload"
-    },
-    {
-      id: 3,
-      user: "Mike Brown",
-      action: "Created new client record",
-      timestamp: "1 hour ago",
-      type: "create"
-    },
-    {
-      id: 4,
-      user: "Lisa Davis",
-      action: "Updated invoice status",
-      timestamp: "2 hours ago",
-      type: "update"
-    }
-  ];
-
-  const users = [
-    {
-      id: 1,
-      name: "John Smith",
-      email: "john@company.com",
-      role: "manager",
-      status: "active",
-      lastLogin: "Today"
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      email: "sarah@company.com",
-      role: "employee",
-      status: "active",
-      lastLogin: "Yesterday"
-    },
-    {
-      id: 3,
-      name: "Mike Brown",
-      email: "mike@company.com",
-      role: "employee",
-      status: "inactive",
-      lastLogin: "1 week ago"
-    }
-  ];
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "approval":
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case "upload":
-        return <Activity className="w-4 h-4 text-blue-600" />;
-      case "create":
-        return <Users className="w-4 h-4 text-purple-600" />;
-      case "update":
-        return <Settings className="w-4 h-4 text-orange-600" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-600" />;
-    }
-  };
-
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <Sidebar />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav 
-          title="Admin Dashboard" 
-          subtitle="System management and user administration"
-        />
-        
-        <main className="flex-1 overflow-auto p-6">
-          {/* System Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{systemStats.totalUsers}</p>
-                  </div>
-                  <Users className="w-8 h-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Manage user roles and permissions
+          </p>
+        </div>
+        <div className="flex items-center space-x-2 text-blue-600">
+          <UserCog className="w-5 h-5" />
+          <span className="font-medium">Manager Dashboard</span>
+        </div>
+      </div>
 
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</p>
-                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">{systemStats.activeUsers}</p>
-                  </div>
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Approvals</p>
-                    <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{systemStats.pendingInvoices}</p>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-yellow-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
-                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">{systemStats.systemHealth}</p>
-                  </div>
-                  <Shield className="w-8 h-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* User Management */}
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">User Management</CardTitle>
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">Add User</Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Users className="w-5 h-5 mr-2" />
+            User Management
+          </CardTitle>
+          <CardDescription>
+            View and manage user roles within the system
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead>Current Role</TableHead>
+                <TableHead>Change Role</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(users as User[])?.map((userData: User) => (
+                <TableRow key={userData.id}>
+                  <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={userData.profileImageUrl || `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=3B82F6&color=fff`}
+                        alt={`${userData.firstName} ${userData.lastName}`}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
                       <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{user.name}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant={user.role === "manager" ? "default" : "secondary"}>
-                            {user.role}
-                          </Badge>
-                          <Badge variant={user.status === "active" ? "default" : "secondary"}>
-                            {user.status}
-                          </Badge>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {userData.firstName} {userData.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {userData.jobTitle || "No job title"}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Last login:</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{user.lastLogin}</p>
-                      </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </TableCell>
+                  <TableCell className="text-gray-600 dark:text-gray-300">
+                    {userData.email || "No email"}
+                  </TableCell>
+                  <TableCell className="text-gray-600 dark:text-gray-300">
+                    {userData.phone || "No phone"}
+                  </TableCell>
+                  <TableCell className="text-gray-600 dark:text-gray-300">
+                    {userData.department || "No department"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant={userData.role === 'manager' ? 'default' : 'secondary'}
+                      className={userData.role === 'manager' ? 'bg-blue-100 text-blue-800' : ''}
+                    >
+                      {userData.role || 'employee'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {userData.id !== (user as any).id ? (
+                      <Select
+                        value={selectedRoles[userData.id] || userData.role || 'employee'}
+                        onValueChange={(value) => handleRoleChange(userData.id, value)}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="manager">Manager</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        (Your account)
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {userData.id !== (user as any).id && selectedRoles[userData.id] && selectedRoles[userData.id] !== userData.role ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleUpdateRole(userData.id)}
+                        disabled={updateUserRole.isPending}
+                      >
+                        {updateUserRole.isPending ? "Updating..." : "Update"}
+                      </Button>
+                    ) : userData.id === (user as any).id ? (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        Cannot modify
+                      </span>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
 
-            {/* Recent Activity */}
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">Recent Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-center space-x-3">
-                      {getActivityIcon(activity.type)}
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {activity.user}
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {activity.action}
-                        </p>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {activity.timestamp}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-      </div>
+          {!users || (users as User[]).length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No users found
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

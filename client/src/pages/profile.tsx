@@ -214,8 +214,9 @@ export default function Profile() {
               <div className="flex flex-col items-center space-y-3">
                 <Avatar className="w-24 h-24">
                   <AvatarImage 
-                    src={user.profileImageUrl || undefined} 
+                    src={user.profileImageUrl || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=3B82F6&color=fff`} 
                     alt={`${user.firstName} ${user.lastName}`}
+                    className="object-cover"
                   />
                   <AvatarFallback className="text-lg">
                     {user.firstName?.[0]}{user.lastName?.[0]}

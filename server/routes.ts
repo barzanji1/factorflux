@@ -59,7 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validUpdates = ['firstName', 'lastName', 'phone', 'jobTitle', 'department'];
       const filteredUpdates = Object.keys(updates)
         .filter(key => validUpdates.includes(key))
-        .reduce((obj, key) => {
+        .reduce((obj: any, key) => {
           obj[key] = updates[key];
           return obj;
         }, {});
@@ -95,6 +95,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error uploading profile image:", error);
       res.status(500).json({ message: "Failed to upload profile image" });
+    }
+  });
+
+  // Admin routes - Role management
+  app.get('/api/admin/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'manager') {
+        return res.status(403).json({ message: "Access denied. Manager role required." });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch('/api/admin/users/:userId/role', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'manager') {
+        return res.status(403).json({ message: "Access denied. Manager role required." });
+      }
+
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!['employee', 'manager'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be 'employee' or 'manager'." });
+      }
+
+      // Prevent changing own role
+      if (userId === req.user.claims.sub) {
+        return res.status(400).json({ message: "Cannot change your own role." });
+      }
+
+      await storage.updateUserProfile(userId, { role });
+      const updatedUser = await storage.getUser(userId);
+
+      // Log the activity
+      await storage.createActivity({
+        userId: req.user.claims.sub,
+        type: "role_changed",
+        entityType: "user", 
+        entityId: parseInt(userId),
+        description: `Changed user role to ${role}`,
+      });
+
+      res.json({
+        message: `User role updated to ${role}`,
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
     }
   });
 
