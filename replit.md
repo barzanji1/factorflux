@@ -219,3 +219,11 @@ The system is designed as a full-stack application with clear separation between
     - Fixed Clients and Invoices pages to use TopNav component for consistent Home button functionality
     - Replaced deprecated Header component with TopNav across all major pages
     - All pages now have unified navigation structure with working Home button access
+- **Recent Activity Reset Functionality**: Added comprehensive reset capability for activity history management
+  - Created Reset button in Recent Activity card header with red styling and trash icon
+  - Added DELETE /api/activities endpoint for clearing all activity history
+  - Implemented clearActivities method in storage interface for database operations
+  - Button only appears when activities exist and includes loading spinner during operation
+  - After reset, automatically logs the reset action with timestamp and user information
+  - Success toast notification confirms reset completion with automatic activity list refresh
+  - Provides clean slate functionality for activity monitoring and audit trail management
