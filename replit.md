@@ -124,6 +124,9 @@ The system is designed as a full-stack application with clear separation between
   - Added comprehensive application form with company details, fleet size, and fuel spend tracking
   - Integrated fuel card navigation with dedicated page and status tracking
   - Implemented backend API for application management and activity logging
+  - Added Fuel Card Admin page for managers to review, approve/reject applications
+  - Created Document Viewer component for viewing uploaded documents associated with applications
+  - Added application status tracking with detailed review capabilities and notes system
 - **Global Search Implementation**: Successfully implemented comprehensive search functionality across the entire system
   - Created global `/api/search` endpoint that searches clients, invoices, and loads simultaneously
   - Added `searchLoads` method to storage interface with proper field references (pickupLocation/deliveryLocation)

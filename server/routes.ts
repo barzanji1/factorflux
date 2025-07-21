@@ -316,6 +316,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/fuel-card-applications/:id', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const id = parseInt(req.params.id);
+      const { status, notes } = req.body;
+
+      const updateData = {
+        status,
+        notes,
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+      };
+
+      const application = await storage.updateFuelCardApplication(id, updateData);
+      
+      // Log activity
+      await storage.createActivity({
+        userId,
+        type: "fuel_card_review",
+        description: `Reviewed fuel card application - Status: ${status}`,
+        entityType: "fuel_card_application",
+        entityId: application.id,
+      });
+
+      res.json(application);
+    } catch (error) {
+      console.error("Error updating fuel card application:", error);
+      res.status(500).json({ message: "Failed to update application" });
+    }
+  });
+
   app.get('/api/invoices/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

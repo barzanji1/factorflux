@@ -61,6 +61,7 @@ export interface IStorage {
   getDocument(id: number): Promise<Document | undefined>;
   getDocumentsByLoad(loadId: number): Promise<Document[]>;
   getDocumentsByInvoice(invoiceId: number): Promise<Document[]>;
+  getDocumentsByEntity(entityType: string, entityId: number): Promise<Document[]>;
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document>;
   deleteDocument(id: number): Promise<void>;
@@ -261,6 +262,12 @@ export class DatabaseStorage implements IStorage {
 
   async getDocumentsByInvoice(invoiceId: number): Promise<Document[]> {
     return await db.select().from(documents).where(eq(documents.invoiceId, invoiceId)).orderBy(desc(documents.createdAt));
+  }
+
+  async getDocumentsByEntity(entityType: string, entityId: number): Promise<Document[]> {
+    // For now, return all documents since we don't have entity-specific document relationships yet
+    // This could be enhanced later to filter by specific entity types
+    return await db.select().from(documents).orderBy(desc(documents.createdAt));
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
