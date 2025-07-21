@@ -34,7 +34,7 @@ interface TopNavProps {
 
 export default function TopNav({ title, subtitle }: TopNavProps) {
   const { user } = useAuth() as { user: User | undefined };
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -99,6 +99,20 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     { label: "Add Client", icon: Users, action: () => setLocation("/clients") },
     { label: "Upload Document", icon: FolderOpen, action: () => setLocation("/documents") },
   ];
+
+  // Define pages where Home button should appear (NOT on Dashboard)
+  const pagesWithHomeButton = [
+    "/clients", 
+    "/invoices", 
+    "/documents", 
+    "/fuel-cards", 
+    "/credit-checks", 
+    "/reports", 
+    "/fuel-card-admin", 
+    "/admin"
+  ];
+  
+  const showHomeButton = pagesWithHomeButton.includes(location);
 
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
@@ -196,16 +210,18 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
         {/* Right side - Actions and user menu */}
         <div className="flex items-center space-x-4">
-          {/* Home Button */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setLocation("/")}
-            className="flex items-center space-x-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-          >
-            <Home className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-blue-600 dark:text-blue-400 font-medium">Home</span>
-          </Button>
+          {/* Home Button - Only show on specific pages, NOT on Dashboard */}
+          {showHomeButton && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setLocation("/")}
+              className="flex items-center space-x-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+            >
+              <Home className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Home</span>
+            </Button>
+          )}
 
           {/* Quick Actions */}
           <DropdownMenu>

@@ -209,3 +209,10 @@ The system is designed as a full-stack application with clear separation between
   - Added activity logging for all clock in/out actions with detailed audit trail
   - Features include: live timer display, running work duration, daily totals, optional notes, recent entries preview
   - Automatic refresh every 30 seconds to keep time data current and synchronized
+- **Selective Home Button Navigation**: Enhanced navigation system with conditional Home button placement
+  - Added Home button to TopNav component with blue styling and Home icon for quick Dashboard access
+  - Implemented conditional logic to show Home button only on specific pages (NOT on Dashboard)
+  - Home button appears on: Clients, Invoices, Documents, Fuel Cards, Credit Checks, Reports, Fuel Card Admin, Admin pages
+  - Button redirects to Dashboard page (/) when clicked with consistent hover effects and theme support
+  - Improved user experience by providing easy navigation back to Dashboard from any sub-page
+  - Created reusable breadcrumb component for future navigation enhancements
