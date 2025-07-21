@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/hooks/useTheme";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -108,6 +109,7 @@ const workDaysOptions = [
 export default function Settings() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("personal");
 
   // Redirect to home if not authenticated
@@ -243,6 +245,10 @@ export default function Settings() {
   };
 
   const onAppearanceSubmit = (data: AppearanceSettings) => {
+    // Update theme immediately for visual feedback
+    if (data.theme) {
+      setTheme(data.theme as "light" | "dark" | "system");
+    }
     updateSettings.mutate(data);
   };
 
@@ -642,20 +648,42 @@ export default function Settings() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Theme</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
+                              <Select 
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  // Apply theme immediately for instant visual feedback
+                                  setTheme(value as "light" | "dark" | "system");
+                                }} 
+                                value={field.value}
+                              >
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select theme" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="light">Light</SelectItem>
-                                  <SelectItem value="dark">Dark</SelectItem>
-                                  <SelectItem value="system">System</SelectItem>
+                                  <SelectItem value="light">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                                      <span>Light</span>
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="dark">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-3 h-3 rounded-full bg-gray-800"></div>
+                                      <span>Dark</span>
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="system">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-yellow-400 to-gray-800"></div>
+                                      <span>System</span>
+                                    </div>
+                                  </SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormDescription>
-                                Choose your preferred theme or follow your system setting
+                                Choose your preferred theme or follow your system setting. Changes apply immediately.
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
