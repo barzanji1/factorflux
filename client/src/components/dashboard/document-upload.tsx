@@ -9,7 +9,12 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { CloudUpload, ExpandIcon, FileIcon, Eye } from "lucide-react";
 
-export default function DocumentUpload() {
+interface DocumentUploadProps {
+  onUploadComplete?: () => void;
+  documentType?: string;
+}
+
+export default function DocumentUpload({ onUploadComplete, documentType = "other" }: DocumentUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -17,6 +22,8 @@ export default function DocumentUpload() {
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      // Add document type to the form data
+      formData.append('documentType', documentType);
       const response = await apiRequest("POST", "/api/documents/upload", formData);
       return response.json();
     },
@@ -27,6 +34,9 @@ export default function DocumentUpload() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-activities"] });
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -74,10 +84,20 @@ export default function DocumentUpload() {
   };
 
   const handleFiles = (files: File[]) => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
+    }
+
     files.forEach((file) => {
       const formData = new FormData();
-      formData.append('document', file);
-      formData.append('documentType', 'other'); // Default type
+      formData.append('file', file);
+      formData.append('userId', user.id);
+      formData.append('documentType', documentType);
       
       uploadMutation.mutate(formData);
     });
@@ -96,39 +116,34 @@ export default function DocumentUpload() {
     }
   };
 
-  // Mock recent files for display purposes
-  const recentFiles = [
-    {
-      id: 1,
-      name: "RC_LOAD_12345.pdf",
-      uploadTime: "2 minutes ago",
-      status: "processed",
-      type: "pdf"
-    },
-    {
-      id: 2,
-      name: "BOL_LOAD_12344.pdf",
-      uploadTime: "15 minutes ago",
-      status: "processing",
-      type: "pdf"
-    },
-    {
-      id: 3,
-      name: "DRIVER_ID_JOHN_DOE.jpg",
-      uploadTime: "1 hour ago",
-      status: "processed",
-      type: "jpg"
+  const getDocumentTypeLabel = (type: string) => {
+    switch (type) {
+      case 'rate_confirmation':
+        return 'Rate Confirmation';
+      case 'bill_of_lading':
+        return 'Bill of Lading';
+      case 'driver_id':
+        return 'Driver ID';
+      case 'carrier_setup':
+        return 'Carrier Setup';
+      default:
+        return 'Other Document';
     }
-  ];
+  };
 
   return (
     <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">Document Upload</CardTitle>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Upload rate confirmations, bills of lading, and supporting documents
+            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+              Upload {getDocumentTypeLabel(documentType)}
+            </CardTitle>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {documentType === 'rate_confirmation' && 'Upload rate confirmation documents for this load'}
+              {documentType === 'bill_of_lading' && 'Upload bill of lading documents for this load'}
+              {documentType === 'driver_id' && 'Upload driver ID and carrier setup documents'}
+              {documentType === 'other' && 'Upload supporting documents'}
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -139,9 +154,9 @@ export default function DocumentUpload() {
             }`}>
               {uploadMutation.isPending ? "Processing..." : "Ready"}
             </span>
-            <Button variant="outline">
-              <ExpandIcon className="w-4 h-4 mr-2" />
-              Full Upload
+            <Button variant="outline" size="sm">
+              <FileIcon className="w-4 h-4 mr-2" />
+              Choose Files
             </Button>
           </div>
         </div>
@@ -184,10 +199,10 @@ export default function DocumentUpload() {
             <span className="text-blue-600 dark:text-blue-400 font-medium">JPEG images will be automatically converted to PDF</span>
           </p>
           
-          <div className="flex flex-wrap justify-center gap-3 text-sm">
-            <span className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full font-medium">Rate Confirmations</span>
-            <span className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full font-medium">Bills of Lading</span>
-            <span className="px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full font-medium">Driver Documents</span>
+          <div className="flex justify-center">
+            <span className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full font-medium">
+              {getDocumentTypeLabel(documentType)}
+            </span>
           </div>
         </div>
 
@@ -199,32 +214,15 @@ export default function DocumentUpload() {
           </div>
         )}
 
-        {/* Recently Uploaded Files */}
-        <div>
-          <h4 className="font-medium text-secondary mb-3">Recently Uploaded</h4>
-          <div className="space-y-3">
-            {recentFiles.map((file) => (
-              <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:shadow-sm transition-shadow">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                    <FileIcon className="w-4 h-4 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-secondary">{file.name}</p>
-                    <p className="text-sm text-gray-500">{file.uploadTime}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className={getStatusColor(file.status)}>
-                    {file.status}
-                  </Badge>
-                  <Button variant="ghost" size="sm">
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Upload Instructions */}
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+          <h4 className="font-medium text-gray-900 dark:text-white mb-2">Upload Instructions</h4>
+          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+            <li>• Ensure document quality is clear and readable</li>
+            <li>• File names should include load numbers when possible</li>
+            <li>• JPEG images will be automatically converted to PDF format</li>
+            <li>• Maximum file size: 10MB per document</li>
+          </ul>
         </div>
       </CardContent>
     </Card>

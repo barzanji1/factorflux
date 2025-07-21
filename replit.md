@@ -114,3 +114,16 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 - Connection pooling configured for serverless environments
 
 The system is designed as a full-stack application with clear separation between frontend React components and backend Express API, unified through shared TypeScript schemas for type safety across the entire application.
+
+## Recent Changes
+
+### January 21, 2025
+- **Document Upload Separation**: Implemented separate document upload tabs for Rate Confirmations, Bills of Lading, and Driver Documents
+  - Created tabbed interface in Documents page with individual upload zones for each document type
+  - Modified DocumentUpload component to accept documentType parameter for specialized handling
+  - Added document type filtering and categorization logic
+  - Enhanced upload workflow with type-specific instructions and labels
+- **Fixed Navigation Issues**: Resolved 404 errors for Activities and Reports pages
+  - Created comprehensive Activities page with detailed activity tracking
+  - Implemented Reports & Analytics page with business KPIs and metrics
+  - Added proper routing for all navigation links
