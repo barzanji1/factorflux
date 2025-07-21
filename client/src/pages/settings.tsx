@@ -360,7 +360,7 @@ export default function Settings() {
                                   <Globe className="w-4 h-4" />
                                   <span>Timezone</span>
                                 </FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select timezone" />
@@ -385,7 +385,7 @@ export default function Settings() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Language</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select language" />
@@ -642,7 +642,7 @@ export default function Settings() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Theme</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select theme" />
@@ -669,7 +669,7 @@ export default function Settings() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Date Format</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select date format" />
@@ -693,7 +693,7 @@ export default function Settings() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Time Format</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select time format" />
