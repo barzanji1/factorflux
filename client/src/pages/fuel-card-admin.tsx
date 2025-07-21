@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import Sidebar from "@/components/layout/sidebar";
+import TopNav from "@/components/layout/top-nav";
 import {
   Card,
   CardContent,
@@ -76,8 +79,35 @@ export default function FuelCardAdmin() {
   const [reviewNotes, setReviewNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAuthenticated, isLoading } = useAuth();
 
-  const { data: applications, isLoading } = useQuery({
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+  }, [isAuthenticated, isLoading, toast]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const { data: applications, isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/fuel-card-applications"],
   });
 
@@ -126,12 +156,17 @@ export default function FuelCardAdmin() {
     });
   };
 
-  if (isLoading) {
+  if (applicationsLoading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fuel Card Applications</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Loading applications...</p>
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNav title="Fuel Card Applications" subtitle="Loading..." />
+          <main className="flex-1 overflow-auto p-6">
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            </div>
+          </main>
         </div>
       </div>
     );
@@ -140,7 +175,17 @@ export default function FuelCardAdmin() {
   const typedApplications = (applications as FuelCardApplication[]) || [];
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopNav 
+          title="Fuel Card Applications" 
+          subtitle="Manage and review TPF fuel card applications from carriers"
+        />
+        
+        <main className="flex-1 overflow-auto p-6">
+          <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fuel Card Applications</h1>
@@ -449,13 +494,16 @@ export default function FuelCardAdmin() {
         </DialogContent>
       </Dialog>
 
-      {/* Document Viewer */}
-      <DocumentViewer
-        isOpen={showDocuments}
-        onClose={() => setShowDocuments(false)}
-        entityType="fuel_card_application"
-        entityId={selectedApplication?.id}
-      />
+            {/* Document Viewer */}
+            <DocumentViewer
+              isOpen={showDocuments}
+              onClose={() => setShowDocuments(false)}
+              entityType="fuel_card_application"
+              entityId={selectedApplication?.id}
+            />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

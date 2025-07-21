@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import Sidebar from "@/components/layout/sidebar";
+import TopNav from "@/components/layout/top-nav";
 import {
   Card,
   CardContent,
@@ -137,13 +140,18 @@ const cardTypes = [
 ];
 
 export default function FuelCards() {
+  // Authentication hooks first
+  const { isAuthenticated, isLoading } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // State hooks
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [showApplication, setShowApplication] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<any>(null);
   const [showApplicationDetails, setShowApplicationDetails] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
+  // Form hook
   const form = useForm<FuelCardApplication>({
     resolver: zodResolver(fuelCardApplicationSchema),
     defaultValues: {
@@ -159,9 +167,24 @@ export default function FuelCards() {
     },
   });
 
-  const { data: applications, isLoading } = useQuery({
+  const { data: applications, isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/fuel-card-applications"],
   });
+
+  // Authentication check effect
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+  }, [isAuthenticated, isLoading, toast]);
 
   // Type the applications data properly
   const typedApplications = applications as Array<{
@@ -170,6 +193,34 @@ export default function FuelCards() {
     status: string;
     createdAt: string;
   }> | undefined;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  if (applicationsLoading) {
+    return (
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNav title="TPF Fuel Card Services" subtitle="Loading..." />
+          <main className="flex-1 overflow-auto p-6">
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   const submitApplication = useMutation({
     mutationFn: async (data: FuelCardApplication) => {
@@ -222,10 +273,20 @@ export default function FuelCards() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">TPF Fuel Card Services</h1>
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopNav 
+          title="TPF Fuel Card Services" 
+          subtitle="Complimentary fuel cards for our carriers with exclusive savings and fleet management benefits"
+        />
+        
+        <main className="flex-1 overflow-auto p-6">
+          <div className="space-y-6">
+            {/* Header */}
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">TPF Fuel Card Services</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
           Complimentary fuel cards for our carriers with exclusive savings and fleet management benefits
         </p>
@@ -643,8 +704,11 @@ export default function FuelCards() {
               </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
