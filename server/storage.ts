@@ -5,6 +5,7 @@ import {
   invoices,
   documents,
   activities,
+  fuelCardApplications,
   type User,
   type UpsertUser,
   type Client,
@@ -17,6 +18,8 @@ import {
   type InsertDocument,
   type Activity,
   type InsertActivity,
+  type FuelCardApplication,
+  type InsertFuelCardApplication,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
@@ -73,6 +76,12 @@ export interface IStorage {
     totalRevenue: string;
     activeClients: number;
   }>;
+  
+  // Fuel card application operations
+  getFuelCardApplications(): Promise<FuelCardApplication[]>;
+  getFuelCardApplication(id: number): Promise<FuelCardApplication | undefined>;
+  createFuelCardApplication(application: InsertFuelCardApplication): Promise<FuelCardApplication>;
+  updateFuelCardApplication(id: number, application: Partial<InsertFuelCardApplication>): Promise<FuelCardApplication>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -285,6 +294,30 @@ export class DatabaseStorage implements IStorage {
   async createActivity(activity: InsertActivity): Promise<Activity> {
     const [newActivity] = await db.insert(activities).values(activity).returning();
     return newActivity;
+  }
+
+  // Fuel card application operations
+  async getFuelCardApplications(): Promise<FuelCardApplication[]> {
+    return await db.select().from(fuelCardApplications).orderBy(desc(fuelCardApplications.createdAt));
+  }
+
+  async getFuelCardApplication(id: number): Promise<FuelCardApplication | undefined> {
+    const [application] = await db.select().from(fuelCardApplications).where(eq(fuelCardApplications.id, id));
+    return application;
+  }
+
+  async createFuelCardApplication(application: InsertFuelCardApplication): Promise<FuelCardApplication> {
+    const [newApplication] = await db.insert(fuelCardApplications).values(application).returning();
+    return newApplication;
+  }
+
+  async updateFuelCardApplication(id: number, application: Partial<InsertFuelCardApplication>): Promise<FuelCardApplication> {
+    const [updatedApplication] = await db
+      .update(fuelCardApplications)
+      .set({ ...application, updatedAt: new Date() })
+      .where(eq(fuelCardApplications.id, id))
+      .returning();
+    return updatedApplication;
   }
 
   // Dashboard statistics

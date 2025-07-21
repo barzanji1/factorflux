@@ -279,6 +279,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fuel card application routes
+  app.get('/api/fuel-card-applications', isAuthenticated, async (req, res) => {
+    try {
+      const applications = await storage.getFuelCardApplications();
+      res.json(applications);
+    } catch (error) {
+      console.error("Error fetching fuel card applications:", error);
+      res.status(500).json({ message: "Failed to fetch applications" });
+    }
+  });
+
+  app.post('/api/fuel-card-applications', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const applicationData = { ...req.body, submittedBy: userId };
+      const application = await storage.createFuelCardApplication(applicationData);
+      
+      // Log activity
+      await storage.createActivity({
+        userId,
+        type: "fuel_card_application",
+        description: `Applied for ${req.body.cardType} fuel card`,
+        entityType: "fuel_card_application",
+        entityId: application.id,
+      });
+
+      res.status(201).json(application);
+    } catch (error) {
+      console.error("Error creating fuel card application:", error);
+      res.status(500).json({ message: "Failed to create application" });
+    }
+  });
+
   app.get('/api/invoices/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

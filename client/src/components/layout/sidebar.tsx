@@ -12,7 +12,8 @@ import {
   Settings, 
   LogOut,
   Shield,
-  CreditCard
+  CreditCard,
+  Fuel
 } from "lucide-react";
 
 const navigation = [
@@ -20,6 +21,7 @@ const navigation = [
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Documents", href: "/documents", icon: FolderOpen },
+  { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Admin", href: "/admin", icon: Shield, role: "manager" },

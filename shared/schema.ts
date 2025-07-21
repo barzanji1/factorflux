@@ -116,6 +116,27 @@ export const activities = pgTable("activities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Fuel card applications table
+export const fuelCardApplications = pgTable("fuel_card_applications", {
+  id: serial("id").primaryKey(),
+  companyName: varchar("company_name").notNull(),
+  contactName: varchar("contact_name").notNull(),
+  email: varchar("email").notNull(),
+  phone: varchar("phone").notNull(),
+  fleetSize: varchar("fleet_size").notNull(),
+  monthlyFuelSpend: varchar("monthly_fuel_spend").notNull(),
+  cardType: varchar("card_type", { enum: ["base", "fleet", "premium"] }).notNull(),
+  businessType: varchar("business_type").notNull(),
+  yearsInBusiness: varchar("years_in_business").notNull(),
+  status: varchar("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
+  submittedBy: varchar("submitted_by").references(() => users.id).notNull(),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   invoices: many(invoices),
@@ -152,16 +173,33 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
   user: one(users, { fields: [activities.userId], references: [users.id] }),
 }));
 
+export const fuelCardApplicationsRelations = relations(fuelCardApplications, ({ one }) => ({
+  submittedByUser: one(users, { fields: [fuelCardApplications.submittedBy], references: [users.id] }),
+  reviewedByUser: one(users, { fields: [fuelCardApplications.reviewedBy], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
 export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
+export const insertFuelCardApplicationSchema = createInsertSchema(fuelCardApplications).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true, 
+  status: true, 
+  reviewedBy: true, 
+  reviewedAt: true, 
+  notes: true 
+});
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export type FuelCardApplication = typeof fuelCardApplications.$inferSelect;
+export type InsertFuelCardApplication = typeof fuelCardApplications.$inferInsert;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Load = typeof loads.$inferSelect;
