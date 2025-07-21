@@ -32,6 +32,12 @@ interface TopNavProps {
   subtitle?: string;
 }
 
+interface SearchResults {
+  clients?: Client[];
+  invoices?: Invoice[];
+  loads?: Load[];
+}
+
 export default function TopNav({ title, subtitle }: TopNavProps) {
   const { user } = useAuth() as { user: User | undefined };
   const [location, setLocation] = useLocation();
@@ -53,7 +59,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   };
 
   // Search functionality
-  const { data: searchResults } = useQuery({
+  const { data: searchResults } = useQuery<SearchResults>({
     queryKey: [`/api/search?q=${encodeURIComponent(searchQuery)}`],
     enabled: searchQuery.length > 2,
   });
@@ -142,10 +148,10 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
             {/* Search Results Dropdown */}
             {showSearchResults && searchResults && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                {(searchResults as any).clients && (searchResults as any).clients.length > 0 && (
+                {searchResults?.clients && searchResults.clients.length > 0 && (
                   <div className="p-2">
                     <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Clients</h4>
-                    {(searchResults as any).clients.slice(0, 3).map((client: Client) => (
+                    {searchResults.clients.slice(0, 3).map((client: Client) => (
                       <div
                         key={`client-${client.id}`}
                         onClick={() => handleSearchItemClick('client', client.id)}
@@ -161,10 +167,10 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                   </div>
                 )}
                 
-                {(searchResults as any).invoices && (searchResults as any).invoices.length > 0 && (
+                {searchResults?.invoices && searchResults.invoices.length > 0 && (
                   <div className="p-2 border-t border-gray-100 dark:border-gray-700">
                     <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Invoices</h4>
-                    {(searchResults as any).invoices.slice(0, 3).map((invoice: Invoice) => (
+                    {searchResults.invoices.slice(0, 3).map((invoice: Invoice) => (
                       <div
                         key={`invoice-${invoice.id}`}
                         onClick={() => handleSearchItemClick('invoice', invoice.id)}
@@ -180,10 +186,10 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                   </div>
                 )}
                 
-                {(searchResults as any).loads && (searchResults as any).loads.length > 0 && (
+                {searchResults?.loads && searchResults.loads.length > 0 && (
                   <div className="p-2 border-t border-gray-100 dark:border-gray-700">
                     <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Loads</h4>
-                    {(searchResults as any).loads.slice(0, 3).map((load: Load) => (
+                    {searchResults.loads.slice(0, 3).map((load: Load) => (
                       <div
                         key={`load-${load.id}`}
                         onClick={() => handleSearchItemClick('load', load.id)}
@@ -199,7 +205,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                   </div>
                 )}
                 
-                {(!(searchResults as any).clients?.length && !(searchResults as any).invoices?.length && !(searchResults as any).loads?.length) && (
+                {(!searchResults?.clients?.length && !searchResults?.invoices?.length && !searchResults?.loads?.length) && (
                   <div className="p-4 text-center text-gray-500 dark:text-gray-400">
                     No results found for "{searchQuery}"
                   </div>

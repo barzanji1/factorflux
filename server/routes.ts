@@ -873,7 +873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(timeEntry);
     } catch (error) {
       console.error("Error clocking in:", error);
-      res.status(400).json({ message: error.message || "Failed to clock in" });
+      res.status(400).json({ message: (error as Error).message || "Failed to clock in" });
     }
   });
 
@@ -886,7 +886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(timeEntry);
     } catch (error) {
       console.error("Error clocking out:", error);
-      res.status(400).json({ message: error.message || "Failed to clock out" });
+      res.status(400).json({ message: (error as Error).message || "Failed to clock out" });
     }
   });
 

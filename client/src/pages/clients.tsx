@@ -44,7 +44,7 @@ export default function Clients() {
     enabled: searchQuery.length > 0,
   });
 
-  const displayClients = searchQuery ? searchResults : clients;
+  const displayClients = searchQuery ? (searchResults as Client[] || []) : (clients as Client[] || []);
 
   const handleCreateClient = () => {
     setSelectedClient(null);
@@ -104,7 +104,7 @@ export default function Clients() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : (
-              displayClients?.map((client: Client) => (
+              displayClients.map((client: Client) => (
                 <Card key={client.id} className="hover:shadow-md transition-shadow cursor-pointer">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -166,7 +166,7 @@ export default function Clients() {
             )}
           </div>
 
-          {displayClients?.length === 0 && !clientsLoading && (
+          {displayClients.length === 0 && !clientsLoading && (
             <Card>
               <CardContent className="text-center py-12">
                 <p className="text-gray-500">No clients found</p>
