@@ -1,8 +1,8 @@
-# EllaFlow - Invoice Processing System
+# QuantumCore - Invoice Processing System
 
 ## Overview
 
-EllaFlow is a comprehensive freight factoring workflow application designed to streamline invoice processing for freight companies. The system provides document management, client management, invoice tracking, and user authentication capabilities through a modern web interface.
+QuantumCore is a comprehensive freight factoring workflow application designed to streamline invoice processing for freight companies through Trucking Pros Financial. The system provides document management, client management, invoice tracking, and user authentication capabilities through a modern web interface.
 
 ## User Preferences
 
@@ -118,6 +118,11 @@ The system is designed as a full-stack application with clear separation between
 ## Recent Changes
 
 ### January 21, 2025
+- **Rebranding to QuantumCore**: Updated application branding from EllaFlow to QuantumCore
+  - Changed app name to "QuantumCore" across sidebar, landing page, and HTML title
+  - Updated subtitle from "Freight Factoring" to "Trucking Pros Financial"
+  - Modified landing page description to emphasize Trucking Pros Financial branding
+  - Updated project documentation to reflect new company identity
 - **Profile Image Upload Fix**: Resolved profile picture upload and display functionality
   - Added static file serving for uploaded images at `/uploads` endpoint
   - Fixed profile image display in both profile page and navigation components

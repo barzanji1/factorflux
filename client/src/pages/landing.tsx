@@ -12,10 +12,10 @@ export default function Landing() {
             <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
               <Truck className="text-white text-xl" />
             </div>
-            <h1 className="text-4xl font-bold text-secondary">EllaFlow</h1>
+            <h1 className="text-4xl font-bold text-secondary">QuantumCore</h1>
           </div>
           <p className="text-xl text-gray-600 mb-8">
-            Streamline your freight factoring workflow with our comprehensive invoice processing system
+            Streamline your trucking operations with our comprehensive invoice processing system - Trucking Pros Financial
           </p>
           <Button size="lg" onClick={() => window.location.href = '/api/login'}>
             Sign In to Get Started
