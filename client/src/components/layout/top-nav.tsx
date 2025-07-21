@@ -53,7 +53,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
   // Search functionality
   const { data: searchResults } = useQuery({
-    queryKey: ["/api/search", { q: searchQuery }],
+    queryKey: [`/api/search?q=${encodeURIComponent(searchQuery)}`],
     enabled: searchQuery.length > 2,
   });
 
