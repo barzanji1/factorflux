@@ -74,6 +74,7 @@ export interface IStorage {
   // Activity operations
   getActivities(limit?: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+  clearActivities(): Promise<void>;
   
   // Dashboard statistics
   getDashboardStats(): Promise<{
@@ -332,6 +333,10 @@ export class DatabaseStorage implements IStorage {
   async createActivity(activity: InsertActivity): Promise<Activity> {
     const [newActivity] = await db.insert(activities).values(activity).returning();
     return newActivity;
+  }
+
+  async clearActivities(): Promise<void> {
+    await db.delete(activities);
   }
 
   // Fuel card application operations

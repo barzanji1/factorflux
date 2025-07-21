@@ -193,6 +193,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear all activities endpoint
+  app.delete('/api/activities', isAuthenticated, async (req, res) => {
+    try {
+      await storage.clearActivities();
+      
+      // Log the activity reset
+      await storage.createActivity({
+        userId: (req.user as any).claims.sub,
+        type: "activities_reset",
+        entityType: "system",
+        entityId: 0,
+        description: "Reset all recent activity history",
+      });
+      
+      res.json({ message: "Activities cleared successfully" });
+    } catch (error) {
+      console.error("Error clearing activities:", error);
+      res.status(500).json({ message: "Failed to clear activities" });
+    }
+  });
+
   // Client routes
   app.get('/api/clients', isAuthenticated, async (req, res) => {
     try {

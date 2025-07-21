@@ -1,11 +1,37 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { RotateCcw, Trash2 } from "lucide-react";
 import type { Activity } from "@shared/schema";
 
 export default function RecentActivity() {
+  const { toast } = useToast();
   const { data: activities = [], isLoading } = useQuery<Activity[]>({
     queryKey: ["/api/dashboard/recent-activities"],
+  });
+
+  const clearActivities = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/activities");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Activities Cleared",
+        description: "All recent activity has been reset successfully",
+      });
+      // Invalidate and refetch activities
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-activities"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clear activities",
+        variant: "destructive",
+      });
+    },
   });
 
   const getActivityColor = (type: string) => {
@@ -48,7 +74,25 @@ export default function RecentActivity() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Recent Activity</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Recent Activity</CardTitle>
+          {activities.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => clearActivities.mutate()}
+              disabled={clearActivities.isPending}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              {clearActivities.isPending ? (
+                <RotateCcw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              <span className="ml-1">Reset</span>
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
