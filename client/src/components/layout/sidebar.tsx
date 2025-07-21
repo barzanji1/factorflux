@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import type { User } from "@shared/schema";
 import { 
   Truck, 
   LayoutDashboard, 
@@ -22,7 +23,7 @@ const navigation = [
 
 export default function Sidebar() {
   const [location, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user } = useAuth() as { user: User | undefined };
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -37,7 +38,7 @@ export default function Sidebar() {
             <Truck className="text-white text-lg" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-secondary">FreightFlow</h1>
+            <h1 className="text-xl font-bold text-secondary">EllaFlow</h1>
             <p className="text-sm text-gray-500">Invoice Processing</p>
           </div>
         </div>

@@ -12,7 +12,7 @@ export default function Landing() {
             <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
               <Truck className="text-white text-xl" />
             </div>
-            <h1 className="text-4xl font-bold text-secondary">FreightFlow</h1>
+            <h1 className="text-4xl font-bold text-secondary">EllaFlow</h1>
           </div>
           <p className="text-xl text-gray-600 mb-8">
             Streamline your freight factoring workflow with our comprehensive invoice processing system
@@ -73,7 +73,7 @@ export default function Landing() {
                 Ready to streamline your freight factoring?
               </h2>
               <p className="text-gray-600 mb-6">
-                Join hundreds of freight companies already using FreightFlow to manage their invoice processing workflow.
+                Join hundreds of freight companies already using EllaFlow to manage their invoice processing workflow.
               </p>
               <Button size="lg" onClick={() => window.location.href = '/api/login'}>
                 Sign In Now

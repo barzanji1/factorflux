@@ -1,8 +1,8 @@
-# FreightFlow - Invoice Processing System
+# EllaFlow - Invoice Processing System
 
 ## Overview
 
-FreightFlow is a comprehensive freight factoring workflow application designed to streamline invoice processing for freight companies. The system provides document management, client management, invoice tracking, and user authentication capabilities through a modern web interface.
+EllaFlow is a comprehensive freight factoring workflow application designed to streamline invoice processing for freight companies. The system provides document management, client management, invoice tracking, and user authentication capabilities through a modern web interface.
 
 ## User Preferences
 

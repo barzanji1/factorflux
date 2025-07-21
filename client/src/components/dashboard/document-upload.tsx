@@ -78,7 +78,6 @@ export default function DocumentUpload() {
       const formData = new FormData();
       formData.append('document', file);
       formData.append('documentType', 'other'); // Default type
-      formData.append('uploadedBy', user?.id || '');
       
       uploadMutation.mutate(formData);
     });
