@@ -13,7 +13,8 @@ import {
   LogOut,
   FileText,
   Users,
-  FolderOpen
+  FolderOpen,
+  Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -195,6 +196,17 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
         {/* Right side - Actions and user menu */}
         <div className="flex items-center space-x-4">
+          {/* Home Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setLocation("/")}
+            className="flex items-center space-x-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+          >
+            <Home className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-blue-600 dark:text-blue-400 font-medium">Home</span>
+          </Button>
+
           {/* Quick Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
