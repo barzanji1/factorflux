@@ -49,6 +49,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Profile routes
+  app.patch('/api/user/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const updates = req.body;
+      
+      // Validate input
+      const validUpdates = ['firstName', 'lastName', 'phone', 'jobTitle', 'department'];
+      const filteredUpdates = Object.keys(updates)
+        .filter(key => validUpdates.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updates[key];
+          return obj;
+        }, {});
+
+      await storage.updateUserProfile(userId, filteredUpdates);
+      const updatedUser = await storage.getUser(userId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.post('/api/user/profile-image', isAuthenticated, upload.single('profileImage'), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      // In a real app, you'd upload to cloud storage (S3, Cloudinary, etc.)
+      // For now, we'll just store the local file path
+      const profileImageUrl = `/uploads/${req.file.filename}`;
+      
+      await storage.updateUserProfile(userId, { profileImageUrl });
+      const updatedUser = await storage.getUser(userId);
+      
+      res.json({ 
+        message: "Profile image updated successfully",
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Error uploading profile image:", error);
+      res.status(500).json({ message: "Failed to upload profile image" });
+    }
+  });
+
   // Dashboard routes
   app.get('/api/dashboard/stats', isAuthenticated, async (req, res) => {
     try {

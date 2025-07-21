@@ -31,6 +31,9 @@ export const users = pgTable("users", {
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  phone: varchar("phone"),
+  jobTitle: varchar("job_title"),
+  department: varchar("department"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role", { enum: ["employee", "manager"] }).default("employee").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -197,6 +200,23 @@ export const insertFuelCardApplicationSchema = createInsertSchema(fuelCardApplic
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// User profile update schema
+export const updateUserProfileSchema = createInsertSchema(users).pick({
+  firstName: true,
+  lastName: true,
+  phone: true,
+  jobTitle: true,
+  department: true,
+}).extend({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  phone: z.string().optional(),
+  jobTitle: z.string().optional(),
+  department: z.string().optional(),
+});
+
+export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 
 export type FuelCardApplication = typeof fuelCardApplications.$inferSelect;
 export type InsertFuelCardApplication = typeof fuelCardApplications.$inferInsert;
