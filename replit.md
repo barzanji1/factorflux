@@ -74,12 +74,13 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 ## Recent Changes
 
 ### January 22, 2025
-- **Restored and Fixed Settings Dropdown Navigation**: Settings tab functionality fully restored
+- **Cleaned Up Settings Navigation**: Streamlined settings access through dropdown menu only
+  - Removed non-functional Settings button from sidebar to avoid confusion
   - Settings dropdown menu now properly navigates to comprehensive `/settings` page with full functionality
   - Settings page includes Personal, Notifications, Work, and Appearance tabs with complete preference management
   - Profile dropdown menu navigates to `/profile` page with basic profile information and image upload
   - Implemented proper Link component navigation using asChild prop for reliable routing
-  - Both dropdown menu items now use native wouter Link components for consistent navigation
+  - Sidebar now shows only functional navigation items with Logout at the bottom
 
 ### January 21, 2025 - Debug Session and Profile Enhancements
 - Fixed TypeScript compilation errors in server routes (error type casting)

@@ -100,12 +100,8 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Settings & Logout */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
-        <button className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all duration-200">
-          <Settings className="w-5 h-5" />
-          <span className="font-medium">Settings</span>
-        </button>
+      {/* Logout */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
         <button 
           onClick={handleLogout}
           className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
