@@ -222,6 +222,19 @@ export default function Profile() {
                     {user.firstName?.[0]}{user.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
+                
+                {/* Name and Job Title */}
+                <div className="text-center space-y-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {user.firstName} {user.lastName}
+                  </h3>
+                  {user.jobTitle && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {user.jobTitle}
+                    </p>
+                  )}
+                </div>
+                
                 <Button 
                   variant="outline" 
                   size="sm" 
