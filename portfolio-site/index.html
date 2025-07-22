@@ -1,530 +1,877 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dosh Barzanji - Software Developer & App Designer</title>
-    <meta name="description" content="Professional software developer specializing in freight factoring systems, web applications, and custom business solutions. Featured work includes QuantumCore for Trucking Pros Financial.">
-    
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="Dosh Barzanji - Software Developer & App Designer">
-    <meta property="og:description" content="Professional software developer creating innovative business solutions and web applications.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://doshbarzanji.dev">
-    
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #3B82F6;
-            --primary-dark: #1E40AF;
-            --secondary: #10B981;
-            --dark: #1F2937;
-            --light: #F8FAFC;
-        }
-        
-        .gradient-bg {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-        }
-        
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        
-        .card-hover:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        }
-        
-        .animate-fade-in {
-            animation: fadeIn 0.8s ease-in-out;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .tech-badge {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-    </style>
-</head>
-<body class="bg-gray-50">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
-        <div class="container mx-auto px-6">
-            <div class="flex justify-between items-center py-4">
-                <div class="text-xl font-bold text-gray-800">
-                    <i class="fas fa-code text-blue-600"></i> Dosh Barzanji
-                </div>
-                <div class="hidden md:flex space-x-8">
-                    <a href="#home" class="text-gray-600 hover:text-blue-600 transition">Home</a>
-                    <a href="#about" class="text-gray-600 hover:text-blue-600 transition">About</a>
-                    <a href="#portfolio" class="text-gray-600 hover:text-blue-600 transition">Portfolio</a>
-                    <a href="#services" class="text-gray-600 hover:text-blue-600 transition">Services</a>
-                    <a href="#contact" class="text-gray-600 hover:text-blue-600 transition">Contact</a>
-                </div>
-                <div class="md:hidden">
-                    <button id="mobile-menu-btn" class="text-gray-600">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Dosh Barzanji - Software Developer & App Designer</title>
+        <meta
+            name="description"
+            content="Professional software developer specializing in freight factoring systems, web applications, and custom business solutions. Featured work includes QuantumCore for Trucking Pros Financial."
+        />
 
-    <!-- Hero Section -->
-    <section id="home" class="gradient-bg text-white py-32 mt-16">
-        <div class="container mx-auto px-6 text-center">
-            <div class="animate-fade-in">
-                <h1 class="text-5xl md:text-6xl font-bold mb-6">
-                    Software Developer & 
-                    <span class="text-yellow-300">App Designer</span>
-                </h1>
-                <p class="text-xl md:text-2xl mb-8 text-gray-100">
-                    Creating innovative business solutions and web applications
-                </p>
-                <div class="space-x-4">
-                    <a href="#portfolio" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
-                        View My Work
-                    </a>
-                    <a href="#contact" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition">
-                        Get In Touch
-                    </a>
+        <!-- Open Graph Meta Tags -->
+        <meta
+            property="og:title"
+            content="Dosh Barzanji - Software Developer & App Designer"
+        />
+        <meta
+            property="og:description"
+            content="Professional software developer creating innovative business solutions and web applications."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://doshbarzanji.dev" />
+
+        <link
+            href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --primary: #3b82f6;
+                --primary-dark: #1e40af;
+                --secondary: #10b981;
+                --dark: #1f2937;
+                --light: #f8fafc;
+            }
+
+            .gradient-bg {
+                background: linear-gradient(
+                    135deg,
+                    var(--primary) 0%,
+                    var(--primary-dark) 100%
+                );
+            }
+
+            .card-hover {
+                transition: all 0.3s ease;
+            }
+
+            .card-hover:hover {
+                transform: translateY(-8px);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            }
+
+            .animate-fade-in {
+                animation: fadeIn 0.8s ease-in-out;
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .tech-badge {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
+            <div class="container mx-auto px-6">
+                <div class="flex justify-between items-center py-4">
+                    <div class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-code text-blue-600"></i> Dosh Barzanji
+                    </div>
+                    <div class="hidden md:flex space-x-8">
+                        <a
+                            href="#home"
+                            class="text-gray-600 hover:text-blue-600 transition"
+                            >Home</a
+                        >
+                        <a
+                            href="#about"
+                            class="text-gray-600 hover:text-blue-600 transition"
+                            >About</a
+                        >
+                        <a
+                            href="#portfolio"
+                            class="text-gray-600 hover:text-blue-600 transition"
+                            >Portfolio</a
+                        >
+                        <a
+                            href="#services"
+                            class="text-gray-600 hover:text-blue-600 transition"
+                            >Services</a
+                        >
+                        <a
+                            href="#contact"
+                            class="text-gray-600 hover:text-blue-600 transition"
+                            >Contact</a
+                        >
+                    </div>
+                    <div class="md:hidden">
+                        <button id="mobile-menu-btn" class="text-gray-600">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </nav>
 
-    <!-- About Section -->
-    <section id="about" class="py-20 bg-white">
-        <div class="container mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-gray-800 mb-4">About Me</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto">
-                    Experienced software developer specializing in full-stack web applications, 
-                    business automation, and freight industry solutions.
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 gap-12 items-center">
-                <div>
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">My Expertise</h3>
-                    <p class="text-gray-600 mb-6">
-                        I'm passionate about building scalable, user-friendly applications that solve real business problems. 
-                        My focus is on creating robust systems for the freight and logistics industry, with expertise in 
-                        modern web technologies and database design.
+        <!-- Hero Section -->
+        <section id="home" class="gradient-bg text-white py-32 mt-16">
+            <div class="container mx-auto px-6 text-center">
+                <div class="animate-fade-in">
+                    <h1 class="text-5xl md:text-6xl font-bold mb-6">
+                        Software Developer &
+                        <span class="text-yellow-300">App Designer</span>
+                    </h1>
+                    <p class="text-xl md:text-2xl mb-8 text-gray-100">
+                        Creating innovative business solutions and web
+                        applications
                     </p>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div class="bg-gray-50 p-4 rounded-lg text-center">
-                            <i class="fas fa-code text-3xl text-blue-600 mb-2"></i>
-                            <h4 class="font-semibold">Full-Stack Development</h4>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg text-center">
-                            <i class="fas fa-database text-3xl text-green-600 mb-2"></i>
-                            <h4 class="font-semibold">Database Design</h4>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg text-center">
-                            <i class="fas fa-truck text-3xl text-yellow-600 mb-2"></i>
-                            <h4 class="font-semibold">Freight Solutions</h4>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg text-center">
-                            <i class="fas fa-mobile-alt text-3xl text-purple-600 mb-2"></i>
-                            <h4 class="font-semibold">Responsive Design</h4>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="bg-gray-100 rounded-lg p-8">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-6">Tech Stack</h3>
-                    <div class="grid grid-cols-3 gap-4">
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">React</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">TypeScript</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">Node.js</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">Express</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">PostgreSQL</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">Tailwind</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">Drizzle ORM</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">Vite</span>
-                        <span class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center">Git</span>
+                    <div class="space-x-4">
+                        <a
+                            href="#portfolio"
+                            class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition"
+                        >
+                            View My Work
+                        </a>
+                        <a
+                            href="#contact"
+                            class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition"
+                        >
+                            Get In Touch
+                        </a>
                     </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- Portfolio Section -->
-    <section id="portfolio" class="py-20 bg-gray-50">
-        <div class="container mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-gray-800 mb-4">Featured Projects</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto">
-                    Showcase of my recent work in business application development and system design.
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- QuantumCore Project -->
-                <div class="bg-white rounded-xl shadow-lg overflow-hidden card-hover">
-                    <div class="gradient-bg h-48 flex items-center justify-center">
-                        <i class="fas fa-truck text-6xl text-white"></i>
-                    </div>
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-xl font-bold text-gray-800">QuantumCore</h3>
-                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Live</span>
-                        </div>
-                        <p class="text-gray-600 mb-4">
-                            Comprehensive freight factoring management system for Trucking Pros Financial. 
-                            Features invoice processing, client management, document handling, and role-based access control.
-                        </p>
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">React</span>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">TypeScript</span>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">PostgreSQL</span>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Express</span>
-                        </div>
-                        <div class="flex space-x-3">
-                            <a href="#" class="flex-1 bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 transition">
-                                <i class="fas fa-external-link-alt mr-2"></i>View Live
-                            </a>
-                            <a href="#" class="flex-1 border border-blue-600 text-blue-600 text-center py-2 rounded-lg hover:bg-blue-50 transition">
-                                <i class="fab fa-github mr-2"></i>Code
-                            </a>
-                        </div>
-                    </div>
+        <!-- About Section -->
+        <section id="about" class="py-20 bg-white">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-bold text-gray-800 mb-4">
+                        About Me
+                    </h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto">
+                        Experienced software developer specializing in
+                        full-stack web applications, business automation, and
+                        freight industry solutions.
+                    </p>
                 </div>
-                
-                <!-- Additional Project Placeholder 1 -->
-                <div class="bg-white rounded-xl shadow-lg overflow-hidden card-hover">
-                    <div class="bg-gradient-to-br from-purple-600 to-blue-600 h-48 flex items-center justify-center">
-                        <i class="fas fa-chart-line text-6xl text-white"></i>
-                    </div>
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-xl font-bold text-gray-800">Analytics Dashboard</h3>
-                            <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">In Progress</span>
-                        </div>
-                        <p class="text-gray-600 mb-4">
-                            Real-time business intelligence dashboard with interactive charts, 
-                            KPI tracking, and automated reporting for freight operations.
-                        </p>
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">React</span>
-                            <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Chart.js</span>
-                            <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">API</span>
-                        </div>
-                        <div class="flex space-x-3">
-                            <a href="#contact" class="flex-1 bg-gray-300 text-gray-600 text-center py-2 rounded-lg">
-                                <i class="fas fa-clock mr-2"></i>Coming Soon
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Additional Project Placeholder 2 -->
-                <div class="bg-white rounded-xl shadow-lg overflow-hidden card-hover">
-                    <div class="bg-gradient-to-br from-green-600 to-teal-600 h-48 flex items-center justify-center">
-                        <i class="fas fa-mobile-alt text-6xl text-white"></i>
-                    </div>
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-xl font-bold text-gray-800">Mobile Logistics App</h3>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Planning</span>
-                        </div>
-                        <p class="text-gray-600 mb-4">
-                            Mobile application for drivers and dispatchers to manage loads, 
-                            track shipments, and communicate in real-time.
-                        </p>
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">React Native</span>
-                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">GPS</span>
-                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Real-time</span>
-                        </div>
-                        <div class="flex space-x-3">
-                            <a href="#contact" class="flex-1 bg-green-600 text-white text-center py-2 rounded-lg hover:bg-green-700 transition">
-                                <i class="fas fa-envelope mr-2"></i>Inquire
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Services Section -->
-    <section id="services" class="py-20 bg-white">
-        <div class="container mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-gray-800 mb-4">Services</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto">
-                    Professional software development services tailored to your business needs.
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <div class="text-center p-6 bg-gray-50 rounded-lg">
-                    <div class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-laptop-code text-2xl text-white"></i>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Web Application Development</h3>
-                    <p class="text-gray-600 text-sm">Custom web applications built with modern technologies and best practices.</p>
-                </div>
-                
-                <div class="text-center p-6 bg-gray-50 rounded-lg">
-                    <div class="bg-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-database text-2xl text-white"></i>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Database Design</h3>
-                    <p class="text-gray-600 text-sm">Efficient database architecture and optimization for scalable applications.</p>
-                </div>
-                
-                <div class="text-center p-6 bg-gray-50 rounded-lg">
-                    <div class="bg-yellow-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-cogs text-2xl text-white"></i>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Business Automation</h3>
-                    <p class="text-gray-600 text-sm">Streamline operations with custom workflow automation and integration solutions.</p>
-                </div>
-                
-                <div class="text-center p-6 bg-gray-50 rounded-lg">
-                    <div class="bg-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-truck text-2xl text-white"></i>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Freight Solutions</h3>
-                    <p class="text-gray-600 text-sm">Specialized software for trucking, logistics, and freight factoring companies.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">
+                            My Expertise
+                        </h3>
+                        <p class="text-gray-600 mb-6">
+                            I'm passionate about building scalable,
+                            user-friendly applications that solve real business
+                            problems. My focus is on creating robust systems for
+                            the freight and logistics industry, with expertise
+                            in modern web technologies and database design.
+                        </p>
 
-    <!-- Contact Section -->
-    <section id="contact" class="py-20 bg-gray-50">
-        <div class="container mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-gray-800 mb-4">Get In Touch</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto">
-                    Ready to start your next project? Let's discuss how I can help bring your ideas to life.
-                </p>
-            </div>
-            
-            <div class="max-w-4xl mx-auto grid md:grid-cols-2 gap-12">
-                <!-- Contact Info -->
-                <div>
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-6">Let's Connect</h3>
-                    
-                    <div class="space-y-4 mb-8">
-                        <div class="flex items-center">
-                            <div class="bg-blue-600 w-12 h-12 rounded-full flex items-center justify-center mr-4">
-                                <i class="fas fa-envelope text-white"></i>
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                                <i
+                                    class="fas fa-code text-3xl text-blue-600 mb-2"
+                                ></i>
+                                <h4 class="font-semibold">
+                                    Full-Stack Development
+                                </h4>
                             </div>
-                            <div>
-                                <h4 class="font-semibold text-gray-800">Email</h4>
-                                <p class="text-gray-600">doshbarzanji@gmail.com</p>
+                            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                                <i
+                                    class="fas fa-database text-3xl text-green-600 mb-2"
+                                ></i>
+                                <h4 class="font-semibold">Database Design</h4>
                             </div>
-                        </div>
-                        
-                        <div class="flex items-center">
-                            <div class="bg-green-600 w-12 h-12 rounded-full flex items-center justify-center mr-4">
-                                <i class="fab fa-linkedin text-white"></i>
+                            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                                <i
+                                    class="fas fa-truck text-3xl text-yellow-600 mb-2"
+                                ></i>
+                                <h4 class="font-semibold">Freight Solutions</h4>
                             </div>
-                            <div>
-                                <h4 class="font-semibold text-gray-800">LinkedIn</h4>
-                                <p class="text-gray-600">Connect with me professionally</p>
-                            </div>
-                        </div>
-                        
-                        <div class="flex items-center">
-                            <div class="bg-gray-800 w-12 h-12 rounded-full flex items-center justify-center mr-4">
-                                <i class="fab fa-github text-white"></i>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold text-gray-800">GitHub</h4>
-                                <p class="text-gray-600">View my open source work</p>
+                            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                                <i
+                                    class="fas fa-mobile-alt text-3xl text-purple-600 mb-2"
+                                ></i>
+                                <h4 class="font-semibold">Responsive Design</h4>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="bg-white p-6 rounded-lg shadow-lg">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Why Work With Me?</h4>
-                        <ul class="text-gray-600 space-y-2">
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-green-600 mr-2"></i>
-                                5+ years of development experience
+
+                    <div class="bg-gray-100 rounded-lg p-8">
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-6">
+                            Tech Stack
+                        </h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >React</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >TypeScript</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >Node.js</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >Express</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >PostgreSQL</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >Tailwind</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >Drizzle ORM</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >Vite</span
+                            >
+                            <span
+                                class="tech-badge text-white px-3 py-2 rounded-full text-sm text-center"
+                                >Git</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Portfolio Section -->
+        <section id="portfolio" class="py-20 bg-gray-50">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-bold text-gray-800 mb-4">
+                        Featured Projects
+                    </h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto">
+                        Showcase of my recent work in business application
+                        development and system design.
+                    </p>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- QuantumCore Project -->
+                    <div
+                        class="bg-white rounded-xl shadow-lg overflow-hidden card-hover"
+                    >
+                        <div
+                            class="gradient-bg h-48 flex items-center justify-center"
+                        >
+                            <i class="fas fa-truck text-6xl text-white"></i>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xl font-bold text-gray-800">
+                                    QuantumCore
+                                </h3>
+                                <span
+                                    class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs"
+                                    >Live</span
+                                >
+                            </div>
+                            <p class="text-gray-600 mb-4">
+                                Comprehensive freight factoring management
+                                system for Trucking Pros Financial. Features
+                                invoice processing, client management, document
+                                handling, and role-based access control.
+                            </p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span
+                                    class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+                                    >React</span
+                                >
+                                <span
+                                    class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+                                    >TypeScript</span
+                                >
+                                <span
+                                    class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+                                    >PostgreSQL</span
+                                >
+                                <span
+                                    class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+                                    >Express</span
+                                >
+                            </div>
+                            <div class="flex space-x-3">
+                                <a
+                                    href="#"
+                                    class="flex-1 bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 transition"
+                                >
+                                    <i class="fas fa-external-link-alt mr-2"></i
+                                    >View Live
+                                </a>
+                                <a
+                                    href="#"
+                                    class="flex-1 border border-blue-600 text-blue-600 text-center py-2 rounded-lg hover:bg-blue-50 transition"
+                                >
+                                    <i class="fab fa-github mr-2"></i>Code
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Project Placeholder 1 -->
+                    <div
+                        class="bg-white rounded-xl shadow-lg overflow-hidden card-hover"
+                    >
+                        <div
+                            class="bg-gradient-to-br from-purple-600 to-blue-600 h-48 flex items-center justify-center"
+                        >
+                            <i
+                                class="fas fa-chart-line text-6xl text-white"
+                            ></i>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xl font-bold text-gray-800">
+                                    Analytics Dashboard
+                                </h3>
+                                <span
+                                    class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs"
+                                    >In Progress</span
+                                >
+                            </div>
+                            <p class="text-gray-600 mb-4">
+                                Real-time business intelligence dashboard with
+                                interactive charts, KPI tracking, and automated
+                                reporting for freight operations.
+                            </p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span
+                                    class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs"
+                                    >React</span
+                                >
+                                <span
+                                    class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs"
+                                    >Chart.js</span
+                                >
+                                <span
+                                    class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs"
+                                    >API</span
+                                >
+                            </div>
+                            <div class="flex space-x-3">
+                                <a
+                                    href="#contact"
+                                    class="flex-1 bg-gray-300 text-gray-600 text-center py-2 rounded-lg"
+                                >
+                                    <i class="fas fa-clock mr-2"></i>Coming Soon
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Project Placeholder 2 -->
+                    <div
+                        class="bg-white rounded-xl shadow-lg overflow-hidden card-hover"
+                    >
+                        <div
+                            class="bg-gradient-to-br from-green-600 to-teal-600 h-48 flex items-center justify-center"
+                        >
+                            <i
+                                class="fas fa-mobile-alt text-6xl text-white"
+                            ></i>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xl font-bold text-gray-800">
+                                    Mobile Logistics App
+                                </h3>
+                                <span
+                                    class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs"
+                                    >Planning</span
+                                >
+                            </div>
+                            <p class="text-gray-600 mb-4">
+                                Mobile application for drivers and dispatchers
+                                to manage loads, track shipments, and
+                                communicate in real-time.
+                            </p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span
+                                    class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs"
+                                    >React Native</span
+                                >
+                                <span
+                                    class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs"
+                                    >GPS</span
+                                >
+                                <span
+                                    class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs"
+                                    >Real-time</span
+                                >
+                            </div>
+                            <div class="flex space-x-3">
+                                <a
+                                    href="#contact"
+                                    class="flex-1 bg-green-600 text-white text-center py-2 rounded-lg hover:bg-green-700 transition"
+                                >
+                                    <i class="fas fa-envelope mr-2"></i>Inquire
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Services Section -->
+        <section id="services" class="py-20 bg-white">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-bold text-gray-800 mb-4">
+                        Services
+                    </h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto">
+                        Professional software development services tailored to
+                        your business needs.
+                    </p>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div class="text-center p-6 bg-gray-50 rounded-lg">
+                        <div
+                            class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                        >
+                            <i
+                                class="fas fa-laptop-code text-2xl text-white"
+                            ></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">
+                            Web Application Development
+                        </h3>
+                        <p class="text-gray-600 text-sm">
+                            Custom web applications built with modern
+                            technologies and best practices.
+                        </p>
+                    </div>
+
+                    <div class="text-center p-6 bg-gray-50 rounded-lg">
+                        <div
+                            class="bg-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                        >
+                            <i class="fas fa-database text-2xl text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">
+                            Database Design
+                        </h3>
+                        <p class="text-gray-600 text-sm">
+                            Efficient database architecture and optimization for
+                            scalable applications.
+                        </p>
+                    </div>
+
+                    <div class="text-center p-6 bg-gray-50 rounded-lg">
+                        <div
+                            class="bg-yellow-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                        >
+                            <i class="fas fa-cogs text-2xl text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">
+                            Business Automation
+                        </h3>
+                        <p class="text-gray-600 text-sm">
+                            Streamline operations with custom workflow
+                            automation and integration solutions.
+                        </p>
+                    </div>
+
+                    <div class="text-center p-6 bg-gray-50 rounded-lg">
+                        <div
+                            class="bg-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                        >
+                            <i class="fas fa-truck text-2xl text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">
+                            Freight Solutions
+                        </h3>
+                        <p class="text-gray-600 text-sm">
+                            Specialized software for trucking, logistics, and
+                            freight factoring companies.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact" class="py-20 bg-gray-50">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-bold text-gray-800 mb-4">
+                        Get In Touch
+                    </h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto">
+                        Ready to start your next project? Let's discuss how I
+                        can help bring your ideas to life.
+                    </p>
+                </div>
+
+                <div class="max-w-4xl mx-auto grid md:grid-cols-2 gap-12">
+                    <!-- Contact Info -->
+                    <div>
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-6">
+                            Let's Connect
+                        </h3>
+
+                        <div class="space-y-4 mb-8">
+                            <div class="flex items-center">
+                                <div
+                                    class="bg-blue-600 w-12 h-12 rounded-full flex items-center justify-center mr-4"
+                                >
+                                    <i class="fas fa-envelope text-white"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">
+                                        Email
+                                    </h4>
+                                    <p class="text-gray-600">
+                                        doshbarzanji@gmail.com
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center">
+                                <div
+                                    class="bg-green-600 w-12 h-12 rounded-full flex items-center justify-center mr-4"
+                                >
+                                    <i class="fab fa-linkedin text-white"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">
+                                        LinkedIn
+                                    </h4>
+                                    <p class="text-gray-600">
+                                        Connect with me professionally
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center">
+                                <div
+                                    class="bg-gray-800 w-12 h-12 rounded-full flex items-center justify-center mr-4"
+                                >
+                                    <i class="fab fa-github text-white"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">
+                                        GitHub
+                                    </h4>
+                                    <p class="text-gray-600">
+                                        View my open source work
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h4
+                                class="text-lg font-semibold text-gray-800 mb-3"
+                            >
+                                Why Work With Me?
+                            </h4>
+                            <ul class="text-gray-600 space-y-2">
+                                <li class="flex items-center">
+                                    <i
+                                        class="fas fa-check text-green-600 mr-2"
+                                    ></i>
+                                    5+ years of development experience
+                                </li>
+                                <li class="flex items-center">
+                                    <i
+                                        class="fas fa-check text-green-600 mr-2"
+                                    ></i>
+                                    Specialized in freight industry solutions
+                                </li>
+                                <li class="flex items-center">
+                                    <i
+                                        class="fas fa-check text-green-600 mr-2"
+                                    ></i>
+                                    Full-stack development expertise
+                                </li>
+                                <li class="flex items-center">
+                                    <i
+                                        class="fas fa-check text-green-600 mr-2"
+                                    ></i>
+                                    Agile development approach
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Contact Form -->
+                    <div class="bg-white p-8 rounded-lg shadow-lg">
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-6">
+                            Send Message
+                        </h3>
+
+                        <form id="contact-form" class="space-y-6">
+                            <div>
+                                <label
+                                    for="name"
+                                    class="block text-sm font-medium text-gray-700 mb-2"
+                                    >Name</label
+                                >
+                                <input
+                                    type="text"
+                                    id="name"
+                                    name="name"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label
+                                    for="email"
+                                    class="block text-sm font-medium text-gray-700 mb-2"
+                                    >Email</label
+                                >
+                                <input
+                                    type="email"
+                                    id="email"
+                                    name="email"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label
+                                    for="subject"
+                                    class="block text-sm font-medium text-gray-700 mb-2"
+                                    >Subject</label
+                                >
+                                <input
+                                    type="text"
+                                    id="subject"
+                                    name="subject"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label
+                                    for="message"
+                                    class="block text-sm font-medium text-gray-700 mb-2"
+                                    >Message</label
+                                >
+                                <textarea
+                                    id="message"
+                                    name="message"
+                                    rows="4"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    required
+                                ></textarea>
+                            </div>
+
+                            <button
+                                type="submit"
+                                class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90 transition"
+                            >
+                                <i class="fas fa-paper-plane mr-2"></i>
+                                Send Message
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white py-12">
+            <div class="container mx-auto px-6">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4">
+                            <i class="fas fa-code text-blue-400"></i> Dosh
+                            Barzanji
+                        </h3>
+                        <p class="text-gray-300 mb-4">
+                            Professional software developer creating innovative
+                            solutions for modern businesses.
+                        </p>
+                        <div class="flex space-x-4">
+                            <a
+                                href="#"
+                                class="text-gray-300 hover:text-white transition"
+                            >
+                                <i class="fab fa-linkedin text-xl"></i>
+                            </a>
+                            <a
+                                href="#"
+                                class="text-gray-300 hover:text-white transition"
+                            >
+                                <i class="fab fa-github text-xl"></i>
+                            </a>
+                            <a
+                                href="#"
+                                class="text-gray-300 hover:text-white transition"
+                            >
+                                <i class="fab fa-twitter text-xl"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">Services</h4>
+                        <ul class="text-gray-300 space-y-2">
+                            <li>
+                                <a
+                                    href="#services"
+                                    class="hover:text-white transition"
+                                    >Web Development</a
+                                >
                             </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-green-600 mr-2"></i>
-                                Specialized in freight industry solutions
+                            <li>
+                                <a
+                                    href="#services"
+                                    class="hover:text-white transition"
+                                    >Database Design</a
+                                >
                             </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-green-600 mr-2"></i>
-                                Full-stack development expertise
+                            <li>
+                                <a
+                                    href="#services"
+                                    class="hover:text-white transition"
+                                    >Business Automation</a
+                                >
                             </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-green-600 mr-2"></i>
-                                Agile development approach
+                            <li>
+                                <a
+                                    href="#services"
+                                    class="hover:text-white transition"
+                                    >Freight Solutions</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">Contact</h4>
+                        <ul class="text-gray-300 space-y-2">
+                            <li>
+                                <i class="fas fa-envelope mr-2"></i>
+                                doshbarzanji@gmail.com
+                            </li>
+                            <li>
+                                <i class="fas fa-map-marker-alt mr-2"></i>
+                                Available Remotely
+                            </li>
+                            <li>
+                                <i class="fas fa-clock mr-2"></i> Mon-Fri,
+                                9AM-6PM EST
                             </li>
                         </ul>
                     </div>
                 </div>
-                
-                <!-- Contact Form -->
-                <div class="bg-white p-8 rounded-lg shadow-lg">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-6">Send Message</h3>
-                    
-                    <form id="contact-form" class="space-y-6">
-                        <div>
-                            <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                            <input type="text" id="name" name="name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                        </div>
-                        
-                        <div>
-                            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input type="email" id="email" name="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                        </div>
-                        
-                        <div>
-                            <label for="subject" class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-                            <input type="text" id="subject" name="subject" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-                        </div>
-                        
-                        <div>
-                            <label for="message" class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                            <textarea id="message" name="message" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required></textarea>
-                        </div>
-                        
-                        <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">
-                            <i class="fas fa-paper-plane mr-2"></i>
-                            Send Message
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Footer -->
-    <footer class="bg-gray-800 text-white py-12">
-        <div class="container mx-auto px-6">
-            <div class="grid md:grid-cols-3 gap-8">
-                <div>
-                    <h3 class="text-xl font-bold mb-4">
-                        <i class="fas fa-code text-blue-400"></i> Dosh Barzanji
-                    </h3>
-                    <p class="text-gray-300 mb-4">
-                        Professional software developer creating innovative solutions for modern businesses.
+                <div class="border-t border-gray-700 mt-8 pt-8 text-center">
+                    <p class="text-gray-300">
+                        © 2025 Dosh Barzanji. All rights reserved. |
+                        <a href="#" class="hover:text-white transition"
+                            >Privacy Policy</a
+                        >
+                        |
+                        <a href="#" class="hover:text-white transition"
+                            >Terms of Service</a
+                        >
                     </p>
-                    <div class="flex space-x-4">
-                        <a href="#" class="text-gray-300 hover:text-white transition">
-                            <i class="fab fa-linkedin text-xl"></i>
-                        </a>
-                        <a href="#" class="text-gray-300 hover:text-white transition">
-                            <i class="fab fa-github text-xl"></i>
-                        </a>
-                        <a href="#" class="text-gray-300 hover:text-white transition">
-                            <i class="fab fa-twitter text-xl"></i>
-                        </a>
-                    </div>
-                </div>
-                
-                <div>
-                    <h4 class="text-lg font-semibold mb-4">Services</h4>
-                    <ul class="text-gray-300 space-y-2">
-                        <li><a href="#services" class="hover:text-white transition">Web Development</a></li>
-                        <li><a href="#services" class="hover:text-white transition">Database Design</a></li>
-                        <li><a href="#services" class="hover:text-white transition">Business Automation</a></li>
-                        <li><a href="#services" class="hover:text-white transition">Freight Solutions</a></li>
-                    </ul>
-                </div>
-                
-                <div>
-                    <h4 class="text-lg font-semibold mb-4">Contact</h4>
-                    <ul class="text-gray-300 space-y-2">
-                        <li><i class="fas fa-envelope mr-2"></i> doshbarzanji@gmail.com</li>
-                        <li><i class="fas fa-map-marker-alt mr-2"></i> Available Remotely</li>
-                        <li><i class="fas fa-clock mr-2"></i> Mon-Fri, 9AM-6PM EST</li>
-                    </ul>
                 </div>
             </div>
-            
-            <div class="border-t border-gray-700 mt-8 pt-8 text-center">
-                <p class="text-gray-300">
-                    © 2025 Dosh Barzanji. All rights reserved. | 
-                    <a href="#" class="hover:text-white transition">Privacy Policy</a> | 
-                    <a href="#" class="hover:text-white transition">Terms of Service</a>
-                </p>
-            </div>
-        </div>
-    </footer>
+        </footer>
 
-    <script>
-        // Smooth scrolling for navigation links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
+        <script>
+            // Smooth scrolling for navigation links
+            document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+                anchor.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(
+                        this.getAttribute("href"),
+                    );
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                        });
+                    }
+                });
             });
-        });
 
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        const nav = document.querySelector('nav');
-        
-        mobileMenuBtn?.addEventListener('click', () => {
-            // Mobile menu functionality can be added here
-            console.log('Mobile menu clicked');
-        });
+            // Mobile menu toggle
+            const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+            const nav = document.querySelector("nav");
 
-        // Contact form handling
-        document.getElementById('contact-form')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Get form data
-            const formData = new FormData(this);
-            const name = formData.get('name');
-            const email = formData.get('email');
-            const subject = formData.get('subject');
-            const message = formData.get('message');
-            
-            // Create mailto link
-            const mailtoLink = `mailto:doshbarzanji@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`)}`;
-            
-            // Open email client
-            window.location.href = mailtoLink;
-            
-            // Show success message
-            alert('Thank you for your message! Your email client should open shortly.');
-            
-            // Reset form
-            this.reset();
-        });
-
-        // Add animation on scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -100px 0px'
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('animate-fade-in');
-                }
+            mobileMenuBtn?.addEventListener("click", () => {
+                // Mobile menu functionality can be added here
+                console.log("Mobile menu clicked");
             });
-        }, observerOptions);
 
-        // Observe elements for animation
-        document.querySelectorAll('.card-hover, section').forEach(el => {
-            observer.observe(el);
-        });
-    </script>
-</body>
+            // Contact form handling
+            document
+                .getElementById("contact-form")
+                ?.addEventListener("submit", function (e) {
+                    e.preventDefault();
+
+                    // Get form data
+                    const formData = new FormData(this);
+                    const name = formData.get("name");
+                    const email = formData.get("email");
+                    const subject = formData.get("subject");
+                    const message = formData.get("message");
+
+                    // Create mailto link
+                    const mailtoLink = `mailto:doshbarzanji@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`)}`;
+
+                    // Open email client
+                    window.location.href = mailtoLink;
+
+                    // Show success message
+                    alert(
+                        "Thank you for your message! Your email client should open shortly.",
+                    );
+
+                    // Reset form
+                    this.reset();
+                });
+
+            // Add animation on scroll
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: "0px 0px -100px 0px",
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("animate-fade-in");
+                    }
+                });
+            }, observerOptions);
+
+            // Observe elements for animation
+            document.querySelectorAll(".card-hover, section").forEach((el) => {
+                observer.observe(el);
+            });
+        </script>
+    </body>
 </html>
