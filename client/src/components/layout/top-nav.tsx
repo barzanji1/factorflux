@@ -310,11 +310,24 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setLocation('/profile')} className="cursor-pointer">
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.preventDefault();
+                  setLocation('/profile');
+                }} 
+                className="cursor-pointer"
+              >
                 <UserIcon className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation('/settings')} className="cursor-pointer">
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.preventDefault();
+                  console.log('Settings clicked, navigating to /settings');
+                  setLocation('/settings');
+                }} 
+                className="cursor-pointer"
+              >
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
