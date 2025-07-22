@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { User, Client, Invoice, Load } from "@shared/schema";
 import { 
@@ -310,27 +310,17 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem 
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('Profile clicked, navigating to /profile');
-                  window.location.href = '/profile';
-                }} 
-                className="cursor-pointer"
-              >
-                <UserIcon className="w-4 h-4 mr-2" />
-                Profile
+              <DropdownMenuItem asChild>
+                <Link to="/profile" className="cursor-pointer flex items-center">
+                  <UserIcon className="w-4 h-4 mr-2" />
+                  Profile
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('Settings clicked, navigating to /settings');
-                  window.location.href = '/settings';
-                }} 
-                className="cursor-pointer"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="cursor-pointer flex items-center">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
