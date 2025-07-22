@@ -911,6 +911,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Portfolio route - serve the portfolio website
+  app.get('/portfolio', (req, res) => {
+    const portfolioPath = path.resolve(process.cwd(), 'portfolio-site', 'index.html');
+    if (fs.existsSync(portfolioPath)) {
+      res.sendFile(portfolioPath);
+    } else {
+      res.status(404).json({ message: "Portfolio not found" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

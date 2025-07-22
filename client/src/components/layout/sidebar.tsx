@@ -25,7 +25,7 @@ const navigation = [
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Portfolio", href: "http://localhost:8080", icon: Globe, external: true },
+  { name: "Portfolio", href: "/portfolio", icon: Globe, external: true },
   { name: "Fuel Card Admin", href: "/fuel-card-admin", icon: CreditCard, role: "manager" },
   { name: "Admin", href: "/admin", icon: Shield, role: "manager" },
 ];
