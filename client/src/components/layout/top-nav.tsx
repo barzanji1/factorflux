@@ -313,7 +313,8 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               <DropdownMenuItem 
                 onClick={(e) => {
                   e.preventDefault();
-                  setLocation('/profile');
+                  console.log('Profile clicked, navigating to /profile');
+                  window.location.href = '/profile';
                 }} 
                 className="cursor-pointer"
               >
@@ -324,7 +325,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                 onClick={(e) => {
                   e.preventDefault();
                   console.log('Settings clicked, navigating to /settings');
-                  setLocation('/settings');
+                  window.location.href = '/settings';
                 }} 
                 className="cursor-pointer"
               >
