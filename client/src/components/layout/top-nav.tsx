@@ -312,7 +312,6 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem 
                 onClick={() => {
-                  console.log('Profile clicked - navigating to /profile');
                   setTimeout(() => {
                     setLocation('/profile');
                     window.location.reload();
@@ -325,7 +324,6 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => {
-                  console.log('Settings clicked - navigating to /settings');
                   setTimeout(() => {
                     setLocation('/settings');
                     window.location.reload();
