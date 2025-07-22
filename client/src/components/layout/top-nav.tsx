@@ -313,7 +313,10 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               <DropdownMenuItem 
                 onClick={() => {
                   console.log('Profile clicked - navigating to /profile');
-                  setTimeout(() => setLocation('/profile'), 100);
+                  setTimeout(() => {
+                    setLocation('/profile');
+                    window.location.reload();
+                  }, 100);
                 }} 
                 className="cursor-pointer"
               >
@@ -322,8 +325,11 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => {
-                  console.log('Settings clicked - navigating to /profile with settings tab');
-                  setTimeout(() => setLocation('/profile'), 100);
+                  console.log('Settings clicked - navigating to /settings');
+                  setTimeout(() => {
+                    setLocation('/settings');
+                    window.location.reload();
+                  }, 100);
                 }} 
                 className="cursor-pointer"
               >
