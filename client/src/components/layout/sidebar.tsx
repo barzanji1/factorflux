@@ -13,7 +13,8 @@ import {
   LogOut,
   Shield,
   CreditCard,
-  Fuel
+  Fuel,
+  Globe
 } from "lucide-react";
 
 const navigation = [
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "Portfolio", href: "http://localhost:8080", icon: Globe, external: true },
   { name: "Fuel Card Admin", href: "/fuel-card-admin", icon: CreditCard, role: "manager" },
   { name: "Admin", href: "/admin", icon: Shield, role: "manager" },
 ];
@@ -79,6 +81,23 @@ export default function Sidebar() {
           }
           
           const isActive = location === item.href;
+          
+          // Handle external links differently
+          if (item.external) {
+            return (
+              <a
+                key={item.name}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all duration-200 group"
+              >
+                <item.icon className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors" />
+                <span className="font-medium">{item.name}</span>
+              </a>
+            );
+          }
+          
           return (
             <button
               key={item.name}
