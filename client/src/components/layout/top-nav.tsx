@@ -310,17 +310,25 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem asChild>
-                <Link to="/profile" className="cursor-pointer flex items-center">
-                  <UserIcon className="w-4 h-4 mr-2" />
-                  Profile
-                </Link>
+              <DropdownMenuItem 
+                onClick={() => {
+                  console.log('Profile clicked - navigating to /profile');
+                  setTimeout(() => setLocation('/profile'), 100);
+                }} 
+                className="cursor-pointer"
+              >
+                <UserIcon className="w-4 h-4 mr-2" />
+                Profile
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/settings" className="cursor-pointer flex items-center">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
-                </Link>
+              <DropdownMenuItem 
+                onClick={() => {
+                  console.log('Settings clicked - navigating to /profile with settings tab');
+                  setTimeout(() => setLocation('/profile'), 100);
+                }} 
+                className="cursor-pointer"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
