@@ -312,10 +312,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem 
                 onClick={() => {
-                  setTimeout(() => {
-                    setLocation('/profile');
-                    window.location.reload();
-                  }, 100);
+                  setLocation('/profile');
                 }} 
                 className="cursor-pointer"
               >
@@ -324,10 +321,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => {
-                  setTimeout(() => {
-                    setLocation('/settings');
-                    window.location.reload();
-                  }, 100);
+                  setLocation('/settings');
                 }} 
                 className="cursor-pointer"
               >
