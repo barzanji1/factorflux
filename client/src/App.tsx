@@ -20,6 +20,7 @@ import FuelCardAdmin from "@/pages/fuel-card-admin";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 
+
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
   useTheme(); // Initialize theme
