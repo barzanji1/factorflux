@@ -310,23 +310,17 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem 
-                onClick={() => {
-                  setLocation('/profile');
-                }} 
-                className="cursor-pointer"
-              >
-                <UserIcon className="w-4 h-4 mr-2" />
-                Profile
+              <DropdownMenuItem asChild>
+                <Link to="/profile" className="cursor-pointer flex items-center">
+                  <UserIcon className="w-4 h-4 mr-2" />
+                  Profile
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => {
-                  setLocation('/');
-                }} 
-                className="cursor-pointer"
-              >
-                <Home className="w-4 h-4 mr-2" />
-                Home
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="cursor-pointer flex items-center">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
