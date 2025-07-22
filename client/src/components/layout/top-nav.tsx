@@ -320,16 +320,13 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                 Profile
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('Settings clicked - attempting navigation to /settings');
-                  setLocation('/settings');
-                  console.log('setLocation called for /settings');
+                onClick={() => {
+                  setLocation('/');
                 }} 
                 className="cursor-pointer"
               >
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
+                <Home className="w-4 h-4 mr-2" />
+                Home
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
