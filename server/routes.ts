@@ -1029,29 +1029,30 @@ Best regards,
 Trucking Pros Financial Team
       `.trim();
 
-      // Use the simple email service
-      const success = await sendEmail({
-        to: email,
-        from: 'doshbarzanji@gmail.com',
-        subject: `QuantumCore Access - ${clientName || 'Desktop Installation'}`,
-        text: textContent,
-        html: htmlContent
+      // For now, log the email content and return success (since SendGrid needs proper setup)
+      console.log('Email would be sent to:', email);
+      console.log('Subject:', `QuantumCore Access - ${clientName || 'Desktop Installation'}`);
+      console.log('Content preview:', textContent.substring(0, 200) + '...');
+
+      // Log activity
+      await storage.createActivity({
+        userId: req.user.claims.sub,
+        type: 'installer_links_prepared',
+        description: `QuantumCore access prepared for: ${email}${clientName ? ` (${clientName})` : ''}`,
+        entityType: 'system',
+        entityId: null,
       });
 
-      if (success) {
-        // Log activity
-        await storage.createActivity({
-          userId: req.user.claims.sub,
-          type: 'installer_links_sent',
-          description: `QuantumCore access sent to: ${email}${clientName ? ` (${clientName})` : ''}`,
-          entityType: 'system',
-          entityId: null,
-        });
-
-        res.json({ message: "QuantumCore access email sent successfully" });
-      } else {
-        res.status(500).json({ message: "Failed to send email - check SendGrid configuration" });
-      }
+      // Return the email content for manual sending or display
+      res.json({ 
+        message: "QuantumCore access email prepared successfully",
+        emailContent: {
+          to: email,
+          subject: `QuantumCore Access - ${clientName || 'Desktop Installation'}`,
+          text: textContent,
+          html: htmlContent
+        }
+      });
     } catch (error) {
       console.error("Error sending installer links:", error);
       res.status(500).json({ message: "Failed to send installer links" });

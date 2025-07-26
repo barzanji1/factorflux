@@ -108,10 +108,26 @@ export default function Admin() {
       return response.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: "Email Sent",
-        description: data.message,
-      });
+      if (data.emailContent) {
+        // Show email content in a modal or copy to clipboard
+        const emailText = `To: ${data.emailContent.to}\nSubject: ${data.emailContent.subject}\n\n${data.emailContent.text}`;
+        navigator.clipboard.writeText(emailText).then(() => {
+          toast({
+            title: "Email Prepared",
+            description: "Email content copied to clipboard. Please send manually via your email client.",
+          });
+        }).catch(() => {
+          toast({
+            title: "Email Prepared", 
+            description: "Email content is ready. Check console for details or contact admin.",
+          });
+        });
+      } else {
+        toast({
+          title: "Email Sent",
+          description: data.message,
+        });
+      }
       setEmailForm({ email: '', clientName: '', message: '' });
     },
     onError: (error: any) => {
@@ -171,7 +187,7 @@ export default function Admin() {
       <div className="flex h-screen">
         <Sidebar />
         <div className="flex-1 flex flex-col">
-          <TopNav />
+          <TopNav title="Admin Panel" subtitle="Access Denied" />
           <main className="flex-1 p-6">
             <div className="text-center">
               <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
@@ -294,7 +310,7 @@ export default function Admin() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Email includes web access link and desktop installers for all platforms
+                      Email content will be prepared and copied to clipboard for manual sending
                     </div>
                     <Button 
                       type="submit" 
@@ -309,10 +325,16 @@ export default function Admin() {
                       ) : (
                         <>
                           <Mail className="w-4 h-4" />
-                          <span>Send Access Email</span>
+                          <span>Prepare Email</span>
                         </>
                       )}
                     </Button>
+                  </div>
+                  <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                    <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>Note:</strong> Email content will be prepared and copied to your clipboard. 
+                      You can then paste and send it through your preferred email client.
+                    </div>
                   </div>
                 </form>
               </CardContent>
