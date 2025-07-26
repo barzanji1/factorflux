@@ -108,8 +108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/users', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = await storage.getUser(req.user.claims.sub);
-      if (currentUser?.role !== 'manager') {
-        return res.status(403).json({ message: "Access denied. Manager role required." });
+      if (currentUser?.role !== 'manager' && currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Manager or admin role required." });
       }
 
       const users = await storage.getAllUsers();
@@ -123,15 +123,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/admin/users/:userId/role', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = await storage.getUser(req.user.claims.sub);
-      if (currentUser?.role !== 'manager') {
-        return res.status(403).json({ message: "Access denied. Manager role required." });
+      if (currentUser?.role !== 'manager' && currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Manager or admin role required." });
       }
 
       const { userId } = req.params;
       const { role } = req.body;
 
-      if (!['employee', 'manager'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role. Must be 'employee' or 'manager'." });
+      if (!['employee', 'manager', 'admin'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be 'employee', 'manager', or 'admin'." });
       }
 
       // Prevent changing own role
@@ -533,7 +533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceData = insertInvoiceSchema.partial().parse(req.body);
       
       // Add approval data if status is being changed to approved and user is manager
-      if (invoiceData.status === 'approved' && user?.role === 'manager') {
+      if (invoiceData.status === 'approved' && (user?.role === 'manager' || user?.role === 'admin')) {
         invoiceData.approvedBy = req.user.claims.sub;
         invoiceData.approvedAt = new Date();
       }
@@ -816,8 +816,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/invoices/:id/approve', isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== 'manager') {
-        return res.status(403).json({ message: "Only managers can approve invoices" });
+      if (user?.role !== 'manager' && user?.role !== 'admin') {
+        return res.status(403).json({ message: "Only managers and admins can approve invoices" });
       }
 
       const id = parseInt(req.params.id);

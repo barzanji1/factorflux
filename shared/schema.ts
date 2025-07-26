@@ -35,7 +35,7 @@ export const users = pgTable("users", {
   jobTitle: varchar("job_title"),
   department: varchar("department"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role", { enum: ["employee", "manager"] }).default("employee").notNull(),
+  role: varchar("role", { enum: ["employee", "manager", "admin"] }).default("employee").notNull(),
   // Personal settings
   bio: text("bio"),
   location: varchar("location"),

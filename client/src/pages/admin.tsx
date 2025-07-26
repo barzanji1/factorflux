@@ -55,7 +55,7 @@ export default function Admin() {
 
   // Check if user is manager
   useEffect(() => {
-    if (user && (user as any).role !== 'manager') {
+    if (user && (user as any).role !== 'manager' && (user as any).role !== 'admin') {
       toast({
         title: "Access Denied",
         description: "You don't have permission to access this page.",
@@ -66,7 +66,7 @@ export default function Admin() {
 
   const { data: users, isLoading: isLoadingUsers } = useQuery({
     queryKey: ["/api/admin/users"],
-    enabled: !!user && (user as any).role === 'manager',
+    enabled: !!user && ((user as any).role === 'manager' || (user as any).role === 'admin'),
   });
 
   const updateUserRole = useMutation({
@@ -129,7 +129,7 @@ export default function Admin() {
     );
   }
 
-  if (!user || (user as any).role !== 'manager') {
+  if (!user || ((user as any).role !== 'manager' && (user as any).role !== 'admin')) {
     return (
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
         <Sidebar />

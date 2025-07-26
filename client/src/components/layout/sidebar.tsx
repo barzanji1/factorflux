@@ -76,7 +76,7 @@ export default function Sidebar() {
       <nav className="flex-1 p-4 space-y-1">
         {navigation.map((item) => {
           // Hide admin tab for non-managers
-          if (item.role === "manager" && user?.role !== "manager") {
+          if (item.role === "manager" && user?.role !== "manager" && user?.role !== "admin") {
             return null;
           }
           
