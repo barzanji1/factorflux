@@ -1,6 +1,9 @@
 {
   "appId": "com.quantumcore.app",
   "productName": "QuantumCore",
+  "description": "QuantumCore - Freight Factoring Management System",
+  "author": "Trucking Pros Financial",
+  "version": "1.0.0",
   "directories": {
     "output": "electron-dist"
   },
@@ -8,7 +11,7 @@
     "dist/**/*",
     "electron/**/*",
     "uploads/**/*",
-    "node_modules/**/*",
+    "!node_modules/**/*",
     "package.json"
   ],
   "mac": {

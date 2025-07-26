@@ -20,12 +20,10 @@ cat > electron-dist/package.json << EOF
   "name": "quantumcore-desktop",
   "version": "1.0.0",
   "description": "QuantumCore - Freight Factoring Management System",
+  "author": "Trucking Pros Financial",
   "main": "electron/main.js",
   "scripts": {
     "start": "node dist/index.js"
-  },
-  "dependencies": {
-    "electron": "^32.2.7"
   }
 }
 EOF
