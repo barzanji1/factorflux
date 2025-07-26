@@ -14,7 +14,8 @@ import {
   FileText,
   Users,
   FolderOpen,
-  Home
+  Home,
+  Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     { label: "New Invoice", icon: FileText, action: () => setLocation("/invoices") },
     { label: "Add Client", icon: Users, action: () => setLocation("/clients") },
     { label: "Upload Document", icon: FolderOpen, action: () => setLocation("/documents") },
+    { label: "Desktop App", icon: Download, action: () => setLocation("/download") },
   ];
 
   // Define pages where Home button should appear (NOT on Dashboard)

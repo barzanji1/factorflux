@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Truck, FileText, Users, DollarSign } from "lucide-react";
+import ContextualDownload from "@/components/contextual-download";
 
 export default function Landing() {
   return (
@@ -68,6 +69,11 @@ export default function Landing() {
           </Card>
         </div>
 
+        {/* Contextual Download Section */}
+        <div className="mb-16">
+          <ContextualDownload showAllOptions={true} />
+        </div>
+
         {/* Call to Action */}
         <div className="text-center">
           <Card className="max-w-2xl mx-auto">
@@ -76,7 +82,7 @@ export default function Landing() {
                 Ready to streamline your freight factoring?
               </h2>
               <p className="text-gray-600 mb-6">
-                Join hundreds of freight companies already using EllaFlow to manage their invoice processing workflow.
+                Join hundreds of freight companies already using QuantumCore to manage their invoice processing workflow.
               </p>
               <Button size="lg" onClick={() => window.location.href = '/api/login'}>
                 Sign In Now

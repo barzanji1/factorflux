@@ -19,6 +19,7 @@ import FuelCards from "@/pages/fuel-cards";
 import FuelCardAdmin from "@/pages/fuel-card-admin";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
+import DownloadPage from "@/pages/download";
 
 
 function Router() {
@@ -28,7 +29,10 @@ function Router() {
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/download" component={DownloadPage} />
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
@@ -43,6 +47,7 @@ function Router() {
           <Route path="/fuel-card-admin" component={FuelCardAdmin} />
           <Route path="/profile" component={Profile} />
           <Route path="/settings" component={Settings} />
+          <Route path="/download" component={DownloadPage} />
         </>
       )}
       <Route component={NotFound} />
