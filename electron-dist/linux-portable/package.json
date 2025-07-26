@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "QuantumCore - Freight Factoring Management System",
   "author": "Trucking Pros Financial",
-  "main": "electron/main.js",
+  "main": "simple-launcher.js",
   "homepage": "./",
   "scripts": {
     "start": "electron ."

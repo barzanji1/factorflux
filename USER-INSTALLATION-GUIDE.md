@@ -19,20 +19,20 @@ Choose the version for your operating system:
 #### Windows:
 1. Go to the extracted folder
 2. Double-click `start-quantumcore.bat`
-3. First launch: Electron will download automatically (one-time setup)
-4. QuantumCore will open as a desktop application window
+3. First launch: Electron downloads automatically (requires internet)
+4. QuantumCore opens as a desktop app connected to your web account
 
 #### Mac:
 1. Go to the extracted folder
 2. Double-click `start-quantumcore.sh` (or run in Terminal)
-3. First launch: Electron will download automatically (one-time setup)
-4. QuantumCore will open as a desktop application window
+3. First launch: Electron downloads automatically (requires internet)
+4. QuantumCore opens as a desktop app connected to your web account
 
 #### Linux:
 1. Go to the extracted folder
 2. Run `./start-quantumcore.sh` in terminal
-3. First launch: Electron will download automatically (one-time setup)
-4. QuantumCore will open as a desktop application window
+3. First launch: Electron downloads automatically (requires internet)
+4. QuantumCore opens as a desktop app connected to your web account
 
 ## 🔧 Requirements
 
@@ -42,7 +42,7 @@ Choose the version for your operating system:
 - **Linux**: Most modern distributions
 - **RAM**: 4GB minimum
 - **Storage**: 1GB free space (includes Electron runtime)
-- **Internet**: Required for database access
+- **Internet**: Required for connecting to QuantumCore web service
 
 ### Prerequisites:
 - **Node.js** must be installed on your computer
@@ -53,10 +53,10 @@ Choose the version for your operating system:
 ## 🚀 How It Works
 
 1. **Download & Extract**: Get the portable version for your OS
-2. **Run the Script**: The startup script installs Electron and launches QuantumCore
-3. **Desktop App**: QuantumCore opens as a native desktop application
-4. **Login**: Use your Replit account to access the system
-5. **Full Access**: All features work just like the web version
+2. **Run the Script**: Installs Electron and launches QuantumCore desktop wrapper
+3. **Desktop App**: Opens as native app window connecting to your web account
+4. **Auto-Login**: Automatically connects to your existing QuantumCore account
+5. **Full Access**: Same features as web version with desktop convenience
 
 ## ✅ Benefits of Desktop Version
 
@@ -80,20 +80,20 @@ Choose the version for your operating system:
 - Restart your computer after installation
 - Try running the start script again
 
-### Port Already in Use:
-- Close any other QuantumCore instances
-- Restart your computer
-- Run the start script again
+### Electron Download Fails:
+- Ensure you have internet connection
+- Check if corporate firewall blocks npm downloads
+- Try running from a different network
 
 ### Application Doesn't Start:
 - Check that Node.js is properly installed
-- Ensure you have internet connection for first-time Electron download
-- Check if any firewall is blocking the application
+- Ensure internet connection for Electron download
+- Try deleting node_modules folder and running script again
 
-### Database Connection Issues:
+### Cannot Connect to QuantumCore:
 - Ensure you have internet connection
-- Check if your firewall allows the application
-- Contact your system administrator
+- Check if firewall blocks web access
+- Contact your system administrator if behind corporate firewall
 
 ## 📞 Support
 

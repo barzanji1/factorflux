@@ -23,16 +23,18 @@ function createWindow() {
     show: false, // Don't show until ready
   });
 
-  // Load the app
-  if (isDev) {
-    // In development, connect to the Vite dev server
-    mainWindow.loadURL('http://localhost:5000');
-    
-    // Open DevTools in development
-    mainWindow.webContents.openDevTools();
+  // Load the app - for desktop, always load from static files
+  const indexPath = path.join(__dirname, '../dist/public/index.html');
+  console.log('Loading from:', indexPath);
+  
+  // Check if the file exists
+  const fs = require('fs');
+  if (fs.existsSync(indexPath)) {
+    mainWindow.loadFile(indexPath);
   } else {
-    // In production, load the built files
-    mainWindow.loadFile(path.join(__dirname, '../dist/public/index.html'));
+    // Fallback: try to connect to web version
+    console.log('Static files not found, connecting to web version...');
+    mainWindow.loadURL('https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev');
   }
 
   // Show window when ready to prevent visual flash
