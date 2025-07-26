@@ -1,0 +1,32 @@
+{
+  "appId": "com.quantumcore.app",
+  "productName": "QuantumCore",
+  "directories": {
+    "output": "electron-dist"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "uploads/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+  "mac": {
+    "category": "public.app-category.business",
+    "target": "dmg"
+  },
+  "win": {
+    "target": "nsis",
+    "icon": "electron/assets/icon.ico"
+  },
+  "linux": {
+    "target": "AppImage",
+    "category": "Office"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}
