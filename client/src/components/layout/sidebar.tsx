@@ -17,7 +17,7 @@ import {
   Globe,
   Download
 } from "lucide-react";
-import ContextualDownload from "@/components/contextual-download";
+
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -120,10 +120,7 @@ export default function Sidebar() {
           );
         })}
         
-        {/* Contextual Download - Compact version in sidebar */}
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <ContextualDownload compact={true} />
-        </div>
+
       </nav>
 
       {/* Logout */}
