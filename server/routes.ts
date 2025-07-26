@@ -912,6 +912,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Desktop installer download routes - Direct download links
+  app.get('/api/desktop/download/windows', async (req, res) => {
+    try {
+      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Windows-Portable.tar.gz');
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Windows installer not found" });
+      }
+
+      const stats = fs.statSync(filePath);
+      
+      res.setHeader('Content-Type', 'application/gzip');
+      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Windows-Portable.tar.gz"');
+      res.setHeader('Content-Length', stats.size.toString());
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.on('error', (error) => {
+        console.error('Error streaming Windows installer:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error downloading Windows installer' });
+        }
+      });
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading Windows installer:", error);
+      res.status(500).json({ message: "Failed to download Windows installer" });
+    }
+  });
+
+  app.get('/api/desktop/download/mac', async (req, res) => {
+    try {
+      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Mac-Portable.tar.gz');
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Mac installer not found" });
+      }
+
+      const stats = fs.statSync(filePath);
+      
+      res.setHeader('Content-Type', 'application/gzip');
+      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Mac-Portable.tar.gz"');
+      res.setHeader('Content-Length', stats.size.toString());
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.on('error', (error) => {
+        console.error('Error streaming Mac installer:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error downloading Mac installer' });
+        }
+      });
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading Mac installer:", error);
+      res.status(500).json({ message: "Failed to download Mac installer" });
+    }
+  });
+
+  app.get('/api/desktop/download/linux', async (req, res) => {
+    try {
+      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Linux-Portable.tar.gz');
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Linux installer not found" });
+      }
+
+      const stats = fs.statSync(filePath);
+      
+      res.setHeader('Content-Type', 'application/gzip');
+      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Linux-Portable.tar.gz"');
+      res.setHeader('Content-Length', stats.size.toString());
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.on('error', (error) => {
+        console.error('Error streaming Linux installer:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error downloading Linux installer' });
+        }
+      });
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading Linux installer:", error);
+      res.status(500).json({ message: "Failed to download Linux installer" });
+    }
+  });
+
+  // Desktop installation guide download route
+  app.get('/api/desktop/download/guide', async (req, res) => {
+    try {
+      const filePath = path.resolve(process.cwd(), 'DESKTOP-TROUBLESHOOTING-GUIDE.md');
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Installation guide not found" });
+      }
+
+      const stats = fs.statSync(filePath);
+      
+      res.setHeader('Content-Type', 'text/markdown');
+      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Installation-Guide.md"');
+      res.setHeader('Content-Length', stats.size.toString());
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.on('error', (error) => {
+        console.error('Error streaming installation guide:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error downloading installation guide' });
+        }
+      });
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading installation guide:", error);
+      res.status(500).json({ message: "Failed to download installation guide" });
+    }
+  });
+
   // Email installer links route - send installer download links via email
   app.post('/api/email/installer-links', isAuthenticated, async (req: any, res) => {
     try {
@@ -949,28 +1067,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             <div style="margin: 15px 0;">
               <strong>🪟 Windows:</strong><br>
-              <a href="${appUrl}/api/download/windows" style="color: #2563eb; text-decoration: none;">
+              <a href="${appUrl}/api/desktop/download/windows" style="color: #2563eb; text-decoration: none;">
                 QuantumCore-Windows-Portable.tar.gz
               </a> (5.7 MB)
             </div>
             
             <div style="margin: 15px 0;">
               <strong>🍎 Mac:</strong><br>
-              <a href="${appUrl}/api/download/mac" style="color: #2563eb; text-decoration: none;">
+              <a href="${appUrl}/api/desktop/download/mac" style="color: #2563eb; text-decoration: none;">
                 QuantumCore-Mac-Portable.tar.gz
               </a> (5.7 MB)
             </div>
             
             <div style="margin: 15px 0;">
               <strong>🐧 Linux:</strong><br>
-              <a href="${appUrl}/api/download/linux" style="color: #2563eb; text-decoration: none;">
+              <a href="${appUrl}/api/desktop/download/linux" style="color: #2563eb; text-decoration: none;">
                 QuantumCore-Linux-Portable.tar.gz
               </a> (5.7 MB)
             </div>
             
             <div style="margin: 15px 0;">
               <strong>📖 Setup Guide:</strong><br>
-              <a href="${appUrl}/api/download/guide" style="color: #2563eb; text-decoration: none;">
+              <a href="${appUrl}/api/desktop/download/guide" style="color: #2563eb; text-decoration: none;">
                 Installation Instructions
               </a>
             </div>
