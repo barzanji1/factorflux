@@ -17,19 +17,22 @@ Choose the version for your operating system:
 ### Step 3: Run QuantumCore
 
 #### Windows:
-1. Go to the extracted `win-portable` folder
+1. Go to the extracted folder
 2. Double-click `start-quantumcore.bat`
-3. QuantumCore will start in your web browser
+3. First launch: Electron will download automatically (one-time setup)
+4. QuantumCore will open as a desktop application window
 
 #### Mac:
-1. Go to the extracted `mac-portable` folder
+1. Go to the extracted folder
 2. Double-click `start-quantumcore.sh` (or run in Terminal)
-3. QuantumCore will start in your web browser
+3. First launch: Electron will download automatically (one-time setup)
+4. QuantumCore will open as a desktop application window
 
 #### Linux:
-1. Go to the extracted `linux-portable` folder
+1. Go to the extracted folder
 2. Run `./start-quantumcore.sh` in terminal
-3. QuantumCore will start in your web browser
+3. First launch: Electron will download automatically (one-time setup)
+4. QuantumCore will open as a desktop application window
 
 ## 🔧 Requirements
 
@@ -38,7 +41,7 @@ Choose the version for your operating system:
 - **Mac**: macOS 10.15 or later
 - **Linux**: Most modern distributions
 - **RAM**: 4GB minimum
-- **Storage**: 1GB free space
+- **Storage**: 1GB free space (includes Electron runtime)
 - **Internet**: Required for database access
 
 ### Prerequisites:
@@ -50,8 +53,8 @@ Choose the version for your operating system:
 ## 🚀 How It Works
 
 1. **Download & Extract**: Get the portable version for your OS
-2. **Run the Script**: The startup script launches the QuantumCore server
-3. **Automatic Browser**: Your default browser opens to QuantumCore
+2. **Run the Script**: The startup script installs Electron and launches QuantumCore
+3. **Desktop App**: QuantumCore opens as a native desktop application
 4. **Login**: Use your Replit account to access the system
 5. **Full Access**: All features work just like the web version
 
@@ -82,9 +85,10 @@ Choose the version for your operating system:
 - Restart your computer
 - Run the start script again
 
-### Browser Doesn't Open:
-- Manually go to: http://localhost:5000
-- Check if any firewall is blocking the connection
+### Application Doesn't Start:
+- Check that Node.js is properly installed
+- Ensure you have internet connection for first-time Electron download
+- Check if any firewall is blocking the application
 
 ### Database Connection Issues:
 - Ensure you have internet connection
