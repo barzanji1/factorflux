@@ -946,6 +946,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Desktop installer download routes
+  app.get('/download/windows', (req, res) => {
+    const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Windows-Portable.tar.gz');
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, 'QuantumCore-Windows-Portable.tar.gz');
+    } else {
+      res.status(404).json({ message: "Windows installer not found" });
+    }
+  });
+
+  app.get('/download/mac', (req, res) => {
+    const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Mac-Portable.tar.gz');
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, 'QuantumCore-Mac-Portable.tar.gz');
+    } else {
+      res.status(404).json({ message: "Mac installer not found" });
+    }
+  });
+
+  app.get('/download/linux', (req, res) => {
+    const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Linux-Portable.tar.gz');
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, 'QuantumCore-Linux-Portable.tar.gz');
+    } else {
+      res.status(404).json({ message: "Linux installer not found" });
+    }
+  });
+
+  app.get('/download/guide', (req, res) => {
+    const filePath = path.resolve(process.cwd(), 'USER-INSTALLATION-GUIDE.md');
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, 'USER-INSTALLATION-GUIDE.md');
+    } else {
+      res.status(404).json({ message: "Installation guide not found" });
+    }
+  });
+
+  // Download page for easy access
+  app.get('/downloads', (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>QuantumCore Desktop Downloads</title>
+        <style>
+          body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+          .download-card { background: #f5f5f5; padding: 20px; margin: 10px 0; border-radius: 8px; }
+          .download-btn { background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 5px; }
+          .download-btn:hover { background: #1d4ed8; }
+          .file-size { color: #666; font-size: 0.9em; }
+        </style>
+      </head>
+      <body>
+        <h1>🚀 QuantumCore Desktop Installers</h1>
+        <p>Download the portable desktop version for your operating system:</p>
+        
+        <div class="download-card">
+          <h3>🪟 Windows</h3>
+          <p>For Windows 10 and later</p>
+          <a href="/download/windows" class="download-btn">Download Windows Version</a>
+          <span class="file-size">(5.7 MB)</span>
+        </div>
+        
+        <div class="download-card">
+          <h3>🍎 Mac</h3>
+          <p>For macOS 10.15 and later</p>
+          <a href="/download/mac" class="download-btn">Download Mac Version</a>
+          <span class="file-size">(5.7 MB)</span>
+        </div>
+        
+        <div class="download-card">
+          <h3>🐧 Linux</h3>
+          <p>For most Linux distributions</p>
+          <a href="/download/linux" class="download-btn">Download Linux Version</a>
+          <span class="file-size">(5.7 MB)</span>
+        </div>
+        
+        <div class="download-card">
+          <h3>📖 Installation Guide</h3>
+          <p>Complete setup instructions and troubleshooting</p>
+          <a href="/download/guide" class="download-btn">Download Guide</a>
+        </div>
+        
+        <h2>🛠️ Quick Setup:</h2>
+        <ol>
+          <li>Download the file for your operating system</li>
+          <li>Extract the archive (no special software needed)</li>
+          <li>Run the startup script</li>
+          <li>QuantumCore opens in your browser automatically</li>
+        </ol>
+        
+        <p><strong>Requirements:</strong> Node.js must be installed on your computer (download from <a href="https://nodejs.org/">nodejs.org</a>)</p>
+      </body>
+      </html>
+    `);
+  });
+
   // Portfolio route - serve the portfolio website
   app.get('/portfolio', (req, res) => {
     const portfolioPath = path.resolve(process.cwd(), 'portfolio-site', 'index.html');
