@@ -8,6 +8,7 @@ Copy and paste these complete URLs for direct downloads:
 ```
 https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
 ```
+**LOCAL TESTING:** http://localhost:5000/api/desktop/download/windows (VERIFIED WORKING)
 - **File:** QuantumCore-Windows-Portable.tar.gz
 - **Size:** 5.7 MB
 - **Platform:** Windows 10/11
