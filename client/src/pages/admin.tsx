@@ -111,17 +111,23 @@ export default function Admin() {
       if (data.emailContent) {
         // Show email content in a modal or copy to clipboard
         const emailText = `To: ${data.emailContent.to}\nSubject: ${data.emailContent.subject}\n\n${data.emailContent.text}`;
-        navigator.clipboard.writeText(emailText).then(() => {
-          toast({
-            title: "Email Prepared",
-            description: "Email content copied to clipboard. Please send manually via your email client.",
+        
+        // Try to copy to clipboard
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(emailText).then(() => {
+            toast({
+              title: "Email Copied to Clipboard!",
+              description: "Email content copied successfully. Paste it into your email client and send.",
+            });
+            console.log('Email content copied to clipboard:', emailText.substring(0, 200) + '...');
+          }).catch((error) => {
+            console.error('Clipboard failed:', error);
+            showEmailContentDialog(emailText);
           });
-        }).catch(() => {
-          toast({
-            title: "Email Prepared", 
-            description: "Email content is ready. Check console for details or contact admin.",
-          });
-        });
+        } else {
+          console.log('Clipboard not available, showing email content');
+          showEmailContentDialog(emailText);
+        }
       } else {
         toast({
           title: "Email Sent",
@@ -159,6 +165,35 @@ export default function Admin() {
     if (!newRole) return;
 
     updateUserRole.mutate({ userId, role: newRole });
+  };
+
+  const showEmailContentDialog = (emailText: string) => {
+    // Create a simple dialog to show email content
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: white; border: 2px solid #ccc; border-radius: 8px;
+      padding: 20px; max-width: 80%; max-height: 80%; overflow: auto;
+      z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+    
+    dialog.innerHTML = `
+      <h3 style="margin-top: 0; color: #333;">Email Content Ready</h3>
+      <p style="color: #666; margin-bottom: 15px;">Copy this content and paste it into your email client:</p>
+      <textarea readonly style="width: 100%; height: 300px; font-family: monospace; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">${emailText}</textarea>
+      <div style="margin-top: 15px; text-align: right;">
+        <button onclick="this.parentElement.parentElement.remove()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Close</button>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Select all text in textarea
+    const textarea = dialog.querySelector('textarea');
+    if (textarea) {
+      textarea.select();
+      textarea.focus();
+    }
   };
 
   const handleSendEmail = (e: React.FormEvent) => {
