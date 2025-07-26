@@ -19,44 +19,42 @@ Choose the version for your operating system:
 #### Windows:
 1. Go to the extracted folder
 2. Double-click `start-quantumcore.bat`
-3. First launch: Electron downloads automatically (requires internet)
-4. QuantumCore opens as a desktop app connected to your web account
+3. QuantumCore opens in your default web browser
+4. Follow the instructions to create a desktop shortcut
 
 #### Mac:
 1. Go to the extracted folder
 2. Double-click `start-quantumcore.sh` (or run in Terminal)
-3. First launch: Electron downloads automatically (requires internet)
-4. QuantumCore opens as a desktop app connected to your web account
+3. QuantumCore opens in your default web browser
+4. Use Safari/Chrome to "Add to Dock" for desktop access
 
 #### Linux:
 1. Go to the extracted folder
 2. Run `./start-quantumcore.sh` in terminal
-3. First launch: Electron downloads automatically (requires internet)
-4. QuantumCore opens as a desktop app connected to your web account
+3. QuantumCore opens in your default web browser
+4. Create a desktop launcher using the provided instructions
 
 ## 🔧 Requirements
 
 ### System Requirements:
 - **Windows**: Windows 10 or later
-- **Mac**: macOS 10.15 or later
+- **Mac**: macOS 10.15 or later  
 - **Linux**: Most modern distributions
-- **RAM**: 4GB minimum
-- **Storage**: 1GB free space (includes Electron runtime)
-- **Internet**: Required for connecting to QuantumCore web service
+- **RAM**: 2GB minimum
+- **Storage**: 50MB free space
+- **Internet**: Required for accessing QuantumCore
 
 ### Prerequisites:
-- **Node.js** must be installed on your computer
-  - Download from: https://nodejs.org/
-  - Choose the LTS (Long Term Support) version
-  - Follow the installation wizard
+- **Web Browser** (Chrome, Firefox, Safari, or Edge)
+- **No additional software required**
 
 ## 🚀 How It Works
 
-1. **Download & Extract**: Get the portable version for your OS
-2. **Run the Script**: Installs Electron and launches QuantumCore desktop wrapper
-3. **Desktop App**: Opens as native app window connecting to your web account
-4. **Auto-Login**: Automatically connects to your existing QuantumCore account
-5. **Full Access**: Same features as web version with desktop convenience
+1. **Download & Extract**: Get the launcher for your OS
+2. **Run the Script**: Opens QuantumCore directly in your web browser
+3. **Browser Access**: Full QuantumCore interface in dedicated browser window
+4. **Auto-Login**: Use your existing QuantumCore account credentials
+5. **Desktop Integration**: Create shortcuts for quick access like a desktop app
 
 ## ✅ Benefits of Desktop Version
 
@@ -75,25 +73,19 @@ Choose the version for your operating system:
 
 ## 🆘 Troubleshooting
 
-### "Node.js not found" Error:
-- Install Node.js from https://nodejs.org/
-- Restart your computer after installation
-- Try running the start script again
-
-### Electron Download Fails:
-- Ensure you have internet connection
-- Check if corporate firewall blocks npm downloads
-- Try running from a different network
-
-### Application Doesn't Start:
-- Check that Node.js is properly installed
-- Ensure internet connection for Electron download
-- Try deleting node_modules folder and running script again
+### Browser Doesn't Open:
+- Manually go to: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+- Check if you have a default browser set
+- Try running the script as administrator
 
 ### Cannot Connect to QuantumCore:
 - Ensure you have internet connection
 - Check if firewall blocks web access
 - Contact your system administrator if behind corporate firewall
+
+### Script Won't Run:
+- **Windows**: Right-click the .bat file and choose "Run as administrator"
+- **Mac/Linux**: Open Terminal, navigate to folder, run: chmod +x start-quantumcore.sh && ./start-quantumcore.sh
 
 ## 📞 Support
 
