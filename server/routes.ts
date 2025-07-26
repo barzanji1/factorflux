@@ -946,8 +946,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Desktop installer download routes
-  app.get('/download/windows', (req, res) => {
+  // Desktop installer download routes - these must come before catch-all routes
+  app.get('/api/download/windows', (req, res) => {
     const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Windows-Portable.tar.gz');
     if (fs.existsSync(filePath)) {
       res.download(filePath, 'QuantumCore-Windows-Portable.tar.gz');
@@ -956,7 +956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/download/mac', (req, res) => {
+  app.get('/api/download/mac', (req, res) => {
     const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Mac-Portable.tar.gz');
     if (fs.existsSync(filePath)) {
       res.download(filePath, 'QuantumCore-Mac-Portable.tar.gz');
@@ -965,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/download/linux', (req, res) => {
+  app.get('/api/download/linux', (req, res) => {
     const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Linux-Portable.tar.gz');
     if (fs.existsSync(filePath)) {
       res.download(filePath, 'QuantumCore-Linux-Portable.tar.gz');
@@ -974,7 +974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/download/guide', (req, res) => {
+  app.get('/api/download/guide', (req, res) => {
     const filePath = path.resolve(process.cwd(), 'USER-INSTALLATION-GUIDE.md');
     if (fs.existsSync(filePath)) {
       res.download(filePath, 'USER-INSTALLATION-GUIDE.md');
@@ -984,7 +984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Download page for easy access
-  app.get('/downloads', (req, res) => {
+  app.get('/api/downloads', (req, res) => {
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -1005,28 +1005,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         <div class="download-card">
           <h3>🪟 Windows</h3>
           <p>For Windows 10 and later</p>
-          <a href="/download/windows" class="download-btn">Download Windows Version</a>
+          <a href="/api/download/windows" class="download-btn">Download Windows Version</a>
           <span class="file-size">(5.7 MB)</span>
         </div>
         
         <div class="download-card">
           <h3>🍎 Mac</h3>
           <p>For macOS 10.15 and later</p>
-          <a href="/download/mac" class="download-btn">Download Mac Version</a>
+          <a href="/api/download/mac" class="download-btn">Download Mac Version</a>
           <span class="file-size">(5.7 MB)</span>
         </div>
         
         <div class="download-card">
           <h3>🐧 Linux</h3>
           <p>For most Linux distributions</p>
-          <a href="/download/linux" class="download-btn">Download Linux Version</a>
+          <a href="/api/download/linux" class="download-btn">Download Linux Version</a>
           <span class="file-size">(5.7 MB)</span>
         </div>
         
         <div class="download-card">
           <h3>📖 Installation Guide</h3>
           <p>Complete setup instructions and troubleshooting</p>
-          <a href="/download/guide" class="download-btn">Download Guide</a>
+          <a href="/api/download/guide" class="download-btn">Download Guide</a>
         </div>
         
         <h2>🛠️ Quick Setup:</h2>
