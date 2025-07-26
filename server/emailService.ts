@@ -29,8 +29,8 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       to: params.to,
       from: params.from,
       subject: params.subject,
-      text: params.text,
-      html: params.html,
+      text: params.text || '',
+      html: params.html || '',
       attachments: params.attachments,
     });
     return true;
@@ -97,7 +97,7 @@ export async function sendDesktopInstallers(recipientEmail: string): Promise<boo
 
     const result = await sendEmail({
       to: recipientEmail,
-      from: 'noreply@quantumcore.app', // SendGrid requires verified sender
+      from: 'doshbarzanji@gmail.com', // Use verified sender email
       subject: 'QuantumCore Desktop Installers - Ready for Distribution',
       html: emailHtml,
       text: `QuantumCore Desktop Installers\n\nYour desktop installers are ready! Please see the attached files:\n\n- QuantumCore-Windows-Portable.tar.gz (Windows)\n- QuantumCore-Mac-Portable.tar.gz (Mac)\n- QuantumCore-Linux-Portable.tar.gz (Linux)\n- USER-INSTALLATION-GUIDE.md (Installation instructions)\n\nUsers just need to extract and run the startup script. Full instructions are in the guide.\n\nBest regards,\nQuantumCore Development Team`,
