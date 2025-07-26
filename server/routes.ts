@@ -13,7 +13,7 @@ import path from "path";
 import fs from "fs";
 import { z } from "zod";
 import { jsPDF } from "jspdf";
-import { sendDesktopInstallers } from "./emailService";
+import { sendDesktopInstallers, sendEmail } from "./emailService";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -912,37 +912,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email installer route - send desktop installers via email
-  app.post('/api/email/installers', isAuthenticated, async (req: any, res) => {
+  // Email installer links route - send installer download links via email
+  app.post('/api/email/installer-links', isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
       if (user?.role !== 'manager' && user?.role !== 'admin') {
-        return res.status(403).json({ message: "Only managers and admins can send installers" });
+        return res.status(403).json({ message: "Only managers and admins can send installer links" });
       }
 
-      const { email } = req.body;
+      const { email, clientName, message } = req.body;
       if (!email) {
         return res.status(400).json({ message: "Email address is required" });
       }
 
-      const success = await sendDesktopInstallers(email);
+      const appUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : 'https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev';
+
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #2563eb;">QuantumCore Desktop Access</h1>
+          
+          ${clientName ? `<p>Hello ${clientName},</p>` : '<p>Hello,</p>'}
+          
+          <p>You now have access to QuantumCore, our freight factoring management system. You can access it in two ways:</p>
+          
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2 style="color: #1e40af; margin-top: 0;">🌐 Web Access (Recommended)</h2>
+            <p><strong>Live Application:</strong> <a href="${appUrl}" style="color: #2563eb; text-decoration: none; font-weight: bold;">${appUrl}</a></p>
+            <p>Access QuantumCore directly in your web browser - no installation required.</p>
+          </div>
+          
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2 style="color: #1e40af; margin-top: 0;">💻 Desktop Installers</h2>
+            <p>For a desktop-like experience, download the portable launcher for your operating system:</p>
+            
+            <div style="margin: 15px 0;">
+              <strong>🪟 Windows:</strong><br>
+              <a href="${appUrl}/api/download/windows" style="color: #2563eb; text-decoration: none;">
+                QuantumCore-Windows-Portable.tar.gz
+              </a> (5.7 MB)
+            </div>
+            
+            <div style="margin: 15px 0;">
+              <strong>🍎 Mac:</strong><br>
+              <a href="${appUrl}/api/download/mac" style="color: #2563eb; text-decoration: none;">
+                QuantumCore-Mac-Portable.tar.gz
+              </a> (5.7 MB)
+            </div>
+            
+            <div style="margin: 15px 0;">
+              <strong>🐧 Linux:</strong><br>
+              <a href="${appUrl}/api/download/linux" style="color: #2563eb; text-decoration: none;">
+                QuantumCore-Linux-Portable.tar.gz
+              </a> (5.7 MB)
+            </div>
+            
+            <div style="margin: 15px 0;">
+              <strong>📖 Setup Guide:</strong><br>
+              <a href="${appUrl}/api/download/guide" style="color: #2563eb; text-decoration: none;">
+                Installation Instructions
+              </a>
+            </div>
+          </div>
+          
+          <h2 style="color: #1e40af;">⚡ Quick Setup for Desktop</h2>
+          <ol>
+            <li>Download the file for your operating system</li>
+            <li>Extract the archive using built-in tools</li>
+            <li>Run the startup script (double-click or run in terminal)</li>
+            <li>QuantumCore opens automatically in your browser</li>
+          </ol>
+          
+          ${message ? `<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
+            <h3 style="color: #047857; margin-top: 0;">Additional Information</h3>
+            <p style="margin-bottom: 0;">${message}</p>
+          </div>` : ''}
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p>If you have any questions or need assistance getting started, please don't hesitate to reach out.</p>
+            <p style="color: #6b7280;">
+              Best regards,<br>
+              <strong>Trucking Pros Financial Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+
+      const textContent = `
+QuantumCore Desktop Access
+
+${clientName ? `Hello ${clientName},` : 'Hello,'}
+
+You now have access to QuantumCore, our freight factoring management system.
+
+WEB ACCESS (Recommended):
+${appUrl}
+
+DESKTOP INSTALLERS:
+• Windows: ${appUrl}/api/download/windows (5.7 MB)
+• Mac: ${appUrl}/api/download/mac (5.7 MB)  
+• Linux: ${appUrl}/api/download/linux (5.7 MB)
+• Setup Guide: ${appUrl}/api/download/guide
+
+QUICK SETUP FOR DESKTOP:
+1. Download the file for your operating system
+2. Extract the archive using built-in tools
+3. Run the startup script (double-click or run in terminal)
+4. QuantumCore opens automatically in your browser
+
+${message ? `Additional Information: ${message}` : ''}
+
+If you have any questions or need assistance getting started, please don't hesitate to reach out.
+
+Best regards,
+Trucking Pros Financial Team
+      `.trim();
+
+      // Use the simple email service
+      const success = await sendEmail({
+        to: email,
+        from: 'doshbarzanji@gmail.com',
+        subject: `QuantumCore Access - ${clientName || 'Desktop Installation'}`,
+        text: textContent,
+        html: htmlContent
+      });
+
       if (success) {
         // Log activity
         await storage.createActivity({
           userId: req.user.claims.sub,
-          type: 'installer_email_sent',
-          description: `Desktop installers sent to: ${email}`,
+          type: 'installer_links_sent',
+          description: `QuantumCore access sent to: ${email}${clientName ? ` (${clientName})` : ''}`,
           entityType: 'system',
           entityId: null,
         });
 
-        res.json({ message: "Desktop installers sent successfully" });
+        res.json({ message: "QuantumCore access email sent successfully" });
       } else {
-        res.status(500).json({ message: "Failed to send installers" });
+        res.status(500).json({ message: "Failed to send email - check SendGrid configuration" });
       }
     } catch (error) {
-      console.error("Error sending installers:", error);
-      res.status(500).json({ message: "Failed to send installers" });
+      console.error("Error sending installer links:", error);
+      res.status(500).json({ message: "Failed to send installer links" });
     }
   });
 

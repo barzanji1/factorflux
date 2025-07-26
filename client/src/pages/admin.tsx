@@ -30,13 +30,21 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Shield, UserCog } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Users, Shield, UserCog, Mail, Download } from "lucide-react";
 import { User } from "@shared/schema";
 
 export default function Admin() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
+  const [emailForm, setEmailForm] = useState({
+    email: '',
+    clientName: '',
+    message: ''
+  });
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -74,14 +82,39 @@ export default function Admin() {
       const response = await apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role });
       return response.json();
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Success",
+        description: "User role updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage = isUnauthorizedError(error) 
+        ? "You don't have permission to update user roles"
+        : "Failed to update user role";
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendInstallerLinks = useMutation({
+    mutationFn: async (data: { email: string; clientName: string; message: string }) => {
+      const response = await apiRequest("POST", "/api/email/installer-links", data);
+      return response.json();
+    },
     onSuccess: (data) => {
       toast({
-        title: "Role Updated",
+        title: "Email Sent",
         description: data.message,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setEmailForm({ email: '', clientName: '', message: '' });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -95,7 +128,7 @@ export default function Admin() {
       }
       toast({
         title: "Error",
-        description: error.message || "Failed to update user role",
+        description: error.message || "Failed to send installer links",
         variant: "destructive",
       });
     },
@@ -111,6 +144,44 @@ export default function Admin() {
 
     updateUserRole.mutate({ userId, role: newRole });
   };
+
+  const handleSendEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailForm.email) {
+      toast({
+        title: "Error",
+        description: "Email address is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    sendInstallerLinks.mutate(emailForm);
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  if (!user || ((user as any).role !== 'manager' && (user as any).role !== 'admin')) {
+    return (
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 flex flex-col">
+          <TopNav />
+          <main className="flex-1 p-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
+              <p className="text-gray-600 mt-2">You don't have permission to access this page.</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading || isLoadingUsers) {
     return (
@@ -175,6 +246,143 @@ export default function Admin() {
                 <span className="font-medium">Manager Dashboard</span>
               </div>
             </div>
+
+            {/* Email Installer Links Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Mail className="w-5 h-5 mr-2" />
+                  Send QuantumCore Access
+                </CardTitle>
+                <CardDescription>
+                  Email QuantumCore access links and desktop installers to clients
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSendEmail} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Client Email Address *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="client@company.com"
+                        value={emailForm.email}
+                        onChange={(e) => setEmailForm(prev => ({ ...prev, email: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientName">Client Name (Optional)</Label>
+                      <Input
+                        id="clientName"
+                        placeholder="John Smith"
+                        value={emailForm.clientName}
+                        onChange={(e) => setEmailForm(prev => ({ ...prev, clientName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="message">Additional Message (Optional)</Label>
+                    <Textarea
+                      id="message"
+                      placeholder="Add any additional instructions or information for the client..."
+                      value={emailForm.message}
+                      onChange={(e) => setEmailForm(prev => ({ ...prev, message: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Email includes web access link and desktop installers for all platforms
+                    </div>
+                    <Button 
+                      type="submit" 
+                      disabled={sendInstallerLinks.isPending}
+                      className="flex items-center space-x-2"
+                    >
+                      {sendInstallerLinks.isPending ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4" />
+                          <span>Send Access Email</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Download Links Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Download className="w-5 h-5 mr-2" />
+                  Direct Download Links
+                </CardTitle>
+                <CardDescription>
+                  Share these links directly with clients for manual downloads
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <div className="font-medium mb-2">🪟 Windows</div>
+                    <a 
+                      href="/api/download/windows" 
+                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Download Windows (5.7 MB)
+                    </a>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="font-medium mb-2">🍎 Mac</div>
+                    <a 
+                      href="/api/download/mac" 
+                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Download Mac (5.7 MB)
+                    </a>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="font-medium mb-2">🐧 Linux</div>
+                    <a 
+                      href="/api/download/linux" 
+                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Download Linux (5.7 MB)
+                    </a>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="font-medium mb-2">📖 Guide</div>
+                    <a 
+                      href="/api/download/guide" 
+                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Installation Guide
+                    </a>
+                  </div>
+                </div>
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Download Portal:</strong> <code>/api/downloads</code>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
       <Card>
         <CardHeader>
