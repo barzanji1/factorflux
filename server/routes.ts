@@ -13,6 +13,7 @@ import path from "path";
 import fs from "fs";
 import { z } from "zod";
 import { jsPDF } from "jspdf";
+import { sendDesktopInstallers } from "./emailService";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -908,6 +909,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching time entries:", error);
       res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
+  // Email installer route - send desktop installers via email
+  app.post('/api/email/installers', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'manager' && user?.role !== 'admin') {
+        return res.status(403).json({ message: "Only managers and admins can send installers" });
+      }
+
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+
+      const success = await sendDesktopInstallers(email);
+      if (success) {
+        // Log activity
+        await storage.createActivity({
+          userId: req.user.claims.sub,
+          type: 'installer_email_sent',
+          description: `Desktop installers sent to: ${email}`,
+          entityType: 'system',
+          entityId: null,
+        });
+
+        res.json({ message: "Desktop installers sent successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to send installers" });
+      }
+    } catch (error) {
+      console.error("Error sending installers:", error);
+      res.status(500).json({ message: "Failed to send installers" });
     }
   });
 
