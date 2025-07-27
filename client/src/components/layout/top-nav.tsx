@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import type { User, Client, Invoice, Load } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { User, Client, Invoice, Load, Notification } from "@shared/schema";
 import { 
   Bell, 
   Plus, 
@@ -45,14 +46,48 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   
-  // Mock notifications - in real app would come from API
-  const notifications = [
-    { id: 1, message: "New invoice submitted for approval", time: "2 min ago", unread: true },
-    { id: 2, message: "Document processed successfully", time: "1 hour ago", unread: true },
-    { id: 3, message: "Payment received for Invoice #12345", time: "3 hours ago", unread: false },
-  ];
-  
-  const unreadCount = notifications.filter(n => n.unread).length;
+  // Fetch real notifications from API
+  const { data: notifications = [] } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    enabled: !!user,
+  });
+
+  const { data: unreadCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    enabled: !!user,
+  });
+
+  const unreadCount = unreadCountData?.count || 0;
+
+  // Mutation to mark notification as read
+  const markAsReadMutation = useMutation({
+    mutationFn: (notificationId: number) =>
+      apiRequest(`/api/notifications/${notificationId}/read`, {
+        method: "PATCH",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const handleNotificationClick = (notificationId: number, isRead: boolean) => {
+    if (!isRead) {
+      markAsReadMutation.mutate(notificationId);
+    }
+  };
+
+  // Mutation to mark all notifications as read
+  const markAllAsReadMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("/api/notifications/mark-all-read", {
+        method: "PATCH",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -269,23 +304,45 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
-              <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                {unreadCount > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => markAllAsReadMutation.mutate()}
+                    className="text-xs h-6 px-2"
+                  >
+                    Mark all read
+                  </Button>
+                )}
               </div>
-              {notifications.map((notification) => (
-                <DropdownMenuItem key={notification.id} className="p-3 cursor-pointer">
+              {notifications.length > 0 ? notifications.map((notification) => (
+                <DropdownMenuItem 
+                  key={notification.id} 
+                  className="p-3 cursor-pointer" 
+                  onClick={() => handleNotificationClick(notification.id, notification.read)}
+                >
                   <div className="flex items-start space-x-3 w-full">
                     <div className={cn(
                       "w-2 h-2 rounded-full mt-2",
-                      notification.unread ? "bg-blue-600" : "bg-gray-300"
+                      !notification.read ? "bg-blue-600" : "bg-gray-300"
                     )} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 dark:text-white">{notification.message}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{notification.time}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : 'Just now'}
+                      </p>
                     </div>
                   </div>
                 </DropdownMenuItem>
-              ))}
+              )) : (
+                <DropdownMenuItem className="p-3">
+                  <div className="text-center w-full">
+                    <p className="text-gray-500 dark:text-gray-400">No notifications</p>
+                  </div>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

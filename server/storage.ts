@@ -7,6 +7,7 @@ import {
   activities,
   fuelCardApplications,
   timeEntries,
+  notifications,
   type User,
   type UpsertUser,
   type TimeEntry,
@@ -23,6 +24,8 @@ import {
   type InsertActivity,
   type FuelCardApplication,
   type InsertFuelCardApplication,
+  type Notification,
+  type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
@@ -98,6 +101,13 @@ export interface IStorage {
   getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
   getTodayTimeEntries(userId: string): Promise<TimeEntry[]>;
   getWeekTimeEntries(userId: string): Promise<TimeEntry[]>;
+
+  // Notification operations
+  getNotifications(userId: string, limit?: number): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: number): Promise<void>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -332,7 +342,72 @@ export class DatabaseStorage implements IStorage {
 
   async createActivity(activity: InsertActivity): Promise<Activity> {
     const [newActivity] = await db.insert(activities).values(activity).returning();
+    
+    // Auto-create notification for important activities
+    if (this.shouldCreateNotification(activity.type)) {
+      await this.createNotificationFromActivity(activity, newActivity);
+    }
+    
     return newActivity;
+  }
+
+  private shouldCreateNotification(activityType: string): boolean {
+    const notifiableTypes = [
+      'document_uploaded',
+      'invoice_created', 
+      'invoice_approved',
+      'fuel_card_application_submitted',
+      'fuel_card_application_approved',
+      'fuel_card_application_rejected'
+    ];
+    return notifiableTypes.includes(activityType);
+  }
+
+  private async createNotificationFromActivity(activity: InsertActivity, createdActivity: Activity): Promise<void> {
+    const notificationMap: Record<string, { title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }> = {
+      'document_uploaded': {
+        title: 'Document Uploaded',
+        message: `New document has been uploaded and is being processed.`,
+        type: 'info'
+      },
+      'invoice_created': {
+        title: 'Invoice Created',
+        message: `New invoice has been created and is ready for review.`,
+        type: 'info'
+      },
+      'invoice_approved': {
+        title: 'Invoice Approved',
+        message: `Invoice has been approved and is ready for processing.`,
+        type: 'success'
+      },
+      'fuel_card_application_submitted': {
+        title: 'Fuel Card Application',
+        message: `Your fuel card application has been submitted for review.`,
+        type: 'info'
+      },
+      'fuel_card_application_approved': {
+        title: 'Fuel Card Approved',
+        message: `Your fuel card application has been approved!`,
+        type: 'success'
+      },
+      'fuel_card_application_rejected': {
+        title: 'Fuel Card Application',
+        message: `Your fuel card application needs revision. Please check the details.`,
+        type: 'warning'
+      }
+    };
+
+    const notificationData = notificationMap[activity.type];
+    if (notificationData) {
+      await this.createNotification({
+        userId: activity.userId,
+        title: notificationData.title,
+        message: notificationData.message,
+        type: notificationData.type,
+        entityType: activity.entityType || undefined,
+        entityId: activity.entityId || undefined,
+      });
+    }
   }
 
   async clearActivities(): Promise<void> {
@@ -531,6 +606,48 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(timeEntries.clockInTime));
+  }
+
+  // Notification operations
+  async getNotifications(userId: string, limit: number = 20): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db.insert(notifications).values(notification).returning();
+    return newNotification;
+  }
+
+  async markNotificationAsRead(id: number): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ read: true })
+      .where(eq(notifications.id, id));
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ read: true })
+      .where(eq(notifications.userId, userId));
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.read, false)
+        )
+      );
+    return result[0]?.count || 0;
   }
 }
 

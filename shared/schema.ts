@@ -170,12 +170,26 @@ export const timeEntries = pgTable("time_entries", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Notifications table
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  type: varchar("type", { enum: ["info", "success", "warning", "error"] }).default("info").notNull(),
+  read: boolean("read").default(false).notNull(),
+  entityType: varchar("entity_type"), // Optional reference to related entity
+  entityId: integer("entity_id"), // Optional reference to related entity
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   invoices: many(invoices),
   documents: many(documents),
   activities: many(activities),
   timeEntries: many(timeEntries),
+  notifications: many(notifications),
 }));
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -216,6 +230,10 @@ export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
   user: one(users, { fields: [timeEntries.userId], references: [users.id] }),
 }));
 
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
@@ -238,10 +256,18 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   updatedAt: true 
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
 // Types
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = typeof timeEntries.$inferInsert;
 export type UpsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
