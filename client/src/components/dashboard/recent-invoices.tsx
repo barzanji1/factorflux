@@ -3,12 +3,61 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Download, Edit } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 import type { Invoice } from "@shared/schema";
 
 export default function RecentInvoices() {
+  const { toast } = useToast();
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["/api/invoices"],
   });
+
+  const handleViewInvoice = (invoice: Invoice) => {
+    // Could open a modal or navigate to detail page
+    toast({
+      title: "View Invoice",
+      description: `Viewing invoice ${invoice.invoiceNumber}`,
+    });
+  };
+
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    // Generate and download PDF
+    toast({
+      title: "Download Started",
+      description: `Downloading invoice ${invoice.invoiceNumber}`,
+    });
+    
+    // Create a simple text-based invoice for download
+    const invoiceData = `
+TRUCKING PROS FINANCIAL
+Invoice: ${invoice.invoiceNumber}
+Load ID: ${invoice.loadId}
+Amount: $${parseFloat(invoice.amount).toFixed(2)}
+Status: ${invoice.status.toUpperCase()}
+Date: ${new Date(invoice.createdAt!).toLocaleDateString()}
+
+Thank you for your business!
+    `.trim();
+    
+    const blob = new Blob([invoiceData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice-${invoice.invoiceNumber}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    // Could open edit modal or navigate to edit page
+    toast({
+      title: "Edit Invoice",
+      description: `Opening edit form for invoice ${invoice.invoiceNumber}`,
+    });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -61,7 +110,9 @@ export default function RecentInvoices() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl">Recent Invoices</CardTitle>
-          <Button>View All Invoices</Button>
+          <Link href="/invoices">
+            <Button>View All Invoices</Button>
+          </Link>
         </div>
       </CardHeader>
       
@@ -100,13 +151,28 @@ export default function RecentInvoices() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-2">
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleViewInvoice(invoice)}
+                        title="View Invoice"
+                      >
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDownloadInvoice(invoice)}
+                        title="Download Invoice"
+                      >
                         <Download className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditInvoice(invoice)}
+                        title="Edit Invoice"
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
                     </div>
