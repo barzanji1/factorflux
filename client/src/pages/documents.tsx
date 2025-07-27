@@ -270,7 +270,7 @@ export default function Documents() {
                           <Badge variant="outline">{load.status}</Badge>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {load.originCity} → {load.destinationCity}
+                          {load.pickupLocation} → {load.deliveryLocation}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
                           {load.pickupDate && new Date(load.pickupDate).toLocaleDateString()}

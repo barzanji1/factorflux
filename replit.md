@@ -73,6 +73,22 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 
 ## Recent Changes
 
+### January 27, 2025 - Real-Time Notification System Implementation and Document Viewing Enhancement
+- **COMPREHENSIVE NOTIFICATION SYSTEM IMPLEMENTED**: Replaced mock notifications with fully functional real-time notification system
+  - Created notifications database table with proper schema (user_id, title, message, type, read status, timestamps)
+  - Built complete notification API endpoints (/api/notifications, /api/notifications/unread-count, mark-as-read functionality)
+  - Enhanced TopNav component to fetch real notifications from database instead of displaying mock data
+  - Added automatic notification creation for key system activities (document uploads, invoice processing, fuel card applications)
+  - Implemented click-to-mark-read functionality and "Mark All Read" button for better user experience
+  - Added proper error handling and retry logic to prevent "plugin failed to fetch" errors
+  - Notification system displays real-time unread count badges and supports different notification types (info, success, warning, error)
+- **DOCUMENT VIEWING FROM ACTIVITY LOG FIXED**: Resolved secure document access from activity log entries
+  - Fixed GET /api/documents/:id endpoint to serve documents via secure blob URLs instead of direct file paths
+  - Enhanced DocumentViewer component to handle document access through API endpoints with proper authentication
+  - Corrected TypeScript property errors in documents page (pickupLocation/deliveryLocation vs originCity/destinationCity)
+  - Added comprehensive error handling and logging to diagnose and resolve fetch-related issues
+  - Document viewing now works seamlessly from activity log with proper security and user access controls
+
 ### January 27, 2025 - Comprehensive Badge Visibility Enhancement and Dashboard Improvements
 - **DASHBOARD INVOICE ACTIONS FIXED**: Resolved all non-functioning action buttons in Recent Invoices section
   - Fixed View action (eye icon): Now displays comprehensive invoice details in toast notification with 5-second duration

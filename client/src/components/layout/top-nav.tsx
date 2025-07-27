@@ -47,17 +47,31 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   const searchRef = useRef<HTMLDivElement>(null);
   
   // Fetch real notifications from API
-  const { data: notifications = [] } = useQuery<Notification[]>({
+  const { data: notifications = [], error: notificationsError } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     enabled: !!user,
+    retry: 1,
+    staleTime: 30000, // 30 seconds
   });
 
-  const { data: unreadCountData } = useQuery<{ count: number }>({
+  const { data: unreadCountData, error: countError } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
     enabled: !!user,
+    retry: 1,
+    staleTime: 30000, // 30 seconds
   });
 
   const unreadCount = unreadCountData?.count || 0;
+
+  // Log errors to help debug the "plugin failed to fetch" issue
+  useEffect(() => {
+    if (notificationsError) {
+      console.error("Notifications fetch error:", notificationsError);
+    }
+    if (countError) {
+      console.error("Unread count fetch error:", countError);
+    }
+  }, [notificationsError, countError]);
 
   // Mutation to mark notification as read
   const markAsReadMutation = useMutation({
