@@ -81,10 +81,11 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
   // Auto-populate client and amount when load is selected
   useEffect(() => {
-    if (selectedLoad) {
-      form.setValue("clientId", selectedLoad.clientId.toString());
-      if (selectedLoad.rate) {
-        form.setValue("amount", selectedLoad.rate);
+    if (selectedLoad && selectedLoad as Load) {
+      const load = selectedLoad as Load;
+      form.setValue("clientId", load.clientId.toString());
+      if (load.rate) {
+        form.setValue("amount", load.rate);
       }
     }
   }, [selectedLoad, form]);
@@ -239,7 +240,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                       <SelectContent>
                         <SelectItem value="draft">Draft</SelectItem>
                         <SelectItem value="submitted">Submitted</SelectItem>
-                        {(user?.role === "manager" || user?.role === "admin") && (
+                        {((user as any)?.role === "manager" || (user as any)?.role === "admin") && (
                           <>
                             <SelectItem value="approved">Approved</SelectItem>
                             <SelectItem value="rejected">Rejected</SelectItem>
@@ -267,7 +268,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {loads?.map((load: Load) => (
+                      {(loads as Load[])?.map((load: Load) => (
                         <SelectItem key={load.id} value={load.id.toString()}>
                           {load.loadNumber} - {load.pickupLocation} → {load.deliveryLocation}
                         </SelectItem>
@@ -293,7 +294,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {clients?.map((client: Client) => (
+                        {(clients as Client[])?.map((client: Client) => (
                           <SelectItem key={client.id} value={client.id.toString()}>
                             {client.name}
                           </SelectItem>
@@ -327,7 +328,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Additional notes..." {...field} />
+                    <Textarea placeholder="Additional notes..." value={field.value || ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

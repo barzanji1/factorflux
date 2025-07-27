@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Download, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
+import InvoiceModal from "@/components/modals/invoice-modal";
 import type { Invoice } from "@shared/schema";
 
 export default function RecentInvoices() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["/api/invoices"],
   });
@@ -61,11 +64,11 @@ Thank you for your business!
   };
 
   const handleEditInvoice = (invoice: Invoice) => {
-    // Navigate to invoices page using wouter
-    setLocation("/invoices");
+    setSelectedInvoice(invoice);
+    setIsEditModalOpen(true);
     toast({
-      title: "Navigate to Invoices",
-      description: `Redirecting to edit invoice ${invoice.invoiceNumber}`,
+      title: "Edit Invoice",
+      description: `Opening edit form for invoice ${invoice.invoiceNumber}`,
     });
   };
 
@@ -199,6 +202,16 @@ Thank you for your business!
           )}
         </div>
       </CardContent>
+
+      {/* Edit Invoice Modal */}
+      <InvoiceModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedInvoice(null);
+        }}
+        invoice={selectedInvoice}
+      />
     </Card>
   );
 }
