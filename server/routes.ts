@@ -729,8 +729,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Try to delete the physical file (optional - don't fail if file doesn't exist)
       try {
-        const fs = require('fs');
-        const path = require('path');
         const filePath = path.join('uploads', document.filename);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);

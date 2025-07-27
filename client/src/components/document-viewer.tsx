@@ -80,9 +80,29 @@ export default function DocumentViewer({ isOpen, onClose, entityType, entityId }
 
   const typedDocuments = (documents as Document[]) || [];
 
-  const handleViewDocument = (document: Document) => {
-    // Open document in new tab for viewing
-    window.open(`/uploads/${document.filename}`, '_blank');
+  const handleViewDocument = async (document: Document) => {
+    try {
+      // Use the proper API endpoint for viewing documents
+      const response = await fetch(`/api/documents/${document.id}/view`, {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Clean up the object URL after a short delay
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+      } else {
+        throw new Error('Failed to view document');
+      }
+    } catch (error) {
+      toast({
+        title: "View Error",
+        description: "Failed to view document. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDownloadDocument = (doc: Document) => {
