@@ -433,12 +433,19 @@ export default function Admin() {
                     {userData.department || "No department"}
                   </TableCell>
                   <TableCell>
-                    <Badge 
-                      variant={userData.role === 'manager' ? 'default' : 'secondary'}
-                      className={userData.role === 'manager' ? 'bg-blue-100 text-blue-800' : ''}
-                    >
-                      {userData.role || 'employee'}
-                    </Badge>
+                    {userData.role === 'manager' ? (
+                      <Badge variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">
+                        Manager
+                      </Badge>
+                    ) : userData.role === 'admin' ? (
+                      <Badge variant="default" className="bg-purple-600 hover:bg-purple-700 text-white">
+                        Admin
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
+                        Employee
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     {userData.id !== (user as any).id ? (
