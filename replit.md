@@ -73,6 +73,14 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 
 ## Recent Changes
 
+### January 27, 2025 - Mac DMG Installer Created
+- **MAC INSTALLER ENHANCEMENT**: Created proper Mac .app bundle installer to resolve launch issues
+  - Built native QuantumCore.app with proper Info.plist and macOS integration
+  - Created Mac installer package (5.5MB) with native app bundle structure
+  - Updated download endpoint to serve QuantumCore-Mac-Installer.tar.gz instead of portable version
+  - Added comprehensive Mac installation instructions and troubleshooting guide
+  - Mac installer now provides proper macOS experience with Applications folder integration
+
 ### January 26, 2025 - Download Links Issue Resolution
 - **DOWNLOAD ENDPOINTS VERIFIED WORKING**: All desktop download endpoints confirmed functional on local server
   - All four endpoints (/api/desktop/download/windows, /mac, /linux, /guide) return HTTP 200 OK

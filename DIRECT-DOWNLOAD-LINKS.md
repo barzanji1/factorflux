@@ -15,11 +15,12 @@ https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
 
 ### Mac Desktop Installer
 ```
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/mac
+https://e603594c-e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/mac
 ```
-- **File:** QuantumCore-Mac-Portable.tar.gz
-- **Size:** 5.7 MB
+- **File:** QuantumCore-Mac-Installer.tar.gz 
+- **Size:** 5.5 MB
 - **Platform:** macOS 10.15+ (Catalina and newer)
+- **Format:** Native Mac .app bundle with proper Info.plist
 
 ### Linux Desktop Installer
 ```

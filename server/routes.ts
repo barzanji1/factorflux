@@ -944,7 +944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/desktop/download/mac', async (req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Mac-Portable.tar.gz');
+      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Mac-Installer.tar.gz');
       
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Mac installer not found" });
@@ -953,7 +953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = fs.statSync(filePath);
       
       res.setHeader('Content-Type', 'application/gzip');
-      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Mac-Portable.tar.gz"');
+      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Mac-Installer.tar.gz"');
       res.setHeader('Content-Length', stats.size.toString());
       res.setHeader('Cache-Control', 'public, max-age=3600');
       

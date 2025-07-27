@@ -1,9 +1,7 @@
 {
   "appId": "com.quantumcore.app",
   "productName": "QuantumCore",
-  "description": "QuantumCore - Freight Factoring Management System",
-  "author": "Trucking Pros Financial",
-  "version": "1.0.0",
+  "copyright": "Copyright © 2025 Trucking Pros Financial",
   "directories": {
     "output": "electron-dist"
   },
@@ -16,7 +14,16 @@
   ],
   "mac": {
     "category": "public.app-category.business",
-    "target": "dmg"
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
+    ]
+  },
+  "dmg": {
+    "title": "QuantumCore ${version}",
+    "artifactName": "QuantumCore-Mac-${version}.dmg"
   },
   "win": {
     "target": "nsis",
