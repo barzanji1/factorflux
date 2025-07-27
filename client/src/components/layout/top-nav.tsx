@@ -40,25 +40,27 @@ interface SearchResults {
 }
 
 export default function TopNav({ title, subtitle }: TopNavProps) {
-  const { user } = useAuth() as { user: User | undefined };
+  const { user, isAuthenticated } = useAuth() as { user: User | undefined; isAuthenticated: boolean };
   const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   
   // Fetch real notifications from API
-  const { data: notifications = [], error: notificationsError } = useQuery<Notification[]>({
+  const { data: notifications = [], error: notificationsError, isError: notificationsIsError } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
-    enabled: !!user,
-    retry: 1,
+    enabled: !!user && isAuthenticated,
+    retry: false,
     staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: false,
   });
 
-  const { data: unreadCountData, error: countError } = useQuery<{ count: number }>({
+  const { data: unreadCountData, error: countError, isError: countIsError } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
-    enabled: !!user,
-    retry: 1,
+    enabled: !!user && isAuthenticated,
+    retry: false,
     staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: false,
   });
 
   const unreadCount = unreadCountData?.count || 0;
@@ -83,11 +85,18 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
     },
+    onError: (error) => {
+      console.error("Failed to mark notification as read:", error);
+    },
   });
 
   const handleNotificationClick = (notificationId: number, isRead: boolean) => {
-    if (!isRead) {
-      markAsReadMutation.mutate(notificationId);
+    try {
+      if (!isRead && isAuthenticated) {
+        markAsReadMutation.mutate(notificationId);
+      }
+    } catch (error) {
+      console.error("Error handling notification click:", error);
     }
   };
 
@@ -100,6 +109,9 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+    onError: (error) => {
+      console.error("Failed to mark all notifications as read:", error);
     },
   });
 
@@ -324,10 +336,19 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => markAllAsReadMutation.mutate()}
+                    onClick={() => {
+                      try {
+                        if (isAuthenticated) {
+                          markAllAsReadMutation.mutate();
+                        }
+                      } catch (error) {
+                        console.error("Error marking all as read:", error);
+                      }
+                    }}
                     className="text-xs h-6 px-2"
+                    disabled={markAllAsReadMutation.isPending}
                   >
-                    Mark all read
+                    {markAllAsReadMutation.isPending ? "Marking..." : "Mark all read"}
                   </Button>
                 )}
               </div>
