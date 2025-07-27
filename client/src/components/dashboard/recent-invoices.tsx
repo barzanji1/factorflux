@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Download, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { Invoice } from "@shared/schema";
 
 export default function RecentInvoices() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["/api/invoices"],
   });
@@ -60,11 +61,11 @@ Thank you for your business!
   };
 
   const handleEditInvoice = (invoice: Invoice) => {
-    // Navigate to invoices page with edit functionality
-    window.location.href = `/invoices?edit=${invoice.id}`;
+    // Navigate to invoices page using wouter
+    setLocation("/invoices");
     toast({
-      title: "Redirecting to Edit",
-      description: `Opening edit form for invoice ${invoice.invoiceNumber}`,
+      title: "Navigate to Invoices",
+      description: `Redirecting to edit invoice ${invoice.invoiceNumber}`,
     });
   };
 

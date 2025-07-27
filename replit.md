@@ -73,7 +73,14 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 
 ## Recent Changes
 
-### January 27, 2025 - Mac DMG Installer Created
+### January 27, 2025 - Dashboard Invoice Actions Fixed and Mac DMG Installer
+- **DASHBOARD INVOICE ACTIONS FIXED**: Resolved all non-functioning action buttons in Recent Invoices section
+  - Fixed View action (eye icon): Now displays comprehensive invoice details in toast notification with 5-second duration
+  - Enhanced Download action (arrow icon): Downloads invoice data as branded text file with company information
+  - Fixed Edit action (pencil icon): Proper navigation to Invoices page using wouter routing (no more 404 errors)
+  - Added proper TypeScript typing and error handling for all action handlers
+  - Enhanced user experience with tooltip titles and improved feedback messages
+- **MAC DMG INSTALLER ENHANCEMENT**: Created proper Mac .app bundle installer to resolve launch issues
 - **MAC INSTALLER ENHANCEMENT**: Created proper Mac .app bundle installer to resolve launch issues
   - Built native QuantumCore.app with proper Info.plist and macOS integration
   - Created Mac installer package (5.5MB) with native app bundle structure
