@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import type { User, Client, Invoice, Load, Notification } from "@shared/schema";
 import { 
   Bell, 
@@ -77,10 +77,19 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
   // Mutation to mark notification as read
   const markAsReadMutation = useMutation({
-    mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/read`, {
+    mutationFn: async (notificationId: number) => {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
         method: "PATCH",
-      }),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to mark notification as read: ${response.statusText}`);
+      }
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
@@ -102,10 +111,19 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
   // Mutation to mark all notifications as read
   const markAllAsReadMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("/api/notifications/mark-all-read", {
+    mutationFn: async () => {
+      const response = await fetch("/api/notifications/mark-all-read", {
         method: "PATCH",
-      }),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to mark all notifications as read: ${response.statusText}`);
+      }
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
