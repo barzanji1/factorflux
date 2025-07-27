@@ -66,10 +66,6 @@ Thank you for your business!
   const handleEditInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setIsEditModalOpen(true);
-    toast({
-      title: "Edit Invoice",
-      description: `Opening edit form for invoice ${invoice.invoiceNumber}`,
-    });
   };
 
   const getStatusColor = (status: string) => {
