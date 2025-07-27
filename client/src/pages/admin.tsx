@@ -33,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Users, Shield, UserCog, Mail, Download, Copy } from "lucide-react";
+import { Users, Shield, UserCog, Mail, Copy } from "lucide-react";
 import { User } from "@shared/schema";
 import ContextualDownload from "@/components/contextual-download";
 
@@ -381,99 +381,7 @@ export default function Admin() {
               <ContextualDownload showAllOptions={false} />
             </div>
 
-            {/* Download Links Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Download className="w-5 h-5 mr-2" />
-                  Direct Download Links
-                </CardTitle>
-                <CardDescription>
-                  Share these links directly with clients for manual downloads
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="p-4 border rounded-lg">
-                    <div className="font-medium mb-2">🪟 Windows</div>
-                    <a 
-                      href="/api/desktop/download/windows" 
-                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Download Windows (5.7 MB)
-                    </a>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="font-medium mb-2">🍎 Mac</div>
-                    <a 
-                      href="/api/desktop/download/mac" 
-                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Download Mac (5.7 MB)
-                    </a>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="font-medium mb-2">🐧 Linux</div>
-                    <a 
-                      href="/api/desktop/download/linux" 
-                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Download Linux (5.7 MB)
-                    </a>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="font-medium mb-2">📖 Guide</div>
-                    <a 
-                      href="/api/desktop/download/guide" 
-                      className="text-blue-600 hover:text-blue-800 text-sm break-all"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Installation Guide
-                    </a>
-                  </div>
-                </div>
-                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
-                    <div><strong>Direct Links:</strong></div>
-                    <div className="font-mono text-xs space-y-1">
-                      <div>Windows: <code className="bg-white dark:bg-gray-800 px-1 rounded">{window.location.origin}/api/desktop/download/windows</code></div>
-                      <div>Mac: <code className="bg-white dark:bg-gray-800 px-1 rounded">{window.location.origin}/api/desktop/download/mac</code></div>
-                      <div>Linux: <code className="bg-white dark:bg-gray-800 px-1 rounded">{window.location.origin}/api/desktop/download/linux</code></div>
-                      <div>Guide: <code className="bg-white dark:bg-gray-800 px-1 rounded">{window.location.origin}/api/desktop/download/guide</code></div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => {
-                        const links = [
-                          `Windows: ${window.location.origin}/api/desktop/download/windows`,
-                          `Mac: ${window.location.origin}/api/desktop/download/mac`,
-                          `Linux: ${window.location.origin}/api/desktop/download/linux`,
-                          `Installation Guide: ${window.location.origin}/api/desktop/download/guide`
-                        ].join('\n\n');
-                        navigator.clipboard.writeText(links).then(() => {
-                          toast({
-                            title: "All Links Copied!",
-                            description: "All download links copied to clipboard for easy sharing",
-                          });
-                        });
-                      }}
-                    >
-                      <Copy className="h-4 w-4 mr-1" />
-                      Copy All Links
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
 
       <Card>
         <CardHeader>
