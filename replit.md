@@ -73,7 +73,7 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 
 ## Recent Changes
 
-### January 27, 2025 - Dashboard Invoice Actions Fixed and Time Clock Visibility Enhancement
+### January 27, 2025 - Comprehensive Badge Visibility Enhancement and Dashboard Improvements
 - **DASHBOARD INVOICE ACTIONS FIXED**: Resolved all non-functioning action buttons in Recent Invoices section
   - Fixed View action (eye icon): Now displays comprehensive invoice details in toast notification with 5-second duration
   - Enhanced Download action (arrow icon): Downloads invoice data as branded text file with company information
@@ -81,13 +81,14 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
   - Removed toast notification for edit action to provide clean, seamless editing experience
   - Added proper TypeScript typing and error handling for all action handlers
   - Enhanced user experience with tooltip titles and improved feedback messages
-- **TIME CLOCK VISIBILITY ENHANCEMENT**: Completely redesigned clocked out status visibility
-  - Enhanced "Clocked Out" badge with high-contrast red styling and clear text visibility
-  - Added prominent "Currently Clocked Out" status display in red-themed information box
-  - Implemented color-coded status system: green for clocked in, red for clocked out
-  - Added helpful instruction text: "Click 'Clock In' to start tracking time"
-  - Improved dark mode support with proper contrast ratios for all status indicators
-  - Enhanced visual hierarchy to ensure status is immediately recognizable at a glance
+- **COMPREHENSIVE BADGE VISIBILITY ENHANCEMENT**: Fixed all low-contrast badge visibility issues across the application
+  - **Time Clock Status**: Enhanced "Clocked Out" badge with high-contrast red styling and prominent status display
+  - **Fuel Card Applications**: Fixed "Pending" badge visibility with yellow outline styling for high contrast
+  - **Admin User Management**: Fixed admin role badge visibility with consistent green styling
+  - Implemented unified color-coded system: green for approved/admin, yellow for pending, red for clocked out/rejected, blue for manager
+  - Added helpful instruction text and status messages throughout for better user guidance
+  - Improved dark mode support with proper contrast ratios for all status indicators across entire application
+  - Enhanced visual hierarchy to ensure all status badges are immediately recognizable at a glance
 - **MAC DMG INSTALLER ENHANCEMENT**: Created proper Mac .app bundle installer to resolve launch issues
 - **MAC INSTALLER ENHANCEMENT**: Created proper Mac .app bundle installer to resolve launch issues
   - Built native QuantumCore.app with proper Info.plist and macOS integration
