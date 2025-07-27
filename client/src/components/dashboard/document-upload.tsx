@@ -154,7 +154,12 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
             }`}>
               {uploadMutation.isPending ? "Processing..." : "Ready"}
             </span>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => document.getElementById('file-input')?.click()}
+              disabled={uploadMutation.isPending}
+            >
               <FileIcon className="w-4 h-4 mr-2" />
               Choose Files
             </Button>
