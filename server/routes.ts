@@ -588,6 +588,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single document by ID
+  app.get('/api/documents/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const document = await storage.getDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      res.json(document);
+    } catch (error) {
+      console.error("Error fetching document:", error);
+      res.status(500).json({ message: "Failed to fetch document" });
+    }
+  });
+
   // Helper function to convert JPEG to PDF using jsPDF
   async function convertImageToPdf(inputPath: string, outputPath: string): Promise<void> {
     try {

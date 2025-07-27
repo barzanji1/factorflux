@@ -38,8 +38,20 @@ export default function DocumentViewer({ isOpen, onClose, entityType, entityId }
   const queryClient = useQueryClient();
 
   const { data: documents, isLoading } = useQuery({
-    queryKey: ["/api/documents", { entityType, entityId }],
+    queryKey: entityType === 'document' && entityId ? ["/api/documents", entityId] : ["/api/documents", { entityType, entityId }],
     enabled: isOpen && !!entityType && !!entityId,
+    queryFn: async () => {
+      if (entityType === 'document' && entityId) {
+        // For direct document viewing, fetch the specific document
+        const response = await apiRequest("GET", `/api/documents/${entityId}`);
+        const document = await response.json();
+        return [document]; // Return as array to match expected format
+      } else {
+        // For other entity types, fetch related documents
+        const response = await apiRequest("GET", `/api/documents?entityType=${entityType}&entityId=${entityId}`);
+        return response.json();
+      }
+    },
   });
 
   const deleteDocument = useMutation({
