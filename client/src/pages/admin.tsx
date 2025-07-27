@@ -438,7 +438,7 @@ export default function Admin() {
                         Manager
                       </Badge>
                     ) : userData.role === 'admin' ? (
-                      <Badge variant="default" className="bg-purple-600 hover:bg-purple-700 text-white">
+                      <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
                         Admin
                       </Badge>
                     ) : (
