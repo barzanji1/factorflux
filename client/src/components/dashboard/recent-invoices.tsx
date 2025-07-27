@@ -14,10 +14,18 @@ export default function RecentInvoices() {
   });
 
   const handleViewInvoice = (invoice: Invoice) => {
-    // Could open a modal or navigate to detail page
     toast({
-      title: "View Invoice",
-      description: `Viewing invoice ${invoice.invoiceNumber}`,
+      title: "Invoice Details",
+      description: (
+        <div className="space-y-1">
+          <div><strong>Invoice:</strong> {invoice.invoiceNumber}</div>
+          <div><strong>Load ID:</strong> {invoice.loadId}</div>
+          <div><strong>Amount:</strong> ${parseFloat(invoice.amount).toFixed(2)}</div>
+          <div><strong>Status:</strong> {invoice.status.toUpperCase()}</div>
+          <div><strong>Created:</strong> {new Date(invoice.createdAt!).toLocaleDateString()}</div>
+        </div>
+      ),
+      duration: 5000,
     });
   };
 
@@ -52,9 +60,10 @@ Thank you for your business!
   };
 
   const handleEditInvoice = (invoice: Invoice) => {
-    // Could open edit modal or navigate to edit page
+    // Navigate to invoices page with edit functionality
+    window.location.href = `/invoices?edit=${invoice.id}`;
     toast({
-      title: "Edit Invoice",
+      title: "Redirecting to Edit",
       description: `Opening edit form for invoice ${invoice.invoiceNumber}`,
     });
   };
@@ -103,7 +112,7 @@ Thank you for your business!
     );
   }
 
-  const recentInvoices = invoices?.slice(0, 5) || [];
+  const recentInvoices = (invoices as Invoice[])?.slice(0, 5) || [];
 
   return (
     <Card>
