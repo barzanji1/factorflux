@@ -297,13 +297,19 @@ export default function FuelCards() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant={
-                            app.status === 'approved' ? 'default' : 
-                            app.status === 'rejected' ? 'destructive' : 
-                            'secondary'
-                          }>
-                            {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
-                          </Badge>
+                          {app.status === 'approved' ? (
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
+                              {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                            </Badge>
+                          ) : app.status === 'rejected' ? (
+                            <Badge variant="destructive">
+                              {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400">
+                              {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                            </Badge>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -584,13 +590,19 @@ export default function FuelCards() {
                   <h4 className="font-medium text-gray-900 dark:text-white">Status</h4>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(selectedApplication.status)}
-                    <Badge variant={
-                      selectedApplication.status === 'approved' ? 'default' : 
-                      selectedApplication.status === 'rejected' ? 'destructive' : 
-                      'secondary'
-                    }>
-                      {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
-                    </Badge>
+                    {selectedApplication.status === 'approved' ? (
+                      <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
+                        {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                      </Badge>
+                    ) : selectedApplication.status === 'rejected' ? (
+                      <Badge variant="destructive">
+                        {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400">
+                        {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <div>
