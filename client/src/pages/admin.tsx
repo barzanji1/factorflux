@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Users, Shield, UserCog, Mail, Copy } from "lucide-react";
 import { User } from "@shared/schema";
-import ContextualDownload from "@/components/contextual-download";
+
 
 export default function Admin() {
   const { toast } = useToast();
@@ -376,10 +376,7 @@ export default function Admin() {
               </CardContent>
             </Card>
 
-            {/* Contextual Download Section */}
-            <div className="mb-6">
-              <ContextualDownload showAllOptions={false} />
-            </div>
+
 
 
 

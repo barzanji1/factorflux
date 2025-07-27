@@ -74,14 +74,6 @@ export function useDeviceDetection(): DeviceInfo {
         size: '5.7 MB',
         icon: '🪟'
       };
-    } else if (detectedPlatform === 'mac') {
-      recommendedDownload = {
-        platform: 'macOS',
-        url: `${baseUrl}/api/desktop/download/mac`,
-        filename: 'QuantumCore-Mac-Portable.tar.gz',
-        size: '5.7 MB',
-        icon: '🍎'
-      };
     } else if (detectedPlatform === 'linux') {
       recommendedDownload = {
         platform: 'Linux',
