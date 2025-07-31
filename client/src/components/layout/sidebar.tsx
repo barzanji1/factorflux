@@ -15,8 +15,7 @@ import {
   CreditCard,
   Fuel,
   Globe,
-  Download,
-  User as UserIcon
+  Download
 } from "lucide-react";
 
 
@@ -28,7 +27,7 @@ const navigation = [
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Jose", href: "/jose", icon: UserIcon },
+
   { name: "Portfolio", href: "/portfolio", icon: Globe, external: true },
   { name: "Fuel Card Admin", href: "/fuel-card-admin", icon: CreditCard, role: "manager" },
   { name: "Admin", href: "/admin", icon: Shield, role: "manager" },

@@ -20,7 +20,7 @@ import FuelCardAdmin from "@/pages/fuel-card-admin";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import DownloadPage from "@/pages/download";
-import Jose from "@/pages/jose";
+
 
 
 function Router() {
@@ -48,7 +48,7 @@ function Router() {
           <Route path="/fuel-card-admin" component={FuelCardAdmin} />
           <Route path="/profile" component={Profile} />
           <Route path="/settings" component={Settings} />
-          <Route path="/jose" component={Jose} />
+
           <Route path="/download" component={DownloadPage} />
         </>
       )}
