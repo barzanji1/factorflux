@@ -61,14 +61,14 @@ export default function Dashboard() {
                   alt="Trucking Pros Financial" 
                   className="h-16 w-auto object-contain"
                 />
-                <div className="text-center">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Welcome to QuantumCore
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-300 mt-1">
-                    Have a Wonderful Day! :-)
-                  </p>
-                </div>
+              </div>
+              <div className="flex-1 text-center">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Welcome to QuantumCore
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                  Have a Wonderful Day! :-)
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
