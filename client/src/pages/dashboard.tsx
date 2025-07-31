@@ -66,7 +66,7 @@ export default function Dashboard() {
                     Welcome to QuantumCore
                   </h2>
                   <p className="text-gray-600 dark:text-gray-300 mt-1">
-                    You're here because you're amazing. I wish you a wonderful day of working :-)
+                    Have a Wonderful Day! :-)
                   </p>
                 </div>
               </div>

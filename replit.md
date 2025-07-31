@@ -80,8 +80,8 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
   - Logo positioned alongside "Welcome to QuantumCore" heading for high visibility
   - Added "Powered by Trucking Pros Financial" branding and professional messaging
   - Responsive design maintains clean, professional appearance across all screen sizes
-- **PERSONALIZED DASHBOARD MESSAGE**: Customized welcome text with motivational message
-  - Replaced corporate messaging with personal touch: "You're here because you're amazing. I wish you a wonderful day of working :-)"
+- **PERSONALIZED DASHBOARD MESSAGE**: Customized welcome text with simple, friendly message
+  - Replaced corporate messaging with concise personal touch: "Have a Wonderful Day! :-)"
   - Enhanced user experience with encouraging, friendly tone while maintaining professional logo branding
   - Dashboard now balances corporate identity with personal motivation for better user engagement
 
