@@ -54,23 +54,21 @@ export default function Dashboard() {
         <main className="flex-1 overflow-auto p-6">
           {/* TPF Branding Header */}
           <div className="mb-8 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-6">
-                <img 
-                  src={tpfLogo} 
-                  alt="Trucking Pros Financial" 
-                  className="h-16 w-auto object-contain"
-                />
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Welcome to QuantumCore
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-300 mt-1">
-                    Have a Wonderful Day! :-)
-                  </p>
-                </div>
+            <div className="flex flex-col items-center text-center space-y-4">
+              <img 
+                src={tpfLogo} 
+                alt="Trucking Pros Financial" 
+                className="h-16 w-auto object-contain"
+              />
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Welcome to QuantumCore
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                  Have a Wonderful Day! :-)
+                </p>
               </div>
-              <div className="text-right">
+              <div className="text-center">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Powered by Trucking Pros Financial
                 </p>
