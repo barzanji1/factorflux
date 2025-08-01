@@ -74,6 +74,8 @@ export default function Forms() {
                       jQuery.ajax({
                         dataType: 'json',
                         url: frmcont.data('url'),
+                        timeout: 15000,
+                        crossDomain: true,
                         success: function(json){
                           console.log('TPF API Response:', json);
                           if (json && json.renderedHtml) {
@@ -125,8 +127,26 @@ export default function Forms() {
                           }
                         },
                         error: function(xhr, status, error) {
-                          console.error('TPF Form loading error:', error, status, xhr);
-                          frmcont.html('<div class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"><p class="text-red-600 dark:text-red-400">Failed to load form. Please use the external portal link below or try refreshing the page.</p></div>');
+                          console.error('TPF Form loading error:', {
+                            error: error,
+                            status: status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText,
+                            readyState: xhr.readyState
+                          });
+                          
+                          var errorMsg = 'Failed to load payment details. ';
+                          if (status === 'timeout') {
+                            errorMsg += 'Request timed out.';
+                          } else if (xhr.status === 0) {
+                            errorMsg += 'Network error or CORS restriction.';
+                          } else if (xhr.status === 404) {
+                            errorMsg += 'Payment data not found.';
+                          } else {
+                            errorMsg += 'Server error (' + xhr.status + ').';
+                          }
+                          
+                          frmcont.html('<div class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"><p class="text-red-600 dark:text-red-400">' + errorMsg + '</p><p class="text-sm text-red-500 dark:text-red-300 mt-2">Please use the external portal link below or contact support.</p></div>');
                         }
                       });
                     }
@@ -134,6 +154,50 @@ export default function Forms() {
                 `
               }}
             />
+          </div>
+          
+          {/* Direct API Test Section */}
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-6 border border-yellow-200 dark:border-yellow-800 mb-8">
+            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-3">
+              API Connection Test
+            </h3>
+            <p className="text-yellow-700 dark:text-yellow-300 mb-4">
+              Testing connection to TPF payment API...
+            </p>
+            <button 
+              id="test-api-btn"
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+              onClick={() => {
+                const testBtn = document.getElementById('test-api-btn');
+                const testResult = document.getElementById('api-test-result');
+                
+                if (testBtn && testResult) {
+                  testBtn.textContent = 'Testing...';
+                  (testBtn as HTMLButtonElement).disabled = true;
+                  
+                  fetch('https://secure.truckingprosfinancial.com/wp-json/frm/v2/views/82676?return=html')
+                    .then(response => {
+                      console.log('Fetch response status:', response.status);
+                      return response.json();
+                    })
+                    .then(data => {
+                      console.log('Fetch response data:', data);
+                      testResult.innerHTML = '<div class="mt-4 p-3 bg-green-100 dark:bg-green-900/30 rounded border border-green-300 dark:border-green-700"><p class="text-green-800 dark:text-green-200">✓ API connection successful</p><pre class="text-xs mt-2 overflow-auto">' + JSON.stringify(data, null, 2) + '</pre></div>';
+                    })
+                    .catch(error => {
+                      console.error('Fetch error:', error);
+                      testResult.innerHTML = '<div class="mt-4 p-3 bg-red-100 dark:bg-red-900/30 rounded border border-red-300 dark:border-red-700"><p class="text-red-800 dark:text-red-200">✗ API connection failed: ' + error.message + '</p></div>';
+                    })
+                    .finally(() => {
+                      testBtn.textContent = 'Test API Connection';
+                      (testBtn as HTMLButtonElement).disabled = false;
+                    });
+                }
+              }}
+            >
+              Test API Connection
+            </button>
+            <div id="api-test-result"></div>
           </div>
           
           {/* Backup Native TPF Application Form */}
