@@ -15,24 +15,17 @@ export default function Forms() {
       .then(data => {
         console.log('TPF Payment Data:', data);
         if (data && data.renderedHtml) {
-          // Clean and format the HTML properly
-          let cleanHtml = data.renderedHtml
-            // First decode any HTML entities
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#x27;/g, "'")
-            // Remove any existing inline styles that might conflict
-            .replace(/style="[^"]*"/g, '')
-            // Add color formatting with inline styles
-            .replace(/(\$[\d,]+\.?\d*)/g, '<span style="color: #059669; font-weight: bold; background-color: #ecfdf5; padding: 2px 6px; border-radius: 3px; margin: 0 2px;">$1</span>')
-            .replace(/(\d{1,2}\/\d{1,2}\/\d{2,4})/g, '<span style="color: #2563eb; font-weight: 600;">$1</span>')
-            .replace(/(#[\w\d]+)/g, '<span style="color: #7c3aed; font-family: monospace; font-size: 0.875rem; background-color: #faf5ff; padding: 1px 4px; border-radius: 3px;">$1</span>')
-            // Format standalone numbers (but not dates or amounts)
-            .replace(/(?<!\$|\/)(\b\d{1,6}\b)(?![\d\/])/g, '<span style="color: #ea580c; font-weight: 600;">$1</span>');
+          // Debug: Let's see the raw HTML first
+          console.log('Raw HTML sample:', data.renderedHtml.substring(0, 500));
           
-          setPaymentData(cleanHtml);
+          // Simplest approach - just display with a test replacement to verify it works
+          let testHtml = data.renderedHtml
+            // Just try to color any "07/31/2025" text to verify the replacement works
+            .replace(/07\/31\/2025/g, '<span style="color: red; background: yellow; font-weight: bold;">07/31/2025</span>');
+            
+          console.log('After replacement sample:', testHtml.substring(0, 500));
+          
+          setPaymentData(testHtml);
         } else {
           setError('No payment data available');
         }
