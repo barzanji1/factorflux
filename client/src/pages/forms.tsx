@@ -91,44 +91,7 @@ export default function Forms() {
           
 
           
-          {/* Additional Services */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Native Application Form */}
-            <details className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <summary className="cursor-pointer px-6 py-4 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 text-gray-900 dark:text-white font-semibold hover:from-green-100 hover:to-green-200 dark:hover:from-green-800/30 dark:hover:to-green-700/30 transition-all duration-200 border-b border-gray-200 dark:border-gray-700">
-                <span className="text-lg">📝 Alternative Application Form</span>
-              </summary>
-              <div className="p-6">
-                <NativeTPFForm />
-              </div>
-            </details>
 
-            {/* External Portal Access */}
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-xl">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M7 7l10 10M17 7v4M17 7h-4" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold mb-2">TPF Portal Access</h3>
-                <p className="text-blue-100 mb-6 text-sm">
-                  Access the full Trucking Pros Financial portal for complete account management
-                </p>
-                <a
-                  href="https://secure.truckingprosfinancial.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-6 py-3 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
-                >
-                  <span>Open TPF Portal</span>
-                  <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M7 7l10 10M17 7v4M17 7h-4" />
-                  </svg>
-                </a>
-              </div>
-            </div>
-          </div>
           
           {/* Support Section */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-6 border border-green-200 dark:border-green-800">
