@@ -27,10 +27,10 @@ export default function Forms() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-8">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                TPF Application Form
+                TPF Payment Details
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
-                Complete your application directly through the embedded TPF form below.
+                View payment information and account details from Trucking Pros Financial.
               </p>
             </div>
             
@@ -75,17 +75,53 @@ export default function Forms() {
                         dataType: 'json',
                         url: frmcont.data('url'),
                         success: function(json){
+                          console.log('TPF API Response:', json);
                           if (json && json.renderedHtml) {
                             frmcont.html(json.renderedHtml);
                             
-                            // Apply styling to the loaded form
+                            // Apply styling to payment details and tables
                             setTimeout(function() {
+                              // Style tables for payment data
+                              frmcont.find('table').addClass('w-full border-collapse border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden');
+                              frmcont.find('th').addClass('bg-gray-100 dark:bg-gray-700 px-4 py-2 text-left font-medium text-gray-900 dark:text-white border-b border-gray-300 dark:border-gray-600');
+                              frmcont.find('td').addClass('px-4 py-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white');
+                              
+                              // Style form elements if present
                               frmcont.find('input, select, textarea').addClass('w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white');
                               frmcont.find('input[type="submit"], button[type="submit"]').addClass('bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors');
                               frmcont.find('label').addClass('block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2');
+                              
+                              // Style payment information containers
+                              frmcont.find('.payment-info, .account-details, .invoice-details').addClass('bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-4');
                             }, 500);
+                          } else if (json && typeof json === 'object') {
+                            // Handle if JSON contains payment data directly
+                            var paymentHtml = '<div class="payment-details-container">';
+                            paymentHtml += '<h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Payment Information</h3>';
+                            
+                            if (json.data && Array.isArray(json.data)) {
+                              paymentHtml += '<div class="grid gap-4">';
+                              json.data.forEach(function(item, index) {
+                                paymentHtml += '<div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">';
+                                for (var key in item) {
+                                  if (item.hasOwnProperty(key)) {
+                                    paymentHtml += '<div class="flex justify-between py-1"><span class="font-medium text-gray-700 dark:text-gray-300">' + key + ':</span><span class="text-gray-900 dark:text-white">' + item[key] + '</span></div>';
+                                  }
+                                }
+                                paymentHtml += '</div>';
+                              });
+                              paymentHtml += '</div>';
+                            } else {
+                              for (var key in json) {
+                                if (json.hasOwnProperty(key) && key !== 'renderedHtml') {
+                                  paymentHtml += '<div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-600"><span class="font-medium text-gray-700 dark:text-gray-300">' + key + ':</span><span class="text-gray-900 dark:text-white">' + json[key] + '</span></div>';
+                                }
+                              }
+                            }
+                            paymentHtml += '</div>';
+                            frmcont.html(paymentHtml);
                           } else {
-                            frmcont.html('<div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg"><p class="text-yellow-600 dark:text-yellow-400">Form data is not available. Please use the external portal link below.</p></div>');
+                            frmcont.html('<div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg"><p class="text-yellow-600 dark:text-yellow-400">Payment data is not available. Please use the external portal link below.</p></div>');
                           }
                         },
                         error: function(xhr, status, error) {
