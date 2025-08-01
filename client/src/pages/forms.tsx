@@ -23,8 +23,92 @@ export default function Forms() {
               </button>
             </Link>
           </div>
-          {/* Native TPF Application Form */}
-          <NativeTPFForm className="mb-8" />
+          {/* External TPF Form Integration */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                TPF Application Form
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300">
+                Complete your application directly through the embedded TPF form below.
+              </p>
+            </div>
+            
+            <div 
+              id="frmapi-5QOP-LWPL-QOT0-H74Y" 
+              className="frmapi-form min-h-[400px] p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700" 
+              data-url="https://secure.truckingprosfinancial.com/wp-json/frm/v2/views/82676?return=html"
+            >
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <span className="ml-3 text-gray-600 dark:text-gray-300">Loading TPF form...</span>
+              </div>
+            </div>
+            
+            <script 
+              dangerouslySetInnerHTML={{
+                __html: `
+                  // Load jQuery if not available
+                  if (typeof jQuery === 'undefined') {
+                    var script = document.createElement('script');
+                    script.src = 'https://code.jquery.com/jquery-3.6.0.min.js';
+                    script.onload = function() {
+                      initializeTPFForm();
+                    };
+                    document.head.appendChild(script);
+                  } else {
+                    initializeTPFForm();
+                  }
+                  
+                  function initializeTPFForm() {
+                    jQuery(document).ready(function($){
+                      var frmapi = $('.frmapi-form');
+                      if(frmapi.length){
+                        for(var frmi = 0, frmlen = frmapi.length; frmi < frmlen; frmi++){
+                          frmapiGetData($(frmapi[frmi]));
+                        }
+                      }
+                    });
+                    
+                    function frmapiGetData(frmcont){
+                      jQuery.ajax({
+                        dataType: 'json',
+                        url: frmcont.data('url'),
+                        success: function(json){
+                          if (json && json.renderedHtml) {
+                            frmcont.html(json.renderedHtml);
+                            
+                            // Apply styling to the loaded form
+                            setTimeout(function() {
+                              frmcont.find('input, select, textarea').addClass('w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white');
+                              frmcont.find('input[type="submit"], button[type="submit"]').addClass('bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors');
+                              frmcont.find('label').addClass('block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2');
+                            }, 500);
+                          } else {
+                            frmcont.html('<div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg"><p class="text-yellow-600 dark:text-yellow-400">Form data is not available. Please use the external portal link below.</p></div>');
+                          }
+                        },
+                        error: function(xhr, status, error) {
+                          console.error('TPF Form loading error:', error, status, xhr);
+                          frmcont.html('<div class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"><p class="text-red-600 dark:text-red-400">Failed to load form. Please use the external portal link below or try refreshing the page.</p></div>');
+                        }
+                      });
+                    }
+                  }
+                `
+              }}
+            />
+          </div>
+          
+          {/* Backup Native TPF Application Form */}
+          <details className="mb-8">
+            <summary className="cursor-pointer p-4 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-900 dark:text-white font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+              Alternative: Use Native Application Form
+            </summary>
+            <div className="mt-4">
+              <NativeTPFForm />
+            </div>
+          </details>
           
           {/* External TPF Portal Access */}
           <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-8 text-white shadow-xl">
