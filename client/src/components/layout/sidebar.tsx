@@ -15,7 +15,8 @@ import {
   CreditCard,
   Fuel,
   Globe,
-  Download
+  Download,
+  FormInput
 } from "lucide-react";
 
 
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Documents", href: "/documents", icon: FolderOpen },
+  { name: "TPF Forms", href: "/forms", icon: FormInput },
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
