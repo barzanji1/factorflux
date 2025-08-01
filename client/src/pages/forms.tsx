@@ -80,10 +80,10 @@ export default function Forms() {
                     className="payment-table-wrapper min-w-full [&_table]:w-full [&_table]:border-collapse [&_table]:bg-white [&_table]:dark:bg-gray-800 [&_thead]:bg-gradient-to-r [&_thead]:from-gray-50 [&_thead]:to-gray-100 [&_thead]:dark:from-gray-700 [&_thead]:dark:to-gray-600 [&_th]:px-6 [&_th]:py-4 [&_th]:text-left [&_th]:font-bold [&_th]:text-gray-900 [&_th]:dark:text-gray-100 [&_th]:text-sm [&_th]:uppercase [&_th]:tracking-wider [&_th]:border-b-2 [&_th]:border-gray-200 [&_th]:dark:border-gray-600 [&_tbody_tr]:border-b [&_tbody_tr]:border-gray-200 [&_tbody_tr]:dark:border-gray-700 [&_tbody_tr:hover]:bg-blue-50 [&_tbody_tr:hover]:dark:bg-gray-700 [&_tbody_tr:hover]:transition-colors [&_td]:px-6 [&_td]:py-4 [&_td]:text-gray-900 [&_td]:dark:text-gray-100 [&_td]:font-medium [&_.to_right]:text-right [&_.to_right]:font-bold"
                     dangerouslySetInnerHTML={{ 
                       __html: paymentData
-                        .replace(/(\$[\d,]+\.?\d*)/g, '<span class="text-green-600 dark:text-green-400 font-bold bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">$1</span>')
-                        .replace(/(\d{1,2}\/\d{1,2}\/\d{2,4})/g, '<span class="text-blue-600 dark:text-blue-400 font-semibold">$1</span>')
-                        .replace(/(#\w+)/g, '<span class="text-purple-600 dark:text-purple-400 font-mono text-sm bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded">$1</span>')
-                        .replace(/(\b\d+\b)(?![\/\.])/g, '<span class="text-orange-600 dark:text-orange-400 font-semibold">$1</span>')
+                        .replace(/(\$[\d,]+\.?\d*)/g, '<span style="color: #059669; font-weight: bold; background-color: #ecfdf5; padding: 4px 8px; border-radius: 4px;">$1</span>')
+                        .replace(/(\d{1,2}\/\d{1,2}\/\d{2,4})/g, '<span style="color: #2563eb; font-weight: 600;">$1</span>')
+                        .replace(/(#\w+)/g, '<span style="color: #7c3aed; font-family: monospace; font-size: 0.875rem; background-color: #faf5ff; padding: 2px 6px; border-radius: 4px;">$1</span>')
+                        .replace(/(\b\d+\b)(?![\/\.])/g, '<span style="color: #ea580c; font-weight: 600;">$1</span>')
                     }}
                   />
                 </div>
