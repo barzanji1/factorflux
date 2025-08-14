@@ -16,7 +16,7 @@ import {
   Fuel,
   Globe,
   Download,
-  FormInput,
+
   Clock
 } from "lucide-react";
 
@@ -27,7 +27,7 @@ const navigation = [
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Documents", href: "/documents", icon: FolderOpen },
   { name: "Follow Ups", href: "/follow-up", icon: Clock },
-  { name: "TPF Forms", href: "/forms", icon: FormInput },
+
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
