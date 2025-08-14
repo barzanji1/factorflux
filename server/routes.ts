@@ -6,7 +6,8 @@ import {
   insertClientSchema, 
   insertLoadSchema, 
   insertInvoiceSchema,
-  insertDocumentSchema 
+  insertDocumentSchema,
+  insertFollowUpSchema 
 } from "@shared/schema";
 import multer from "multer";
 import path from "path";
@@ -1333,6 +1334,82 @@ Trucking Pros Financial Team
       </body>
       </html>
     `);
+  });
+
+  // Follow-up routes
+  app.get('/api/follow-ups', isAuthenticated, async (req: any, res) => {
+    try {
+      const followUps = await storage.getAllFollowUps();
+      res.json(followUps);
+    } catch (error) {
+      console.error("Error fetching follow-ups:", error);
+      res.status(500).json({ message: "Failed to fetch follow-ups" });
+    }
+  });
+
+  app.post('/api/follow-ups', isAuthenticated, async (req: any, res) => {
+    try {
+      const data = insertFollowUpSchema.parse(req.body);
+      const followUp = await storage.createFollowUp(data);
+      
+      // Log activity
+      await storage.createActivity({
+        userId: req.user.claims.sub,
+        type: 'follow_up_created',
+        description: `Created follow-up task: ${data.title}`,
+        entityType: 'follow_up',
+        entityId: followUp.id,
+      });
+
+      res.json(followUp);
+    } catch (error) {
+      console.error("Error creating follow-up:", error);
+      res.status(500).json({ message: "Failed to create follow-up" });
+    }
+  });
+
+  app.patch('/api/follow-ups/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+      
+      const followUp = await storage.updateFollowUp(id, updates);
+      
+      // Log activity
+      await storage.createActivity({
+        userId: req.user.claims.sub,
+        type: 'follow_up_updated',
+        description: `Updated follow-up task: ${followUp.title}`,
+        entityType: 'follow_up',
+        entityId: followUp.id,
+      });
+
+      res.json(followUp);
+    } catch (error) {
+      console.error("Error updating follow-up:", error);
+      res.status(500).json({ message: "Failed to update follow-up" });
+    }
+  });
+
+  app.delete('/api/follow-ups/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteFollowUp(id);
+      
+      // Log activity
+      await storage.createActivity({
+        userId: req.user.claims.sub,
+        type: 'follow_up_deleted',
+        description: `Deleted follow-up task`,
+        entityType: 'follow_up',
+        entityId: id,
+      });
+
+      res.json({ message: "Follow-up deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting follow-up:", error);
+      res.status(500).json({ message: "Failed to delete follow-up" });
+    }
   });
 
   // Portfolio route - serve the portfolio website

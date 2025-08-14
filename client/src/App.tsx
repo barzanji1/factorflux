@@ -21,6 +21,7 @@ import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import DownloadPage from "@/pages/download";
 import Forms from "@/pages/forms";
+import FollowUp from "@/pages/follow-up";
 
 
 
@@ -41,6 +42,7 @@ function Router() {
           <Route path="/clients" component={Clients} />
           <Route path="/invoices" component={Invoices} />
           <Route path="/documents" component={Documents} />
+          <Route path="/follow-up" component={FollowUp} />
           <Route path="/forms" component={Forms} />
           <Route path="/credit-checks" component={CreditChecks} />
           <Route path="/admin" component={Admin} />

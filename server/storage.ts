@@ -8,6 +8,7 @@ import {
   fuelCardApplications,
   timeEntries,
   notifications,
+  followUps,
   type User,
   type UpsertUser,
   type TimeEntry,
@@ -26,6 +27,8 @@ import {
   type InsertFuelCardApplication,
   type Notification,
   type InsertNotification,
+  type FollowUp,
+  type InsertFollowUp,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
@@ -108,6 +111,13 @@ export interface IStorage {
   markNotificationAsRead(id: number): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
   getUnreadNotificationCount(userId: string): Promise<number>;
+  
+  // Follow-up operations
+  getAllFollowUps(): Promise<FollowUp[]>;
+  getFollowUp(id: number): Promise<FollowUp | undefined>;
+  createFollowUp(followUp: InsertFollowUp): Promise<FollowUp>;
+  updateFollowUp(id: number, updates: Partial<InsertFollowUp>): Promise<FollowUp>;
+  deleteFollowUp(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -648,6 +658,56 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result[0]?.count || 0;
+  }
+
+  // Follow-up operations
+  async getAllFollowUps(): Promise<FollowUp[]> {
+    return await db
+      .select({
+        id: followUps.id,
+        clientId: followUps.clientId,
+        title: followUps.title,
+        description: followUps.description,
+        priority: followUps.priority,
+        status: followUps.status,
+        dueDate: followUps.dueDate,
+        createdAt: followUps.createdAt,
+        updatedAt: followUps.updatedAt,
+        client: {
+          id: clients.id,
+          name: clients.name,
+          email: clients.email,
+        }
+      })
+      .from(followUps)
+      .leftJoin(clients, eq(followUps.clientId, clients.id))
+      .orderBy(desc(followUps.createdAt));
+  }
+
+  async getFollowUp(id: number): Promise<FollowUp | undefined> {
+    const [followUp] = await db
+      .select()
+      .from(followUps)
+      .where(eq(followUps.id, id));
+    return followUp;
+  }
+
+  async createFollowUp(followUp: InsertFollowUp): Promise<FollowUp> {
+    const [newFollowUp] = await db.insert(followUps).values(followUp).returning();
+    return newFollowUp;
+  }
+
+  async updateFollowUp(id: number, updates: Partial<InsertFollowUp>): Promise<FollowUp> {
+    const [updatedFollowUp] = await db
+      .update(followUps)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(followUps.id, id))
+      .returning();
+    return updatedFollowUp;
+  }
+
+  async deleteFollowUp(id: number): Promise<void> {
+    await db.delete(followUps).where(eq(followUps.id, id));
   }
 }
 

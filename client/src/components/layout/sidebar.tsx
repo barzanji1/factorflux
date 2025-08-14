@@ -16,7 +16,8 @@ import {
   Fuel,
   Globe,
   Download,
-  FormInput
+  FormInput,
+  Clock
 } from "lucide-react";
 
 
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Documents", href: "/documents", icon: FolderOpen },
+  { name: "Follow Up", href: "/follow-up", icon: Clock },
   { name: "TPF Forms", href: "/forms", icon: FormInput },
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
@@ -86,7 +88,7 @@ export default function Sidebar() {
           const isActive = location === item.href;
           
           // Handle external links differently
-          if (item.external) {
+          if ('external' in item && item.external) {
             return (
               <a
                 key={item.name}

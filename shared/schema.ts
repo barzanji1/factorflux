@@ -183,6 +183,19 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Follow-ups table
+export const followUps = pgTable("follow_ups", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  priority: varchar("priority", { enum: ["low", "medium", "high"] }).default("medium").notNull(),
+  status: varchar("status", { enum: ["pending", "in-progress", "completed"] }).default("pending").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   invoices: many(invoices),
@@ -195,6 +208,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const clientsRelations = relations(clients, ({ many }) => ({
   loads: many(loads),
   invoices: many(invoices),
+  followUps: many(followUps),
 }));
 
 export const loadsRelations = relations(loads, ({ one, many }) => ({
@@ -234,6 +248,10 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));
 
+export const followUpsRelations = relations(followUps, ({ one }) => ({
+  client: one(clients, { fields: [followUps.clientId], references: [clients.id] }),
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
@@ -261,6 +279,12 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true 
 });
 
+export const insertFollowUpSchema = createInsertSchema(followUps).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
 // Types
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = typeof timeEntries.$inferInsert;
@@ -268,6 +292,9 @@ export type UpsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type FollowUp = typeof followUps.$inferSelect;
+export type InsertFollowUp = z.infer<typeof insertFollowUpSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
