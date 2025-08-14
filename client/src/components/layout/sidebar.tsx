@@ -26,7 +26,7 @@ const navigation = [
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Documents", href: "/documents", icon: FolderOpen },
-  { name: "Follow Up", href: "/follow-up", icon: Clock },
+  { name: "Follow Ups", href: "/follow-up", icon: Clock },
   { name: "TPF Forms", href: "/forms", icon: FormInput },
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },

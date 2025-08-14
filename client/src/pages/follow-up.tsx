@@ -147,7 +147,7 @@ export default function FollowUpPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <TopNav title="Follow Up Tasks" />
+      <TopNav title="Follow Ups" />
       
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
