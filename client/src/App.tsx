@@ -20,6 +20,7 @@ import FuelCardAdmin from "@/pages/fuel-card-admin";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import DownloadPage from "@/pages/download";
+import LocalLogin from "@/pages/local-login";
 
 import FollowUp from "@/pages/follow-up";
 
@@ -35,6 +36,7 @@ function Router() {
         <>
           <Route path="/" component={Landing} />
           <Route path="/download" component={DownloadPage} />
+          <Route path="/local-login" component={LocalLogin} />
         </>
       ) : (
         <>

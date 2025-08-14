@@ -34,11 +34,12 @@ import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (required for Replit Auth)
+  // User operations (supports both Replit Auth and local auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserProfile(id: string, updates: Partial<User>): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  getUserByEmailAndType(email: string, authType: string): Promise<User[]>;
   
   // Client operations
   getClients(): Promise<Client[]>;
@@ -156,6 +157,11 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async getUserByEmailAndType(email: string, authType: string): Promise<User[]> {
+    return await db.select().from(users)
+      .where(and(eq(users.email, email), eq(users.authType, authType)));
   }
 
   // Client operations
