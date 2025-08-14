@@ -72,21 +72,21 @@ export default function ContextualDownload({ showAllOptions = false, compact = f
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Recommended Option */}
-        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+        <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center text-lg">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-lg">
                 {deviceInfo.recommendedDownload?.icon || '🌐'}
               </div>
               <div>
-                <p className="font-semibold text-blue-900 dark:text-blue-100">
+                <p className="font-semibold text-blue-900">
                   {deviceInfo.recommendedDownload ? (
                     `${deviceInfo.recommendedDownload.platform} Desktop App`
                   ) : (
                     'Web Application'
                   )}
                 </p>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+                <p className="text-sm text-blue-700">
                   {deviceInfo.recommendedDownload ? (
                     `Optimized for ${deviceInfo.recommendedDownload.platform} • ${deviceInfo.recommendedDownload.size}`
                   ) : (
