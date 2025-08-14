@@ -13,7 +13,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
-import { jsPDF } from "jspdf";
+// jsPDF removed for web deployment optimization
 import { sendDesktopInstallers, sendEmail } from "./emailService";
 
 // Configure multer for file uploads
@@ -606,36 +606,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to convert JPEG to PDF using jsPDF
+  // PDF conversion temporarily disabled for web deployment optimization
+  // Will be re-enabled with server-side PDF processing in future version
   async function convertImageToPdf(inputPath: string, outputPath: string): Promise<void> {
-    try {
-      // Read the image file as base64
-      const imageBuffer = fs.readFileSync(inputPath);
-      const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
-      
-      // Create PDF with standard letter size
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      // Add image to PDF - fit to page with margins
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const maxWidth = pageWidth - (margin * 2);
-      const maxHeight = pageHeight - (margin * 2);
-      
-      pdf.addImage(base64Image, 'JPEG', margin, margin, maxWidth, maxHeight);
-      
-      // Save PDF to file
-      const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
-      fs.writeFileSync(outputPath, pdfBuffer);
-    } catch (error) {
-      console.error('Error converting image to PDF:', error);
-      throw error;
-    }
+    // Feature disabled - images will be kept as-is for now
+    throw new Error('PDF conversion temporarily unavailable');
   }
 
   app.post('/api/documents/upload', isAuthenticated, upload.single('file'), async (req: any, res) => {
@@ -649,27 +624,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let processedMimeType = req.file.mimetype;
       let processedOriginalName = req.file.originalname;
 
-      // Convert JPEG/JPG to PDF automatically
+      // PDF conversion temporarily disabled - keep original image format
+      // Future enhancement: server-side PDF processing
       if (req.file.mimetype.includes('jpeg') || req.file.mimetype.includes('jpg')) {
-        try {
-          const pdfFilename = req.file.filename + '.pdf';
-          const pdfPath = path.join('uploads', pdfFilename);
-          
-          await convertImageToPdf(req.file.path, pdfPath);
-          
-          // Remove original image file
-          fs.unlinkSync(req.file.path);
-          
-          // Update file info to reflect PDF conversion
-          processedFilename = pdfFilename;
-          processedMimeType = 'application/pdf';
-          processedOriginalName = req.file.originalname.replace(/\.[^/.]+$/, '.pdf');
-          
-          console.log(`Converted ${req.file.originalname} to PDF: ${pdfFilename}`);
-        } catch (conversionError) {
-          console.error('Failed to convert image to PDF:', conversionError);
-          // Continue with original file if conversion fails
-        }
+        // Keep original image for now
+        console.log('Image uploaded as-is (PDF conversion disabled for web deployment)');
       }
       
       const documentData = {
