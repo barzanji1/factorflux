@@ -7,23 +7,16 @@ export function useTheme() {
   const { user } = useAuth();
   const [theme, setTheme] = useState<Theme>("system");
 
-  // Apply theme to document
+  // Apply theme to document - Force light theme always
   const applyTheme = (newTheme: Theme) => {
     const root = document.documentElement;
-    
-    if (newTheme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      root.classList.toggle("dark", systemTheme === "dark");
-    } else {
-      root.classList.toggle("dark", newTheme === "dark");
-    }
+    // Always remove dark class to force light theme
+    root.classList.remove("dark");
   };
 
-  // Initialize theme from user settings or localStorage
+  // Initialize theme from user settings or localStorage - Force light theme
   useEffect(() => {
-    const userTheme = (user as any)?.theme as Theme;
-    const storedTheme = localStorage.getItem("theme") as Theme;
-    const initialTheme = userTheme || storedTheme || "system";
+    const initialTheme = "light"; // Force light theme always
     
     setTheme(initialTheme);
     applyTheme(initialTheme);
