@@ -17,7 +17,6 @@ import Activities from "@/pages/activities";
 import Reports from "@/pages/reports";
 
 import FuelCardsInternal from "@/pages/fuel-cards-internal";
-import FuelCardAdmin from "@/pages/fuel-card-admin";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import DownloadPage from "@/pages/download";
@@ -60,7 +59,6 @@ function Router() {
           <Route path="/activities" component={Activities} />
           <Route path="/reports" component={Reports} />
           <Route path="/fuel-cards-internal" component={FuelCardsInternal} />
-          <Route path="/fuel-card-admin" component={FuelCardAdmin} />
           <Route path="/profile" component={Profile} />
           <Route path="/settings" component={Settings} />
           <Route path="/download" component={DownloadPage} />
