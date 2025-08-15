@@ -218,23 +218,6 @@ export default function Admin() {
     return null;
   }
 
-  if (!user || ((user as any).role !== 'manager' && (user as any).role !== 'admin')) {
-    return (
-      <div className="flex h-screen">
-        <Sidebar />
-        <div className="flex-1 flex flex-col">
-          <TopNav title="Admin Panel" subtitle="Access Denied" />
-          <main className="flex-1 p-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-              <p className="text-gray-600 mt-2">You don't have permission to access this page.</p>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
   if (isLoading || isLoadingUsers) {
     return (
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -492,8 +475,8 @@ export default function Admin() {
               No users found
             </div>
           )}
-            </CardContent>
-          </Card>
+        </CardContent>
+      </Card>
           </div>
         </main>
       </div>
