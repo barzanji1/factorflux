@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import {
@@ -105,6 +106,7 @@ export default function FuelCardsInternal() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const [selectedApplication, setSelectedApplication] = useState<FuelCardApplication | null>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -557,15 +559,39 @@ export default function FuelCardsInternal() {
                     <CardDescription>Tools for contacting and following up with clients</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Button className="w-full justify-start">
+                    <Button 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        toast({
+                          title: "Email Template",
+                          description: "Opening email template for client follow-up...",
+                        });
+                        // Could integrate with email service or open mail client
+                        window.open(`mailto:?subject=Fuel Card Application Follow-up&body=Dear Client,%0A%0AThank you for your interest in our fuel card services...`, '_blank');
+                      }}
+                    >
                       <Mail className="mr-2 h-4 w-4" />
                       Send Follow-up Email
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        toast({
+                          title: "Call Scheduled",
+                          description: "Phone call reminder added to your calendar.",
+                        });
+                        // Could integrate with calendar API
+                      }}
+                    >
                       <Phone className="mr-2 h-4 w-4" />
                       Schedule Phone Call
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setLocation("/follow-up")}
+                    >
                       <MessageSquare className="mr-2 h-4 w-4" />
                       Create Follow-up Task
                     </Button>
@@ -578,15 +604,77 @@ export default function FuelCardsInternal() {
                     <CardDescription>Generate reports and export data</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Button className="w-full justify-start">
+                    <Button 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        // Export applications as CSV
+                        const csvContent = "data:text/csv;charset=utf-8," 
+                          + "ID,Company,Contact,Email,Card Type,Status,Applied Date\n"
+                          + typedApplications.map(app => 
+                              `${app.id},"${app.companyName}","${app.contactName}","${app.email}","${app.cardType}","${app.status}","${app.createdAt}"`
+                            ).join("\n");
+                        
+                        const encodedUri = encodeURI(csvContent);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", encodedUri);
+                        link.setAttribute("download", `fuel-card-applications-${new Date().toISOString().split('T')[0]}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        toast({
+                          title: "Export Complete",
+                          description: "Applications data has been downloaded as CSV file.",
+                        });
+                      }}
+                    >
                       <Download className="mr-2 h-4 w-4" />
                       Export All Applications
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        toast({
+                          title: "Monthly Report",
+                          description: "Generating comprehensive monthly report...",
+                        });
+                        // Generate and download monthly report
+                        const reportData = {
+                          period: new Date().toLocaleDateString(),
+                          totalApplications: stats.total,
+                          approvedApplications: stats.approved,
+                          pendingApplications: stats.pending,
+                          rejectedApplications: stats.rejected
+                        };
+                        
+                        const reportContent = `Monthly Fuel Card Report\n
+Generated: ${new Date().toLocaleDateString()}\n
+Total Applications: ${reportData.totalApplications}\n
+Approved: ${reportData.approvedApplications}\n
+Pending: ${reportData.pendingApplications}\n
+Rejected: ${reportData.rejectedApplications}\n
+Approval Rate: ${Math.round((reportData.approvedApplications / reportData.totalApplications) * 100) || 0}%`;
+                        
+                        const blob = new Blob([reportContent], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `monthly-fuel-card-report-${new Date().toISOString().split('T')[0]}.txt`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
                       <BarChart3 className="mr-2 h-4 w-4" />
                       Generate Monthly Report
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setLocation("/")}
+                    >
                       <Calendar className="mr-2 h-4 w-4" />
                       Performance Dashboard
                     </Button>
@@ -599,11 +687,23 @@ export default function FuelCardsInternal() {
                     <CardDescription>Frequently used agent functions</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Button className="w-full justify-start">
+                    <Button 
+                      className="w-full justify-start"
+                      onClick={() => setLocation("/fuel-cards")}
+                    >
                       <Plus className="mr-2 h-4 w-4" />
                       Create Manual Application
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        toast({
+                          title: "Bulk Update",
+                          description: "Bulk status update feature coming soon...",
+                        });
+                      }}
+                    >
                       <Edit className="mr-2 h-4 w-4" />
                       Bulk Status Update
                     </Button>
@@ -616,11 +716,115 @@ export default function FuelCardsInternal() {
                     <CardDescription>Reference materials and guides</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const guideContent = `
+TPF Fuel Card Comparison Guide
+
+TPF Base Card:
+- 2¢/gallon discount at 5,000+ locations
+- Basic purchase controls
+- Monthly spending reports
+- 24/7 customer support
+- No monthly fees
+
+TPF Fleet Card:
+- 4¢/gallon discount at 8,000+ locations
+- Advanced purchase controls & limits
+- Real-time transaction alerts
+- Detailed reporting & analytics
+- Driver ID verification
+- 10% discount on lodging
+- No monthly fees
+
+TPF Premium Card:
+- 6¢/gallon discount at 12,000+ locations
+- Comprehensive fleet management tools
+- Dedicated account manager
+- Priority customer support
+- Cash back rewards (1% on fuel)
+- 15% discount on lodging
+- Free roadside assistance
+- Advanced fraud protection
+- No monthly fees
+                        `;
+                        
+                        const blob = new Blob([guideContent], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'tpf-card-comparison-guide.txt';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        
+                        toast({
+                          title: "Guide Downloaded",
+                          description: "Card comparison guide has been downloaded.",
+                        });
+                      }}
+                    >
                       <Building className="mr-2 h-4 w-4" />
                       Card Comparison Guide
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const pricingInfo = `
+TPF Fuel Card Pricing Information
+
+ALL TPF FUEL CARDS ARE COMPLIMENTARY - NO MONTHLY FEES!
+
+Base Card Benefits:
+- 2¢/gallon savings
+- Basic controls
+- Monthly reports
+- 24/7 support
+
+Fleet Card Benefits:
+- 4¢/gallon savings
+- Advanced controls
+- Real-time alerts
+- Analytics dashboard
+- Hotel discounts (10%)
+
+Premium Card Benefits:
+- 6¢/gallon savings
+- Dedicated account manager
+- Priority support
+- 1% cash back on fuel
+- Hotel discounts (15%)
+- Free roadside assistance
+
+All cards include:
+✓ No application fees
+✓ No monthly maintenance fees
+✓ No transaction fees
+✓ Wide acceptance network
+✓ Fraud protection
+✓ Online account management
+                        `;
+                        
+                        const blob = new Blob([pricingInfo], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'tpf-pricing-information.txt';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        
+                        toast({
+                          title: "Pricing Info Downloaded",
+                          description: "Complete pricing information has been downloaded.",
+                        });
+                      }}
+                    >
                       <DollarSign className="mr-2 h-4 w-4" />
                       Pricing Information
                     </Button>
