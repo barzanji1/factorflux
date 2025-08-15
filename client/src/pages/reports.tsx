@@ -1,4 +1,5 @@
 import TopNav from '@/components/layout/top-nav';
+import Sidebar from '@/components/layout/sidebar';
 import { Link } from 'wouter';
 import { NativeTPFForm } from '@/components/forms/NativeTPFForm';
 import { useEffect, useState } from 'react';
@@ -30,7 +31,9 @@ export default function Reports() {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
       <TopNav 
         title="Reports" 
         subtitle="Access Trucking Pros Financial forms and applications"
@@ -120,6 +123,7 @@ export default function Reports() {
           </div>
         </div>
       </main>
+      </div>
     </div>
   );
 }

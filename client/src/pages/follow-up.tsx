@@ -15,6 +15,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 
 const followUpSchema = z.object({
@@ -146,13 +147,15 @@ export default function FollowUpPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      <TopNav 
-        title="Follow Ups" 
-        subtitle="Manage client follow-ups and pending tasks"
-      />
-      
-      <div className="flex-1 p-6">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopNav 
+          title="Follow Ups" 
+          subtitle="Manage client follow-ups and pending tasks"
+        />
+        
+        <main className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
           <div className="flex justify-between items-center">
@@ -428,6 +431,7 @@ export default function FollowUpPage() {
             )}
           </div>
         </div>
+        </main>
       </div>
     </div>
   );
