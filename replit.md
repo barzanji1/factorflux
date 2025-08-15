@@ -46,11 +46,11 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 - **Portfolio Integration**: A professional portfolio website showcasing development expertise is integrated into the application's sidebar.
 - **User Settings & Profile**: Comprehensive settings page with personal, notification, work, and appearance preferences, including a full theme system (Light/Dark/System). Profile page displays user name and job title.
 - **Admin Role Management**: Admin panel for managers to manage user roles with audit trails.
-- **Fuel Card Services**: Integrated fuel card application system with complimentary tiers, application forms, and an admin review portal.
+- **Unified Fuel Card Services**: Consolidated fuel card management system combining customer applications with agent tools in a single interface. Features complimentary tiers (Base, Fleet, Premium), streamlined application forms, admin review portal, analytics dashboard, and integrated communication tools.
 - **Global Search**: Comprehensive search functionality across clients, invoices, and loads.
 - **Document Management**: Separate tabbed upload interfaces for different document types and document deletion functionality.
 - **Time Tracking**: Employee time clock functionality with clock-in/out, duration tracking, and activity logging.
-- **Navigation**: Standardized navigation using TopNav component across all pages, including a consistent Home button for quick dashboard access and streamlined settings menu access.
+- **Navigation**: Standardized navigation using TopNav component across all pages, including a consistent Home button for quick dashboard access and streamlined settings menu access. Consolidated fuel card functionality into single "TPF Fuel Cards" tab with four main sections: Overview, Fuel Cards, Applications, and Analytics.
 - **Activity Log Management**: Option to reset activity history.
 - **TPF Form Integration**: Embedded form system from Trucking Pros Financial integrated within the Reports tab enabling direct integration of WordPress forms within QuantumCore interface with dynamic loading and error handling, plus backup native form implementation.
 
