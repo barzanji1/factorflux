@@ -195,7 +195,8 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     "/reports", 
     "/fuel-card-admin", 
     "/admin",
-    "/activities"
+    "/activities",
+    "/follow-up"
   ];
   
   const showHomeButton = pagesWithHomeButton.some(page => location.startsWith(page));
