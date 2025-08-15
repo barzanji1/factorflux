@@ -312,15 +312,53 @@ export default function FuelCardsInternal() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Button onClick={() => setActiveTab("applications")} className="h-20 flex-col gap-2">
+                    <Button 
+                      onClick={() => setActiveTab("applications")} 
+                      className="h-20 flex-col gap-2"
+                    >
                       <Eye className="h-6 w-6" />
                       Review Applications
                     </Button>
-                    <Button variant="outline" className="h-20 flex-col gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col gap-2"
+                      onClick={() => {
+                        toast({
+                          title: "Contact Client",
+                          description: "Opening client communication tools...",
+                        });
+                        // Navigate to client contact form or open email
+                        window.open(`mailto:?subject=Fuel Card Application Follow-up&body=Dear Client,%0A%0AThank you for your interest in our fuel card services. We wanted to follow up on your recent application...%0A%0ABest regards,%0ATrucking Pros Financial Team`, '_blank');
+                      }}
+                    >
                       <Phone className="h-6 w-6" />
                       Contact Client
                     </Button>
-                    <Button variant="outline" className="h-20 flex-col gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col gap-2"
+                      onClick={() => {
+                        // Export applications as CSV
+                        const csvContent = "data:text/csv;charset=utf-8," 
+                          + "ID,Company,Contact,Email,Card Type,Status,Applied Date,Fleet Size,Monthly Spend\n"
+                          + typedApplications.map(app => 
+                              `${app.id},"${app.companyName}","${app.contactName}","${app.email}","${app.cardType}","${app.status}","${app.createdAt}","${app.fleetSize}","${app.monthlyFuelSpend}"`
+                            ).join("\n");
+                        
+                        const encodedUri = encodeURI(csvContent);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", encodedUri);
+                        link.setAttribute("download", `fuel-card-applications-report-${new Date().toISOString().split('T')[0]}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        toast({
+                          title: "Report Exported",
+                          description: "Applications report has been downloaded as CSV file.",
+                        });
+                      }}
+                    >
                       <Download className="h-6 w-6" />
                       Export Reports
                     </Button>
