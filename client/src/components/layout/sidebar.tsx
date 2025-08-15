@@ -29,6 +29,7 @@ const navigation = [
   { name: "Follow Ups", href: "/follow-up", icon: Clock },
 
   { name: "Fuel Cards", href: "/fuel-cards", icon: Fuel },
+  { name: "Fuel Cards - Internal", href: "/fuel-cards-internal", icon: Fuel, role: "employee" },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Fuel Card Admin", href: "/fuel-card-admin", icon: CreditCard, role: "manager" },
