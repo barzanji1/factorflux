@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +16,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Table,
   TableBody,
@@ -68,7 +79,12 @@ import {
   BarChart3,
   Download,
   Plus,
-  MessageSquare
+  MessageSquare,
+  Star,
+  Check,
+  MapPin,
+  Hotel,
+  Truck
 } from "lucide-react";
 
 interface FuelCardApplication {
@@ -89,6 +105,22 @@ interface FuelCardApplication {
   submittedBy: string;
 }
 
+const fuelCardApplicationSchema = z.object({
+  companyName: z.string().min(1, "Company name is required"),
+  contactName: z.string().min(1, "Contact name is required"),
+  email: z.string().email("Valid email is required"),
+  phone: z.string().min(10, "Phone number is required"),
+  fleetSize: z.string().min(1, "Fleet size is required"),
+  monthlyFuelSpend: z.string().min(1, "Monthly fuel spend is required"),
+  cardType: z.enum(["base", "fleet", "premium"], {
+    required_error: "Please select a card type",
+  }),
+  businessType: z.string().min(1, "Business type is required"),
+  yearsInBusiness: z.string().min(1, "Years in business is required"),
+});
+
+type FuelCardApplicationForm = z.infer<typeof fuelCardApplicationSchema>;
+
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
   approved: "bg-green-100 text-green-800 border-green-200",
@@ -101,6 +133,66 @@ const cardTypeLabels = {
   fleet: "TPF Fleet Card", 
   premium: "TPF Premium Card"
 };
+
+const cardTypes = [
+  {
+    id: "base",
+    name: "TPF Base Card",
+    monthlyFee: 0,
+    description: "Essential fuel savings for small carriers",
+    perks: [
+      "2¢/gallon discount at 5,000+ locations",
+      "Basic purchase controls",
+      "Monthly spending reports",
+      "24/7 customer support",
+      "Complimentary service - no fees"
+    ],
+    color: "bg-blue-50 border-blue-200",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600"
+  },
+  {
+    id: "fleet",
+    name: "TPF Fleet Card",
+    monthlyFee: 0,
+    description: "Advanced features for growing carriers",
+    perks: [
+      "4¢/gallon discount at 8,000+ locations",
+      "Advanced purchase controls & limits",
+      "Real-time transaction alerts",
+      "Detailed reporting & analytics",
+      "Driver ID verification",
+      "Maintenance tracking integration",
+      "10% discount on lodging at partner hotels",
+      "Complimentary service - no fees"
+    ],
+    color: "bg-green-50 border-green-200",
+    iconBg: "bg-green-100",
+    iconColor: "text-green-600",
+    popular: true
+  },
+  {
+    id: "premium",
+    name: "TPF Premium Card",
+    monthlyFee: 0,
+    description: "Premium benefits for established carriers",
+    perks: [
+      "6¢/gallon discount at 12,000+ locations",
+      "Comprehensive fleet management tools",
+      "Dedicated account manager",
+      "Priority customer support",
+      "Cash back rewards program (1% on fuel)",
+      "15% discount on lodging",
+      "Free roadside assistance",
+      "Advanced fraud protection",
+      "Custom reporting & API access",
+      "Complimentary service - no fees"
+    ],
+    color: "bg-purple-50 border-purple-200",
+    iconBg: "bg-purple-100",
+    iconColor: "text-purple-600"
+  }
+];
 
 export default function FuelCardsInternal() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -116,9 +208,51 @@ export default function FuelCardsInternal() {
   const [newStatus, setNewStatus] = useState("");
   const [reviewNotes, setReviewNotes] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [showApplicationForm, setShowApplicationForm] = useState(false);
+
+  const form = useForm<FuelCardApplicationForm>({
+    resolver: zodResolver(fuelCardApplicationSchema),
+    defaultValues: {
+      companyName: "",
+      contactName: "",
+      email: "",
+      phone: "",
+      fleetSize: "",
+      monthlyFuelSpend: "",
+      cardType: undefined,
+      businessType: "",
+      yearsInBusiness: "",
+    },
+  });
 
   const { data: applications, isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/fuel-card-applications"],
+  });
+
+  const submitApplication = useMutation({
+    mutationFn: async (data: FuelCardApplicationForm) => {
+      const response = await apiRequest("POST", "/api/fuel-card-applications", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Application Submitted",
+        description: "Fuel card application has been submitted successfully. We'll review it within 2-3 business days.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/fuel-card-applications"] });
+      form.reset();
+      setShowApplicationForm(false);
+      setSelectedCard(null);
+      setActiveTab("applications");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit application",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateApplicationMutation = useMutation({
@@ -201,6 +335,16 @@ export default function FuelCardsInternal() {
     setShowDetails(true);
   };
 
+  const handleCardSelect = (cardType: string) => {
+    setSelectedCard(cardType);
+    form.setValue("cardType", cardType as "base" | "fleet" | "premium");
+    setShowApplicationForm(true);
+  };
+
+  const onSubmit = (data: FuelCardApplicationForm) => {
+    submitApplication.mutate(data);
+  };
+
   const handleUpdateStatus = () => {
     if (!selectedApplication || !newStatus) return;
     
@@ -245,12 +389,288 @@ export default function FuelCardsInternal() {
         
         <main className="flex-1 overflow-auto p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="applications">Applications</TabsTrigger>
+              <TabsTrigger value="new-application">New Application</TabsTrigger>
+              <TabsTrigger value="applications">Manage Applications</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
               <TabsTrigger value="tools">Agent Tools</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="new-application" className="space-y-6">
+              {/* Card Selection */}
+              {!showApplicationForm && (
+                <>
+                  <div className="text-center space-y-4">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">TPF Fuel Card Services</h2>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Complimentary fuel cards for our carriers with exclusive savings and fleet management benefits
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {cardTypes.map((card) => (
+                      <Card key={card.id} className={`relative ${card.color} hover:shadow-lg transition-shadow cursor-pointer`}>
+                        {card.popular && (
+                          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                            <Badge className="bg-orange-500 text-white px-3 py-1">
+                              <Star className="w-3 h-3 mr-1" />
+                              Most Popular
+                            </Badge>
+                          </div>
+                        )}
+                        <CardHeader className="pb-4">
+                          <div className="flex items-center justify-between">
+                            <div className={`p-3 rounded-full ${card.iconBg}`}>
+                              <CreditCard className={`w-6 h-6 ${card.iconColor}`} />
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-green-600">FREE</p>
+                              <p className="text-sm text-gray-500">No Monthly Fee</p>
+                            </div>
+                          </div>
+                          <CardTitle className="text-xl">{card.name}</CardTitle>
+                          <CardDescription className="text-gray-600">
+                            {card.description}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            {card.perks.map((perk, index) => (
+                              <div key={index} className="flex items-start gap-2">
+                                <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">{perk}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <Button 
+                            className="w-full mt-4" 
+                            onClick={() => handleCardSelect(card.id)}
+                            variant={card.popular ? "default" : "outline"}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Apply for {card.name}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Application Form */}
+              {showApplicationForm && selectedCard && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="w-5 h-5" />
+                      Apply for {cardTypeLabels[selectedCard as keyof typeof cardTypeLabels]}
+                    </CardTitle>
+                    <CardDescription>
+                      Complete the application form below. All information is secure and confidential.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Company Information */}
+                          <div className="space-y-4">
+                            <h3 className="font-semibold text-lg">Company Information</h3>
+                            
+                            <FormField
+                              control={form.control}
+                              name="companyName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Company Name *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Enter company name" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="businessType"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Business Type *</FormLabel>
+                                  <FormControl>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select business type" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="trucking">Trucking Company</SelectItem>
+                                        <SelectItem value="logistics">Logistics Provider</SelectItem>
+                                        <SelectItem value="owner-operator">Owner-Operator</SelectItem>
+                                        <SelectItem value="freight-broker">Freight Broker</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="yearsInBusiness"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Years in Business *</FormLabel>
+                                  <FormControl>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select years in business" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="less-than-1">Less than 1 year</SelectItem>
+                                        <SelectItem value="1-2">1-2 years</SelectItem>
+                                        <SelectItem value="3-5">3-5 years</SelectItem>
+                                        <SelectItem value="6-10">6-10 years</SelectItem>
+                                        <SelectItem value="more-than-10">More than 10 years</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          {/* Contact Information */}
+                          <div className="space-y-4">
+                            <h3 className="font-semibold text-lg">Contact Information</h3>
+                            
+                            <FormField
+                              control={form.control}
+                              name="contactName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Contact Name *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Enter contact name" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email Address *</FormLabel>
+                                  <FormControl>
+                                    <Input type="email" placeholder="Enter email address" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="phone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Phone Number *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Enter phone number" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Fleet Information */}
+                          <FormField
+                            control={form.control}
+                            name="fleetSize"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Fleet Size *</FormLabel>
+                                <FormControl>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select fleet size" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="1">1 vehicle</SelectItem>
+                                      <SelectItem value="2-5">2-5 vehicles</SelectItem>
+                                      <SelectItem value="6-10">6-10 vehicles</SelectItem>
+                                      <SelectItem value="11-25">11-25 vehicles</SelectItem>
+                                      <SelectItem value="26-50">26-50 vehicles</SelectItem>
+                                      <SelectItem value="50+">50+ vehicles</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="monthlyFuelSpend"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Monthly Fuel Spend *</FormLabel>
+                                <FormControl>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select monthly fuel spend" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="less-than-5000">Less than $5,000</SelectItem>
+                                      <SelectItem value="5000-10000">$5,000 - $10,000</SelectItem>
+                                      <SelectItem value="10000-25000">$10,000 - $25,000</SelectItem>
+                                      <SelectItem value="25000-50000">$25,000 - $50,000</SelectItem>
+                                      <SelectItem value="50000+">$50,000+</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="flex gap-4 pt-6">
+                          <Button
+                            type="submit"
+                            disabled={submitApplication.isPending}
+                            className="flex-1"
+                          >
+                            {submitApplication.isPending ? "Submitting..." : "Submit Application"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setShowApplicationForm(false);
+                              setSelectedCard(null);
+                              form.reset();
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
             <TabsContent value="overview" className="space-y-6">
               {/* Stats Cards */}
@@ -317,7 +737,7 @@ export default function FuelCardsInternal() {
                       className="h-20 flex-col gap-2"
                     >
                       <Eye className="h-6 w-6" />
-                      Review Applications
+                      Manage Applications
                     </Button>
                     <Button 
                       variant="outline" 
@@ -727,7 +1147,7 @@ Approval Rate: ${Math.round((reportData.approvedApplications / reportData.totalA
                   <CardContent className="space-y-4">
                     <Button 
                       className="w-full justify-start"
-                      onClick={() => setLocation("/fuel-cards")}
+                      onClick={() => setActiveTab("new-application")}
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Create Manual Application
