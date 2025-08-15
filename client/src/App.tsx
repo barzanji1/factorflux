@@ -31,13 +31,22 @@ function Router() {
   const { isAuthenticated, isLoading } = useAuth();
   useTheme(); // Initialize theme
 
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
+      {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
           <Route path="/download" component={DownloadPage} />
           <Route path="/local-login" component={LocalLogin} />
+          <Route component={Landing} />
         </>
       ) : (
         <>
@@ -46,7 +55,6 @@ function Router() {
           <Route path="/invoices" component={Invoices} />
           <Route path="/documents" component={Documents} />
           <Route path="/follow-up" component={FollowUp} />
-
           <Route path="/credit-checks" component={CreditChecks} />
           <Route path="/admin" component={Admin} />
           <Route path="/activities" component={Activities} />
@@ -56,11 +64,10 @@ function Router() {
           <Route path="/fuel-card-admin" component={FuelCardAdmin} />
           <Route path="/profile" component={Profile} />
           <Route path="/settings" component={Settings} />
-
           <Route path="/download" component={DownloadPage} />
+          <Route component={NotFound} />
         </>
       )}
-      <Route component={NotFound} />
     </Switch>
   );
 }
