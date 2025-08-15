@@ -15,7 +15,7 @@ import CreditChecks from "@/pages/credit-checks";
 import Admin from "@/pages/admin";
 import Activities from "@/pages/activities";
 import Reports from "@/pages/reports";
-import FuelCards from "@/pages/fuel-cards";
+
 import FuelCardsInternal from "@/pages/fuel-cards-internal";
 import FuelCardAdmin from "@/pages/fuel-card-admin";
 import Profile from "@/pages/profile";
@@ -59,7 +59,6 @@ function Router() {
           <Route path="/admin" component={Admin} />
           <Route path="/activities" component={Activities} />
           <Route path="/reports" component={Reports} />
-          <Route path="/fuel-cards" component={FuelCards} />
           <Route path="/fuel-cards-internal" component={FuelCardsInternal} />
           <Route path="/fuel-card-admin" component={FuelCardAdmin} />
           <Route path="/profile" component={Profile} />

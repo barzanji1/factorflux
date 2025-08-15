@@ -383,21 +383,20 @@ export default function FuelCardsInternal() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav 
-          title="Fuel Cards - Internal Agent Dashboard" 
-          subtitle="Manage fuel card applications and client services"
+          title="TPF Fuel Cards" 
+          subtitle="Comprehensive fuel card services and application management"
         />
         
         <main className="flex-1 overflow-auto p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="new-application">New Application</TabsTrigger>
-              <TabsTrigger value="applications">Manage Applications</TabsTrigger>
+              <TabsTrigger value="fuel-cards">Fuel Cards</TabsTrigger>
+              <TabsTrigger value="applications">Applications</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              <TabsTrigger value="tools">Agent Tools</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="new-application" className="space-y-6">
+            <TabsContent value="fuel-cards" className="space-y-6">
               {/* Card Selection */}
               {!showApplicationForm && (
                 <>
@@ -825,6 +824,58 @@ export default function FuelCardsInternal() {
             </TabsContent>
 
             <TabsContent value="applications" className="space-y-6">
+              {/* Search and Filter Controls */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Application Management
+                  </CardTitle>
+                  <CardDescription>Search, filter and manage all fuel card applications</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col md:flex-row gap-4 mb-6">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Input
+                          placeholder="Search applications..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-48">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="under_review">Under Review</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={cardTypeFilter} onValueChange={setCardTypeFilter}>
+                      <SelectTrigger className="w-48">
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Filter by card type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Card Types</SelectItem>
+                        <SelectItem value="base">TPF Base Card</SelectItem>
+                        <SelectItem value="fleet">TPF Fleet Card</SelectItem>
+                        <SelectItem value="premium">TPF Premium Card</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Applications Table */}
               {/* Filters */}
               <Card>
                 <CardContent className="p-6">
@@ -1009,23 +1060,95 @@ export default function FuelCardsInternal() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="tools" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Analytics Tab with enhanced functionality */}
+            <TabsContent value="analytics" className="space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                        <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Applications</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {typedApplications?.length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+                        <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Review</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {typedApplications?.filter(app => app.status === 'pending' || app.status === 'under_review').length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                        <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Approved</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {typedApplications?.filter(app => app.status === 'approved').length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                        <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Rejected</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {typedApplications?.filter(app => app.status === 'rejected').length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Agent Tools and Communication */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Client Communication</CardTitle>
-                    <CardDescription>Tools for contacting and following up with clients</CardDescription>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5" />
+                      Client Communication
+                    </CardTitle>
+                    <CardDescription>Quick communication tools and templates</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Button 
+                      variant="outline" 
                       className="w-full justify-start"
                       onClick={() => {
                         toast({
-                          title: "Email Template",
-                          description: "Opening email template for client follow-up...",
+                          title: "Contact Client",
+                          description: "Opening client communication tools...",
                         });
-                        // Could integrate with email service or open mail client
-                        window.open(`mailto:?subject=Fuel Card Application Follow-up&body=Dear Client,%0A%0AThank you for your interest in our fuel card services...`, '_blank');
+                        window.open(`mailto:?subject=Fuel Card Application Follow-up&body=Dear Client,%0A%0AThank you for your interest in our fuel card services. We wanted to follow up on your recent application...%0A%0ABest regards,%0ATrucking Pros Financial Team`, '_blank');
                       }}
                     >
                       <Mail className="mr-2 h-4 w-4" />
@@ -1035,390 +1158,76 @@ export default function FuelCardsInternal() {
                       variant="outline" 
                       className="w-full justify-start"
                       onClick={() => {
-                        toast({
-                          title: "Call Scheduled",
-                          description: "Phone call reminder added to your calendar.",
-                        });
-                        // Could integrate with calendar API
-                      }}
-                    >
-                      <Phone className="mr-2 h-4 w-4" />
-                      Schedule Phone Call
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => setLocation("/follow-up")}
-                    >
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Create Follow-up Task
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Reporting Tools</CardTitle>
-                    <CardDescription>Generate reports and export data</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Button 
-                      className="w-full justify-start"
-                      onClick={() => {
-                        // Export applications as CSV
                         const csvContent = "data:text/csv;charset=utf-8," 
-                          + "ID,Company,Contact,Email,Card Type,Status,Applied Date\n"
-                          + typedApplications.map(app => 
-                              `${app.id},"${app.companyName}","${app.contactName}","${app.email}","${app.cardType}","${app.status}","${app.createdAt}"`
-                            ).join("\n");
+                          + "ID,Company,Contact,Email,Card Type,Status,Applied Date,Fleet Size,Monthly Spend\n"
+                          + (typedApplications?.map(app => 
+                              `${app.id},"${app.companyName}","${app.contactName}","${app.email}","${app.cardType}","${app.status}","${app.createdAt}","${app.fleetSize}","${app.monthlyFuelSpend}"`
+                            ).join("\n") || "");
                         
                         const encodedUri = encodeURI(csvContent);
                         const link = document.createElement("a");
                         link.setAttribute("href", encodedUri);
-                        link.setAttribute("download", `fuel-card-applications-${new Date().toISOString().split('T')[0]}.csv`);
+                        link.setAttribute("download", `fuel-card-applications-report-${new Date().toISOString().split('T')[0]}.csv`);
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
                         
                         toast({
-                          title: "Export Complete",
-                          description: "Applications data has been downloaded as CSV file.",
+                          title: "Report Exported",
+                          description: "Applications report has been downloaded as CSV file.",
                         });
                       }}
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Export All Applications
+                      Export Applications Report
                     </Button>
                     <Button 
                       variant="outline" 
                       className="w-full justify-start"
-                      onClick={() => {
-                        toast({
-                          title: "Monthly Report",
-                          description: "Generating comprehensive monthly report...",
-                        });
-                        // Generate and download monthly report
-                        const reportData = {
-                          period: new Date().toLocaleDateString(),
-                          totalApplications: stats.total,
-                          approvedApplications: stats.approved,
-                          pendingApplications: stats.pending,
-                          rejectedApplications: stats.rejected
-                        };
-                        
-                        const reportContent = `Monthly Fuel Card Report\n
-Generated: ${new Date().toLocaleDateString()}\n
-Total Applications: ${reportData.totalApplications}\n
-Approved: ${reportData.approvedApplications}\n
-Pending: ${reportData.pendingApplications}\n
-Rejected: ${reportData.rejectedApplications}\n
-Approval Rate: ${Math.round((reportData.approvedApplications / reportData.totalApplications) * 100) || 0}%`;
-                        
-                        const blob = new Blob([reportContent], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `monthly-fuel-card-report-${new Date().toISOString().split('T')[0]}.txt`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                      }}
-                    >
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Generate Monthly Report
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => setLocation("/")}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Performance Dashboard
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                    <CardDescription>Frequently used agent functions</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Button 
-                      className="w-full justify-start"
-                      onClick={() => setActiveTab("new-application")}
+                      onClick={() => setActiveTab("fuel-cards")}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Create Manual Application
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => {
-                        toast({
-                          title: "Bulk Update",
-                          description: "Bulk status update feature coming soon...",
-                        });
-                      }}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Bulk Status Update
+                      Create New Application
                     </Button>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Resources</CardTitle>
-                    <CardDescription>Reference materials and guides</CardDescription>
+                    <CardTitle>Application Status Distribution</CardTitle>
+                    <CardDescription>Visual breakdown of current application statuses</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => {
-                        const guideContent = `
-TPF Fuel Card Comparison Guide
-
-TPF Base Card:
-- 2¢/gallon discount at 5,000+ locations
-- Basic purchase controls
-- Monthly spending reports
-- 24/7 customer support
-- No monthly fees
-
-TPF Fleet Card:
-- 4¢/gallon discount at 8,000+ locations
-- Advanced purchase controls & limits
-- Real-time transaction alerts
-- Detailed reporting & analytics
-- Driver ID verification
-- 10% discount on lodging
-- No monthly fees
-
-TPF Premium Card:
-- 6¢/gallon discount at 12,000+ locations
-- Comprehensive fleet management tools
-- Dedicated account manager
-- Priority customer support
-- Cash back rewards (1% on fuel)
-- 15% discount on lodging
-- Free roadside assistance
-- Advanced fraud protection
-- No monthly fees
-                        `;
+                  <CardContent>
+                    <div className="space-y-3">
+                      {[
+                        { status: 'pending', label: 'Pending', color: 'bg-yellow-500' },
+                        { status: 'under_review', label: 'Under Review', color: 'bg-blue-500' },
+                        { status: 'approved', label: 'Approved', color: 'bg-green-500' },
+                        { status: 'rejected', label: 'Rejected', color: 'bg-red-500' }
+                      ].map(({ status, label, color }) => {
+                        const count = typedApplications?.filter(app => app.status === status).length || 0;
+                        const total = typedApplications?.length || 1;
+                        const percentage = Math.round((count / total) * 100);
                         
-                        const blob = new Blob([guideContent], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = 'tpf-card-comparison-guide.txt';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                        
-                        toast({
-                          title: "Guide Downloaded",
-                          description: "Card comparison guide has been downloaded.",
-                        });
-                      }}
-                    >
-                      <Building className="mr-2 h-4 w-4" />
-                      Card Comparison Guide
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => {
-                        const pricingInfo = `
-TPF Fuel Card Pricing Information
-
-ALL TPF FUEL CARDS ARE COMPLIMENTARY - NO MONTHLY FEES!
-
-Base Card Benefits:
-- 2¢/gallon savings
-- Basic controls
-- Monthly reports
-- 24/7 support
-
-Fleet Card Benefits:
-- 4¢/gallon savings
-- Advanced controls
-- Real-time alerts
-- Analytics dashboard
-- Hotel discounts (10%)
-
-Premium Card Benefits:
-- 6¢/gallon savings
-- Dedicated account manager
-- Priority support
-- 1% cash back on fuel
-- Hotel discounts (15%)
-- Free roadside assistance
-
-All cards include:
-✓ No application fees
-✓ No monthly maintenance fees
-✓ No transaction fees
-✓ Wide acceptance network
-✓ Fraud protection
-✓ Online account management
-                        `;
-                        
-                        const blob = new Blob([pricingInfo], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = 'tpf-pricing-information.txt';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                        
-                        toast({
-                          title: "Pricing Info Downloaded",
-                          description: "Complete pricing information has been downloaded.",
-                        });
-                      }}
-                    >
-                      <DollarSign className="mr-2 h-4 w-4" />
-                      Pricing Information
-                    </Button>
+                        return (
+                          <div key={status} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${color}`}></div>
+                              <span className="text-sm font-medium">{label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">{count}</span>
+                              <span className="text-xs text-gray-400">({percentage}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
             </TabsContent>
           </Tabs>
-
-          {/* Application Details Dialog */}
-          <Dialog open={showDetails} onOpenChange={setShowDetails}>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>Application Details</DialogTitle>
-                <DialogDescription>
-                  Review and manage fuel card application
-                </DialogDescription>
-              </DialogHeader>
-
-              {selectedApplication && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Application Info */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Application Information</h3>
-                    <div className="space-y-2">
-                      <div>
-                        <Label className="text-sm font-medium">Company Name</Label>
-                        <p className="text-sm text-gray-600">{selectedApplication.companyName}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Contact Person</Label>
-                        <p className="text-sm text-gray-600">{selectedApplication.contactName}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Email</Label>
-                        <p className="text-sm text-gray-600">{selectedApplication.email}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Phone</Label>
-                        <p className="text-sm text-gray-600">{selectedApplication.phone}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Card Type</Label>
-                        <p className="text-sm text-gray-600">
-                          {cardTypeLabels[selectedApplication.cardType as keyof typeof cardTypeLabels]}
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Fleet Size</Label>
-                        <p className="text-sm text-gray-600">{selectedApplication.fleetSize} vehicles</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Monthly Fuel Spend</Label>
-                        <p className="text-sm text-gray-600">${selectedApplication.monthlyFuelSpend}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Business Type</Label>
-                        <p className="text-sm text-gray-600">{selectedApplication.businessType}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Years in Business</Label>
-                        <p className="text-sm text-gray-600">{selectedApplication.yearsInBusiness}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Applied</Label>
-                        <p className="text-sm text-gray-600">{formatDate(selectedApplication.createdAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Review Section */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Review & Update</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="text-sm font-medium">Current Status</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          {getStatusIcon(selectedApplication.status)}
-                          <Badge className={statusColors[selectedApplication.status as keyof typeof statusColors]}>
-                            {selectedApplication.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm font-medium">Update Status</Label>
-                        <Select value={newStatus} onValueChange={setNewStatus}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select new status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="under_review">Under Review</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="rejected">Rejected</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm font-medium">Review Notes</Label>
-                        <Textarea
-                          placeholder="Add notes about this application..."
-                          value={reviewNotes}
-                          onChange={(e) => setReviewNotes(e.target.value)}
-                          className="mt-1"
-                          rows={4}
-                        />
-                      </div>
-
-                      {selectedApplication.notes && (
-                        <div>
-                          <Label className="text-sm font-medium">Previous Notes</Label>
-                          <p className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
-                            {selectedApplication.notes}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-4">
-                        <Button 
-                          onClick={handleUpdateStatus}
-                          disabled={updateApplicationMutation.isPending}
-                        >
-                          {updateApplicationMutation.isPending ? "Updating..." : "Update Application"}
-                        </Button>
-                        <Button variant="outline" onClick={() => setShowDetails(false)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
         </main>
       </div>
     </div>
