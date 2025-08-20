@@ -22,7 +22,7 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 - **Runtime**: Node.js with Express.js server
 - **Language**: TypeScript with ES modules
 - **API Pattern**: RESTful API design
-- **Authentication**: Replit Auth with OpenID Connect integration
+- **Authentication**: Local authentication with bcrypt password hashing
 - **Session Management**: Express sessions with PostgreSQL storage
 - **File Handling**: Multer for document uploads with file type validation
 
@@ -33,7 +33,7 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 - **Connection**: Connection pooling with @neondatabase/serverless
 
 ### Key Features and System Design
-- **Authentication System**: Replit Auth integration, session-based authentication, role-based access control (employee/manager roles), automatic redirect handling.
+- **Authentication System**: Local authentication system with session-based authentication, role-based access control (employee/manager/admin roles), secure password hashing with bcrypt, and automatic redirect handling.
 - **Data Models**: Users, Clients, Loads, Invoices, Documents, Activities for comprehensive data management.
 - **File Upload System**: Multer-based, with size limits (10MB) and file type validation (PDF, JPEG, JPG, PNG), supporting specific document categorization (rate confirmations, bills of lading, driver IDs, carrier setup).
 - **API Structure**: RESTful endpoints for CRUD, search, dashboard statistics, and file uploads.
