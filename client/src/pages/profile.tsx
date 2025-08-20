@@ -68,7 +68,7 @@ export default function Profile() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/local-login";
       }, 500);
       return;
     }
@@ -95,7 +95,7 @@ export default function Profile() {
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
     },
     onError: (error: Error) => {
       toast({
@@ -128,7 +128,7 @@ export default function Profile() {
         title: "Profile Image Updated",
         description: "Your profile image has been updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
       setIsUploadingImage(false);
     },
     onError: (error: Error) => {
