@@ -21,15 +21,9 @@ export default function Landing() {
           <p className="text-lg text-gray-500 mb-8">
             Trucking Pros Financial - Your trusted partner in freight factoring solutions
           </p>
-          <div className="space-y-4">
-            <Button size="lg" onClick={() => window.location.href = '/local-login'}>
-              Admin Login (Local)
-            </Button>
-            <br />
-            <Button variant="outline" size="lg" onClick={() => window.location.href = '/api/login'}>
-              Sign In with Replit
-            </Button>
-          </div>
+          <Button size="lg" onClick={() => window.location.href = '/local-login'}>
+            Agent LOGIN
+          </Button>
         </div>
 
         {/* Features */}

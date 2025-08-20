@@ -56,7 +56,7 @@ export default function LocalLogin() {
             </div>
             <h1 className="text-3xl font-bold text-secondary">QuantumCore</h1>
           </div>
-          <p className="text-lg text-gray-600 mb-2">Admin Login</p>
+          <p className="text-lg text-gray-600 mb-2">Agent LOGIN</p>
           <p className="text-sm text-gray-500">
             Trucking Pros Financial - Secure Access
           </p>
@@ -67,7 +67,7 @@ export default function LocalLogin() {
           <CardHeader>
             <CardTitle>Sign In</CardTitle>
             <CardDescription>
-              Enter your admin credentials to access the system
+              Enter your agent credentials to access the system
             </CardDescription>
           </CardHeader>
           <CardContent>
