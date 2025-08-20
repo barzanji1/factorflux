@@ -3,9 +3,44 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import type { Express } from "express";
+import session from "express-session";
+import createMemoryStore from "memorystore";
+
+const MemoryStore = createMemoryStore(session);
 
 // Setup local authentication strategy
 export function setupLocalAuth(app: Express) {
+  // Session configuration
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-here',
+    resave: false,
+    saveUninitialized: false,
+    store: new MemoryStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    }),
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  }));
+
+  // Initialize Passport
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  // Serialize/deserialize user for session storage
+  passport.serializeUser((user: any, done) => {
+    done(null, user.id);
+  });
+
+  passport.deserializeUser(async (id: string, done) => {
+    try {
+      const user = await storage.getUser(id);
+      done(null, user);
+    } catch (error) {
+      done(error, null);
+    }
+  });
   // Local Strategy
   passport.use(
     'local',
@@ -107,7 +142,7 @@ export function setupLocalAuth(app: Express) {
 
   // Check authentication for local users
   app.get('/api/auth/local/check', (req: any, res) => {
-    if (req.isAuthenticated() && req.user.authType === 'local') {
+    if (req.isAuthenticated() && req.user && req.user.authType === 'local') {
       res.json({
         authenticated: true,
         user: {

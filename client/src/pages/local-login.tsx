@@ -122,16 +122,7 @@ export default function LocalLogin() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600 mb-4">or</p>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setLocation("/")}
-              >
-                Use Replit Authentication
-              </Button>
-            </div>
+
           </CardContent>
         </Card>
 
