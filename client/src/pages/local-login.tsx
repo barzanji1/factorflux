@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Truck, Eye, EyeOff } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function LocalLogin() {
   const [email, setEmail] = useState("");
@@ -14,6 +15,7 @@ export default function LocalLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +35,12 @@ export default function LocalLogin() {
       const data = await response.json();
 
       if (response.ok) {
-        // Login successful, redirect to dashboard
-        setLocation("/");
+        // Login successful, invalidate auth cache and redirect to dashboard
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
+        // Wait a bit for the query to refetch before redirecting
+        setTimeout(() => {
+          setLocation("/");
+        }, 100);
       } else {
         setError(data.message || "Login failed");
       }
