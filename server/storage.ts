@@ -161,7 +161,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByEmailAndType(email: string, authType: string): Promise<User[]> {
     return await db.select().from(users)
-      .where(and(eq(users.email, email), eq(users.authType, authType)));
+      .where(and(eq(users.email, email), eq(users.authType, authType as "replit" | "local")));
   }
 
   // Client operations
