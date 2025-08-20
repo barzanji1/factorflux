@@ -141,19 +141,23 @@ export function setupLocalAuth(app: Express) {
   });
 
   // Check authentication for local users
-  app.get('/api/auth/local/check', (req: any, res) => {
+  app.get('/api/auth/local/check', async (req: any, res) => {
     if (req.isAuthenticated() && req.user && req.user.authType === 'local') {
-      res.json({
-        authenticated: true,
-        user: {
-          id: req.user.id,
-          email: req.user.email,
-          role: req.user.role,
-          firstName: req.user.firstName,
-          lastName: req.user.lastName,
-          authType: req.user.authType
+      // Get the latest user data to ensure we have all fields including profileImageUrl
+      try {
+        const latestUser = await storage.getUser(req.user.id);
+        if (latestUser) {
+          res.json({
+            authenticated: true,
+            user: latestUser
+          });
+        } else {
+          res.json({ authenticated: false });
         }
-      });
+      } catch (error) {
+        console.error('Error fetching user data for auth check:', error);
+        res.json({ authenticated: false });
+      }
     } else {
       res.json({ authenticated: false });
     }
