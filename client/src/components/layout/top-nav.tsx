@@ -133,8 +133,17 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     },
   });
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/local/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      window.location.href = "/local-login";
+    } catch (error) {
+      console.error("Logout error:", error);
+      window.location.href = "/local-login";
+    }
   };
 
   // Search functionality
