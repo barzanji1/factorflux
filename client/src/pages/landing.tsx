@@ -22,7 +22,7 @@ export default function Landing() {
             Trucking Pros Financial - Your trusted partner in freight factoring solutions
           </p>
           <Button size="lg" onClick={() => window.location.href = '/local-login'}>
-            Agent LOGIN
+            Agent Login
           </Button>
         </div>
 
