@@ -6,6 +6,12 @@ QuantumCore is a comprehensive freight factoring workflow application designed t
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+- **August 20, 2025**: Successfully deployed QuantumCore to qcoretpf.com with full functionality
+- Fixed database schema conflicts that were causing deployment delays
+- Local authentication system working correctly
+- All freight factoring features operational in production
+
 Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients, Invoices, Docs, Reports), top navigation bar (User menu, Notifications), and main content area with Invoice Summary, Load Details, Upload Zone, and Recent Activity/Payment Status sections.
 
 ## System Architecture
