@@ -1411,6 +1411,47 @@ Trucking Pros Financial Team
     }
   });
 
+  // Emergency admin creation endpoint
+  app.post('/api/emergency-admin', async (req, res) => {
+    try {
+      const { secret } = req.body;
+      
+      // Check for emergency secret
+      if (secret !== 'tpf-emergency-2025') {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      // Check if admin already exists
+      const existingAdmin = await db.select().from(users).where(eq(users.email, 'doshbarzanji@gmail.com'));
+      
+      if (existingAdmin.length > 0) {
+        // Update existing user password
+        const hashedPassword = await bcrypt.hash('admintpf2025', 10);
+        await db.update(users)
+          .set({ password: hashedPassword })
+          .where(eq(users.email, 'doshbarzanji@gmail.com'));
+        
+        return res.json({ message: 'Admin password updated successfully' });
+      } else {
+        // Create new admin user
+        const hashedPassword = await bcrypt.hash('admintpf2025', 10);
+        const newUser = await db.insert(users).values({
+          email: 'doshbarzanji@gmail.com',
+          password: hashedPassword,
+          firstName: 'Dosh',
+          lastName: 'Barzanji',
+          role: 'admin',
+          authType: 'local'
+        }).returning();
+        
+        return res.json({ message: 'Admin user created successfully', user: newUser[0] });
+      }
+    } catch (error) {
+      console.error('Emergency admin creation error:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
