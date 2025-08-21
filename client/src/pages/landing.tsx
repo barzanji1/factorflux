@@ -67,10 +67,6 @@ export default function Landing() {
             </CardContent>
           </Card>
         </div>
-
-
-
-
       </div>
     </div>
   );
