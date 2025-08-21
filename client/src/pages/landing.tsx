@@ -69,10 +69,7 @@ export default function Landing() {
           </Card>
         </div>
 
-        {/* Contextual Download Section */}
-        <div className="mb-16">
-          <ContextualDownload showAllOptions={true} />
-        </div>
+
 
         {/* Call to Action */}
         <div className="text-center">
