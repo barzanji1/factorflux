@@ -127,7 +127,7 @@ export function setupLocalAuth(app: Express) {
       res.json({ message: 'Password updated successfully' });
     } catch (error) {
       console.error('Password reset error:', error);
-      res.status(500).json({ message: 'Failed to reset password', error: error.message });
+      res.status(500).json({ message: 'Failed to reset password', error: (error as Error).message });
     }
   });
 
