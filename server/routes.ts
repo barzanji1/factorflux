@@ -1426,9 +1426,9 @@ Trucking Pros Financial Team
       // Use raw SQL to ensure admin user exists with correct password
       const hashedPassword = await bcrypt.hash('admintpf2025', 10);
       
+      // Use upsertUser which should work with the storage interface
       try {
-        // Insert or update admin user using storage layer
-        const adminUser = await storage.createUser({
+        const adminUser = await storage.upsertUser({
           email: 'doshbarzanji@gmail.com',
           password: hashedPassword,
           firstName: 'Dosh',
@@ -1439,25 +1439,18 @@ Trucking Pros Financial Team
         
         return res.json({ 
           success: true, 
-          message: 'Admin user created successfully',
+          message: 'Admin user created/updated successfully',
           user: { 
             id: adminUser.id, 
             email: adminUser.email, 
             role: adminUser.role 
           } 
         });
-      } catch (createError) {
-        // User might already exist, try to update password
-        // User already exists, show existing user info
-        const existingUser = await storage.getUserByEmail('doshbarzanji@gmail.com');
-        return res.json({ 
-          success: true, 
-          message: 'Admin user already exists',
-          user: existingUser ? { 
-            id: existingUser.id, 
-            email: existingUser.email, 
-            role: existingUser.role 
-          } : null
+      } catch (error) {
+        console.error('Admin upsert failed:', error);
+        return res.status(500).json({ 
+          error: 'Failed to create admin user',
+          details: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     } catch (error) {
