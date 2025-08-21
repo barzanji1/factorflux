@@ -1,7 +1,6 @@
 import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
+// Authentication system removed - direct access
 import { cn } from "@/lib/utils";
-import type { User } from "@shared/schema";
 import { 
   Truck, 
   LayoutDashboard, 
@@ -36,20 +35,8 @@ const navigation = [
 
 export default function Sidebar() {
   const [location, setLocation] = useLocation();
-  const { user } = useAuth() as { user: User | undefined };
-
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/local/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-      window.location.href = "/local-login";
-    } catch (error) {
-      console.error("Logout error:", error);
-      window.location.href = "/local-login";
-    }
-  };
+  // Default user for navigation - authentication removed
+  const user = { role: "admin" };
 
   return (
     <div className="w-64 bg-white dark:bg-gray-900 shadow-xl border-r border-gray-200 dark:border-gray-700 flex flex-col">
@@ -135,15 +122,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-        <button 
-          onClick={handleLogout}
-          className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
-        >
-          <LogOut className="w-5 h-5" />
-          <span className="font-medium">Logout</span>
-        </button>
-      </div>
+      {/* Logout removed - no authentication required */}
     </div>
   );
 }

@@ -42,7 +42,7 @@ function Router() {
       <Route path="/download" component={DownloadPage} />
       <Route path="/form-demo" component={FormDemo} />
       <Route path="/landing" component={Landing} />
-      <Route component={NotFound} />
+      <Route path="*" component={NotFound} />
     </Switch>
   );
 }

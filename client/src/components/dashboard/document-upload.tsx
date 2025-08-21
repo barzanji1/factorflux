@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { isUnauthorizedError } from "@/lib/authUtils";
+// Authentication system removed - direct access
 import { apiRequest } from "@/lib/queryClient";
 import { CloudUpload, ExpandIcon, FileIcon, Eye } from "lucide-react";
 
@@ -17,7 +16,6 @@ interface DocumentUploadProps {
 export default function DocumentUpload({ onUploadComplete, documentType = "other" }: DocumentUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const uploadMutation = useMutation({
@@ -39,17 +37,6 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
       }
     },
     onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
       toast({
         title: "Error",
         description: "Failed to upload document",
