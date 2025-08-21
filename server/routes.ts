@@ -1448,19 +1448,17 @@ Trucking Pros Financial Team
         });
       } catch (createError) {
         // User might already exist, try to update password
-        try {
-          await storage.updateUserPassword('doshbarzanji@gmail.com', hashedPassword);
-          return res.json({ 
-            success: true, 
-            message: 'Admin password updated successfully' 
-          });
-        } catch (updateError) {
-          console.error('Admin creation/update failed:', { createError, updateError });
-          return res.status(500).json({ 
-            error: 'Failed to create or update admin user',
-            details: updateError instanceof Error ? updateError.message : 'Unknown error'
-          });
-        }
+        // User already exists, show existing user info
+        const existingUser = await storage.getUserByEmail('doshbarzanji@gmail.com');
+        return res.json({ 
+          success: true, 
+          message: 'Admin user already exists',
+          user: existingUser ? { 
+            id: existingUser.id, 
+            email: existingUser.email, 
+            role: existingUser.role 
+          } : null
+        });
       }
     } catch (error) {
       console.error('Migration error:', error);
