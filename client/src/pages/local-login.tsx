@@ -22,8 +22,6 @@ export default function LocalLogin() {
     setError("");
     setLoading(true);
 
-    console.log("Login attempt:", { email, password: "***" });
-
     try {
       const response = await fetch("/api/auth/local/login", {
         method: "POST",
@@ -34,12 +32,7 @@ export default function LocalLogin() {
         body: JSON.stringify({ email, password }),
       });
 
-      console.log("Login response status:", response.status);
-      
       if (response.ok) {
-        const data = await response.json();
-        console.log("Login successful:", data);
-        
         // Login successful, invalidate auth cache and redirect to dashboard
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
         // Force a refetch to update auth state
@@ -50,7 +43,6 @@ export default function LocalLogin() {
         setLocation("/");
       } else {
         const data = await response.json();
-        console.error("Login failed:", response.status, data);
         setError(data.message || "Login failed");
       }
     } catch (err) {
