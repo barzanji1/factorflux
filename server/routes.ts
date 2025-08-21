@@ -1416,6 +1416,69 @@ Trucking Pros Financial Team
     }
   });
 
+  // Emergency login endpoint that bypasses Passport 
+  app.post('/api/emergency-login', async (req, res) => {
+    try {
+      const { email, password, secret } = req.body;
+      
+      if (secret !== 'emergency-tpf-2025') {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      console.log('Emergency login attempt for:', email);
+      
+      // Direct database query - no storage interface
+      const [adminUser] = await db.select().from(userTable).where(
+        and(
+          eq(userTable.email, email),
+          eq(userTable.authType, 'local')
+        )
+      );
+      
+      if (!adminUser) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+
+      console.log('Testing password for user:', adminUser.id);
+      
+      // Direct bcrypt comparison
+      const passwordValid = await bcrypt.compare(password, adminUser.password);
+      
+      if (!passwordValid) {
+        return res.status(401).json({ 
+          message: 'Invalid password',
+          debug: {
+            hashLength: adminUser.password?.length,
+            passwordLength: password.length
+          }
+        });
+      }
+
+      // Manually set session (bypass Passport)
+      req.session.userId = adminUser.id;
+      req.session.user = adminUser;
+      
+      console.log('Emergency login successful for:', email);
+      
+      return res.json({
+        success: true,
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          firstName: adminUser.firstName,
+          lastName: adminUser.lastName,
+          role: adminUser.role
+        }
+      });
+      
+    } catch (error) {
+      console.error('Emergency login error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Emergency login failed'
+      });
+    }
+  });
+
   // Simple test login endpoint to verify credentials
   app.post('/api/test-login', async (req, res) => {
     try {

@@ -56,14 +56,30 @@ export function setupLocalAuth(app: Express) {
         try {
           console.log('Passport strategy: attempting login for:', email);
           
-          // Find user by email with local auth type - using direct DB query
-          const users = await db.select().from(usersTable).where(
-            and(
-              eq(usersTable.email, email),
-              eq(usersTable.authType, 'local')
-            )
-          );
-          console.log('Passport strategy: found users:', users?.length || 0);
+          // Find user by email with local auth type - using direct DB query first
+          let users = [];
+          try {
+            users = await db.select().from(usersTable).where(
+              and(
+                eq(usersTable.email, email),
+                eq(usersTable.authType, 'local')
+              )
+            );
+            console.log('Passport strategy: direct DB found users:', users?.length || 0);
+            
+            // If direct DB fails, try storage method as fallback
+            if (!users || users.length === 0) {
+              console.log('Trying storage method as fallback...');
+              const storageUsers = await storage.getUserByEmailAndType(email, 'local');
+              console.log('Passport strategy: storage found users:', storageUsers?.length || 0);
+              users = storageUsers;
+            }
+          } catch (dbError) {
+            console.error('Direct DB query failed:', dbError);
+            // Fallback to storage method
+            users = await storage.getUserByEmailAndType(email, 'local');
+            console.log('Passport strategy: fallback found users:', users?.length || 0);
+          }
           
           const user = users[0];
 
