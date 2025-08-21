@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Truck, FileText, Users, DollarSign } from "lucide-react";
-import ContextualDownload from "@/components/contextual-download";
 
 export default function Landing() {
   return (
