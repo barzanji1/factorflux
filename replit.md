@@ -14,7 +14,7 @@ Preferred communication style: Simple, everyday language.
 - Updated local login page with new micro-interaction components
 - Added comprehensive demo page at /form-demo showcasing all validation features
 - **August 21, 2025**: Authentication system fully debugged and working locally
-- Local authentication confirmed working perfectly (doshbarzanji@gmail.com / admintpf2025)
+- Local authentication confirmed working perfectly (doshbarzanji@gmail.com / admin@tpf2025)
 - Created comprehensive authentication debugging with production bypass
 - Direct authentication endpoint confirms bcrypt works correctly in all environments
 - Passport authentication working with enhanced debugging and bypass code

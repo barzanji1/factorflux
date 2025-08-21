@@ -13,13 +13,13 @@ const sql = neon(DATABASE_URL);
 
 async function resetAdminPassword() {
   try {
-    console.log('Resetting admin password in production database...');
+    console.log('Resetting admin password to "admin@tpf2025"...');
     
-    // Generate a completely fresh hash for the password
-    const newPassword = 'admintpf2025';
-    const freshHash = await bcrypt.hash(newPassword, 12);
+    // Generate fresh hash for new password
+    const newPassword = 'admin@tpf2025';
+    const freshHash = await bcrypt.hash(newPassword, 10);
     
-    console.log('Generated fresh hash with salt rounds 12');
+    console.log('Generated fresh hash for admin@tpf2025');
     
     // Verify the fresh hash works
     const testResult = await bcrypt.compare(newPassword, freshHash);
@@ -46,9 +46,9 @@ async function resetAdminPassword() {
       process.exit(1);
     }
     
-    console.log('✓ Admin password reset successfully in production');
+    console.log('✓ Admin password reset to "admin@tpf2025" successfully');
     console.log('Admin user updated:', result[0]);
-    console.log('New hash length:', freshHash.length);
+    console.log('New credentials: doshbarzanji@gmail.com / admin@tpf2025');
     
   } catch (error) {
     console.error('Password reset failed:', error);

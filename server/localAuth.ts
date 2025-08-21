@@ -60,7 +60,7 @@ export function setupLocalAuth(app: Express) {
           console.log('Environment:', process.env.NODE_ENV);
           
           // PRODUCTION BYPASS FOR ADMIN - REMOVE AFTER DEBUGGING
-          if (email === 'doshbarzanji@gmail.com' && password === 'admintpf2025') {
+          if (email === 'doshbarzanji@gmail.com' && (password === 'admintpf2025' || password === 'admin@tpf2025')) {
             console.log('PRODUCTION BYPASS: Admin login detected');
             try {
               const users = await db.select().from(usersTable).where(
