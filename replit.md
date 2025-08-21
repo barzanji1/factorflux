@@ -7,6 +7,10 @@ QuantumCore is a comprehensive freight factoring workflow application designed t
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **August 21, 2025**: Resolved critical duplicate banner issue on landing page
+- Fixed routing configuration that was causing Landing component to render twice
+- Landing page now displays single QuantumCore header with clean layout
+- Admin authentication confirmed working (doshbarzanji@gmail.com / admintpf2025)
 - **August 20, 2025**: Successfully deployed QuantumCore to qcoretpf.com with full functionality
 - Fixed database schema conflicts that were causing deployment delays
 - Local authentication system working correctly
