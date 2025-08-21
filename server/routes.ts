@@ -1416,16 +1416,68 @@ Trucking Pros Financial Team
     }
   });
 
-  // Version check endpoint
+  // Version check endpoint - FORCE DEPLOYMENT UPDATE v3
   app.get('/api/version-check', (req, res) => {
     res.json({
       timestamp: new Date().toISOString(),
-      version: 'v1.0.0-with-debug',
+      version: 'v3.0.0-WITH-BYPASS-' + Date.now(),
       hasLocalAuth: !!app._router?.stack?.find((layer: any) => 
         layer.route?.path === '/api/auth/local/login'
       ),
-      environment: process.env.NODE_ENV || 'unknown'
+      environment: process.env.NODE_ENV || 'unknown',
+      authEndpointExists: true,
+      bypassAdded: true
     });
+  });
+
+  // Direct authentication test endpoint - bypasses Passport entirely
+  app.post('/api/direct-auth-test', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      console.log('Direct auth test for:', email);
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password required' });
+      }
+      
+      // Get user directly from database
+      const users = await db.select().from(userTable).where(
+        and(
+          eq(userTable.email, email),
+          eq(userTable.authType, 'local')
+        )
+      );
+      
+      if (users.length === 0) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+      
+      const user = users[0];
+      console.log('Direct auth: found user', user.id);
+      
+      // Test password directly
+      const isValid = await bcrypt.compare(password, user.password);
+      console.log('Direct auth: password valid', isValid);
+      
+      if (isValid) {
+        return res.json({
+          success: true,
+          message: 'Direct authentication successful',
+          user: {
+            id: user.id,
+            email: user.email,
+            role: user.role
+          }
+        });
+      } else {
+        return res.status(401).json({ message: 'Invalid password' });
+      }
+      
+    } catch (error) {
+      console.error('Direct auth error:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Direct auth failed' });
+    }
   });
 
   // Reset admin password with fresh hash
