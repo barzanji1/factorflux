@@ -42,9 +42,9 @@ function Router() {
     <Switch>
       {!isAuthenticated ? (
         <>
-          <Route path="/" component={Landing} />
-          <Route path="/download" component={DownloadPage} />
           <Route path="/local-login" component={LocalLogin} />
+          <Route path="/download" component={DownloadPage} />
+          <Route path="/" component={Landing} />
           <Route component={Landing} />
         </>
       ) : (
