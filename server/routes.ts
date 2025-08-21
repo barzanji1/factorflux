@@ -10,7 +10,8 @@ import {
   insertFollowUpSchema,
   users
 } from "@shared/schema";
-
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
@@ -1414,48 +1415,50 @@ Trucking Pros Financial Team
     }
   });
 
-  // Database migration endpoint - create admin user
-  app.post('/api/migration/create-admin', async (req, res) => {
+  // Database migration endpoint - sync admin password with local
+  app.post('/api/migration/sync-admin', async (req, res) => {
     try {
       const { secret } = req.body;
       
-      if (secret !== 'tpf-migrate-2025') {
-        return res.status(401).json({ message: 'Unauthorized migration' });
+      if (secret !== 'tpf-sync-admin-2025') {
+        return res.status(401).json({ message: 'Unauthorized sync' });
       }
 
-      // Use raw SQL to ensure admin user exists with correct password
-      const hashedPassword = await bcrypt.hash('admintpf2025', 10);
+      // Use the exact working password hash from local development
+      const workingHash = '$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO';
       
-      // Use upsertUser which should work with the storage interface
       try {
-        const adminUser = await storage.upsertUser({
-          email: 'doshbarzanji@gmail.com',
-          password: hashedPassword,
-          firstName: 'Dosh',
-          lastName: 'Barzanji',
-          role: 'admin',
-          authType: 'local'
-        });
+        // Direct database query to update password hash
+        const result = await db.update(users)
+          .set({ password: workingHash })
+          .where(eq(users.email, 'doshbarzanji@gmail.com'))
+          .returning();
         
-        return res.json({ 
-          success: true, 
-          message: 'Admin user created/updated successfully',
-          user: { 
-            id: adminUser.id, 
-            email: adminUser.email, 
-            role: adminUser.role 
-          } 
-        });
+        if (result.length > 0) {
+          return res.json({ 
+            success: true, 
+            message: 'Admin password synchronized successfully',
+            user: { 
+              id: result[0].id, 
+              email: result[0].email, 
+              role: result[0].role 
+            } 
+          });
+        } else {
+          return res.status(404).json({ 
+            error: 'Admin user not found' 
+          });
+        }
       } catch (error) {
-        console.error('Admin upsert failed:', error);
+        console.error('Password sync failed:', error);
         return res.status(500).json({ 
-          error: 'Failed to create admin user',
+          error: 'Failed to sync admin password',
           details: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     } catch (error) {
-      console.error('Migration error:', error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Migration failed' });
+      console.error('Sync error:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Sync failed' });
     }
   });
 
