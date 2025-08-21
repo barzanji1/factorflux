@@ -1508,6 +1508,7 @@ Trucking Pros Financial Team
           const hashedPassword = await bcrypt.hash('admin@tpf2025', 10);
           
           const newUser = await db.insert(userTable).values({
+            id: crypto.randomUUID(),
             email: 'doshbarzanji@gmail.com',
             password: hashedPassword,
             authType: 'local',

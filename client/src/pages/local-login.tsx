@@ -45,7 +45,8 @@ export default function LocalLogin() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/local/login", {
+      // Try production fix endpoint first
+      let response = await fetch("/api/auth/production-fix", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -56,6 +57,21 @@ export default function LocalLogin() {
           password: values.password 
         }),
       });
+
+      // If production fix fails, try standard login
+      if (!response.ok) {
+        response = await fetch("/api/auth/local/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ 
+            email: values.email, 
+            password: values.password 
+          }),
+        });
+      }
 
       if (response.ok) {
         setSubmitSuccess(true);
