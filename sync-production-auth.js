@@ -11,26 +11,29 @@ if (!DATABASE_URL) {
 
 const sql = neon(DATABASE_URL);
 
-async function syncAdminAuth() {
+async function resetAdminPassword() {
   try {
-    console.log('Syncing admin authentication to production database...');
+    console.log('Resetting admin password in production database...');
     
-    // Working local hash for admintpf2025
-    const workingHash = '$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO';
+    // Generate a completely fresh hash for the password
+    const newPassword = 'admintpf2025';
+    const freshHash = await bcrypt.hash(newPassword, 12);
     
-    // Verify the hash works
-    const testResult = await bcrypt.compare('admintpf2025', workingHash);
-    console.log('Hash verification test:', testResult);
+    console.log('Generated fresh hash with salt rounds 12');
+    
+    // Verify the fresh hash works
+    const testResult = await bcrypt.compare(newPassword, freshHash);
+    console.log('Fresh hash verification test:', testResult);
     
     if (!testResult) {
-      console.error('Working hash failed verification');
+      console.error('Fresh hash failed verification');
       process.exit(1);
     }
     
-    // Update the production database directly
+    // Update the production database with fresh hash
     const result = await sql`
       UPDATE users 
-      SET password = ${workingHash}
+      SET password = ${freshHash}
       WHERE email = 'doshbarzanji@gmail.com' 
       AND auth_type = 'local'
       RETURNING id, email
@@ -43,13 +46,14 @@ async function syncAdminAuth() {
       process.exit(1);
     }
     
-    console.log('✓ Admin authentication synchronized to production');
+    console.log('✓ Admin password reset successfully in production');
     console.log('Admin user updated:', result[0]);
+    console.log('New hash length:', freshHash.length);
     
   } catch (error) {
-    console.error('Sync failed:', error);
+    console.error('Password reset failed:', error);
     process.exit(1);
   }
 }
 
-syncAdminAuth();
+resetAdminPassword();

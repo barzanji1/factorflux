@@ -1416,23 +1416,38 @@ Trucking Pros Financial Team
     }
   });
 
-  // Fix production authentication by updating admin password with working local hash
-  app.post('/api/fix-admin-auth', async (req, res) => {
+  // Version check endpoint
+  app.get('/api/version-check', (req, res) => {
+    res.json({
+      timestamp: new Date().toISOString(),
+      version: 'v1.0.0-with-debug',
+      hasLocalAuth: !!app._router?.stack?.find((layer: any) => 
+        layer.route?.path === '/api/auth/local/login'
+      ),
+      environment: process.env.NODE_ENV || 'unknown'
+    });
+  });
+
+  // Reset admin password with fresh hash
+  app.post('/api/reset-admin-password', async (req, res) => {
     try {
       const { secret } = req.body;
       
-      if (secret !== 'fix-admin-auth-2025') {
+      if (secret !== 'reset-admin-2025') {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      console.log('Fixing admin authentication in production');
+      console.log('Resetting admin password in production');
       
-      // Use the exact same hash that works in local environment
-      const workingLocalHash = '$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO';
+      // Generate a completely fresh hash for admintpf2025
+      const freshPassword = 'admintpf2025';
+      const freshHash = await bcrypt.hash(freshPassword, 12);
       
-      // Update admin user with the working hash
+      console.log('Generated fresh hash for password reset');
+      
+      // Update admin user with the fresh hash
       const result = await db.update(userTable).set({
-        password: workingLocalHash
+        password: freshHash
       }).where(
         and(
           eq(userTable.email, 'doshbarzanji@gmail.com'),
@@ -1444,25 +1459,26 @@ Trucking Pros Financial Team
         return res.status(404).json({ message: 'Admin user not found' });
       }
       
-      console.log('Admin authentication fixed in production');
+      console.log('Admin password reset successfully');
       
-      // Test the password immediately after update
-      const testValid = await bcrypt.compare('admintpf2025', workingLocalHash);
+      // Test the new password immediately
+      const testValid = await bcrypt.compare(freshPassword, freshHash);
       
       return res.json({
         success: true,
-        message: 'Admin authentication fixed',
+        message: 'Admin password reset successfully',
         user: {
           id: result[0].id,
           email: result[0].email
         },
-        passwordTest: testValid
+        passwordTest: testValid,
+        hashLength: freshHash.length
       });
       
     } catch (error) {
-      console.error('Fix auth error:', error);
+      console.error('Password reset error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Auth fix failed'
+        error: error instanceof Error ? error.message : 'Password reset failed'
       });
     }
   });
