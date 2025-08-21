@@ -61,7 +61,7 @@ export const users = pgTable("users", {
 
 // Clients table
 export const clients = pgTable("clients", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   name: varchar("name").notNull(),
   email: varchar("email"),
   phone: varchar("phone"),
@@ -75,7 +75,7 @@ export const clients = pgTable("clients", {
 
 // Loads table
 export const loads = pgTable("loads", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   loadNumber: varchar("load_number").unique().notNull(),
   clientId: integer("client_id").references(() => clients.id).notNull(),
   pickupLocation: text("pickup_location"),
@@ -93,7 +93,7 @@ export const loads = pgTable("loads", {
 
 // Invoices table
 export const invoices = pgTable("invoices", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   invoiceNumber: varchar("invoice_number").unique().notNull(),
   loadId: integer("load_id").references(() => loads.id).notNull(),
   clientId: integer("client_id").references(() => clients.id).notNull(),
@@ -112,7 +112,7 @@ export const invoices = pgTable("invoices", {
 
 // Documents table
 export const documents = pgTable("documents", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   filename: varchar("filename").notNull(),
   originalName: varchar("original_name").notNull(),
   mimeType: varchar("mime_type").notNull(),
@@ -129,7 +129,7 @@ export const documents = pgTable("documents", {
 
 // Activity log table
 export const activities = pgTable("activities", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   type: varchar("type").notNull(),
   description: text("description").notNull(),
@@ -140,7 +140,7 @@ export const activities = pgTable("activities", {
 
 // Fuel card applications table
 export const fuelCardApplications = pgTable("fuel_card_applications", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   companyName: varchar("company_name").notNull(),
   contactName: varchar("contact_name").notNull(),
   email: varchar("email").notNull(),
@@ -161,7 +161,7 @@ export const fuelCardApplications = pgTable("fuel_card_applications", {
 
 // Time Tracking table
 export const timeEntries = pgTable("time_entries", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   clockInTime: timestamp("clock_in_time").notNull(),
   clockOutTime: timestamp("clock_out_time"),
@@ -174,7 +174,7 @@ export const timeEntries = pgTable("time_entries", {
 
 // Notifications table
 export const notifications = pgTable("notifications", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   title: varchar("title").notNull(),
   message: text("message").notNull(),
@@ -187,7 +187,7 @@ export const notifications = pgTable("notifications", {
 
 // Follow-ups table
 export const followUps = pgTable("follow_ups", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
   clientId: integer("client_id").references(() => clients.id).notNull(),
   title: varchar("title").notNull(),
   description: text("description"),
