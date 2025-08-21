@@ -71,34 +71,7 @@ export default function Landing() {
 
 
 
-        {/* Call to Action */}
-        <div className="text-center">
-          <Card className="max-w-2xl mx-auto">
-            <CardContent className="p-8">
-              <h2 className="text-2xl font-bold text-secondary mb-4">
-                Ready to streamline your freight factoring?
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Join hundreds of freight companies already using QuantumCore to manage their invoice processing workflow.
-              </p>
-              <div className="space-y-3">
-                <Button size="lg" onClick={() => window.location.href = '/api/auth/login'}>
-                  Sign In Now
-                </Button>
-                
-                <div className="text-sm text-gray-500">or</div>
-                
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  onClick={() => window.location.href = '/local-login'}
-                >
-                  Admin Login
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+
       </div>
     </div>
   );
