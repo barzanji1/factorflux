@@ -61,9 +61,7 @@ function Router() {
           <Route path="/profile" component={Profile} />
           <Route path="/settings" component={Settings} />
           <Route path="/download" component={DownloadPage} />
-          <Route path="*">
-            <Dashboard />
-          </Route>
+          <Route component={NotFound} />
         </>
       )}
     </Switch>
