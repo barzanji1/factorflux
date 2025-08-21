@@ -40,16 +40,16 @@ interface SearchResults {
 }
 
 export default function TopNav({ title, subtitle }: TopNavProps) {
-  const { user, isAuthenticated } = useAuth() as { user: User | undefined; isAuthenticated: boolean };
+  // Authentication system removed - using default user profile
+  const user = { firstName: 'Admin', lastName: 'User', role: 'admin', profileImageUrl: null };
   const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   
-  // Fetch real notifications from API
+  // Fetch real notifications from API (authentication removed)
   const { data: notifications = [], error: notificationsError, isError: notificationsIsError } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
-    enabled: !!user && isAuthenticated,
     retry: false,
     staleTime: 30000, // 30 seconds
     refetchOnWindowFocus: false,
@@ -57,7 +57,6 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
   const { data: unreadCountData, error: countError, isError: countIsError } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
-    enabled: !!user && isAuthenticated,
     retry: false,
     staleTime: 30000, // 30 seconds
     refetchOnWindowFocus: false,
@@ -101,7 +100,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
   const handleNotificationClick = (notificationId: number, isRead: boolean) => {
     try {
-      if (!isRead && isAuthenticated) {
+      if (!isRead) {
         markAsReadMutation.mutate(notificationId);
       }
     } catch (error) {
@@ -133,18 +132,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     },
   });
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/local/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-      window.location.href = "/local-login";
-    } catch (error) {
-      console.error("Logout error:", error);
-      window.location.href = "/local-login";
-    }
-  };
+  // Logout functionality removed - no authentication required
 
   // Search functionality
   const { data: searchResults } = useQuery<SearchResults>({
@@ -366,9 +354,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                     size="sm" 
                     onClick={() => {
                       try {
-                        if (isAuthenticated) {
-                          markAllAsReadMutation.mutate();
-                        }
+                        markAllAsReadMutation.mutate();
                       } catch (error) {
                         console.error("Error marking all as read:", error);
                       }
@@ -442,14 +428,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                   Settings
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={handleLogout}
-                className="cursor-pointer text-red-600 dark:text-red-400"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </DropdownMenuItem>
+              {/* Logout removed - no authentication required */}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
