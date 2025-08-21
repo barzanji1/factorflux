@@ -71,19 +71,10 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
   };
 
   const handleFiles = (files: File[]) => {
-    if (!user?.id) {
-      toast({
-        title: "Error",
-        description: "User not authenticated",
-        variant: "destructive",
-      });
-      return;
-    }
-
     files.forEach((file) => {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('userId', user.id);
+      formData.append('userId', '1'); // Default user ID - authentication removed
       formData.append('documentType', documentType);
       
       uploadMutation.mutate(formData);

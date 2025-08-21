@@ -57,8 +57,7 @@ async function getCurrentUser(req: any): Promise<any> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  setupLocalAuth(app);
+  // Authentication system disabled - direct access enabled
 
   // Auth routes - Handle both Replit Auth and Local Auth
   app.get('/api/auth/user', async (req: any, res) => {
@@ -199,7 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard routes
-  app.get('/api/dashboard/stats', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/dashboard/stats', async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -209,7 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/dashboard/recent-activities', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/dashboard/recent-activities', async (req, res) => {
     try {
       const activities = await storage.getActivities(10);
       res.json(activities);
@@ -220,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // All activities endpoint
-  app.get('/api/activities', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/activities', async (req, res) => {
     try {
       const activities = await storage.getActivities();
       res.json(activities);
@@ -252,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client routes
-  app.get('/api/clients', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/clients', async (req, res) => {
     try {
       const clients = await storage.getClients();
       res.json(clients);
@@ -340,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Load routes
-  app.get('/api/loads', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/loads', async (req, res) => {
     try {
       const loads = await storage.getLoads();
       res.json(loads);
@@ -389,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoice routes
-  app.get('/api/invoices', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/invoices', async (req, res) => {
     try {
       const { status, client } = req.query;
       let invoices;
@@ -855,9 +854,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Time tracking routes
-  app.get('/api/time-tracking/status', isAuthenticatedLocal, async (req: any, res) => {
+  app.get('/api/time-tracking/status', async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = 1; // Default user ID - authentication removed
       const currentEntry = await storage.getCurrentTimeEntry(userId);
       const todayEntries = await storage.getTodayTimeEntries(userId);
       
@@ -923,9 +922,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Notification routes
-  app.get('/api/notifications', isAuthenticatedLocal, async (req: any, res) => {
+  app.get('/api/notifications', async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = 1; // Default user ID - authentication removed
       const limit = parseInt(req.query.limit as string) || 20;
       const notifications = await storage.getNotifications(userId, limit);
       res.json(notifications);
@@ -935,9 +934,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/notifications/unread-count', isAuthenticatedLocal, async (req: any, res) => {
+  app.get('/api/notifications/unread-count', async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = 1; // Default user ID - authentication removed
       const count = await storage.getUnreadNotificationCount(userId);
       res.json({ count });
     } catch (error) {
@@ -946,7 +945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/notifications/:id/read', isAuthenticatedLocal, async (req: any, res) => {
+  app.patch('/api/notifications/:id/read', async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.markNotificationAsRead(id);
@@ -957,9 +956,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/notifications/mark-all-read', isAuthenticatedLocal, async (req: any, res) => {
+  app.patch('/api/notifications/mark-all-read', async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = 1; // Default user ID - authentication removed
       await storage.markAllNotificationsAsRead(userId);
       res.json({ message: "All notifications marked as read" });
     } catch (error) {
