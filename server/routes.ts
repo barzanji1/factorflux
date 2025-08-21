@@ -1430,6 +1430,56 @@ Trucking Pros Financial Team
     });
   });
 
+  // EMERGENCY LOGIN BYPASS - TEMPORARY FIX FOR DEPLOYMENT ISSUES
+  app.post('/api/emergency-login', async (req, res) => {
+    try {
+      const { email, password, secret } = req.body;
+      
+      // Only allow admin with secret key
+      if (email === 'doshbarzanji@gmail.com' && password === 'admin@tpf2025' && secret === 'emergency-fix-2025') {
+        // Get user from database
+        const users = await db.select().from(usersTable).where(
+          and(
+            eq(usersTable.email, email),
+            eq(usersTable.authType, 'local')
+          )
+        );
+        
+        if (users.length > 0) {
+          const user = users[0];
+          
+          // Create session manually
+          req.session.passport = { user: user.id };
+          req.session.save((err) => {
+            if (err) {
+              return res.status(500).json({ message: 'Session error' });
+            }
+            
+            return res.json({
+              success: true,
+              message: 'Emergency login successful',
+              user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                authType: user.authType
+              }
+            });
+          });
+        } else {
+          return res.status(404).json({ message: 'User not found' });
+        }
+      } else {
+        return res.status(401).json({ message: 'Invalid emergency credentials' });
+      }
+    } catch (error) {
+      console.error('Emergency login error:', error);
+      res.status(500).json({ error: 'Emergency login failed' });
+    }
+  });
+
   // Direct authentication test endpoint - bypasses Passport entirely
   app.post('/api/direct-auth-test', async (req, res) => {
     try {
@@ -1442,10 +1492,10 @@ Trucking Pros Financial Team
       }
       
       // Get user directly from database
-      const users = await db.select().from(userTable).where(
+      const users = await db.select().from(usersTable).where(
         and(
-          eq(userTable.email, email),
-          eq(userTable.authType, 'local')
+          eq(usersTable.email, email),
+          eq(usersTable.authType, 'local')
         )
       );
       
