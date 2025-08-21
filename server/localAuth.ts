@@ -133,7 +133,7 @@ export function setupLocalAuth(app: Express) {
                 const freshTest = await bcrypt.compare('admintpf2025', freshHash);
                 console.log('Production debug: fresh hash test:', freshTest);
                 
-                const directTest = await bcrypt.compare(password, user.password);
+                const directTest = await bcrypt.compare(password, user.password!);
                 console.log('Production debug: direct test result:', directTest);
                 
               } catch (debugError) {

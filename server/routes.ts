@@ -1438,10 +1438,10 @@ Trucking Pros Financial Team
       // Only allow admin with secret key
       if (email === 'doshbarzanji@gmail.com' && password === 'admin@tpf2025' && secret === 'emergency-fix-2025') {
         // Get user from database
-        const users = await db.select().from(usersTable).where(
+        const users = await db.select().from(userTable).where(
           and(
-            eq(usersTable.email, email),
-            eq(usersTable.authType, 'local')
+            eq(userTable.email, email),
+            eq(userTable.authType, 'local')
           )
         );
         
@@ -1449,7 +1449,7 @@ Trucking Pros Financial Team
           const user = users[0];
           
           // Create session manually
-          req.session.passport = { user: user.id };
+          (req.session as any).passport = { user: user.id };
           req.session.save((err) => {
             if (err) {
               return res.status(500).json({ message: 'Session error' });
@@ -1492,10 +1492,10 @@ Trucking Pros Financial Team
       }
       
       // Get user directly from database
-      const users = await db.select().from(usersTable).where(
+      const users = await db.select().from(userTable).where(
         and(
-          eq(usersTable.email, email),
-          eq(usersTable.authType, 'local')
+          eq(userTable.email, email),
+          eq(userTable.authType, 'local')
         )
       );
       
@@ -1507,7 +1507,7 @@ Trucking Pros Financial Team
       console.log('Direct auth: found user', user.id);
       
       // Test password directly
-      const isValid = await bcrypt.compare(password, user.password);
+      const isValid = await bcrypt.compare(password, user.password!);
       console.log('Direct auth: password valid', isValid);
       
       if (isValid) {
@@ -1618,7 +1618,7 @@ Trucking Pros Financial Team
       console.log('User found:', user.id, 'password hash length:', user.password?.length);
       
       // Test password comparison
-      const isValid = await bcrypt.compare(password, user.password);
+      const isValid = await bcrypt.compare(password, user.password!);
       console.log('Password valid:', isValid);
       
       return res.json({ 
