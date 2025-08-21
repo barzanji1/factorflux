@@ -75,18 +75,26 @@ export function setupLocalAuth(app: Express) {
 
   // Local login route
   app.post('/api/auth/local/login', (req, res, next) => {
+    console.log('Login request received:', { email: req.body.email, hasPassword: !!req.body.password });
+    
     passport.authenticate('local', (err: any, user: any, info: any) => {
+      console.log('Passport authenticate result:', { err: !!err, user: !!user, info });
+      
       if (err) {
+        console.error('Authentication error:', err);
         return res.status(500).json({ message: 'Authentication error', error: err.message });
       }
       if (!user) {
+        console.log('Authentication failed:', info?.message || 'No user returned');
         return res.status(401).json({ message: info?.message || 'Authentication failed' });
       }
 
       req.logIn(user, (err) => {
         if (err) {
+          console.error('Login error:', err);
           return res.status(500).json({ message: 'Login error', error: err.message });
         }
+        console.log('Login successful for user:', user.email);
         res.json({
           id: user.id,
           email: user.email,
