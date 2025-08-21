@@ -5,6 +5,9 @@ import { storage } from "./storage";
 import type { Express } from "express";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { db } from "./db";
+import { users as usersTable } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -51,22 +54,39 @@ export function setupLocalAuth(app: Express) {
       },
       async (email, password, done) => {
         try {
-          // Find user by email with local auth type
-          const users = await storage.getUserByEmailAndType(email, 'local');
+          console.log('Passport strategy: attempting login for:', email);
+          
+          // Find user by email with local auth type - using direct DB query
+          const users = await db.select().from(usersTable).where(
+            and(
+              eq(usersTable.email, email),
+              eq(usersTable.authType, 'local')
+            )
+          );
+          console.log('Passport strategy: found users:', users?.length || 0);
+          
           const user = users[0];
 
           if (!user) {
+            console.log('Passport strategy: no user found for:', email);
             return done(null, false, { message: 'Invalid email or password' });
           }
 
+          console.log('Passport strategy: checking password for user:', user.id, 'hash length:', user.password?.length);
+          
           // Check password
           const isValidPassword = await bcrypt.compare(password, user.password!);
+          console.log('Passport strategy: password validation result:', isValidPassword);
+          
           if (!isValidPassword) {
+            console.log('Passport strategy: password mismatch for:', email);
             return done(null, false, { message: 'Invalid email or password' });
           }
 
+          console.log('Passport strategy: login successful for:', email);
           return done(null, user);
         } catch (error) {
+          console.error('Passport strategy error:', error);
           return done(error);
         }
       }

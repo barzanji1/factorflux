@@ -8,10 +8,11 @@ import {
   insertInvoiceSchema,
   insertDocumentSchema,
   insertFollowUpSchema,
-  users
+  users,
+  users as userTable
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
@@ -1412,6 +1413,63 @@ Trucking Pros Financial Team
       res.sendFile(portfolioPath);
     } else {
       res.status(404).json({ message: "Portfolio not found" });
+    }
+  });
+
+  // Simple test login endpoint to verify credentials
+  app.post('/api/test-login', async (req, res) => {
+    try {
+      const { email, password, secret } = req.body;
+      
+      if (secret !== 'test-login-tpf-2025') {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      console.log('Testing login for:', email);
+      
+      // Direct database query to find user
+      const users = await db.select().from(userTable).where(
+        and(
+          eq(userTable.email, email),
+          eq(userTable.authType, 'local')
+        )
+      );
+      
+      console.log('Found users:', users.length);
+      
+      if (users.length === 0) {
+        return res.json({ 
+          success: false, 
+          message: 'User not found',
+          email: email
+        });
+      }
+
+      const user = users[0];
+      console.log('User found:', user.id, 'password hash length:', user.password?.length);
+      
+      // Test password comparison
+      const isValid = await bcrypt.compare(password, user.password);
+      console.log('Password valid:', isValid);
+      
+      return res.json({ 
+        success: isValid,
+        message: isValid ? 'Credentials valid' : 'Password mismatch',
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role
+        },
+        hashLength: user.password?.length,
+        passwordTested: password
+      });
+      
+    } catch (error) {
+      console.error('Test login error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Test failed',
+        details: error
+      });
     }
   });
 
