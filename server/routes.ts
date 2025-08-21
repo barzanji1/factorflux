@@ -7,8 +7,11 @@ import {
   insertLoadSchema, 
   insertInvoiceSchema,
   insertDocumentSchema,
-  insertFollowUpSchema 
+  insertFollowUpSchema,
+  users
 } from "@shared/schema";
+
+import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1422,29 +1425,27 @@ Trucking Pros Financial Team
       }
 
       // Check if admin already exists
-      const existingAdmin = await db.select().from(users).where(eq(users.email, 'doshbarzanji@gmail.com'));
+      const existingAdmin = await storage.getUserByEmail('doshbarzanji@gmail.com');
       
-      if (existingAdmin.length > 0) {
+      if (existingAdmin) {
         // Update existing user password
         const hashedPassword = await bcrypt.hash('admintpf2025', 10);
-        await db.update(users)
-          .set({ password: hashedPassword })
-          .where(eq(users.email, 'doshbarzanji@gmail.com'));
+        await storage.updateUserPassword('doshbarzanji@gmail.com', hashedPassword);
         
         return res.json({ message: 'Admin password updated successfully' });
       } else {
         // Create new admin user
         const hashedPassword = await bcrypt.hash('admintpf2025', 10);
-        const newUser = await db.insert(users).values({
+        const newUser = await storage.createUser({
           email: 'doshbarzanji@gmail.com',
           password: hashedPassword,
           firstName: 'Dosh',
           lastName: 'Barzanji',
           role: 'admin',
           authType: 'local'
-        }).returning();
+        });
         
-        return res.json({ message: 'Admin user created successfully', user: newUser[0] });
+        return res.json({ message: 'Admin user created successfully', user: newUser });
       }
     } catch (error) {
       console.error('Emergency admin creation error:', error);
