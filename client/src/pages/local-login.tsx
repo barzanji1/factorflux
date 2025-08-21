@@ -32,19 +32,21 @@ export default function LocalLogin() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
       if (response.ok) {
         // Login successful, invalidate auth cache and redirect to dashboard
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
-        // Wait a bit for the query to refetch before redirecting
-        setTimeout(() => {
-          setLocation("/");
-        }, 100);
+        // Force a refetch to update auth state
+        await queryClient.refetchQueries({ queryKey: ["/api/auth/local/check"] });
+        // Clear any existing error state
+        setError("");
+        // Redirect to dashboard
+        setLocation("/");
       } else {
+        const data = await response.json();
         setError(data.message || "Login failed");
       }
     } catch (err) {
+      console.error("Login error:", err);
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
