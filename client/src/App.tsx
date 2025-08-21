@@ -45,9 +45,6 @@ function Router() {
           <Route path="/local-login" component={LocalLogin} />
           <Route path="/download" component={DownloadPage} />
           <Route path="/" component={Landing} />
-          <Route>
-            <Landing />
-          </Route>
         </>
       ) : (
         <>
