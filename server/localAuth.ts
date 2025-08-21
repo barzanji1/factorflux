@@ -99,6 +99,38 @@ export function setupLocalAuth(app: Express) {
     })(req, res, next);
   });
 
+  // Reset password route (for admin setup)
+  app.post('/api/auth/local/reset-password', async (req, res) => {
+    try {
+      const { email, newPassword, adminKey } = req.body;
+
+      // Simple admin key check for production reset
+      if (adminKey !== 'tpf-admin-reset-2025') {
+        return res.status(403).json({ message: 'Invalid admin key' });
+      }
+
+      // Find user by email with local auth type
+      const existingUsers = await storage.getUserByEmailAndType(email, 'local');
+      if (existingUsers.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const user = existingUsers[0];
+
+      // Hash new password
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Update user password
+      await storage.updateUserProfile(user.id, { password: hashedPassword });
+
+      res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      res.status(500).json({ message: 'Failed to reset password', error: error.message });
+    }
+  });
+
   // Create local user route (for admin setup)
   app.post('/api/auth/local/create', async (req, res) => {
     try {
