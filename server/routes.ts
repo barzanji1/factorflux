@@ -40,20 +40,16 @@ const upload = multer({
   },
 });
 
-// Helper function to get user ID from local auth
+// Helper function to get user ID - authentication removed
 function getUserId(req: any): string | null {
-  if (!req.isAuthenticated()) {
-    return null;
-  }
-  return req.user.id;
+  // Return default user ID since authentication is disabled
+  return "1";
 }
 
-// Helper function to get current user from local auth
+// Helper function to get current user - authentication removed
 async function getCurrentUser(req: any): Promise<any> {
-  if (!req.isAuthenticated()) {
-    return null;
-  }
-  return req.user;
+  // Return default admin user since authentication is disabled
+  return { id: "1", firstName: "Admin", lastName: "User", role: "admin", email: "admin@tpf.com" };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -62,10 +58,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes - Handle both Replit Auth and Local Auth
   app.get('/api/auth/user', async (req: any, res) => {
     try {
-      const user = await getCurrentUser(req);
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      // Authentication removed - return default admin user
+      const user = { id: "1", firstName: "Admin", lastName: "User", role: "admin", email: "admin@tpf.com" };
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -76,10 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile routes
   app.patch('/api/user/profile', async (req: any, res) => {
     try {
-      const userId = getUserId(req);
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const userId = "1"; // Authentication removed - use default user ID
 
       const updates = req.body;
       
@@ -109,11 +100,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/user/profile-image', upload.single('profileImage'), async (req: any, res) => {
     try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const userId = req.user.authType === 'local' ? req.user.id : req.user.id;
+      // Authentication removed - use default user ID
+      const userId = "1";
       
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });
@@ -139,14 +127,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin routes - Role management
   app.get('/api/admin/users', async (req: any, res) => {
     try {
-      const currentUser = await getCurrentUser(req);
-      if (!currentUser) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      if (currentUser?.role !== 'manager' && currentUser?.role !== 'admin') {
-        return res.status(403).json({ message: "Access denied. Manager or admin role required." });
-      }
+      // Authentication removed - admin access enabled by default
+      const currentUser = { id: "1", role: "admin" };
 
       const users = await storage.getAllUsers();
       res.json(users);
@@ -156,12 +138,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/admin/users/:userId/role', isAuthenticatedLocal, async (req: any, res) => {
+  app.patch('/api/admin/users/:userId/role', async (req: any, res) => {
     try {
-      const currentUser = req.user;
-      if (currentUser?.role !== 'manager' && currentUser?.role !== 'admin') {
-        return res.status(403).json({ message: "Access denied. Manager or admin role required." });
-      }
+      // Authentication removed - admin access enabled by default
+      const currentUser = { id: "1", role: "admin" };
 
       const { userId } = req.params;
       const { role } = req.body;
@@ -170,8 +150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid role. Must be 'employee', 'manager', or 'admin'." });
       }
 
-      // Prevent changing own role
-      if (userId === req.user.id) {
+      // Prevent changing own role (admin user)
+      if (userId === "1") {
         return res.status(400).json({ message: "Cannot change your own role." });
       }
 

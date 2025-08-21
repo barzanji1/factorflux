@@ -60,19 +60,7 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/local-login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+  // Authentication system removed - no redirect needed
 
   const form = useForm<UpdateUserProfile>({
     resolver: zodResolver(updateUserProfileSchema),
@@ -92,10 +80,10 @@ export default function Profile() {
     },
     onSuccess: () => {
       toast({
-        title: "Profile Updated",
+        title: "Profile Updated", 
         description: "Your profile has been updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
+      // Authentication system removed - simplified refresh
     },
     onError: (error: Error) => {
       toast({
@@ -128,7 +116,7 @@ export default function Profile() {
         title: "Profile Image Updated",
         description: "Your profile image has been updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
+      // Authentication system removed - simplified refresh
       setIsUploadingImage(false);
     },
     onError: (error: Error) => {
