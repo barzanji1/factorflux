@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+// Authentication system removed
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { insertInvoiceSchema, type Invoice, type Load, type Client } from "@shared/schema";
@@ -48,7 +48,7 @@ const invoiceFormSchema = insertInvoiceSchema.extend({
 
 export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
+  // Authentication system removed
   const queryClient = useQueryClient();
   const [selectedLoadId, setSelectedLoadId] = useState<string>("");
 

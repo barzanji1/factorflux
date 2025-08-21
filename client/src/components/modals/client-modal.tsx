@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
+// Authentication system removed
 import { apiRequest } from "@/lib/queryClient";
 import { insertClientSchema, type Client } from "@shared/schema";
 import {
@@ -97,19 +97,9 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
       onClose();
     },
     onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+      // Authentication system removed - simplified error handling
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Failed to create client",
         variant: "destructive",
       });
@@ -129,20 +119,10 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
       onClose();
     },
     onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+      // Authentication system removed - simplified error handling
       toast({
         title: "Error",
-        description: "Failed to update client",
+        description: "Failed to update client", 
         variant: "destructive",
       });
     },

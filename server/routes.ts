@@ -856,7 +856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Time tracking routes
   app.get('/api/time-tracking/status', async (req: any, res) => {
     try {
-      const userId = 1; // Default user ID - authentication removed
+      const userId = "1"; // Default user ID - authentication removed
       const currentEntry = await storage.getCurrentTimeEntry(userId);
       const todayEntries = await storage.getTodayTimeEntries(userId);
       
@@ -924,7 +924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification routes
   app.get('/api/notifications', async (req: any, res) => {
     try {
-      const userId = 1; // Default user ID - authentication removed
+      const userId = "1"; // Default user ID - authentication removed
       const limit = parseInt(req.query.limit as string) || 20;
       const notifications = await storage.getNotifications(userId, limit);
       res.json(notifications);
@@ -936,7 +936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/notifications/unread-count', async (req: any, res) => {
     try {
-      const userId = 1; // Default user ID - authentication removed
+      const userId = "1"; // Default user ID - authentication removed
       const count = await storage.getUnreadNotificationCount(userId);
       res.json({ count });
     } catch (error) {
@@ -958,7 +958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/notifications/mark-all-read', async (req: any, res) => {
     try {
-      const userId = 1; // Default user ID - authentication removed
+      const userId = "1"; // Default user ID - authentication removed
       await storage.markAllNotificationsAsRead(userId);
       res.json({ message: "All notifications marked as read" });
     } catch (error) {

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+// Authentication system removed
 
 type Theme = "light" | "dark" | "system";
 
 export function useTheme() {
-  const { user } = useAuth();
+  // Authentication system removed
   const [theme, setTheme] = useState<Theme>("system");
 
   // Apply theme to document - Force light theme always
@@ -20,7 +20,7 @@ export function useTheme() {
     
     setTheme(initialTheme);
     applyTheme(initialTheme);
-  }, [user]);
+  }, []); // No user dependency - authentication removed
 
   // Listen for system theme changes when using system theme
   useEffect(() => {
