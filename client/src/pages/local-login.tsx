@@ -62,9 +62,8 @@ export default function LocalLogin() {
             </div>
             <h1 className="text-3xl font-bold text-secondary">QuantumCore</h1>
           </div>
-          <p className="text-lg text-gray-600 mb-2">Agent Login</p>
           <p className="text-sm text-gray-500">
-            Trucking Pros Financial - Secure Access
+            Trucking Pros Financial - Agent Access
           </p>
         </div>
 
