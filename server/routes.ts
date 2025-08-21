@@ -1416,65 +1416,53 @@ Trucking Pros Financial Team
     }
   });
 
-  // Emergency login endpoint that bypasses Passport 
-  app.post('/api/emergency-login', async (req, res) => {
+  // Fix production authentication by updating admin password with working local hash
+  app.post('/api/fix-admin-auth', async (req, res) => {
     try {
-      const { email, password, secret } = req.body;
+      const { secret } = req.body;
       
-      if (secret !== 'emergency-tpf-2025') {
+      if (secret !== 'fix-admin-auth-2025') {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      console.log('Emergency login attempt for:', email);
+      console.log('Fixing admin authentication in production');
       
-      // Direct database query - no storage interface
-      const [adminUser] = await db.select().from(userTable).where(
+      // Use the exact same hash that works in local environment
+      const workingLocalHash = '$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO';
+      
+      // Update admin user with the working hash
+      const result = await db.update(userTable).set({
+        password: workingLocalHash
+      }).where(
         and(
-          eq(userTable.email, email),
+          eq(userTable.email, 'doshbarzanji@gmail.com'),
           eq(userTable.authType, 'local')
         )
-      );
+      ).returning();
       
-      if (!adminUser) {
-        return res.status(401).json({ message: 'User not found' });
+      if (result.length === 0) {
+        return res.status(404).json({ message: 'Admin user not found' });
       }
-
-      console.log('Testing password for user:', adminUser.id);
       
-      // Direct bcrypt comparison
-      const passwordValid = await bcrypt.compare(password, adminUser.password);
+      console.log('Admin authentication fixed in production');
       
-      if (!passwordValid) {
-        return res.status(401).json({ 
-          message: 'Invalid password',
-          debug: {
-            hashLength: adminUser.password?.length,
-            passwordLength: password.length
-          }
-        });
-      }
-
-      // Manually set session (bypass Passport)
-      req.session.userId = adminUser.id;
-      req.session.user = adminUser;
-      
-      console.log('Emergency login successful for:', email);
+      // Test the password immediately after update
+      const testValid = await bcrypt.compare('admintpf2025', workingLocalHash);
       
       return res.json({
         success: true,
+        message: 'Admin authentication fixed',
         user: {
-          id: adminUser.id,
-          email: adminUser.email,
-          firstName: adminUser.firstName,
-          lastName: adminUser.lastName,
-          role: adminUser.role
-        }
+          id: result[0].id,
+          email: result[0].email
+        },
+        passwordTest: testValid
       });
       
     } catch (error) {
-      console.error('Emergency login error:', error);
+      console.error('Fix auth error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Emergency login failed'
+        error: error instanceof Error ? error.message : 'Auth fix failed'
       });
     }
   });

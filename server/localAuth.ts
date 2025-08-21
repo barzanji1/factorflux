@@ -90,9 +90,26 @@ export function setupLocalAuth(app: Express) {
 
           console.log('Passport strategy: checking password for user:', user.id, 'hash length:', user.password?.length);
           
-          // Check password
-          const isValidPassword = await bcrypt.compare(password, user.password!);
-          console.log('Passport strategy: password validation result:', isValidPassword);
+          // Enhanced password validation with production debugging
+          let isValidPassword = false;
+          try {
+            isValidPassword = await bcrypt.compare(password, user.password!);
+            console.log('Passport strategy: bcrypt.compare result:', isValidPassword);
+            
+            // Production debugging - test known working credentials
+            if (!isValidPassword && email === 'doshbarzanji@gmail.com') {
+              console.log('Production debug: testing admin credentials');
+              const knownWorkingHash = '$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO';
+              const knownTest = await bcrypt.compare('admintpf2025', knownWorkingHash);
+              console.log('Production debug: known hash test result:', knownTest);
+              console.log('Production debug: user hash matches known:', user.password === knownWorkingHash);
+              console.log('Production debug: user password length:', user.password?.length);
+              console.log('Production debug: provided password:', password);
+            }
+          } catch (bcryptError) {
+            console.error('Bcrypt comparison error:', bcryptError);
+            return done(null, false, { message: 'Authentication error' });
+          }
           
           if (!isValidPassword) {
             console.log('Passport strategy: password mismatch for:', email);
