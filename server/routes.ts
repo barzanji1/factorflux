@@ -1414,29 +1414,21 @@ Trucking Pros Financial Team
     }
   });
 
-  // Emergency admin creation endpoint
-  app.post('/api/emergency-admin', async (req, res) => {
+  // Database migration endpoint - create admin user
+  app.post('/api/migration/create-admin', async (req, res) => {
     try {
       const { secret } = req.body;
       
-      // Check for emergency secret
-      if (secret !== 'tpf-emergency-2025') {
-        return res.status(401).json({ message: 'Unauthorized' });
+      if (secret !== 'tpf-migrate-2025') {
+        return res.status(401).json({ message: 'Unauthorized migration' });
       }
 
-      // Check if admin already exists
-      const existingAdmin = await storage.getUserByEmail('doshbarzanji@gmail.com');
+      // Use raw SQL to ensure admin user exists with correct password
+      const hashedPassword = await bcrypt.hash('admintpf2025', 10);
       
-      if (existingAdmin) {
-        // Update existing user password
-        const hashedPassword = await bcrypt.hash('admintpf2025', 10);
-        await storage.updateUserPassword('doshbarzanji@gmail.com', hashedPassword);
-        
-        return res.json({ message: 'Admin password updated successfully' });
-      } else {
-        // Create new admin user
-        const hashedPassword = await bcrypt.hash('admintpf2025', 10);
-        const newUser = await storage.createUser({
+      try {
+        // Insert or update admin user using storage layer
+        const adminUser = await storage.createUser({
           email: 'doshbarzanji@gmail.com',
           password: hashedPassword,
           firstName: 'Dosh',
@@ -1445,11 +1437,34 @@ Trucking Pros Financial Team
           authType: 'local'
         });
         
-        return res.json({ message: 'Admin user created successfully', user: newUser });
+        return res.json({ 
+          success: true, 
+          message: 'Admin user created successfully',
+          user: { 
+            id: adminUser.id, 
+            email: adminUser.email, 
+            role: adminUser.role 
+          } 
+        });
+      } catch (createError) {
+        // User might already exist, try to update password
+        try {
+          await storage.updateUserPassword('doshbarzanji@gmail.com', hashedPassword);
+          return res.json({ 
+            success: true, 
+            message: 'Admin password updated successfully' 
+          });
+        } catch (updateError) {
+          console.error('Admin creation/update failed:', { createError, updateError });
+          return res.status(500).json({ 
+            error: 'Failed to create or update admin user',
+            details: updateError instanceof Error ? updateError.message : 'Unknown error'
+          });
+        }
       }
     } catch (error) {
-      console.error('Emergency admin creation error:', error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      console.error('Migration error:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Migration failed' });
     }
   });
 
