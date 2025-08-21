@@ -1,26 +1,48 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Truck, Eye, EyeOff } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { FormFieldWithValidation } from "@/components/ui/form-field-with-validation";
+import { AnimatedButton } from "@/components/ui/animated-button";
+import { useFormValidation, commonValidations } from "@/hooks/useFormValidation";
+import { z } from "zod";
 
 export default function LocalLogin() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Form validation setup
+  const {
+    values,
+    setValue,
+    validationStates,
+    handleBlur,
+    handleSubmit,
+    isFormValid,
+  } = useFormValidation(
+    { email: "", password: "" },
+    {
+      email: {
+        schema: commonValidations.email,
+        message: "Please enter a valid email address"
+      },
+      password: {
+        schema: z.string().min(1, "Password is required"),
+        message: "Password is required"
+      }
+    },
+    { validateOnChange: true, validateOnBlur: true }
+  );
+
+  const onSubmit = async () => {
     setError("");
-    setLoading(true);
+    setIsSubmitting(true);
 
     try {
       const response = await fetch("/api/auth/local/login", {
@@ -29,27 +51,35 @@ export default function LocalLogin() {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ 
+          email: values.email, 
+          password: values.password 
+        }),
       });
 
       if (response.ok) {
+        setSubmitSuccess(true);
         // Login successful, invalidate auth cache and redirect to dashboard
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/local/check"] });
         // Force a refetch to update auth state
         await queryClient.refetchQueries({ queryKey: ["/api/auth/local/check"] });
         // Clear any existing error state
         setError("");
-        // Redirect to dashboard
-        setLocation("/");
+        // Small delay to show success animation
+        setTimeout(() => {
+          setLocation("/");
+        }, 1000);
       } else {
         const data = await response.json();
         setError(data.message || "Login failed");
+        setSubmitSuccess(false);
       }
     } catch (err) {
       console.error("Login error:", err);
       setError("Network error. Please try again.");
+      setSubmitSuccess(false);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -78,59 +108,51 @@ export default function LocalLogin() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmit(onSubmit); }} className="space-y-6">
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="admin@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+              {/* Email Field with Validation */}
+              <FormFieldWithValidation
+                label="Email"
+                name="email"
+                type="email"
+                placeholder="admin@example.com"
+                value={values.email}
+                onChange={(value) => setValue("email", value)}
+                onBlur={() => handleBlur("email")}
+                validation={validationStates.email}
+                required
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-auto p-1"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
+              {/* Password Field with Validation */}
+              <FormFieldWithValidation
+                label="Password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={values.password}
+                onChange={(value) => setValue("password", value)}
+                onBlur={() => handleBlur("password")}
+                validation={validationStates.password}
+                required
+              />
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing In..." : "Sign In"}
-              </Button>
+              {/* Animated Submit Button */}
+              <AnimatedButton
+                type="submit"
+                className="w-full"
+                loading={isSubmitting}
+                success={submitSuccess}
+                loadingText="Signing In..."
+                successText="Login Successful!"
+                disabled={!isFormValid && Object.keys(validationStates).length > 0}
+              >
+                Sign In
+              </AnimatedButton>
             </form>
 
 

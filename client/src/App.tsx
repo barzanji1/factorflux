@@ -23,6 +23,7 @@ import DownloadPage from "@/pages/download";
 import LocalLogin from "@/pages/local-login";
 
 import FollowUp from "@/pages/follow-up";
+import FormDemo from "@/pages/form-demo";
 
 
 
@@ -61,6 +62,7 @@ function Router() {
           <Route path="/profile" component={Profile} />
           <Route path="/settings" component={Settings} />
           <Route path="/download" component={DownloadPage} />
+          <Route path="/form-demo" component={FormDemo} />
         </>
       )}
     </Switch>
