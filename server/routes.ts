@@ -52,11 +52,11 @@ async function getCurrentUser(req: any): Promise<any> {
   return { id: "1", firstName: "Admin", lastName: "User", role: "admin", email: "admin@tpf.com" };
 }
 
-// Production credentials
+// Production credentials with secure bcrypt hashes  
 const PRODUCTION_USERS = [
   {
     username: "agent1",
-    password: "$2a$10$rQJZP0WMXF0FzBx9pOHJGuR8dKXJU2k0wJzCwQv9xR3KF0sGV1Hba", // "tpf2025!"
+    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla", // "tpf2025!"
     name: "Production Agent",
     role: "agent",
     id: "prod-1",
@@ -65,7 +65,7 @@ const PRODUCTION_USERS = [
   },
   {
     username: "manager1", 
-    password: "$2a$10$rQJZP0WMXF0FzBx9pOHJGuR8dKXJU2k0wJzCwQv9xR3KF0sGV1Hba", // "tpf2025!"
+    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla", // "tpf2025!"
     name: "Production Manager",
     role: "manager",
     id: "prod-2",
@@ -74,7 +74,7 @@ const PRODUCTION_USERS = [
   },
   {
     username: "admin1",
-    password: "$2a$10$rQJZP0WMXF0FzBx9pOHJGuR8dKXJU2k0wJzCwQv9xR3KF0sGV1Hba", // "tpf2025!"
+    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla", // "tpf2025!"
     name: "System Administrator", 
     role: "admin",
     id: "prod-3",
@@ -91,12 +91,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find user in production credentials
       const user = PRODUCTION_USERS.find(u => u.username === username);
+      
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      // Verify password
+      // Verify password with bcrypt
       const isValid = await bcrypt.compare(password, user.password);
+      
       if (!isValid) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
