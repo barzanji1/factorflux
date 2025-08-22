@@ -632,6 +632,7 @@ export default function Settings() {
                               <FormLabel>Theme</FormLabel>
                               <Select 
                                 onValueChange={(value) => {
+                                  console.log(`Theme selector changed to: ${value}`);
                                   field.onChange(value);
                                   // Apply theme immediately for instant visual feedback
                                   setTheme(value as "light" | "dark" | "system");
