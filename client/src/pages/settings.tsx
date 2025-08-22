@@ -182,11 +182,15 @@ export default function Settings() {
         workDays: (user as any)?.workDays?.split(',') || ["monday", "tuesday", "wednesday", "thursday", "friday"],
       });
 
+      // Sync appearance form with database data but preserve localStorage theme
+      const savedTheme = localStorage.getItem("theme") as "light" | "dark" | "system" || (user as any)?.theme || "system";
       appearanceForm.reset({
-        theme: (user as any)?.theme || "system",
+        theme: savedTheme,
         dateFormat: (user as any)?.dateFormat || "MM/dd/yyyy",
         timeFormat: (user as any)?.timeFormat || "12h",
       });
+      // Ensure theme is applied when form loads
+      setTheme(savedTheme);
     }
   }, [user, personalForm, notificationForm, workForm, appearanceForm]);
 
@@ -636,6 +640,8 @@ export default function Settings() {
                                   field.onChange(value);
                                   // Apply theme immediately for instant visual feedback
                                   setTheme(value as "light" | "dark" | "system");
+                                  // Auto-save theme selection to database
+                                  updateSettings.mutate({ theme: value });
                                 }} 
                                 value={field.value || theme}
                               >

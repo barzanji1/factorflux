@@ -33,6 +33,7 @@ export function useTheme() {
   // Initialize theme from localStorage or default to system
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme || "system";
+    console.log(`Initializing theme from localStorage: ${savedTheme}`);
     setTheme(savedTheme);
     applyTheme(savedTheme);
   }, []);
