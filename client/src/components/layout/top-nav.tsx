@@ -40,13 +40,25 @@ interface SearchResults {
 }
 
 export default function TopNav({ title, subtitle }: TopNavProps) {
-  // Authentication system removed - using default admin user with uploaded profile image
-  const user = { 
-    firstName: 'Admin', 
-    lastName: 'User', 
-    role: 'admin', 
-    profileImageUrl: '/uploads/c20bf48700fe065a95d9858e806bf4ce' 
+  // Get updated user data from localStorage if available, otherwise use defaults
+  const getUserData = () => {
+    const savedUserData = localStorage.getItem('currentUser');
+    if (savedUserData) {
+      try {
+        return JSON.parse(savedUserData);
+      } catch (e) {
+        // Fall back to defaults if parsing fails
+      }
+    }
+    return {
+      firstName: 'Admin', 
+      lastName: 'User', 
+      role: 'admin', 
+      profileImageUrl: '/uploads/c20bf48700fe065a95d9858e806bf4ce' 
+    };
   };
+  
+  const user = getUserData();
   const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);

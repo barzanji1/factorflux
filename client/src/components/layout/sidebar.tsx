@@ -35,16 +35,28 @@ const navigation = [
 
 export default function Sidebar() {
   const [location, setLocation] = useLocation();
-  // Default admin user with profile image - authentication removed
-  const user = {
-    id: "1",
-    firstName: "Admin",
-    lastName: "User",
-    email: "admin@tpf.com",
-    role: "admin",
-    profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
-    jobTitle: "System Administrator"
+  // Get updated user data from localStorage if available, otherwise use defaults
+  const getUserData = () => {
+    const savedUserData = localStorage.getItem('currentUser');
+    if (savedUserData) {
+      try {
+        return JSON.parse(savedUserData);
+      } catch (e) {
+        // Fall back to defaults if parsing fails
+      }
+    }
+    return {
+      id: "1",
+      firstName: "Admin",
+      lastName: "User", 
+      email: "admin@tpf.com",
+      role: "admin",
+      profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
+      jobTitle: "System Administrator"
+    };
   };
+  
+  const user = getUserData();
 
   return (
     <div className="w-64 bg-white dark:bg-gray-900 shadow-xl border-r border-gray-200 dark:border-gray-700 flex flex-col">

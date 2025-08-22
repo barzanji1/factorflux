@@ -116,12 +116,19 @@ export default function Profile() {
       }
       return { success: true };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Profile Updated", 
         description: "Your profile has been updated successfully.",
       });
-      // Authentication system removed - simplified refresh
+      // Save updated user data to localStorage for immediate UI updates
+      const updatedUser = { ...user, ...form.getValues() };
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      
+      // Refresh the page to show updated information
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     },
     onError: (error: Error) => {
       toast({
