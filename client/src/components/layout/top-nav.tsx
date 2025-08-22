@@ -40,6 +40,8 @@ interface SearchResults {
 }
 
 export default function TopNav({ title, subtitle }: TopNavProps) {
+  const { user: authUser, logout } = useAuth();
+  
   // Get updated user data from localStorage if available, otherwise use defaults
   const getUserData = () => {
     const savedUserData = localStorage.getItem('currentUser');
@@ -149,7 +151,9 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     },
   });
 
-  // Logout functionality removed - no authentication required
+  const handleLogout = () => {
+    logout();
+  };
 
   // Search functionality
   const { data: searchResults } = useQuery<SearchResults>({
@@ -418,21 +422,21 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               <Button variant="ghost" className="flex items-center space-x-2 h-10">
                 <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600">
                   <img 
-                    src={user?.profileImageUrl || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`} 
+                    src={authUser?.profileImageUrl || `https://ui-avatars.com/api/?name=${authUser?.firstName}+${authUser?.lastName}&background=3B82F6&color=fff`} 
                     alt="User Profile" 
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       // Fallback to initials avatar if image fails to load
-                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`;
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${authUser?.firstName}+${authUser?.lastName}&background=3B82F6&color=fff`;
                     }}
                   />
                 </div>
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {user?.firstName} {user?.lastName}
+                    {authUser?.firstName} {authUser?.lastName}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                    {user?.role || "Employee"}
+                    {authUser?.role || "Employee"}
                   </p>
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-500" />
@@ -451,7 +455,14 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
                   Settings
                 </Link>
               </DropdownMenuItem>
-              {/* Logout removed - no authentication required */}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="cursor-pointer flex items-center text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

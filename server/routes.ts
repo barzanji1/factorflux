@@ -52,10 +52,108 @@ async function getCurrentUser(req: any): Promise<any> {
   return { id: "1", firstName: "Admin", lastName: "User", role: "admin", email: "admin@tpf.com" };
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication system disabled - direct access enabled
+// Production credentials
+const PRODUCTION_USERS = [
+  {
+    username: "agent1",
+    password: "$2a$10$rQJZP0WMXF0FzBx9pOHJGuR8dKXJU2k0wJzCwQv9xR3KF0sGV1Hba", // "tpf2025!"
+    name: "Production Agent",
+    role: "agent",
+    id: "prod-1",
+    firstName: "TPF",
+    lastName: "Agent"
+  },
+  {
+    username: "manager1", 
+    password: "$2a$10$rQJZP0WMXF0FzBx9pOHJGuR8dKXJU2k0wJzCwQv9xR3KF0sGV1Hba", // "tpf2025!"
+    name: "Production Manager",
+    role: "manager",
+    id: "prod-2",
+    firstName: "TPF",
+    lastName: "Manager"
+  },
+  {
+    username: "admin1",
+    password: "$2a$10$rQJZP0WMXF0FzBx9pOHJGuR8dKXJU2k0wJzCwQv9xR3KF0sGV1Hba", // "tpf2025!"
+    name: "System Administrator", 
+    role: "admin",
+    id: "prod-3",
+    firstName: "System",
+    lastName: "Admin"
+  }
+];
 
-  // Auth routes - Handle both Replit Auth and Local Auth
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication endpoints
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      // Find user in production credentials
+      const user = PRODUCTION_USERS.find(u => u.username === username);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Verify password
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Store in session
+      (req.session as any).user = {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role
+      };
+      
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/auth/verify", (req, res) => {
+    const user = (req.session as any)?.user;
+    if (user) {
+      res.json({ user });
+    } else {
+      res.status(401).json({ message: "Not authenticated" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Middleware to check authentication for protected routes
+  const requireAuth = (req: any, res: any, next: any) => {
+    const user = (req.session as any)?.user;
+    if (!user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    req.user = user;
+    next();
+  };
   app.get('/api/auth/user', async (req: any, res) => {
     try {
       // Authentication removed - return default admin user
