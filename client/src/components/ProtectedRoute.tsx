@@ -9,6 +9,8 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
+  console.log("ProtectedRoute - isLoading:", isLoading, "isAuthenticated:", isAuthenticated);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -21,8 +23,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isAuthenticated) {
+    console.log("Not authenticated, redirecting to login");
     return <Redirect to="/login" />;
   }
 
+  console.log("Authenticated, rendering protected content");
   return <>{children}</>;
 }

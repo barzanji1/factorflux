@@ -38,15 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Verify with server
         try {
-          const response = await fetch("/api/auth/verify");
+          const response = await fetch("/api/auth/verify", {
+            credentials: "include" // Important for session cookies
+          });
           if (!response.ok) {
+            console.log("Server verification failed, clearing auth state");
             // Server says not authenticated, clear localStorage
             localStorage.removeItem("isAuthenticated");
             localStorage.removeItem("user");
             setUser(null);
             setIsAuthenticated(false);
+          } else {
+            console.log("Server verification successful");
           }
-        } catch {
+        } catch (error) {
+          console.log("Network error during verification:", error);
           // Network error, assume still authenticated if localStorage says so
         }
       } else {
@@ -70,14 +76,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
+        credentials: "include" // Important for session cookies
       });
       
       if (response.ok) {
         const result = await response.json();
+        console.log("Login response:", result);
         setUser(result.user);
         setIsAuthenticated(true);
         localStorage.setItem("isAuthenticated", "true");
         localStorage.setItem("user", JSON.stringify(result.user));
+        console.log("Auth state updated - authenticated:", true);
         return true;
       }
       return false;
