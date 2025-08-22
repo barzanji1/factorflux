@@ -35,8 +35,16 @@ const navigation = [
 
 export default function Sidebar() {
   const [location, setLocation] = useLocation();
-  // Default user for navigation - authentication removed
-  const user = { role: "admin" };
+  // Default admin user with profile image - authentication removed
+  const user = {
+    id: "1",
+    firstName: "Admin",
+    lastName: "User",
+    email: "admin@tpf.com",
+    role: "admin",
+    profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
+    jobTitle: "System Administrator"
+  };
 
   return (
     <div className="w-64 bg-white dark:bg-gray-900 shadow-xl border-r border-gray-200 dark:border-gray-700 flex flex-col">
@@ -56,11 +64,17 @@ export default function Sidebar() {
       {/* User Info */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3">
-          <img 
-            src={user?.profileImageUrl || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`} 
-            alt="User Profile" 
-            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-          />
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600">
+            <img 
+              src={user?.profileImageUrl || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`} 
+              alt="User Profile" 
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback to initials avatar if image fails to load
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`;
+              }}
+            />
+          </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-gray-900 dark:text-white truncate">
               {user?.firstName} {user?.lastName}
