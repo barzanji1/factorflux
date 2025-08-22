@@ -45,7 +45,8 @@ export default function LoginPage() {
       
       if (success) {
         console.log("Login successful, redirecting to dashboard");
-        setLocation("/");
+        // Use window.location for hard refresh to ensure state is properly updated
+        window.location.href = "/";
       } else {
         console.log("Login failed - invalid credentials");
         setError("Invalid username or password. Please try again.");

@@ -27,35 +27,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
+      console.log("Checking authentication...");
       // Check localStorage first
       const authFlag = localStorage.getItem("isAuthenticated");
       const userData = localStorage.getItem("user");
+      
+      console.log("LocalStorage - isAuthenticated:", authFlag, "userData:", !!userData);
       
       if (authFlag === "true" && userData) {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
         setIsAuthenticated(true);
+        console.log("Setting authenticated state from localStorage");
         
-        // Verify with server
-        try {
-          const response = await fetch("/api/auth/verify", {
-            credentials: "include" // Important for session cookies
-          });
-          if (!response.ok) {
-            console.log("Server verification failed, clearing auth state");
-            // Server says not authenticated, clear localStorage
-            localStorage.removeItem("isAuthenticated");
-            localStorage.removeItem("user");
-            setUser(null);
-            setIsAuthenticated(false);
-          } else {
-            console.log("Server verification successful");
+        // Verify with server in background (don't block the UI)
+        setTimeout(async () => {
+          try {
+            const response = await fetch("/api/auth/verify", {
+              credentials: "include"
+            });
+            if (!response.ok) {
+              console.log("Server verification failed, clearing auth state");
+              localStorage.removeItem("isAuthenticated");
+              localStorage.removeItem("user");
+              setUser(null);
+              setIsAuthenticated(false);
+            } else {
+              console.log("Server verification successful");
+            }
+          } catch (error) {
+            console.log("Network error during verification:", error);
           }
-        } catch (error) {
-          console.log("Network error during verification:", error);
-          // Network error, assume still authenticated if localStorage says so
-        }
+        }, 100);
       } else {
+        console.log("No valid auth data in localStorage");
         setUser(null);
         setIsAuthenticated(false);
       }
