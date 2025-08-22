@@ -204,7 +204,13 @@ export default function Settings() {
   const updateSettings = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("PATCH", "/api/user/profile", data);
-      return response.json();
+      
+      // Check if response has content before parsing JSON
+      const text = await response.text();
+      if (text) {
+        return JSON.parse(text);
+      }
+      return { success: true };
     },
     onSuccess: () => {
       toast({
@@ -214,17 +220,7 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
     onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+      // Authentication system removed - simplified error handling
       toast({
         title: "Error",
         description: error.message || "Failed to update settings",
@@ -265,9 +261,7 @@ export default function Settings() {
     );
   }
 
-  if (!isAuthenticated || !user) {
-    return null;
-  }
+  // Authentication system removed - always show settings
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
