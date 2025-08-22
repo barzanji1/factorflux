@@ -40,8 +40,13 @@ interface SearchResults {
 }
 
 export default function TopNav({ title, subtitle }: TopNavProps) {
-  // Authentication system removed - using default user profile
-  const user = { firstName: 'Admin', lastName: 'User', role: 'admin', profileImageUrl: null };
+  // Authentication system removed - using default admin user with uploaded profile image
+  const user = { 
+    firstName: 'Admin', 
+    lastName: 'User', 
+    role: 'admin', 
+    profileImageUrl: '/uploads/c20bf48700fe065a95d9858e806bf4ce' 
+  };
   const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -399,11 +404,17 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center space-x-2 h-10">
-                <img 
-                  src={user?.profileImageUrl || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`} 
-                  alt="User Profile" 
-                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                />
+                <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600">
+                  <img 
+                    src={user?.profileImageUrl || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`} 
+                    alt="User Profile" 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to initials avatar if image fails to load
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`;
+                    }}
+                  />
+                </div>
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {user?.firstName} {user?.lastName}
