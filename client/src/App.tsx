@@ -30,7 +30,9 @@ function Router() {
   return (
     <Switch>
       {/* Public route */}
-      <Route path="/login" component={LoginPage} />
+      <Route path="/login">
+        <LoginPage />
+      </Route>
       
       {/* Protected routes */}
       <Route path="/">

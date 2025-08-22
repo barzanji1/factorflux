@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -21,6 +21,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
+  const { login } = useAuth();
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -38,19 +39,20 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await apiRequest("POST", "/api/auth/login", data);
+      console.log("Attempting login with:", data.username);
+      const success = await login(data.username, data.password);
+      console.log("Login result:", success);
       
-      if (response.ok) {
-        const result = await response.json();
-        localStorage.setItem("isAuthenticated", "true");
-        localStorage.setItem("user", JSON.stringify(result.user));
+      if (success) {
+        console.log("Login successful, redirecting to dashboard");
         setLocation("/");
       } else {
-        const errorData = await response.json();
-        setError(errorData.message || "Invalid credentials");
+        console.log("Login failed - invalid credentials");
+        setError("Invalid username or password. Please try again.");
       }
-    } catch (err) {
-      setError("Network error. Please try again.");
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("Login failed. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
     }
