@@ -108,24 +108,12 @@ const workDaysOptions = [
 
 export default function Settings() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  // Authentication removed - using mock user data
+  const user = { id: "1", firstName: "Admin", lastName: "User", email: "admin@tpf.com" };
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("personal");
 
-  // Redirect to home if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+  // Authentication system removed
 
   // Forms
   const personalForm = useForm<PersonalSettings>({

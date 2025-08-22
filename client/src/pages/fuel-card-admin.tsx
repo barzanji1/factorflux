@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import {
@@ -82,7 +81,6 @@ export default function FuelCardAdmin() {
   
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
@@ -93,11 +91,9 @@ export default function FuelCardAdmin() {
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, toast]);
 
 
 
-  const { data: applications, isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/fuel-card-applications"],
   });
 

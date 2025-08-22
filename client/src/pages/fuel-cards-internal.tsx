@@ -226,7 +226,7 @@ export default function FuelCardsInternal() {
     },
   });
 
-  const { data: applications, isLoading: applicationsLoading } = useQuery({
+  const { data: applications = [], isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/fuel-card-applications"],
   });
 
@@ -283,28 +283,7 @@ export default function FuelCardsInternal() {
     },
   });
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      window.location.href = "/api/login";
-      return;
-    }
-  }, [isAuthenticated, isLoading]);
-
-  if (isLoading || applicationsLoading) {
-    return (
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNav title="Fuel Cards - Internal" subtitle="Loading..." />
-          <main className="flex-1 overflow-auto p-6">
-            <div className="min-h-screen flex items-center justify-center">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
+  // Authentication removed
 
   const typedApplications = applications as FuelCardApplication[] || [];
   

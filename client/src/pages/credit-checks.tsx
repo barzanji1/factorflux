@@ -1,6 +1,4 @@
-// Authentication removed
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,23 +16,6 @@ import {
 
 export default function CreditChecks() {
   const { toast } = useToast();
-  
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
-
-
 
   // Mock data for credit checks
   const creditChecks = [

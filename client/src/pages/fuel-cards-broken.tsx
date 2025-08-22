@@ -5,7 +5,6 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import {
@@ -165,23 +164,19 @@ export default function FuelCards() {
     },
   });
 
-  const { data: applications, isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/fuel-card-applications"],
   });
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, toast]);
 
   // Type the applications data properly
   const typedApplications = applications as Array<{
@@ -192,7 +187,6 @@ export default function FuelCards() {
   }> | undefined;
 
   // Early returns after all hooks are called
-  if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>

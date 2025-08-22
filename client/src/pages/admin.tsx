@@ -39,7 +39,8 @@ import { User } from "@shared/schema";
 
 export default function Admin() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  // Authentication removed - using mock admin user
+  const user = { id: "1", role: "admin", firstName: "Admin", lastName: "User" };
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const [emailForm, setEmailForm] = useState({
     email: '',
@@ -47,20 +48,7 @@ export default function Admin() {
     message: ''
   });
 
-  // Redirect to home if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+  // Authentication system removed
 
   // Check if user is manager
   useEffect(() => {
@@ -212,7 +200,7 @@ export default function Admin() {
 
 
 
-  if (isLoading || isLoadingUsers) {
+  if (isLoadingUsers) {
     return (
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
         <Sidebar />

@@ -20,19 +20,7 @@ export default function Activities() {
   const [selectedEntityId, setSelectedEntityId] = useState<number | undefined>();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+  // Authentication system removed
 
   const { data: activities = [], isLoading: activitiesLoading } = useQuery<ActivityType[]>({
     queryKey: ["/api/activities"],
