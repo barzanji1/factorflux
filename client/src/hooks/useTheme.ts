@@ -7,20 +7,31 @@ export function useTheme() {
   // Authentication system removed
   const [theme, setTheme] = useState<Theme>("system");
 
-  // Apply theme to document - Force light theme always
+  // Apply theme to document
   const applyTheme = (newTheme: Theme) => {
     const root = document.documentElement;
-    // Always remove dark class to force light theme
-    root.classList.remove("dark");
+    
+    if (newTheme === "dark") {
+      root.classList.add("dark");
+    } else if (newTheme === "light") {
+      root.classList.remove("dark");
+    } else if (newTheme === "system") {
+      // Follow system preference
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (prefersDark) {
+        root.classList.add("dark");
+      } else {
+        root.classList.remove("dark");
+      }
+    }
   };
 
-  // Initialize theme from user settings or localStorage - Force light theme
+  // Initialize theme from localStorage or default to system
   useEffect(() => {
-    const initialTheme = "light"; // Force light theme always
-    
-    setTheme(initialTheme);
-    applyTheme(initialTheme);
-  }, []); // No user dependency - authentication removed
+    const savedTheme = localStorage.getItem("theme") as Theme || "system";
+    setTheme(savedTheme);
+    applyTheme(savedTheme);
+  }, []);
 
   // Listen for system theme changes when using system theme
   useEffect(() => {
@@ -28,7 +39,7 @@ export function useTheme() {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       const handleChange = () => {
         if (theme === "system") {
-          applyTheme("system");
+          applyTheme(theme);
         }
       };
 

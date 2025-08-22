@@ -159,11 +159,16 @@ export default function Settings() {
   const appearanceForm = useForm<AppearanceSettings>({
     resolver: zodResolver(appearanceSettingsSchema),
     defaultValues: {
-      theme: "system",
+      theme: theme || "system",
       dateFormat: "MM/dd/yyyy",
       timeFormat: "12h",
     },
   });
+
+  // Update form when theme changes
+  useEffect(() => {
+    appearanceForm.setValue("theme", theme);
+  }, [theme, appearanceForm]);
 
   // Update forms when user data loads
   useEffect(() => {
