@@ -11,7 +11,7 @@ export function useAuth() {
       jobTitle: "System Administrator",
       department: "IT",
       role: "admin",
-      profileImageUrl: "/uploads/admin-profile.png",
+      profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
       bio: null,
       location: null,
       timezone: "America/New_York",

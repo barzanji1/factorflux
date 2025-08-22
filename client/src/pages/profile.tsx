@@ -64,7 +64,7 @@ export default function Profile() {
     jobTitle: "System Administrator",
     department: "IT",
     role: "admin",
-    profileImageUrl: "/uploads/admin-profile.png",
+    profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
     bio: null,
     location: null,
     timezone: "America/New_York",
@@ -139,13 +139,14 @@ export default function Profile() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Profile Image Updated",
         description: "Your profile image has been updated successfully.",
       });
-      // Authentication system removed - simplified refresh
       setIsUploadingImage(false);
+      // Refresh the page to show the new image
+      window.location.reload();
     },
     onError: (error: Error) => {
       toast({
@@ -191,17 +192,7 @@ export default function Profile() {
     fileInputRef.current?.click();
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || !user) {
-    return null;
-  }
+  // Authentication system removed - always show profile
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
