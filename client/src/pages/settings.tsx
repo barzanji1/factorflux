@@ -155,7 +155,9 @@ export default function Settings() {
 
   // Update form when theme changes
   useEffect(() => {
-    appearanceForm.setValue("theme", theme);
+    if (theme) {
+      appearanceForm.setValue("theme", theme);
+    }
   }, [theme, appearanceForm]);
 
   // Update forms when user data loads
@@ -634,7 +636,7 @@ export default function Settings() {
                                   // Apply theme immediately for instant visual feedback
                                   setTheme(value as "light" | "dark" | "system");
                                 }} 
-                                value={field.value}
+                                value={field.value || theme}
                               >
                                 <FormControl>
                                   <SelectTrigger>
