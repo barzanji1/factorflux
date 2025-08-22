@@ -90,8 +90,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, {});
 
       await storage.updateUserProfile(userId, filteredUpdates);
-      const updatedUser = await storage.getUser(userId);
-      res.json(updatedUser);
+      
+      // Return a simple success message instead of trying to fetch updated user
+      res.json({ 
+        message: "Profile updated successfully",
+        success: true 
+      });
     } catch (error) {
       console.error("Error updating user profile:", error);
       res.status(500).json({ message: "Failed to update profile" });

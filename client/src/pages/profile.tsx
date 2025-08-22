@@ -104,7 +104,13 @@ export default function Profile() {
   const updateProfile = useMutation({
     mutationFn: async (data: UpdateUserProfile) => {
       const response = await apiRequest("PATCH", "/api/user/profile", data);
-      return response.json();
+      
+      // Check if response has content before parsing JSON
+      const text = await response.text();
+      if (text) {
+        return JSON.parse(text);
+      }
+      return { success: true };
     },
     onSuccess: () => {
       toast({
