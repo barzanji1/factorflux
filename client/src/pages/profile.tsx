@@ -40,6 +40,7 @@ const departments = [
 ];
 
 const jobTitles = [
+  "System Administrator",
   "Account Manager",
   "Operations Manager", 
   "Finance Manager",
@@ -50,6 +51,9 @@ const jobTitles = [
   "Administrative Assistant",
   "Vice President",
   "Director",
+  "Chief Executive Officer",
+  "Chief Technology Officer",
+  "Chief Financial Officer",
   "Other"
 ];
 
@@ -380,7 +384,7 @@ export default function Profile() {
                           <Briefcase className="w-4 h-4" />
                           Job Title
                         </FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select your job title" />
@@ -408,7 +412,7 @@ export default function Profile() {
                           <Building className="w-4 h-4" />
                           Department
                         </FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select your department" />
