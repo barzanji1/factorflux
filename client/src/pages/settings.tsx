@@ -147,7 +147,7 @@ export default function Settings() {
   const appearanceForm = useForm<AppearanceSettings>({
     resolver: zodResolver(appearanceSettingsSchema),
     defaultValues: {
-      theme: theme || "system",
+      theme: theme || "light",
       dateFormat: "MM/dd/yyyy",
       timeFormat: "12h",
     },
@@ -155,7 +155,7 @@ export default function Settings() {
 
   // Update form when theme changes
   useEffect(() => {
-    if (theme) {
+    if (theme && (theme === "light" || theme === "dark")) {
       appearanceForm.setValue("theme", theme);
     }
   }, [theme, appearanceForm]);
@@ -183,7 +183,7 @@ export default function Settings() {
       });
 
       // Sync appearance form with database data but preserve localStorage theme
-      const savedTheme = localStorage.getItem("theme") as "light" | "dark" | "system" || (user as any)?.theme || "system";
+      const savedTheme = localStorage.getItem("theme") as "light" | "dark" || (user as any)?.theme || "light";
       appearanceForm.reset({
         theme: savedTheme,
         dateFormat: (user as any)?.dateFormat || "MM/dd/yyyy",
@@ -242,7 +242,7 @@ export default function Settings() {
   const onAppearanceSubmit = (data: AppearanceSettings) => {
     // Update theme immediately for visual feedback
     if (data.theme) {
-      setTheme(data.theme as "light" | "dark" | "system");
+      setTheme(data.theme as "light" | "dark");
     }
     updateSettings.mutate(data);
   };
@@ -639,7 +639,7 @@ export default function Settings() {
                                   console.log(`Theme selector changed to: ${value}`);
                                   field.onChange(value);
                                   // Apply theme immediately for instant visual feedback
-                                  setTheme(value as "light" | "dark" | "system");
+                                  setTheme(value as "light" | "dark");
                                   // Auto-save theme selection to database
                                   updateSettings.mutate({ theme: value });
                                 }} 
@@ -663,16 +663,11 @@ export default function Settings() {
                                       <span>Dark</span>
                                     </div>
                                   </SelectItem>
-                                  <SelectItem value="system">
-                                    <div className="flex items-center space-x-2">
-                                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-yellow-400 to-gray-800"></div>
-                                      <span>System</span>
-                                    </div>
-                                  </SelectItem>
+
                                 </SelectContent>
                               </Select>
                               <FormDescription>
-                                Choose your preferred theme or follow your system setting. Changes apply immediately.
+                                Choose your preferred theme. Changes apply immediately and are saved automatically.
                               </FormDescription>
                               <FormMessage />
                             </FormItem>

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 // Authentication system removed
 
-type Theme = "light" | "dark" | "system";
+type Theme = "light" | "dark";
 
 export function useTheme() {
   // Authentication system removed
-  const [theme, setTheme] = useState<Theme>("system");
+  const [theme, setTheme] = useState<Theme>("light");
 
   // Apply theme to document
   const applyTheme = (newTheme: Theme) => {
@@ -16,42 +16,22 @@ export function useTheme() {
     
     if (newTheme === "dark") {
       root.classList.add("dark");
-    } else if (newTheme === "light") {
-      // Light theme: dark class already removed above
-    } else if (newTheme === "system") {
-      // Follow system preference
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      if (prefersDark) {
-        root.classList.add("dark");
-      }
     }
+    // Light theme: dark class already removed above
     
     // Debug logging to verify theme application
     console.log(`Theme applied: ${newTheme}, Dark class present: ${root.classList.contains("dark")}`);
   };
 
-  // Initialize theme from localStorage or default to system
+  // Initialize theme from localStorage or default to light
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as Theme || "system";
+    const savedTheme = localStorage.getItem("theme") as Theme || "light";
     console.log(`Initializing theme from localStorage: ${savedTheme}`);
     setTheme(savedTheme);
     applyTheme(savedTheme);
   }, []);
 
-  // Listen for system theme changes when using system theme
-  useEffect(() => {
-    if (theme === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handleChange = () => {
-        if (theme === "system") {
-          applyTheme(theme);
-        }
-      };
-
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
-    }
-  }, [theme]);
+  // System theme functionality removed
 
   const updateTheme = (newTheme: Theme) => {
     console.log(`Updating theme to: ${newTheme}`);
