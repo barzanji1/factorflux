@@ -149,11 +149,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Middleware to check authentication for protected routes
   const requireAuth = (req: any, res: any, next: any) => {
+    console.log("RequireAuth middleware - session:", !!req.session, "user:", !!(req.session as any)?.user);
     const user = (req.session as any)?.user;
     if (!user) {
+      console.log("Authentication required - no user in session");
       return res.status(401).json({ message: "Authentication required" });
     }
     req.user = user;
+    console.log("Authentication successful - user ID:", user.id);
     next();
   };
   app.get('/api/auth/user', async (req: any, res) => {
@@ -938,9 +941,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Time tracking routes
-  app.get('/api/time-tracking/status', async (req: any, res) => {
+  app.get('/api/time-tracking/status', requireAuth, async (req: any, res) => {
     try {
-      const userId = "1"; // Default user ID - authentication removed
+      const userId = req.user.id;
       const currentEntry = await storage.getCurrentTimeEntry(userId);
       const todayEntries = await storage.getTodayTimeEntries(userId);
       
@@ -958,8 +961,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/time-tracking/clock-in', async (req: any, res) => {
+  app.post('/api/time-tracking/clock-in', requireAuth, async (req: any, res) => {
     try {
+      console.log("Clock-in request - user:", req.user);
       const userId = req.user.id;
       const { notes } = req.body;
       
@@ -971,7 +975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/time-tracking/clock-out', async (req: any, res) => {
+  app.post('/api/time-tracking/clock-out', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const { notes } = req.body;
@@ -984,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/time-tracking/entries', async (req: any, res) => {
+  app.get('/api/time-tracking/entries', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const { period } = req.query;
