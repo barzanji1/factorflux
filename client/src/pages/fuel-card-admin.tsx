@@ -79,7 +79,7 @@ export default function FuelCardAdmin() {
   const [reviewNotes, setReviewNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading } = useAuth();
+  
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -95,17 +95,7 @@ export default function FuelCardAdmin() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
-  if (!isAuthenticated) {
-    return null;
-  }
 
   const { data: applications, isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/fuel-card-applications"],

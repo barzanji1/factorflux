@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/useAuth";
+// Authentication removed
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 import Sidebar from "@/components/layout/sidebar";
@@ -18,7 +18,7 @@ import {
 
 export default function CreditChecks() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -34,17 +34,7 @@ export default function CreditChecks() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
-  if (!isAuthenticated) {
-    return null;
-  }
 
   // Mock data for credit checks
   const creditChecks = [

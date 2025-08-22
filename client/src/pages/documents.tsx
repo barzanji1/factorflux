@@ -26,36 +26,19 @@ import DocumentUpload from "@/components/dashboard/document-upload";
 
 export default function Documents() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  // Authentication system removed
   const [activeTab, setActiveTab] = useState("rate_confirmations");
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
 
   const { data: documents = [], isLoading: documentsLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
-    enabled: isAuthenticated,
   });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
-    enabled: isAuthenticated,
   });
 
   const { data: loads = [] } = useQuery<Load[]>({
     queryKey: ["/api/loads"],
-    enabled: isAuthenticated,
   });
 
   // Filter documents by type
@@ -178,17 +161,7 @@ export default function Documents() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
+  // Authentication system removed - always show documents page
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">

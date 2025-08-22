@@ -15,28 +15,13 @@ import type { Invoice } from "@shared/schema";
 
 export default function Invoices() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  // Authentication system removed
   const [searchQuery, setSearchQuery] = useState("");
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
-
   const { data: invoices, isLoading: invoicesLoading } = useQuery({
     queryKey: ["/api/invoices"],
-    enabled: isAuthenticated,
   });
 
   const { data: searchResults } = useQuery({
@@ -72,17 +57,7 @@ export default function Invoices() {
     setIsInvoiceModalOpen(true);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
+  // Authentication system removed - always show invoices page
 
   return (
     <div className="flex h-screen bg-background">

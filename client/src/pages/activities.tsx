@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
+// Authentication removed
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -14,7 +14,7 @@ import type { Activity as ActivityType } from "@shared/schema";
 
 export default function Activities() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  
   const [showDocuments, setShowDocuments] = useState(false);
   const [selectedEntityType, setSelectedEntityType] = useState<string>("");
   const [selectedEntityId, setSelectedEntityId] = useState<number | undefined>();
@@ -36,7 +36,6 @@ export default function Activities() {
 
   const { data: activities = [], isLoading: activitiesLoading } = useQuery<ActivityType[]>({
     queryKey: ["/api/activities"],
-    enabled: isAuthenticated,
   });
 
   const getActivityIcon = (type: string) => {
@@ -136,17 +135,7 @@ export default function Activities() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
-  if (!isAuthenticated) {
-    return null;
-  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">

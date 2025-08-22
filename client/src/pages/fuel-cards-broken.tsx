@@ -141,7 +141,7 @@ const cardTypes = [
 
 export default function FuelCards() {
   // All hooks must be called in the same order every time
-  const { isAuthenticated, isLoading } = useAuth();
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
   

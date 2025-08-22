@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+// Authentication removed
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -210,13 +210,7 @@ export default function Admin() {
     sendInstallerLinks.mutate(emailForm);
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
 
-  if (!isAuthenticated) {
-    return null;
-  }
 
   if (isLoading || isLoadingUsers) {
     return (

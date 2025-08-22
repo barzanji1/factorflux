@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+// Authentication removed
 import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -195,7 +195,7 @@ const cardTypes = [
 ];
 
 export default function FuelCardsInternal() {
-  const { isAuthenticated, isLoading } = useAuth();
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();

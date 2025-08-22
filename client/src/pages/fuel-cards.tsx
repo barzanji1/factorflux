@@ -135,7 +135,7 @@ const cardTypes = [
 
 export default function FuelCards() {
   // All hooks at the top - no conditional hook calls
-  const { isAuthenticated, isLoading } = useAuth();
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -252,9 +252,6 @@ export default function FuelCards() {
   }
 
   // Not authenticated
-  if (!isAuthenticated) {
-    return null;
-  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">

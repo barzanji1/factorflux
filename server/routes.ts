@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupLocalAuth, isAuthenticatedLocal } from "./localAuth";
+import { setupLocalAuth } from "./localAuth";
 import { 
   insertClientSchema, 
   insertLoadSchema, 
@@ -164,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Log the activity
       await storage.createActivity({
-        userId: req.user.id,
+        userId: "1", // Authentication removed - use default user
         type: "role_changed",
         entityType: "user", 
         entityId: parseInt(userId),
@@ -214,13 +214,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Clear all activities endpoint
-  app.delete('/api/activities', isAuthenticatedLocal, async (req, res) => {
+  app.delete('/api/activities', async (req, res) => {
     try {
       await storage.clearActivities();
       
       // Log the activity reset
       await storage.createActivity({
-        userId: (req.user as any).claims.sub,
+        userId: "1", // Authentication removed - use default user
         type: "activities_reset",
         entityType: "system",
         entityId: 0,
@@ -245,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/clients/search', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/clients/search', async (req, res) => {
     try {
       const { q } = req.query;
       if (!q || typeof q !== 'string') {
@@ -259,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/clients/:id', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/clients/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const client = await storage.getClient(id);
@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/clients', isAuthenticatedLocal, async (req: any, res) => {
+  app.post('/api/clients', async (req: any, res) => {
     try {
       const clientData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(clientData);
@@ -297,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/clients/:id', isAuthenticatedLocal, async (req: any, res) => {
+  app.put('/api/clients/:id', async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const clientData = insertClientSchema.partial().parse(req.body);
@@ -333,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/loads/:id', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/loads/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const load = await storage.getLoad(id);
@@ -347,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/loads', isAuthenticatedLocal, async (req: any, res) => {
+  app.post('/api/loads', async (req: any, res) => {
     try {
       const loadData = insertLoadSchema.parse(req.body);
       const load = await storage.createLoad(loadData);
@@ -393,7 +393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/invoices/search', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/invoices/search', async (req, res) => {
     try {
       const { q } = req.query;
       if (!q || typeof q !== 'string') {
@@ -408,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Global search endpoint
-  app.get('/api/search', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/search', async (req, res) => {
     try {
       const { q } = req.query;
       if (!q || typeof q !== 'string') {
@@ -433,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fuel card application routes
-  app.get('/api/fuel-card-applications', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/fuel-card-applications', async (req, res) => {
     try {
       const applications = await storage.getFuelCardApplications();
       res.json(applications);
@@ -443,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/fuel-card-applications', isAuthenticatedLocal, async (req, res) => {
+  app.post('/api/fuel-card-applications', async (req, res) => {
     try {
       const userId = (req as any).user?.claims?.sub;
       if (!userId) {
@@ -469,7 +469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/fuel-card-applications/:id', isAuthenticatedLocal, async (req, res) => {
+  app.patch('/api/fuel-card-applications/:id', async (req, res) => {
     try {
       const userId = (req as any).user?.claims?.sub;
       if (!userId) {
@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/invoices/:id', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/invoices/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const invoice = await storage.getInvoice(id);
@@ -518,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/invoices', isAuthenticatedLocal, async (req: any, res) => {
+  app.post('/api/invoices', async (req: any, res) => {
     try {
       const invoiceData = insertInvoiceSchema.parse(req.body);
       const invoice = await storage.createInvoice({
@@ -546,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/invoices/:id', isAuthenticatedLocal, async (req: any, res) => {
+  app.put('/api/invoices/:id', async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const user = req.user;
@@ -580,7 +580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document routes
-  app.get('/api/documents', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/documents', async (req, res) => {
     try {
       const { load, invoice, entityType, entityId } = req.query;
       let documents;
@@ -608,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single document by ID
-  app.get('/api/documents/:id', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/documents/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
@@ -631,7 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw new Error('PDF conversion temporarily unavailable');
   }
 
-  app.post('/api/documents/upload', isAuthenticatedLocal, upload.single('file'), async (req: any, res) => {
+  app.post('/api/documents/upload', upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -688,7 +688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/documents/:id', isAuthenticatedLocal, async (req: any, res) => {
+  app.delete('/api/documents/:id', async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document download/view routes
-  app.get('/api/documents/:id/download', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/documents/:id/download', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
@@ -775,7 +775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/documents/:id/view', isAuthenticatedLocal, async (req, res) => {
+  app.get('/api/documents/:id/view', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
@@ -807,7 +807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manager-only routes
-  app.put('/api/invoices/:id/approve', isAuthenticatedLocal, async (req: any, res) => {
+  app.put('/api/invoices/:id/approve', async (req: any, res) => {
     try {
       const user = req.user;
       if (user?.role !== 'manager' && user?.role !== 'admin') {
@@ -858,7 +858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/time-tracking/clock-in', isAuthenticatedLocal, async (req: any, res) => {
+  app.post('/api/time-tracking/clock-in', async (req: any, res) => {
     try {
       const userId = req.user.id;
       const { notes } = req.body;
@@ -871,7 +871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/time-tracking/clock-out', isAuthenticatedLocal, async (req: any, res) => {
+  app.post('/api/time-tracking/clock-out', async (req: any, res) => {
     try {
       const userId = req.user.id;
       const { notes } = req.body;
@@ -884,7 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/time-tracking/entries', isAuthenticatedLocal, async (req: any, res) => {
+  app.get('/api/time-tracking/entries', async (req: any, res) => {
     try {
       const userId = req.user.id;
       const { period } = req.query;
@@ -1070,7 +1070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Email installer links route - send installer download links via email
-  app.post('/api/email/installer-links', isAuthenticatedLocal, async (req: any, res) => {
+  app.post('/api/email/installer-links', async (req: any, res) => {
     try {
       const user = req.user;
       if (user?.role !== 'manager' && user?.role !== 'admin') {
@@ -1314,7 +1314,7 @@ Trucking Pros Financial Team
   });
 
   // Follow-up routes
-  app.get('/api/follow-ups', isAuthenticatedLocal, async (req: any, res) => {
+  app.get('/api/follow-ups', async (req: any, res) => {
     try {
       const followUps = await storage.getAllFollowUps();
       res.json(followUps);
@@ -1324,7 +1324,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post('/api/follow-ups', isAuthenticatedLocal, async (req: any, res) => {
+  app.post('/api/follow-ups', async (req: any, res) => {
     try {
       const data = insertFollowUpSchema.parse(req.body);
       const followUp = await storage.createFollowUp(data);
@@ -1345,7 +1345,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch('/api/follow-ups/:id', isAuthenticatedLocal, async (req: any, res) => {
+  app.patch('/api/follow-ups/:id', async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
@@ -1368,7 +1368,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete('/api/follow-ups/:id', isAuthenticatedLocal, async (req: any, res) => {
+  app.delete('/api/follow-ups/:id', async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteFollowUp(id);
