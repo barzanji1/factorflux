@@ -74,7 +74,7 @@ export default function LoginPage() {
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
             <CardDescription>
-              Enter your TPF Pulse OS credentials to access the system
+              Enter your credentials to access the system
             </CardDescription>
           </CardHeader>
           <CardContent>
