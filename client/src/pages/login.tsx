@@ -74,7 +74,7 @@ export default function LoginPage() {
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
             <CardDescription>
-              Enter your freight factoring credentials to access the system
+              Enter your TPF Pulse OS credentials to access the system
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -164,7 +164,7 @@ export default function LoginPage() {
             </Form>
 
             <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
-              <p>Freight Factoring System Access Only</p>
+              <p>TPF Pulse OS System Access Only</p>
               <p className="mt-1 text-xs">Contact IT support for credential issues</p>
             </div>
           </CardContent>
