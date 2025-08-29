@@ -164,7 +164,7 @@ export default function LoginPage() {
             </Form>
 
             <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
-              <p>TPF Pulse OS 1.0</p>
+              <p>TPF Pulse OS 1.4.2</p>
               <p className="mt-1 text-xs">Contact IT support for credential issues</p>
             </div>
           </CardContent>
