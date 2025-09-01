@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-// Authentication removed
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/hooks/useTheme";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import { z } from "zod";
 import {
   Card,
@@ -108,12 +106,14 @@ const workDaysOptions = [
 
 export default function Settings() {
   const { toast } = useToast();
-  // Authentication removed - using mock user data
-  const user = { id: "1", firstName: "Admin", lastName: "User", email: "admin@tpf.com" };
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("personal");
 
-  // Authentication system removed
+  // Fetch current user data
+  const { data: user, isLoading: userLoading, error: userError } = useQuery({
+    queryKey: ["/api/auth/user"],
+    retry: false,
+  });
 
   // Forms
   const personalForm = useForm<PersonalSettings>({
@@ -214,7 +214,6 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
     onError: (error: Error) => {
-      // Authentication system removed - simplified error handling
       toast({
         title: "Error",
         description: error.message || "Failed to update settings",
@@ -248,7 +247,42 @@ export default function Settings() {
   };
 
 
-  // Authentication system removed - always show settings
+  // Handle loading and error states
+  if (userLoading) {
+    return (
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNav 
+            title="Settings" 
+            subtitle="Customize your experience and preferences"
+          />
+          <main className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (userError || !user) {
+    return (
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNav 
+            title="Settings" 
+            subtitle="Customize your experience and preferences"
+          />
+          <main className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-red-600">Failed to load user data. Please try logging in again.</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">

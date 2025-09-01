@@ -161,11 +161,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("Authentication successful - user ID:", user.id);
     next();
   };
-  app.get('/api/auth/user', async (req: any, res) => {
+  app.get('/api/auth/user', requireAuth, async (req: any, res) => {
     try {
-      // Authentication removed - return default admin user
-      const user = { id: "1", firstName: "Admin", lastName: "User", role: "admin", email: "admin@tpf.com" };
-      res.json(user);
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Don't send password in response
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -173,9 +180,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Profile routes
-  app.patch('/api/user/profile', async (req: any, res) => {
+  app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
     try {
-      const userId = "1"; // Authentication removed - use default user ID
+      const userId = req.user.id; // Use authenticated user ID
 
       const updates = req.body;
       
