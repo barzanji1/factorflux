@@ -215,7 +215,8 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     "/admin",
     "/activities",
     "/follow-up",
-    "/collections"
+    "/collections",
+    "/vault"
   ];
   
   const showHomeButton = pagesWithHomeButton.some(page => location.startsWith(page));

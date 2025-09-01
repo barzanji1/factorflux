@@ -27,6 +27,7 @@ const navigation = [
   { name: "Documents", href: "/documents", icon: FolderOpen },
   { name: "Follow Ups", href: "/follow-up", icon: Clock },
   { name: "Collections", href: "/collections", icon: DollarSign },
+  { name: "Vault", href: "/vault", icon: Shield },
   { name: "Fuel Cards", href: "/fuel-cards-internal", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },

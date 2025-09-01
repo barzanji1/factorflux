@@ -10,6 +10,7 @@ import {
   notifications,
   followUps,
   collections,
+  clientVault,
   type User,
   type UpsertUser,
   type TimeEntry,
@@ -32,6 +33,8 @@ import {
   type InsertFollowUp,
   type Collection,
   type InsertCollection,
+  type ClientVault,
+  type InsertClientVault,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
@@ -140,6 +143,14 @@ export interface IStorage {
     totalOwed: string;
     pendingCollections: number;
   }[]>;
+  
+  // Client Vault operations
+  getAllVaultEntries(clientId: number): Promise<ClientVault[]>;
+  getVaultEntry(id: number): Promise<ClientVault | undefined>;
+  createVaultEntry(entry: InsertClientVault): Promise<ClientVault>;
+  updateVaultEntry(id: number, updates: Partial<InsertClientVault>): Promise<ClientVault>;
+  deleteVaultEntry(id: number): Promise<void>;
+  recordVaultAccess(id: number, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -903,6 +914,131 @@ export class DatabaseStorage implements IStorage {
         status,
       };
     });
+  }
+
+  // Client Vault operations
+  async getAllVaultEntries(clientId: number): Promise<ClientVault[]> {
+    return await db
+      .select({
+        id: clientVault.id,
+        clientId: clientVault.clientId,
+        dataType: clientVault.dataType,
+        label: clientVault.label,
+        encryptedData: clientVault.encryptedData,
+        notes: clientVault.notes,
+        isActive: clientVault.isActive,
+        lastAccessedAt: clientVault.lastAccessedAt,
+        lastAccessedBy: clientVault.lastAccessedBy,
+        createdAt: clientVault.createdAt,
+        updatedAt: clientVault.updatedAt,
+        createdBy: clientVault.createdBy,
+        client: {
+          id: clients.id,
+          name: clients.name,
+        },
+        createdByUser: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        },
+        lastAccessedByUser: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        },
+      })
+      .from(clientVault)
+      .leftJoin(clients, eq(clientVault.clientId, clients.id))
+      .leftJoin(users, eq(clientVault.createdBy, users.id))
+      .leftJoin(users, eq(clientVault.lastAccessedBy, users.id))
+      .where(and(eq(clientVault.clientId, clientId), eq(clientVault.isActive, true)))
+      .orderBy(desc(clientVault.createdAt));
+  }
+
+  async getVaultEntry(id: number): Promise<ClientVault | undefined> {
+    const [entry] = await db
+      .select({
+        id: clientVault.id,
+        clientId: clientVault.clientId,
+        dataType: clientVault.dataType,
+        label: clientVault.label,
+        encryptedData: clientVault.encryptedData,
+        notes: clientVault.notes,
+        isActive: clientVault.isActive,
+        lastAccessedAt: clientVault.lastAccessedAt,
+        lastAccessedBy: clientVault.lastAccessedBy,
+        createdAt: clientVault.createdAt,
+        updatedAt: clientVault.updatedAt,
+        createdBy: clientVault.createdBy,
+        client: {
+          id: clients.id,
+          name: clients.name,
+        },
+        createdByUser: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        },
+      })
+      .from(clientVault)
+      .leftJoin(clients, eq(clientVault.clientId, clients.id))
+      .leftJoin(users, eq(clientVault.createdBy, users.id))
+      .where(eq(clientVault.id, id));
+    return entry;
+  }
+
+  async createVaultEntry(entry: InsertClientVault): Promise<ClientVault> {
+    const [newEntry] = await db.insert(clientVault).values(entry).returning();
+    
+    // Log activity
+    await this.createActivity({
+      userId: entry.createdBy,
+      type: 'vault_created',
+      description: `Created vault entry: ${entry.label}`,
+      entityType: 'vault',
+      entityId: newEntry.id,
+    });
+    
+    return newEntry;
+  }
+
+  async updateVaultEntry(id: number, updates: Partial<InsertClientVault>): Promise<ClientVault> {
+    const [updatedEntry] = await db
+      .update(clientVault)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(clientVault.id, id))
+      .returning();
+      
+    // Log activity if the entry was modified significantly
+    if (updates.encryptedData || updates.label) {
+      await this.createActivity({
+        userId: updates.createdBy || 'system',
+        type: 'vault_updated',
+        description: `Updated vault entry: ${updatedEntry.label}`,
+        entityType: 'vault',
+        entityId: id,
+      });
+    }
+    
+    return updatedEntry;
+  }
+
+  async deleteVaultEntry(id: number): Promise<void> {
+    // Soft delete by setting isActive to false
+    await db
+      .update(clientVault)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(clientVault.id, id));
+  }
+
+  async recordVaultAccess(id: number, userId: string): Promise<void> {
+    await db
+      .update(clientVault)
+      .set({ 
+        lastAccessedAt: new Date(),
+        lastAccessedBy: userId,
+      })
+      .where(eq(clientVault.id, id));
   }
 }
 

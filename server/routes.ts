@@ -9,6 +9,7 @@ import {
   insertDocumentSchema,
   insertFollowUpSchema,
   insertCollectionSchema,
+  insertClientVaultSchema,
   users,
   users as userTable
 } from "@shared/schema";
@@ -1500,6 +1501,104 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deleting collection:", error);
       res.status(500).json({ message: "Failed to delete collection" });
+    }
+  });
+
+  // Client Vault routes - Secure storage for confidential information
+  app.get('/api/vault/:clientId', requireAuth, async (req: any, res) => {
+    try {
+      const clientId = parseInt(req.params.clientId);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "Invalid client ID" });
+      }
+      
+      const vaultEntries = await storage.getAllVaultEntries(clientId);
+      res.json(vaultEntries);
+    } catch (error) {
+      console.error("Error fetching vault entries:", error);
+      res.status(500).json({ message: "Failed to fetch vault entries" });
+    }
+  });
+
+  app.get('/api/vault/entry/:id', requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid vault entry ID" });
+      }
+      
+      const entry = await storage.getVaultEntry(id);
+      if (!entry) {
+        return res.status(404).json({ message: "Vault entry not found" });
+      }
+      
+      // Record access for audit trail
+      await storage.recordVaultAccess(id, req.user.id);
+      
+      res.json(entry);
+    } catch (error) {
+      console.error("Error fetching vault entry:", error);
+      res.status(500).json({ message: "Failed to fetch vault entry" });
+    }
+  });
+
+  app.post('/api/vault', requireAuth, async (req: any, res) => {
+    try {
+      const data = insertClientVaultSchema.parse({
+        ...req.body,
+        createdBy: req.user.id
+      });
+      
+      const entry = await storage.createVaultEntry(data);
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error creating vault entry:", error);
+      res.status(500).json({ message: "Failed to create vault entry" });
+    }
+  });
+
+  app.patch('/api/vault/:id', requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid vault entry ID" });
+      }
+      
+      const updates = {
+        ...req.body,
+        createdBy: req.user.id // For audit trail in update
+      };
+      
+      const entry = await storage.updateVaultEntry(id, updates);
+      res.json(entry);
+    } catch (error) {
+      console.error("Error updating vault entry:", error);
+      res.status(500).json({ message: "Failed to update vault entry" });
+    }
+  });
+
+  app.delete('/api/vault/:id', requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid vault entry ID" });
+      }
+      
+      await storage.deleteVaultEntry(id);
+      
+      // Log activity for security audit
+      await storage.createActivity({
+        userId: req.user.id,
+        type: 'vault_deleted',
+        description: 'Deleted confidential vault entry',
+        entityType: 'vault',
+        entityId: id,
+      });
+
+      res.json({ message: "Vault entry deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting vault entry:", error);
+      res.status(500).json({ message: "Failed to delete vault entry" });
     }
   });
 

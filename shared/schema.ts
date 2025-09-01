@@ -201,6 +201,24 @@ export const collections = pgTable("collections", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Client Vault - Secure storage for confidential information
+export const clientVault = pgTable("client_vault", {
+  id: integer("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  dataType: varchar("data_type", { 
+    enum: ["ssn", "bank_account", "password", "driver_license", "passport", "tax_documents", "insurance", "other"] 
+  }).notNull(),
+  label: varchar("label").notNull(), // User-friendly label like "Primary Bank Account"
+  encryptedData: text("encrypted_data").notNull(), // AES encrypted data
+  notes: text("notes"), // Optional notes (non-encrypted)
+  isActive: boolean("is_active").default(true).notNull(),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  lastAccessedBy: varchar("last_accessed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+});
+
 // Follow-ups table
 export const followUps = pgTable("follow_ups", {
   id: integer("id").primaryKey(),
@@ -276,6 +294,12 @@ export const collectionsRelations = relations(collections, ({ one }) => ({
   assignedToUser: one(users, { fields: [collections.assignedTo], references: [users.id] }),
 }));
 
+export const clientVaultRelations = relations(clientVault, ({ one }) => ({
+  client: one(clients, { fields: [clientVault.clientId], references: [clients.id] }),
+  createdByUser: one(users, { fields: [clientVault.createdBy], references: [users.id] }),
+  lastAccessedByUser: one(users, { fields: [clientVault.lastAccessedBy], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
@@ -315,6 +339,14 @@ export const insertCollectionSchema = createInsertSchema(collections).omit({
   updatedAt: true
 });
 
+export const insertClientVaultSchema = createInsertSchema(clientVault).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastAccessedAt: true,
+  lastAccessedBy: true
+});
+
 // Types
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = typeof timeEntries.$inferInsert;
@@ -328,6 +360,9 @@ export type InsertFollowUp = z.infer<typeof insertFollowUpSchema>;
 
 export type Collection = typeof collections.$inferSelect;
 export type InsertCollection = z.infer<typeof insertCollectionSchema>;
+
+export type ClientVault = typeof clientVault.$inferSelect;
+export type InsertClientVault = z.infer<typeof insertClientVaultSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
