@@ -20,11 +20,11 @@ export default function Invoices() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
-  const { data: invoices, isLoading: invoicesLoading } = useQuery({
+  const { data: invoices, isLoading: invoicesLoading } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
   });
 
-  const { data: searchResults } = useQuery({
+  const { data: searchResults } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices/search", { q: searchQuery }],
     enabled: searchQuery.length > 0,
   });

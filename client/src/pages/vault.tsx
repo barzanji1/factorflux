@@ -90,7 +90,7 @@ export default function VaultPage() {
   const queryClient = useQueryClient();
 
   // Fetch clients for dropdown
-  const { data: clients = [] } = useQuery({
+  const { data: clients = [] } = useQuery<Array<{id: number, name: string}>>({
     queryKey: ["/api/clients"],
   });
 
@@ -138,7 +138,7 @@ export default function VaultPage() {
   // Update vault entry mutation
   const updateVaultMutation = useMutation({
     mutationFn: async (data: { id: number; updates: Partial<VaultFormData> }) => {
-      const updates = { ...data.updates };
+      const updates: any = { ...data.updates };
       if (updates.data) {
         updates.encryptedData = encryptData(updates.data);
         delete updates.data;
