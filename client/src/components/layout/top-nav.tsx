@@ -214,7 +214,8 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     "/fuel-card-admin", 
     "/admin",
     "/activities",
-    "/follow-up"
+    "/follow-up",
+    "/collections"
   ];
   
   const showHomeButton = pagesWithHomeButton.some(page => location.startsWith(page));

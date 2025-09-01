@@ -9,6 +9,7 @@ import {
   timeEntries,
   notifications,
   followUps,
+  collections,
   type User,
   type UpsertUser,
   type TimeEntry,
@@ -29,6 +30,8 @@ import {
   type InsertNotification,
   type FollowUp,
   type InsertFollowUp,
+  type Collection,
+  type InsertCollection,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
@@ -120,6 +123,23 @@ export interface IStorage {
   createFollowUp(followUp: InsertFollowUp): Promise<FollowUp>;
   updateFollowUp(id: number, updates: Partial<InsertFollowUp>): Promise<FollowUp>;
   deleteFollowUp(id: number): Promise<void>;
+  
+  // Collections operations
+  getAllCollections(): Promise<Collection[]>;
+  getCollection(id: number): Promise<Collection | undefined>;
+  getCollectionsByClient(clientId: number): Promise<Collection[]>;
+  createCollection(collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: number, updates: Partial<InsertCollection>): Promise<Collection>;
+  deleteCollection(id: number): Promise<void>;
+  getClientPerformanceData(): Promise<{
+    clientId: number;
+    name: string;
+    lastLoadDate: Date | null;
+    daysSinceLastLoad: number;
+    status: 'active' | 'warning' | 'inactive';
+    totalOwed: string;
+    pendingCollections: number;
+  }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -720,6 +740,169 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFollowUp(id: number): Promise<void> {
     await db.delete(followUps).where(eq(followUps.id, id));
+  }
+
+  // Collections operations
+  async getAllCollections(): Promise<Collection[]> {
+    return await db
+      .select({
+        id: collections.id,
+        clientId: collections.clientId,
+        amount: collections.amount,
+        description: collections.description,
+        status: collections.status,
+        priority: collections.priority,
+        dueDate: collections.dueDate,
+        lastContactDate: collections.lastContactDate,
+        notes: collections.notes,
+        assignedTo: collections.assignedTo,
+        createdAt: collections.createdAt,
+        updatedAt: collections.updatedAt,
+        client: {
+          id: clients.id,
+          name: clients.name,
+          email: clients.email,
+          status: clients.status,
+        },
+        assignedUser: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        },
+      })
+      .from(collections)
+      .leftJoin(clients, eq(collections.clientId, clients.id))
+      .leftJoin(users, eq(collections.assignedTo, users.id))
+      .orderBy(desc(collections.createdAt));
+  }
+
+  async getCollection(id: number): Promise<Collection | undefined> {
+    const [collection] = await db
+      .select({
+        id: collections.id,
+        clientId: collections.clientId,
+        amount: collections.amount,
+        description: collections.description,
+        status: collections.status,
+        priority: collections.priority,
+        dueDate: collections.dueDate,
+        lastContactDate: collections.lastContactDate,
+        notes: collections.notes,
+        assignedTo: collections.assignedTo,
+        createdAt: collections.createdAt,
+        updatedAt: collections.updatedAt,
+        client: {
+          id: clients.id,
+          name: clients.name,
+          email: clients.email,
+          status: clients.status,
+        },
+        assignedUser: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        },
+      })
+      .from(collections)
+      .leftJoin(clients, eq(collections.clientId, clients.id))
+      .leftJoin(users, eq(collections.assignedTo, users.id))
+      .where(eq(collections.id, id));
+    return collection;
+  }
+
+  async getCollectionsByClient(clientId: number): Promise<Collection[]> {
+    return await db
+      .select()
+      .from(collections)
+      .where(eq(collections.clientId, clientId))
+      .orderBy(desc(collections.createdAt));
+  }
+
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const [newCollection] = await db.insert(collections).values(collection).returning();
+    
+    // Log activity
+    await this.createActivity({
+      userId: collection.assignedTo || 'system',
+      type: 'collection_created',
+      description: `New collection created for ${collection.amount} - ${collection.description}`,
+      entityType: 'collection',
+      entityId: newCollection.id,
+    });
+    
+    return newCollection;
+  }
+
+  async updateCollection(id: number, updates: Partial<InsertCollection>): Promise<Collection> {
+    const [updatedCollection] = await db
+      .update(collections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(collections.id, id))
+      .returning();
+    
+    // Log activity for status changes
+    if (updates.status) {
+      await this.createActivity({
+        userId: updates.assignedTo || 'system',
+        type: 'collection_updated',
+        description: `Collection status updated to ${updates.status}`,
+        entityType: 'collection',
+        entityId: id,
+      });
+    }
+    
+    return updatedCollection;
+  }
+
+  async deleteCollection(id: number): Promise<void> {
+    await db.delete(collections).where(eq(collections.id, id));
+  }
+
+  async getClientPerformanceData(): Promise<{
+    clientId: number;
+    name: string;
+    lastLoadDate: Date | null;
+    daysSinceLastLoad: number;
+    status: 'active' | 'warning' | 'inactive';
+    totalOwed: string;
+    pendingCollections: number;
+  }[]> {
+    // Get all clients with their last load date and pending collections
+    const clientsWithData = await db
+      .select({
+        clientId: clients.id,
+        name: clients.name,
+        lastLoadDate: sql<Date | null>`MAX(${loads.createdAt})`,
+        totalOwed: sql<string>`COALESCE(SUM(CASE WHEN ${collections.status} IN ('pending', 'in_progress') THEN ${collections.amount} ELSE 0 END), 0)`,
+        pendingCollections: sql<number>`COUNT(CASE WHEN ${collections.status} IN ('pending', 'in_progress') THEN 1 END)`,
+      })
+      .from(clients)
+      .leftJoin(loads, eq(clients.id, loads.clientId))
+      .leftJoin(collections, eq(clients.id, collections.clientId))
+      .groupBy(clients.id, clients.name)
+      .orderBy(clients.name);
+
+    // Calculate days since last load and determine status
+    return clientsWithData.map(client => {
+      const daysSinceLastLoad = client.lastLoadDate 
+        ? Math.floor((Date.now() - client.lastLoadDate.getTime()) / (1000 * 60 * 60 * 24))
+        : 999; // Very high number for clients with no loads
+      
+      let status: 'active' | 'warning' | 'inactive';
+      if (daysSinceLastLoad <= 7) {
+        status = 'active';
+      } else if (daysSinceLastLoad <= 30) {
+        status = 'warning';
+      } else {
+        status = 'inactive';
+      }
+      
+      return {
+        ...client,
+        daysSinceLastLoad,
+        status,
+      };
+    });
   }
 }
 

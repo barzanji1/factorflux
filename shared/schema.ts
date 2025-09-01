@@ -185,6 +185,22 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Collections table
+export const collections = pgTable("collections", {
+  id: integer("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description").notNull(),
+  status: varchar("status", { enum: ["pending", "in_progress", "paid", "written_off"] }).default("pending").notNull(),
+  priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  lastContactDate: timestamp("last_contact_date"),
+  notes: text("notes"),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Follow-ups table
 export const followUps = pgTable("follow_ups", {
   id: integer("id").primaryKey(),
@@ -211,6 +227,7 @@ export const clientsRelations = relations(clients, ({ many }) => ({
   loads: many(loads),
   invoices: many(invoices),
   followUps: many(followUps),
+  collections: many(collections),
 }));
 
 export const loadsRelations = relations(loads, ({ one, many }) => ({
@@ -254,6 +271,11 @@ export const followUpsRelations = relations(followUps, ({ one }) => ({
   client: one(clients, { fields: [followUps.clientId], references: [clients.id] }),
 }));
 
+export const collectionsRelations = relations(collections, ({ one }) => ({
+  client: one(clients, { fields: [collections.clientId], references: [clients.id] }),
+  assignedToUser: one(users, { fields: [collections.assignedTo], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
@@ -287,6 +309,12 @@ export const insertFollowUpSchema = createInsertSchema(followUps).omit({
   updatedAt: true 
 });
 
+export const insertCollectionSchema = createInsertSchema(collections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 // Types
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = typeof timeEntries.$inferInsert;
@@ -297,6 +325,9 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 export type FollowUp = typeof followUps.$inferSelect;
 export type InsertFollowUp = z.infer<typeof insertFollowUpSchema>;
+
+export type Collection = typeof collections.$inferSelect;
+export type InsertCollection = z.infer<typeof insertCollectionSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;

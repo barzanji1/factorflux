@@ -8,6 +8,7 @@ import {
   insertInvoiceSchema,
   insertDocumentSchema,
   insertFollowUpSchema,
+  insertCollectionSchema,
   users,
   users as userTable
 } from "@shared/schema";
@@ -1415,6 +1416,91 @@ Trucking Pros Financial Team
       </body>
       </html>
     `);
+  });
+
+  // Collections routes
+  app.get('/api/collections', async (req: any, res) => {
+    try {
+      const collections = await storage.getAllCollections();
+      res.json(collections);
+    } catch (error) {
+      console.error("Error fetching collections:", error);
+      res.status(500).json({ message: "Failed to fetch collections" });
+    }
+  });
+
+  app.get('/api/collections/client-performance', async (req: any, res) => {
+    try {
+      const performanceData = await storage.getClientPerformanceData();
+      res.json(performanceData);
+    } catch (error) {
+      console.error("Error fetching client performance data:", error);
+      res.status(500).json({ message: "Failed to fetch client performance data" });
+    }
+  });
+
+  app.get('/api/collections/:id', async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const collection = await storage.getCollection(id);
+      if (!collection) {
+        return res.status(404).json({ message: "Collection not found" });
+      }
+      res.json(collection);
+    } catch (error) {
+      console.error("Error fetching collection:", error);
+      res.status(500).json({ message: "Failed to fetch collection" });
+    }
+  });
+
+  app.post('/api/collections', requireAuth, async (req: any, res) => {
+    try {
+      const collectionData = insertCollectionSchema.parse(req.body);
+      const collection = await storage.createCollection({
+        ...collectionData,
+        assignedTo: collectionData.assignedTo || req.user.id
+      });
+      res.status(201).json(collection);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid collection data", errors: error.errors });
+      }
+      console.error("Error creating collection:", error);
+      res.status(500).json({ message: "Failed to create collection" });
+    }
+  });
+
+  app.patch('/api/collections/:id', requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+      const collection = await storage.updateCollection(id, updates);
+      res.json(collection);
+    } catch (error) {
+      console.error("Error updating collection:", error);
+      res.status(500).json({ message: "Failed to update collection" });
+    }
+  });
+
+  app.delete('/api/collections/:id', requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteCollection(id);
+      
+      // Log activity
+      await storage.createActivity({
+        userId: req.user.id,
+        type: 'collection_deleted',
+        description: 'Deleted collection',
+        entityType: 'collection',
+        entityId: id,
+      });
+
+      res.json({ message: "Collection deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting collection:", error);
+      res.status(500).json({ message: "Failed to delete collection" });
+    }
   });
 
   // Follow-up routes
