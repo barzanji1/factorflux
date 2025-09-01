@@ -240,13 +240,9 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                       <SelectContent>
                         <SelectItem value="draft">Draft</SelectItem>
                         <SelectItem value="submitted">Submitted</SelectItem>
-                        {((user as any)?.role === "manager" || (user as any)?.role === "admin") && (
-                          <>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="rejected">Rejected</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                          </>
-                        )}
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
