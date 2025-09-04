@@ -145,7 +145,7 @@ const cardTypes = [
     description: "Fuel rebates, expense tracking and tools for saving",
     perks: [
       "Save up to 15¢ per gallon at network locations",
-      "Plus up to 3¢ per gallon everywhere else",
+      "Plus up to 3¢ per gallon everywhere else", 
       "No monthly fees or contracts"
     ],
     color: "bg-green-50 border-green-200",
@@ -343,16 +343,6 @@ export default function FuelCardsInternal() {
                 <>
                   <div className="text-center space-y-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">TPF Fleet Fuel Card</h2>
-                    <div className="text-gray-600 dark:text-gray-400 max-w-3xl mx-auto space-y-4">
-                      <p>
-                        The TPF Fleet Card is the best way to manage business fueling, with automatic accounting and reports, easy spending controls, and access to special discounts to help free up cash flow. Apply today and you could save up to 15¢ per gallon in average annual fuel savings!
-                      </p>
-                      <div className="space-y-2">
-                        <p className="font-semibold">• Save up to 15¢ per gallon at network locations</p>
-                        <p className="font-semibold">• Plus up to 3¢ per gallon everywhere else</p>
-                        <p className="font-semibold">• No monthly fees or contracts</p>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="flex justify-center">
@@ -373,6 +363,11 @@ export default function FuelCardsInternal() {
                             <CardDescription className="text-gray-600">
                               {card.description}
                             </CardDescription>
+                            <div className="mt-4 space-y-3">
+                              <p className="text-sm text-gray-700 leading-relaxed">
+                                The TPF Fleet Card is the best way to manage business fueling, with automatic accounting and reports, easy spending controls, and access to special discounts to help free up cash flow. Apply today and you could save up to 15¢ per gallon in average annual fuel savings!
+                              </p>
+                            </div>
                           </CardHeader>
                           <CardContent className="space-y-4">
                             <div className="space-y-2">
