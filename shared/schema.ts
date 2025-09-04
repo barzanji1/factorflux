@@ -255,6 +255,22 @@ export const brokers = pgTable("brokers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Fuel Advances table
+export const fuelAdvances = pgTable("fuel_advances", {
+  id: serial("id").primaryKey(),
+  carrierName: varchar("carrier_name").notNull(),
+  advanceAmount: decimal("advance_amount", { precision: 10, scale: 2 }).notNull(),
+  advanceDate: timestamp("advance_date").notNull(),
+  pickupState: varchar("pickup_state", { length: 2 }).notNull(), // State initials
+  deliveryState: varchar("delivery_state", { length: 2 }).notNull(), // State initials
+  processedBy: varchar("processed_by").references(() => users.id).notNull(), // Agent who processed
+  loadId: integer("load_id").references(() => loads.id), // Optional reference to load
+  notes: text("notes"),
+  status: varchar("status", { enum: ["pending", "approved", "paid", "cancelled"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Follow-ups table
 export const followUps = pgTable("follow_ups", {
   id: integer("id").primaryKey(),
@@ -345,6 +361,11 @@ export const brokersRelations = relations(brokers, ({ many }) => ({
   // Add relations to loads/invoices if needed in the future
 }));
 
+export const fuelAdvancesRelations = relations(fuelAdvances, ({ one }) => ({
+  processedByUser: one(users, { fields: [fuelAdvances.processedBy], references: [users.id] }),
+  load: one(loads, { fields: [fuelAdvances.loadId], references: [loads.id] }),
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
@@ -404,6 +425,12 @@ export const insertBrokerSchema = createInsertSchema(brokers).omit({
   updatedAt: true
 });
 
+export const insertFuelAdvanceSchema = createInsertSchema(fuelAdvances).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 // Types
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = typeof timeEntries.$inferInsert;
@@ -426,6 +453,9 @@ export type InsertTask = z.infer<typeof insertTaskSchema>;
 
 export type Broker = typeof brokers.$inferSelect;
 export type InsertBroker = z.infer<typeof insertBrokerSchema>;
+
+export type FuelAdvance = typeof fuelAdvances.$inferSelect;
+export type InsertFuelAdvance = z.infer<typeof insertFuelAdvanceSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;

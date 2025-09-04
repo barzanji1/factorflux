@@ -12,15 +12,19 @@ import {
   insertClientVaultSchema,
   insertTaskSchema,
   insertBrokerSchema,
+  insertFuelAdvanceSchema,
   users,
   users as userTable,
   tasks,
   clients,
   brokers,
+  fuelAdvances,
   type Task,
   type InsertTask,
   type Broker,
-  type InsertBroker
+  type InsertBroker,
+  type FuelAdvance,
+  type InsertFuelAdvance
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -2189,6 +2193,135 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deleting broker:", error);
       res.status(500).json({ message: "Failed to delete broker" });
+    }
+  });
+
+  // Fuel Advances routes
+  app.get('/api/fuel-advances', requireAuth, async (req, res) => {
+    try {
+      const fuelAdvancesData = await db
+        .select({
+          id: fuelAdvances.id,
+          carrierName: fuelAdvances.carrierName,
+          advanceAmount: fuelAdvances.advanceAmount,
+          advanceDate: fuelAdvances.advanceDate,
+          pickupState: fuelAdvances.pickupState,
+          deliveryState: fuelAdvances.deliveryState,
+          processedBy: fuelAdvances.processedBy,
+          loadId: fuelAdvances.loadId,
+          notes: fuelAdvances.notes,
+          status: fuelAdvances.status,
+          createdAt: fuelAdvances.createdAt,
+          updatedAt: fuelAdvances.updatedAt,
+          // Include agent name
+          processedByName: users.firstName,
+        })
+        .from(fuelAdvances)
+        .leftJoin(users, eq(fuelAdvances.processedBy, users.id))
+        .orderBy(fuelAdvances.advanceDate);
+
+      res.json(fuelAdvancesData);
+    } catch (error) {
+      console.error("Error fetching fuel advances:", error);
+      res.status(500).json({ message: "Failed to fetch fuel advances" });
+    }
+  });
+
+  app.get('/api/fuel-advances/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [fuelAdvance] = await db
+        .select({
+          id: fuelAdvances.id,
+          carrierName: fuelAdvances.carrierName,
+          advanceAmount: fuelAdvances.advanceAmount,
+          advanceDate: fuelAdvances.advanceDate,
+          pickupState: fuelAdvances.pickupState,
+          deliveryState: fuelAdvances.deliveryState,
+          processedBy: fuelAdvances.processedBy,
+          loadId: fuelAdvances.loadId,
+          notes: fuelAdvances.notes,
+          status: fuelAdvances.status,
+          createdAt: fuelAdvances.createdAt,
+          updatedAt: fuelAdvances.updatedAt,
+          processedByName: users.firstName,
+        })
+        .from(fuelAdvances)
+        .leftJoin(users, eq(fuelAdvances.processedBy, users.id))
+        .where(eq(fuelAdvances.id, id))
+        .limit(1);
+
+      if (!fuelAdvance) {
+        return res.status(404).json({ message: "Fuel advance not found" });
+      }
+
+      res.json(fuelAdvance);
+    } catch (error) {
+      console.error("Error fetching fuel advance:", error);
+      res.status(500).json({ message: "Failed to fetch fuel advance" });
+    }
+  });
+
+  app.post('/api/fuel-advances', requireAuth, async (req, res) => {
+    try {
+      const fuelAdvanceData = insertFuelAdvanceSchema.parse(req.body);
+
+      const [newFuelAdvance] = await db
+        .insert(fuelAdvances)
+        .values(fuelAdvanceData)
+        .returning();
+
+      res.status(201).json(newFuelAdvance);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid fuel advance data", errors: error.errors });
+      }
+      console.error("Error creating fuel advance:", error);
+      res.status(500).json({ message: "Failed to create fuel advance" });
+    }
+  });
+
+  app.patch('/api/fuel-advances/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = insertFuelAdvanceSchema.partial().parse(req.body);
+
+      const [updatedFuelAdvance] = await db
+        .update(fuelAdvances)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(fuelAdvances.id, id))
+        .returning();
+
+      if (!updatedFuelAdvance) {
+        return res.status(404).json({ message: "Fuel advance not found" });
+      }
+
+      res.json(updatedFuelAdvance);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid fuel advance data", errors: error.errors });
+      }
+      console.error("Error updating fuel advance:", error);
+      res.status(500).json({ message: "Failed to update fuel advance" });
+    }
+  });
+
+  app.delete('/api/fuel-advances/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [deletedFuelAdvance] = await db
+        .delete(fuelAdvances)
+        .where(eq(fuelAdvances.id, id))
+        .returning();
+
+      if (!deletedFuelAdvance) {
+        return res.status(404).json({ message: "Fuel advance not found" });
+      }
+
+      res.json({ message: "Fuel advance deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting fuel advance:", error);
+      res.status(500).json({ message: "Failed to delete fuel advance" });
     }
   });
 

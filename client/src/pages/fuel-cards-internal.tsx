@@ -87,6 +87,9 @@ import {
   Truck
 } from "lucide-react";
 
+// Import the fuel advance tracking component
+import FuelAdvanceTracking from './fuel-advance-tracking';
+
 interface FuelCardApplication {
   id: number;
   companyName: string;
@@ -368,10 +371,11 @@ export default function FuelCardsInternal() {
         
         <main className="flex-1 overflow-auto p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="fuel-cards">Fuel Cards</TabsTrigger>
               <TabsTrigger value="applications">Applications</TabsTrigger>
+              <TabsTrigger value="tracking">Advance Tracking</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
@@ -966,6 +970,12 @@ export default function FuelCardsInternal() {
                   </Table>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="tracking" className="space-y-6">
+              <div className="bg-white rounded-lg overflow-hidden">
+                <FuelAdvanceTracking />
+              </div>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">
