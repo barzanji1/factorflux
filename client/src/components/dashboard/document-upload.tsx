@@ -105,7 +105,7 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
       case 'carrier_setup':
         return 'Carrier Setup';
       default:
-        return 'Other Document';
+        return 'Documents';
     }
   };
 
@@ -121,7 +121,7 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
               {documentType === 'rate_confirmation' && 'Upload rate confirmation documents for this load'}
               {documentType === 'bill_of_lading' && 'Upload bill of lading documents for this load'}
               {documentType === 'driver_id' && 'Upload driver ID and carrier setup documents'}
-              {documentType === 'other' && 'Upload supporting documents'}
+              {documentType === 'other' && 'All supporting documents such as RC, BOL, Lumpers, and receipts'}
             </p>
           </div>
           <div className="flex items-center space-x-3">
