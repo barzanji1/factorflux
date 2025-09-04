@@ -19,7 +19,8 @@ import {
   Clock,
   CheckSquare,
   Phone,
-  Building
+  Building,
+  HelpCircle
 } from "lucide-react";
 
 
@@ -36,6 +37,7 @@ const navigation = [
   { name: "Fuel Advance", href: "/fuel-cards-internal", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "Help", href: "/help", icon: HelpCircle },
   { name: "Admin", href: "/admin", icon: Shield, role: "manager" },
 ];
 

@@ -28,6 +28,7 @@ import Tasks from "@/pages/tasks";
 import Brokers from "@/pages/brokers";
 import FormDemo from "@/pages/form-demo";
 import LoginPage from "@/pages/login";
+import Help from "@/pages/help";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -108,6 +109,11 @@ function Router() {
       <Route path="/reports">
         <ProtectedRoute>
           <Reports />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/help">
+        <ProtectedRoute>
+          <Help />
         </ProtectedRoute>
       </Route>
       <Route path="/fuel-cards-internal">
