@@ -22,9 +22,7 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
     mutationFn: async (formData: FormData) => {
       // Add document type to the form data
       formData.append('documentType', documentType);
-      console.log('Starting document upload...');
       const response = await apiRequest("POST", "/api/documents/upload", formData);
-      console.log('Upload response status:', response.status);
       return response.json();
     },
     onSuccess: () => {

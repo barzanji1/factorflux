@@ -61,9 +61,7 @@ export default function TimeClock() {
   // Clock in mutation
   const clockInMutation = useMutation({
     mutationFn: async (notes: string) => {
-      console.log('Attempting clock-in...');
       const response = await apiRequest("POST", "/api/time-tracking/clock-in", { notes });
-      console.log('Clock-in response status:', response.status);
       return response.json();
     },
     onSuccess: () => {

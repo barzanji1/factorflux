@@ -813,7 +813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/documents/:id', async (req: any, res) => {
+  app.delete('/api/documents/:id', requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       
