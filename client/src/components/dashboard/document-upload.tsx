@@ -22,7 +22,9 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
     mutationFn: async (formData: FormData) => {
       // Add document type to the form data
       formData.append('documentType', documentType);
+      console.log('Starting document upload...');
       const response = await apiRequest("POST", "/api/documents/upload", formData);
+      console.log('Upload response status:', response.status);
       return response.json();
     },
     onSuccess: () => {
@@ -36,10 +38,24 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
         onUploadComplete();
       }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
+      let errorMessage = "Failed to upload document";
+      
+      // Check if it's an authentication error
+      if (error.message.includes("401") || error.message.includes("Authentication required")) {
+        errorMessage = "Please log in again to upload documents";
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+      } else if (error.message.includes("413") || error.message.includes("too large")) {
+        errorMessage = "File is too large. Maximum size is 10MB";
+      } else if (error.message.includes("Only PDF, JPEG, JPG, and PNG")) {
+        errorMessage = "Only PDF, JPEG, JPG, and PNG files are allowed";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to upload document",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -74,7 +90,6 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
     files.forEach((file) => {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('userId', '1'); // Default user ID - authentication removed
       formData.append('documentType', documentType);
       
       uploadMutation.mutate(formData);

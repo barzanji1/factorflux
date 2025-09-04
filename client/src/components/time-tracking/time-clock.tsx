@@ -61,7 +61,9 @@ export default function TimeClock() {
   // Clock in mutation
   const clockInMutation = useMutation({
     mutationFn: async (notes: string) => {
+      console.log('Attempting clock-in...');
       const response = await apiRequest("POST", "/api/time-tracking/clock-in", { notes });
+      console.log('Clock-in response status:', response.status);
       return response.json();
     },
     onSuccess: () => {
@@ -81,7 +83,7 @@ export default function TimeClock() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -116,7 +118,7 @@ export default function TimeClock() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
