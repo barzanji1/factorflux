@@ -339,13 +339,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Clear all activities endpoint
-  app.delete('/api/activities', async (req, res) => {
+  app.delete('/api/activities', requireAuth, async (req: any, res) => {
     try {
       await storage.clearActivities();
       
       // Log the activity reset
       await storage.createActivity({
-        userId: "1", // Authentication removed - use default user
+        userId: req.user.id,
         type: "activities_reset",
         entityType: "system",
         entityId: 0,
