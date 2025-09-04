@@ -10,8 +10,13 @@ import {
   insertFollowUpSchema,
   insertCollectionSchema,
   insertClientVaultSchema,
+  insertTaskSchema,
   users,
-  users as userTable
+  users as userTable,
+  tasks,
+  clients,
+  type Task,
+  type InsertTask
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -1964,6 +1969,124 @@ Trucking Pros Financial Team
       res.status(500).json({ 
         error: error instanceof Error ? error.message : 'Password reset failed'
       });
+    }
+  });
+
+  // Tasks routes
+  app.get('/api/tasks', requireAuth, async (req: any, res) => {
+    try {
+      const tasksData = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          type: tasks.type,
+          priority: tasks.priority,
+          status: tasks.status,
+          dueDate: tasks.dueDate,
+          clientId: tasks.clientId,
+          assignedTo: tasks.assignedTo,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+          client: {
+            id: clients.id,
+            name: clients.name,
+          },
+        })
+        .from(tasks)
+        .leftJoin(clients, eq(tasks.clientId, clients.id))
+        .orderBy(tasks.createdAt);
+
+      res.json(tasksData);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  app.get('/api/tasks/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [task] = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, id))
+        .limit(1);
+
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      res.json(task);
+    } catch (error) {
+      console.error("Error fetching task:", error);
+      res.status(500).json({ message: "Failed to fetch task" });
+    }
+  });
+
+  app.post('/api/tasks', requireAuth, async (req: any, res) => {
+    try {
+      const taskData = insertTaskSchema.parse({
+        ...req.body,
+        assignedTo: req.user.id,
+      });
+
+      const [newTask] = await db
+        .insert(tasks)
+        .values(taskData)
+        .returning();
+
+      res.status(201).json(newTask);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid task data", errors: error.errors });
+      }
+      console.error("Error creating task:", error);
+      res.status(500).json({ message: "Failed to create task" });
+    }
+  });
+
+  app.patch('/api/tasks/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = insertTaskSchema.partial().parse(req.body);
+
+      const [updatedTask] = await db
+        .update(tasks)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(tasks.id, id))
+        .returning();
+
+      if (!updatedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      res.json(updatedTask);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid task data", errors: error.errors });
+      }
+      console.error("Error updating task:", error);
+      res.status(500).json({ message: "Failed to update task" });
+    }
+  });
+
+  app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [deletedTask] = await db
+        .delete(tasks)
+        .where(eq(tasks.id, id))
+        .returning();
+
+      if (!deletedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      res.json({ message: "Task deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      res.status(500).json({ message: "Failed to delete task" });
     }
   });
 

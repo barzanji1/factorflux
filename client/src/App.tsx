@@ -24,6 +24,7 @@ import FollowUp from "@/pages/follow-up";
 import Collections from "@/pages/collections";
 import Vault from "@/pages/vault";
 import Factoring from "@/pages/factoring";
+import Tasks from "@/pages/tasks";
 import FormDemo from "@/pages/form-demo";
 import LoginPage from "@/pages/login";
 
@@ -76,6 +77,11 @@ function Router() {
       <Route path="/factoring">
         <ProtectedRoute>
           <Factoring />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/tasks">
+        <ProtectedRoute>
+          <Tasks />
         </ProtectedRoute>
       </Route>
       <Route path="/credit-checks">

@@ -219,6 +219,21 @@ export const clientVault = pgTable("client_vault", {
   createdBy: varchar("created_by").references(() => users.id).notNull(),
 });
 
+// Tasks table
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  type: varchar("type", { enum: ["chargeback", "followup", "call", "task", "processing"] }).notNull(),
+  priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium").notNull(),
+  status: varchar("status", { enum: ["todo", "in_progress", "held", "completed"] }).default("todo").notNull(),
+  dueDate: timestamp("due_date"),
+  clientId: integer("client_id").references(() => clients.id),
+  assignedTo: varchar("assigned_to").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Follow-ups table
 export const followUps = pgTable("follow_ups", {
   id: integer("id").primaryKey(),
@@ -300,6 +315,11 @@ export const clientVaultRelations = relations(clientVault, ({ one }) => ({
   lastAccessedByUser: one(users, { fields: [clientVault.lastAccessedBy], references: [users.id] }),
 }));
 
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  client: one(clients, { fields: [tasks.clientId], references: [clients.id] }),
+  assignedToUser: one(users, { fields: [tasks.assignedTo], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
@@ -347,6 +367,12 @@ export const insertClientVaultSchema = createInsertSchema(clientVault).omit({
   lastAccessedBy: true
 });
 
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 // Types
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = typeof timeEntries.$inferInsert;
@@ -363,6 +389,9 @@ export type InsertCollection = z.infer<typeof insertCollectionSchema>;
 
 export type ClientVault = typeof clientVault.$inferSelect;
 export type InsertClientVault = z.infer<typeof insertClientVaultSchema>;
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;

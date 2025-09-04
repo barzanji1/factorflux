@@ -16,7 +16,8 @@ import {
   Globe,
   Download,
   DollarSign,
-  Clock
+  Clock,
+  CheckSquare
 } from "lucide-react";
 
 
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Factoring", href: "/factoring", icon: DollarSign },
+  { name: "Tasks", href: "/tasks", icon: CheckSquare },
   { name: "Documents", href: "/documents", icon: FolderOpen },
   { name: "Follow Ups", href: "/follow-up", icon: Clock },
   { name: "Collections", href: "/collections", icon: DollarSign },

@@ -208,6 +208,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     "/clients", 
     "/invoices", 
     "/factoring",
+    "/tasks",
     "/documents", 
     "/fuel-cards", 
     "/credit-checks", 
