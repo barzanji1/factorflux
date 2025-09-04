@@ -380,7 +380,7 @@ export default function FuelCardsInternal() {
                             </div>
                             <Button 
                               className="w-full mt-4" 
-                              onClick={() => window.open('https://wexinc.my.site.com/communities/login', '_blank')}
+                              onClick={() => window.open('https://wexinc.my.site.com/communities/s/', '_blank')}
                               variant="default"
                             >
                               Process Application
