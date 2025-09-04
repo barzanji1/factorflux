@@ -325,8 +325,8 @@ export default function HelpPage() {
                     </div>
                     <div className="text-right space-y-1">
                       <div className="text-blue-100">
-                        <div>ACH Cut-off Time: <span className="font-bold">2:15 PM</span></div>
-                        <div>WIRE Cut-off Time: <span className="font-bold">1:15 PM</span></div>
+                        <div>ACH Cut-off Time: <span className="font-bold">2:15 PM MST</span></div>
+                        <div>WIRE Cut-off Time: <span className="font-bold">1:15 PM MST</span></div>
                       </div>
                     </div>
                   </div>
