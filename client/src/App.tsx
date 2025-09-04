@@ -23,6 +23,7 @@ import DownloadPage from "@/pages/download";
 import FollowUp from "@/pages/follow-up";
 import Collections from "@/pages/collections";
 import Vault from "@/pages/vault";
+import Factoring from "@/pages/factoring";
 import FormDemo from "@/pages/form-demo";
 import LoginPage from "@/pages/login";
 
@@ -70,6 +71,11 @@ function Router() {
       <Route path="/vault">
         <ProtectedRoute>
           <Vault />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/factoring">
+        <ProtectedRoute>
+          <Factoring />
         </ProtectedRoute>
       </Route>
       <Route path="/credit-checks">

@@ -207,6 +207,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   const pagesWithHomeButton = [
     "/clients", 
     "/invoices", 
+    "/factoring",
     "/documents", 
     "/fuel-cards", 
     "/credit-checks", 

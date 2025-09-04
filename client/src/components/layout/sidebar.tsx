@@ -24,6 +24,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Invoices", href: "/invoices", icon: FileText },
+  { name: "Factoring", href: "/factoring", icon: DollarSign },
   { name: "Documents", href: "/documents", icon: FolderOpen },
   { name: "Follow Ups", href: "/follow-up", icon: Clock },
   { name: "Collections", href: "/collections", icon: DollarSign },
