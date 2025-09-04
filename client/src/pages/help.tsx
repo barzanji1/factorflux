@@ -395,8 +395,12 @@ export default function HelpPage() {
                               {feature.name}
                             </h4>
                             <Badge 
-                              variant={feature.status === 'active' ? 'default' : 'secondary'}
-                              className="text-xs px-2 py-0.5 ml-1"
+                              variant={feature.status === 'active' ? 'default' : 'outline'}
+                              className={`text-xs px-2 py-0.5 ml-1 ${
+                                feature.status === 'active' 
+                                  ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200 dark:border-green-700' 
+                                  : 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700'
+                              }`}
                             >
                               {feature.status === 'active' ? 'Active' : 'Planned'}
                             </Badge>
