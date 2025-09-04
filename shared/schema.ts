@@ -234,6 +234,27 @@ export const tasks = pgTable("tasks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Brokers table
+export const brokers = pgTable("brokers", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  contactPerson: varchar("contact_person").notNull(),
+  email: varchar("email").notNull(),
+  phone: varchar("phone").notNull(),
+  address: varchar("address"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zipCode: varchar("zip_code"),
+  mcNumber: varchar("mc_number"),
+  dotNumber: varchar("dot_number"),
+  creditLimit: integer("credit_limit").default(0),
+  paymentTerms: varchar("payment_terms", { enum: ["net15", "net30", "net45", "net60", "quickpay"] }).default("net30").notNull(),
+  status: varchar("status", { enum: ["active", "inactive", "suspended"] }).default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Follow-ups table
 export const followUps = pgTable("follow_ups", {
   id: integer("id").primaryKey(),
@@ -320,6 +341,10 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   assignedToUser: one(users, { fields: [tasks.assignedTo], references: [users.id] }),
 }));
 
+export const brokersRelations = relations(brokers, ({ many }) => ({
+  // Add relations to loads/invoices if needed in the future
+}));
+
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
@@ -373,6 +398,12 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   updatedAt: true
 });
 
+export const insertBrokerSchema = createInsertSchema(brokers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 // Types
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = typeof timeEntries.$inferInsert;
@@ -392,6 +423,9 @@ export type InsertClientVault = z.infer<typeof insertClientVaultSchema>;
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type Broker = typeof brokers.$inferSelect;
+export type InsertBroker = z.infer<typeof insertBrokerSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;

@@ -11,12 +11,16 @@ import {
   insertCollectionSchema,
   insertClientVaultSchema,
   insertTaskSchema,
+  insertBrokerSchema,
   users,
   users as userTable,
   tasks,
   clients,
+  brokers,
   type Task,
-  type InsertTask
+  type InsertTask,
+  type Broker,
+  type InsertBroker
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -2087,6 +2091,104 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deleting task:", error);
       res.status(500).json({ message: "Failed to delete task" });
+    }
+  });
+
+  // Brokers routes
+  app.get('/api/brokers', requireAuth, async (req, res) => {
+    try {
+      const brokersData = await db
+        .select()
+        .from(brokers)
+        .orderBy(brokers.name);
+
+      res.json(brokersData);
+    } catch (error) {
+      console.error("Error fetching brokers:", error);
+      res.status(500).json({ message: "Failed to fetch brokers" });
+    }
+  });
+
+  app.get('/api/brokers/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [broker] = await db
+        .select()
+        .from(brokers)
+        .where(eq(brokers.id, id))
+        .limit(1);
+
+      if (!broker) {
+        return res.status(404).json({ message: "Broker not found" });
+      }
+
+      res.json(broker);
+    } catch (error) {
+      console.error("Error fetching broker:", error);
+      res.status(500).json({ message: "Failed to fetch broker" });
+    }
+  });
+
+  app.post('/api/brokers', requireAuth, async (req, res) => {
+    try {
+      const brokerData = insertBrokerSchema.parse(req.body);
+
+      const [newBroker] = await db
+        .insert(brokers)
+        .values(brokerData)
+        .returning();
+
+      res.status(201).json(newBroker);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid broker data", errors: error.errors });
+      }
+      console.error("Error creating broker:", error);
+      res.status(500).json({ message: "Failed to create broker" });
+    }
+  });
+
+  app.patch('/api/brokers/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = insertBrokerSchema.partial().parse(req.body);
+
+      const [updatedBroker] = await db
+        .update(brokers)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(brokers.id, id))
+        .returning();
+
+      if (!updatedBroker) {
+        return res.status(404).json({ message: "Broker not found" });
+      }
+
+      res.json(updatedBroker);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid broker data", errors: error.errors });
+      }
+      console.error("Error updating broker:", error);
+      res.status(500).json({ message: "Failed to update broker" });
+    }
+  });
+
+  app.delete('/api/brokers/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [deletedBroker] = await db
+        .delete(brokers)
+        .where(eq(brokers.id, id))
+        .returning();
+
+      if (!deletedBroker) {
+        return res.status(404).json({ message: "Broker not found" });
+      }
+
+      res.json({ message: "Broker deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting broker:", error);
+      res.status(500).json({ message: "Failed to delete broker" });
     }
   });
 
