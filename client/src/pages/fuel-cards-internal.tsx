@@ -139,26 +139,10 @@ const cardTypeLabels = {
 
 const cardTypes = [
   {
-    id: "base",
-    name: "TPF Base Card",
-    monthlyFee: 0,
-    description: "Essential fuel savings for small carriers",
-    perks: [
-      "2¢/gallon discount at 5,000+ locations",
-      "Basic purchase controls",
-      "Monthly spending reports",
-      "24/7 customer support",
-      "Complimentary service - no fees"
-    ],
-    color: "bg-blue-50 border-blue-200",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600"
-  },
-  {
     id: "fleet",
     name: "TPF Fleet Card",
     monthlyFee: 0,
-    description: "Advanced features for growing carriers",
+    description: "Internal processing for fleet fuel card applications",
     perks: [
       "4¢/gallon discount at 8,000+ locations",
       "Advanced purchase controls & limits",
@@ -172,28 +156,7 @@ const cardTypes = [
     color: "bg-green-50 border-green-200",
     iconBg: "bg-green-100",
     iconColor: "text-green-600",
-    popular: true
-  },
-  {
-    id: "premium",
-    name: "TPF Premium Card",
-    monthlyFee: 0,
-    description: "Premium benefits for established carriers",
-    perks: [
-      "6¢/gallon discount at 12,000+ locations",
-      "Comprehensive fleet management tools",
-      "Dedicated account manager",
-      "Priority customer support",
-      "Cash back rewards program (1% on fuel)",
-      "15% discount on lodging",
-      "Free roadside assistance",
-      "Advanced fraud protection",
-      "Custom reporting & API access",
-      "Complimentary service - no fees"
-    ],
-    color: "bg-purple-50 border-purple-200",
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600"
+    popular: false
   }
 ];
 
@@ -386,56 +349,50 @@ export default function FuelCardsInternal() {
                   <div className="text-center space-y-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">TPF Fuel Card Services</h2>
                     <p className="text-gray-600 dark:text-gray-400">
-                      Complimentary fuel cards for our carriers with exclusive savings and fleet management benefits
+                      Internal fuel card application processing for agent use only
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {cardTypes.map((card) => (
-                      <Card key={card.id} className={`relative ${card.color} hover:shadow-lg transition-shadow cursor-pointer`}>
-                        {card.popular && (
-                          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                            <Badge className="bg-orange-500 text-white px-3 py-1">
-                              <Star className="w-3 h-3 mr-1" />
-                              Most Popular
-                            </Badge>
-                          </div>
-                        )}
-                        <CardHeader className="pb-4">
-                          <div className="flex items-center justify-between">
-                            <div className={`p-3 rounded-full ${card.iconBg}`}>
-                              <CreditCard className={`w-6 h-6 ${card.iconColor}`} />
-                            </div>
-                            <div className="text-right">
-                              <p className="text-2xl font-bold text-green-600">FREE</p>
-                              <p className="text-sm text-gray-500">No Monthly Fee</p>
-                            </div>
-                          </div>
-                          <CardTitle className="text-xl">{card.name}</CardTitle>
-                          <CardDescription className="text-gray-600">
-                            {card.description}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2">
-                            {card.perks.map((perk, index) => (
-                              <div key={index} className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">{perk}</span>
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-md">
+                      {cardTypes.map((card) => (
+                        <Card key={card.id} className={`relative ${card.color} hover:shadow-lg transition-shadow cursor-pointer`}>
+                          <CardHeader className="pb-4">
+                            <div className="flex items-center justify-between">
+                              <div className={`p-3 rounded-full ${card.iconBg}`}>
+                                <CreditCard className={`w-6 h-6 ${card.iconColor}`} />
                               </div>
-                            ))}
-                          </div>
-                          <Button 
-                            className="w-full mt-4" 
-                            onClick={() => handleCardSelect(card.id)}
-                            variant={card.popular ? "default" : "outline"}
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Apply for {card.name}
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-green-600">FREE</p>
+                                <p className="text-sm text-gray-500">No Monthly Fee</p>
+                              </div>
+                            </div>
+                            <CardTitle className="text-xl">{card.name}</CardTitle>
+                            <CardDescription className="text-gray-600">
+                              {card.description}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                              {card.perks.map((perk, index) => (
+                                <div key={index} className="flex items-start gap-2">
+                                  <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                  <span className="text-sm text-gray-700 dark:text-gray-300">{perk}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <Button 
+                              className="w-full mt-4" 
+                              onClick={() => handleCardSelect(card.id)}
+                              variant="default"
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Process Application
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
