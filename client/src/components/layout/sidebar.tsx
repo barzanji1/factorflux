@@ -33,7 +33,7 @@ const navigation = [
   { name: "Brokers", href: "/brokers", icon: Building },
   { name: "Collections", href: "/collections", icon: Phone },
   { name: "Vault", href: "/vault", icon: Shield },
-  { name: "Fuel Cards", href: "/fuel-cards-internal", icon: Fuel },
+  { name: "Fuel Advance", href: "/fuel-cards-internal", icon: Fuel },
   { name: "Credit Checks", href: "/credit-checks", icon: CreditCard },
   { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Admin", href: "/admin", icon: Shield, role: "manager" },
