@@ -140,18 +140,13 @@ const cardTypeLabels = {
 const cardTypes = [
   {
     id: "fleet",
-    name: "TPF Fleet Card",
+    name: "TPF Fleet Fuel Card",
     monthlyFee: 0,
-    description: "Internal processing for fleet fuel card applications",
+    description: "Fuel rebates, expense tracking and tools for saving",
     perks: [
-      "4¢/gallon discount at 8,000+ locations",
-      "Advanced purchase controls & limits",
-      "Real-time transaction alerts",
-      "Detailed reporting & analytics",
-      "Driver ID verification",
-      "Maintenance tracking integration",
-      "10% discount on lodging at partner hotels",
-      "Complimentary service - no fees"
+      "Save up to 15¢ per gallon at network locations",
+      "Plus up to 3¢ per gallon everywhere else",
+      "No monthly fees or contracts"
     ],
     color: "bg-green-50 border-green-200",
     iconBg: "bg-green-100",
@@ -347,9 +342,9 @@ export default function FuelCardsInternal() {
               {!showApplicationForm && (
                 <>
                   <div className="text-center space-y-4">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">TPF Fuel Card Services</h2>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Internal fuel card application processing for agent use only
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">TPF Fleet Fuel Card</h2>
+                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                      The TPF Fleet Card is the best way to manage business fueling, with automatic accounting and reports, easy spending controls, and access to special discounts to help free up cash flow. Apply today and you could save up to 15¢ per gallon in average annual fuel savings!
                     </p>
                   </div>
 
