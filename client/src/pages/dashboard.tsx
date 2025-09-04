@@ -7,6 +7,7 @@ import QuickActions from "@/components/dashboard/quick-actions";
 import RecentActivity from "@/components/dashboard/recent-activity";
 import RecentInvoices from "@/components/dashboard/recent-invoices";
 import TimeClock from "@/components/time-tracking/time-clock";
+import CutoffTimes from "@/components/dashboard/cutoff-times";
 import tpfLogo from "@assets/TPF-glass-Sign_1753927893748.png";
 
 export default function Dashboard() {
@@ -62,6 +63,7 @@ export default function Dashboard() {
             
             <div className="space-y-6">
               <TimeClock />
+              <CutoffTimes />
               <QuickActions />
               <RecentActivity />
             </div>
