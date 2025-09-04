@@ -227,8 +227,10 @@ export default function HelpPage() {
       title: "Technical Support",
       description: "Get help with system issues",
       icon: Settings,
-      contact: "support@truckingprosfinancial.com",
-      hours: "Monday - Friday, 8 AM - 6 PM EST"
+      contact: "Dosh Barzanji",
+      email: "Dosh@truckingprosfinancial.com",
+      phone: "385-495-4962",
+      hours: "Internal use only"
     },
     {
       title: "Account Management",
@@ -508,8 +510,20 @@ export default function HelpPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-400">{option.description}</p>
                   </CardHeader>
                   <CardContent>
-                    <p className="font-medium text-blue-600 dark:text-blue-400 mb-2">{option.contact}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{option.hours}</p>
+                    <div className="space-y-2">
+                      <p className="font-medium text-blue-600 dark:text-blue-400">{option.contact}</p>
+                      {option.email && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Email: <span className="font-medium">{option.email}</span>
+                        </p>
+                      )}
+                      {option.phone && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Text: <span className="font-medium">{option.phone}</span>
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{option.hours}</p>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
