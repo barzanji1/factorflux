@@ -383,7 +383,6 @@ export default function FuelCardsInternal() {
                               onClick={() => handleCardSelect(card.id)}
                               variant="default"
                             >
-                              <Plus className="w-4 h-4 mr-2" />
                               Process Application
                             </Button>
                           </CardContent>
