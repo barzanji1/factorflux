@@ -18,7 +18,8 @@ import {
   DollarSign,
   Clock,
   CheckSquare,
-  Phone
+  Phone,
+  Building
 } from "lucide-react";
 
 
@@ -29,7 +30,7 @@ const navigation = [
   { name: "Factoring", href: "/factoring", icon: DollarSign },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
   { name: "Documents", href: "/documents", icon: FolderOpen },
-  { name: "Follow Ups", href: "/follow-up", icon: Clock },
+  { name: "Brokers", href: "/brokers", icon: Building },
   { name: "Collections", href: "/collections", icon: Phone },
   { name: "Vault", href: "/vault", icon: Shield },
   { name: "Fuel Cards", href: "/fuel-cards-internal", icon: Fuel },

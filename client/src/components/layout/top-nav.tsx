@@ -216,7 +216,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
     "/fuel-card-admin", 
     "/admin",
     "/activities",
-    "/follow-up",
+    "/brokers",
     "/collections",
     "/vault"
   ];
