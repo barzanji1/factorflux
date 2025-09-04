@@ -756,7 +756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw new Error('PDF conversion temporarily unavailable');
   }
 
-  app.post('/api/documents/upload', upload.single('file'), async (req: any, res) => {
+  app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
