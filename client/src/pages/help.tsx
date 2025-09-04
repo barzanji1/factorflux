@@ -243,7 +243,9 @@ export default function HelpPage() {
       title: "Emergency Support",
       description: "Urgent operational issues",
       icon: Phone,
-      contact: "(555) 123-4567",
+      contact: "Dosh Barzanji",
+      email: "Dosh@truckingprosfinancial.com",
+      phone: "385-495-4962",
       hours: "24/7 Emergency Line"
     }
   ];
