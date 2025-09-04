@@ -236,7 +236,7 @@ export default function HelpPage() {
       title: "Account Management",
       description: "Questions about your account",
       icon: Users,
-      contact: "accounts@truckingprosfinancial.com",
+      contact: "Support@Truckingprosfinancial.com",
       hours: "Monday - Friday, 8 AM - 5 PM EST"
     },
     {
