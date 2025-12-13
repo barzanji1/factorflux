@@ -36,7 +36,7 @@ export default function Dashboard() {
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                   Welcome to QuantumCore
                 </h2>
-                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                   Your personalized user interface. Happy Working :-)
                 </p>
               </div>
