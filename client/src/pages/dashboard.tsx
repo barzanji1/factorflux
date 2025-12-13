@@ -29,7 +29,7 @@ export default function Dashboard() {
                 <img 
                   src={tpfLogo} 
                   alt="Trucking Pros Financial" 
-                  className="h-16 w-auto object-contain"
+                  className="h-10 w-auto object-contain"
                 />
               </div>
               <div className="flex-1 text-center">
