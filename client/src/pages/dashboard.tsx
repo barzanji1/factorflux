@@ -8,7 +8,7 @@ import RecentActivity from "@/components/dashboard/recent-activity";
 import RecentInvoices from "@/components/dashboard/recent-invoices";
 import TimeClock from "@/components/time-tracking/time-clock";
 import CutoffTimes from "@/components/dashboard/cutoff-times";
-import tpfLogo from "@assets/TPF-glass-Sign_1753927893748.png";
+import tpfLogo from "@assets/2026-TPF_Logo_1765652205621.png";
 
 export default function Dashboard() {
   return (
