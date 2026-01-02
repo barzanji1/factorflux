@@ -6,7 +6,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { insertInvoiceSchema, type Invoice, type Load, type Client } from "@shared/schema";
+import { insertInvoiceSchema, type Invoice, type Client } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,8 @@ interface InvoiceModalProps {
 const invoiceFormSchema = insertInvoiceSchema.extend({
   invoiceNumber: z.string().min(1, "Invoice number is required"),
   loadType: z.string().min(1, "Load type is required"),
-  loadId: z.string().optional(),
+  pickupLocation: z.string().min(1, "Pickup location is required"),
+  deliveryLocation: z.string().min(1, "Delivery location is required"),
   clientId: z.string().min(1, "Client is required"),
   amount: z.string().min(1, "Amount is required"),
   bolNumber: z.string().optional(),
@@ -53,7 +54,6 @@ const invoiceFormSchema = insertInvoiceSchema.extend({
 export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedLoadId, setSelectedLoadId] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -66,7 +66,8 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     defaultValues: {
       invoiceNumber: "",
       loadType: "",
-      loadId: "",
+      pickupLocation: "",
+      deliveryLocation: "",
       clientId: "",
       amount: "",
       status: "draft",
@@ -75,19 +76,9 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     },
   });
 
-  const { data: loads } = useQuery({
-    queryKey: ["/api/loads"],
-    enabled: isOpen,
-  });
-
   const { data: clients } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
     enabled: isOpen,
-  });
-
-  const { data: selectedLoad } = useQuery({
-    queryKey: ["/api/loads", selectedLoadId],
-    enabled: !!selectedLoadId,
   });
 
   // Filter clients based on search
@@ -97,36 +88,19 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     client.phone?.includes(clientSearch)
   ) || [];
 
-  // Auto-populate client and amount when load is selected
-  useEffect(() => {
-    if (selectedLoad && selectedLoad as Load) {
-      const load = selectedLoad as Load;
-      form.setValue("clientId", load.clientId.toString());
-      if (load.rate) {
-        form.setValue("amount", load.rate);
-      }
-      // Find and set the client details
-      const client = clients?.find(c => c.id === load.clientId);
-      if (client) {
-        setSelectedClient(client);
-        setClientSearch(client.name);
-      }
-    }
-  }, [selectedLoad, form, clients]);
-
   useEffect(() => {
     if (invoice) {
       form.reset({
         invoiceNumber: invoice.invoiceNumber,
         loadType: "otr_load",
-        loadId: invoice.loadId.toString(),
+        pickupLocation: "",
+        deliveryLocation: "",
         clientId: invoice.clientId.toString(),
         amount: invoice.amount,
         status: invoice.status,
         notes: invoice.notes || "",
         bolNumber: "",
       });
-      setSelectedLoadId(invoice.loadId.toString());
       const client = clients?.find(c => c.id === invoice.clientId);
       if (client) {
         setSelectedClient(client);
@@ -136,14 +110,14 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       form.reset({
         invoiceNumber: "",
         loadType: "",
-        loadId: "",
+        pickupLocation: "",
+        deliveryLocation: "",
         clientId: "",
         amount: "",
         status: "draft",
         notes: "",
         bolNumber: "",
       });
-      setSelectedLoadId("");
       setSelectedClient(null);
       setClientSearch("");
       setAttachedFile(null);
@@ -290,7 +264,6 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   const onSubmit = async (values: z.infer<typeof invoiceFormSchema>) => {
     const data = {
       ...values,
-      loadId: values.loadId ? parseInt(values.loadId) : null,
       clientId: parseInt(values.clientId),
       amount: values.amount,
     };
@@ -300,11 +273,6 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     } else {
       createMutation.mutate(data);
     }
-  };
-
-  const handleLoadChange = (loadId: string) => {
-    setSelectedLoadId(loadId);
-    form.setValue("loadId", loadId);
   };
 
   return (
@@ -444,36 +412,35 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="loadId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Load (Optional)</FormLabel>
-                  <Select onValueChange={handleLoadChange} value={field.value || ""}>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="pickupLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>From (Pickup Location)</FormLabel>
                     <FormControl>
-                      <SelectTrigger data-testid="select-load">
-                        <SelectValue placeholder="Link to existing load (optional)" />
-                      </SelectTrigger>
+                      <Input placeholder="City, State" {...field} data-testid="input-pickup-location" />
                     </FormControl>
-                    <SelectContent position="popper" sideOffset={4}>
-                      {(loads as Load[])?.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-500 text-center">
-                          No loads available
-                        </div>
-                      ) : (
-                        (loads as Load[])?.map((load: Load) => (
-                          <SelectItem key={load.id} value={load.id.toString()}>
-                            {load.loadNumber} - {load.pickupLocation} → {load.deliveryLocation}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="deliveryLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>To (Delivery Location)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="City, State" {...field} data-testid="input-delivery-location" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* Smart Client Search */}
             <div className="space-y-2">
