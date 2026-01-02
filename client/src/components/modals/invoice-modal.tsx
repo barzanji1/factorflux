@@ -398,7 +398,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-status">
                           <SelectValue placeholder="Select status" />
@@ -424,18 +424,24 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Load</FormLabel>
-                  <Select onValueChange={handleLoadChange} defaultValue={field.value}>
+                  <Select onValueChange={handleLoadChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-load">
                         <SelectValue placeholder="Select a load" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(loads as Load[])?.map((load: Load) => (
-                        <SelectItem key={load.id} value={load.id.toString()}>
-                          {load.loadNumber} - {load.pickupLocation} → {load.deliveryLocation}
-                        </SelectItem>
-                      ))}
+                      {(loads as Load[])?.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500 text-center">
+                          No loads available. Create a load first.
+                        </div>
+                      ) : (
+                        (loads as Load[])?.map((load: Load) => (
+                          <SelectItem key={load.id} value={load.id.toString()}>
+                            {load.loadNumber} - {load.pickupLocation} → {load.deliveryLocation}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
