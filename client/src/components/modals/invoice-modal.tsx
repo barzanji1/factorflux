@@ -43,7 +43,8 @@ interface InvoiceModalProps {
 
 const invoiceFormSchema = insertInvoiceSchema.extend({
   invoiceNumber: z.string().min(1, "Invoice number is required"),
-  loadId: z.string().min(1, "Load is required"),
+  loadType: z.string().min(1, "Load type is required"),
+  loadId: z.string().optional(),
   clientId: z.string().min(1, "Client is required"),
   amount: z.string().min(1, "Amount is required"),
   bolNumber: z.string().optional(),
@@ -64,6 +65,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       invoiceNumber: "",
+      loadType: "",
       loadId: "",
       clientId: "",
       amount: "",
@@ -116,6 +118,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     if (invoice) {
       form.reset({
         invoiceNumber: invoice.invoiceNumber,
+        loadType: "otr_load",
         loadId: invoice.loadId.toString(),
         clientId: invoice.clientId.toString(),
         amount: invoice.amount,
@@ -132,6 +135,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     } else {
       form.reset({
         invoiceNumber: "",
+        loadType: "",
         loadId: "",
         clientId: "",
         amount: "",
@@ -286,7 +290,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   const onSubmit = async (values: z.infer<typeof invoiceFormSchema>) => {
     const data = {
       ...values,
-      loadId: parseInt(values.loadId),
+      loadId: values.loadId ? parseInt(values.loadId) : null,
       clientId: parseInt(values.clientId),
       amount: values.amount,
     };
@@ -420,20 +424,42 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
             <FormField
               control={form.control}
+              name="loadType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Load Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-load-type">
+                        <SelectValue placeholder="Select load type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="otr_load">OTR Load</SelectItem>
+                      <SelectItem value="dump_truck_ticket">Dump Truck Ticket</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="loadId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Load</FormLabel>
-                  <Select onValueChange={handleLoadChange} value={field.value}>
+                  <FormLabel>Load (Optional)</FormLabel>
+                  <Select onValueChange={handleLoadChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-load">
-                        <SelectValue placeholder="Select a load" />
+                        <SelectValue placeholder="Link to existing load (optional)" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {(loads as Load[])?.length === 0 ? (
                         <div className="p-3 text-sm text-gray-500 text-center">
-                          No loads available. Create a load first.
+                          No loads available
                         </div>
                       ) : (
                         (loads as Load[])?.map((load: Load) => (
