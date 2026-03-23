@@ -227,31 +227,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/user/profile-image', upload.single('profileImage'), async (req: any, res) => {
-    try {
-      // Authentication removed - use default user ID
-      const userId = "1";
-      
-      if (!req.file) {
-        return res.status(400).json({ message: "No image file provided" });
-      }
+        app.post("/api/support/contact", async (req, res) => {
+          try {
+            const contactSchema = z.object({
+              name: z.string().trim().min(1, "Name is required"),
+              email: z.string().trim().email("Valid email is required"),
+              subject: z.string().trim().min(1, "Subject is required"),
+              message: z.string().trim().min(1, "Message is required"),
+            });
 
-      // In a real app, you'd upload to cloud storage (S3, Cloudinary, etc.)
-      // For now, we'll just store the local file path
-      const profileImageUrl = `/uploads/${req.file.filename}`;
-      
-      await storage.updateUserProfile(userId, { profileImageUrl });
-      const updatedUser = await storage.getUser(userId);
-      
-      res.json({ 
-        message: "Profile image updated successfully",
-        user: updatedUser
-      });
-    } catch (error) {
-      console.error("Error uploading profile image:", error);
-      res.status(500).json({ message: "Failed to upload profile image" });
-    }
-  });
+            const { name, email, subject, message } = contactSchema.parse(req.body);
+
+            const supportEmail = "dosh@truckingprosfinancial.com";
+            const senderEmail = "doshbarzanji@gmail.com";
+
+            const html = `
+              <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
+                <h2 style="margin-bottom: 16px; color: #111827;">New QuantumCore Help Message</h2>
+
+                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+                  <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
+                  <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
+                  <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
+                </div>
+
+                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
+                  <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
+                  <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
+                </div>
+              </div>
+            `;
+
+            const text = `
+        New QuantumCore Help Message
+
+        Name: ${name}
+        Email: ${email}
+        Subject: ${subject}
+
+        Message:
+        ${message}
+            `.trim();
+
+            const sent = await sendEmail({
+              to: supportEmail,
+              from: senderEmail,
+              subject: `[QuantumCore Help] ${subject} - ${email}`,
+              text,
+              html,
+            });
+
+            if (!sent) {
+              return res.status(500).json({
+                error: "Message could not be sent right now.",
+              });
+            }
+
+            res.status(200).json({
+              success: true,
+              message: "Message sent successfully.",
+            });
+          } catch (error) {
+            if (error instanceof z.ZodError) {
+              return res.status(400).json({
+                error: error.errors[0]?.message || "Invalid form data.",
+              });
+            }
+
+            console.error("Contact support route error:", error);
+            res.status(500).json({
+              error: "Failed to send message.",
+            });
+          }
+        });
 
   // Admin routes - Role management
   app.get('/api/admin/users', async (req: any, res) => {
@@ -267,42 +315,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/admin/users/:userId/role', async (req: any, res) => {
+  // Profile routes
+  app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
     try {
-      // Authentication removed - admin access enabled by default
-      const currentUser = { id: "1", role: "admin" };
+      const userId = req.user.id;
 
-      const { userId } = req.params;
-      const { role } = req.body;
+      const updates = req.body;
 
-      if (!['employee', 'manager', 'admin'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role. Must be 'employee', 'manager', or 'admin'." });
-      }
+      const validUpdates = [
+        'firstName', 'lastName', 'phone', 'jobTitle', 'department',
+        'bio', 'location', 'timezone', 'language',
+        'emailNotifications', 'smsNotifications', 'desktopNotifications',
+        'startTime', 'endTime', 'workDays',
+        'theme', 'dateFormat', 'timeFormat'
+      ];
 
-      // Prevent changing own role (admin user)
-      if (userId === "1") {
-        return res.status(400).json({ message: "Cannot change your own role." });
-      }
+      const filteredUpdates = Object.keys(updates)
+        .filter((key) => validUpdates.includes(key))
+        .reduce((obj: any, key) => {
+          obj[key] = updates[key];
+          return obj;
+        }, {});
 
-      await storage.updateUserProfile(userId, { role });
-      const updatedUser = await storage.getUser(userId);
-
-      // Log the activity
-      await storage.createActivity({
-        userId: "1", // Authentication removed - use default user
-        type: "role_changed",
-        entityType: "user", 
-        entityId: parseInt(userId),
-        description: `Changed user role to ${role}`,
-      });
+      await storage.updateUserProfile(userId, filteredUpdates);
 
       res.json({
-        message: `User role updated to ${role}`,
+        message: "Profile updated successfully",
+        success: true
+      });
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.post('/api/user/profile-image', upload.single('profileImage'), async (req: any, res) => {
+    try {
+      const userId = "1";
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      const profileImageUrl = `/uploads/${req.file.filename}`;
+
+      await storage.updateUserProfile(userId, { profileImageUrl });
+      const updatedUser = await storage.getUser(userId);
+
+      res.json({
+        message: "Profile image updated successfully",
         user: updatedUser
       });
     } catch (error) {
-      console.error("Error updating user role:", error);
-      res.status(500).json({ message: "Failed to update user role" });
+      console.error("Error uploading profile image:", error);
+      res.status(500).json({ message: "Failed to upload profile image" });
+    }
+  });
+
+  app.post("/api/support/contact", async (req, res) => {
+    try {
+      const contactSchema = z.object({
+        name: z.string().trim().min(1, "Name is required"),
+        email: z.string().trim().email("Valid email is required"),
+        subject: z.string().trim().min(1, "Subject is required"),
+        message: z.string().trim().min(1, "Message is required"),
+      });
+
+      const { name, email, subject, message } = contactSchema.parse(req.body);
+
+      const supportEmail = "doshbarzanji@gmail.com";
+      const senderEmail = "dosh@truckingprosfinancial.com";
+
+      console.log("Support contact route hit");
+      console.log({
+        name,
+        email,
+        subject,
+        supportEmail,
+        senderEmail,
+      });
+
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
+          <h2 style="margin-bottom: 16px; color: #111827;">New QuantumCore Help Message</h2>
+
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+            <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
+            <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
+          </div>
+
+          <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
+            <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
+            <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
+          </div>
+        </div>
+      `;
+
+      const text = `
+New QuantumCore Help Message
+
+Name: ${name}
+Email: ${email}
+Subject: ${subject}
+
+Message:
+${message}
+      `.trim();
+
+      const sent = await sendEmail({
+        to: supportEmail,
+        from: senderEmail,
+        subject: `[QuantumCore Help] ${subject} - ${email}`,
+        text,
+        html,
+      });
+
+      console.log("Send email result:", sent);
+
+      if (!sent) {
+        return res.status(500).json({
+          error: "Message could not be sent right now.",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Message sent successfully.",
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: error.errors[0]?.message || "Invalid form data.",
+        });
+      }
+
+      console.error("Contact support route error:", error);
+      res.status(500).json({
+        error: "Failed to send message.",
+      });
     }
   });
 

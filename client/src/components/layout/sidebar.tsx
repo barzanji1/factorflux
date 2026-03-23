@@ -1,161 +1,273 @@
+import { useMemo } from "react";
 import { useLocation } from "wouter";
-// Authentication system removed - direct access
 import { cn } from "@/lib/utils";
-import { 
-  Truck, 
-  LayoutDashboard, 
-  FileText, 
-  FolderOpen, 
-  Users, 
-  BarChart3, 
-  Settings, 
-  LogOut,
+import type { LucideIcon } from "lucide-react";
+import {
+  Truck,
+  LayoutDashboard,
+  FileText,
+  FolderOpen,
+  Users,
+  BarChart3,
   Shield,
-  CreditCard,
   Fuel,
-  Globe,
-  Download,
   DollarSign,
-  Clock,
   CheckSquare,
   Phone,
   Building,
-  HelpCircle
+  HelpCircle,
+  Briefcase,
+  FolderKanban,
 } from "lucide-react";
 
+type UserRole = "manager" | "admin" | "employee";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Clients", href: "/clients", icon: Users },
-  { name: "Invoices", href: "/invoices", icon: FileText },
-  { name: "Factoring", href: "/factoring", icon: DollarSign },
-  { name: "Tasks", href: "/tasks", icon: CheckSquare },
-  { name: "Documents", href: "/documents", icon: FolderOpen },
-  { name: "Brokers", href: "/brokers", icon: Building },
-  { name: "Collections", href: "/collections", icon: Phone },
-  { name: "Vault", href: "/vault", icon: Shield },
-  { name: "Fuel Advance", href: "/fuel-cards-internal", icon: Fuel },
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Help", href: "/help", icon: HelpCircle },
-  { name: "Admin", href: "/admin", icon: Shield, role: "manager" },
+type NavItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  role?: "manager";
+};
+
+type NavSection = {
+  title: string;
+  items: NavItem[];
+};
+
+type CurrentUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  profileImageUrl?: string;
+  jobTitle?: string;
+};
+
+interface SidebarProps {
+  mobile?: boolean;
+  onNavigate?: () => void;
+}
+
+const navSections: NavSection[] = [
+  {
+    title: "Core",
+    items: [
+      { name: "Dashboard", href: "/", icon: LayoutDashboard },
+      { name: "Clients", href: "/clients", icon: Users },
+      { name: "Invoices", href: "/invoices", icon: FileText },
+      { name: "Documents", href: "/documents", icon: FolderOpen },
+      { name: "Tasks", href: "/tasks", icon: CheckSquare },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { name: "Factoring", href: "/factoring", icon: DollarSign },
+      { name: "Fuel Advance", href: "/fuel-cards-internal", icon: Fuel },
+      { name: "Collections", href: "/collections", icon: Phone },
+      { name: "Reports", href: "/reports", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { name: "Brokers", href: "/brokers", icon: Building },
+      { name: "Vault", href: "/vault", icon: Shield },
+    ],
+  },
+  {
+    title: "Admin",
+    items: [
+      { name: "Help", href: "/help", icon: HelpCircle },
+      { name: "Admin", href: "/admin", icon: Briefcase, role: "manager" },
+    ],
+  },
 ];
 
-export default function Sidebar() {
-  const [location, setLocation] = useLocation();
-  // Get updated user data from localStorage if available, otherwise use defaults
-  const getUserData = () => {
-    const savedUserData = localStorage.getItem('currentUser');
-    if (savedUserData) {
-      try {
-        return JSON.parse(savedUserData);
-      } catch (e) {
-        // Fall back to defaults if parsing fails
-      }
+const defaultUser: CurrentUser = {
+  id: "1",
+  firstName: "Admin",
+  lastName: "User",
+  email: "admin@tpf.com",
+  role: "admin",
+  profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
+  jobTitle: "System Administrator",
+};
+
+function getUserData(): CurrentUser {
+  if (typeof window === "undefined") return defaultUser;
+
+  const savedUserData = window.localStorage.getItem("currentUser");
+
+  if (savedUserData) {
+    try {
+      return { ...defaultUser, ...JSON.parse(savedUserData) };
+    } catch {
+      return defaultUser;
     }
-    return {
-      id: "1",
-      firstName: "Admin",
-      lastName: "User", 
-      email: "admin@tpf.com",
-      role: "admin",
-      profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
-      jobTitle: "System Administrator"
-    };
-  };
-  
+  }
+
+  return defaultUser;
+}
+
+function isRouteActive(currentPath: string, itemHref: string) {
+  if (itemHref === "/") return currentPath === "/";
+  return currentPath === itemHref || currentPath.startsWith(`${itemHref}/`);
+}
+
+export default function Sidebar({
+  mobile = false,
+  onNavigate,
+}: SidebarProps) {
+  const [location, setLocation] = useLocation();
   const user = getUserData();
 
+  const filteredSections = useMemo(() => {
+    return navSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => {
+          if (item.role === "manager") {
+            return user.role === "manager" || user.role === "admin";
+          }
+          return true;
+        }),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [user.role]);
+
   return (
-    <div className="w-64 bg-white dark:bg-gray-900 shadow-xl border-r border-gray-200 dark:border-gray-700 flex flex-col">
-      {/* Logo/Brand */}
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-            <Truck className="text-white text-lg" />
+    <aside
+      className={cn(
+        "w-72 shrink-0 border-r border-[hsl(var(--border))] bg-white/95 backdrop-blur dark:bg-[hsl(var(--card))]",
+        mobile ? "flex h-full" : "hidden h-screen md:flex"
+      )}
+    >
+      <div className="flex h-full w-full flex-col">
+        <div className="border-b border-[hsl(var(--border))] px-5 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-[0_12px_28px_rgba(37,99,235,0.25)]">
+              <Truck className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                QuantumCore
+              </h1>
+              <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                Trucking Pros Financial
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">QuantumCore</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Trucking Pros Financial</p>
+        </div>
+
+        <div className="border-b border-[hsl(var(--border))] px-5 py-4">
+          <div className="qc-card flex items-center gap-3 rounded-2xl border px-3 py-3 shadow-sm">
+            <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-slate-200 dark:border-slate-700">
+              <img
+                src={
+                  user.profileImageUrl ||
+                  `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=2563EB&color=fff`
+                }
+                alt={`${user.firstName} ${user.lastName}`}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=2563EB&color=fff`;
+                }}
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                {user.firstName} {user.lastName}
+              </p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                {user.jobTitle || "Employee"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="custom-scrollbar flex-1 overflow-y-auto px-4 py-4">
+          <div className="space-y-6">
+            {filteredSections.map((section) => (
+              <div key={section.title}>
+                <div className="mb-2 px-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+                    {section.title}
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  {section.items.map((item) => {
+                    const isActive = isRouteActive(location, item.href);
+                    const Icon = item.icon;
+
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => {
+                          setLocation(item.href);
+                          onNavigate?.();
+                        }}
+                        aria-current={isActive ? "page" : undefined}
+                        className={cn(
+                          "group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-all duration-200",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2",
+                          "ring-offset-[hsl(var(--background))]",
+                          isActive
+                            ? "qc-sidebar-item-active text-blue-700 dark:text-blue-300"
+                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-white"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all duration-200",
+                            isActive
+                              ? "bg-white/80 text-blue-600 shadow-sm dark:bg-slate-900/40 dark:text-blue-400"
+                              : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-slate-700"
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        <div className="flex min-w-0 flex-1 items-center justify-between">
+                          <span className="truncate text-sm font-medium">
+                            {item.name}
+                          </span>
+
+                          {isActive && (
+                            <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </nav>
+
+        <div className="border-t border-[hsl(var(--border))] px-5 py-4">
+          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-3 dark:bg-slate-800/60">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 text-white">
+              <FolderKanban className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                QuantumCore OS
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Internal operations suite
+              </p>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* User Info */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600">
-            <img 
-              src={user?.profileImageUrl || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`} 
-              alt="User Profile" 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback to initials avatar if image fails to load
-                e.currentTarget.src = `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=3B82F6&color=fff`;
-              }}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-gray-900 dark:text-white truncate">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-              {user?.role || "Employee"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
-        {navigation.map((item) => {
-          // Hide admin tab for non-managers
-          if (item.role === "manager" && user?.role !== "manager" && user?.role !== "admin") {
-            return null;
-          }
-          
-          const isActive = location === item.href;
-          
-          // Handle external links differently
-          if ('external' in item && item.external) {
-            return (
-              <a
-                key={item.name}
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all duration-200 group"
-              >
-                <item.icon className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors" />
-                <span className="font-medium">{item.name}</span>
-              </a>
-            );
-          }
-          
-          return (
-            <button
-              key={item.name}
-              onClick={() => setLocation(item.href)}
-              className={cn(
-                "w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-left transition-all duration-200 group",
-                isActive
-                  ? "bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/50 dark:to-blue-800/50 text-blue-700 dark:text-blue-300 font-medium shadow-sm border-l-4 border-blue-600"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
-              )}
-            >
-              <item.icon className={cn(
-                "w-5 h-5 transition-colors",
-                isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-500 group-hover:text-gray-700"
-              )} />
-              <span className="font-medium">{item.name}</span>
-            </button>
-          );
-        })}
-        
-
-      </nav>
-
-      {/* Logout */}
-      {/* Logout removed - no authentication required */}
-    </div>
+    </aside>
   );
 }

@@ -1,19 +1,57 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import {
+  Eye,
+  Download,
+  Edit,
+  ArrowRight,
+  ReceiptText,
+} from "lucide-react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Download, Edit } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
 import InvoiceModal from "@/components/modals/invoice-modal";
 import type { Invoice } from "@shared/schema";
+import { cn } from "@/lib/utils";
+
+function InvoiceRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+      <div className="space-y-2">
+        <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="h-3 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+      </div>
+      <div className="h-6 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+    </div>
+  );
+}
+
+function formatCurrency(amount: string | number) {
+  return `$${Number(amount).toFixed(2)}`;
+}
+
+function formatDate(date?: string | Date | null) {
+  if (!date) return "—";
+  return new Date(date).toLocaleDateString();
+}
 
 export default function RecentInvoices() {
   const { toast } = useToast();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const { data: invoices, isLoading } = useQuery({
+
+  const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
   });
 
@@ -22,11 +60,21 @@ export default function RecentInvoices() {
       title: "Invoice Details",
       description: (
         <div className="space-y-1">
-          <div><strong>Invoice:</strong> {invoice.invoiceNumber}</div>
-          <div><strong>Load ID:</strong> {invoice.loadId}</div>
-          <div><strong>Amount:</strong> ${parseFloat(invoice.amount).toFixed(2)}</div>
-          <div><strong>Status:</strong> {invoice.status.toUpperCase()}</div>
-          <div><strong>Created:</strong> {new Date(invoice.createdAt!).toLocaleDateString()}</div>
+          <div>
+            <strong>Invoice:</strong> {invoice.invoiceNumber}
+          </div>
+          <div>
+            <strong>Load ID:</strong> {invoice.loadId}
+          </div>
+          <div>
+            <strong>Amount:</strong> {formatCurrency(invoice.amount)}
+          </div>
+          <div>
+            <strong>Status:</strong> {invoice.status.toUpperCase()}
+          </div>
+          <div>
+            <strong>Created:</strong> {formatDate(invoice.createdAt)}
+          </div>
         </div>
       ),
       duration: 5000,
@@ -34,32 +82,30 @@ export default function RecentInvoices() {
   };
 
   const handleDownloadInvoice = (invoice: Invoice) => {
-    // Generate and download PDF
     toast({
       title: "Download Started",
       description: `Downloading invoice ${invoice.invoiceNumber}`,
     });
-    
-    // Create a simple text-based invoice for download
+
     const invoiceData = `
 TRUCKING PROS FINANCIAL
 Invoice: ${invoice.invoiceNumber}
 Load ID: ${invoice.loadId}
-Amount: $${parseFloat(invoice.amount).toFixed(2)}
+Amount: ${formatCurrency(invoice.amount)}
 Status: ${invoice.status.toUpperCase()}
-Date: ${new Date(invoice.createdAt!).toLocaleDateString()}
+Date: ${formatDate(invoice.createdAt)}
 
 Thank you for your business!
     `.trim();
-    
-    const blob = new Blob([invoiceData], { type: 'text/plain' });
+
+    const blob = new Blob([invoiceData], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `invoice-${invoice.invoiceNumber}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `invoice-${invoice.invoiceNumber}.txt`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   };
 
@@ -72,134 +118,180 @@ Thank you for your business!
     switch (status) {
       case "approved":
       case "paid":
-        return "bg-green-100 text-green-800";
+        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300";
       case "submitted":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300";
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300";
       case "rejected":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
     }
   };
 
+  const recentInvoices = invoices.slice(0, 5);
+
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
+      <Card className="rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">Recent Invoices</CardTitle>
-            <Button>View All Invoices</Button>
+            <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">
+              Recent Invoices
+            </CardTitle>
+            <div className="h-10 w-36 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-700" />
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="animate-pulse">
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-4 border rounded">
-                  <div className="space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    <div className="h-3 bg-gray-200 rounded w-32"></div>
-                  </div>
-                  <div className="h-6 bg-gray-200 rounded w-16"></div>
-                </div>
-              ))}
-            </div>
+
+        <CardContent className="p-6">
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <InvoiceRowSkeleton key={index} />
+            ))}
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  const recentInvoices = (invoices as Invoice[])?.slice(0, 5) || [];
-
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl">Recent Invoices</CardTitle>
+    <Card className="rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+      <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                <ReceiptText className="h-4.5 w-4.5" />
+              </div>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                Finance
+              </span>
+            </div>
+
+            <CardTitle className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Recent Invoices
+            </CardTitle>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Latest invoice activity across the system
+            </p>
+          </div>
+
           <Link href="/invoices">
-            <Button>View All Invoices</Button>
+            <Button className="h-11 rounded-xl bg-blue-600 px-4 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)] hover:bg-blue-700">
+              View All Invoices
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </Link>
         </div>
       </CardHeader>
-      
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-600">Invoice #</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-600">Load #</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-600">Amount</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-600">Status</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-600">Date</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {recentInvoices.map((invoice: Invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-primary">
-                    {invoice.invoiceNumber}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    #{invoice.loadId}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-secondary">
-                    ${parseFloat(invoice.amount).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge className={getStatusColor(invoice.status)}>
-                      {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(invoice.createdAt!).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleViewInvoice(invoice)}
-                        title="View Invoice"
+
+      <CardContent className="p-0">
+        {recentInvoices.length > 0 ? (
+          <div className="custom-scrollbar overflow-x-auto">
+            <Table className="min-w-[760px]">
+              <TableHeader>
+                <TableRow className="bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-50/80 dark:hover:bg-slate-900/40">
+                  <TableHead className="px-6">Invoice #</TableHead>
+                  <TableHead className="px-6">Load #</TableHead>
+                  <TableHead className="px-6">Amount</TableHead>
+                  <TableHead className="px-6">Status</TableHead>
+                  <TableHead className="px-6">Date</TableHead>
+                  <TableHead className="px-6">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {recentInvoices.map((invoice) => (
+                  <TableRow
+                    key={invoice.id}
+                    className="dark:hover:bg-slate-900/30"
+                  >
+                    <TableCell className="px-6">
+                      <div className="font-semibold text-blue-700 dark:text-blue-400">
+                        {invoice.invoiceNumber}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="px-6 text-sm text-slate-600 dark:text-slate-300">
+                      #{invoice.loadId}
+                    </TableCell>
+
+                    <TableCell className="px-6 text-sm font-semibold text-slate-900 dark:text-white">
+                      {formatCurrency(invoice.amount)}
+                    </TableCell>
+
+                    <TableCell className="px-6">
+                      <Badge
+                        className={cn(
+                          "rounded-full px-2.5 py-1 font-semibold",
+                          getStatusColor(invoice.status)
+                        )}
                       >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleDownloadInvoice(invoice)}
-                        title="Download Invoice"
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleEditInvoice(invoice)}
-                        title="Edit Invoice"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {recentInvoices.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No invoices found</p>
+                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell className="px-6 text-sm text-slate-500 dark:text-slate-400">
+                      {formatDate(invoice.createdAt)}
+                    </TableCell>
+
+                    <TableCell className="px-6">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => handleViewInvoice(invoice)}
+                          title="View Invoice"
+                          className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => handleDownloadInvoice(invoice)}
+                          title="Download Invoice"
+                          className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => handleEditInvoice(invoice)}
+                          title="Edit Invoice"
+                          className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="px-6 py-14 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+              <ReceiptText className="h-6 w-6" />
             </div>
-          )}
-        </div>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              No invoices found
+            </p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              New invoices will appear here once created.
+            </p>
+          </div>
+        )}
       </CardContent>
 
-      {/* Edit Invoice Modal */}
       <InvoiceModal
         isOpen={isEditModalOpen}
         onClose={() => {

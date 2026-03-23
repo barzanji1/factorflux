@@ -1,27 +1,45 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useId, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-// Authentication system removed - direct access
 import { apiRequest } from "@/lib/queryClient";
-import { CloudUpload, ExpandIcon, FileIcon, Eye } from "lucide-react";
+import {
+  CloudUpload,
+  FileIcon,
+  Sparkles,
+  ShieldCheck,
+  FileCheck2,
+  ArrowUpRight,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DocumentUploadProps {
   onUploadComplete?: () => void;
   documentType?: string;
 }
 
-export default function DocumentUpload({ onUploadComplete, documentType = "other" }: DocumentUploadProps) {
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+];
+
+export default function DocumentUpload({
+  onUploadComplete,
+  documentType = "other",
+}: DocumentUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // Add document type to the form data
-      formData.append('documentType', documentType);
+      formData.append("documentType", documentType);
       const response = await apiRequest("POST", "/api/documents/upload", formData);
       return response.json();
     },
@@ -30,16 +48,15 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
         title: "Success",
         description: "Document uploaded successfully",
       });
+
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-activities"] });
-      if (onUploadComplete) {
-        onUploadComplete();
-      }
+
+      onUploadComplete?.();
     },
     onError: (error: Error) => {
       let errorMessage = "Failed to upload document";
-      
-      // Check if it's an authentication error
+
       if (error.message.includes("401") || error.message.includes("Authentication required")) {
         errorMessage = "Please log in again to upload documents";
         setTimeout(() => {
@@ -50,7 +67,7 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
       } else if (error.message.includes("Only PDF, JPEG, JPG, and PNG")) {
         errorMessage = "Only PDF, JPEG, JPG, and PNG files are allowed";
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -59,166 +76,286 @@ export default function DocumentUpload({ onUploadComplete, documentType = "other
     },
   });
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const openFilePicker = () => {
+    inputRef.current?.click();
+  };
+
+  const validateFiles = (files: File[]) => {
+    const validFiles: File[] = [];
+
+    files.forEach((file) => {
+      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name} is not a supported file. Use PDF, JPG, or PNG.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds the 10MB size limit.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    return validFiles;
+  };
+
+  const handleFiles = useCallback(
+    (files: File[]) => {
+      const validFiles = validateFiles(files);
+
+      validFiles.forEach((file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("documentType", documentType);
+        uploadMutation.mutate(formData);
+      });
+    },
+    [documentType, uploadMutation]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(true);
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    handleFiles(files);
-  }, []);
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragOver(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      handleFiles(files);
+    },
+    [handleFiles]
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      handleFiles(files);
-    }
-  };
+    if (!e.target.files) return;
 
-  const handleFiles = (files: File[]) => {
-    files.forEach((file) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('documentType', documentType);
-      
-      uploadMutation.mutate(formData);
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "processed":
-        return "bg-green-100 text-green-800";
-      case "processing":
-        return "bg-yellow-100 text-yellow-800";
-      case "failed":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+    handleFiles(Array.from(e.target.files));
+    e.target.value = "";
   };
 
   const getDocumentTypeLabel = (type: string) => {
     switch (type) {
-      case 'rate_confirmation':
-        return 'Rate Confirmation';
-      case 'bill_of_lading':
-        return 'Bill of Lading';
-      case 'driver_id':
-        return 'Driver ID';
-      case 'carrier_setup':
-        return 'Carrier Setup';
+      case "rate_confirmation":
+        return "Rate Confirmation";
+      case "bill_of_lading":
+        return "Bill of Lading";
+      case "driver_id":
+        return "Driver ID";
+      case "carrier_setup":
+        return "Carrier Setup";
       default:
-        return 'Documents';
+        return "Documents";
+    }
+  };
+
+  const getDocumentDescription = (type: string) => {
+    switch (type) {
+      case "rate_confirmation":
+        return "Upload rate confirmation documents for this load";
+      case "bill_of_lading":
+        return "Upload bill of lading documents for this load";
+      case "driver_id":
+        return "Upload driver ID and carrier setup documents";
+      default:
+        return "All supporting documents such as RC, BOL, lumpers, and receipts";
     }
   };
 
   return (
-    <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+    <Card className="overflow-hidden rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+      <CardHeader className="border-b border-slate-100 pb-5 dark:border-slate-800">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                <FileCheck2 className="h-4.5 w-4.5" />
+              </div>
+              <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
+                Smart Intake
+              </span>
+            </div>
+
+            <CardTitle className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
               Upload {getDocumentTypeLabel(documentType)}
             </CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {documentType === 'rate_confirmation' && 'Upload rate confirmation documents for this load'}
-              {documentType === 'bill_of_lading' && 'Upload bill of lading documents for this load'}
-              {documentType === 'driver_id' && 'Upload driver ID and carrier setup documents'}
-              {documentType === 'other' && 'All supporting documents such as RC, BOL, Lumpers, and receipts'}
+
+            <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+              {getDocumentDescription(documentType)}
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <span className={`text-sm font-medium px-3 py-1 rounded-full ${
-              uploadMutation.isPending 
-                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" 
-                : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-            }`}>
-              {uploadMutation.isPending ? "Processing..." : "Ready"}
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => document.getElementById('file-input')?.click()}
-              disabled={uploadMutation.isPending}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold",
+                uploadMutation.isPending
+                  ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
+                  : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+              )}
             >
-              <FileIcon className="w-4 h-4 mr-2" />
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  uploadMutation.isPending ? "bg-amber-500" : "bg-emerald-500"
+                )}
+              />
+              {uploadMutation.isPending ? "Processing..." : "Ready"}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openFilePicker}
+              disabled={uploadMutation.isPending}
+              className="h-10 rounded-xl border-slate-200 px-4 dark:border-slate-700"
+            >
+              <FileIcon className="mr-2 h-4 w-4" />
               Choose Files
             </Button>
           </div>
         </div>
       </CardHeader>
-      
-      <CardContent className="space-y-6">
-        {/* Drag & Drop Zone */}
+
+      <CardContent className="space-y-6 p-6">
         <div
-          className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 ${
+          role="button"
+          tabIndex={0}
+          aria-label={`Upload ${getDocumentTypeLabel(documentType)}`}
+          className={cn(
+            "relative cursor-pointer overflow-hidden rounded-[24px] border-2 border-dashed p-8 text-center transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:ring-offset-2",
             isDragOver
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10 scale-105 shadow-lg"
-              : "border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-          }`}
+              ? "scale-[1.01] border-blue-500 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-[0_18px_40px_rgba(37,99,235,0.14)] dark:from-blue-950/20 dark:to-cyan-950/10"
+              : "border-slate-300 bg-slate-50/70 hover:border-blue-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-blue-500"
+          )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => document.getElementById('file-input')?.click()}
+          onClick={openFilePicker}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openFilePicker();
+            }
+          }}
         >
           <input
-            id="file-input"
+            ref={inputRef}
+            id={inputId}
             type="file"
             multiple
             accept=".pdf,.jpg,.jpeg,.png"
             onChange={handleFileSelect}
             className="hidden"
           />
-          
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <CloudUpload className="text-white w-8 h-8" />
+
+          <div className="absolute right-4 top-4 hidden rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur md:inline-flex dark:bg-slate-900/70 dark:text-slate-300">
+            AI-ready workflow
           </div>
-          
-          <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-            + Add Files
+
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-[0_16px_32px_rgba(37,99,235,0.22)]">
+            <CloudUpload className="h-8 w-8" />
+          </div>
+
+          <h4 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            Drop files here
           </h4>
-          <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">
-            Drop files here or click to browse
+
+          <p className="mt-2 text-base text-slate-500 dark:text-slate-400">
+            or click to browse from your computer
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            Supported formats: PDF, JPG, PNG (Max 10MB each)<br/>
-            <span className="text-blue-600 dark:text-blue-400 font-medium">JPEG images will be automatically converted to PDF</span>
-          </p>
-          
-          <div className="flex justify-center">
-            <span className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full font-medium">
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
               {getDocumentTypeLabel(documentType)}
             </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              PDF
+            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              JPG
+            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              PNG
+            </span>
+          </div>
+
+          <div className="mx-auto mt-6 max-w-2xl rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-sm backdrop-blur dark:bg-slate-900/70 dark:text-slate-300">
+            Supported formats: PDF, JPG, PNG • Max 10MB each
+            <div className="mt-1 font-medium text-blue-600 dark:text-blue-400">
+              JPEG images are automatically converted to PDF
+            </div>
           </div>
         </div>
 
-        {/* Upload Progress */}
         {uploadMutation.isPending && (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-sm text-gray-500 mt-2">Uploading documents...</p>
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 dark:border-blue-950/40 dark:bg-blue-950/20">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Uploading documents...
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Processing your files securely
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Upload Instructions */}
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-2">Upload Instructions</h4>
-          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-            <li>• Ensure document quality is clear and readable</li>
-            <li>• File names should include load numbers when possible</li>
-            <li>• JPEG images will be automatically converted to PDF format</li>
-            <li>• Maximum file size: 10MB per document</li>
-          </ul>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Clean readable scans
+            </h4>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Make sure documents are clear, flat, and easy to read before upload.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Smart processing
+            </h4>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              JPEG images are automatically converted to PDF for easier storage and review.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
+              <ArrowUpRight className="h-5 w-5" />
+            </div>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Faster indexing
+            </h4>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Include load numbers in file names when possible to improve tracking.
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>
