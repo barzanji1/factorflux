@@ -1,4 +1,4 @@
-# QuantumCore Desktop Launcher Troubleshooting Guide
+# FactorFlux Desktop Launcher Troubleshooting Guide
 
 ## Updated Desktop Launchers (January 26, 2025)
 
@@ -14,18 +14,18 @@ The desktop launchers have been completely updated to resolve launch failures. H
 
 ### 🚀 How the New Launchers Work
 
-#### Windows (`start-quantumcore.bat`)
+#### Windows (`start-factorflux.bat`)
 - Checks if Node.js is available for enhanced experience
 - Falls back to basic Windows `start` command
 - Provides clear desktop app creation instructions
 - Works without any dependencies
 
-#### Mac (`start-quantumcore.sh`)
+#### Mac (`start-factorflux.sh`)
 - Uses `open` command (built into macOS)
 - Provides Safari "Add to Dock" and Chrome "Create Shortcut" instructions
 - No external dependencies required
 
-#### Linux (`start-quantumcore.sh`)
+#### Linux (`start-factorflux.sh`)
 - Uses `xdg-open` (standard on most Linux distributions)
 - Falls back to Firefox or Chrome if available
 - Provides desktop launcher creation instructions
@@ -35,15 +35,15 @@ The desktop launchers have been completely updated to resolve launch failures. H
 Users can create a true "desktop app" experience by:
 
 **Chrome/Edge:**
-1. Open QuantumCore in browser
+1. Open FactorFlux in browser
 2. Go to "More Tools" > "Create Shortcut"
 3. Check "Open as window"
-4. Name it "QuantumCore"
+4. Name it "FactorFlux"
 
 **Safari (Mac):**
-1. Open QuantumCore in Safari
+1. Open FactorFlux in Safari
 2. Click "Share" > "Add to Dock"
-3. Name it "QuantumCore"
+3. Name it "FactorFlux"
 
 **Firefox:**
 1. Right-click on page
@@ -52,22 +52,22 @@ Users can create a true "desktop app" experience by:
 ### 🔧 If Launchers Still Don't Work
 
 **Windows:**
-- Double-click `start-quantumcore.bat`
+- Double-click `start-factorflux.bat`
 - If that fails, manually open: `https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev`
 
 **Mac:**
-- Double-click `start-quantumcore.sh`
-- If permission denied: `chmod +x start-quantumcore.sh`
+- Double-click `start-factorflux.sh`
+- If permission denied: `chmod +x start-factorflux.sh`
 - If that fails, manually open the URL in Safari/Chrome
 
 **Linux:**
-- Double-click `start-quantumcore.sh` or run `./start-quantumcore.sh`
-- If permission denied: `chmod +x start-quantumcore.sh`
+- Double-click `start-factorflux.sh` or run `./start-factorflux.sh`
+- If permission denied: `chmod +x start-factorflux.sh`
 - If that fails, run: `xdg-open https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev`
 
 ### 📋 Manual Access
 
-If all else fails, users can always access QuantumCore directly:
+If all else fails, users can always access FactorFlux directly:
 - **Live URL**: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
 - **Bookmark this URL** for instant access
 - **Add to browser favorites** for easy access
@@ -91,9 +91,9 @@ All desktop installers have been rebuilt with:
 - ✅ Clear setup instructions
 
 Download the updated installers:
-- **Windows**: QuantumCore-Windows-Portable.tar.gz
-- **Mac**: QuantumCore-Mac-Portable.tar.gz  
-- **Linux**: QuantumCore-Linux-Portable.tar.gz
+- **Windows**: FactorFlux-Windows-Portable.tar.gz
+- **Mac**: FactorFlux-Mac-Portable.tar.gz  
+- **Linux**: FactorFlux-Linux-Portable.tar.gz
 
 ### 💡 Pro Tips
 
@@ -103,4 +103,4 @@ Download the updated installers:
 4. **Check browser security settings** if automatic opening fails
 5. **Try different browsers** if one doesn't work
 
-The desktop experience is now reliable and professional, with multiple fallback methods ensuring QuantumCore always launches successfully.
+The desktop experience is now reliable and professional, with multiple fallback methods ensuring FactorFlux always launches successfully.

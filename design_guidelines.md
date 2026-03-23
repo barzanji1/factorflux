@@ -1,4 +1,4 @@
-# QuantumCore/TPF Pulse OS Design Guidelines
+# FactorFlux/TPF Pulse OS Design Guidelines
 
 ## Design Approach
 **System:** shadcn/ui component library with Tailwind CSS

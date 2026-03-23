@@ -27,7 +27,7 @@ export default function Dashboard() {
             <div className="min-w-0">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
-                  QuantumCore OS
+                  FactorFlux OS
                 </span>
                 <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
                   Internal Operations Suite
@@ -35,7 +35,7 @@ export default function Dashboard() {
               </div>
 
               <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
-                Welcome to QuantumCore
+                Welcome to FactorFlux
               </h2>
 
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 lg:text-base">

@@ -66,7 +66,7 @@ export default function LoginPage() {
           <div className="mx-auto w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mb-4">
             <Lock className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">QuantumCore</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">FactorFlux</h1>
           <p className="text-gray-600 dark:text-gray-300 mt-2">Trucking Pros Financial</p>
         </div>
 

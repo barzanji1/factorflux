@@ -18,8 +18,8 @@ export default function DownloadPage() {
             Back to Home
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Download QuantumCore</h1>
-            <p className="text-gray-600">Get QuantumCore on your device for the best experience</p>
+            <h1 className="text-3xl font-bold text-gray-900">Download FactorFlux</h1>
+            <p className="text-gray-600">Get FactorFlux on your device for the best experience</p>
           </div>
         </div>
 
@@ -36,7 +36,7 @@ export default function DownloadPage() {
                 Why Choose Desktop App?
               </CardTitle>
               <CardDescription>
-                Enhanced performance and features when you download QuantumCore
+                Enhanced performance and features when you download FactorFlux
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -120,7 +120,7 @@ export default function DownloadPage() {
             <CardHeader>
               <CardTitle>Quick Start Guide</CardTitle>
               <CardDescription>
-                Get up and running with QuantumCore in minutes
+                Get up and running with FactorFlux in minutes
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -154,7 +154,7 @@ export default function DownloadPage() {
                   <div>
                     <h3 className="font-medium">Run the launcher</h3>
                     <p className="text-sm text-muted-foreground">
-                      Double-click the startup script, and QuantumCore will open in your browser
+                      Double-click the startup script, and FactorFlux will open in your browser
                     </p>
                   </div>
                 </div>

@@ -243,7 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             const html = `
               <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
-                <h2 style="margin-bottom: 16px; color: #111827;">New QuantumCore Help Message</h2>
+                <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
 
                 <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
                   <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
@@ -259,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `;
 
             const text = `
-        New QuantumCore Help Message
+        New FactorFlux Help Message
 
         Name: ${name}
         Email: ${email}
@@ -272,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sent = await sendEmail({
               to: supportEmail,
               from: senderEmail,
-              subject: `[QuantumCore Help] ${subject} - ${email}`,
+              subject: `[FactorFlux Help] ${subject} - ${email}`,
               text,
               html,
             });
@@ -397,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
-          <h2 style="margin-bottom: 16px; color: #111827;">New QuantumCore Help Message</h2>
+          <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
 
           <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
             <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
@@ -413,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `;
 
       const text = `
-New QuantumCore Help Message
+New FactorFlux Help Message
 
 Name: ${name}
 Email: ${email}
@@ -426,7 +426,7 @@ ${message}
       const sent = await sendEmail({
         to: supportEmail,
         from: senderEmail,
-        subject: `[QuantumCore Help] ${subject} - ${email}`,
+        subject: `[FactorFlux Help] ${subject} - ${email}`,
         text,
         html,
       });
@@ -1231,7 +1231,7 @@ ${message}
   // Desktop installer download routes - Direct download links
   app.get('/api/desktop/download/windows', async (req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Windows-Portable.tar.gz');
+      const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Windows-Portable.tar.gz');
       
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Windows installer not found" });
@@ -1240,7 +1240,7 @@ ${message}
       const stats = fs.statSync(filePath);
       
       res.setHeader('Content-Type', 'application/gzip');
-      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Windows-Portable.tar.gz"');
+      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Windows-Portable.tar.gz"');
       res.setHeader('Content-Length', stats.size.toString());
       res.setHeader('Cache-Control', 'public, max-age=3600');
       
@@ -1260,7 +1260,7 @@ ${message}
 
   app.get('/api/desktop/download/mac', async (req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Mac-Installer.tar.gz');
+      const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Mac-Installer.tar.gz');
       
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Mac installer not found" });
@@ -1269,7 +1269,7 @@ ${message}
       const stats = fs.statSync(filePath);
       
       res.setHeader('Content-Type', 'application/gzip');
-      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Mac-Installer.tar.gz"');
+      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Mac-Installer.tar.gz"');
       res.setHeader('Content-Length', stats.size.toString());
       res.setHeader('Cache-Control', 'public, max-age=3600');
       
@@ -1289,7 +1289,7 @@ ${message}
 
   app.get('/api/desktop/download/linux', async (req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Linux-Portable.tar.gz');
+      const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Linux-Portable.tar.gz');
       
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Linux installer not found" });
@@ -1298,7 +1298,7 @@ ${message}
       const stats = fs.statSync(filePath);
       
       res.setHeader('Content-Type', 'application/gzip');
-      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Linux-Portable.tar.gz"');
+      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Linux-Portable.tar.gz"');
       res.setHeader('Content-Length', stats.size.toString());
       res.setHeader('Cache-Control', 'public, max-age=3600');
       
@@ -1328,7 +1328,7 @@ ${message}
       const stats = fs.statSync(filePath);
       
       res.setHeader('Content-Type', 'text/markdown');
-      res.setHeader('Content-Disposition', 'attachment; filename="QuantumCore-Installation-Guide.md"');
+      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Installation-Guide.md"');
       res.setHeader('Content-Length', stats.size.toString());
       res.setHeader('Cache-Control', 'public, max-age=3600');
       
@@ -1365,16 +1365,16 @@ ${message}
 
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #2563eb;">QuantumCore Desktop Access</h1>
+          <h1 style="color: #2563eb;">FactorFlux Desktop Access</h1>
           
           ${clientName ? `<p>Hello ${clientName},</p>` : '<p>Hello,</p>'}
           
-          <p>You now have access to QuantumCore, our freight factoring management system. You can access it in two ways:</p>
+          <p>You now have access to FactorFlux, our freight factoring management system. You can access it in two ways:</p>
           
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h2 style="color: #1e40af; margin-top: 0;">🌐 Web Access (Recommended)</h2>
             <p><strong>Live Application:</strong> <a href="${appUrl}" style="color: #2563eb; text-decoration: none; font-weight: bold;">${appUrl}</a></p>
-            <p>Access QuantumCore directly in your web browser - no installation required.</p>
+            <p>Access FactorFlux directly in your web browser - no installation required.</p>
           </div>
           
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -1384,21 +1384,21 @@ ${message}
             <div style="margin: 15px 0;">
               <strong>🪟 Windows:</strong><br>
               <a href="${appUrl}/api/desktop/download/windows" style="color: #2563eb; text-decoration: none;">
-                QuantumCore-Windows-Portable.tar.gz
+                FactorFlux-Windows-Portable.tar.gz
               </a> (5.7 MB)
             </div>
             
             <div style="margin: 15px 0;">
               <strong>🍎 Mac:</strong><br>
               <a href="${appUrl}/api/desktop/download/mac" style="color: #2563eb; text-decoration: none;">
-                QuantumCore-Mac-Portable.tar.gz
+                FactorFlux-Mac-Portable.tar.gz
               </a> (5.7 MB)
             </div>
             
             <div style="margin: 15px 0;">
               <strong>🐧 Linux:</strong><br>
               <a href="${appUrl}/api/desktop/download/linux" style="color: #2563eb; text-decoration: none;">
-                QuantumCore-Linux-Portable.tar.gz
+                FactorFlux-Linux-Portable.tar.gz
               </a> (5.7 MB)
             </div>
             
@@ -1415,7 +1415,7 @@ ${message}
             <li>Download the file for your operating system</li>
             <li>Extract the archive using built-in tools</li>
             <li>Run the startup script (double-click or run in terminal)</li>
-            <li>QuantumCore opens automatically in your browser</li>
+            <li>FactorFlux opens automatically in your browser</li>
           </ol>
           
           ${message ? `<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
@@ -1434,11 +1434,11 @@ ${message}
       `;
 
       const textContent = `
-QuantumCore Desktop Access
+FactorFlux Desktop Access
 
 ${clientName ? `Hello ${clientName},` : 'Hello,'}
 
-You now have access to QuantumCore, our freight factoring management system.
+You now have access to FactorFlux, our freight factoring management system.
 
 WEB ACCESS (Recommended):
 ${appUrl}
@@ -1453,7 +1453,7 @@ QUICK SETUP FOR DESKTOP:
 1. Download the file for your operating system
 2. Extract the archive using built-in tools
 3. Run the startup script (double-click or run in terminal)
-4. QuantumCore opens automatically in your browser
+4. FactorFlux opens automatically in your browser
 
 ${message ? `Additional Information: ${message}` : ''}
 
@@ -1465,24 +1465,24 @@ Trucking Pros Financial Team
 
       // For now, log the email content and return success (since SendGrid needs proper setup)
       console.log('Email would be sent to:', email);
-      console.log('Subject:', `QuantumCore Access - ${clientName || 'Desktop Installation'}`);
+      console.log('Subject:', `FactorFlux Access - ${clientName || 'Desktop Installation'}`);
       console.log('Content preview:', textContent.substring(0, 200) + '...');
 
       // Log activity
       await storage.createActivity({
         userId: req.user.id,
         type: 'installer_links_prepared',
-        description: `QuantumCore access prepared for: ${email}${clientName ? ` (${clientName})` : ''}`,
+        description: `FactorFlux access prepared for: ${email}${clientName ? ` (${clientName})` : ''}`,
         entityType: 'system',
         entityId: null,
       });
 
       // Return the email content for manual sending or display
       res.json({ 
-        message: "QuantumCore access email prepared successfully",
+        message: "FactorFlux access email prepared successfully",
         emailContent: {
           to: email,
-          subject: `QuantumCore Access - ${clientName || 'Desktop Installation'}`,
+          subject: `FactorFlux Access - ${clientName || 'Desktop Installation'}`,
           text: textContent,
           html: htmlContent
         }
@@ -1495,27 +1495,27 @@ Trucking Pros Financial Team
 
   // Desktop installer download routes - these must come before catch-all routes
   app.get('/api/download/windows', (req, res) => {
-    const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Windows-Portable.tar.gz');
+    const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Windows-Portable.tar.gz');
     if (fs.existsSync(filePath)) {
-      res.download(filePath, 'QuantumCore-Windows-Portable.tar.gz');
+      res.download(filePath, 'FactorFlux-Windows-Portable.tar.gz');
     } else {
       res.status(404).json({ message: "Windows installer not found" });
     }
   });
 
   app.get('/api/download/mac', (req, res) => {
-    const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Mac-Portable.tar.gz');
+    const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Mac-Portable.tar.gz');
     if (fs.existsSync(filePath)) {
-      res.download(filePath, 'QuantumCore-Mac-Portable.tar.gz');
+      res.download(filePath, 'FactorFlux-Mac-Portable.tar.gz');
     } else {
       res.status(404).json({ message: "Mac installer not found" });
     }
   });
 
   app.get('/api/download/linux', (req, res) => {
-    const filePath = path.resolve(process.cwd(), 'electron-dist', 'QuantumCore-Linux-Portable.tar.gz');
+    const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Linux-Portable.tar.gz');
     if (fs.existsSync(filePath)) {
-      res.download(filePath, 'QuantumCore-Linux-Portable.tar.gz');
+      res.download(filePath, 'FactorFlux-Linux-Portable.tar.gz');
     } else {
       res.status(404).json({ message: "Linux installer not found" });
     }
@@ -1536,7 +1536,7 @@ Trucking Pros Financial Team
       <!DOCTYPE html>
       <html>
       <head>
-        <title>QuantumCore Desktop Downloads</title>
+        <title>FactorFlux Desktop Downloads</title>
         <style>
           body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
           .download-card { background: #f5f5f5; padding: 20px; margin: 10px 0; border-radius: 8px; }
@@ -1546,7 +1546,7 @@ Trucking Pros Financial Team
         </style>
       </head>
       <body>
-        <h1>🚀 QuantumCore Desktop Installers</h1>
+        <h1>🚀 FactorFlux Desktop Installers</h1>
         <p>Download the portable desktop version for your operating system:</p>
         
         <div class="download-card">
@@ -1581,7 +1581,7 @@ Trucking Pros Financial Team
           <li>Download the file for your operating system</li>
           <li>Extract the archive (no special software needed)</li>
           <li>Run the startup script</li>
-          <li>QuantumCore opens in your browser automatically</li>
+          <li>FactorFlux opens in your browser automatically</li>
         </ol>
         
         <p><strong>Requirements:</strong> Node.js must be installed on your computer (download from <a href="https://nodejs.org/">nodejs.org</a>)</p>

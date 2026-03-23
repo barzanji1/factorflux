@@ -86,7 +86,7 @@ export default function HelpPage() {
   const quickStartGuides = [
     {
       title: "Getting Started",
-      description: "Learn the basics of QuantumCore",
+      description: "Learn the basics of FactorFlux",
       icon: HelpCircle,
       steps: [
         "Log in with your credentials",
@@ -734,7 +734,7 @@ export default function HelpPage() {
   return (
     <AppShell
       title="Help Center"
-      subtitle="Find answers, explore features, and get support for QuantumCore"
+      subtitle="Find answers, explore features, and get support for FactorFlux"
     >
       <div className="space-y-8">
         <section className="rounded-[28px] border border-[hsl(var(--border))] bg-white p-6 shadow-md dark:bg-[hsl(var(--card))] lg:p-8">
@@ -751,7 +751,7 @@ export default function HelpPage() {
                 </div>
 
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
-                  QuantumCore Help Center
+                  FactorFlux Help Center
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                   Learn the platform, explore system functions, search common

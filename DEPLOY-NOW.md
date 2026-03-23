@@ -1,8 +1,8 @@
-# 🚀 DEPLOY QUANTUMCORE NOW
+# 🚀 DEPLOY FACTORFLUX NOW
 
 ## YOUR APP IS READY FOR PUBLIC DEPLOYMENT
 
-I've prepared everything for public access. Here's how to make QuantumCore publicly available:
+I've prepared everything for public access. Here's how to make FactorFlux publicly available:
 
 ## STEP 1: CLICK THE DEPLOY BUTTON
 1. Look for the **"Deploy"** button in your Replit interface (usually in the top toolbar)

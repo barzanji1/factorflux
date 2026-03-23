@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-// Simple cross-platform browser launcher for QuantumCore
+// Simple cross-platform browser launcher for FactorFlux
 const { spawn, exec } = require('child_process');
 const os = require('os');
 
-const QUANTUMCORE_URL = 'https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev';
+const FACTORFLUX_URL = 'https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev';
 
-console.log('🚀 Starting QuantumCore Desktop...');
+console.log('🚀 Starting FactorFlux Desktop...');
 console.log('📱 Opening in your default web browser...');
 console.log('');
 
@@ -32,7 +32,7 @@ function openBrowser(url) {
             console.log('📋 Please manually open this URL in your browser:');
             console.log('🔗', url);
         } else {
-            console.log('✅ QuantumCore is now running in your browser!');
+            console.log('✅ FactorFlux is now running in your browser!');
             console.log('💡 You can bookmark this URL for easy access:');
             console.log('🔗', url);
         }
@@ -61,4 +61,4 @@ function openBrowser(url) {
     });
 }
 
-openBrowser(QUANTUMCORE_URL);
+openBrowser(FACTORFLUX_URL);

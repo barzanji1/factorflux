@@ -1,10 +1,10 @@
-# QuantumCore Admin Email Setup Guide
+# FactorFlux Admin Email Setup Guide
 
 ## Current Status: Email Preparation Mode
 
 The admin panel email feature is currently set to **preparation mode** because SendGrid requires proper sender verification. Instead of failing to send emails, the system now:
 
-1. **Prepares professional email content** with QuantumCore access information
+1. **Prepares professional email content** with FactorFlux access information
 2. **Copies the email to your clipboard** automatically
 3. **Logs the activity** for tracking purposes
 4. **Provides manual sending instructions**
@@ -13,7 +13,7 @@ The admin panel email feature is currently set to **preparation mode** because S
 
 ### Step 1: Access Admin Panel
 - Navigate to **Admin** page (manager/admin role required)
-- Find the "Send QuantumCore Access" section
+- Find the "Send FactorFlux Access" section
 
 ### Step 2: Fill Out Client Information
 - **Client Email**: Required - the recipient's email address
@@ -34,7 +34,7 @@ The admin panel email feature is currently set to **preparation mode** because S
 
 The prepared email contains:
 - **Professional greeting** with client name (if provided)
-- **Live web access link** to QuantumCore
+- **Live web access link** to FactorFlux
 - **Desktop installer downloads** for Windows, Mac, and Linux
 - **Installation instructions** and setup guide
 - **Additional message** (if provided)
@@ -44,11 +44,11 @@ The prepared email contains:
 
 ```
 To: client@company.com
-Subject: QuantumCore Access - John Smith
+Subject: FactorFlux Access - John Smith
 
 Hello John,
 
-You now have access to QuantumCore, our freight factoring management system. You can access it in two ways:
+You now have access to FactorFlux, our freight factoring management system. You can access it in two ways:
 
 🌐 Web Access (Recommended):
 https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev

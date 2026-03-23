@@ -1,6 +1,6 @@
 {
-  "appId": "com.quantumcore.app",
-  "productName": "QuantumCore",
+  "appId": "com.factorflux.app",
+  "productName": "FactorFlux",
   "copyright": "Copyright © 2025 Trucking Pros Financial",
   "directories": {
     "output": "electron-dist"
@@ -22,8 +22,8 @@
     ]
   },
   "dmg": {
-    "title": "QuantumCore ${version}",
-    "artifactName": "QuantumCore-Mac-${version}.dmg"
+    "title": "FactorFlux ${version}",
+    "artifactName": "FactorFlux-Mac-${version}.dmg"
   },
   "win": {
     "target": "nsis",

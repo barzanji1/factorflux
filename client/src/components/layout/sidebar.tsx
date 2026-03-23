@@ -153,7 +153,7 @@ export default function Sidebar({
 
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                QuantumCore
+                FactorFlux
               </h1>
               <p className="truncate text-sm text-slate-500 dark:text-slate-400">
                 Trucking Pros Financial
@@ -259,7 +259,7 @@ export default function Sidebar({
 
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                QuantumCore OS
+                FactorFlux OS
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Internal operations suite

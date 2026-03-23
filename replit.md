@@ -1,7 +1,7 @@
-# QuantumCore - Invoice Processing System
+# FactorFlux - Invoice Processing System
 
 ## Overview
-QuantumCore is a comprehensive freight factoring workflow application designed to streamline invoice processing for freight companies through Trucking Pros Financial. It provides document management, client management, invoice tracking, user authentication, and a modern web interface. The system aims to enhance efficiency and provide a robust platform for financial operations in the trucking industry.
+FactorFlux is a comprehensive freight factoring workflow application designed to streamline invoice processing for freight companies through Trucking Pros Financial. It provides document management, client management, invoice tracking, user authentication, and a modern web interface. The system aims to enhance efficiency and provide a robust platform for financial operations in the trucking industry.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -73,7 +73,7 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 - **Time Tracking**: Employee time clock functionality with clock-in/out, duration tracking, and activity logging.
 - **Navigation**: Standardized navigation using TopNav component across all pages, including a consistent Home button for quick dashboard access and streamlined settings menu access. Consolidated fuel card functionality into single "TPF Fuel Cards" tab with four main sections: Overview, Fuel Cards, Applications, and Analytics.
 - **Activity Log Management**: Option to reset activity history.
-- **TPF Form Integration**: Embedded form system from Trucking Pros Financial integrated within the Reports tab enabling direct integration of WordPress forms within QuantumCore interface with dynamic loading and error handling, plus backup native form implementation.
+- **TPF Form Integration**: Embedded form system from Trucking Pros Financial integrated within the Reports tab enabling direct integration of WordPress forms within FactorFlux interface with dynamic loading and error handling, plus backup native form implementation.
 
 ## External Dependencies
 

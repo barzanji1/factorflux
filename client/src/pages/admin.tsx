@@ -269,10 +269,10 @@ export default function Admin() {
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Mail className="w-5 h-5 mr-2" />
-                  Send QuantumCore Access
+                  Send FactorFlux Access
                 </CardTitle>
                 <CardDescription>
-                  Email QuantumCore access links and desktop installers to clients
+                  Email FactorFlux access links and desktop installers to clients
                 </CardDescription>
               </CardHeader>
               <CardContent>

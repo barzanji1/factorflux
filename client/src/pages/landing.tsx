@@ -12,7 +12,7 @@ export default function Landing() {
             <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
               <Truck className="text-white text-xl" />
             </div>
-            <h1 className="text-4xl font-bold text-secondary">QuantumCore</h1>
+            <h1 className="text-4xl font-bold text-secondary">FactorFlux</h1>
           </div>
           <p className="text-xl text-gray-600 mb-8">
             Streamline your freight factoring operations with our comprehensive invoice processing system

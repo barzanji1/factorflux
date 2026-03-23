@@ -108,7 +108,7 @@ export default function LocalLogin() {
             <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
               <Truck className="text-white text-xl" />
             </div>
-            <h1 className="text-3xl font-bold text-secondary">QuantumCore</h1>
+            <h1 className="text-3xl font-bold text-secondary">FactorFlux</h1>
           </div>
           <p className="text-sm text-gray-500">
             Trucking Pros Financial - Agent Access
@@ -177,7 +177,7 @@ export default function LocalLogin() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-sm text-gray-500">
-          <p>Secure local authentication for QuantumCore</p>
+          <p>Secure local authentication for FactorFlux</p>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Build Mac DMG installer for QuantumCore
-echo "🚀 Building QuantumCore Mac DMG installer..."
+# Build Mac DMG installer for FactorFlux
+echo "🚀 Building FactorFlux Mac DMG installer..."
 
 # Step 1: Build the application
 echo "📦 Building application..."
@@ -18,13 +18,13 @@ cp package.json desktop-build/
 # Step 3: Create electron package.json for building
 cat > desktop-build/package.json << 'EOF'
 {
-  "name": "quantumcore",
+  "name": "factorflux",
   "version": "1.0.0",
-  "description": "QuantumCore - Freight Factoring Management System",
+  "description": "FactorFlux - Freight Factoring Management System",
   "main": "main.js",
   "author": "Trucking Pros Financial",
   "license": "MIT",
-  "homepage": "https://quantumcore.app"
+  "homepage": "https://factorflux.app"
 }
 EOF
 
@@ -36,10 +36,10 @@ npx electron-builder --mac --config ../electron-builder.json
 # Step 5: Move DMG to main directory
 echo "📦 Finalizing DMG..."
 cd ..
-if [ -f "desktop-build/dist/QuantumCore-*.dmg" ]; then
-    cp desktop-build/dist/QuantumCore-*.dmg electron-dist/QuantumCore-Mac.dmg
-    echo "✅ DMG created successfully: electron-dist/QuantumCore-Mac.dmg"
-    ls -lh electron-dist/QuantumCore-Mac.dmg
+if [ -f "desktop-build/dist/FactorFlux-*.dmg" ]; then
+    cp desktop-build/dist/FactorFlux-*.dmg electron-dist/FactorFlux-Mac.dmg
+    echo "✅ DMG created successfully: electron-dist/FactorFlux-Mac.dmg"
+    ls -lh electron-dist/FactorFlux-Mac.dmg
 else
     echo "❌ DMG build failed"
     ls -la desktop-build/dist/ 2>/dev/null || echo "No dist directory found"

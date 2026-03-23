@@ -40,17 +40,17 @@ export async function sendDesktopInstallers(recipientEmail: string): Promise<boo
     const windowsPath = path.join(
       process.cwd(),
       'electron-dist',
-      'QuantumCore-Windows-Portable.tar.gz'
+      'FactorFlux-Windows-Portable.tar.gz'
     );
     const macPath = path.join(
       process.cwd(),
       'electron-dist',
-      'QuantumCore-Mac-Portable.tar.gz'
+      'FactorFlux-Mac-Portable.tar.gz'
     );
     const linuxPath = path.join(
       process.cwd(),
       'electron-dist',
-      'QuantumCore-Linux-Portable.tar.gz'
+      'FactorFlux-Linux-Portable.tar.gz'
     );
     const guidePath = path.join(
       process.cwd(),
@@ -62,7 +62,7 @@ export async function sendDesktopInstallers(recipientEmail: string): Promise<boo
     if (fs.existsSync(windowsPath)) {
       attachments.push({
         content: fs.readFileSync(windowsPath).toString('base64'),
-        filename: 'QuantumCore-Windows-Portable.tar.gz',
+        filename: 'FactorFlux-Windows-Portable.tar.gz',
         type: 'application/gzip',
         disposition: 'attachment'
       });
@@ -71,7 +71,7 @@ export async function sendDesktopInstallers(recipientEmail: string): Promise<boo
     if (fs.existsSync(macPath)) {
       attachments.push({
         content: fs.readFileSync(macPath).toString('base64'),
-        filename: 'QuantumCore-Mac-Portable.tar.gz',
+        filename: 'FactorFlux-Mac-Portable.tar.gz',
         type: 'application/gzip',
         disposition: 'attachment'
       });
@@ -80,7 +80,7 @@ export async function sendDesktopInstallers(recipientEmail: string): Promise<boo
     if (fs.existsSync(linuxPath)) {
       attachments.push({
         content: fs.readFileSync(linuxPath).toString('base64'),
-        filename: 'QuantumCore-Linux-Portable.tar.gz',
+        filename: 'FactorFlux-Linux-Portable.tar.gz',
         type: 'application/gzip',
         disposition: 'attachment'
       });
@@ -98,24 +98,24 @@ export async function sendDesktopInstallers(recipientEmail: string): Promise<boo
 
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #2563eb;">QuantumCore Desktop Installers</h1>
+        <h1 style="color: #2563eb;">FactorFlux Desktop Installers</h1>
         <p>Hello,</p>
-        <p>Your QuantumCore desktop installers are ready! I've attached the portable versions for all operating systems.</p>
-        <p>Best regards,<br>QuantumCore Development Team</p>
+        <p>Your FactorFlux desktop installers are ready! I've attached the portable versions for all operating systems.</p>
+        <p>Best regards,<br>FactorFlux Development Team</p>
       </div>
     `;
 
     return await sendEmail({
       to: recipientEmail,
       from: 'dosh@truckingprosfinancial.com',
-      subject: 'QuantumCore Desktop Installers - Ready for Distribution',
+      subject: 'FactorFlux Desktop Installers - Ready for Distribution',
       html: emailHtml,
-      text: `QuantumCore Desktop Installers
+      text: `FactorFlux Desktop Installers
 
 Your desktop installers are ready.
 
 Best regards,
-QuantumCore Development Team`,
+FactorFlux Development Team`,
       attachments,
     });
   } catch (error) {

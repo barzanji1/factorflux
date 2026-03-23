@@ -20,7 +20,7 @@ The download endpoints are working perfectly on the server. Local testing shows:
 ```
 
 ### Method 2: Test from Admin Panel
-1. Go to your QuantumCore admin panel
+1. Go to your FactorFlux admin panel
 2. Scroll to "Direct Download Links" section
 3. Click any download link - they will work from inside the app
 

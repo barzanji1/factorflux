@@ -70,7 +70,7 @@ export function useDeviceDetection(): DeviceInfo {
       recommendedDownload = {
         platform: 'Windows',
         url: `${baseUrl}/api/desktop/download/windows`,
-        filename: 'QuantumCore-Windows-Portable.tar.gz',
+        filename: 'FactorFlux-Windows-Portable.tar.gz',
         size: '5.7 MB',
         icon: '🪟'
       };
@@ -78,7 +78,7 @@ export function useDeviceDetection(): DeviceInfo {
       recommendedDownload = {
         platform: 'Linux',
         url: `${baseUrl}/api/desktop/download/linux`,
-        filename: 'QuantumCore-Linux-Portable.tar.gz',
+        filename: 'FactorFlux-Linux-Portable.tar.gz',
         size: '5.7 MB',
         icon: '🐧'
       };

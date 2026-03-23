@@ -1,8 +1,8 @@
-# QuantumCore Desktop Download Instructions
+# FactorFlux Desktop Download Instructions
 
 ## Direct Download Links (Updated January 26, 2025)
 
-Use these direct download links to share QuantumCore desktop installers with clients:
+Use these direct download links to share FactorFlux desktop installers with clients:
 
 ### 🚀 Live Web Application
 **Instant Access (Recommended):** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
@@ -11,22 +11,22 @@ Use these direct download links to share QuantumCore desktop installers with cli
 
 #### Windows
 **Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
-- File: QuantumCore-Windows-Portable.tar.gz (5.7 MB)
+- File: FactorFlux-Windows-Portable.tar.gz (5.7 MB)
 - Supports: Windows 10/11
 
 #### Mac
 **Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/mac
-- File: QuantumCore-Mac-Portable.tar.gz (5.7 MB)
+- File: FactorFlux-Mac-Portable.tar.gz (5.7 MB)
 - Supports: macOS 10.15+ (Catalina and newer)
 
 #### Linux
 **Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/linux
-- File: QuantumCore-Linux-Portable.tar.gz (5.7 MB)
+- File: FactorFlux-Linux-Portable.tar.gz (5.7 MB)
 - Supports: Ubuntu, Debian, CentOS, Fedora
 
 #### Installation Guide
 **Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/guide
-- File: QuantumCore-Installation-Guide.md
+- File: FactorFlux-Installation-Guide.md
 - Complete setup instructions and troubleshooting
 
 ## 📱 Quick Setup Instructions
@@ -35,7 +35,7 @@ Use these direct download links to share QuantumCore desktop installers with cli
 1. Click the download link for your operating system
 2. Extract the downloaded .tar.gz file using built-in tools
 3. Run the startup script (double-click or execute in terminal)
-4. QuantumCore opens automatically in your web browser
+4. FactorFlux opens automatically in your web browser
 
 ### Creating Desktop Shortcuts:
 - **Chrome/Edge:** Menu → More Tools → Create Shortcut → Check "Open as window"
@@ -58,7 +58,7 @@ The new desktop launchers include:
 ```
 Hi [Client Name],
 
-You now have access to QuantumCore, our freight factoring management system.
+You now have access to FactorFlux, our freight factoring management system.
 
 🌐 Web Access (Instant): https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
 
