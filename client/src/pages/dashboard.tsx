@@ -6,7 +6,6 @@ import RecentActivity from "@/components/dashboard/recent-activity";
 import RecentInvoices from "@/components/dashboard/recent-invoices";
 import TimeClock from "@/components/time-tracking/time-clock";
 import CutoffTimes from "@/components/dashboard/cutoff-times";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
 import { Sparkles, ShieldCheck, Activity } from "lucide-react";
 
 export default function Dashboard() {
@@ -54,28 +53,6 @@ export default function Dashboard() {
                   Live workflow visibility
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-start gap-4 lg:items-end">
-            <div className="rounded-2xl border border-slate-200 bg-white/80 px-5 py-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/70">
-              <img
-                src={factorFluxLogo}
-                alt="FactorFlux"
-                className="h-10 w-auto object-contain"
-              />
-            </div>
-
-            <div className="text-left lg:text-right">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                Powered by Trucking Pros Financial
-              </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Professional freight factoring solutions
-              </p>
-              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                Designed and developed by Dosh Barzanji
-              </p>
             </div>
           </div>
         </div>

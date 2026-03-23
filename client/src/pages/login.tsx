@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, User, Eye, EyeOff } from "lucide-react";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import { Loader2, Lock, User, Eye, EyeOff } from "lucide-react";
+import factorFluxLogo from "@assets/FactorFlux-icon_1774282916669.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";

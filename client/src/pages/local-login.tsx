@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff } from "lucide-react";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import factorFluxLogo from "@assets/FactorFlux-icon_1774282916669.png";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { FormFieldWithValidation } from "@/components/ui/form-field-with-validation";

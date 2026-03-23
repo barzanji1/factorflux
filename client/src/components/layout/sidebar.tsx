@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import factorFluxLogo from "@assets/FactorFlux-icon_1774282916669.png";
 import {
   LayoutDashboard,
   FileText,

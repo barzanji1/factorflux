@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Truck, FileText, Users, DollarSign } from "lucide-react";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import factorFluxLogo from "@assets/FactorFlux-icon_1774282916669.png";
 
 export default function Landing() {
   return (
