@@ -17,7 +17,6 @@ import {
   Building,
   HelpCircle,
   Briefcase,
-  FolderKanban,
 } from "lucide-react";
 
 type UserRole = "manager" | "admin" | "employee";
@@ -253,8 +252,8 @@ export default function Sidebar({
 
         <div className="border-t border-[hsl(var(--border))] px-5 py-4">
           <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-3 dark:bg-slate-800/60">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 text-white">
-              <FolderKanban className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white overflow-hidden shadow-sm">
+              <img src={factorFluxLogo} alt="FactorFlux" className="h-8 w-8 object-contain" />
             </div>
 
             <div className="min-w-0">
