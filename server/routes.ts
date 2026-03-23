@@ -315,200 +315,455 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Profile routes
-  app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
+ 
+  
+ 
+    // Profile routes
+    app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
+      try {
+        const userId = req.user.id;
 
-      const updates = req.body;
+        const updates = req.body;
 
-      const validUpdates = [
-        'firstName', 'lastName', 'phone', 'jobTitle', 'department',
-        'bio', 'location', 'timezone', 'language',
-        'emailNotifications', 'smsNotifications', 'desktopNotifications',
-        'startTime', 'endTime', 'workDays',
-        'theme', 'dateFormat', 'timeFormat'
-      ];
+        const validUpdates = [
+          'firstName', 'lastName', 'phone', 'jobTitle', 'department',
+          'bio', 'location', 'timezone', 'language',
+          'emailNotifications', 'smsNotifications', 'desktopNotifications',
+          'startTime', 'endTime', 'workDays',
+          'theme', 'dateFormat', 'timeFormat'
+        ];
 
-      const filteredUpdates = Object.keys(updates)
-        .filter((key) => validUpdates.includes(key))
-        .reduce((obj: any, key) => {
-          obj[key] = updates[key];
-          return obj;
-        }, {});
+        const filteredUpdates = Object.keys(updates)
+          .filter((key) => validUpdates.includes(key))
+          .reduce((obj: any, key) => {
+            obj[key] = updates[key];
+            return obj;
+          }, {});
 
-      await storage.updateUserProfile(userId, filteredUpdates);
+        await storage.updateUserProfile(userId, filteredUpdates);
 
-      res.json({
-        message: "Profile updated successfully",
-        success: true
-      });
-    } catch (error) {
-      console.error("Error updating user profile:", error);
-      res.status(500).json({ message: "Failed to update profile" });
-    }
-  });
-
-  app.post('/api/user/profile-image', upload.single('profileImage'), async (req: any, res) => {
-    try {
-      const userId = "1";
-
-      if (!req.file) {
-        return res.status(400).json({ message: "No image file provided" });
+        res.json({
+          message: "Profile updated successfully",
+          success: true
+        });
+      } catch (error) {
+        console.error("Error updating user profile:", error);
+        res.status(500).json({ message: "Failed to update profile" });
       }
+    });
 
-      const profileImageUrl = `/uploads/${req.file.filename}`;
+    app.post('/api/user/profile-image', upload.single('profileImage'), async (req: any, res) => {
+      try {
+        const userId = "1";
 
-      await storage.updateUserProfile(userId, { profileImageUrl });
-      const updatedUser = await storage.getUser(userId);
+        if (!req.file) {
+          return res.status(400).json({ message: "No image file provided" });
+        }
 
-      res.json({
-        message: "Profile image updated successfully",
-        user: updatedUser
-      });
-    } catch (error) {
-      console.error("Error uploading profile image:", error);
-      res.status(500).json({ message: "Failed to upload profile image" });
-    }
-  });
+        const profileImageUrl = `/uploads/${req.file.filename}`;
 
-  app.post("/api/support/contact", async (req, res) => {
-    try {
-      const contactSchema = z.object({
-        name: z.string().trim().min(1, "Name is required"),
-        email: z.string().trim().email("Valid email is required"),
-        subject: z.string().trim().min(1, "Subject is required"),
-        message: z.string().trim().min(1, "Message is required"),
-      });
+        await storage.updateUserProfile(userId, { profileImageUrl });
+        const updatedUser = await storage.getUser(userId);
 
-      const { name, email, subject, message } = contactSchema.parse(req.body);
+        res.json({
+          message: "Profile image updated successfully",
+          user: updatedUser
+        });
+      } catch (error) {
+        console.error("Error uploading profile image:", error);
+        res.status(500).json({ message: "Failed to upload profile image" });
+      }
+    });
 
-      const supportEmail = "doshbarzanji@gmail.com";
-      const senderEmail = "dosh@truckingprosfinancial.com";
+    // Admin routes - Role management
+    app.get('/api/admin/users', async (req: any, res) => {
+      try {
+        const users = await storage.getAllUsers();
+        res.json(users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).json({ message: "Failed to fetch users" });
+      }
+    });
 
-      console.log("Support contact route hit");
-      console.log({
-        name,
-        email,
-        subject,
-        supportEmail,
-        senderEmail,
-      });
+    // Support routes
+    app.get('/api/support/test', (req, res) => {
+      res.json({ ok: true });
+    });
 
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
-          <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
+    app.post("/api/support/contact", async (req, res) => {
+      try {
+        const contactSchema = z.object({
+          name: z.string().trim().min(1, "Name is required"),
+          email: z.string().trim().email("Valid email is required"),
+          subject: z.string().trim().min(1, "Subject is required"),
+          message: z.string().trim().min(1, "Message is required"),
+        });
 
-          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
-            <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
-            <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
-            <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
+        const { name, email, subject, message } = contactSchema.parse(req.body);
+
+        await storage.createActivity({
+          userId: "1",
+          type: "support_message",
+          entityType: "support",
+          entityId: 0,
+          description: JSON.stringify({
+            name,
+            email,
+            subject,
+            message,
+          }),
+        });
+
+        const supportEmail = "doshbarzanji@gmail.com";
+        const senderEmail = "dosh@truckingprosfinancial.com";
+
+        const html = `
+          <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
+            <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
+            <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+              <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
+              <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
+              <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
+            </div>
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
+              <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
+              <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
+            </div>
           </div>
+        `;
 
-          <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
-            <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
-            <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
-          </div>
-        </div>
-      `;
+        const text = `
+  New FactorFlux Help Message
 
-      const text = `
-New FactorFlux Help Message
+  Name: ${name}
+  Email: ${email}
+  Subject: ${subject}
 
-Name: ${name}
-Email: ${email}
-Subject: ${subject}
+  Message:
+  ${message}
+        `.trim();
 
-Message:
-${message}
-      `.trim();
+        const sent = await sendEmail({
+          to: supportEmail,
+          from: senderEmail,
+          subject: `[FactorFlux Help] ${subject} - ${email}`,
+          text,
+          html,
+        });
 
-      const sent = await sendEmail({
-        to: supportEmail,
-        from: senderEmail,
-        subject: `[FactorFlux Help] ${subject} - ${email}`,
-        text,
-        html,
-      });
+        res.status(200).json({
+          success: true,
+          message: sent
+            ? "Message sent successfully."
+            : "Message saved successfully. Email delivery is currently unavailable.",
+        });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            error: error.errors[0]?.message || "Invalid form data.",
+          });
+        }
 
-      console.log("Send email result:", sent);
-
-      if (!sent) {
-        return res.status(500).json({
-          error: "Message could not be sent right now.",
+        console.error("Contact support route error:", error);
+        res.status(500).json({
+          error: "Failed to save message.",
         });
       }
+    });
 
-      res.status(200).json({
-        success: true,
-        message: "Message sent successfully.",
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          error: error.errors[0]?.message || "Invalid form data.",
-        });
+    app.get('/api/support/messages', async (req, res) => {
+      try {
+        const activities = await storage.getActivities();
+
+        const supportMessages = activities
+          .filter((a: any) => a.type === "support_message")
+          .map((a: any) => {
+            let parsed = {
+              name: "",
+              email: "",
+              subject: "",
+              message: a.description || "",
+            };
+
+            try {
+              parsed = JSON.parse(a.description);
+            } catch {}
+
+            return {
+              id: a.id,
+              createdAt: a.createdAt,
+              ...parsed,
+            };
+          });
+
+        res.json(supportMessages);
+      } catch (error) {
+        console.error("Error fetching support messages:", error);
+        res.status(500).json({ message: "Failed to fetch messages" });
       }
+    });
 
-      console.error("Contact support route error:", error);
-      res.status(500).json({
-        error: "Failed to send message.",
-      });
-    }
-  });
+    // Dashboard routes
+    app.get('/api/dashboard/stats', async (req, res) => {
+      try {
+        const stats = await storage.getDashboardStats();
+        res.json(stats);
+      } catch (error) {
+        console.error("Error fetching dashboard stats:", error);
+        res.status(500).json({ message: "Failed to fetch dashboard statistics" });
+      }
+    });
 
-  // Dashboard routes
-  app.get('/api/dashboard/stats', async (req, res) => {
-    try {
-      const stats = await storage.getDashboardStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard statistics" });
-    }
-  });
+    app.get('/api/dashboard/recent-activities', async (req, res) => {
+      try {
+        const activities = await storage.getActivities(10);
+        res.json(activities);
+      } catch (error) {
+        console.error("Error fetching recent activities:", error);
+        res.status(500).json({ message: "Failed to fetch recent activities" });
+      }
+    });
 
-  app.get('/api/dashboard/recent-activities', async (req, res) => {
-    try {
-      const activities = await storage.getActivities(10);
-      res.json(activities);
-    } catch (error) {
-      console.error("Error fetching recent activities:", error);
-      res.status(500).json({ message: "Failed to fetch recent activities" });
-    }
-  });
+    // All activities endpoint
+    app.get('/api/activities', async (req, res) => {
+      try {
+        const activities = await storage.getActivities();
+        res.json(activities);
+      } catch (error) {
+        console.error("Error fetching all activities:", error);
+        res.status(500).json({ message: "Failed to fetch activities" });
+      }
+    });
 
-  // All activities endpoint
-  app.get('/api/activities', async (req, res) => {
-    try {
-      const activities = await storage.getActivities();
-      res.json(activities);
-    } catch (error) {
-      console.error("Error fetching all activities:", error);
-      res.status(500).json({ message: "Failed to fetch activities" });
-    }
-  });
+    // Clear all activities endpoint
+    app.delete('/api/activities', requireAuth, async (req: any, res) => {
+      try {
+        await storage.clearActivities();
 
-  // Clear all activities endpoint
-  app.delete('/api/activities', requireAuth, async (req: any, res) => {
-    try {
-      await storage.clearActivities();
-      
-      // Log the activity reset
-      await storage.createActivity({
-        userId: req.user.id,
-        type: "activities_reset",
-        entityType: "system",
-        entityId: 0,
-        description: "Reset all recent activity history",
-      });
-      
-      res.json({ message: "Activities cleared successfully" });
-    } catch (error) {
-      console.error("Error clearing activities:", error);
-      res.status(500).json({ message: "Failed to clear activities" });
+        await storage.createActivity({
+          userId: req.user.id,
+          type: "activities_reset",
+          entityType: "system",
+          entityId: 0,
+          description: "Reset all recent activity history",
+        });
+
+        res.json({ message: "Activities cleared successfully" });
+      } catch (error) {
+        console.error("Error clearing activities:", error);
+        res.status(500).json({ message: "Failed to clear activities" });
+      }
+    });
+
+    // Document routes
+    app.get('/api/documents', async (req, res) => {
+      try {
+        const { load, invoice, entityType, entityId } = req.query;
+        let documents;
+
+        if (entityType && entityId) {
+          documents = await storage.getDocumentsByEntity(
+            entityType as string,
+            parseInt(entityId as string)
+          );
+        } else if (load) {
+          const loadId = parseInt(load as string);
+          documents = await storage.getDocumentsByLoad(loadId);
+        } else if (invoice) {
+          const invoiceId = parseInt(invoice as string);
+          documents = await storage.getDocumentsByInvoice(invoiceId);
+        } else {
+          documents = await storage.getDocuments();
+        }
+
+        res.json(documents);
+      } catch (error) {
+        console.error("Error fetching documents:", error);
+        res.status(500).json({ message: "Failed to fetch documents" });
+      }
+    });
+
+    app.get('/api/documents/:id', async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const document = await storage.getDocument(id);
+
+        if (!document) {
+          return res.status(404).json({ message: "Document not found" });
+        }
+
+        res.json(document);
+      } catch (error) {
+        console.error("Error fetching document:", error);
+        res.status(500).json({ message: "Failed to fetch document" });
+      }
+    });
+
+    async function convertImageToPdf(inputPath: string, outputPath: string): Promise<void> {
+      throw new Error('PDF conversion temporarily unavailable');
     }
-  });
+
+    app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req: any, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const { documentType, loadId, invoiceId } = req.body;
+        let processedFilename = req.file.filename;
+        let processedMimeType = req.file.mimetype;
+        let processedOriginalName = req.file.originalname;
+
+        if (req.file.mimetype.includes('jpeg') || req.file.mimetype.includes('jpg')) {
+          console.log('Image uploaded as-is (PDF conversion disabled for web deployment)');
+        }
+
+        const documentData = {
+          filename: processedFilename,
+          originalName: processedOriginalName,
+          mimeType: processedMimeType,
+          size: req.file.size,
+          documentType: documentType || 'other',
+          loadId: loadId && loadId !== 'undefined' ? parseInt(loadId) : null,
+          invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId) : null,
+          uploadedBy: req.user.id,
+          status: 'processing' as const,
+        };
+
+        const document = await storage.createDocument(documentData);
+
+        await storage.createActivity({
+          userId: req.user.id,
+          type: 'document_uploaded',
+          description: `Uploaded document: ${document.originalName}`,
+          entityType: 'document',
+          entityId: document.id,
+        });
+
+        setTimeout(async () => {
+          try {
+            await storage.updateDocument(document.id, { status: 'processed' });
+          } catch (error) {
+            console.error("Error updating document status:", error);
+          }
+        }, 2000);
+
+        res.status(201).json(document);
+      } catch (error) {
+        console.error("Error uploading document:", error);
+        res.status(500).json({ message: "Failed to upload document" });
+      }
+    });
+
+    app.delete('/api/documents/:id', requireAuth, async (req: any, res) => {
+      try {
+        const id = parseInt(req.params.id);
+
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "Invalid document ID" });
+        }
+
+        const document = await storage.getDocument(id);
+
+        if (!document) {
+          return res.status(404).json({ message: "Document not found" });
+        }
+
+        await storage.deleteDocument(id);
+
+        try {
+          const filePath = path.join('uploads', document.filename);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (fileError) {
+          console.warn("Could not delete physical file:", fileError);
+        }
+
+        await storage.createActivity({
+          userId: req.user.id,
+          type: 'document_deleted',
+          description: `Deleted document: ${document.originalName}`,
+          entityType: 'document',
+          entityId: document.id,
+        });
+
+        res.json({ message: "Document deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        res.status(500).json({ message: "Failed to delete document" });
+      }
+    });
+
+    // Document download/view routes
+    app.get('/api/documents/:id/download', async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const document = await storage.getDocument(id);
+
+        if (!document) {
+          return res.status(404).json({ message: "Document not found" });
+        }
+
+        let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
+        if (!fs.existsSync(filePath)) {
+          filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
+          if (!fs.existsSync(filePath)) {
+            console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
+            return res.status(404).json({ message: "File not found on disk" });
+          }
+        }
+
+        const stats = fs.statSync(filePath);
+
+        res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
+        res.setHeader('Content-Length', stats.size.toString());
+        res.setHeader('Cache-Control', 'no-cache');
+
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.on('error', (error) => {
+          console.error('Error streaming file:', error);
+          if (!res.headersSent) {
+            res.status(500).json({ message: 'Error streaming file' });
+          }
+        });
+        fileStream.pipe(res);
+      } catch (error) {
+        console.error("Error downloading document:", error);
+        res.status(500).json({ message: "Failed to download document" });
+      }
+    });
+
+    app.get('/api/documents/:id/view', async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const document = await storage.getDocument(id);
+
+        if (!document) {
+          return res.status(404).json({ message: "Document not found" });
+        }
+
+        let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
+        if (!fs.existsSync(filePath)) {
+          filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
+          if (!fs.existsSync(filePath)) {
+            console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
+            return res.status(404).json({ message: "File not found on disk" });
+          }
+        }
+
+        res.setHeader('Content-Type', document.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${document.originalName}"`);
+
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+      } catch (error) {
+        console.error("Error viewing document:", error);
+        res.status(500).json({ message: "Failed to view document" });
+      }
+    });
 
   // Client routes
   app.get('/api/clients', async (req, res) => {
@@ -1051,36 +1306,20 @@ ${message}
     }
   });
 
-  app.get('/api/documents/:id/view', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const document = await storage.getDocument(id);
-      
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
+      app.get('/api/support/messages', async (req, res) => {
+        try {
+          const activities = await storage.getActivities();
 
-      // Check for file with and without extension
-      let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
-      if (!fs.existsSync(filePath)) {
-        // Try with .pdf extension for converted files
-        filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
-        if (!fs.existsSync(filePath)) {
-          console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
-          return res.status(404).json({ message: "File not found on disk" });
+          const supportMessages = activities.filter(
+            (a: any) => a.type === "support_message"
+          );
+
+          res.json(supportMessages);
+        } catch (error) {
+          console.error("Error fetching support messages:", error);
+          res.status(500).json({ message: "Failed to fetch messages" });
         }
-      }
-
-      res.setHeader('Content-Type', document.mimeType);
-      res.setHeader('Content-Disposition', `inline; filename="${document.originalName}"`);
-      
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
-    } catch (error) {
-      console.error("Error viewing document:", error);
-      res.status(500).json({ message: "Failed to view document" });
-    }
-  });
+      });
 
   // Manager-only routes
   app.put('/api/invoices/:id/approve', async (req: any, res) => {
@@ -2582,4 +2821,4 @@ Trucking Pros Financial Team
 
   const httpServer = createServer(app);
   return httpServer;
-}
+} 
