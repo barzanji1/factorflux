@@ -67,21 +67,15 @@ export default function HelpPage() {
   const [featureSearchQuery, setFeatureSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const [contactForm, setContactForm] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: "",
-  });
-
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [messageStatus, setMessageStatus] = useState<{
-    type: "success" | "error" | null;
-    text: string;
-  }>({
-    type: null,
-    text: "",
-  });
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactSubject, setContactSubject] = useState("");
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactStatus, setContactStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const quickStartGuides = [
     {
@@ -196,7 +190,6 @@ export default function HelpPage() {
       status: "active",
       description: "Broker performance and metrics",
     },
-
     {
       name: "Factoring",
       route: "/factoring",
@@ -237,7 +230,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Expense tracking and management",
     },
-
     {
       name: "Clients",
       route: "/clients",
@@ -270,7 +262,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Dispatcher contact management",
     },
-
     {
       name: "Invoices",
       route: "/invoices",
@@ -303,7 +294,6 @@ export default function HelpPage() {
       status: "active",
       description: "Proof of delivery documents",
     },
-
     {
       name: "Tasks",
       route: "/tasks",
@@ -344,7 +334,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Schedule and appointment management",
     },
-
     {
       name: "Live Chat",
       route: "/help",
@@ -377,7 +366,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Mass SMS campaigns",
     },
-
     {
       name: "Vault",
       route: "/vault",
@@ -410,7 +398,6 @@ export default function HelpPage() {
       status: "active",
       description: "Client and carrier reviews",
     },
-
     {
       name: "Fuel Advance",
       route: "/fuel-cards-internal",
@@ -427,7 +414,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Fleet and truck management",
     },
-
     {
       name: "Admin",
       route: "/admin",
@@ -468,7 +454,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Email server configuration",
     },
-
     {
       name: "My Clocking",
       route: "/",
@@ -501,7 +486,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Payroll processing and management",
     },
-
     {
       name: "Reports",
       route: "/reports",
@@ -518,7 +502,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Data export and spreadsheet tools",
     },
-
     {
       name: "Tickets",
       route: "/help",
@@ -551,7 +534,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Secure payment lockbox",
     },
-
     {
       name: "Branches",
       route: "/admin",
@@ -568,7 +550,6 @@ export default function HelpPage() {
       status: "planned",
       description: "Factoring company management",
     },
-
     {
       name: "Pres",
       route: "/reports",
@@ -643,93 +624,54 @@ export default function HelpPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleContactInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
+      const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setContactLoading(true);
+        setContactStatus(null);
 
-    setContactForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+        try {
+          const response = await fetch("/api/support/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name: contactName.trim(),
+              email: contactEmail.trim(),
+              subject: contactSubject.trim(),
+              message: contactMessage.trim(),
+            }),
+          });
 
-    if (messageStatus.type) {
-      setMessageStatus({
-        type: null,
-        text: "",
-      });
-    }
-  };
+          const data = await response.json().catch(() => null);
 
-  const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+          if (!response.ok) {
+            throw new Error(data?.error || "Failed to send message.");
+          }
 
-    const trimmedForm = {
-      name: contactForm.name.trim(),
-      email: contactForm.email.trim(),
-      subject: contactForm.subject.trim(),
-      message: contactForm.message.trim(),
-    };
+          setContactStatus({
+            type: "success",
+            message: data?.message || "Message sent successfully.",
+          });
 
-    if (
-      !trimmedForm.name ||
-      !trimmedForm.email ||
-      !trimmedForm.subject ||
-      !trimmedForm.message
-    ) {
-      setMessageStatus({
-        type: "error",
-        text: "Please complete all fields before sending your message.",
-      });
-      return;
-    }
+          setContactName("");
+          setContactEmail("");
+          setContactSubject("");
+          setContactMessage("");
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Something went wrong while sending your message.";
 
-    setIsSendingMessage(true);
-    setMessageStatus({
-      type: null,
-      text: "",
-    });
-
-    try {
-      const response = await fetch("/api/support/contact", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(trimmedForm),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to send message.");
-      }
-
-      setMessageStatus({
-        type: "success",
-        text: "Your message has been sent successfully.",
-      });
-
-      setContactForm({
-        name: "",
-        email: "",
-        subject: "",
-        message: "",
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while sending your message.";
-
-      setMessageStatus({
-        type: "error",
-        text: errorMessage,
-      });
-    } finally {
-      setIsSendingMessage(false);
-    }
-  };
+          setContactStatus({
+            type: "error",
+            message,
+          });
+        } finally {
+          setContactLoading(false);
+        }
+      };
 
   return (
     <AppShell
@@ -1096,58 +1038,54 @@ export default function HelpPage() {
                 <form onSubmit={handleContactSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Input
-                      name="name"
                       placeholder="Your Name"
-                      value={contactForm.name}
-                      onChange={handleContactInputChange}
-                      disabled={isSendingMessage}
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      disabled={contactLoading}
                     />
                     <Input
-                      name="email"
                       type="email"
                       placeholder="Your Email"
-                      value={contactForm.email}
-                      onChange={handleContactInputChange}
-                      disabled={isSendingMessage}
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      disabled={contactLoading}
                     />
                   </div>
 
                   <Input
-                    name="subject"
                     placeholder="Subject"
-                    value={contactForm.subject}
-                    onChange={handleContactInputChange}
-                    disabled={isSendingMessage}
+                    value={contactSubject}
+                    onChange={(e) => setContactSubject(e.target.value)}
+                    disabled={contactLoading}
                   />
 
                   <Textarea
-                    name="message"
                     placeholder="Describe your issue or question..."
                     rows={4}
-                    value={contactForm.message}
-                    onChange={handleContactInputChange}
-                    disabled={isSendingMessage}
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    disabled={contactLoading}
                   />
 
-                  {messageStatus.type && (
+                  {contactStatus && (
                     <div
                       className={cn(
                         "rounded-xl border px-4 py-3 text-sm",
-                        messageStatus.type === "success"
+                        contactStatus.type === "success"
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
                           : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
                       )}
                     >
-                      {messageStatus.text}
+                      {contactStatus.message}
                     </div>
                   )}
 
                   <Button
                     type="submit"
                     className="h-11 w-full rounded-xl"
-                    disabled={isSendingMessage}
+                    disabled={contactLoading}
                   >
-                    {isSendingMessage ? "Sending..." : "Send Message"}
+                    {contactLoading ? "Sending..." : "Send Message"}
                   </Button>
                 </form>
               </CardContent>
