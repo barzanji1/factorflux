@@ -6,7 +6,7 @@ import RecentActivity from "@/components/dashboard/recent-activity";
 import RecentInvoices from "@/components/dashboard/recent-invoices";
 import TimeClock from "@/components/time-tracking/time-clock";
 import CutoffTimes from "@/components/dashboard/cutoff-times";
-import tpfLogo from "@assets/2026-TPF_Logo_1765652205621.png";
+import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
 import { Sparkles, ShieldCheck, Activity } from "lucide-react";
 
 export default function Dashboard() {
@@ -60,8 +60,8 @@ export default function Dashboard() {
           <div className="flex flex-col items-start gap-4 lg:items-end">
             <div className="rounded-2xl border border-slate-200 bg-white/80 px-5 py-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/70">
               <img
-                src={tpfLogo}
-                alt="Trucking Pros Financial"
+                src={factorFluxLogo}
+                alt="FactorFlux"
                 className="h-10 w-auto object-contain"
               />
             </div>

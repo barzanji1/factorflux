@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
+import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
 import {
-  Truck,
   LayoutDashboard,
   FileText,
   FolderOpen,
@@ -147,8 +147,8 @@ export default function Sidebar({
       <div className="flex h-full w-full flex-col">
         <div className="border-b border-[hsl(var(--border))] px-5 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-[0_12px_28px_rgba(37,99,235,0.25)]">
-              <Truck className="h-5 w-5" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-[0_12px_28px_rgba(37,99,235,0.25)] overflow-hidden">
+              <img src={factorFluxLogo} alt="FactorFlux" className="h-9 w-9 object-contain" />
             </div>
 
             <div className="min-w-0">

@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Loader2, User, Eye, EyeOff } from "lucide-react";
+import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -63,8 +64,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="mx-auto w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-            <Lock className="w-10 h-10 text-white" />
+          <div className="mx-auto w-20 h-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-md overflow-hidden">
+            <img src={factorFluxLogo} alt="FactorFlux" className="w-16 h-16 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">FactorFlux</h1>
           <p className="text-gray-600 dark:text-gray-300 mt-2">Trucking Pros Financial</p>
