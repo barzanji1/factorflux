@@ -385,55 +385,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: "Failed to fetch users" });
       }
     });
+  
+  // Profile 
+  app.post("/api/support/messages", async (req, res) => {
+    try {
+      const contactSchema = z.object({
+        name: z.string().trim().min(1, "Name is required"),
+        email: z.string().trim().email("Valid email is required"),
+        subject: z.string().trim().min(1, "Subject is required"),
+        message: z.string().trim().min(1, "Message is required"),
+      });
 
-    // Support routes
-    app.get('/api/support/test', (req, res) => {
-      res.json({ ok: true });
-    });
+      const { name, email, subject, message } = contactSchema.parse(req.body);
 
-    app.post("/api/support/contact", async (req, res) => {
-      try {
-        const contactSchema = z.object({
-          name: z.string().trim().min(1, "Name is required"),
-          email: z.string().trim().email("Valid email is required"),
-          subject: z.string().trim().min(1, "Subject is required"),
-          message: z.string().trim().min(1, "Message is required"),
-        });
+      await storage.createSupportMessage({
+        name,
+        email,
+        subject,
+        message,
+      });
 
-        const { name, email, subject, message } = contactSchema.parse(req.body);
+      const supportEmail = "doshbarzanji@gmail.com";
+      const senderEmail = "dosh@truckingprosfinancial.com";
 
-        await storage.createActivity({
-          userId: "1",
-          type: "support_message",
-          entityType: "support",
-          entityId: 0,
-          description: JSON.stringify({
-            name,
-            email,
-            subject,
-            message,
-          }),
-        });
-
-        const supportEmail = "doshbarzanji@gmail.com";
-        const senderEmail = "dosh@truckingprosfinancial.com";
-
-        const html = `
-          <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
-            <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
-            <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
-              <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
-              <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
-              <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
-            </div>
-            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
-              <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
-              <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
-            </div>
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
+          <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+            <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
+            <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
           </div>
-        `;
+          <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
+            <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
+            <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
+          </div>
+        </div>
+      `;
 
-        const text = `
+      const text = `
   New FactorFlux Help Message
 
   Name: ${name}
@@ -442,67 +432,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   Message:
   ${message}
-        `.trim();
+      `.trim();
 
-        const sent = await sendEmail({
-          to: supportEmail,
-          from: senderEmail,
-          subject: `[FactorFlux Help] ${subject} - ${email}`,
-          text,
-          html,
-        });
+      await sendEmail({
+        to: supportEmail,
+        from: senderEmail,
+        subject: `[FactorFlux Help] ${subject} - ${email}`,
+        text,
+        html,
+      });
 
-        res.status(200).json({
-          success: true,
-          message: sent
-            ? "Message sent successfully."
-            : "Message saved successfully. Email delivery is currently unavailable.",
-        });
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          return res.status(400).json({
-            error: error.errors[0]?.message || "Invalid form data.",
-          });
-        }
-
-        console.error("Contact support route error:", error);
-        res.status(500).json({
-          error: "Failed to save message.",
+      res.status(200).json({
+        success: true,
+        message: "Message sent successfully.",
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: error.errors[0]?.message || "Invalid form data.",
         });
       }
-    });
 
-    app.get('/api/support/messages', async (req, res) => {
-      try {
-        const activities = await storage.getActivities();
+      console.error("Support message route error:", error);
+      res.status(500).json({
+        error: "Failed to save message.",
+      });
+    }
+  });
 
-        const supportMessages = activities
-          .filter((a: any) => a.type === "support_message")
-          .map((a: any) => {
-            let parsed = {
-              name: "",
-              email: "",
-              subject: "",
-              message: a.description || "",
-            };
-
-            try {
-              parsed = JSON.parse(a.description);
-            } catch {}
-
-            return {
-              id: a.id,
-              createdAt: a.createdAt,
-              ...parsed,
-            };
-          });
-
-        res.json(supportMessages);
-      } catch (error) {
-        console.error("Error fetching support messages:", error);
-        res.status(500).json({ message: "Failed to fetch messages" });
-      }
-    });
+  app.get("/api/support/messages", async (_req, res) => {
+    try {
+      const messages = await storage.getSupportMessages();
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching support messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
 
     // Dashboard routes
     app.get('/api/dashboard/stats', async (req, res) => {
@@ -1305,21 +1271,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to download document" });
     }
   });
-
-      app.get('/api/support/messages', async (req, res) => {
-        try {
-          const activities = await storage.getActivities();
-
-          const supportMessages = activities.filter(
-            (a: any) => a.type === "support_message"
-          );
-
-          res.json(supportMessages);
-        } catch (error) {
-          console.error("Error fetching support messages:", error);
-          res.status(500).json({ message: "Failed to fetch messages" });
-        }
-      });
 
   // Manager-only routes
   app.put('/api/invoices/:id/approve', async (req: any, res) => {

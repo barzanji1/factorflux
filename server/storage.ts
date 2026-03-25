@@ -5,6 +5,7 @@ import {
   invoices,
   documents,
   activities,
+  supportMessages,
   fuelCardApplications,
   timeEntries,
   notifications,
@@ -25,6 +26,8 @@ import {
   type InsertDocument,
   type Activity,
   type InsertActivity,
+  type SupportMessage,
+  type InsertSupportMessage,
   type FuelCardApplication,
   type InsertFuelCardApplication,
   type Notification,
@@ -47,7 +50,7 @@ export interface IStorage {
   updateUserProfile(id: string, updates: Partial<User>): Promise<User>;
   getAllUsers(): Promise<User[]>;
   getUserByEmailAndType(email: string, authType: string): Promise<User[]>;
-  
+
   // Client operations
   getClients(): Promise<Client[]>;
   getClient(id: number): Promise<Client | undefined>;
@@ -55,7 +58,7 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   searchClients(query: string): Promise<Client[]>;
-  
+
   // Load operations
   getLoads(): Promise<Load[]>;
   getLoad(id: number): Promise<Load | undefined>;
@@ -64,7 +67,7 @@ export interface IStorage {
   updateLoad(id: number, load: Partial<InsertLoad>): Promise<Load>;
   deleteLoad(id: number): Promise<void>;
   searchLoads(query: string): Promise<Load[]>;
-  
+
   // Invoice operations
   getInvoices(): Promise<Invoice[]>;
   getInvoice(id: number): Promise<Invoice | undefined>;
@@ -74,7 +77,7 @@ export interface IStorage {
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
   searchInvoices(query: string): Promise<Invoice[]>;
-  
+
   // Document operations
   getDocuments(): Promise<Document[]>;
   getDocument(id: number): Promise<Document | undefined>;
@@ -84,12 +87,18 @@ export interface IStorage {
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document>;
   deleteDocument(id: number): Promise<void>;
-  
+
   // Activity operations
   getActivities(limit?: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
   clearActivities(): Promise<void>;
-  
+
+  // Support message operations
+  getSupportMessages(): Promise<SupportMessage[]>;
+  getSupportMessage(id: number): Promise<SupportMessage | undefined>;
+  createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage>;
+  deleteSupportMessage(id: number): Promise<void>;
+
   // Dashboard statistics
   getDashboardStats(): Promise<{
     pendingInvoices: number;
@@ -97,7 +106,7 @@ export interface IStorage {
     totalRevenue: string;
     activeClients: number;
   }>;
-  
+
   // Fuel card application operations
   getFuelCardApplications(): Promise<FuelCardApplication[]>;
   getFuelCardApplication(id: number): Promise<FuelCardApplication | undefined>;
@@ -119,14 +128,14 @@ export interface IStorage {
   markNotificationAsRead(id: number): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
   getUnreadNotificationCount(userId: string): Promise<number>;
-  
+
   // Follow-up operations
   getAllFollowUps(): Promise<FollowUp[]>;
   getFollowUp(id: number): Promise<FollowUp | undefined>;
   createFollowUp(followUp: InsertFollowUp): Promise<FollowUp>;
   updateFollowUp(id: number, updates: Partial<InsertFollowUp>): Promise<FollowUp>;
   deleteFollowUp(id: number): Promise<void>;
-  
+
   // Collections operations
   getAllCollections(): Promise<Collection[]>;
   getCollection(id: number): Promise<Collection | undefined>;
@@ -139,11 +148,11 @@ export interface IStorage {
     name: string;
     lastLoadDate: Date | null;
     daysSinceLastLoad: number;
-    status: 'active' | 'warning' | 'inactive';
+    status: "active" | "warning" | "inactive";
     totalOwed: string;
     pendingCollections: number;
   }[]>;
-  
+
   // Client Vault operations
   getAllVaultEntries(clientId: number): Promise<ClientVault[]>;
   getVaultEntry(id: number): Promise<ClientVault | undefined>;
@@ -178,7 +187,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserProfile(id: string, updates: Partial<User>): Promise<User> {
     const [updatedUser] = await db
       .update(users)
-      .set({ 
+      .set({
         ...updates,
         updatedAt: new Date(),
       })
@@ -197,7 +206,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmailAndType(email: string, authType: string): Promise<User[]> {
-    return await db.select().from(users)
+    return await db
+      .select()
+      .from(users)
       .where(and(eq(users.email, email), eq(users.authType, authType as "replit" | "local")));
   }
 
@@ -359,9 +370,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocumentsByEntity(entityType: string, entityId: number): Promise<Document[]> {
-    // For fuel card applications, we'll return all documents since we don't have
-    // a direct relationship table yet. In the future, this could be enhanced
-    // to filter by specific entity types and relationships
     return await db.select().from(documents).orderBy(desc(documents.createdAt));
   }
 
@@ -385,69 +393,67 @@ export class DatabaseStorage implements IStorage {
 
   // Activity operations
   async getActivities(limit?: number): Promise<Activity[]> {
-    const query = db
-      .select()
-      .from(activities)
-      .orderBy(desc(activities.createdAt));
-    
+    const query = db.select().from(activities).orderBy(desc(activities.createdAt));
     return limit ? await query.limit(limit) : await query;
   }
 
   async createActivity(activity: InsertActivity): Promise<Activity> {
     const [newActivity] = await db.insert(activities).values(activity).returning();
-    
-    // Auto-create notification for important activities
+
     if (this.shouldCreateNotification(activity.type)) {
       await this.createNotificationFromActivity(activity, newActivity);
     }
-    
+
     return newActivity;
   }
 
   private shouldCreateNotification(activityType: string): boolean {
     const notifiableTypes = [
-      'document_uploaded',
-      'invoice_created', 
-      'invoice_approved',
-      'fuel_card_application_submitted',
-      'fuel_card_application_approved',
-      'fuel_card_application_rejected'
+      "document_uploaded",
+      "invoice_created",
+      "invoice_approved",
+      "fuel_card_application_submitted",
+      "fuel_card_application_approved",
+      "fuel_card_application_rejected",
     ];
     return notifiableTypes.includes(activityType);
   }
 
   private async createNotificationFromActivity(activity: InsertActivity, createdActivity: Activity): Promise<void> {
-    const notificationMap: Record<string, { title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }> = {
-      'document_uploaded': {
-        title: 'Document Uploaded',
+    const notificationMap: Record<
+      string,
+      { title: string; message: string; type: "info" | "success" | "warning" | "error" }
+    > = {
+      document_uploaded: {
+        title: "Document Uploaded",
         message: `New document has been uploaded and is being processed.`,
-        type: 'info'
+        type: "info",
       },
-      'invoice_created': {
-        title: 'Invoice Created',
+      invoice_created: {
+        title: "Invoice Created",
         message: `New invoice has been created and is ready for review.`,
-        type: 'info'
+        type: "info",
       },
-      'invoice_approved': {
-        title: 'Invoice Approved',
+      invoice_approved: {
+        title: "Invoice Approved",
         message: `Invoice has been approved and is ready for processing.`,
-        type: 'success'
+        type: "success",
       },
-      'fuel_card_application_submitted': {
-        title: 'Fuel Card Application',
+      fuel_card_application_submitted: {
+        title: "Fuel Card Application",
         message: `Your fuel card application has been submitted for review.`,
-        type: 'info'
+        type: "info",
       },
-      'fuel_card_application_approved': {
-        title: 'Fuel Card Approved',
+      fuel_card_application_approved: {
+        title: "Fuel Card Approved",
         message: `Your fuel card application has been approved!`,
-        type: 'success'
+        type: "success",
       },
-      'fuel_card_application_rejected': {
-        title: 'Fuel Card Application',
+      fuel_card_application_rejected: {
+        title: "Fuel Card Application",
         message: `Your fuel card application needs revision. Please check the details.`,
-        type: 'warning'
-      }
+        type: "warning",
+      },
     };
 
     const notificationData = notificationMap[activity.type];
@@ -465,6 +471,25 @@ export class DatabaseStorage implements IStorage {
 
   async clearActivities(): Promise<void> {
     await db.delete(activities);
+  }
+
+  // Support message operations
+  async getSupportMessages(): Promise<SupportMessage[]> {
+    return await db.select().from(supportMessages).orderBy(desc(supportMessages.createdAt));
+  }
+
+  async getSupportMessage(id: number): Promise<SupportMessage | undefined> {
+    const [message] = await db.select().from(supportMessages).where(eq(supportMessages.id, id));
+    return message;
+  }
+
+  async createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage> {
+    const [newMessage] = await db.insert(supportMessages).values(message).returning();
+    return newMessage;
+  }
+
+  async deleteSupportMessage(id: number): Promise<void> {
+    await db.delete(supportMessages).where(eq(supportMessages.id, id));
   }
 
   // Fuel card application operations
@@ -498,68 +523,50 @@ export class DatabaseStorage implements IStorage {
     totalRevenue: string;
     activeClients: number;
   }> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
     const [pendingInvoicesResult] = await db
       .select({ count: count() })
       .from(invoices)
-      .where(eq(invoices.status, 'submitted'));
+      .where(eq(invoices.status, "submitted"));
 
     const [processedTodayResult] = await db
       .select({ count: count() })
       .from(invoices)
-      .where(
-        and(
-          eq(invoices.status, 'approved'),
-          sql`DATE(${invoices.approvedAt}) = CURRENT_DATE`
-        )
-      );
+      .where(and(eq(invoices.status, "approved"), sql`DATE(${invoices.approvedAt}) = CURRENT_DATE`));
 
     const [totalRevenueResult] = await db
       .select({ sum: sql<string>`COALESCE(SUM(${invoices.amount}), 0)` })
       .from(invoices)
-      .where(eq(invoices.status, 'paid'));
+      .where(eq(invoices.status, "paid"));
 
     const [activeClientsResult] = await db
       .select({ count: count() })
       .from(clients)
-      .where(eq(clients.status, 'active'));
+      .where(eq(clients.status, "active"));
 
     return {
       pendingInvoices: pendingInvoicesResult.count,
       processedToday: processedTodayResult.count,
-      totalRevenue: totalRevenueResult.sum || '0',
+      totalRevenue: totalRevenueResult.sum || "0",
       activeClients: activeClientsResult.count,
     };
   }
 
   // Time tracking operations
   async getTimeEntries(userId: string): Promise<TimeEntry[]> {
-    return await db
-      .select()
-      .from(timeEntries)
-      .where(eq(timeEntries.userId, userId))
-      .orderBy(desc(timeEntries.clockInTime));
+    return await db.select().from(timeEntries).where(eq(timeEntries.userId, userId)).orderBy(desc(timeEntries.clockInTime));
   }
 
   async getCurrentTimeEntry(userId: string): Promise<TimeEntry | undefined> {
     const [entry] = await db
       .select()
       .from(timeEntries)
-      .where(
-        and(
-          eq(timeEntries.userId, userId),
-          eq(timeEntries.status, 'clocked_in')
-        )
-      )
+      .where(and(eq(timeEntries.userId, userId), eq(timeEntries.status, "clocked_in")))
       .orderBy(desc(timeEntries.clockInTime))
       .limit(1);
     return entry;
   }
 
   async clockIn(userId: string, notes?: string): Promise<TimeEntry> {
-    // Check if user is already clocked in
     const existingEntry = await this.getCurrentTimeEntry(userId);
     if (existingEntry) {
       throw new Error("User is already clocked in");
@@ -570,17 +577,16 @@ export class DatabaseStorage implements IStorage {
       .values({
         userId,
         clockInTime: new Date(),
-        status: 'clocked_in',
+        status: "clocked_in",
         notes: notes || null,
       })
       .returning();
 
-    // Log activity
     await this.createActivity({
       userId,
-      type: 'clock_in',
+      type: "clock_in",
       description: `Clocked in at ${new Date().toLocaleTimeString()}`,
-      entityType: 'time_entry',
+      entityType: "time_entry",
       entityId: timeEntry.id,
     });
 
@@ -601,19 +607,18 @@ export class DatabaseStorage implements IStorage {
       .set({
         clockOutTime,
         totalHours: totalHours.toFixed(2),
-        status: 'clocked_out',
+        status: "clocked_out",
         notes: notes || currentEntry.notes,
         updatedAt: new Date(),
       })
       .where(eq(timeEntries.id, currentEntry.id))
       .returning();
 
-    // Log activity
     await this.createActivity({
       userId,
-      type: 'clock_out',
+      type: "clock_out",
       description: `Clocked out at ${clockOutTime.toLocaleTimeString()} (${totalHours.toFixed(2)} hours)`,
-      entityType: 'time_entry',
+      entityType: "time_entry",
       entityId: timeEntry.id,
     });
 
@@ -621,26 +626,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {
-    const [entry] = await db
-      .select()
-      .from(timeEntries)
-      .where(eq(timeEntries.id, id));
+    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
     return entry;
   }
 
   async getTodayTimeEntries(userId: string): Promise<TimeEntry[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
     return await db
       .select()
       .from(timeEntries)
-      .where(
-        and(
-          eq(timeEntries.userId, userId),
-          sql`DATE(${timeEntries.clockInTime}) = CURRENT_DATE`
-        )
-      )
+      .where(and(eq(timeEntries.userId, userId), sql`DATE(${timeEntries.clockInTime}) = CURRENT_DATE`))
       .orderBy(desc(timeEntries.clockInTime));
   }
 
@@ -648,16 +642,11 @@ export class DatabaseStorage implements IStorage {
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     return await db
       .select()
       .from(timeEntries)
-      .where(
-        and(
-          eq(timeEntries.userId, userId),
-          sql`${timeEntries.clockInTime} >= ${startOfWeek}`
-        )
-      )
+      .where(and(eq(timeEntries.userId, userId), sql`${timeEntries.clockInTime} >= ${startOfWeek}`))
       .orderBy(desc(timeEntries.clockInTime));
   }
 
@@ -677,29 +666,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markNotificationAsRead(id: number): Promise<void> {
-    await db
-      .update(notifications)
-      .set({ read: true })
-      .where(eq(notifications.id, id));
+    await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
   }
 
   async markAllNotificationsAsRead(userId: string): Promise<void> {
-    await db
-      .update(notifications)
-      .set({ read: true })
-      .where(eq(notifications.userId, userId));
+    await db.update(notifications).set({ read: true }).where(eq(notifications.userId, userId));
   }
 
   async getUnreadNotificationCount(userId: string): Promise<number> {
     const result = await db
       .select({ count: count() })
       .from(notifications)
-      .where(
-        and(
-          eq(notifications.userId, userId),
-          eq(notifications.read, false)
-        )
-      );
+      .where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
     return result[0]?.count || 0;
   }
 
@@ -720,7 +698,7 @@ export class DatabaseStorage implements IStorage {
           id: clients.id,
           name: clients.name,
           email: clients.email,
-        }
+        },
       })
       .from(followUps)
       .leftJoin(clients, eq(followUps.clientId, clients.id))
@@ -728,10 +706,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFollowUp(id: number): Promise<FollowUp | undefined> {
-    const [followUp] = await db
-      .select()
-      .from(followUps)
-      .where(eq(followUps.id, id));
+    const [followUp] = await db.select().from(followUps).where(eq(followUps.id, id));
     return followUp;
   }
 
@@ -822,25 +797,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCollectionsByClient(clientId: number): Promise<Collection[]> {
-    return await db
-      .select()
-      .from(collections)
-      .where(eq(collections.clientId, clientId))
-      .orderBy(desc(collections.createdAt));
+    return await db.select().from(collections).where(eq(collections.clientId, clientId)).orderBy(desc(collections.createdAt));
   }
 
   async createCollection(collection: InsertCollection): Promise<Collection> {
     const [newCollection] = await db.insert(collections).values(collection).returning();
-    
-    // Log activity
+
     await this.createActivity({
-      userId: collection.assignedTo || 'system',
-      type: 'collection_created',
+      userId: collection.assignedTo || "system",
+      type: "collection_created",
       description: `New collection created for ${collection.amount} - ${collection.description}`,
-      entityType: 'collection',
+      entityType: "collection",
       entityId: newCollection.id,
     });
-    
+
     return newCollection;
   }
 
@@ -850,18 +820,17 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(collections.id, id))
       .returning();
-    
-    // Log activity for status changes
+
     if (updates.status) {
       await this.createActivity({
-        userId: updates.assignedTo || 'system',
-        type: 'collection_updated',
+        userId: updates.assignedTo || "system",
+        type: "collection_updated",
         description: `Collection status updated to ${updates.status}`,
-        entityType: 'collection',
+        entityType: "collection",
         entityId: id,
       });
     }
-    
+
     return updatedCollection;
   }
 
@@ -874,11 +843,10 @@ export class DatabaseStorage implements IStorage {
     name: string;
     lastLoadDate: Date | null;
     daysSinceLastLoad: number;
-    status: 'active' | 'warning' | 'inactive';
+    status: "active" | "warning" | "inactive";
     totalOwed: string;
     pendingCollections: number;
   }[]> {
-    // Get all clients with their last load date and pending collections
     const clientsWithData = await db
       .select({
         clientId: clients.id,
@@ -893,21 +861,20 @@ export class DatabaseStorage implements IStorage {
       .groupBy(clients.id, clients.name)
       .orderBy(clients.name);
 
-    // Calculate days since last load and determine status
-    return clientsWithData.map(client => {
-      const daysSinceLastLoad = client.lastLoadDate 
+    return clientsWithData.map((client) => {
+      const daysSinceLastLoad = client.lastLoadDate
         ? Math.floor((Date.now() - client.lastLoadDate.getTime()) / (1000 * 60 * 60 * 24))
-        : 999; // Very high number for clients with no loads
-      
-      let status: 'active' | 'warning' | 'inactive';
+        : 999;
+
+      let status: "active" | "warning" | "inactive";
       if (daysSinceLastLoad <= 7) {
-        status = 'active';
+        status = "active";
       } else if (daysSinceLastLoad <= 30) {
-        status = 'warning';
+        status = "warning";
       } else {
-        status = 'inactive';
+        status = "inactive";
       }
-      
+
       return {
         ...client,
         daysSinceLastLoad,
@@ -989,16 +956,15 @@ export class DatabaseStorage implements IStorage {
 
   async createVaultEntry(entry: InsertClientVault): Promise<ClientVault> {
     const [newEntry] = await db.insert(clientVault).values(entry).returning();
-    
-    // Log activity
+
     await this.createActivity({
       userId: entry.createdBy,
-      type: 'vault_created',
+      type: "vault_created",
       description: `Created vault entry: ${entry.label}`,
-      entityType: 'vault',
+      entityType: "vault",
       entityId: newEntry.id,
     });
-    
+
     return newEntry;
   }
 
@@ -1008,33 +974,28 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(clientVault.id, id))
       .returning();
-      
-    // Log activity if the entry was modified significantly
+
     if (updates.encryptedData || updates.label) {
       await this.createActivity({
-        userId: updates.createdBy || 'system',
-        type: 'vault_updated',
+        userId: updates.createdBy || "system",
+        type: "vault_updated",
         description: `Updated vault entry: ${updatedEntry.label}`,
-        entityType: 'vault',
+        entityType: "vault",
         entityId: id,
       });
     }
-    
+
     return updatedEntry;
   }
 
   async deleteVaultEntry(id: number): Promise<void> {
-    // Soft delete by setting isActive to false
-    await db
-      .update(clientVault)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(clientVault.id, id));
+    await db.update(clientVault).set({ isActive: false, updatedAt: new Date() }).where(eq(clientVault.id, id));
   }
 
   async recordVaultAccess(id: number, userId: string): Promise<void> {
     await db
       .update(clientVault)
-      .set({ 
+      .set({
         lastAccessedAt: new Date(),
         lastAccessedBy: userId,
       })

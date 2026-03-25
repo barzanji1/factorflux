@@ -83,8 +83,8 @@ export const loads = pgTable("loads", {
   pickupDate: timestamp("pickup_date"),
   deliveryDate: timestamp("delivery_date"),
   rate: decimal("rate", { precision: 10, scale: 2 }),
-  status: varchar("status", { 
-    enum: ["pending", "in_transit", "delivered", "invoiced", "paid"] 
+  status: varchar("status", {
+    enum: ["pending", "in_transit", "delivered", "invoiced", "paid"]
   }).default("pending").notNull(),
   driverName: varchar("driver_name"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -98,8 +98,8 @@ export const invoices = pgTable("invoices", {
   loadId: integer("load_id").references(() => loads.id).notNull(),
   clientId: integer("client_id").references(() => clients.id).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  status: varchar("status", { 
-    enum: ["draft", "submitted", "approved", "rejected", "paid"] 
+  status: varchar("status", {
+    enum: ["draft", "submitted", "approved", "rejected", "paid"]
   }).default("draft").notNull(),
   submittedBy: varchar("submitted_by").references(() => users.id),
   submittedAt: timestamp("submitted_at"),
@@ -117,8 +117,8 @@ export const documents = pgTable("documents", {
   originalName: varchar("original_name").notNull(),
   mimeType: varchar("mime_type").notNull(),
   size: integer("size").notNull(),
-  documentType: varchar("document_type", { 
-    enum: ["rate_confirmation", "bill_of_lading", "driver_id", "carrier_setup", "other"] 
+  documentType: varchar("document_type", {
+    enum: ["rate_confirmation", "bill_of_lading", "driver_id", "carrier_setup", "other"]
   }).notNull(),
   loadId: integer("load_id").references(() => loads.id),
   invoiceId: integer("invoice_id").references(() => invoices.id),
@@ -136,6 +136,16 @@ export const activities = pgTable("activities", {
   entityType: varchar("entity_type"),
   entityId: integer("entity_id"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Support Messages table
+export const supportMessages = pgTable("support_messages", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  email: varchar("email").notNull(),
+  subject: varchar("subject").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Fuel card applications table
@@ -205,8 +215,8 @@ export const collections = pgTable("collections", {
 export const clientVault = pgTable("client_vault", {
   id: integer("id").primaryKey(),
   clientId: integer("client_id").references(() => clients.id).notNull(),
-  dataType: varchar("data_type", { 
-    enum: ["ssn", "bank_account", "password", "driver_license", "passport", "tax_documents", "insurance", "other"] 
+  dataType: varchar("data_type", {
+    enum: ["ssn", "bank_account", "password", "driver_license", "passport", "tax_documents", "insurance", "other"]
   }).notNull(),
   label: varchar("label").notNull(), // User-friendly label like "Primary Bank Account"
   encryptedData: text("encrypted_data").notNull(), // AES encrypted data
@@ -372,31 +382,35 @@ export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, creat
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
 export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
-export const insertFuelCardApplicationSchema = createInsertSchema(fuelCardApplications).omit({ 
-  id: true, 
-  createdAt: true, 
-  updatedAt: true, 
-  status: true, 
-  reviewedBy: true, 
-  reviewedAt: true, 
-  notes: true 
+export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertFuelCardApplicationSchema = createInsertSchema(fuelCardApplications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  reviewedBy: true,
+  reviewedAt: true,
+  notes: true
 });
 
-export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ 
-  id: true, 
-  createdAt: true, 
-  updatedAt: true 
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
 
-export const insertNotificationSchema = createInsertSchema(notifications).omit({ 
-  id: true, 
-  createdAt: true 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true
 });
 
-export const insertFollowUpSchema = createInsertSchema(followUps).omit({ 
-  id: true, 
-  createdAt: true, 
-  updatedAt: true 
+export const insertFollowUpSchema = createInsertSchema(followUps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
 
 export const insertCollectionSchema = createInsertSchema(collections).omit({
@@ -456,6 +470,9 @@ export type InsertBroker = z.infer<typeof insertBrokerSchema>;
 
 export type FuelAdvance = typeof fuelAdvances.$inferSelect;
 export type InsertFuelAdvance = z.infer<typeof insertFuelAdvanceSchema>;
+
+export type SupportMessage = typeof supportMessages.$inferSelect;
+export type InsertSupportMessage = z.infer<typeof insertSupportMessageSchema>;
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
