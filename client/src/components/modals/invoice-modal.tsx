@@ -325,8 +325,8 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>
             {invoice ? "Edit Invoice" : "Create New Invoice"}
           </DialogTitle>
@@ -334,6 +334,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
             {invoice ? "Update the invoice details below" : "Drag and drop an invoice document or fill in the details manually"}
           </DialogDescription>
         </DialogHeader>
+        <div className="overflow-y-auto flex-1 px-6 pb-6">
 
         {/* Document Upload Slots */}
         {!invoice && (
@@ -601,6 +602,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
             </div>
           </form>
         </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );
