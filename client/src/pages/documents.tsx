@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useToast } from "@/hooks/use-toast";
@@ -23,58 +22,10 @@ import {
   FileText,
 } from "lucide-react";
 import type { Document, Invoice, Load } from "@shared/schema";
-import DocumentUpload from "@/components/dashboard/document-upload";
 import { cn } from "@/lib/utils";
-
-type IntakeSection = {
-  key: string;
-  title: string;
-  description: string;
-  documentType: string;
-};
-
-const intakeSections: IntakeSection[] = [
-  {
-    key: "rate_confirmation",
-    title: "Rate Confirmations",
-    description: "Upload signed rate confirmations for each load.",
-    documentType: "rate_confirmation",
-  },
-  {
-    key: "bill_of_lading",
-    title: "Bills of Lading",
-    description: "Upload delivered BOL documents for proof of delivery.",
-    documentType: "bill_of_lading",
-  },
-  {
-    key: "lumper_receipt",
-    title: "Lumper Receipts",
-    description: "Upload lumper payment receipts and related proofs.",
-    documentType: "lumper_receipt",
-  },
-  {
-    key: "fuel_receipt",
-    title: "Fuel Receipts",
-    description: "Upload fuel receipts, scales, tolls, and reimbursement receipts.",
-    documentType: "fuel_receipt",
-  },
-  {
-    key: "driver_docs",
-    title: "Carrier / Driver Docs",
-    description: "Upload driver IDs, carrier setup, and supporting onboarding files.",
-    documentType: "driver_docs",
-  },
-  {
-    key: "other_docs",
-    title: "Other Documents",
-    description: "Upload any additional supporting paperwork.",
-    documentType: "other",
-  },
-];
 
 export default function Documents() {
   const { toast } = useToast();
-  const [selectedSection, setSelectedSection] = useState("rate_confirmation");
 
   const { data: documents = [], isLoading: documentsLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
@@ -101,7 +52,11 @@ export default function Documents() {
       case "rate_confirmation":
         return <FileCheck className="h-5 w-5" />;
       case "bill_of_lading":
+      case "lumper_receipt":
         return <ReceiptText className="h-5 w-5" />;
+      case "fuel_receipt":
+        return <DollarSign className="h-5 w-5" />;
+      case "driver_docs":
       case "driver_id":
       case "carrier_setup":
         return <Truck className="h-5 w-5" />;
@@ -224,125 +179,145 @@ export default function Documents() {
     }
   };
 
-  const renderDocumentGrid = (docs: Document[]) => {
+  const renderDocumentGrid = (docs: Document[], title: string) => {
     if (documentsLoading) {
       return (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/30"
-            >
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
-                <div className="h-3 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
-                <div className="h-8 w-full rounded bg-slate-200 dark:bg-slate-700" />
-              </div>
+        <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">
+              {title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5">
+            <div className="grid grid-cols-1 gap-4">
+              {[...Array(2)].map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-[18px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/30"
+                >
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-3 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-8 w-full rounded bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (docs.length === 0) {
-      return (
-        <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-14 text-center dark:border-slate-800 dark:bg-slate-900/30">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-            <FolderOpen className="h-5 w-5" />
-          </div>
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-            No documents in this section
-          </p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Upload files to populate this category.
-          </p>
-        </div>
+          </CardContent>
+        </Card>
       );
     }
 
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {docs.map((document) => (
-          <Card
-            key={document.id}
-            className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm transition dark:border-slate-800 dark:bg-transparent"
-          >
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    {getDocumentIcon(document.documentType)}
-                  </div>
+      <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">
+              {title}
+            </CardTitle>
+            <Badge className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              {docs.length}
+            </Badge>
+          </div>
+        </CardHeader>
 
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                      {document.originalName}
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {formatDocumentType(document.documentType)} • {formatFileSize(document.size)}
-                    </p>
-                  </div>
-                </div>
-
-                <Badge
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 font-medium",
-                    getStatusColor(document.status)
-                  )}
+        <CardContent className="p-5">
+          {docs.length === 0 ? (
+            <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center dark:border-slate-800 dark:bg-slate-900/30">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                <FolderOpen className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                No documents yet
+              </p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Upload files to populate this category.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {docs.map((document) => (
+                <Card
+                  key={document.id}
+                  className="rounded-[18px] border border-slate-200/80 bg-white shadow-sm transition dark:border-slate-800 dark:bg-transparent"
                 >
-                  {document.status}
-                </Badge>
-              </div>
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {getDocumentIcon(document.documentType)}
+                        </div>
 
-              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                {document.loadId && (
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-slate-400" />
-                    <span>Load #{document.loadId}</span>
-                  </div>
-                )}
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                            {document.originalName}
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatDocumentType(document.documentType)} • {formatFileSize(document.size)}
+                          </p>
+                        </div>
+                      </div>
 
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-slate-400" />
-                  <span>{new Date(document.createdAt!).toLocaleDateString()}</span>
-                </div>
-              </div>
+                      <Badge
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 font-medium",
+                          getStatusColor(document.status)
+                        )}
+                      >
+                        {document.status}
+                      </Badge>
+                    </div>
 
-              <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Ready for review
-                </span>
+                    <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                      {document.loadId && (
+                        <div className="flex items-center gap-2">
+                          <Truck className="h-4 w-4 text-slate-400" />
+                          <span>Load #{document.loadId}</span>
+                        </div>
+                      )}
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleViewDocument(document.id)}
-                    className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-                    title="View Document"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                        <span>{new Date(document.createdAt!).toLocaleDateString()}</span>
+                      </div>
+                    </div>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDownloadDocument(document.id)}
-                    className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-                    title="Download Document"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                    <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        Ready for review
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDocument(document.id)}
+                          className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+                          title="View Document"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadDocument(document.id)}
+                          className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+                          title="Download Document"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
   };
-
-  const selectedDocs = sectionDocuments(selectedSection);
 
   const recentUploads = documents
     .slice()
@@ -461,66 +436,41 @@ export default function Documents() {
             <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
               <div className="space-y-6 xl:col-span-8">
                 <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <div>
-                      <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
-                        Structured Intake
-                      </CardTitle>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Upload freight paperwork by document type for cleaner processing.
-                      </p>
-                    </div>
-                  </CardHeader>
-
                   <CardContent className="p-6">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {intakeSections.map((section) => {
-                        const docs = sectionDocuments(section.key);
-                        const isSelected = selectedSection === section.key;
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                          Supporting Documents
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                          Upload rate confirmations, BOLs, lumpers, and receipts during invoice creation.
+                        </p>
+                      </div>
 
-                        return (
-                          <button
-                            key={section.key}
-                            type="button"
-                            onClick={() => setSelectedSection(section.key)}
-                            className={cn(
-                              "rounded-[18px] border p-5 text-left transition",
-                              isSelected
-                                ? "border-slate-900 bg-slate-50 dark:border-white dark:bg-slate-900/40"
-                                : "border-slate-200/80 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/20 dark:hover:border-slate-700"
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                  {section.title}
-                                </p>
-                                <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                  {section.description}
-                                </p>
-                              </div>
-
-                              <Badge
-                                className={cn(
-                                  "rounded-full border px-2.5 py-1 font-medium",
-                                  docs.length > 0
-                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
-                                    : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                                )}
-                              >
-                                {docs.length > 0 ? `${docs.length} file${docs.length > 1 ? "s" : ""}` : "Missing"}
-                              </Badge>
-                            </div>
-                          </button>
-                        );
-                      })}
+                      <Button
+                        variant="outline"
+                        className="h-11 rounded-xl px-5"
+                        onClick={() =>
+                          toast({
+                            title: "Create Invoice",
+                            description: "Open the Create Invoice modal to upload supporting documents.",
+                          })
+                        }
+                      >
+                        Create Invoice
+                        <ArrowUpRight className="ml-2 h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
 
                 <div className="space-y-6">
-                  <DocumentUpload documentType={intakeSections.find((s) => s.key === selectedSection)?.documentType || "other"} />
-                  {renderDocumentGrid(selectedDocs)}
+                  {renderDocumentGrid(sectionDocuments("rate_confirmation"), "Rate Confirmations")}
+                  {renderDocumentGrid(sectionDocuments("bill_of_lading"), "Bills of Lading")}
+                  {renderDocumentGrid(sectionDocuments("lumper_receipt"), "Lumper Receipts")}
+                  {renderDocumentGrid(sectionDocuments("fuel_receipt"), "Fuel Receipts")}
+                  {renderDocumentGrid(sectionDocuments("driver_docs"), "Carrier / Driver Docs")}
+                  {renderDocumentGrid(sectionDocuments("other_docs"), "Other Documents")}
                 </div>
               </div>
 

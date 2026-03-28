@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/layout/AppShell";
 import StatsCards from "@/components/dashboard/stats-cards";
-import DocumentUpload from "@/components/dashboard/document-upload";
 import QuickActions from "@/components/dashboard/quick-actions";
 import RecentActivity from "@/components/dashboard/recent-activity";
 import RecentInvoices from "@/components/dashboard/recent-invoices";
@@ -48,15 +47,15 @@ export default function Dashboard() {
         <StatsCards />
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <div className="xl:col-span-8">
-          <DocumentUpload />
-        </div>
-
-        <div className="space-y-6 xl:col-span-4">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-6">
           <TimeClock />
           <CutoffTimes />
+        </div>
+        <div className="space-y-6">
           <QuickActions />
+        </div>
+        <div className="space-y-6 lg:col-span-2 xl:col-span-1">
           <RecentActivity />
         </div>
       </section>
