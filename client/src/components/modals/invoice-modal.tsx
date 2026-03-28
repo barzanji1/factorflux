@@ -22,13 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -325,7 +319,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-visible"  style={{ overflowY: "visible" }}>
         <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>
             {invoice ? "Edit Invoice" : "Create New Invoice"}
@@ -378,20 +372,25 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-status">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="submitted">Submitted</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {(["draft","submitted","approved","rejected","paid"] as const).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => field.onChange(s)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-full text-sm font-medium border transition-all capitalize",
+                              field.value === s
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
+                            )}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -404,17 +403,28 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Load Type</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-load-type">
-                        <SelectValue placeholder="Select load type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="otr_load">OTR Load</SelectItem>
-                      <SelectItem value="dump_truck_ticket">Dump Truck Ticket</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <div className="flex gap-2 pt-1">
+                      {([
+                        { value: "otr_load", label: "OTR Load" },
+                        { value: "dump_truck_ticket", label: "Dump Truck Ticket" },
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => field.onChange(opt.value)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-full text-sm font-medium border transition-all",
+                            field.value === opt.value
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                              : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
