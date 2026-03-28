@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,7 +33,92 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, FileText, X, Building, Phone, Mail, MapPin, Search } from "lucide-react";
+import { Upload, X, Building, Phone, Mail, MapPin, Search, CheckCircle2 } from "lucide-react";
+
+type DocKey = "rate_confirmation" | "bill_of_lading" | "lumper" | "receipts";
+
+const DOC_SLOTS: { key: DocKey; label: string; hint: string }[] = [
+  { key: "rate_confirmation", label: "Rate Confirmation", hint: "Upload the signed rate confirmation" },
+  { key: "bill_of_lading", label: "Bill of Lading", hint: "Upload the BOL document" },
+  { key: "lumper", label: "Lumper Receipt", hint: "Upload any lumper receipt" },
+  { key: "receipts", label: "Receipts", hint: "Upload additional receipts" },
+];
+
+function MiniUploadZone({
+  label,
+  hint,
+  file,
+  onFile,
+  onRemove,
+}: {
+  label: string;
+  hint: string;
+  file: File | null;
+  onFile: (f: File) => void;
+  onRemove: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const accept = (f: File) => {
+    const valid = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
+    if (valid.includes(f.type) && f.size <= 10 * 1024 * 1024) onFile(f);
+  };
+
+  return (
+    <div
+      className={`relative rounded-xl border-2 border-dashed p-4 transition-all cursor-pointer select-none ${
+        dragOver
+          ? "border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-950/20"
+          : file
+          ? "border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/20"
+          : "border-slate-300 bg-slate-50 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-slate-600"
+      }`}
+      onClick={() => !file && inputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const f = e.dataTransfer.files[0];
+        if (f) accept(f);
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) accept(f); }}
+      />
+
+      {file ? (
+        <div className="flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-emerald-700 dark:text-emerald-400">{file.name}</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-500">{(file.size / 1024).toFixed(1)} KB</p>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="shrink-0 rounded-md p-1 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <Upload className="h-5 w-5 shrink-0 text-slate-400" />
+          <div>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{hint} · PDF, JPG, PNG · Max 10 MB</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -57,8 +142,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<Record<DocKey, File | null>>({
+    rate_confirmation: null,
+    bill_of_lading: null,
+    lumper: null,
+    receipts: null,
+  });
   const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<z.infer<typeof invoiceFormSchema>>({
@@ -120,56 +209,9 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       });
       setSelectedClient(null);
       setClientSearch("");
-      setAttachedFile(null);
+      setAttachedFiles({ rate_confirmation: null, bill_of_lading: null, lumper: null, receipts: null });
     }
   }, [invoice, form, clients]);
-
-  // Drag and drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-      if (validTypes.includes(file.type)) {
-        setAttachedFile(file);
-        toast({
-          title: "Document Attached",
-          description: `${file.name} ready to upload with invoice`,
-        });
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF, JPEG, or PNG file",
-          variant: "destructive",
-        });
-      }
-    }
-  }, [toast]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      setAttachedFile(file);
-      toast({
-        title: "Document Attached",
-        description: `${file.name} ready to upload with invoice`,
-      });
-    }
-  };
 
   const handleClientSelect = (client: Client) => {
     setSelectedClient(client);
@@ -183,18 +225,24 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       return await apiRequest("POST", "/api/invoices", data);
     },
     onSuccess: async (response) => {
-      // If there's an attached file, upload it
-      if (attachedFile) {
+      const hasFiles = Object.values(attachedFiles).some(Boolean);
+      if (hasFiles) {
         setIsUploading(true);
         try {
-          const formData = new FormData();
-          formData.append('file', attachedFile);
-          formData.append('documentType', 'rate_confirmation');
           const invoiceData = await response.json();
-          formData.append('invoiceId', invoiceData.id.toString());
-          await apiRequest("POST", "/api/documents/upload", formData);
+          await Promise.all(
+            DOC_SLOTS.map(async ({ key }) => {
+              const file = attachedFiles[key];
+              if (!file) return;
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("documentType", key);
+              formData.append("invoiceId", invoiceData.id.toString());
+              await apiRequest("POST", "/api/documents/upload", formData);
+            })
+          );
         } catch (error) {
-          console.error("Error uploading document:", error);
+          console.error("Error uploading documents:", error);
         } finally {
           setIsUploading(false);
         }
@@ -287,63 +335,22 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
           </DialogDescription>
         </DialogHeader>
 
-        {/* Document Drop Zone */}
+        {/* Document Upload Slots */}
         {!invoice && (
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              isDragOver 
-                ? "border-primary bg-primary/5" 
-                : attachedFile 
-                  ? "border-green-500 bg-green-50 dark:bg-green-950" 
-                  : "border-gray-300 dark:border-gray-700"
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            data-testid="invoice-dropzone"
-          >
-            {attachedFile ? (
-              <div className="flex items-center justify-center gap-3">
-                <FileText className="w-8 h-8 text-green-600" />
-                <div className="text-left">
-                  <p className="font-medium text-green-700 dark:text-green-400">{attachedFile.name}</p>
-                  <p className="text-sm text-green-600 dark:text-green-500">
-                    {(attachedFile.size / 1024).toFixed(1)} KB - Ready to upload
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAttachedFile(null)}
-                  data-testid="remove-file-button"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Upload className="w-10 h-10 mx-auto mb-3 text-gray-400" />
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  Drag and drop your invoice document here
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mb-3">
-                  Supports PDF, JPEG, PNG (Max 10MB)
-                </p>
-                <label className="cursor-pointer">
-                  <span className="text-primary hover:underline text-sm">
-                    or click to browse files
-                  </span>
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.jpeg,.jpg,.png"
-                    onChange={handleFileSelect}
-                    data-testid="file-input"
-                  />
-                </label>
-              </>
-            )}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Attach Documents</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {DOC_SLOTS.map(({ key, label, hint }) => (
+                <MiniUploadZone
+                  key={key}
+                  label={label}
+                  hint={hint}
+                  file={attachedFiles[key]}
+                  onFile={(f) => setAttachedFiles((prev) => ({ ...prev, [key]: f }))}
+                  onRemove={() => setAttachedFiles((prev) => ({ ...prev, [key]: null }))}
+                />
+              ))}
+            </div>
           </div>
         )}
 
