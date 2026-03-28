@@ -384,7 +384,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent position="popper" sideOffset={4}>
+                      <SelectContent>
                         <SelectItem value="draft">Draft</SelectItem>
                         <SelectItem value="submitted">Submitted</SelectItem>
                         <SelectItem value="approved">Approved</SelectItem>
@@ -410,7 +410,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                         <SelectValue placeholder="Select load type" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent position="popper" sideOffset={4}>
+                    <SelectContent>
                       <SelectItem value="otr_load">OTR Load</SelectItem>
                       <SelectItem value="dump_truck_ticket">Dump Truck Ticket</SelectItem>
                     </SelectContent>
