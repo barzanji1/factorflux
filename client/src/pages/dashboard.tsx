@@ -6,7 +6,7 @@ import RecentActivity from "@/components/dashboard/recent-activity";
 import RecentInvoices from "@/components/dashboard/recent-invoices";
 import TimeClock from "@/components/time-tracking/time-clock";
 import CutoffTimes from "@/components/dashboard/cutoff-times";
-import { Sparkles, ShieldCheck, Activity } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 export default function Dashboard() {
   return (
@@ -14,45 +14,31 @@ export default function Dashboard() {
       title="Dashboard"
       subtitle="Welcome back — manage your freight factoring workflow from one command center"
     >
-      <section className="relative mb-8 overflow-hidden rounded-[28px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.10),transparent_28%)]" />
+      <section className="relative mb-8 overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.05),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.03),transparent_26%)]" />
 
-        <div className="relative flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
-          <div className="flex min-w-0 flex-1 items-start gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-[0_18px_34px_rgba(37,99,235,0.22)]">
-              <Sparkles className="h-7 w-7" />
+        <div className="relative p-6 lg:p-8">
+          <div className="max-w-3xl">
+            <div className="mb-5">
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                FactorFlux OS
+              </span>
             </div>
 
-            <div className="min-w-0">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
-                  FactorFlux OS
-                </span>
-                <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
-                  Internal Operations Suite
-                </span>
-              </div>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white lg:text-[2rem]">
+              Welcome to FactorFlux
+            </h2>
 
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
-                Welcome to FactorFlux
-              </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300 lg:text-[15px]">
+              Your central operating system for freight factoring, document
+              intake, invoice visibility, and workflow execution.
+            </p>
 
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 lg:text-base">
-                Your central operating system for freight factoring, document
-                intake, invoice visibility, workflow tracking, and team execution.
-              </p>
+            <div className="mt-6 h-px w-full max-w-xl bg-gradient-to-r from-slate-200 via-slate-200/70 to-transparent dark:from-slate-700 dark:via-slate-700/70 dark:to-transparent" />
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Secure internal workspace
-                </div>
-
-                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  <Activity className="h-3.5 w-3.5" />
-                  Live workflow visibility
-                </div>
-              </div>
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-slate-200/90 bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Secure internal workspace
             </div>
           </div>
         </div>

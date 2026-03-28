@@ -54,6 +54,23 @@ const upload = multer({
     }
   },
 });
+function sanitizeOriginalName(name: string) {
+  return name
+    .normalize("NFKC")
+    .replace(/[^\w.\- ()]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildDocumentMetadata(document: any) {
+  return {
+    documentId: document.id,
+    filePath: `/api/documents/${document.id}/view`,
+    downloadPath: `/api/documents/${document.id}/download`,
+    originalName: document.originalName,
+    mimeType: document.mimeType,
+  };
+}
 
 // Helper function to get user ID - authentication removed
 function getUserId(req: any): string | null {
@@ -570,57 +587,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       throw new Error('PDF conversion temporarily unavailable');
     }
 
-    app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req: any, res) => {
-      try {
-        if (!req.file) {
-          return res.status(400).json({ message: "No file uploaded" });
-        }
-
-        const { documentType, loadId, invoiceId } = req.body;
-        let processedFilename = req.file.filename;
-        let processedMimeType = req.file.mimetype;
-        let processedOriginalName = req.file.originalname;
-
-        if (req.file.mimetype.includes('jpeg') || req.file.mimetype.includes('jpg')) {
-          console.log('Image uploaded as-is (PDF conversion disabled for web deployment)');
-        }
-
-        const documentData = {
-          filename: processedFilename,
-          originalName: processedOriginalName,
-          mimeType: processedMimeType,
-          size: req.file.size,
-          documentType: documentType || 'other',
-          loadId: loadId && loadId !== 'undefined' ? parseInt(loadId) : null,
-          invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId) : null,
-          uploadedBy: req.user.id,
-          status: 'processing' as const,
-        };
-
-        const document = await storage.createDocument(documentData);
-
-        await storage.createActivity({
-          userId: req.user.id,
-          type: 'document_uploaded',
-          description: `Uploaded document: ${document.originalName}`,
-          entityType: 'document',
-          entityId: document.id,
-        });
-
-        setTimeout(async () => {
-          try {
-            await storage.updateDocument(document.id, { status: 'processed' });
-          } catch (error) {
-            console.error("Error updating document status:", error);
-          }
-        }, 2000);
-
-        res.status(201).json(document);
-      } catch (error) {
-        console.error("Error uploading document:", error);
-        res.status(500).json({ message: "Failed to upload document" });
+  app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
       }
-    });
+
+      const { documentType, loadId, invoiceId } = req.body;
+
+      const safeOriginalName = req.file.originalname
+        .normalize("NFKC")
+        .replace(/[^\w.\- ()]/g, "_");
+
+      const documentData = {
+        filename: req.file.filename,
+        originalName: safeOriginalName,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        documentType: documentType || 'other',
+        loadId: loadId && loadId !== 'undefined' ? parseInt(loadId, 10) : null,
+        invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId, 10) : null,
+        uploadedBy: req.user.id,
+        status: 'processing' as const,
+      };
+
+      const document = await storage.createDocument(documentData);
+
+      // ✅ CRITICAL FIX: add metadata for frontend
+      await storage.createActivity({
+        userId: req.user.id,
+        type: 'document_uploaded',
+        description: `Uploaded document: ${document.originalName}`,
+        entityType: 'document',
+        entityId: document.id,
+        metadata: {
+          documentId: document.id,
+          filePath: `/api/documents/${document.id}/view`,
+          downloadPath: `/api/documents/${document.id}/download`,
+          originalName: document.originalName,
+        },
+      });
+
+      // simulate processing
+      setTimeout(async () => {
+        try {
+          await storage.updateDocument(document.id, { status: 'processed' });
+        } catch (error) {
+          console.error("Error updating document status:", error);
+        }
+      }, 1500);
+
+      // ✅ also return URLs immediately
+      res.status(201).json({
+        ...document,
+        filePath: `/api/documents/${document.id}/view`,
+        downloadPath: `/api/documents/${document.id}/download`,
+      });
+
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
 
     app.delete('/api/documents/:id', requireAuth, async (req: any, res) => {
       try {

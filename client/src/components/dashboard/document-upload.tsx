@@ -7,7 +7,6 @@ import { apiRequest } from "@/lib/queryClient";
 import {
   CloudUpload,
   FileIcon,
-  Sparkles,
   ShieldCheck,
   FileCheck2,
   ArrowUpRight,
@@ -179,16 +178,17 @@ export default function DocumentUpload({
   };
 
   return (
-    <Card className="overflow-hidden rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+    <Card className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
       <CardHeader className="border-b border-slate-100 pb-5 dark:border-slate-800">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0">
-            <div className="mb-3 flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 <FileCheck2 className="h-4.5 w-4.5" />
               </div>
-              <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
-                Smart Intake
+
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                Document Intake
               </span>
             </div>
 
@@ -196,7 +196,7 @@ export default function DocumentUpload({
               Upload {getDocumentTypeLabel(documentType)}
             </CardTitle>
 
-            <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
               {getDocumentDescription(documentType)}
             </p>
           </div>
@@ -204,10 +204,10 @@ export default function DocumentUpload({
           <div className="flex flex-wrap items-center gap-3">
             <div
               className={cn(
-                "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold",
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium",
                 uploadMutation.isPending
-                  ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
-                  : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
               )}
             >
               <span
@@ -216,7 +216,7 @@ export default function DocumentUpload({
                   uploadMutation.isPending ? "bg-amber-500" : "bg-emerald-500"
                 )}
               />
-              {uploadMutation.isPending ? "Processing..." : "Ready"}
+              {uploadMutation.isPending ? "Uploading" : "Ready"}
             </div>
 
             <Button
@@ -239,10 +239,10 @@ export default function DocumentUpload({
           tabIndex={0}
           aria-label={`Upload ${getDocumentTypeLabel(documentType)}`}
           className={cn(
-            "relative cursor-pointer overflow-hidden rounded-[24px] border-2 border-dashed p-8 text-center transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:ring-offset-2",
+            "relative cursor-pointer rounded-[22px] border border-dashed p-10 text-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:ring-offset-2",
             isDragOver
-              ? "scale-[1.01] border-blue-500 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-[0_18px_40px_rgba(37,99,235,0.14)] dark:from-blue-950/20 dark:to-cyan-950/10"
-              : "border-slate-300 bg-slate-50/70 hover:border-blue-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-blue-500"
+              ? "border-blue-400 bg-blue-50/60 dark:border-blue-500 dark:bg-blue-950/10"
+              : "border-slate-300 bg-slate-50/70 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-slate-600"
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -265,52 +265,45 @@ export default function DocumentUpload({
             className="hidden"
           />
 
-          <div className="absolute right-4 top-4 hidden rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur md:inline-flex dark:bg-slate-900/70 dark:text-slate-300">
-            AI-ready workflow
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[18px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <CloudUpload className="h-7 w-7" />
           </div>
 
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-[0_16px_32px_rgba(37,99,235,0.22)]">
-            <CloudUpload className="h-8 w-8" />
-          </div>
-
-          <h4 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          <h4 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
             Drop files here
           </h4>
 
-          <p className="mt-2 text-base text-slate-500 dark:text-slate-400">
-            or click to browse from your computer
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Or click to browse from your computer
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
-              {getDocumentTypeLabel(documentType)}
-            </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
               PDF
             </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
               JPG
             </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
               PNG
+            </span>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              Max 10MB
             </span>
           </div>
 
-          <div className="mx-auto mt-6 max-w-2xl rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-sm backdrop-blur dark:bg-slate-900/70 dark:text-slate-300">
-            Supported formats: PDF, JPG, PNG • Max 10MB each
-            <div className="mt-1 font-medium text-blue-600 dark:text-blue-400">
-              JPEG images are automatically converted to PDF
-            </div>
-          </div>
+          <p className="mt-5 text-xs text-slate-500 dark:text-slate-400">
+            JPEG images are automatically converted to PDF for storage and review.
+          </p>
         </div>
 
         {uploadMutation.isPending && (
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 dark:border-blue-950/40 dark:bg-blue-950/20">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/40">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700 dark:border-slate-700 dark:border-t-slate-200" />
               <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  Uploading documents...
+                <p className="text-sm font-medium text-slate-900 dark:text-white">
+                  Uploading documents
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Processing your files securely
@@ -321,38 +314,38 @@ export default function DocumentUpload({
         )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
-              <ShieldCheck className="h-5 w-5" />
+          <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <ShieldCheck className="h-4.5 w-4.5" />
             </div>
             <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
               Clean readable scans
             </h4>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
               Make sure documents are clear, flat, and easy to read before upload.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400">
-              <Sparkles className="h-5 w-5" />
+          <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <FileCheck2 className="h-4.5 w-4.5" />
             </div>
             <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
               Smart processing
             </h4>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
               JPEG images are automatically converted to PDF for easier storage and review.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
-              <ArrowUpRight className="h-5 w-5" />
+          <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <ArrowUpRight className="h-4.5 w-4.5" />
             </div>
             <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
               Faster indexing
             </h4>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
               Include load numbers in file names when possible to improve tracking.
             </p>
           </div>

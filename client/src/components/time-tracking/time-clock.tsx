@@ -20,7 +20,6 @@ import {
   Timer,
   CalendarDays,
   PauseCircle,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -171,7 +170,7 @@ export default function TimeClock() {
 
   if (isLoading) {
     return (
-      <Card className="rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+      <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
         <CardHeader className="border-b border-slate-100 dark:border-slate-800">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
             <Clock3 className="h-5 w-5" />
@@ -179,10 +178,10 @@ export default function TimeClock() {
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="p-6">
+        <CardContent className="p-5">
           <div className="animate-pulse space-y-4">
-            <div className="h-24 rounded-2xl bg-slate-200 dark:bg-slate-700" />
-            <div className="h-16 rounded-2xl bg-slate-200 dark:bg-slate-700" />
+            <div className="h-24 rounded-[18px] bg-slate-200 dark:bg-slate-700" />
+            <div className="h-16 rounded-[18px] bg-slate-200 dark:bg-slate-700" />
             <div className="h-10 rounded-xl bg-slate-200 dark:bg-slate-700" />
           </div>
         </CardContent>
@@ -194,29 +193,22 @@ export default function TimeClock() {
   const isSubmitting = clockInMutation.isPending || clockOutMutation.isPending;
 
   return (
-    <Card className="rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+    <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
       <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
-              <Clock3 className="h-5 w-5" />
-              Time Clock
-            </CardTitle>
-            <CardDescription className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Track work sessions and daily hours
-            </CardDescription>
-          </div>
-
-          <div className="hidden items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300 sm:inline-flex">
-            <Sparkles className="h-3.5 w-3.5" />
-            Workforce
-          </div>
+        <div>
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+            <Clock3 className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+            Time Clock
+          </CardTitle>
+          <CardDescription className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Track work sessions and daily hours
+          </CardDescription>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-5 p-6">
-        <div className="rounded-[22px] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 text-center dark:border-slate-800 dark:from-slate-900 dark:to-slate-950/70">
-          <div className="text-[2rem] font-bold tracking-tight text-blue-600 dark:text-blue-400">
+      <CardContent className="space-y-5 p-5">
+        <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-5 text-center dark:border-slate-800 dark:bg-slate-900/30">
+          <div className="text-[2rem] font-semibold tracking-tight text-slate-900 dark:text-white">
             {formatClockTime(currentTime)}
           </div>
           <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -229,17 +221,17 @@ export default function TimeClock() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+        <div className="flex items-center justify-between gap-3 rounded-[18px] border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/30">
           <div className="flex items-center gap-2">
             {isClockedIn ? (
-              <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">
+              <Badge className="border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
                 <Timer className="mr-1 h-3 w-3" />
                 Clocked In
               </Badge>
             ) : (
               <Badge
                 variant="outline"
-                className="border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400"
+                className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               >
                 <PauseCircle className="mr-1 h-3 w-3" />
                 Clocked Out
@@ -258,36 +250,36 @@ export default function TimeClock() {
         </div>
 
         {isClockedIn && timeStatus?.currentEntry ? (
-          <div className="rounded-[22px] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 text-center dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-slate-950/30">
-            <div className="mb-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-5 text-center dark:border-slate-800 dark:bg-slate-900/30">
+            <div className="mb-1 text-sm font-medium text-slate-500 dark:text-slate-400">
               Active session
             </div>
-            <div className="text-3xl font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
+            <div className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
               {formatDurationFromStart(timeStatus.currentEntry.clockInTime, currentTime)}
             </div>
-            <div className="mt-1 text-xs text-emerald-600 dark:text-emerald-500">
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Currently tracking live work time
             </div>
           </div>
         ) : (
-          <div className="rounded-[22px] border border-red-200 bg-gradient-to-br from-red-50 to-white p-5 text-center dark:border-red-900/40 dark:from-red-950/20 dark:to-slate-950/30">
-            <div className="mb-1 text-sm font-medium text-red-700 dark:text-red-400">
+          <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-5 text-center dark:border-slate-800 dark:bg-slate-900/30">
+            <div className="mb-1 text-sm font-medium text-slate-500 dark:text-slate-400">
               Status
             </div>
-            <div className="text-lg font-semibold text-red-700 dark:text-red-400">
+            <div className="text-lg font-semibold text-slate-900 dark:text-white">
               Currently Clocked Out
             </div>
-            <div className="mt-1 text-xs text-red-600 dark:text-red-500">
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Start a session to begin tracking time
             </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+        <div className="flex items-center justify-between rounded-[18px] border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/30">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-slate-500" />
             <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Today's Total
+              Today&apos;s Total
             </span>
           </div>
           <div className="font-mono text-sm font-semibold text-slate-900 dark:text-white">
@@ -328,7 +320,7 @@ export default function TimeClock() {
               type="button"
               onClick={handleClockIn}
               disabled={clockInMutation.isPending}
-              className="h-11 w-full rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+              className="h-11 w-full rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
             >
               <Play className="mr-2 h-4 w-4" />
               {clockInMutation.isPending ? "Clocking In..." : "Clock In"}
@@ -339,14 +331,14 @@ export default function TimeClock() {
         {timeStatus?.todayEntries && timeStatus.todayEntries.length > 0 && (
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
-              Today's Entries
+              Today&apos;s Entries
             </h4>
 
             <div className="custom-scrollbar max-h-40 space-y-2 overflow-y-auto pr-1">
               {timeStatus.todayEntries.slice(0, 4).map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/40"
+                  className="flex items-center justify-between rounded-[18px] border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/30"
                 >
                   <div className="min-w-0 text-xs text-slate-600 dark:text-slate-300">
                     <span className="font-medium text-slate-900 dark:text-white">
@@ -364,8 +356,7 @@ export default function TimeClock() {
                   {entry.totalHours && (
                     <div
                       className={cn(
-                        "rounded-full px-2.5 py-1 text-xs font-semibold",
-                        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        "rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                       )}
                     >
                       {parseFloat(entry.totalHours).toFixed(2)}h

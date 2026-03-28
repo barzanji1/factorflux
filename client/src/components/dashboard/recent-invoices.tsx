@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 
 function InvoiceRowSkeleton() {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+    <div className="flex items-center justify-between rounded-[18px] border border-slate-200/80 p-4 dark:border-slate-800">
       <div className="space-y-2">
         <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
         <div className="h-3 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
@@ -118,15 +118,15 @@ Thank you for your business!
     switch (status) {
       case "approved":
       case "paid":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300";
+        return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300";
       case "submitted":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300";
+        return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300";
       case "pending":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300";
+        return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300";
       case "rejected":
-        return "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300";
+        return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300";
       default:
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+        return "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
     }
   };
 
@@ -134,7 +134,7 @@ Thank you for your business!
 
   if (isLoading) {
     return (
-      <Card className="rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+      <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
         <CardHeader className="border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">
@@ -144,7 +144,7 @@ Thank you for your business!
           </div>
         </CardHeader>
 
-        <CardContent className="p-6">
+        <CardContent className="p-5">
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, index) => (
               <InvoiceRowSkeleton key={index} />
@@ -156,16 +156,16 @@ Thank you for your business!
   }
 
   return (
-    <Card className="rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+    <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
       <CardHeader className="border-b border-slate-100 dark:border-slate-800">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="mb-3 flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 <ReceiptText className="h-4.5 w-4.5" />
               </div>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                Finance
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                Invoices
               </span>
             </div>
 
@@ -178,7 +178,10 @@ Thank you for your business!
           </div>
 
           <Link href="/invoices">
-            <Button className="h-11 rounded-xl bg-blue-600 px-4 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)] hover:bg-blue-700">
+            <Button
+              variant="outline"
+              className="h-11 rounded-xl border-slate-200 bg-white px-4 font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+            >
               View All Invoices
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -191,13 +194,25 @@ Thank you for your business!
           <div className="custom-scrollbar overflow-x-auto">
             <Table className="min-w-[760px]">
               <TableHeader>
-                <TableRow className="bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-50/80 dark:hover:bg-slate-900/40">
-                  <TableHead className="px-6">Invoice #</TableHead>
-                  <TableHead className="px-6">Load #</TableHead>
-                  <TableHead className="px-6">Amount</TableHead>
-                  <TableHead className="px-6">Status</TableHead>
-                  <TableHead className="px-6">Date</TableHead>
-                  <TableHead className="px-6">Actions</TableHead>
+                <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 dark:bg-slate-900/30 dark:hover:bg-slate-900/30">
+                  <TableHead className="px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Invoice #
+                  </TableHead>
+                  <TableHead className="px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Load #
+                  </TableHead>
+                  <TableHead className="px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Amount
+                  </TableHead>
+                  <TableHead className="px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Status
+                  </TableHead>
+                  <TableHead className="px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Date
+                  </TableHead>
+                  <TableHead className="px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -205,10 +220,10 @@ Thank you for your business!
                 {recentInvoices.map((invoice) => (
                   <TableRow
                     key={invoice.id}
-                    className="dark:hover:bg-slate-900/30"
+                    className="border-slate-100 dark:border-slate-800 dark:hover:bg-slate-900/20"
                   >
                     <TableCell className="px-6">
-                      <div className="font-semibold text-blue-700 dark:text-blue-400">
+                      <div className="font-semibold text-slate-900 dark:text-white">
                         {invoice.invoiceNumber}
                       </div>
                     </TableCell>
@@ -224,7 +239,7 @@ Thank you for your business!
                     <TableCell className="px-6">
                       <Badge
                         className={cn(
-                          "rounded-full px-2.5 py-1 font-semibold",
+                          "rounded-full border px-2.5 py-1 font-medium",
                           getStatusColor(invoice.status)
                         )}
                       >
@@ -279,8 +294,8 @@ Thank you for your business!
           </div>
         ) : (
           <div className="px-6 py-14 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-              <ReceiptText className="h-6 w-6" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+              <ReceiptText className="h-5 w-5" />
             </div>
             <p className="text-sm font-semibold text-slate-900 dark:text-white">
               No invoices found
