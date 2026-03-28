@@ -614,19 +614,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const document = await storage.createDocument(documentData);
 
       // ✅ CRITICAL FIX: add metadata for frontend
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'document_uploaded',
-        description: `Uploaded document: ${document.originalName}`,
-        entityType: 'document',
-        entityId: document.id,
-        metadata: {
-          documentId: document.id,
-          filePath: `/api/documents/${document.id}/view`,
-          downloadPath: `/api/documents/${document.id}/download`,
-          originalName: document.originalName,
-        },
-      });
+        await storage.createActivity({
+          userId: req.user.id,
+          type: 'document_uploaded',
+          description: `Uploaded document: ${document.originalName}`,
+          entityType: 'document',
+          entityId: document.id,
+          metadata: {
+            documentId: document.id,
+            filePath: `/api/documents/${document.id}/view`,
+            downloadPath: `/api/documents/${document.id}/download`,
+            originalName: document.originalName,
+            mimeType: document.mimeType,
+          },
+        });
 
       // simulate processing
       setTimeout(async () => {
@@ -1195,6 +1196,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: `Uploaded document: ${document.originalName}`,
         entityType: 'document',
         entityId: document.id,
+        metadata: {
+          documentId: document.id,
+          filePath: `/api/documents/${document.id}/view`,
+          downloadPath: `/api/documents/${document.id}/download`,
+          originalName: document.originalName,
+          mimeType: document.mimeType,
+        },
       });
 
       // Simulate document processing

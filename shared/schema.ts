@@ -135,6 +135,16 @@ export const activities = pgTable("activities", {
   description: text("description").notNull(),
   entityType: varchar("entity_type"),
   entityId: integer("entity_id"),
+
+  // 🔥 ADD THIS
+  metadata: jsonb("metadata").$type<{
+    documentId?: number;
+    filePath?: string;
+    downloadPath?: string;
+    originalName?: string;
+    mimeType?: string;
+  }>(),
+
   createdAt: timestamp("created_at").defaultNow(),
 });
 

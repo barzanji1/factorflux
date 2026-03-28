@@ -7,13 +7,10 @@ import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  FileText,
   Eye,
   Download,
   Calendar,
-  Upload,
   Truck,
   FileCheck,
   DollarSign,
@@ -23,14 +20,61 @@ import {
   FolderOpen,
   Clock3,
   ArrowUpRight,
+  FileText,
 } from "lucide-react";
 import type { Document, Invoice, Load } from "@shared/schema";
 import DocumentUpload from "@/components/dashboard/document-upload";
 import { cn } from "@/lib/utils";
 
+type IntakeSection = {
+  key: string;
+  title: string;
+  description: string;
+  documentType: string;
+};
+
+const intakeSections: IntakeSection[] = [
+  {
+    key: "rate_confirmation",
+    title: "Rate Confirmations",
+    description: "Upload signed rate confirmations for each load.",
+    documentType: "rate_confirmation",
+  },
+  {
+    key: "bill_of_lading",
+    title: "Bills of Lading",
+    description: "Upload delivered BOL documents for proof of delivery.",
+    documentType: "bill_of_lading",
+  },
+  {
+    key: "lumper_receipt",
+    title: "Lumper Receipts",
+    description: "Upload lumper payment receipts and related proofs.",
+    documentType: "lumper_receipt",
+  },
+  {
+    key: "fuel_receipt",
+    title: "Fuel Receipts",
+    description: "Upload fuel receipts, scales, tolls, and reimbursement receipts.",
+    documentType: "fuel_receipt",
+  },
+  {
+    key: "driver_docs",
+    title: "Carrier / Driver Docs",
+    description: "Upload driver IDs, carrier setup, and supporting onboarding files.",
+    documentType: "driver_docs",
+  },
+  {
+    key: "other_docs",
+    title: "Other Documents",
+    description: "Upload any additional supporting paperwork.",
+    documentType: "other",
+  },
+];
+
 export default function Documents() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("rate_confirmations");
+  const [selectedSection, setSelectedSection] = useState("rate_confirmation");
 
   const { data: documents = [], isLoading: documentsLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
@@ -43,46 +87,6 @@ export default function Documents() {
   const { data: loads = [] } = useQuery<Load[]>({
     queryKey: ["/api/loads"],
   });
-
-  const rateConfirmations = documents.filter(
-    (doc) => doc.documentType === "rate_confirmation"
-  );
-  const billsOfLading = documents.filter(
-    (doc) => doc.documentType === "bill_of_lading"
-  );
-  const driverDocuments = documents.filter(
-    (doc) => doc.documentType === "driver_id" || doc.documentType === "carrier_setup"
-  );
-  const otherDocuments = documents.filter(
-    (doc) =>
-      !["rate_confirmation", "bill_of_lading", "driver_id", "carrier_setup"].includes(
-        doc.documentType
-      )
-  );
-
-  const recentActivity = [
-    {
-      id: 1,
-      type: "upload",
-      document: "RC_LOAD_12345.pdf",
-      time: "2 minutes ago",
-      status: "processed",
-    },
-    {
-      id: 2,
-      type: "upload",
-      document: "BOL_LOAD_12344.pdf",
-      time: "15 minutes ago",
-      status: "processing",
-    },
-    {
-      id: 3,
-      type: "view",
-      document: "DRIVER_ID_JOHN.pdf",
-      time: "1 hour ago",
-      status: "completed",
-    },
-  ];
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
@@ -112,6 +116,12 @@ export default function Documents() {
         return "Rate Confirmation";
       case "bill_of_lading":
         return "Bill of Lading";
+      case "lumper_receipt":
+        return "Lumper Receipt";
+      case "fuel_receipt":
+        return "Fuel Receipt";
+      case "driver_docs":
+        return "Carrier / Driver Docs";
       case "driver_id":
         return "Driver ID";
       case "carrier_setup":
@@ -125,13 +135,13 @@ export default function Documents() {
     switch (status) {
       case "processed":
       case "completed":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300";
+        return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300";
       case "processing":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300";
+        return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300";
       case "failed":
-        return "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300";
+        return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300";
       default:
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+        return "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
     }
   };
 
@@ -171,7 +181,7 @@ export default function Documents() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `document_${documentId}.pdf`;
+      a.download = `document_${documentId}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -190,6 +200,30 @@ export default function Documents() {
     }
   };
 
+  const sectionDocuments = (sectionKey: string) => {
+    switch (sectionKey) {
+      case "rate_confirmation":
+        return documents.filter((doc) => doc.documentType === "rate_confirmation");
+      case "bill_of_lading":
+        return documents.filter((doc) => doc.documentType === "bill_of_lading");
+      case "lumper_receipt":
+        return documents.filter((doc) => doc.documentType === "lumper_receipt");
+      case "fuel_receipt":
+        return documents.filter((doc) => doc.documentType === "fuel_receipt");
+      case "driver_docs":
+        return documents.filter(
+          (doc) =>
+            doc.documentType === "driver_docs" ||
+            doc.documentType === "driver_id" ||
+            doc.documentType === "carrier_setup"
+        );
+      case "other_docs":
+        return documents.filter((doc) => doc.documentType === "other");
+      default:
+        return [];
+    }
+  };
+
   const renderDocumentGrid = (docs: Document[]) => {
     if (documentsLoading) {
       return (
@@ -197,7 +231,7 @@ export default function Documents() {
           {[...Array(4)].map((_, i) => (
             <div
               key={i}
-              className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/30"
+              className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/30"
             >
               <div className="animate-pulse space-y-3">
                 <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
@@ -212,15 +246,15 @@ export default function Documents() {
 
     if (docs.length === 0) {
       return (
-        <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-14 text-center dark:border-slate-800 dark:bg-slate-900/30">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-            <FolderOpen className="h-6 w-6" />
+        <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-14 text-center dark:border-slate-800 dark:bg-slate-900/30">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            <FolderOpen className="h-5 w-5" />
           </div>
           <p className="text-sm font-semibold text-slate-900 dark:text-white">
-            No documents in this category
+            No documents in this section
           </p>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Upload files to populate this section.
+            Upload files to populate this category.
           </p>
         </div>
       );
@@ -231,12 +265,12 @@ export default function Documents() {
         {docs.map((document) => (
           <Card
             key={document.id}
-            className="group rounded-[22px] border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-1 hover:border-blue-100 hover:shadow-[0_16px_40px_rgba(37,99,235,0.10)] dark:border-slate-800 dark:bg-transparent dark:hover:border-blue-950/40"
+            className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm transition dark:border-slate-800 dark:bg-transparent"
           >
             <CardContent className="p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     {getDocumentIcon(document.documentType)}
                   </div>
 
@@ -252,7 +286,7 @@ export default function Documents() {
 
                 <Badge
                   className={cn(
-                    "rounded-full px-2.5 py-1 font-semibold",
+                    "rounded-full border px-2.5 py-1 font-medium",
                     getStatusColor(document.status)
                   )}
                 >
@@ -276,7 +310,7 @@ export default function Documents() {
 
               <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  File ready for review
+                  Ready for review
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -308,6 +342,16 @@ export default function Documents() {
     );
   };
 
+  const selectedDocs = sectionDocuments(selectedSection);
+
+  const recentUploads = documents
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )
+    .slice(0, 5);
+
   return (
     <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
@@ -315,61 +359,59 @@ export default function Documents() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
           title="Document Management"
-          subtitle="Manage freight documentation, uploads, and supporting files"
+          subtitle="Manage freight paperwork, uploads, and supporting files"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
-            {/* Summary */}
             <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
+              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <Clock3 className="h-5 w-5" />
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Pending Invoices</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
                   {invoices.filter((inv) => inv.status === "submitted").length}
                 </p>
               </div>
 
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <DollarSign className="h-5 w-5" />
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Processed Invoices</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
                   {invoices.filter((inv) => inv.status === "paid").length}
                 </p>
               </div>
 
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <FileText className="h-5 w-5" />
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Total Documents</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
                   {documents.length}
                 </p>
               </div>
 
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400">
+              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <Truck className="h-5 w-5" />
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Tracked Loads</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
                   {loads.length}
                 </p>
               </div>
             </section>
 
-            {/* Loads */}
             {loads.length > 0 && (
               <section className="mb-8">
-                <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <MapPin className="h-5 w-5" />
                       </div>
                       <div>
@@ -377,7 +419,7 @@ export default function Documents() {
                           Recent Load Details
                         </CardTitle>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Quick reference for the most recent tracked loads
+                          Quick reference for recently tracked loads
                         </p>
                       </div>
                     </div>
@@ -388,15 +430,13 @@ export default function Documents() {
                       {loads.slice(0, 3).map((load) => (
                         <div
                           key={load.id}
-                          className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/30"
+                          className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/30"
                         >
                           <div className="mb-3 flex items-center justify-between">
                             <span className="font-semibold text-slate-900 dark:text-white">
                               Load #{load.id}
                             </span>
-                            <Badge
-                              className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                            >
+                            <Badge className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                               {load.status}
                             </Badge>
                           </div>
@@ -418,121 +458,134 @@ export default function Documents() {
               </section>
             )}
 
-            {/* Main grid */}
             <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-              {/* Left */}
-              <div className="xl:col-span-8">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[20px] bg-slate-100 p-2 md:grid-cols-4 dark:bg-slate-800">
-                    <TabsTrigger value="rate_confirmations" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <FileCheck className="h-4 w-4" />
-                        <span className="hidden sm:inline">Rate Confirmations</span>
-                        <span className="sm:hidden">RC</span>
-                      </div>
-                    </TabsTrigger>
+              <div className="space-y-6 xl:col-span-8">
+                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                      <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
+                        Structured Intake
+                      </CardTitle>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Upload freight paperwork by document type for cleaner processing.
+                      </p>
+                    </div>
+                  </CardHeader>
 
-                    <TabsTrigger value="bills_of_lading" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <ReceiptText className="h-4 w-4" />
-                        <span className="hidden sm:inline">Bills of Lading</span>
-                        <span className="sm:hidden">BOL</span>
-                      </div>
-                    </TabsTrigger>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {intakeSections.map((section) => {
+                        const docs = sectionDocuments(section.key);
+                        const isSelected = selectedSection === section.key;
 
-                    <TabsTrigger value="driver_documents" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <Truck className="h-4 w-4" />
-                        <span className="hidden sm:inline">Driver Docs</span>
-                        <span className="sm:hidden">Driver</span>
-                      </div>
-                    </TabsTrigger>
+                        return (
+                          <button
+                            key={section.key}
+                            type="button"
+                            onClick={() => setSelectedSection(section.key)}
+                            className={cn(
+                              "rounded-[18px] border p-5 text-left transition",
+                              isSelected
+                                ? "border-slate-900 bg-slate-50 dark:border-white dark:bg-slate-900/40"
+                                : "border-slate-200/80 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/20 dark:hover:border-slate-700"
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                  {section.title}
+                                </p>
+                                <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                                  {section.description}
+                                </p>
+                              </div>
 
-                    <TabsTrigger value="other" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <Upload className="h-4 w-4" />
-                        <span>Other</span>
-                      </div>
-                    </TabsTrigger>
-                  </TabsList>
+                              <Badge
+                                className={cn(
+                                  "rounded-full border px-2.5 py-1 font-medium",
+                                  docs.length > 0
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
+                                    : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                )}
+                              >
+                                {docs.length > 0 ? `${docs.length} file${docs.length > 1 ? "s" : ""}` : "Missing"}
+                              </Badge>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <TabsContent value="rate_confirmations" className="space-y-6">
-                    <DocumentUpload documentType="rate_confirmation" />
-                    {renderDocumentGrid(rateConfirmations)}
-                  </TabsContent>
-
-                  <TabsContent value="bills_of_lading" className="space-y-6">
-                    <DocumentUpload documentType="bill_of_lading" />
-                    {renderDocumentGrid(billsOfLading)}
-                  </TabsContent>
-
-                  <TabsContent value="driver_documents" className="space-y-6">
-                    <DocumentUpload documentType="driver_id" />
-                    {renderDocumentGrid(driverDocuments)}
-                  </TabsContent>
-
-                  <TabsContent value="other" className="space-y-6">
-                    <DocumentUpload documentType="other" />
-                    {renderDocumentGrid(otherDocuments)}
-                  </TabsContent>
-                </Tabs>
+                <div className="space-y-6">
+                  <DocumentUpload documentType={intakeSections.find((s) => s.key === selectedSection)?.documentType || "other"} />
+                  {renderDocumentGrid(selectedDocs)}
+                </div>
               </div>
 
-              {/* Right */}
               <div className="space-y-6 xl:col-span-4">
-                <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <Activity className="h-5 w-5" />
                       </div>
                       <div>
                         <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Recent Activity
+                          Recent Uploads
                         </CardTitle>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Latest document workflow events
+                          Latest document activity
                         </p>
                       </div>
                     </div>
                   </CardHeader>
 
                   <CardContent className="space-y-3 p-6">
-                    {recentActivity.map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/30"
-                      >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
-                          <FileText className="h-4 w-4" />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
-                            {activity.document}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {activity.time}
-                          </p>
-                        </div>
-
-                        <Badge
-                          className={cn(
-                            "rounded-full px-2.5 py-1 font-semibold",
-                            getStatusColor(activity.status)
-                          )}
+                    {recentUploads.length > 0 ? (
+                      recentUploads.map((document) => (
+                        <div
+                          key={document.id}
+                          className="flex items-center gap-3 rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/30"
                         >
-                          {activity.status}
-                        </Badge>
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {getDocumentIcon(document.documentType)}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                              {document.originalName}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              {new Date(document.createdAt!).toLocaleString()}
+                            </p>
+                          </div>
+
+                          <Badge
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 font-medium",
+                              getStatusColor(document.status)
+                            )}
+                          >
+                            {document.status}
+                          </Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-[18px] border border-dashed border-slate-200 px-6 py-10 text-center dark:border-slate-800">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          No recent uploads yet
+                        </p>
                       </div>
-                    ))}
+                    )}
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <DollarSign className="h-5 w-5" />
                       </div>
                       <div>
@@ -547,7 +600,7 @@ export default function Documents() {
                   </CardHeader>
 
                   <CardContent className="space-y-4 p-6">
-                    <div className="rounded-[20px] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-slate-950/30">
+                    <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/30">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -558,7 +611,7 @@ export default function Documents() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                          <p className="text-xl font-semibold text-slate-900 dark:text-white">
                             $2,450
                           </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -568,7 +621,7 @@ export default function Documents() {
                       </div>
                     </div>
 
-                    <div className="rounded-[20px] border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 dark:border-amber-900/40 dark:from-amber-950/20 dark:to-slate-950/30">
+                    <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/30">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -579,7 +632,7 @@ export default function Documents() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                          <p className="text-xl font-semibold text-slate-900 dark:text-white">
                             $1,850
                           </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
