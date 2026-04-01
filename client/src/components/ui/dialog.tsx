@@ -49,14 +49,11 @@ const DialogContent = React.forwardRef<
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
         "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-        "sm:max-w-lg",
         className
       )}
       {...props}
     >
-      <div className="max-h-[75vh] overflow-y-auto pr-1">
-        {children}
-      </div>
+      {children}
 
       <DialogPrimitive.Close
         className={cn(
