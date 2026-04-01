@@ -30,18 +30,75 @@ export default function Clients() {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
-  const { data: clients, isLoading: clientsLoading } = useQuery<Client[]>({
+  const {
+    data: clients = [],
+    isLoading: clientsLoading,
+    refetch: refetchClients,
+  } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+    queryFn: async () => {
+      const res = await fetch("/api/clients", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to fetch clients: ${res.status} ${text.slice(0, 200)}`);
+      }
+
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(`Expected JSON from /api/clients but got: ${text.slice(0, 200)}`);
+      }
+
+      const data = await res.json();
+      console.log("GET /api/clients response:", data);
+      return data;
+    },
   });
 
-  const { data: searchResults } = useQuery<Client[]>({
-    queryKey: ["/api/clients/search", { q: searchQuery }],
-    enabled: searchQuery.length > 0,
+  const { data: searchResults = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients/search", searchQuery],
+    enabled: searchQuery.trim().length > 0,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/clients/search?q=${encodeURIComponent(searchQuery)}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const contentType = res.headers.get("content-type") || "";
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to search clients: ${res.status} ${text.slice(0, 200)}`);
+      }
+
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(
+          `Expected JSON from /api/clients/search but got: ${text.slice(0, 200)}`
+        );
+      }
+
+      const data = await res.json();
+      console.log("GET /api/clients/search response:", data);
+      return data;
+    },
   });
 
-  const displayClients = searchQuery
-    ? searchResults || []
-    : clients || [];
+  const displayClients = searchQuery.trim() ? searchResults : clients;
 
   const handleCreateClient = () => {
     setSelectedClient(null);
@@ -53,13 +110,10 @@ export default function Clients() {
     setIsClientModalOpen(true);
   };
 
-  const totalClients = clients?.length || 0;
-  const activeClients =
-    clients?.filter((client) => client.status === "active").length || 0;
-  const inactiveClients =
-    clients?.filter((client) => client.status !== "active").length || 0;
-  const clientsWithEmail =
-    clients?.filter((client) => !!client.email).length || 0;
+  const totalClients = clients.length;
+  const activeClients = clients.filter((client) => client.status === "active").length;
+  const inactiveClients = clients.filter((client) => client.status !== "active").length;
+  const clientsWithEmail = clients.filter((client) => !!client.email).length;
 
   return (
     <div className="flex h-screen bg-[hsl(var(--background))]">
@@ -73,7 +127,6 @@ export default function Clients() {
 
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
-            {/* Top controls */}
             <section className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="relative w-full max-w-xl">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -94,7 +147,6 @@ export default function Clients() {
               </Button>
             </section>
 
-            {/* Summary cards */}
             <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
@@ -137,7 +189,6 @@ export default function Clients() {
               </div>
             </section>
 
-            {/* Client grid */}
             <section>
               <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
                 <CardHeader className="border-b border-slate-100 dark:border-slate-800">
@@ -164,7 +215,10 @@ export default function Clients() {
                       {searchQuery ? (
                         <>Showing results for “{searchQuery}”</>
                       ) : (
-                        <>Showing {displayClients.length} client{displayClients.length === 1 ? "" : "s"}</>
+                        <>
+                          Showing {displayClients.length} client
+                          {displayClients.length === 1 ? "" : "s"}
+                        </>
                       )}
                     </div>
                   </div>
@@ -186,7 +240,7 @@ export default function Clients() {
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <CardTitle className="truncate text-lg font-semibold text-slate-900 dark:text-white">
-                                  {client.name}
+                                  {client.name || "Unnamed Client"}
                                 </CardTitle>
                                 {client.contactPerson && (
                                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -255,7 +309,10 @@ export default function Clients() {
 
                             <div className="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
                               <span className="text-xs text-slate-500 dark:text-slate-400">
-                                Created {new Date(client.createdAt!).toLocaleDateString()}
+                                Created{" "}
+                                {client.createdAt
+                                  ? new Date(client.createdAt).toLocaleDateString()
+                                  : "—"}
                               </span>
 
                               <Button
@@ -306,7 +363,10 @@ export default function Clients() {
 
       <ClientModal
         isOpen={isClientModalOpen}
-        onClose={() => setIsClientModalOpen(false)}
+        onClose={() => {
+          setIsClientModalOpen(false);
+          refetchClients();
+        }}
         client={selectedClient}
       />
     </div>

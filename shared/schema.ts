@@ -9,6 +9,7 @@ import {
   decimal,
   boolean,
   integer,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -59,9 +60,57 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// New addition to users table for role-based permissions
+export const roles = pgTable("roles", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", {
+    enum: [
+      "admin",
+      "operations_manager",
+      "funding_specialist",
+      "underwriter",
+      "account_manager",
+      "client_user",
+    ],
+  }).notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const permissions = pgTable("permissions", {
+  id: serial("id").primaryKey(),
+  key: varchar("key").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    roleId: integer("role_id").references(() => roles.id, { onDelete: "cascade" }).notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.roleId] }),
+  })
+);
+
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    roleId: integer("role_id").references(() => roles.id, { onDelete: "cascade" }).notNull(),
+    permissionId: integer("permission_id").references(() => permissions.id, { onDelete: "cascade" }).notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.roleId, table.permissionId] }),
+  })
+);
+
 // Clients table
 export const clients = pgTable("clients", {
-  id: integer("id").primaryKey(),
+  id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
   email: varchar("email"),
   phone: varchar("phone"),
@@ -69,6 +118,41 @@ export const clients = pgTable("clients", {
   contactPerson: varchar("contact_person"),
   taxId: varchar("tax_id"),
   status: varchar("status", { enum: ["active", "inactive"] }).default("active").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// New addition for debtors table
+export const debtors = pgTable("debtors", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  address: text("address"),
+  contactPerson: varchar("contact_person"),
+  taxId: varchar("tax_id"),
+  mcNumber: varchar("mc_number"),
+  dotNumber: varchar("dot_number"),
+  creditLimit: decimal("credit_limit", { precision: 12, scale: 2 }).default("0"),
+  averageDaysToPay: integer("average_days_to_pay"),
+  status: varchar("status", { enum: ["active", "inactive", "on_hold"] })
+    .default("active")
+    .notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const debtorContacts = pgTable("debtor_contacts", {
+  id: serial("id").primaryKey(),
+  debtorId: integer("debtor_id")
+    .references(() => debtors.id, { onDelete: "cascade" })
+    .notNull(),
+  fullName: varchar("full_name").notNull(),
+  title: varchar("title"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  isPrimary: boolean("is_primary").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -93,18 +177,42 @@ export const loads = pgTable("loads", {
 
 // Invoices table
 export const invoices = pgTable("invoices", {
-  id: integer("id").primaryKey(),
+  id: serial("id").primaryKey(),
   invoiceNumber: varchar("invoice_number").unique().notNull(),
-  loadId: integer("load_id").references(() => loads.id).notNull(),
+  loadId: integer("load_id").references(() => loads.id),
   clientId: integer("client_id").references(() => clients.id).notNull(),
+  debtorId: integer("debtor_id").references(() => debtors.id),
+  loadNumber: varchar("load_number"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency").default("USD").notNull(),
+  invoiceDate: timestamp("invoice_date"),
+  dueDate: timestamp("due_date"),
+  pickupLocation: text("pickup_location"),
+  deliveryLocation: text("delivery_location"),
+  loadType: varchar("load_type", {
+    enum: ["otr_load", "dump_truck_ticket", "other"],
+  }),
+  bolNumber: varchar("bol_number"),
   status: varchar("status", {
-    enum: ["draft", "submitted", "approved", "rejected", "paid"]
-  }).default("draft").notNull(),
+    enum: [
+      "draft",
+      "submitted",
+      "docs_pending",
+      "under_review",
+      "approved",
+      "rejected",
+      "funded",
+      "settled",
+      "paid",
+    ],
+  })
+    .default("draft")
+    .notNull(),
   submittedBy: varchar("submitted_by").references(() => users.id),
   submittedAt: timestamp("submitted_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
   approvedAt: timestamp("approved_at"),
+  assignedTo: varchar("assigned_to").references(() => users.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -112,18 +220,74 @@ export const invoices = pgTable("invoices", {
 
 // Documents table
 export const documents = pgTable("documents", {
-  id: integer("id").primaryKey(),
+  id: serial("id").primaryKey(),
+  companyId: varchar("company_id"),
   filename: varchar("filename").notNull(),
   originalName: varchar("original_name").notNull(),
   mimeType: varchar("mime_type").notNull(),
   size: integer("size").notNull(),
+  storageKey: varchar("storage_key"),
   documentType: varchar("document_type", {
-    enum: ["rate_confirmation", "bill_of_lading", "driver_id", "carrier_setup", "other"]
+    enum: [
+      "invoice",
+      "rate_confirmation",
+      "bill_of_lading",
+      "proof_of_delivery",
+      "lumper_receipt",
+      "receipt",
+      "driver_id",
+      "carrier_setup",
+      "other",
+    ],
   }).notNull(),
   loadId: integer("load_id").references(() => loads.id),
   invoiceId: integer("invoice_id").references(() => invoices.id),
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
-  status: varchar("status", { enum: ["processing", "processed", "failed"] }).default("processing").notNull(),
+  sourceChannel: varchar("source_channel", {
+    enum: ["portal", "manual", "email", "api"],
+  }).default("manual"),
+  status: varchar("status", {
+    enum: ["processing", "processed", "failed"],
+  }).default("processing").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const documentLinks = pgTable("document_links", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id")
+    .references(() => documents.id, { onDelete: "cascade" })
+    .notNull(),
+  entityType: varchar("entity_type", {
+    enum: ["client", "debtor", "invoice", "load"],
+  }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// New addition for document processing status
+export const invoiceStatusHistory = pgTable("invoice_status_history", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id")
+    .references(() => invoices.id, { onDelete: "cascade" })
+    .notNull(),
+  oldStatus: varchar("old_status"),
+  newStatus: varchar("new_status").notNull(),
+  changedBy: varchar("changed_by").references(() => users.id),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventLedger = pgTable("event_ledger", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type", {
+    enum: ["client", "debtor", "invoice", "load", "document", "user"],
+  }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  eventType: varchar("event_type").notNull(),
+  actorType: varchar("actor_type", {
+    enum: ["user", "system", "client"],
+  }).default("user"),
+  actorId: varchar("actor_id"),
+  payloadJson: jsonb("payload_json"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -313,6 +477,35 @@ export const usersRelations = relations(users, ({ many }) => ({
   notifications: many(notifications),
 }));
 
+// New relations for role-based permissions 3/29/26
+export const rolesRelations = relations(roles, ({ many }) => ({
+  userRoles: many(userRoles),
+  rolePermissions: many(rolePermissions),
+}));
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
+}));
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, { fields: [userRoles.userId], references: [users.id] }),
+  role: one(roles, { fields: [userRoles.roleId], references: [roles.id] }),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, { fields: [rolePermissions.roleId], references: [roles.id] }),
+  permission: one(permissions, { fields: [rolePermissions.permissionId], references: [permissions.id] }),
+}));
+
+export const debtorsRelations = relations(debtors, ({ many }) => ({
+  contacts: many(debtorContacts),
+  invoices: many(invoices),
+}));
+
+export const debtorContactsRelations = relations(debtorContacts, ({ one }) => ({
+  debtor: one(debtors, { fields: [debtorContacts.debtorId], references: [debtors.id] }),
+}));
+
 export const clientsRelations = relations(clients, ({ many }) => ({
   loads: many(loads),
   invoices: many(invoices),
@@ -325,13 +518,25 @@ export const loadsRelations = relations(loads, ({ one, many }) => ({
   invoices: many(invoices),
   documents: many(documents),
 }));
-
+// Added new invoice relations 3/29/26
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   load: one(loads, { fields: [invoices.loadId], references: [loads.id] }),
   client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
+  debtor: one(debtors, { fields: [invoices.debtorId], references: [debtors.id] }),
   submittedByUser: one(users, { fields: [invoices.submittedBy], references: [users.id] }),
   approvedByUser: one(users, { fields: [invoices.approvedBy], references: [users.id] }),
+  assignedToUser: one(users, { fields: [invoices.assignedTo], references: [users.id] }),
   documents: many(documents),
+}));
+
+// Added new document relations 3/29/26
+export const documentLinksRelations = relations(documentLinks, ({ one }) => ({
+  document: one(documents, { fields: [documentLinks.documentId], references: [documents.id] }),
+}));
+
+export const invoiceStatusHistoryRelations = relations(invoiceStatusHistory, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoiceStatusHistory.invoiceId], references: [invoices.id] }),
+  changedByUser: one(users, { fields: [invoiceStatusHistory.changedBy], references: [users.id] }),
 }));
 
 export const documentsRelations = relations(documents, ({ one }) => ({
@@ -393,6 +598,43 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true,
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
 export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
 export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({
+  id: true,
+  createdAt: true,
+});
+// New insert schemas 3/29/26
+export const insertRoleSchema = createInsertSchema(roles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPermissionSchema = createInsertSchema(permissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDebtorSchema = createInsertSchema(debtors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDebtorContactSchema = createInsertSchema(debtorContacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDocumentLinkSchema = createInsertSchema(documentLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInvoiceStatusHistorySchema = createInsertSchema(invoiceStatusHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEventLedgerSchema = createInsertSchema(eventLedger).omit({
   id: true,
   createdAt: true,
 });
@@ -502,6 +744,28 @@ export const updateUserProfileSchema = createInsertSchema(users).pick({
   jobTitle: z.string().optional(),
   department: z.string().optional(),
 });
+
+// User settings update schema 3/29/26
+export type Role = typeof roles.$inferSelect;
+export type InsertRole = z.infer<typeof insertRoleSchema>;
+
+export type Permission = typeof permissions.$inferSelect;
+export type InsertPermission = z.infer<typeof insertPermissionSchema>;
+
+export type Debtor = typeof debtors.$inferSelect;
+export type InsertDebtor = z.infer<typeof insertDebtorSchema>;
+
+export type DebtorContact = typeof debtorContacts.$inferSelect;
+export type InsertDebtorContact = z.infer<typeof insertDebtorContactSchema>;
+
+export type DocumentLink = typeof documentLinks.$inferSelect;
+export type InsertDocumentLink = z.infer<typeof insertDocumentLinkSchema>;
+
+export type InvoiceStatusHistory = typeof invoiceStatusHistory.$inferSelect;
+export type InsertInvoiceStatusHistory = z.infer<typeof insertInvoiceStatusHistorySchema>;
+
+export type EventLedger = typeof eventLedger.$inferSelect;
+export type InsertEventLedger = z.infer<typeof insertEventLedgerSchema>;
 
 export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 

@@ -593,21 +593,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const { documentType, loadId, invoiceId } = req.body;
+      const { documentType, loadId, invoiceId, sourceChannel } = req.body;
 
       const safeOriginalName = req.file.originalname
         .normalize("NFKC")
         .replace(/[^\w.\- ()]/g, "_");
 
       const documentData = {
-        filename: req.file.filename,
-        originalName: safeOriginalName,
-        mimeType: req.file.mimetype,
+        filename: processedFilename,
+        originalName: processedOriginalName,
+        mimeType: processedMimeType,
         size: req.file.size,
         documentType: documentType || 'other',
-        loadId: loadId && loadId !== 'undefined' ? parseInt(loadId, 10) : null,
-        invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId, 10) : null,
+        loadId: loadId && loadId !== 'undefined' ? parseInt(loadId) : null,
+        invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId) : null,
         uploadedBy: req.user.id,
+        sourceChannel: sourceChannel || 'manual',
         status: 'processing' as const,
       };
 
@@ -761,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
   // Client routes
-  app.get('/api/clients', async (req, res) => {
+      app.post('/api/clients', requireAuth, async (req: any, res) => {
     try {
       const clients = await storage.getClients();
       res.json(clients);
@@ -785,7 +786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/clients/:id', async (req, res) => {
+      app.put('/api/clients/:id', requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const client = await storage.getClient(id);
@@ -859,7 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/loads/:id', async (req, res) => {
+    app.post('/api/loads', requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const load = await storage.getLoad(id);
@@ -898,24 +899,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoice routes
-  app.get('/api/invoices', async (req, res) => {
+  app.put('/api/invoices/:id', requireAuth, async (req: any, res) => {
     try {
-      const { status, client } = req.query;
-      let invoices;
-      
-      if (status && typeof status === 'string') {
-        invoices = await storage.getInvoicesByStatus(status);
-      } else if (client) {
-        const clientId = parseInt(client as string);
-        invoices = await storage.getInvoicesByClient(clientId);
-      } else {
-        invoices = await storage.getInvoices();
+      const id = parseInt(req.params.id);
+      const user = req.user;
+      const invoiceData = insertInvoiceSchema.partial().parse(req.body);
+
+      const updatePayload: any = {
+        ...invoiceData,
+        updatedAt: new Date(),
+      };
+
+      if (
+        invoiceData.status === 'approved' &&
+        (user?.role === 'manager' || user?.role === 'admin')
+      ) {
+        updatePayload.approvedBy = req.user.id;
+        updatePayload.approvedAt = new Date();
       }
-      
-      res.json(invoices);
+
+      if (invoiceData.status === 'submitted') {
+        updatePayload.submittedAt = new Date();
+      }
+
+      const invoice = await storage.updateInvoice(id, updatePayload);
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: 'invoice_updated',
+        description: `Updated invoice: ${invoice.invoiceNumber}`,
+        entityType: 'invoice',
+        entityId: invoice.id,
+      });
+
+      res.json(invoice);
     } catch (error) {
-      console.error("Error fetching invoices:", error);
-      res.status(500).json({ message: "Failed to fetch invoices" });
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      }
+      console.error("Error updating invoice:", error);
+      res.status(500).json({ message: "Failed to update invoice" });
     }
   });
 
@@ -1030,7 +1053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/invoices/:id', async (req, res) => {
+    app.put('/api/invoices/:id', requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const invoice = await storage.getInvoice(id);
@@ -2010,7 +2033,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post('/api/follow-ups', async (req: any, res) => {
+    app.post('/api/follow-ups', requireAuth, async (req: any, res) => {
     try {
       const data = insertFollowUpSchema.parse(req.body);
       const followUp = await storage.createFollowUp(data);
@@ -2031,7 +2054,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch('/api/follow-ups/:id', async (req: any, res) => {
+    app.patch('/api/follow-ups/:id', requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
@@ -2054,7 +2077,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete('/api/follow-ups/:id', async (req: any, res) => {
+    app.delete('/api/follow-ups/:id', requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteFollowUp(id);

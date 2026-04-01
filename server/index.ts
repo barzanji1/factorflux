@@ -66,7 +66,7 @@ app.use((req, res, next) => {
 });
 
 export async function startServer(
-  port = parseInt(process.env.PORT || "5001", 10)
+  port = parseInt(process.env.PORT || "5000", 10)
 ) {
   const server = await registerRoutes(app);
 

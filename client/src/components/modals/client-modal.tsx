@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-// Authentication system removed
 import { apiRequest } from "@/lib/queryClient";
 import { insertClientSchema, type Client } from "@shared/schema";
 import {
@@ -84,22 +83,29 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
   }, [client, form]);
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/clients", data);
+    mutationFn: async (data: z.infer<typeof clientFormSchema>) => {
+      const res = await apiRequest("POST", "/api/clients", data);
+      return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (newClient: Client) => {
+      queryClient.setQueryData(["/api/clients"], (old: Client[] | undefined) => {
+        if (!old) return [newClient];
+        return [newClient, ...old];
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+
       toast({
         title: "Success",
         description: "Client created successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+
       onClose();
     },
-    onError: (error) => {
-      // Authentication system removed - simplified error handling
+    onError: () => {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "Failed to create client",
         variant: "destructive",
       });
@@ -107,31 +113,37 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("PUT", `/api/clients/${client!.id}`, data);
+    mutationFn: async (data: z.infer<typeof clientFormSchema>) => {
+      const res = await apiRequest("PUT", `/api/clients/${client!.id}`, data);
+      return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedClient: Client) => {
+      queryClient.setQueryData(["/api/clients"], (old: Client[] | undefined) => {
+        if (!old) return [updatedClient];
+        return old.map((c) => (c.id === updatedClient.id ? updatedClient : c));
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+
       toast({
         title: "Success",
         description: "Client updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+
       onClose();
     },
-    onError: (error) => {
-      // Authentication system removed - simplified error handling
+    onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update client", 
+        description: "Failed to update client",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof clientFormSchema>) => {
+  const onSubmit = (values: z.infer<typeof clientFormSchema>) => {
     const data = {
       ...values,
-      // Convert empty strings to null for optional fields
       email: values.email || null,
       phone: values.phone || null,
       address: values.address || null,
@@ -150,9 +162,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
-            {client ? "Edit Client" : "Add New Client"}
-          </DialogTitle>
+          <DialogTitle>{client ? "Edit Client" : "Add New Client"}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -178,7 +188,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
@@ -203,7 +213,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                   <FormItem>
                     <FormLabel>Contact Person</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" {...field} />
+                      <Input placeholder="John Doe" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -217,7 +227,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                   <FormItem>
                     <FormLabel>Tax ID</FormLabel>
                     <FormControl>
-                      <Input placeholder="XX-XXXXXXX" {...field} />
+                      <Input placeholder="XX-XXXXXXX" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -233,7 +243,12 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="contact@company.com" {...field} />
+                      <Input
+                        type="email"
+                        placeholder="contact@company.com"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -247,7 +262,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input placeholder="(555) 123-4567" {...field} />
+                      <Input placeholder="(555) 123-4567" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -262,7 +277,11 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="123 Main St, City, State, ZIP" {...field} />
+                    <Textarea
+                      placeholder="123 Main St, City, State, ZIP"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -273,8 +292,8 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}

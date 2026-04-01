@@ -43,7 +43,7 @@ const DialogContent = React.forwardRef<
         "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg",
         "-translate-x-1/2 -translate-y-1/2 gap-4 border border-border",
         "bg-background p-6 shadow-2xl duration-200",
-        "max-h-[90vh] overflow-y-auto rounded-xl",
+        "max-h-[90vh] overflow-visible rounded-xl",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -54,7 +54,9 @@ const DialogContent = React.forwardRef<
       )}
       {...props}
     >
-      {children}
+      <div className="max-h-[75vh] overflow-y-auto pr-1">
+        {children}
+      </div>
 
       <DialogPrimitive.Close
         className={cn(

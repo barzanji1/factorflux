@@ -1,9 +1,14 @@
 import {
   users,
   clients,
+  debtors,
+  debtorContacts,
   loads,
   invoices,
   documents,
+  documentLinks,
+  invoiceStatusHistory,
+  eventLedger,
   activities,
   supportMessages,
   fuelCardApplications,
@@ -18,12 +23,20 @@ import {
   type InsertTimeEntry,
   type Client,
   type InsertClient,
+  type Debtor,
+  type InsertDebtor,
   type Load,
   type InsertLoad,
   type Invoice,
   type InsertInvoice,
   type Document,
   type InsertDocument,
+  type DocumentLink,
+  type InsertDocumentLink,
+  type InvoiceStatusHistory,
+  type InsertInvoiceStatusHistory,
+  type EventLedger,
+  type InsertEventLedger,
   type Activity,
   type InsertActivity,
   type SupportMessage,
@@ -43,7 +56,7 @@ import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (supports both Replit Auth and local auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
@@ -58,6 +71,14 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   searchClients(query: string): Promise<Client[]>;
+
+  // Debtor operations
+  getDebtors(): Promise<Debtor[]>;
+  getDebtor(id: number): Promise<Debtor | undefined>;
+  createDebtor(debtor: InsertDebtor): Promise<Debtor>;
+  updateDebtor(id: number, debtor: Partial<InsertDebtor>): Promise<Debtor>;
+  deleteDebtor(id: number): Promise<void>;
+  searchDebtors(query: string): Promise<Debtor[]>;
 
   // Load operations
   getLoads(): Promise<Load[]>;
@@ -87,11 +108,19 @@ export interface IStorage {
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document>;
   deleteDocument(id: number): Promise<void>;
+  getDocumentLinks(documentId: number): Promise<DocumentLink[]>;
+  linkDocument(link: InsertDocumentLink): Promise<DocumentLink>;
 
   // Activity operations
   getActivities(limit?: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
   clearActivities(): Promise<void>;
+
+  // Invoice history / event ledger
+  getInvoiceStatusHistory(invoiceId: number): Promise<InvoiceStatusHistory[]>;
+  createInvoiceStatusHistory(entry: InsertInvoiceStatusHistory): Promise<InvoiceStatusHistory>;
+  getEvents(entityType?: string, entityId?: number): Promise<EventLedger[]>;
+  createEvent(entry: InsertEventLedger): Promise<EventLedger>;
 
   // Support message operations
   getSupportMessages(): Promise<SupportMessage[]>;
@@ -111,7 +140,10 @@ export interface IStorage {
   getFuelCardApplications(): Promise<FuelCardApplication[]>;
   getFuelCardApplication(id: number): Promise<FuelCardApplication | undefined>;
   createFuelCardApplication(application: InsertFuelCardApplication): Promise<FuelCardApplication>;
-  updateFuelCardApplication(id: number, application: Partial<InsertFuelCardApplication>): Promise<FuelCardApplication>;
+  updateFuelCardApplication(
+    id: number,
+    application: Partial<InsertFuelCardApplication>
+  ): Promise<FuelCardApplication>;
 
   // Time tracking operations
   getTimeEntries(userId: string): Promise<TimeEntry[]>;
@@ -143,15 +175,17 @@ export interface IStorage {
   createCollection(collection: InsertCollection): Promise<Collection>;
   updateCollection(id: number, updates: Partial<InsertCollection>): Promise<Collection>;
   deleteCollection(id: number): Promise<void>;
-  getClientPerformanceData(): Promise<{
-    clientId: number;
-    name: string;
-    lastLoadDate: Date | null;
-    daysSinceLastLoad: number;
-    status: "active" | "warning" | "inactive";
-    totalOwed: string;
-    pendingCollections: number;
-  }[]>;
+  getClientPerformanceData(): Promise<
+    {
+      clientId: number;
+      name: string;
+      lastLoadDate: Date | null;
+      daysSinceLastLoad: number;
+      status: "active" | "warning" | "inactive";
+      totalOwed: string;
+      pendingCollections: number;
+    }[]
+  >;
 
   // Client Vault operations
   getAllVaultEntries(clientId: number): Promise<ClientVault[]>;
@@ -163,7 +197,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations (required for Replit Auth)
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -181,6 +215,7 @@ export class DatabaseStorage implements IStorage {
         },
       })
       .returning();
+
     return user;
   }
 
@@ -193,6 +228,7 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(users.id, id))
       .returning();
+
     return updatedUser;
   }
 
@@ -214,7 +250,16 @@ export class DatabaseStorage implements IStorage {
 
   // Client operations
   async getClients(): Promise<Client[]> {
-    return await db.select().from(clients).orderBy(desc(clients.createdAt));
+    const rows = await db
+      .select()
+      .from(clients)
+      .orderBy(desc(clients.createdAt));
+
+    return rows.map((c) => ({
+      ...c,
+      createdAt: c.createdAt || new Date(), // fallback safety
+      updatedAt: c.updatedAt || new Date(),
+    }));
   }
 
   async getClient(id: number): Promise<Client | undefined> {
@@ -223,16 +268,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createClient(client: InsertClient): Promise<Client> {
-    const [newClient] = await db.insert(clients).values(client).returning();
+    const [newClient] = await db
+      .insert(clients)
+      .values({
+        ...client,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
     return newClient;
   }
 
   async updateClient(id: number, client: Partial<InsertClient>): Promise<Client> {
     const [updatedClient] = await db
       .update(clients)
-      .set({ ...client, updatedAt: new Date() })
+      .set({
+        ...client,
+        updatedAt: new Date(),
+      })
       .where(eq(clients.id, id))
       .returning();
+
     return updatedClient;
   }
 
@@ -252,6 +309,49 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(clients.createdAt));
+  }
+
+  // Debtor operations
+  async getDebtors(): Promise<Debtor[]> {
+    return await db.select().from(debtors).orderBy(desc(debtors.createdAt));
+  }
+
+  async getDebtor(id: number): Promise<Debtor | undefined> {
+    const [debtor] = await db.select().from(debtors).where(eq(debtors.id, id));
+    return debtor;
+  }
+
+  async createDebtor(debtor: InsertDebtor): Promise<Debtor> {
+    const [newDebtor] = await db.insert(debtors).values(debtor).returning();
+    return newDebtor;
+  }
+
+  async updateDebtor(id: number, debtor: Partial<InsertDebtor>): Promise<Debtor> {
+    const [updatedDebtor] = await db
+      .update(debtors)
+      .set({ ...debtor, updatedAt: new Date() })
+      .where(eq(debtors.id, id))
+      .returning();
+
+    return updatedDebtor;
+  }
+
+  async deleteDebtor(id: number): Promise<void> {
+    await db.delete(debtors).where(eq(debtors.id, id));
+  }
+
+  async searchDebtors(query: string): Promise<Debtor[]> {
+    return await db
+      .select()
+      .from(debtors)
+      .where(
+        or(
+          like(debtors.name, `%${query}%`),
+          like(debtors.email, `%${query}%`),
+          like(debtors.contactPerson, `%${query}%`)
+        )
+      )
+      .orderBy(desc(debtors.createdAt));
   }
 
   // Load operations
@@ -280,6 +380,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...load, updatedAt: new Date() })
       .where(eq(loads.id, id))
       .returning();
+
     return updatedLoad;
   }
 
@@ -313,24 +414,105 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoicesByClient(clientId: number): Promise<Invoice[]> {
-    return await db.select().from(invoices).where(eq(invoices.clientId, clientId)).orderBy(desc(invoices.createdAt));
+    return await db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.clientId, clientId))
+      .orderBy(desc(invoices.createdAt));
   }
 
   async getInvoicesByStatus(status: string): Promise<Invoice[]> {
-    return await db.select().from(invoices).where(eq(invoices.status, status as any)).orderBy(desc(invoices.createdAt));
+    return await db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.status, status as any))
+      .orderBy(desc(invoices.createdAt));
   }
 
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
     const [newInvoice] = await db.insert(invoices).values(invoice).returning();
+
+    await this.createInvoiceStatusHistory({
+      invoiceId: newInvoice.id,
+      oldStatus: null,
+      newStatus: newInvoice.status,
+      changedBy: newInvoice.submittedBy || null,
+      reason: "Invoice created",
+    });
+
+    await this.createEvent({
+      entityType: "invoice",
+      entityId: newInvoice.id,
+      eventType: "invoice.created",
+      actorType: "user",
+      actorId: newInvoice.submittedBy || null,
+      payloadJson: {
+        invoiceNumber: newInvoice.invoiceNumber,
+        status: newInvoice.status,
+        clientId: newInvoice.clientId,
+        debtorId: newInvoice.debtorId,
+        amount: newInvoice.amount,
+      },
+    });
+
     return newInvoice;
   }
 
   async updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice> {
+    const existing = await this.getInvoice(id);
+    if (!existing) {
+      throw new Error("Invoice not found");
+    }
+
     const [updatedInvoice] = await db
       .update(invoices)
       .set({ ...invoice, updatedAt: new Date() })
       .where(eq(invoices.id, id))
       .returning();
+
+    if (invoice.status && invoice.status !== existing.status) {
+      await this.createInvoiceStatusHistory({
+        invoiceId: updatedInvoice.id,
+        oldStatus: existing.status,
+        newStatus: invoice.status,
+        changedBy:
+          updatedInvoice.approvedBy ||
+          updatedInvoice.submittedBy ||
+          updatedInvoice.assignedTo ||
+          null,
+        reason: "Invoice status updated",
+      });
+
+      await this.createEvent({
+        entityType: "invoice",
+        entityId: updatedInvoice.id,
+        eventType: "invoice.status_changed",
+        actorType: "user",
+        actorId:
+          updatedInvoice.approvedBy ||
+          updatedInvoice.submittedBy ||
+          updatedInvoice.assignedTo ||
+          null,
+        payloadJson: {
+          oldStatus: existing.status,
+          newStatus: invoice.status,
+        },
+      });
+    }
+
+    await this.createEvent({
+      entityType: "invoice",
+      entityId: updatedInvoice.id,
+      eventType: "invoice.updated",
+      actorType: "user",
+      actorId:
+        updatedInvoice.approvedBy ||
+        updatedInvoice.submittedBy ||
+        updatedInvoice.assignedTo ||
+        null,
+      payloadJson: invoice,
+    });
+
     return updatedInvoice;
   }
 
@@ -345,7 +527,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         or(
           like(invoices.invoiceNumber, `%${query}%`),
-          like(sql`CAST(${invoices.loadId} AS TEXT)`, `%${query}%`)
+          like(invoices.loadNumber, `%${query}%`),
+          like(invoices.bolNumber, `%${query}%`)
         )
       )
       .orderBy(desc(invoices.createdAt));
@@ -362,19 +545,85 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocumentsByLoad(loadId: number): Promise<Document[]> {
-    return await db.select().from(documents).where(eq(documents.loadId, loadId)).orderBy(desc(documents.createdAt));
+    return await db
+      .select()
+      .from(documents)
+      .where(eq(documents.loadId, loadId))
+      .orderBy(desc(documents.createdAt));
   }
 
   async getDocumentsByInvoice(invoiceId: number): Promise<Document[]> {
-    return await db.select().from(documents).where(eq(documents.invoiceId, invoiceId)).orderBy(desc(documents.createdAt));
+    return await db
+      .select()
+      .from(documents)
+      .where(eq(documents.invoiceId, invoiceId))
+      .orderBy(desc(documents.createdAt));
   }
 
   async getDocumentsByEntity(entityType: string, entityId: number): Promise<Document[]> {
-    return await db.select().from(documents).orderBy(desc(documents.createdAt));
+    const rows = await db
+      .select({
+        id: documents.id,
+        companyId: documents.companyId,
+        filename: documents.filename,
+        originalName: documents.originalName,
+        mimeType: documents.mimeType,
+        size: documents.size,
+        storageKey: documents.storageKey,
+        documentType: documents.documentType,
+        loadId: documents.loadId,
+        invoiceId: documents.invoiceId,
+        uploadedBy: documents.uploadedBy,
+        sourceChannel: documents.sourceChannel,
+        status: documents.status,
+        createdAt: documents.createdAt,
+      })
+      .from(documentLinks)
+      .innerJoin(documents, eq(documentLinks.documentId, documents.id))
+      .where(
+        and(
+          eq(documentLinks.entityType, entityType as any),
+          eq(documentLinks.entityId, entityId)
+        )
+      )
+      .orderBy(desc(documents.createdAt));
+
+    return rows as Document[];
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
     const [newDocument] = await db.insert(documents).values(document).returning();
+
+    if (newDocument.invoiceId) {
+      await this.linkDocument({
+        documentId: newDocument.id,
+        entityType: "invoice",
+        entityId: newDocument.invoiceId,
+      });
+    }
+
+    if (newDocument.loadId) {
+      await this.linkDocument({
+        documentId: newDocument.id,
+        entityType: "load",
+        entityId: newDocument.loadId,
+      });
+    }
+
+    await this.createEvent({
+      entityType: "document",
+      entityId: newDocument.id,
+      eventType: "document.created",
+      actorType: "user",
+      actorId: newDocument.uploadedBy,
+      payloadJson: {
+        originalName: newDocument.originalName,
+        documentType: newDocument.documentType,
+        invoiceId: newDocument.invoiceId,
+        loadId: newDocument.loadId,
+      },
+    });
+
     return newDocument;
   }
 
@@ -384,11 +633,25 @@ export class DatabaseStorage implements IStorage {
       .set(document)
       .where(eq(documents.id, id))
       .returning();
+
     return updatedDocument;
   }
 
   async deleteDocument(id: number): Promise<void> {
     await db.delete(documents).where(eq(documents.id, id));
+  }
+
+  async getDocumentLinks(documentId: number): Promise<DocumentLink[]> {
+    return await db
+      .select()
+      .from(documentLinks)
+      .where(eq(documentLinks.documentId, documentId))
+      .orderBy(desc(documentLinks.createdAt));
+  }
+
+  async linkDocument(link: InsertDocumentLink): Promise<DocumentLink> {
+    const [newLink] = await db.insert(documentLinks).values(link).returning();
+    return newLink;
   }
 
   // Activity operations
@@ -407,6 +670,47 @@ export class DatabaseStorage implements IStorage {
     return newActivity;
   }
 
+  async clearActivities(): Promise<void> {
+    await db.delete(activities);
+  }
+
+  async getInvoiceStatusHistory(invoiceId: number): Promise<InvoiceStatusHistory[]> {
+    return await db
+      .select()
+      .from(invoiceStatusHistory)
+      .where(eq(invoiceStatusHistory.invoiceId, invoiceId))
+      .orderBy(desc(invoiceStatusHistory.createdAt));
+  }
+
+  async createInvoiceStatusHistory(
+    entry: InsertInvoiceStatusHistory
+  ): Promise<InvoiceStatusHistory> {
+    const [newEntry] = await db.insert(invoiceStatusHistory).values(entry).returning();
+    return newEntry;
+  }
+
+  async getEvents(entityType?: string, entityId?: number): Promise<EventLedger[]> {
+    if (entityType && typeof entityId === "number") {
+      return await db
+        .select()
+        .from(eventLedger)
+        .where(
+          and(
+            eq(eventLedger.entityType, entityType as any),
+            eq(eventLedger.entityId, entityId)
+          )
+        )
+        .orderBy(desc(eventLedger.createdAt));
+    }
+
+    return await db.select().from(eventLedger).orderBy(desc(eventLedger.createdAt));
+  }
+
+  async createEvent(entry: InsertEventLedger): Promise<EventLedger> {
+    const [newEvent] = await db.insert(eventLedger).values(entry).returning();
+    return newEvent;
+  }
+
   private shouldCreateNotification(activityType: string): boolean {
     const notifiableTypes = [
       "document_uploaded",
@@ -419,7 +723,10 @@ export class DatabaseStorage implements IStorage {
     return notifiableTypes.includes(activityType);
   }
 
-  private async createNotificationFromActivity(activity: InsertActivity, createdActivity: Activity): Promise<void> {
+  private async createNotificationFromActivity(
+    activity: InsertActivity,
+    _createdActivity: Activity
+  ): Promise<void> {
     const notificationMap: Record<
       string,
       { title: string; message: string; type: "info" | "success" | "warning" | "error" }
@@ -469,10 +776,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async clearActivities(): Promise<void> {
-    await db.delete(activities);
-  }
-
   // Support message operations
   async getSupportMessages(): Promise<SupportMessage[]> {
     return await db.select().from(supportMessages).orderBy(desc(supportMessages.createdAt));
@@ -490,30 +793,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSupportMessage(id: number): Promise<void> {
     await db.delete(supportMessages).where(eq(supportMessages.id, id));
-  }
-
-  // Fuel card application operations
-  async getFuelCardApplications(): Promise<FuelCardApplication[]> {
-    return await db.select().from(fuelCardApplications).orderBy(desc(fuelCardApplications.createdAt));
-  }
-
-  async getFuelCardApplication(id: number): Promise<FuelCardApplication | undefined> {
-    const [application] = await db.select().from(fuelCardApplications).where(eq(fuelCardApplications.id, id));
-    return application;
-  }
-
-  async createFuelCardApplication(application: InsertFuelCardApplication): Promise<FuelCardApplication> {
-    const [newApplication] = await db.insert(fuelCardApplications).values(application).returning();
-    return newApplication;
-  }
-
-  async updateFuelCardApplication(id: number, application: Partial<InsertFuelCardApplication>): Promise<FuelCardApplication> {
-    const [updatedApplication] = await db
-      .update(fuelCardApplications)
-      .set({ ...application, updatedAt: new Date() })
-      .where(eq(fuelCardApplications.id, id))
-      .returning();
-    return updatedApplication;
   }
 
   // Dashboard statistics
@@ -551,9 +830,49 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Fuel card application operations
+  async getFuelCardApplications(): Promise<FuelCardApplication[]> {
+    return await db.select().from(fuelCardApplications).orderBy(desc(fuelCardApplications.createdAt));
+  }
+
+  async getFuelCardApplication(id: number): Promise<FuelCardApplication | undefined> {
+    const [application] = await db
+      .select()
+      .from(fuelCardApplications)
+      .where(eq(fuelCardApplications.id, id));
+    return application;
+  }
+
+  async createFuelCardApplication(
+    application: InsertFuelCardApplication
+  ): Promise<FuelCardApplication> {
+    const [newApplication] = await db
+      .insert(fuelCardApplications)
+      .values(application)
+      .returning();
+    return newApplication;
+  }
+
+  async updateFuelCardApplication(
+    id: number,
+    application: Partial<InsertFuelCardApplication>
+  ): Promise<FuelCardApplication> {
+    const [updatedApplication] = await db
+      .update(fuelCardApplications)
+      .set({ ...application, updatedAt: new Date() })
+      .where(eq(fuelCardApplications.id, id))
+      .returning();
+
+    return updatedApplication;
+  }
+
   // Time tracking operations
   async getTimeEntries(userId: string): Promise<TimeEntry[]> {
-    return await db.select().from(timeEntries).where(eq(timeEntries.userId, userId)).orderBy(desc(timeEntries.clockInTime));
+    return await db
+      .select()
+      .from(timeEntries)
+      .where(eq(timeEntries.userId, userId))
+      .orderBy(desc(timeEntries.clockInTime));
   }
 
   async getCurrentTimeEntry(userId: string): Promise<TimeEntry | undefined> {
@@ -563,6 +882,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(timeEntries.userId, userId), eq(timeEntries.status, "clocked_in")))
       .orderBy(desc(timeEntries.clockInTime))
       .limit(1);
+
     return entry;
   }
 
@@ -600,7 +920,8 @@ export class DatabaseStorage implements IStorage {
     }
 
     const clockOutTime = new Date();
-    const totalHours = (clockOutTime.getTime() - currentEntry.clockInTime.getTime()) / (1000 * 60 * 60);
+    const totalHours =
+      (clockOutTime.getTime() - currentEntry.clockInTime.getTime()) / (1000 * 60 * 60);
 
     const [timeEntry] = await db
       .update(timeEntries)
@@ -678,12 +999,13 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(notifications)
       .where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
+
     return result[0]?.count || 0;
   }
 
   // Follow-up operations
   async getAllFollowUps(): Promise<FollowUp[]> {
-    return await db
+    return (await db
       .select({
         id: followUps.id,
         clientId: followUps.clientId,
@@ -702,7 +1024,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(followUps)
       .leftJoin(clients, eq(followUps.clientId, clients.id))
-      .orderBy(desc(followUps.createdAt));
+      .orderBy(desc(followUps.createdAt))) as any;
   }
 
   async getFollowUp(id: number): Promise<FollowUp | undefined> {
@@ -721,6 +1043,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(followUps.id, id))
       .returning();
+
     return updatedFollowUp;
   }
 
@@ -730,7 +1053,7 @@ export class DatabaseStorage implements IStorage {
 
   // Collections operations
   async getAllCollections(): Promise<Collection[]> {
-    return await db
+    return (await db
       .select({
         id: collections.id,
         clientId: collections.clientId,
@@ -759,7 +1082,7 @@ export class DatabaseStorage implements IStorage {
       .from(collections)
       .leftJoin(clients, eq(collections.clientId, clients.id))
       .leftJoin(users, eq(collections.assignedTo, users.id))
-      .orderBy(desc(collections.createdAt));
+      .orderBy(desc(collections.createdAt))) as any;
   }
 
   async getCollection(id: number): Promise<Collection | undefined> {
@@ -793,11 +1116,16 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(clients, eq(collections.clientId, clients.id))
       .leftJoin(users, eq(collections.assignedTo, users.id))
       .where(eq(collections.id, id));
-    return collection;
+
+    return collection as any;
   }
 
   async getCollectionsByClient(clientId: number): Promise<Collection[]> {
-    return await db.select().from(collections).where(eq(collections.clientId, clientId)).orderBy(desc(collections.createdAt));
+    return await db
+      .select()
+      .from(collections)
+      .where(eq(collections.clientId, clientId))
+      .orderBy(desc(collections.createdAt));
   }
 
   async createCollection(collection: InsertCollection): Promise<Collection> {
@@ -838,15 +1166,17 @@ export class DatabaseStorage implements IStorage {
     await db.delete(collections).where(eq(collections.id, id));
   }
 
-  async getClientPerformanceData(): Promise<{
-    clientId: number;
-    name: string;
-    lastLoadDate: Date | null;
-    daysSinceLastLoad: number;
-    status: "active" | "warning" | "inactive";
-    totalOwed: string;
-    pendingCollections: number;
-  }[]> {
+  async getClientPerformanceData(): Promise<
+    {
+      clientId: number;
+      name: string;
+      lastLoadDate: Date | null;
+      daysSinceLastLoad: number;
+      status: "active" | "warning" | "inactive";
+      totalOwed: string;
+      pendingCollections: number;
+    }[]
+  > {
     const clientsWithData = await db
       .select({
         clientId: clients.id,
@@ -885,7 +1215,7 @@ export class DatabaseStorage implements IStorage {
 
   // Client Vault operations
   async getAllVaultEntries(clientId: number): Promise<ClientVault[]> {
-    return await db
+    return (await db
       .select({
         id: clientVault.id,
         clientId: clientVault.clientId,
@@ -919,7 +1249,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(clientVault.createdBy, users.id))
       .leftJoin(users, eq(clientVault.lastAccessedBy, users.id))
       .where(and(eq(clientVault.clientId, clientId), eq(clientVault.isActive, true)))
-      .orderBy(desc(clientVault.createdAt));
+      .orderBy(desc(clientVault.createdAt))) as any;
   }
 
   async getVaultEntry(id: number): Promise<ClientVault | undefined> {
@@ -951,7 +1281,8 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(clients, eq(clientVault.clientId, clients.id))
       .leftJoin(users, eq(clientVault.createdBy, users.id))
       .where(eq(clientVault.id, id));
-    return entry;
+
+    return entry as any;
   }
 
   async createVaultEntry(entry: InsertClientVault): Promise<ClientVault> {
@@ -989,7 +1320,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteVaultEntry(id: number): Promise<void> {
-    await db.update(clientVault).set({ isActive: false, updatedAt: new Date() }).where(eq(clientVault.id, id));
+    await db
+      .update(clientVault)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(clientVault.id, id));
   }
 
   async recordVaultAccess(id: number, userId: string): Promise<void> {

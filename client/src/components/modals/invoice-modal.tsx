@@ -27,18 +27,99 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, X, Building, Phone, Mail, MapPin, Search, CheckCircle2 } from "lucide-react";
+import {
+  Upload,
+  X,
+  Building,
+  Phone,
+  Mail,
+  MapPin,
+  Search,
+  CheckCircle2,
+  Sparkles,
+  FileText,
+  Truck,
+  CircleDollarSign,
+  ClipboardList,
+} from "lucide-react";
 
 type DocKey = "rate_confirmation" | "bill_of_lading" | "lumper" | "receipts";
 
 const DOC_SLOTS: { key: DocKey; label: string; hint: string }[] = [
-  { key: "rate_confirmation", label: "Rate Confirmation", hint: "Upload the signed rate confirmation" },
-  { key: "bill_of_lading", label: "Bill of Lading", hint: "Upload the BOL document" },
-  { key: "lumper", label: "Lumper Receipt", hint: "Upload any lumper receipt" },
-  { key: "receipts", label: "Receipts", hint: "Upload additional receipts" },
+  { key: "rate_confirmation", label: "Rate Confirmation", hint: "Signed rate confirmation" },
+  { key: "bill_of_lading", label: "Bill of Lading", hint: "BOL document" },
+  { key: "lumper", label: "Lumper Receipt", hint: "Any lumper receipt" },
+  { key: "receipts", label: "Receipts", hint: "Additional receipts" },
 ];
 
-function MiniUploadZone({
+function SectionCard({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[24px] border border-slate-200/80 bg-white/80 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/40">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold tracking-tight text-slate-900 dark:text-white">
+            {title}
+          </h3>
+          {description ? (
+            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function PremiumPillGroup<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const active = value === opt.value;
+
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "rounded-full border px-4 py-2 text-sm font-medium transition-all",
+              active
+                ? "border-blue-600 bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]"
+                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PremiumUploadTile({
   label,
   hint,
   file,
@@ -61,15 +142,19 @@ function MiniUploadZone({
 
   return (
     <div
-      className={`relative rounded-xl border-2 border-dashed p-4 transition-all cursor-pointer select-none ${
+      className={cn(
+        "group relative rounded-[22px] border border-dashed p-4 transition-all cursor-pointer select-none",
         dragOver
-          ? "border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-950/20"
+          ? "border-blue-400 bg-blue-50 shadow-[0_10px_24px_rgba(37,99,235,0.12)] dark:border-blue-500 dark:bg-blue-950/20"
           : file
-          ? "border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/20"
-          : "border-slate-300 bg-slate-50 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-slate-600"
-      }`}
+          ? "border-emerald-300 bg-emerald-50 shadow-[0_10px_24px_rgba(16,185,129,0.10)] dark:border-emerald-700 dark:bg-emerald-950/20"
+          : "border-slate-200 bg-slate-50/80 hover:border-slate-300 hover:bg-white hover:shadow-sm dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-slate-600 dark:hover:bg-slate-900"
+      )}
       onClick={() => !file && inputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
         e.preventDefault();
@@ -83,30 +168,49 @@ function MiniUploadZone({
         type="file"
         className="hidden"
         accept=".pdf,.jpg,.jpeg,.png"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) accept(f); }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) accept(f);
+        }}
       />
 
       {file ? (
         <div className="flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-emerald-700 dark:text-emerald-400">{file.name}</p>
-            <p className="text-xs text-emerald-600 dark:text-emerald-500">{(file.size / 1024).toFixed(1)} KB</p>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <CheckCircle2 className="h-5 w-5" />
           </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+              {file.name}
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-600/90 dark:text-emerald-500">
+              {(file.size / 1024).toFixed(1)} KB
+            </p>
+          </div>
+
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            className="shrink-0 rounded-md p-1 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="rounded-xl p-2 text-emerald-600 transition hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-3">
-          <Upload className="h-5 w-5 shrink-0 text-slate-400" />
-          <div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{hint} · PDF, JPG, PNG · Max 10 MB</p>
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-300">
+            <Upload className="h-5 w-5" />
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {hint} · PDF, JPG, PNG · Max 10 MB
+            </p>
           </div>
         </div>
       )}
@@ -133,6 +237,7 @@ const invoiceFormSchema = insertInvoiceSchema.extend({
 export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -164,12 +269,13 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     enabled: isOpen,
   });
 
-  // Filter clients based on search
-  const filteredClients = clients?.filter(client => 
-    client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-    client.email?.toLowerCase().includes(clientSearch.toLowerCase()) ||
-    client.phone?.includes(clientSearch)
-  ) || [];
+  const filteredClients =
+    clients?.filter(
+      (client) =>
+        client.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+        client.email?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+        client.phone?.includes(clientSearch)
+    ) || [];
 
   useEffect(() => {
     if (invoice) {
@@ -184,7 +290,8 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         notes: invoice.notes || "",
         bolNumber: "",
       });
-      const client = clients?.find(c => c.id === invoice.clientId);
+
+      const client = clients?.find((c) => c.id === invoice.clientId);
       if (client) {
         setSelectedClient(client);
         setClientSearch(client.name);
@@ -203,7 +310,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       });
       setSelectedClient(null);
       setClientSearch("");
-      setAttachedFiles({ rate_confirmation: null, bill_of_lading: null, lumper: null, receipts: null });
+      setAttachedFiles({
+        rate_confirmation: null,
+        bill_of_lading: null,
+        lumper: null,
+        receipts: null,
+      });
     }
   }, [invoice, form, clients]);
 
@@ -220,18 +332,22 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     },
     onSuccess: async (response) => {
       const hasFiles = Object.values(attachedFiles).some(Boolean);
+
       if (hasFiles) {
         setIsUploading(true);
         try {
           const invoiceData = await response.json();
+
           await Promise.all(
             DOC_SLOTS.map(async ({ key }) => {
               const file = attachedFiles[key];
               if (!file) return;
+
               const formData = new FormData();
               formData.append("file", file);
               formData.append("documentType", key);
               formData.append("invoiceId", invoiceData.id.toString());
+
               await apiRequest("POST", "/api/documents/upload", formData);
             })
           );
@@ -241,11 +357,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
           setIsUploading(false);
         }
       }
-      
+
       toast({
         title: "Success",
         description: "Invoice created successfully",
       });
+
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
@@ -263,6 +380,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         }, 500);
         return;
       }
+
       toast({
         title: "Error",
         description: "Failed to create invoice",
@@ -295,6 +413,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         }, 500);
         return;
       }
+
       toast({
         title: "Error",
         description: "Failed to update invoice",
@@ -317,301 +436,401 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     }
   };
 
+  const isSaving = createMutation.isPending || updateMutation.isPending || isUploading;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-visible"  style={{ overflowY: "visible" }}>
-        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
-          <DialogTitle>
-            {invoice ? "Edit Invoice" : "Create New Invoice"}
-          </DialogTitle>
-          <DialogDescription>
-            {invoice ? "Update the invoice details below" : "Drag and drop an invoice document or fill in the details manually"}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="overflow-y-auto flex-1 px-6 pb-6">
-
-        {/* Document Upload Slots */}
-        {!invoice && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Attach Documents</p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {DOC_SLOTS.map(({ key, label, hint }) => (
-                <MiniUploadZone
-                  key={key}
-                  label={label}
-                  hint={hint}
-                  file={attachedFiles[key]}
-                  onFile={(f) => setAttachedFiles((prev) => ({ ...prev, [key]: f }))}
-                  onRemove={() => setAttachedFiles((prev) => ({ ...prev, [key]: null }))}
-                />
-              ))}
+      <DialogContent className="max-w-5xl border-slate-200/80 bg-[linear-gradient(to_bottom,_rgba(255,255,255,0.97),_rgba(248,250,252,0.98))] p-0 shadow-[0_30px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[hsl(var(--background))]">
+        <DialogHeader className="shrink-0 border-b border-slate-200/70 px-8 pb-6 pt-8 dark:border-slate-800">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)]">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300">
+                Invoice workflow
+              </div>
             </div>
           </div>
-        )}
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="invoiceNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="INV-001234" {...field} data-testid="input-invoice-number" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <DialogTitle className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            {invoice ? "Edit Invoice" : "Create New Invoice"}
+          </DialogTitle>
 
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <FormControl>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {(["draft","submitted","approved","rejected","paid"] as const).map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            onClick={() => field.onChange(s)}
-                            className={cn(
-                              "px-3 py-1.5 rounded-full text-sm font-medium border transition-all capitalize",
-                              field.value === s
-                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
-                            )}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+          <DialogDescription className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+            {invoice
+              ? "Update invoice details, shipment information, and billing references."
+              : "Upload documents or enter shipment details manually with a cleaner premium workflow."}
+          </DialogDescription>
+        </DialogHeader>
 
-            <FormField
-              control={form.control}
-              name="loadType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Load Type</FormLabel>
-                  <FormControl>
-                    <div className="flex gap-2 pt-1">
-                      {([
-                        { value: "otr_load", label: "OTR Load" },
-                        { value: "dump_truck_ticket", label: "Dump Truck Ticket" },
-                      ] as const).map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => field.onChange(opt.value)}
-                          className={cn(
-                            "px-3 py-1.5 rounded-full text-sm font-medium border transition-all",
-                            field.value === opt.value
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
-                          )}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="pickupLocation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>From (Pickup Location)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="City, State" {...field} data-testid="input-pickup-location" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="deliveryLocation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>To (Delivery Location)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="City, State" {...field} data-testid="input-delivery-location" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Smart Client Search */}
-            <div className="space-y-2">
-              <FormLabel>Client</FormLabel>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search client by name, email, or phone..."
-                  value={clientSearch}
-                  onChange={(e) => {
-                    setClientSearch(e.target.value);
-                    setShowClientDropdown(true);
-                    if (!e.target.value) {
-                      setSelectedClient(null);
-                      form.setValue("clientId", "");
-                    }
-                  }}
-                  onFocus={() => setShowClientDropdown(true)}
-                  className="pl-10"
-                  data-testid="input-client-search"
-                />
-                
-                {/* Client dropdown */}
-                {showClientDropdown && clientSearch && filteredClients.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
-                    {filteredClients.map((client) => (
-                      <div
-                        key={client.id}
-                        className="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
-                        onClick={() => handleClientSelect(client)}
-                        data-testid={`client-option-${client.id}`}
-                      >
-                        <div className="font-medium">{client.name}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {client.email} • {client.phone}
-                        </div>
-                      </div>
+        <div className="custom-scrollbar max-h-[78vh] overflow-y-auto px-8 py-7">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {!invoice && (
+                <SectionCard
+                  icon={<Upload className="h-5 w-5" />}
+                  title="Attached Documents"
+                  description="Upload the core paperwork needed to process this invoice."
+                >
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {DOC_SLOTS.map(({ key, label, hint }) => (
+                      <PremiumUploadTile
+                        key={key}
+                        label={label}
+                        hint={hint}
+                        file={attachedFiles[key]}
+                        onFile={(f) => setAttachedFiles((prev) => ({ ...prev, [key]: f }))}
+                        onRemove={() => setAttachedFiles((prev) => ({ ...prev, [key]: null }))}
+                      />
                     ))}
                   </div>
-                )}
-              </div>
-              {form.formState.errors.clientId && (
-                <p className="text-sm text-red-500">{form.formState.errors.clientId.message}</p>
+                </SectionCard>
               )}
-            </div>
 
-            {/* Selected Client Details Card */}
-            {selectedClient && (
-              <Card className="bg-gray-50 dark:bg-gray-800/50">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Building className="w-5 h-5 text-primary mt-0.5" />
-                    <div className="flex-1 grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-white">{selectedClient.name}</p>
-                        {selectedClient.contactPerson && (
-                          <p className="text-gray-600 dark:text-gray-400">Contact: {selectedClient.contactPerson}</p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        {selectedClient.email && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Mail className="w-3.5 h-3.5" />
-                            <span>{selectedClient.email}</span>
-                          </div>
-                        )}
-                        {selectedClient.phone && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Phone className="w-3.5 h-3.5" />
-                            <span>{selectedClient.phone}</span>
-                          </div>
-                        )}
-                        {selectedClient.address && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span>{selectedClient.address}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0.00" type="number" step="0.01" {...field} data-testid="input-amount" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="bolNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>BOL Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Bill of Lading #" {...field} data-testid="input-bol-number" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Additional notes..." 
-                      value={field.value || ""} 
-                      onChange={field.onChange} 
-                      onBlur={field.onBlur} 
-                      name={field.name} 
-                      ref={field.ref}
-                      data-testid="textarea-notes"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end space-x-4">
-              <Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel">
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={createMutation.isPending || updateMutation.isPending || isUploading}
-                data-testid="button-submit"
+              <SectionCard
+                icon={<FileText className="h-5 w-5" />}
+                title="Invoice Details"
+                description="Set the invoice number, review state, and load type."
               >
-                {createMutation.isPending || updateMutation.isPending || isUploading 
-                  ? "Saving..." 
-                  : invoice ? "Update" : "Create Invoice"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="invoiceNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Invoice Number
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="INV-001234"
+                            {...field}
+                            data-testid="input-invoice-number"
+                            className="h-12 rounded-2xl border-slate-200 bg-white text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Status
+                        </FormLabel>
+                        <FormControl>
+                          <div className="pt-1">
+                            <PremiumPillGroup
+                              value={field.value as "draft" | "submitted" | "approved" | "rejected" | "paid"}
+                              onChange={field.onChange}
+                              options={[
+                                { value: "draft", label: "Draft" },
+                                { value: "submitted", label: "Submitted" },
+                                { value: "approved", label: "Approved" },
+                                { value: "rejected", label: "Rejected" },
+                                { value: "paid", label: "Paid" },
+                              ]}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-5">
+                  <FormField
+                    control={form.control}
+                    name="loadType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Load Type
+                        </FormLabel>
+                        <FormControl>
+                          <div className="pt-1">
+                            <PremiumPillGroup
+                              value={field.value as "otr_load" | "dump_truck_ticket"}
+                              onChange={field.onChange}
+                              options={[
+                                { value: "otr_load", label: "OTR Load" },
+                                { value: "dump_truck_ticket", label: "Dump Truck Ticket" },
+                              ]}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                icon={<Truck className="h-5 w-5" />}
+                title="Shipment Details"
+                description="Capture the pickup and delivery locations for this load."
+              >
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="pickupLocation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          From (Pickup Location)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="City, State"
+                            {...field}
+                            data-testid="input-pickup-location"
+                            className="h-12 rounded-2xl border-slate-200 bg-white text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="deliveryLocation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          To (Delivery Location)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="City, State"
+                            {...field}
+                            data-testid="input-delivery-location"
+                            className="h-12 rounded-2xl border-slate-200 bg-white text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                icon={<Building className="h-5 w-5" />}
+                title="Client & Billing"
+                description="Search and assign the client tied to this invoice."
+              >
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Client
+                  </FormLabel>
+
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      placeholder="Search client by name, email, or phone..."
+                      value={clientSearch}
+                      onChange={(e) => {
+                        setClientSearch(e.target.value);
+                        setShowClientDropdown(true);
+                        if (!e.target.value) {
+                          setSelectedClient(null);
+                          form.setValue("clientId", "");
+                        }
+                      }}
+                      onFocus={() => setShowClientDropdown(true)}
+                      className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                      data-testid="input-client-search"
+                    />
+
+                    {showClientDropdown && clientSearch && filteredClients.length > 0 && (
+                      <div className="absolute z-[9999] mt-2 w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_20px_40px_rgba(15,23,42,0.12)] dark:border-slate-700 dark:bg-slate-900">
+                        <div className="max-h-72 overflow-auto py-2">
+                          {filteredClients.map((client) => (
+                            <button
+                              key={client.id}
+                              type="button"
+                              className="flex w-full flex-col items-start px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800"
+                              onClick={() => handleClientSelect(client)}
+                              data-testid={`client-option-${client.id}`}
+                            >
+                              <span className="font-medium text-slate-900 dark:text-white">
+                                {client.name}
+                              </span>
+                              <span className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                {client.email || "No email"} • {client.phone || "No phone"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {form.formState.errors.clientId && (
+                    <p className="text-sm text-red-500">
+                      {form.formState.errors.clientId.message}
+                    </p>
+                  )}
+                </div>
+
+                {selectedClient && (
+                  <Card className="mt-5 rounded-[22px] border border-slate-200/80 bg-slate-50/80 shadow-sm dark:border-slate-700 dark:bg-slate-800/50">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400">
+                          <Building className="h-5 w-5" />
+                        </div>
+
+                        <div className="flex-1 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                          <div>
+                            <p className="font-semibold text-slate-900 dark:text-white">
+                              {selectedClient.name}
+                            </p>
+                            {selectedClient.contactPerson ? (
+                              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                Contact: {selectedClient.contactPerson}
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                            {selectedClient.email ? (
+                              <div className="flex items-center gap-2">
+                                <Mail className="h-3.5 w-3.5" />
+                                <span>{selectedClient.email}</span>
+                              </div>
+                            ) : null}
+
+                            {selectedClient.phone ? (
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-3.5 w-3.5" />
+                                <span>{selectedClient.phone}</span>
+                              </div>
+                            ) : null}
+
+                            {selectedClient.address ? (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3.5 w-3.5" />
+                                <span>{selectedClient.address}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Amount
+                        </FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <CircleDollarSign className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                              placeholder="0.00"
+                              type="number"
+                              step="0.01"
+                              {...field}
+                              data-testid="input-amount"
+                              className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="bolNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          BOL Number
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Bill of Lading #"
+                            {...field}
+                            data-testid="input-bol-number"
+                            className="h-12 rounded-2xl border-slate-200 bg-white text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                icon={<ClipboardList className="h-5 w-5" />}
+                title="Notes"
+                description="Add any operational notes or billing context."
+              >
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Additional notes..."
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                          data-testid="textarea-notes"
+                          className="min-h-[130px] rounded-[22px] border-slate-200 bg-white text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </SectionCard>
+
+              <div className="sticky bottom-0 z-20 -mx-8 border-t border-slate-200/80 bg-white/90 px-8 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--background))]/90">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    data-testid="button-cancel"
+                    className="h-11 rounded-2xl border-slate-200 px-5 dark:border-slate-700"
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    disabled={isSaving}
+                    data-testid="button-submit"
+                    className="h-11 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] hover:bg-blue-700"
+                  >
+                    {isSaving ? "Saving..." : invoice ? "Update Invoice" : "Create Invoice"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </Form>
         </div>
       </DialogContent>
     </Dialog>
