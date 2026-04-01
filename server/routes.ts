@@ -762,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
   // Client routes
-      app.post('/api/clients', requireAuth, async (req: any, res) => {
+  app.get('/api/clients', async (req, res) => {
     try {
       const clients = await storage.getClients();
       res.json(clients);
@@ -783,20 +783,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching clients:", error);
       res.status(500).json({ message: "Failed to search clients" });
-    }
-  });
-
-      app.put('/api/clients/:id', requireAuth, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const client = await storage.getClient(id);
-      if (!client) {
-        return res.status(404).json({ message: "Client not found" });
-      }
-      res.json(client);
-    } catch (error) {
-      console.error("Error fetching client:", error);
-      res.status(500).json({ message: "Failed to fetch client" });
     }
   });
 
@@ -857,20 +843,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching loads:", error);
       res.status(500).json({ message: "Failed to fetch loads" });
-    }
-  });
-
-    app.post('/api/loads', requireAuth, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const load = await storage.getLoad(id);
-      if (!load) {
-        return res.status(404).json({ message: "Load not found" });
-      }
-      res.json(load);
-    } catch (error) {
-      console.error("Error fetching load:", error);
-      res.status(500).json({ message: "Failed to fetch load" });
     }
   });
 
