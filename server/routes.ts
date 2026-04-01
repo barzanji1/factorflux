@@ -1043,21 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-    app.put('/api/invoices/:id', requireAuth, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const invoice = await storage.getInvoice(id);
-      if (!invoice) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
-      res.json(invoice);
-    } catch (error) {
-      console.error("Error fetching invoice:", error);
-      res.status(500).json({ message: "Failed to fetch invoice" });
-    }
-  });
-
-  app.post('/api/invoices', async (req: any, res) => {
+  app.post('/api/invoices', requireAuth, async (req: any, res) => {
     try {
       const invoiceData = insertInvoiceSchema.parse(req.body);
       const invoice = await storage.createInvoice({
@@ -1082,39 +1068,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating invoice:", error);
       res.status(500).json({ message: "Failed to create invoice" });
-    }
-  });
-
-  app.put('/api/invoices/:id', async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const user = req.user;
-      const invoiceData = insertInvoiceSchema.partial().parse(req.body);
-      
-      // Add approval data if status is being changed to approved and user is manager
-      if (invoiceData.status === 'approved' && (user?.role === 'manager' || user?.role === 'admin')) {
-        invoiceData.approvedBy = req.user.id;
-        invoiceData.approvedAt = new Date();
-      }
-      
-      const invoice = await storage.updateInvoice(id, invoiceData);
-      
-      // Log activity
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'invoice_updated',
-        description: `Updated invoice: ${invoice.invoiceNumber}`,
-        entityType: 'invoice',
-        entityId: invoice.id,
-      });
-
-      res.json(invoice);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
-      }
-      console.error("Error updating invoice:", error);
-      res.status(500).json({ message: "Failed to update invoice" });
     }
   });
 

@@ -436,6 +436,25 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     }
   };
 
+  const onValidationError = (errors: Record<string, unknown>) => {
+    const fieldLabels: Record<string, string> = {
+      invoiceNumber: "Invoice Number",
+      clientId: "Client",
+      amount: "Amount",
+      loadType: "Load Type",
+      pickupLocation: "Pickup Location",
+      deliveryLocation: "Delivery Location",
+    };
+    const missing = Object.keys(errors)
+      .map((k) => fieldLabels[k] ?? k)
+      .join(", ");
+    toast({
+      title: "Missing required fields",
+      description: `Please fill in: ${missing}`,
+      variant: "destructive",
+    });
+  };
+
   const isSaving = createMutation.isPending || updateMutation.isPending || isUploading;
 
   return (
@@ -466,7 +485,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
         <div className="custom-scrollbar max-h-[78vh] overflow-y-auto px-8 py-7">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit, onValidationError)} className="space-y-6">
               {!invoice && (
                 <SectionCard
                   icon={<Upload className="h-5 w-5" />}
