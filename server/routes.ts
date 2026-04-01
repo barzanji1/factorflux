@@ -1048,6 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceData = insertInvoiceSchema.parse(req.body);
       const invoice = await storage.createInvoice({
         ...invoiceData,
+        loadId: null,
         submittedBy: req.user.id,
         submittedAt: new Date(),
       });

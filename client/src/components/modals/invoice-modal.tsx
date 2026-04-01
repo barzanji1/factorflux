@@ -226,9 +226,9 @@ interface InvoiceModalProps {
 
 const invoiceFormSchema = insertInvoiceSchema.extend({
   invoiceNumber: z.string().min(1, "Invoice number is required"),
-  loadType: z.string().min(1, "Load type is required"),
-  pickupLocation: z.string().min(1, "Pickup location is required"),
-  deliveryLocation: z.string().min(1, "Delivery location is required"),
+  loadType: z.string().optional(),
+  pickupLocation: z.string().optional(),
+  deliveryLocation: z.string().optional(),
   clientId: z.string().min(1, "Client is required"),
   amount: z.string().min(1, "Amount is required"),
   bolNumber: z.string().optional(),
@@ -459,7 +459,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl border-slate-200/80 bg-[linear-gradient(to_bottom,_rgba(255,255,255,0.97),_rgba(248,250,252,0.98))] p-0 shadow-[0_30px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[hsl(var(--background))]">
+      <DialogContent className="w-[95vw] max-w-6xl border-slate-200/80 bg-[linear-gradient(to_bottom,_rgba(255,255,255,0.97),_rgba(248,250,252,0.98))] p-0 shadow-[0_30px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[hsl(var(--background))]">
         <DialogHeader className="shrink-0 border-b border-slate-200/70 px-8 pb-6 pt-8 dark:border-slate-800">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)]">
@@ -483,7 +483,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
           </DialogDescription>
         </DialogHeader>
 
-        <div className="custom-scrollbar max-h-[78vh] overflow-y-auto px-8 py-7">
+        <div className="custom-scrollbar max-h-[82vh] overflow-y-auto px-8 py-7">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit, onValidationError)} className="space-y-6">
               {!invoice && (
