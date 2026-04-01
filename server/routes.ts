@@ -786,12 +786,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/clients', async (req: any, res) => {
+  app.post('/api/clients', requireAuth, async (req: any, res) => {
     try {
       const clientData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(clientData);
-      
-      // Log activity
+
       await storage.createActivity({
         userId: req.user.id,
         type: 'client_created',
@@ -810,13 +809,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/clients/:id', async (req: any, res) => {
+  app.put('/api/clients/:id', requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const clientData = insertClientSchema.partial().parse(req.body);
       const client = await storage.updateClient(id, clientData);
-      
-      // Log activity
+
       await storage.createActivity({
         userId: req.user.id,
         type: 'client_updated',
@@ -832,6 +830,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating client:", error);
       res.status(500).json({ message: "Failed to update client" });
+    }
+  });
+
+  app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteClient(id);
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: 'client_deleted',
+        description: `Deleted client ID: ${id}`,
+        entityType: 'client',
+        entityId: id,
+      });
+
+      res.json({ message: "Client deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting client:", error);
+      res.status(500).json({ message: "Failed to delete client" });
     }
   });
 

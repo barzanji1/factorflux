@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -12,6 +13,7 @@ import {
   Plus,
   Search,
   Edit,
+  Trash2,
   Mail,
   Phone,
   Building2,
@@ -26,9 +28,11 @@ import { cn } from "@/lib/utils";
 
 export default function Clients() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const {
     data: clients = [],
@@ -99,6 +103,26 @@ export default function Clients() {
   });
 
   const displayClients = searchQuery.trim() ? searchResults : clients;
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest("DELETE", `/api/clients/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({ title: "Client deleted", description: "The client has been removed." });
+      setDeletingId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete client.", variant: "destructive" });
+      setDeletingId(null);
+    },
+  });
+
+  const handleDeleteClient = (client: Client) => {
+    if (!window.confirm(`Delete "${client.name}"? This cannot be undone.`)) return;
+    setDeletingId(client.id);
+    deleteMutation.mutate(client.id);
+  };
 
   const handleCreateClient = () => {
     setSelectedClient(null);
@@ -315,15 +339,27 @@ export default function Clients() {
                                   : "—"}
                               </span>
 
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditClient(client)}
-                                className="h-9 rounded-xl px-3 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-                              >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditClient(client)}
+                                  className="h-9 rounded-xl px-3 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                                >
+                                  <Edit className="mr-1.5 h-4 w-4" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteClient(client)}
+                                  disabled={deletingId === client.id}
+                                  className="h-9 rounded-xl px-3 text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                                >
+                                  <Trash2 className="mr-1.5 h-4 w-4" />
+                                  {deletingId === client.id ? "Deleting…" : "Delete"}
+                                </Button>
+                              </div>
                             </div>
                           </CardContent>
                         </Card>
