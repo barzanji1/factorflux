@@ -1,10 +1,21 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import bcrypt from "bcryptjs";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+
 import { storage } from "./storage";
 import { setupLocalAuth } from "./localAuth";
-import { 
-  insertClientSchema, 
-  insertLoadSchema, 
+import { firestore } from "./firebase";
+import { upsertClientMirror, addClientActivityLog } from "./services/firestore-records";
+import { db } from "./db";
+
+import {
+  insertClientSchema,
+  insertLoadSchema,
   insertInvoiceSchema,
   insertDocumentSchema,
   insertFollowUpSchema,
@@ -26,13 +37,6 @@ import {
   type FuelAdvance,
   type InsertFuelAdvance
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, and } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { z } from "zod";
 // jsPDF removed for web deployment optimization
 import { sendDesktopInstallers, sendEmail } from "./emailService";
 
@@ -178,7 +182,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Logged out successfully" });
     });
   });
+  app.get("/api/firebase-test", async (_req, res) => {
+    try {
+      const testRef = firestore.collection("test").doc("ping");
 
+      await testRef.set({
+        message: "firebase working",
+        timestamp: new Date().toISOString(),
+      });
+
+      const snap = await testRef.get();
+
+      return res.json(snap.data());
+    } catch (err) {
+      console.error("Firebase test failed:", err);
+      return res.status(500).json({ error: "Firebase failed" });
+    }
+  });
   // Middleware to check authentication for protected routes
   const requireAuth = (req: any, res: any, next: any) => {
     console.log("RequireAuth middleware - session:", !!req.session, "user:", !!(req.session as any)?.user);
@@ -761,97 +781,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
-  // Client routes
-  app.get('/api/clients', async (req, res) => {
-    try {
-      const clients = await storage.getClients();
-      res.json(clients);
-    } catch (error) {
-      console.error("Error fetching clients:", error);
-      res.status(500).json({ message: "Failed to fetch clients" });
+// Client routes
+app.get('/api/clients', async (req, res) => {
+  try {
+    const clients = await storage.getClients();
+    res.json(clients);
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    res.status(500).json({ message: 'Failed to fetch clients' });
+  }
+});
+
+app.get('/api/clients/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ message: 'Search query is required' });
     }
-  });
 
-  app.get('/api/clients/search', async (req, res) => {
-    try {
-      const { q } = req.query;
-      if (!q || typeof q !== 'string') {
-        return res.status(400).json({ message: "Search query is required" });
-      }
-      const clients = await storage.searchClients(q);
-      res.json(clients);
-    } catch (error) {
-      console.error("Error searching clients:", error);
-      res.status(500).json({ message: "Failed to search clients" });
-    }
-  });
+    const clients = await storage.searchClients(q);
+    res.json(clients);
+  } catch (error) {
+    console.error('Error searching clients:', error);
+    res.status(500).json({ message: 'Failed to search clients' });
+  }
+});
 
-  app.post('/api/clients', requireAuth, async (req: any, res) => {
-    try {
-      const clientData = insertClientSchema.parse(req.body);
-      const client = await storage.createClient(clientData);
+app.post('/api/clients', requireAuth, async (req: any, res) => {
+  try {
+    const clientData = insertClientSchema.parse(req.body);
+    const client = await storage.createClient(clientData);
 
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'client_created',
-        description: `Created new client: ${client.name}`,
-        entityType: 'client',
-        entityId: client.id,
+    await upsertClientMirror(client);
+
+    await addClientActivityLog(client.id, {
+      type: 'client_created',
+      message: `Client ${client.name} was created`,
+    });
+
+    await storage.createActivity({
+      userId: req.user.id,
+      type: 'client_created',
+      description: `Created new client: ${client.name}`,
+      entityType: 'client',
+      entityId: client.id,
+    });
+
+    res.status(201).json(client);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        message: 'Invalid client data',
+        errors: error.errors,
       });
-
-      res.status(201).json(client);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid client data", errors: error.errors });
-      }
-      console.error("Error creating client:", error);
-      res.status(500).json({ message: "Failed to create client" });
     }
-  });
 
-  app.put('/api/clients/:id', requireAuth, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const clientData = insertClientSchema.partial().parse(req.body);
-      const client = await storage.updateClient(id, clientData);
+    console.error('Error creating client:', error);
+    res.status(500).json({ message: 'Failed to create client' });
+  }
+});
 
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'client_updated',
-        description: `Updated client: ${client.name}`,
-        entityType: 'client',
-        entityId: client.id,
+app.get('/api/firebase-clients', async (_req: any, res) => {
+  try {
+    const snap = await firestore.collection('clients').get();
+    const data = snap.docs.map((doc) => doc.data());
+    res.json(data);
+  } catch (error) {
+    console.error('Failed to fetch firebase clients:', error);
+    res.status(500).json({ error: 'Failed to fetch firebase clients' });
+  }
+});
+
+app.put('/api/clients/:id', requireAuth, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'Invalid client id' });
+    }
+
+    const clientData = insertClientSchema.partial().parse(req.body);
+    const client = await storage.updateClient(id, clientData);
+
+    await upsertClientMirror(client);
+
+    await addClientActivityLog(client.id, {
+      type: 'client_updated',
+      message: `Client ${client.name} was updated`,
+    });
+
+    await storage.createActivity({
+      userId: req.user.id,
+      type: 'client_updated',
+      description: `Updated client: ${client.name}`,
+      entityType: 'client',
+      entityId: client.id,
+    });
+
+    res.json(client);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        message: 'Invalid client data',
+        errors: error.errors,
       });
-
-      res.json(client);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid client data", errors: error.errors });
-      }
-      console.error("Error updating client:", error);
-      res.status(500).json({ message: "Failed to update client" });
     }
-  });
 
-  app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await storage.deleteClient(id);
+    console.error('Error updating client:', error);
+    res.status(500).json({ message: 'Failed to update client' });
+  }
+});
 
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'client_deleted',
-        description: `Deleted client ID: ${id}`,
-        entityType: 'client',
-        entityId: id,
-      });
+app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
 
-      res.json({ message: "Client deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting client:", error);
-      res.status(500).json({ message: "Failed to delete client" });
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'Invalid client id' });
     }
-  });
+
+    await storage.deleteClient(id);
+
+    await storage.createActivity({
+      userId: req.user.id,
+      type: 'client_deleted',
+      description: `Deleted client ID: ${id}`,
+      entityType: 'client',
+      entityId: id,
+    });
+
+    res.json({ message: 'Client deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    res.status(500).json({ message: 'Failed to delete client' });
+  }
+});
 
   // Load routes
   app.get('/api/loads', async (req, res) => {
