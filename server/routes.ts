@@ -436,6 +436,26 @@ ${message}
     }
   });
 
+  app.patch("/api/admin/users/:id/role", requireAuth, async (req: any, res) => {
+    try {
+      const requestingUser = req.user;
+      if (!requestingUser || (requestingUser.role !== "manager" && requestingUser.role !== "admin")) {
+        return res.status(403).json({ message: "Only managers and admins can update user roles" });
+      }
+      const { id } = req.params;
+      const { role } = req.body;
+      const validRoles = ["employee", "agent", "manager", "admin"];
+      if (!role || !validRoles.includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be one of: " + validRoles.join(", ") });
+      }
+      const updatedUser = await storage.updateUserProfile(id, { role });
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
   // Dashboard / Activities
   app.get("/api/dashboard/stats", requireAuth, async (_req: any, res) => {
     try {

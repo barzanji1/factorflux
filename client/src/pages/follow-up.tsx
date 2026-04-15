@@ -73,7 +73,7 @@ export default function FollowUpPage() {
   // Add follow-up mutation
   const addFollowUpMutation = useMutation({
     mutationFn: (data: z.infer<typeof followUpSchema>) =>
-      apiRequest("/api/follow-ups", "POST", data),
+      apiRequest("POST", "/api/follow-ups", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/follow-ups"] });
       form.reset();
@@ -95,7 +95,7 @@ export default function FollowUpPage() {
   // Update follow-up status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
-      apiRequest(`/api/follow-ups/${id}`, "PATCH", { status }),
+      apiRequest("PATCH", `/api/follow-ups/${id}`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/follow-ups"] });
       toast({
