@@ -45,17 +45,17 @@ export function TPFForm({ formId, viewId, className = '', title }: TPFFormProps)
                   formElements.addClass('form-control');
                   
                   // Style form inputs with Tailwind classes
-                  frmcont.find('input[type="text"], input[type="email"], input[type="tel"], textarea, select').each(function() {
+                  frmcont.find('input[type="text"], input[type="email"], input[type="tel"], textarea, select').each(function(this: any) {
                     $(this).addClass('w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white');
                   });
                   
                   // Style submit buttons
-                  frmcont.find('input[type="submit"], button[type="submit"]').each(function() {
+                  frmcont.find('input[type="submit"], button[type="submit"]').each(function(this: any) {
                     $(this).addClass('bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors');
                   });
                   
                   // Style labels
-                  frmcont.find('label').each(function() {
+                  frmcont.find('label').each(function(this: any) {
                     $(this).addClass('block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2');
                   });
                 }, 100);

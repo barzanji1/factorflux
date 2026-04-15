@@ -234,10 +234,11 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
 
   const showHomeButton = pagesWithHomeButton.some((page) => location.startsWith(page));
 
-  const fullName = `${authUser?.firstName || "Admin"} ${authUser?.lastName || "User"}`;
+  const authUserAny = authUser as any;
+  const fullName = `${authUserAny?.firstName || "Admin"} ${authUserAny?.lastName || "User"}`;
   const userRole = authUser?.role || "Employee";
   const avatarSrc =
-    authUser?.profileImageUrl ||
+    authUserAny?.profileImageUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=2563EB&color=fff`;
 
   return (

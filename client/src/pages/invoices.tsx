@@ -75,7 +75,7 @@ export default function Invoices() {
 
     const totalInvoices = allInvoices.length;
     const pendingInvoices = allInvoices.filter(
-      (invoice) => invoice.status === "pending" || invoice.status === "draft"
+      (invoice) => (invoice.status as string) === "pending" || invoice.status === "draft"
     ).length;
 
     const approvedInvoices = allInvoices.filter(

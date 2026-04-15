@@ -370,7 +370,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLoad(load: InsertLoad): Promise<Load> {
-    const [newLoad] = await db.insert(loads).values(load).returning();
+    const [newLoad] = await db.insert(loads).values(load as any).returning();
     return newLoad;
   }
 
@@ -661,7 +661,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createActivity(activity: InsertActivity): Promise<Activity> {
-    const [newActivity] = await db.insert(activities).values(activity).returning();
+    const [newActivity] = await db.insert(activities).values(activity as any).returning();
 
     if (this.shouldCreateNotification(activity.type)) {
       await this.createNotificationFromActivity(activity, newActivity);
@@ -899,7 +899,7 @@ export class DatabaseStorage implements IStorage {
         clockInTime: new Date(),
         status: "clocked_in",
         notes: notes || null,
-      })
+      } as any)
       .returning();
 
     await this.createActivity({
@@ -982,7 +982,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [newNotification] = await db.insert(notifications).values(notification).returning();
+    const [newNotification] = await db.insert(notifications).values(notification as any).returning();
     return newNotification;
   }
 
@@ -1033,7 +1033,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFollowUp(followUp: InsertFollowUp): Promise<FollowUp> {
-    const [newFollowUp] = await db.insert(followUps).values(followUp).returning();
+    const [newFollowUp] = await db.insert(followUps).values(followUp as any).returning();
     return newFollowUp;
   }
 
@@ -1129,7 +1129,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCollection(collection: InsertCollection): Promise<Collection> {
-    const [newCollection] = await db.insert(collections).values(collection).returning();
+    const [newCollection] = await db.insert(collections).values(collection as any).returning();
 
     await this.createActivity({
       userId: collection.assignedTo || "system",
@@ -1286,7 +1286,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createVaultEntry(entry: InsertClientVault): Promise<ClientVault> {
-    const [newEntry] = await db.insert(clientVault).values(entry).returning();
+    const [newEntry] = await db.insert(clientVault).values(entry as any).returning();
 
     await this.createActivity({
       userId: entry.createdBy,

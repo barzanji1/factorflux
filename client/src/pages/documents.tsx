@@ -164,11 +164,11 @@ export default function Documents() {
       case "lumper_receipt":
         return documents.filter((doc) => doc.documentType === "lumper_receipt");
       case "fuel_receipt":
-        return documents.filter((doc) => doc.documentType === "fuel_receipt");
+        return documents.filter((doc) => (doc.documentType as string) === "fuel_receipt");
       case "driver_docs":
         return documents.filter(
           (doc) =>
-            doc.documentType === "driver_docs" ||
+            (doc.documentType as string) === "driver_docs" ||
             doc.documentType === "driver_id" ||
             doc.documentType === "carrier_setup"
         );

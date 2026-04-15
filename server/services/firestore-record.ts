@@ -1,3 +1,5 @@
+import { firestore as db } from "../firebase";
+
 export async function deleteClientMirror(clientId: number) {
   const clientIdStr = String(clientId);
 
