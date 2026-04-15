@@ -8,16 +8,18 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 
 import { storage } from "./storage";
-import { setupLocalAuth } from "./localAuth";
 import { firestore } from "./firebase";
-import { upsertClientMirror, addClientActivityLog } from "./services/firestore-records";
+import {
+  upsertClientMirror,
+  addClientActivityLog,
+} from "./services/firestore-records";
+import { deleteClientMirror } from "./services/firestore-record";
 import { db } from "./db";
 
 import {
   insertClientSchema,
   insertLoadSchema,
   insertInvoiceSchema,
-  insertDocumentSchema,
   insertFollowUpSchema,
   insertCollectionSchema,
   insertClientVaultSchema,
@@ -30,34 +32,28 @@ import {
   clients,
   brokers,
   fuelAdvances,
-  type Task,
-  type InsertTask,
-  type Broker,
-  type InsertBroker,
-  type FuelAdvance,
-  type InsertFuelAdvance
 } from "@shared/schema";
-// jsPDF removed for web deployment optimization
-import { sendDesktopInstallers, sendEmail } from "./emailService";
 
-// Configure multer for file uploads
+import { sendEmail } from "./emailService";
+
 const upload = multer({
-  dest: 'uploads/',
+  dest: "uploads/",
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 10 * 1024 * 1024,
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|pdf/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
     if (mimetype && extname) {
       return cb(null, true);
-    } else {
-      cb(new Error('Only PDF, JPEG, JPG, and PNG files are allowed'));
     }
+
+    cb(new Error("Only PDF, JPEG, JPG, and PNG files are allowed"));
   },
 });
+
 function sanitizeOriginalName(name: string) {
   return name
     .normalize("NFKC")
@@ -76,77 +72,69 @@ function buildDocumentMetadata(document: any) {
   };
 }
 
-// Helper function to get user ID - authentication removed
-function getUserId(req: any): string | null {
-  // Return default user ID since authentication is disabled
-  return "1";
-}
-
-// Helper function to get current user - authentication removed
-async function getCurrentUser(req: any): Promise<any> {
-  // Return default admin user since authentication is disabled
-  return { id: "1", firstName: "Admin", lastName: "User", role: "admin", email: "admin@tpf.com" };
-}
-
-// Production credentials with secure bcrypt hashes  
 const PRODUCTION_USERS = [
   {
     username: "agent1",
-    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla", // "tpf2025!"
+    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla",
     name: "Production Agent",
     role: "agent",
     id: "prod-1",
     firstName: "TPF",
-    lastName: "Agent"
+    lastName: "Agent",
   },
   {
-    username: "manager1", 
-    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla", // "tpf2025!"
+    username: "manager1",
+    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla",
     name: "Production Manager",
     role: "manager",
     id: "prod-2",
     firstName: "TPF",
-    lastName: "Manager"
+    lastName: "Manager",
   },
   {
     username: "admin1",
-    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla", // "tpf2025!"
-    name: "System Administrator", 
+    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla",
+    name: "System Administrator",
     role: "admin",
     id: "prod-3",
     firstName: "System",
-    lastName: "Admin"
-  }
+    lastName: "Admin",
+  },
 ];
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication endpoints
+  const requireAuth = (req: any, res: any, next: any) => {
+    const user = (req.session as any)?.user;
+    if (!user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    req.user = user;
+    next();
+  };
+
+  // Auth
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      
-      // Find user in production credentials
-      const user = PRODUCTION_USERS.find(u => u.username === username);
-      
+      const user = PRODUCTION_USERS.find((u) => u.username === username);
+
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
-      
-      // Verify password with bcrypt
+
       const isValid = await bcrypt.compare(password, user.password);
-      
+
       if (!isValid) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
-      
-      // Store in session
+
       (req.session as any).user = {
         id: user.id,
         username: user.username,
         name: user.name,
-        role: user.role
+        role: user.role,
       };
-      
+
       res.json({
         success: true,
         user: {
@@ -155,8 +143,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           role: user.role,
           firstName: user.firstName,
-          lastName: user.lastName
-        }
+          lastName: user.lastName,
+        },
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -167,10 +155,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/verify", (req, res) => {
     const user = (req.session as any)?.user;
     if (user) {
-      res.json({ user });
-    } else {
-      res.status(401).json({ message: "Not authenticated" });
+      return res.json({ user });
     }
+    return res.status(401).json({ message: "Not authenticated" });
   });
 
   app.post("/api/auth/logout", (req, res) => {
@@ -182,6 +169,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Logged out successfully" });
     });
   });
+
+  app.get("/api/auth/user", requireAuth, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   app.get("/api/firebase-test", async (_req, res) => {
     try {
       const testRef = firestore.collection("test").doc("ping");
@@ -192,71 +196,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const snap = await testRef.get();
-
       return res.json(snap.data());
     } catch (err) {
       console.error("Firebase test failed:", err);
       return res.status(500).json({ error: "Firebase failed" });
     }
   });
-  // Middleware to check authentication for protected routes
-  const requireAuth = (req: any, res: any, next: any) => {
-    console.log("RequireAuth middleware - session:", !!req.session, "user:", !!(req.session as any)?.user);
-    const user = (req.session as any)?.user;
-    if (!user) {
-      console.log("Authentication required - no user in session");
-      return res.status(401).json({ message: "Authentication required" });
-    }
-    req.user = user;
-    console.log("Authentication successful - user ID:", user.id);
-    next();
-  };
-  app.get('/api/auth/user', requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Don't send password in response
-      const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
 
-  // Profile routes
-  app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
+  // Profile
+  app.patch("/api/user/profile", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.id; // Use authenticated user ID
-
-      const updates = req.body;
-      
-      // Validate input
       const validUpdates = [
-        'firstName', 'lastName', 'phone', 'jobTitle', 'department',
-        'bio', 'location', 'timezone', 'language',
-        'emailNotifications', 'smsNotifications', 'desktopNotifications',
-        'startTime', 'endTime', 'workDays',
-        'theme', 'dateFormat', 'timeFormat'
+        "firstName",
+        "lastName",
+        "phone",
+        "jobTitle",
+        "department",
+        "bio",
+        "location",
+        "timezone",
+        "language",
+        "emailNotifications",
+        "smsNotifications",
+        "desktopNotifications",
+        "startTime",
+        "endTime",
+        "workDays",
+        "theme",
+        "dateFormat",
+        "timeFormat",
       ];
-      const filteredUpdates = Object.keys(updates)
-        .filter(key => validUpdates.includes(key))
+
+      const filteredUpdates = Object.keys(req.body)
+        .filter((key) => validUpdates.includes(key))
         .reduce((obj: any, key) => {
-          obj[key] = updates[key];
+          obj[key] = req.body[key];
           return obj;
         }, {});
 
-      await storage.updateUserProfile(userId, filteredUpdates);
-      
-      // Return a simple success message instead of trying to fetch updated user
-      res.json({ 
+      await storage.updateUserProfile(req.user.id, filteredUpdates);
+
+      res.json({
         message: "Profile updated successfully",
-        success: true 
+        success: true,
       });
     } catch (error) {
       console.error("Error updating user profile:", error);
@@ -264,166 +246,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-        app.post("/api/support/contact", async (req, res) => {
-          try {
-            const contactSchema = z.object({
-              name: z.string().trim().min(1, "Name is required"),
-              email: z.string().trim().email("Valid email is required"),
-              subject: z.string().trim().min(1, "Subject is required"),
-              message: z.string().trim().min(1, "Message is required"),
-            });
-
-            const { name, email, subject, message } = contactSchema.parse(req.body);
-
-            const supportEmail = "dosh@truckingprosfinancial.com";
-            const senderEmail = "doshbarzanji@gmail.com";
-
-            const html = `
-              <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
-                <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
-
-                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
-                  <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
-                  <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
-                  <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
-                </div>
-
-                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
-                  <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
-                  <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
-                </div>
-              </div>
-            `;
-
-            const text = `
-        New FactorFlux Help Message
-
-        Name: ${name}
-        Email: ${email}
-        Subject: ${subject}
-
-        Message:
-        ${message}
-            `.trim();
-
-            const sent = await sendEmail({
-              to: supportEmail,
-              from: senderEmail,
-              subject: `[FactorFlux Help] ${subject} - ${email}`,
-              text,
-              html,
-            });
-
-            if (!sent) {
-              return res.status(500).json({
-                error: "Message could not be sent right now.",
-              });
-            }
-
-            res.status(200).json({
-              success: true,
-              message: "Message sent successfully.",
-            });
-          } catch (error) {
-            if (error instanceof z.ZodError) {
-              return res.status(400).json({
-                error: error.errors[0]?.message || "Invalid form data.",
-              });
-            }
-
-            console.error("Contact support route error:", error);
-            res.status(500).json({
-              error: "Failed to send message.",
-            });
-          }
-        });
-
-  // Admin routes - Role management
-  app.get('/api/admin/users', async (req: any, res) => {
+  app.post("/api/user/profile-image", upload.single("profileImage"), async (req: any, res) => {
     try {
-      // Authentication removed - admin access enabled by default
-      const currentUser = { id: "1", role: "admin" };
+      const userId = "1";
 
-      const users = await storage.getAllUsers();
-      res.json(users);
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      const profileImageUrl = `/uploads/${req.file.filename}`;
+
+      await storage.updateUserProfile(userId, { profileImageUrl });
+      const updatedUser = await storage.getUser(userId);
+
+      res.json({
+        message: "Profile image updated successfully",
+        user: updatedUser,
+      });
     } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
+      console.error("Error uploading profile image:", error);
+      res.status(500).json({ message: "Failed to upload profile image" });
     }
   });
 
- 
-  
- 
-    // Profile routes
-    app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
-      try {
-        const userId = req.user.id;
+  // Support
+  app.post("/api/support/contact", async (req, res) => {
+    try {
+      const contactSchema = z.object({
+        name: z.string().trim().min(1, "Name is required"),
+        email: z.string().trim().email("Valid email is required"),
+        subject: z.string().trim().min(1, "Subject is required"),
+        message: z.string().trim().min(1, "Message is required"),
+      });
 
-        const updates = req.body;
+      const { name, email, subject, message } = contactSchema.parse(req.body);
 
-        const validUpdates = [
-          'firstName', 'lastName', 'phone', 'jobTitle', 'department',
-          'bio', 'location', 'timezone', 'language',
-          'emailNotifications', 'smsNotifications', 'desktopNotifications',
-          'startTime', 'endTime', 'workDays',
-          'theme', 'dateFormat', 'timeFormat'
-        ];
+      const supportEmail = "dosh@truckingprosfinancial.com";
+      const senderEmail = "doshbarzanji@gmail.com";
 
-        const filteredUpdates = Object.keys(updates)
-          .filter((key) => validUpdates.includes(key))
-          .reduce((obj: any, key) => {
-            obj[key] = updates[key];
-            return obj;
-          }, {});
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
+          <h2 style="margin-bottom: 16px; color: #111827;">New FactorFlux Help Message</h2>
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+            <p style="margin: 0 0 8px;"><strong>Name:</strong> ${name}</p>
+            <p style="margin: 0 0 8px;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 0 0 8px;"><strong>Subject:</strong> ${subject}</p>
+          </div>
+          <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
+            <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
+            <p style="white-space: pre-wrap; margin: 0; color: #374151;">${message}</p>
+          </div>
+        </div>
+      `;
 
-        await storage.updateUserProfile(userId, filteredUpdates);
+      const text = `
+New FactorFlux Help Message
 
-        res.json({
-          message: "Profile updated successfully",
-          success: true
+Name: ${name}
+Email: ${email}
+Subject: ${subject}
+
+Message:
+${message}
+      `.trim();
+
+      const sent = await sendEmail({
+        to: supportEmail,
+        from: senderEmail,
+        subject: `[FactorFlux Help] ${subject} - ${email}`,
+        text,
+        html,
+      });
+
+      if (!sent) {
+        return res.status(500).json({
+          error: "Message could not be sent right now.",
         });
-      } catch (error) {
-        console.error("Error updating user profile:", error);
-        res.status(500).json({ message: "Failed to update profile" });
       }
-    });
 
-    app.post('/api/user/profile-image', upload.single('profileImage'), async (req: any, res) => {
-      try {
-        const userId = "1";
-
-        if (!req.file) {
-          return res.status(400).json({ message: "No image file provided" });
-        }
-
-        const profileImageUrl = `/uploads/${req.file.filename}`;
-
-        await storage.updateUserProfile(userId, { profileImageUrl });
-        const updatedUser = await storage.getUser(userId);
-
-        res.json({
-          message: "Profile image updated successfully",
-          user: updatedUser
+      res.status(200).json({
+        success: true,
+        message: "Message sent successfully.",
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: error.errors[0]?.message || "Invalid form data.",
         });
-      } catch (error) {
-        console.error("Error uploading profile image:", error);
-        res.status(500).json({ message: "Failed to upload profile image" });
       }
-    });
 
-    // Admin routes - Role management
-    app.get('/api/admin/users', async (req: any, res) => {
-      try {
-        const users = await storage.getAllUsers();
-        res.json(users);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        res.status(500).json({ message: "Failed to fetch users" });
-      }
-    });
-  
-  // Profile 
+      console.error("Contact support route error:", error);
+      res.status(500).json({
+        error: "Failed to send message.",
+      });
+    }
+  });
+
   app.post("/api/support/messages", async (req, res) => {
     try {
       const contactSchema = z.object({
@@ -461,14 +379,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `;
 
       const text = `
-  New FactorFlux Help Message
+New FactorFlux Help Message
 
-  Name: ${name}
-  Email: ${email}
-  Subject: ${subject}
+Name: ${name}
+Email: ${email}
+Subject: ${subject}
 
-  Message:
-  ${message}
+Message:
+${message}
       `.trim();
 
       await sendEmail({
@@ -507,107 +425,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-    // Dashboard routes
-    app.get('/api/dashboard/stats', async (req, res) => {
-      try {
-        const stats = await storage.getDashboardStats();
-        res.json(stats);
-      } catch (error) {
-        console.error("Error fetching dashboard stats:", error);
-        res.status(500).json({ message: "Failed to fetch dashboard statistics" });
-      }
-    });
-
-    app.get('/api/dashboard/recent-activities', async (req, res) => {
-      try {
-        const activities = await storage.getActivities(10);
-        res.json(activities);
-      } catch (error) {
-        console.error("Error fetching recent activities:", error);
-        res.status(500).json({ message: "Failed to fetch recent activities" });
-      }
-    });
-
-    // All activities endpoint
-    app.get('/api/activities', async (req, res) => {
-      try {
-        const activities = await storage.getActivities();
-        res.json(activities);
-      } catch (error) {
-        console.error("Error fetching all activities:", error);
-        res.status(500).json({ message: "Failed to fetch activities" });
-      }
-    });
-
-    // Clear all activities endpoint
-    app.delete('/api/activities', requireAuth, async (req: any, res) => {
-      try {
-        await storage.clearActivities();
-
-        await storage.createActivity({
-          userId: req.user.id,
-          type: "activities_reset",
-          entityType: "system",
-          entityId: 0,
-          description: "Reset all recent activity history",
-        });
-
-        res.json({ message: "Activities cleared successfully" });
-      } catch (error) {
-        console.error("Error clearing activities:", error);
-        res.status(500).json({ message: "Failed to clear activities" });
-      }
-    });
-
-    // Document routes
-    app.get('/api/documents', async (req, res) => {
-      try {
-        const { load, invoice, entityType, entityId } = req.query;
-        let documents;
-
-        if (entityType && entityId) {
-          documents = await storage.getDocumentsByEntity(
-            entityType as string,
-            parseInt(entityId as string)
-          );
-        } else if (load) {
-          const loadId = parseInt(load as string);
-          documents = await storage.getDocumentsByLoad(loadId);
-        } else if (invoice) {
-          const invoiceId = parseInt(invoice as string);
-          documents = await storage.getDocumentsByInvoice(invoiceId);
-        } else {
-          documents = await storage.getDocuments();
-        }
-
-        res.json(documents);
-      } catch (error) {
-        console.error("Error fetching documents:", error);
-        res.status(500).json({ message: "Failed to fetch documents" });
-      }
-    });
-
-    app.get('/api/documents/:id', async (req, res) => {
-      try {
-        const id = parseInt(req.params.id);
-        const document = await storage.getDocument(id);
-
-        if (!document) {
-          return res.status(404).json({ message: "Document not found" });
-        }
-
-        res.json(document);
-      } catch (error) {
-        console.error("Error fetching document:", error);
-        res.status(500).json({ message: "Failed to fetch document" });
-      }
-    });
-
-    async function convertImageToPdf(inputPath: string, outputPath: string): Promise<void> {
-      throw new Error('PDF conversion temporarily unavailable');
+  // Admin
+  app.get("/api/admin/users", async (_req: any, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
     }
+  });
 
-  app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req: any, res) => {
+  // Dashboard / Activities
+  app.get("/api/dashboard/stats", async (_req, res) => {
+    try {
+      const stats = await storage.getDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard statistics" });
+    }
+  });
+
+  app.get("/api/dashboard/recent-activities", async (_req, res) => {
+    try {
+      const activities = await storage.getActivities(10);
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching recent activities:", error);
+      res.status(500).json({ message: "Failed to fetch recent activities" });
+    }
+  });
+
+  app.get("/api/activities", async (_req, res) => {
+    try {
+      const activities = await storage.getActivities();
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching all activities:", error);
+      res.status(500).json({ message: "Failed to fetch activities" });
+    }
+  });
+
+  app.delete("/api/activities", requireAuth, async (req: any, res) => {
+    try {
+      await storage.clearActivities();
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "activities_reset",
+        entityType: "system",
+        entityId: 0,
+        description: "Reset all recent activity history",
+      });
+
+      res.json({ message: "Activities cleared successfully" });
+    } catch (error) {
+      console.error("Error clearing activities:", error);
+      res.status(500).json({ message: "Failed to clear activities" });
+    }
+  });
+
+  // Documents
+  app.get("/api/documents", async (req, res) => {
+    try {
+      const { load, invoice, entityType, entityId } = req.query;
+      let documents;
+
+      if (entityType && entityId) {
+        documents = await storage.getDocumentsByEntity(
+          entityType as string,
+          parseInt(entityId as string, 10)
+        );
+      } else if (load) {
+        documents = await storage.getDocumentsByLoad(parseInt(load as string, 10));
+      } else if (invoice) {
+        documents = await storage.getDocumentsByInvoice(parseInt(invoice as string, 10));
+      } else {
+        documents = await storage.getDocuments();
+      }
+
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
+
+  app.get("/api/documents/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const document = await storage.getDocument(id);
+
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      res.json(document);
+    } catch (error) {
+      console.error("Error fetching document:", error);
+      res.status(500).json({ message: "Failed to fetch document" });
+    }
+  });
+
+  app.post("/api/documents/upload", requireAuth, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -615,311 +536,319 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { documentType, loadId, invoiceId, sourceChannel } = req.body;
 
-      const safeOriginalName = req.file.originalname
-        .normalize("NFKC")
-        .replace(/[^\w.\- ()]/g, "_");
+      const processedFilename = req.file.filename;
+      const processedMimeType = req.file.mimetype;
+      const processedOriginalName = sanitizeOriginalName(req.file.originalname);
+
+      if (req.file.mimetype.includes("jpeg") || req.file.mimetype.includes("jpg")) {
+        console.log("Image uploaded as-is (PDF conversion disabled for web deployment)");
+      }
 
       const documentData = {
         filename: processedFilename,
         originalName: processedOriginalName,
         mimeType: processedMimeType,
         size: req.file.size,
-        documentType: documentType || 'other',
-        loadId: loadId && loadId !== 'undefined' ? parseInt(loadId) : null,
-        invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId) : null,
+        documentType: documentType || "other",
+        loadId: loadId && loadId !== "undefined" ? parseInt(loadId, 10) : null,
+        invoiceId: invoiceId && invoiceId !== "undefined" ? parseInt(invoiceId, 10) : null,
         uploadedBy: req.user.id,
-        sourceChannel: sourceChannel || 'manual',
-        status: 'processing' as const,
+        sourceChannel: sourceChannel || "manual",
+        status: "processing" as const,
       };
 
       const document = await storage.createDocument(documentData);
 
-      // ✅ CRITICAL FIX: add metadata for frontend
-        await storage.createActivity({
-          userId: req.user.id,
-          type: 'document_uploaded',
-          description: `Uploaded document: ${document.originalName}`,
-          entityType: 'document',
-          entityId: document.id,
-          metadata: {
-            documentId: document.id,
-            filePath: `/api/documents/${document.id}/view`,
-            downloadPath: `/api/documents/${document.id}/download`,
-            originalName: document.originalName,
-            mimeType: document.mimeType,
-          },
-        });
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "document_uploaded",
+        description: `Uploaded document: ${document.originalName}`,
+        entityType: "document",
+        entityId: document.id,
+        metadata: buildDocumentMetadata(document),
+      });
 
-      // simulate processing
       setTimeout(async () => {
         try {
-          await storage.updateDocument(document.id, { status: 'processed' });
+          await storage.updateDocument(document.id, { status: "processed" });
         } catch (error) {
           console.error("Error updating document status:", error);
         }
-      }, 1500);
+      }, 2000);
 
-      // ✅ also return URLs immediately
       res.status(201).json({
         ...document,
-        filePath: `/api/documents/${document.id}/view`,
-        downloadPath: `/api/documents/${document.id}/download`,
+        ...buildDocumentMetadata(document),
       });
-
     } catch (error) {
       console.error("Error uploading document:", error);
       res.status(500).json({ message: "Failed to upload document" });
     }
   });
 
-    app.delete('/api/documents/:id', requireAuth, async (req: any, res) => {
-      try {
-        const id = parseInt(req.params.id);
+  app.delete("/api/documents/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
 
-        if (isNaN(id)) {
-          return res.status(400).json({ message: "Invalid document ID" });
-        }
-
-        const document = await storage.getDocument(id);
-
-        if (!document) {
-          return res.status(404).json({ message: "Document not found" });
-        }
-
-        await storage.deleteDocument(id);
-
-        try {
-          const filePath = path.join('uploads', document.filename);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (fileError) {
-          console.warn("Could not delete physical file:", fileError);
-        }
-
-        await storage.createActivity({
-          userId: req.user.id,
-          type: 'document_deleted',
-          description: `Deleted document: ${document.originalName}`,
-          entityType: 'document',
-          entityId: document.id,
-        });
-
-        res.json({ message: "Document deleted successfully" });
-      } catch (error) {
-        console.error("Error deleting document:", error);
-        res.status(500).json({ message: "Failed to delete document" });
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid document ID" });
       }
-    });
 
-    // Document download/view routes
-    app.get('/api/documents/:id/download', async (req, res) => {
+      const document = await storage.getDocument(id);
+
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      await storage.deleteDocument(id);
+
       try {
-        const id = parseInt(req.params.id);
-        const document = await storage.getDocument(id);
-
-        if (!document) {
-          return res.status(404).json({ message: "Document not found" });
+        const filePath = path.join("uploads", document.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
         }
+      } catch (fileError) {
+        console.warn("Could not delete physical file:", fileError);
+      }
 
-        let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "document_deleted",
+        description: `Deleted document: ${document.originalName}`,
+        entityType: "document",
+        entityId: document.id,
+      });
+
+      res.json({ message: "Document deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
+  app.get("/api/documents/:id/download", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const document = await storage.getDocument(id);
+
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      let filePath = path.resolve(process.cwd(), "uploads", document.filename);
+      if (!fs.existsSync(filePath)) {
+        filePath = path.resolve(process.cwd(), "uploads", `${document.filename}.pdf`);
         if (!fs.existsSync(filePath)) {
-          filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
-          if (!fs.existsSync(filePath)) {
-            console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
-            return res.status(404).json({ message: "File not found on disk" });
-          }
+          return res.status(404).json({ message: "File not found on disk" });
         }
-
-        const stats = fs.statSync(filePath);
-
-        res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
-        res.setHeader('Content-Length', stats.size.toString());
-        res.setHeader('Cache-Control', 'no-cache');
-
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.on('error', (error) => {
-          console.error('Error streaming file:', error);
-          if (!res.headersSent) {
-            res.status(500).json({ message: 'Error streaming file' });
-          }
-        });
-        fileStream.pipe(res);
-      } catch (error) {
-        console.error("Error downloading document:", error);
-        res.status(500).json({ message: "Failed to download document" });
       }
-    });
 
-    app.get('/api/documents/:id/view', async (req, res) => {
-      try {
-        const id = parseInt(req.params.id);
-        const document = await storage.getDocument(id);
+      const stats = fs.statSync(filePath);
 
-        if (!document) {
-          return res.status(404).json({ message: "Document not found" });
+      res.setHeader("Content-Type", document.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${document.originalName}"`);
+      res.setHeader("Content-Length", stats.size.toString());
+      res.setHeader("Cache-Control", "no-cache");
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.on("error", (error) => {
+        console.error("Error streaming file:", error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Error streaming file" });
         }
+      });
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      res.status(500).json({ message: "Failed to download document" });
+    }
+  });
 
-        let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
+  app.get("/api/documents/:id/view", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const document = await storage.getDocument(id);
+
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      let filePath = path.resolve(process.cwd(), "uploads", document.filename);
+      if (!fs.existsSync(filePath)) {
+        filePath = path.resolve(process.cwd(), "uploads", `${document.filename}.pdf`);
         if (!fs.existsSync(filePath)) {
-          filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
-          if (!fs.existsSync(filePath)) {
-            console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
-            return res.status(404).json({ message: "File not found on disk" });
-          }
+          return res.status(404).json({ message: "File not found on disk" });
         }
-
-        res.setHeader('Content-Type', document.mimeType);
-        res.setHeader('Content-Disposition', `inline; filename="${document.originalName}"`);
-
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.pipe(res);
-      } catch (error) {
-        console.error("Error viewing document:", error);
-        res.status(500).json({ message: "Failed to view document" });
       }
-    });
 
-// Client routes
-app.get('/api/clients', async (req, res) => {
-  try {
-    const clients = await storage.getClients();
-    res.json(clients);
-  } catch (error) {
-    console.error('Error fetching clients:', error);
-    res.status(500).json({ message: 'Failed to fetch clients' });
-  }
-});
+      res.setHeader("Content-Type", document.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${document.originalName}"`);
 
-app.get('/api/clients/search', async (req, res) => {
-  try {
-    const { q } = req.query;
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.on("error", (error) => {
+        console.error("Error streaming file:", error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Error streaming file" });
+        }
+      });
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error viewing document:", error);
+      res.status(500).json({ message: "Failed to view document" });
+    }
+  });
 
-    if (!q || typeof q !== 'string') {
-      return res.status(400).json({ message: 'Search query is required' });
+  // Clients
+  app.get("/api/clients", async (_req, res) => {
+    try {
+      const allClients = await storage.getClients();
+      res.json(allClients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ message: "Failed to fetch clients" });
+    }
+  });
+
+  app.get("/api/clients/search", async (req, res) => {
+    try {
+      const { q } = req.query;
+
+      if (!q || typeof q !== "string") {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+
+      const results = await storage.searchClients(q);
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching clients:", error);
+      res.status(500).json({ message: "Failed to search clients" });
+    }
+  });
+
+  app.post("/api/clients", requireAuth, async (req: any, res) => {
+    try {
+      const clientData = insertClientSchema.parse(req.body);
+      const client = await storage.createClient(clientData);
+
+      await upsertClientMirror(client);
+
+      await addClientActivityLog(client.id, {
+        type: "client_created",
+        message: `Client ${client.name} was created`,
+      });
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "client_created",
+        description: `Created new client: ${client.name}`,
+        entityType: "client",
+        entityId: client.id,
+      });
+
+      res.status(201).json(client);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid client data",
+          errors: error.errors,
+        });
+      }
+
+      console.error("Error creating client:", error);
+      res.status(500).json({ message: "Failed to create client" });
+    }
+  });
+
+  app.get("/api/firebase-clients", async (_req: any, res) => {
+    try {
+      const snap = await firestore.collection("clients").get();
+      const data = snap.docs.map((doc) => doc.data());
+      res.json(data);
+    } catch (error) {
+      console.error("Failed to fetch firebase clients:", error);
+      res.status(500).json({ error: "Failed to fetch firebase clients" });
+    }
+  });
+
+  app.put("/api/clients/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid client id" });
+      }
+
+      const clientData = insertClientSchema.partial().parse(req.body);
+      const client = await storage.updateClient(id, clientData);
+
+      await upsertClientMirror(client);
+
+      await addClientActivityLog(client.id, {
+        type: "client_updated",
+        message: `Client ${client.name} was updated`,
+      });
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "client_updated",
+        description: `Updated client: ${client.name}`,
+        entityType: "client",
+        entityId: client.id,
+      });
+
+      res.json(client);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid client data",
+          errors: error.errors,
+        });
+      }
+
+      console.error("Error updating client:", error);
+      res.status(500).json({ message: "Failed to update client" });
+    }
+  });
+
+  app.delete("/api/clients/:id", requireAuth, async (req: any, res) => {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ message: "Invalid client id" });
     }
 
-    const clients = await storage.searchClients(q);
-    res.json(clients);
-  } catch (error) {
-    console.error('Error searching clients:', error);
-    res.status(500).json({ message: 'Failed to search clients' });
-  }
-});
+    try {
+      console.log(`[DELETE CLIENT] route hit for id=${id}`);
 
-app.post('/api/clients', requireAuth, async (req: any, res) => {
-  try {
-    const clientData = insertClientSchema.parse(req.body);
-    const client = await storage.createClient(clientData);
+      await storage.deleteClient(id);
+      console.log(`[DELETE CLIENT] Postgres delete complete for id=${id}`);
 
-    await upsertClientMirror(client);
+      const firestoreDeleted = await deleteClientMirror(id);
+      console.log(`[DELETE CLIENT] Firestore delete result for id=${id}:`, firestoreDeleted);
 
-    await addClientActivityLog(client.id, {
-      type: 'client_created',
-      message: `Client ${client.name} was created`,
-    });
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "client_deleted",
+        description: `Deleted client ID: ${id}`,
+        entityType: "client",
+        entityId: id,
+      });
 
-    await storage.createActivity({
-      userId: req.user.id,
-      type: 'client_created',
-      description: `Created new client: ${client.name}`,
-      entityType: 'client',
-      entityId: client.id,
-    });
-
-    res.status(201).json(client);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        message: 'Invalid client data',
-        errors: error.errors,
+      return res.json({
+        message: "Client deleted successfully",
+        firestoreDeleted,
+      });
+    } catch (error) {
+      console.error(`[DELETE CLIENT] failed for id=${id}:`, error);
+      return res.status(500).json({
+        message: "Failed to delete client",
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
+  });
 
-    console.error('Error creating client:', error);
-    res.status(500).json({ message: 'Failed to create client' });
-  }
-});
-
-app.get('/api/firebase-clients', async (_req: any, res) => {
-  try {
-    const snap = await firestore.collection('clients').get();
-    const data = snap.docs.map((doc) => doc.data());
-    res.json(data);
-  } catch (error) {
-    console.error('Failed to fetch firebase clients:', error);
-    res.status(500).json({ error: 'Failed to fetch firebase clients' });
-  }
-});
-
-app.put('/api/clients/:id', requireAuth, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-
-    if (Number.isNaN(id)) {
-      return res.status(400).json({ message: 'Invalid client id' });
-    }
-
-    const clientData = insertClientSchema.partial().parse(req.body);
-    const client = await storage.updateClient(id, clientData);
-
-    await upsertClientMirror(client);
-
-    await addClientActivityLog(client.id, {
-      type: 'client_updated',
-      message: `Client ${client.name} was updated`,
-    });
-
-    await storage.createActivity({
-      userId: req.user.id,
-      type: 'client_updated',
-      description: `Updated client: ${client.name}`,
-      entityType: 'client',
-      entityId: client.id,
-    });
-
-    res.json(client);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        message: 'Invalid client data',
-        errors: error.errors,
-      });
-    }
-
-    console.error('Error updating client:', error);
-    res.status(500).json({ message: 'Failed to update client' });
-  }
-});
-
-app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-
-    if (Number.isNaN(id)) {
-      return res.status(400).json({ message: 'Invalid client id' });
-    }
-
-    await storage.deleteClient(id);
-
-    await storage.createActivity({
-      userId: req.user.id,
-      type: 'client_deleted',
-      description: `Deleted client ID: ${id}`,
-      entityType: 'client',
-      entityId: id,
-    });
-
-    res.json({ message: 'Client deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting client:', error);
-    res.status(500).json({ message: 'Failed to delete client' });
-  }
-});
-
-  // Load routes
-  app.get('/api/loads', async (req, res) => {
+  // Loads
+  app.get("/api/loads", async (_req, res) => {
     try {
       const loads = await storage.getLoads();
       res.json(loads);
@@ -929,17 +858,16 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.post('/api/loads', async (req: any, res) => {
+  app.post("/api/loads", requireAuth, async (req: any, res) => {
     try {
       const loadData = insertLoadSchema.parse(req.body);
       const load = await storage.createLoad(loadData);
-      
-      // Log activity
+
       await storage.createActivity({
         userId: req.user.id,
-        type: 'load_created',
+        type: "load_created",
         description: `Created new load: ${load.loadNumber}`,
-        entityType: 'load',
+        entityType: "load",
         entityId: load.id,
       });
 
@@ -953,27 +881,52 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  // Invoice routes
-  app.put('/api/invoices/:id', requireAuth, async (req: any, res) => {
+  // Invoices
+  app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const user = req.user;
+      const invoiceData = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice({
+        ...invoiceData,
+        loadId: null,
+        submittedBy: req.user.id,
+        submittedAt: new Date(),
+      });
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "invoice_created",
+        description: `Created invoice: ${invoice.invoiceNumber}`,
+        entityType: "invoice",
+        entityId: invoice.id,
+      });
+
+      res.status(201).json(invoice);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      }
+      console.error("Error creating invoice:", error);
+      res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+
+  app.put("/api/invoices/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
       const invoiceData = insertInvoiceSchema.partial().parse(req.body);
+      const user = req.user;
 
       const updatePayload: any = {
         ...invoiceData,
         updatedAt: new Date(),
       };
 
-      if (
-        invoiceData.status === 'approved' &&
-        (user?.role === 'manager' || user?.role === 'admin')
-      ) {
+      if (invoiceData.status === "approved" && (user?.role === "manager" || user?.role === "admin")) {
         updatePayload.approvedBy = req.user.id;
         updatePayload.approvedAt = new Date();
       }
 
-      if (invoiceData.status === 'submitted') {
+      if (invoiceData.status === "submitted") {
         updatePayload.submittedAt = new Date();
       }
 
@@ -981,9 +934,9 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
 
       await storage.createActivity({
         userId: req.user.id,
-        type: 'invoice_updated',
+        type: "invoice_updated",
         description: `Updated invoice: ${invoice.invoiceNumber}`,
-        entityType: 'invoice',
+        entityType: "invoice",
         entityId: invoice.id,
       });
 
@@ -997,10 +950,39 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.get('/api/invoices/search', async (req, res) => {
+  app.put("/api/invoices/:id/approve", requireAuth, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user?.role !== "manager" && user?.role !== "admin") {
+        return res.status(403).json({ message: "Only managers and admins can approve invoices" });
+      }
+
+      const id = parseInt(req.params.id, 10);
+      const invoice = await storage.updateInvoice(id, {
+        status: "approved",
+        approvedBy: req.user.id,
+        approvedAt: new Date(),
+      });
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "invoice_approved",
+        description: `Approved invoice: ${invoice.invoiceNumber}`,
+        entityType: "invoice",
+        entityId: invoice.id,
+      });
+
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error approving invoice:", error);
+      res.status(500).json({ message: "Failed to approve invoice" });
+    }
+  });
+
+  app.get("/api/invoices/search", async (req, res) => {
     try {
       const { q } = req.query;
-      if (!q || typeof q !== 'string') {
+      if (!q || typeof q !== "string") {
         return res.status(400).json({ message: "Search query is required" });
       }
       const invoices = await storage.searchInvoices(q);
@@ -1011,24 +993,24 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  // Global search endpoint
-  app.get('/api/search', async (req, res) => {
+  // Search
+  app.get("/api/search", async (req, res) => {
     try {
       const { q } = req.query;
-      if (!q || typeof q !== 'string') {
+      if (!q || typeof q !== "string") {
         return res.status(400).json({ message: "Search query is required" });
       }
-      
-      const [clients, invoices, loads] = await Promise.all([
+
+      const [clientResults, invoiceResults, loadResults] = await Promise.all([
         storage.searchClients(q),
         storage.searchInvoices(q),
-        storage.searchLoads(q)
+        storage.searchLoads(q),
       ]);
-      
+
       res.json({
-        clients,
-        invoices,
-        loads
+        clients: clientResults,
+        invoices: invoiceResults,
+        loads: loadResults,
       });
     } catch (error) {
       console.error("Error performing global search:", error);
@@ -1036,8 +1018,8 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  // Fuel card application routes
-  app.get('/api/fuel-card-applications', async (req, res) => {
+  // Fuel card applications
+  app.get("/api/fuel-card-applications", async (_req, res) => {
     try {
       const applications = await storage.getFuelCardApplications();
       res.json(applications);
@@ -1047,7 +1029,7 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.post('/api/fuel-card-applications', async (req, res) => {
+  app.post("/api/fuel-card-applications", async (req, res) => {
     try {
       const userId = (req as any).user?.claims?.sub;
       if (!userId) {
@@ -1056,8 +1038,7 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
 
       const applicationData = { ...req.body, submittedBy: userId };
       const application = await storage.createFuelCardApplication(applicationData);
-      
-      // Log activity
+
       await storage.createActivity({
         userId,
         type: "fuel_card_application",
@@ -1073,26 +1054,23 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.patch('/api/fuel-card-applications/:id', async (req, res) => {
+  app.patch("/api/fuel-card-applications/:id", async (req, res) => {
     try {
       const userId = (req as any).user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       const { status, notes } = req.body;
 
-      const updateData = {
+      const application = await storage.updateFuelCardApplication(id, {
         status,
         notes,
         reviewedBy: userId,
         reviewedAt: new Date(),
-      };
+      });
 
-      const application = await storage.updateFuelCardApplication(id, updateData);
-      
-      // Log activity
       await storage.createActivity({
         userId,
         type: "fuel_card_review",
@@ -1108,283 +1086,19 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.post('/api/invoices', requireAuth, async (req: any, res) => {
+  // Time tracking
+  app.get("/api/time-tracking/status", requireAuth, async (req: any, res) => {
     try {
-      const invoiceData = insertInvoiceSchema.parse(req.body);
-      const invoice = await storage.createInvoice({
-        ...invoiceData,
-        loadId: null,
-        submittedBy: req.user.id,
-        submittedAt: new Date(),
-      });
-      
-      // Log activity
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'invoice_created',
-        description: `Created invoice: ${invoice.invoiceNumber}`,
-        entityType: 'invoice',
-        entityId: invoice.id,
-      });
+      const currentEntry = await storage.getCurrentTimeEntry(req.user.id);
+      const todayEntries = await storage.getTodayTimeEntries(req.user.id);
 
-      res.status(201).json(invoice);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
-      }
-      console.error("Error creating invoice:", error);
-      res.status(500).json({ message: "Failed to create invoice" });
-    }
-  });
-
-  // Document routes
-  app.get('/api/documents', async (req, res) => {
-    try {
-      const { load, invoice, entityType, entityId } = req.query;
-      let documents;
-      
-      if (entityType && entityId) {
-        documents = await storage.getDocumentsByEntity(
-          entityType as string, 
-          parseInt(entityId as string)
-        );
-      } else if (load) {
-        const loadId = parseInt(load as string);
-        documents = await storage.getDocumentsByLoad(loadId);
-      } else if (invoice) {
-        const invoiceId = parseInt(invoice as string);
-        documents = await storage.getDocumentsByInvoice(invoiceId);
-      } else {
-        documents = await storage.getDocuments();
-      }
-      
-      res.json(documents);
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-      res.status(500).json({ message: "Failed to fetch documents" });
-    }
-  });
-
-  // Get single document by ID
-  app.get('/api/documents/:id', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const document = await storage.getDocument(id);
-      
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-      
-      res.json(document);
-    } catch (error) {
-      console.error("Error fetching document:", error);
-      res.status(500).json({ message: "Failed to fetch document" });
-    }
-  });
-
-  // PDF conversion temporarily disabled for web deployment optimization
-  // Will be re-enabled with server-side PDF processing in future version
-  async function convertImageToPdf(inputPath: string, outputPath: string): Promise<void> {
-    // Feature disabled - images will be kept as-is for now
-    throw new Error('PDF conversion temporarily unavailable');
-  }
-
-  app.post('/api/documents/upload', requireAuth, upload.single('file'), async (req: any, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const { documentType, loadId, invoiceId } = req.body;
-      let processedFilename = req.file.filename;
-      let processedMimeType = req.file.mimetype;
-      let processedOriginalName = req.file.originalname;
-
-      // PDF conversion temporarily disabled - keep original image format
-      // Future enhancement: server-side PDF processing
-      if (req.file.mimetype.includes('jpeg') || req.file.mimetype.includes('jpg')) {
-        // Keep original image for now
-        console.log('Image uploaded as-is (PDF conversion disabled for web deployment)');
-      }
-      
-      const documentData = {
-        filename: processedFilename,
-        originalName: processedOriginalName,
-        mimeType: processedMimeType,
-        size: req.file.size,
-        documentType: documentType || 'other',
-        loadId: loadId && loadId !== 'undefined' ? parseInt(loadId) : null,
-        invoiceId: invoiceId && invoiceId !== 'undefined' ? parseInt(invoiceId) : null,
-        uploadedBy: req.user.id,
-        status: 'processing' as const,
-      };
-
-      const document = await storage.createDocument(documentData);
-      
-      // Log activity
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'document_uploaded',
-        description: `Uploaded document: ${document.originalName}`,
-        entityType: 'document',
-        entityId: document.id,
-        metadata: {
-          documentId: document.id,
-          filePath: `/api/documents/${document.id}/view`,
-          downloadPath: `/api/documents/${document.id}/download`,
-          originalName: document.originalName,
-          mimeType: document.mimeType,
-        },
-      });
-
-      // Simulate document processing
-      setTimeout(async () => {
-        try {
-          await storage.updateDocument(document.id, { status: 'processed' });
-        } catch (error) {
-          console.error("Error updating document status:", error);
-        }
-      }, 2000);
-
-      res.status(201).json(document);
-    } catch (error) {
-      console.error("Error uploading document:", error);
-      res.status(500).json({ message: "Failed to upload document" });
-    }
-  });
-
-  app.delete('/api/documents/:id', requireAuth, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid document ID" });
-      }
-      
-      const document = await storage.getDocument(id);
-      
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-
-      // Delete the document from database
-      await storage.deleteDocument(id);
-      
-      // Try to delete the physical file (optional - don't fail if file doesn't exist)
-      try {
-        const filePath = path.join('uploads', document.filename);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (fileError) {
-        console.warn("Could not delete physical file:", fileError);
-        // Continue anyway - database record is more important
-      }
-      
-      // Log activity
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'document_deleted',
-        description: `Deleted document: ${document.originalName}`,
-        entityType: 'document',
-        entityId: document.id,
-      });
-
-      res.json({ message: "Document deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting document:", error);
-      res.status(500).json({ message: "Failed to delete document" });
-    }
-  });
-
-  // Document download/view routes
-  app.get('/api/documents/:id/download', async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const document = await storage.getDocument(id);
-      
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-
-      // Check for file with and without extension
-      let filePath = path.resolve(process.cwd(), 'uploads', document.filename);
-      if (!fs.existsSync(filePath)) {
-        // Try with .pdf extension for converted files
-        filePath = path.resolve(process.cwd(), 'uploads', document.filename + '.pdf');
-        if (!fs.existsSync(filePath)) {
-          console.error(`File not found: ${document.filename} or ${document.filename}.pdf`);
-          return res.status(404).json({ message: "File not found on disk" });
-        }
-      }
-
-      // Get file stats for Content-Length
-      const stats = fs.statSync(filePath);
-      
-      res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
-      res.setHeader('Content-Length', stats.size.toString());
-      res.setHeader('Cache-Control', 'no-cache');
-      
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.on('error', (error) => {
-        console.error('Error streaming file:', error);
-        if (!res.headersSent) {
-          res.status(500).json({ message: 'Error streaming file' });
-        }
-      });
-      fileStream.pipe(res);
-    } catch (error) {
-      console.error("Error downloading document:", error);
-      res.status(500).json({ message: "Failed to download document" });
-    }
-  });
-
-  // Manager-only routes
-  app.put('/api/invoices/:id/approve', async (req: any, res) => {
-    try {
-      const user = req.user;
-      if (user?.role !== 'manager' && user?.role !== 'admin') {
-        return res.status(403).json({ message: "Only managers and admins can approve invoices" });
-      }
-
-      const id = parseInt(req.params.id);
-      const invoice = await storage.updateInvoice(id, {
-        status: 'approved',
-        approvedBy: req.user.id,
-        approvedAt: new Date(),
-      });
-      
-      // Log activity
-      await storage.createActivity({
-        userId: req.user.id,
-        type: 'invoice_approved',
-        description: `Approved invoice: ${invoice.invoiceNumber}`,
-        entityType: 'invoice',
-        entityId: invoice.id,
-      });
-
-      res.json(invoice);
-    } catch (error) {
-      console.error("Error approving invoice:", error);
-      res.status(500).json({ message: "Failed to approve invoice" });
-    }
-  });
-
-  // Time tracking routes
-  app.get('/api/time-tracking/status', requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const currentEntry = await storage.getCurrentTimeEntry(userId);
-      const todayEntries = await storage.getTodayTimeEntries(userId);
-      
       res.json({
         isClocked: !!currentEntry,
         currentEntry,
         todayEntries,
         todayHours: todayEntries
-          .filter(entry => entry.status === 'clocked_out')
-          .reduce((total, entry) => total + parseFloat(entry.totalHours || '0'), 0),
+          .filter((entry) => entry.status === "clocked_out")
+          .reduce((total, entry) => total + parseFloat(entry.totalHours || "0"), 0),
       });
     } catch (error) {
       console.error("Error fetching time tracking status:", error);
@@ -1392,13 +1106,9 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.post('/api/time-tracking/clock-in', requireAuth, async (req: any, res) => {
+  app.post("/api/time-tracking/clock-in", requireAuth, async (req: any, res) => {
     try {
-      console.log("Clock-in request - user:", req.user);
-      const userId = req.user.id;
-      const { notes } = req.body;
-      
-      const timeEntry = await storage.clockIn(userId, notes);
+      const timeEntry = await storage.clockIn(req.user.id, req.body.notes);
       res.json(timeEntry);
     } catch (error) {
       console.error("Error clocking in:", error);
@@ -1406,12 +1116,9 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.post('/api/time-tracking/clock-out', requireAuth, async (req: any, res) => {
+  app.post("/api/time-tracking/clock-out", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.id;
-      const { notes } = req.body;
-      
-      const timeEntry = await storage.clockOut(userId, notes);
+      const timeEntry = await storage.clockOut(req.user.id, req.body.notes);
       res.json(timeEntry);
     } catch (error) {
       console.error("Error clocking out:", error);
@@ -1419,20 +1126,19 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.get('/api/time-tracking/entries', requireAuth, async (req: any, res) => {
+  app.get("/api/time-tracking/entries", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.id;
       const { period } = req.query;
-      
+
       let entries;
-      if (period === 'today') {
-        entries = await storage.getTodayTimeEntries(userId);
-      } else if (period === 'week') {
-        entries = await storage.getWeekTimeEntries(userId);
+      if (period === "today") {
+        entries = await storage.getTodayTimeEntries(req.user.id);
+      } else if (period === "week") {
+        entries = await storage.getWeekTimeEntries(req.user.id);
       } else {
-        entries = await storage.getTimeEntries(userId);
+        entries = await storage.getTimeEntries(req.user.id);
       }
-      
+
       res.json(entries);
     } catch (error) {
       console.error("Error fetching time entries:", error);
@@ -1440,11 +1146,11 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  // Notification routes
-  app.get('/api/notifications', async (req: any, res) => {
+  // Notifications
+  app.get("/api/notifications", async (req: any, res) => {
     try {
-      const userId = "1"; // Default user ID - authentication removed
-      const limit = parseInt(req.query.limit as string) || 20;
+      const userId = "1";
+      const limit = parseInt(req.query.limit as string, 10) || 20;
       const notifications = await storage.getNotifications(userId, limit);
       res.json(notifications);
     } catch (error) {
@@ -1453,10 +1159,9 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.get('/api/notifications/unread-count', async (req: any, res) => {
+  app.get("/api/notifications/unread-count", async (_req: any, res) => {
     try {
-      const userId = "1"; // Default user ID - authentication removed
-      const count = await storage.getUnreadNotificationCount(userId);
+      const count = await storage.getUnreadNotificationCount("1");
       res.json({ count });
     } catch (error) {
       console.error("Error fetching unread notification count:", error);
@@ -1464,9 +1169,9 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.patch('/api/notifications/:id/read', async (req: any, res) => {
+  app.patch("/api/notifications/:id/read", async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       await storage.markNotificationAsRead(id);
       res.json({ message: "Notification marked as read" });
     } catch (error) {
@@ -1475,10 +1180,9 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.patch('/api/notifications/mark-all-read', async (req: any, res) => {
+  app.patch("/api/notifications/mark-all-read", async (_req: any, res) => {
     try {
-      const userId = "1"; // Default user ID - authentication removed
-      await storage.markAllNotificationsAsRead(userId);
+      await storage.markAllNotificationsAsRead("1");
       res.json({ message: "All notifications marked as read" });
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
@@ -1486,27 +1190,27 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  // Desktop installer download routes - Direct download links
-  app.get('/api/desktop/download/windows', async (req, res) => {
+  // Desktop downloads
+  app.get("/api/desktop/download/windows", async (_req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Windows-Portable.tar.gz');
-      
+      const filePath = path.resolve(process.cwd(), "electron-dist", "FactorFlux-Windows-Portable.tar.gz");
+
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Windows installer not found" });
       }
 
       const stats = fs.statSync(filePath);
-      
-      res.setHeader('Content-Type', 'application/gzip');
-      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Windows-Portable.tar.gz"');
-      res.setHeader('Content-Length', stats.size.toString());
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      
+
+      res.setHeader("Content-Type", "application/gzip");
+      res.setHeader("Content-Disposition", 'attachment; filename="FactorFlux-Windows-Portable.tar.gz"');
+      res.setHeader("Content-Length", stats.size.toString());
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
       const fileStream = fs.createReadStream(filePath);
-      fileStream.on('error', (error) => {
-        console.error('Error streaming Windows installer:', error);
+      fileStream.on("error", (error) => {
+        console.error("Error streaming Windows installer:", error);
         if (!res.headersSent) {
-          res.status(500).json({ message: 'Error downloading Windows installer' });
+          res.status(500).json({ message: "Error downloading Windows installer" });
         }
       });
       fileStream.pipe(res);
@@ -1516,26 +1220,26 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.get('/api/desktop/download/mac', async (req, res) => {
+  app.get("/api/desktop/download/mac", async (_req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Mac-Installer.tar.gz');
-      
+      const filePath = path.resolve(process.cwd(), "electron-dist", "FactorFlux-Mac-Installer.tar.gz");
+
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Mac installer not found" });
       }
 
       const stats = fs.statSync(filePath);
-      
-      res.setHeader('Content-Type', 'application/gzip');
-      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Mac-Installer.tar.gz"');
-      res.setHeader('Content-Length', stats.size.toString());
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      
+
+      res.setHeader("Content-Type", "application/gzip");
+      res.setHeader("Content-Disposition", 'attachment; filename="FactorFlux-Mac-Installer.tar.gz"');
+      res.setHeader("Content-Length", stats.size.toString());
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
       const fileStream = fs.createReadStream(filePath);
-      fileStream.on('error', (error) => {
-        console.error('Error streaming Mac installer:', error);
+      fileStream.on("error", (error) => {
+        console.error("Error streaming Mac installer:", error);
         if (!res.headersSent) {
-          res.status(500).json({ message: 'Error downloading Mac installer' });
+          res.status(500).json({ message: "Error downloading Mac installer" });
         }
       });
       fileStream.pipe(res);
@@ -1545,26 +1249,26 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  app.get('/api/desktop/download/linux', async (req, res) => {
+  app.get("/api/desktop/download/linux", async (_req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Linux-Portable.tar.gz');
-      
+      const filePath = path.resolve(process.cwd(), "electron-dist", "FactorFlux-Linux-Portable.tar.gz");
+
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Linux installer not found" });
       }
 
       const stats = fs.statSync(filePath);
-      
-      res.setHeader('Content-Type', 'application/gzip');
-      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Linux-Portable.tar.gz"');
-      res.setHeader('Content-Length', stats.size.toString());
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      
+
+      res.setHeader("Content-Type", "application/gzip");
+      res.setHeader("Content-Disposition", 'attachment; filename="FactorFlux-Linux-Portable.tar.gz"');
+      res.setHeader("Content-Length", stats.size.toString());
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
       const fileStream = fs.createReadStream(filePath);
-      fileStream.on('error', (error) => {
-        console.error('Error streaming Linux installer:', error);
+      fileStream.on("error", (error) => {
+        console.error("Error streaming Linux installer:", error);
         if (!res.headersSent) {
-          res.status(500).json({ message: 'Error downloading Linux installer' });
+          res.status(500).json({ message: "Error downloading Linux installer" });
         }
       });
       fileStream.pipe(res);
@@ -1574,27 +1278,26 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  // Desktop installation guide download route
-  app.get('/api/desktop/download/guide', async (req, res) => {
+  app.get("/api/desktop/download/guide", async (_req, res) => {
     try {
-      const filePath = path.resolve(process.cwd(), 'DESKTOP-TROUBLESHOOTING-GUIDE.md');
-      
+      const filePath = path.resolve(process.cwd(), "DESKTOP-TROUBLESHOOTING-GUIDE.md");
+
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Installation guide not found" });
       }
 
       const stats = fs.statSync(filePath);
-      
-      res.setHeader('Content-Type', 'text/markdown');
-      res.setHeader('Content-Disposition', 'attachment; filename="FactorFlux-Installation-Guide.md"');
-      res.setHeader('Content-Length', stats.size.toString());
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      
+
+      res.setHeader("Content-Type", "text/markdown");
+      res.setHeader("Content-Disposition", 'attachment; filename="FactorFlux-Installation-Guide.md"');
+      res.setHeader("Content-Length", stats.size.toString());
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
       const fileStream = fs.createReadStream(filePath);
-      fileStream.on('error', (error) => {
-        console.error('Error streaming installation guide:', error);
+      fileStream.on("error", (error) => {
+        console.error("Error streaming installation guide:", error);
         if (!res.headersSent) {
-          res.status(500).json({ message: 'Error downloading installation guide' });
+          res.status(500).json({ message: "Error downloading installation guide" });
         }
       });
       fileStream.pipe(res);
@@ -1604,11 +1307,9 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
     }
   });
 
-  // Email installer links route - send installer download links via email
-  app.post('/api/email/installer-links', async (req: any, res) => {
+  app.post("/api/email/installer-links", requireAuth, async (req: any, res) => {
     try {
-      const user = req.user;
-      if (user?.role !== 'manager' && user?.role !== 'admin') {
+      if (req.user?.role !== "manager" && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Only managers and admins can send installer links" });
       }
 
@@ -1617,57 +1318,28 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
         return res.status(400).json({ message: "Email address is required" });
       }
 
-      const appUrl = process.env.REPLIT_DEV_DOMAIN 
+      const appUrl = process.env.REPLIT_DEV_DOMAIN
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : 'https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev';
+        : "https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev";
 
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #2563eb;">FactorFlux Desktop Access</h1>
-          
-          ${clientName ? `<p>Hello ${clientName},</p>` : '<p>Hello,</p>'}
-          
+          ${clientName ? `<p>Hello ${clientName},</p>` : "<p>Hello,</p>"}
           <p>You now have access to FactorFlux, our freight factoring management system. You can access it in two ways:</p>
-          
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h2 style="color: #1e40af; margin-top: 0;">🌐 Web Access (Recommended)</h2>
             <p><strong>Live Application:</strong> <a href="${appUrl}" style="color: #2563eb; text-decoration: none; font-weight: bold;">${appUrl}</a></p>
             <p>Access FactorFlux directly in your web browser - no installation required.</p>
           </div>
-          
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h2 style="color: #1e40af; margin-top: 0;">💻 Desktop Installers</h2>
             <p>For a desktop-like experience, download the portable launcher for your operating system:</p>
-            
-            <div style="margin: 15px 0;">
-              <strong>🪟 Windows:</strong><br>
-              <a href="${appUrl}/api/desktop/download/windows" style="color: #2563eb; text-decoration: none;">
-                FactorFlux-Windows-Portable.tar.gz
-              </a> (5.7 MB)
-            </div>
-            
-            <div style="margin: 15px 0;">
-              <strong>🍎 Mac:</strong><br>
-              <a href="${appUrl}/api/desktop/download/mac" style="color: #2563eb; text-decoration: none;">
-                FactorFlux-Mac-Portable.tar.gz
-              </a> (5.7 MB)
-            </div>
-            
-            <div style="margin: 15px 0;">
-              <strong>🐧 Linux:</strong><br>
-              <a href="${appUrl}/api/desktop/download/linux" style="color: #2563eb; text-decoration: none;">
-                FactorFlux-Linux-Portable.tar.gz
-              </a> (5.7 MB)
-            </div>
-            
-            <div style="margin: 15px 0;">
-              <strong>📖 Setup Guide:</strong><br>
-              <a href="${appUrl}/api/desktop/download/guide" style="color: #2563eb; text-decoration: none;">
-                Installation Instructions
-              </a>
-            </div>
+            <div style="margin: 15px 0;"><strong>🪟 Windows:</strong><br><a href="${appUrl}/api/desktop/download/windows" style="color: #2563eb; text-decoration: none;">FactorFlux-Windows-Portable.tar.gz</a> (5.7 MB)</div>
+            <div style="margin: 15px 0;"><strong>🍎 Mac:</strong><br><a href="${appUrl}/api/desktop/download/mac" style="color: #2563eb; text-decoration: none;">FactorFlux-Mac-Portable.tar.gz</a> (5.7 MB)</div>
+            <div style="margin: 15px 0;"><strong>🐧 Linux:</strong><br><a href="${appUrl}/api/desktop/download/linux" style="color: #2563eb; text-decoration: none;">FactorFlux-Linux-Portable.tar.gz</a> (5.7 MB)</div>
+            <div style="margin: 15px 0;"><strong>📖 Setup Guide:</strong><br><a href="${appUrl}/api/desktop/download/guide" style="color: #2563eb; text-decoration: none;">Installation Instructions</a></div>
           </div>
-          
           <h2 style="color: #1e40af;">⚡ Quick Setup for Desktop</h2>
           <ol>
             <li>Download the file for your operating system</li>
@@ -1675,18 +1347,17 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
             <li>Run the startup script (double-click or run in terminal)</li>
             <li>FactorFlux opens automatically in your browser</li>
           </ol>
-          
-          ${message ? `<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
-            <h3 style="color: #047857; margin-top: 0;">Additional Information</h3>
-            <p style="margin-bottom: 0;">${message}</p>
-          </div>` : ''}
-          
+          ${
+            message
+              ? `<div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
+                  <h3 style="color: #047857; margin-top: 0;">Additional Information</h3>
+                  <p style="margin-bottom: 0;">${message}</p>
+                </div>`
+              : ""
+          }
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
             <p>If you have any questions or need assistance getting started, please don't hesitate to reach out.</p>
-            <p style="color: #6b7280;">
-              Best regards,<br>
-              <strong>Trucking Pros Financial Team</strong>
-            </p>
+            <p style="color: #6b7280;">Best regards,<br><strong>Trucking Pros Financial Team</strong></p>
           </div>
         </div>
       `;
@@ -1694,7 +1365,7 @@ app.delete('/api/clients/:id', requireAuth, async (req: any, res) => {
       const textContent = `
 FactorFlux Desktop Access
 
-${clientName ? `Hello ${clientName},` : 'Hello,'}
+${clientName ? `Hello ${clientName},` : "Hello,"}
 
 You now have access to FactorFlux, our freight factoring management system.
 
@@ -1703,7 +1374,7 @@ ${appUrl}
 
 DESKTOP INSTALLERS:
 • Windows: ${appUrl}/api/download/windows (5.7 MB)
-• Mac: ${appUrl}/api/download/mac (5.7 MB)  
+• Mac: ${appUrl}/api/download/mac (5.7 MB)
 • Linux: ${appUrl}/api/download/linux (5.7 MB)
 • Setup Guide: ${appUrl}/api/download/guide
 
@@ -1713,7 +1384,7 @@ QUICK SETUP FOR DESKTOP:
 3. Run the startup script (double-click or run in terminal)
 4. FactorFlux opens automatically in your browser
 
-${message ? `Additional Information: ${message}` : ''}
+${message ? `Additional Information: ${message}` : ""}
 
 If you have any questions or need assistance getting started, please don't hesitate to reach out.
 
@@ -1721,29 +1392,26 @@ Best regards,
 Trucking Pros Financial Team
       `.trim();
 
-      // For now, log the email content and return success (since SendGrid needs proper setup)
-      console.log('Email would be sent to:', email);
-      console.log('Subject:', `FactorFlux Access - ${clientName || 'Desktop Installation'}`);
-      console.log('Content preview:', textContent.substring(0, 200) + '...');
+      console.log("Email would be sent to:", email);
+      console.log("Subject:", `FactorFlux Access - ${clientName || "Desktop Installation"}`);
+      console.log("Content preview:", `${textContent.substring(0, 200)}...`);
 
-      // Log activity
       await storage.createActivity({
         userId: req.user.id,
-        type: 'installer_links_prepared',
-        description: `FactorFlux access prepared for: ${email}${clientName ? ` (${clientName})` : ''}`,
-        entityType: 'system',
+        type: "installer_links_prepared",
+        description: `FactorFlux access prepared for: ${email}${clientName ? ` (${clientName})` : ""}`,
+        entityType: "system",
         entityId: null,
       });
 
-      // Return the email content for manual sending or display
-      res.json({ 
+      res.json({
         message: "FactorFlux access email prepared successfully",
         emailContent: {
           to: email,
-          subject: `FactorFlux Access - ${clientName || 'Desktop Installation'}`,
+          subject: `FactorFlux Access - ${clientName || "Desktop Installation"}`,
           text: textContent,
-          html: htmlContent
-        }
+          html: htmlContent,
+        },
       });
     } catch (error) {
       console.error("Error sending installer links:", error);
@@ -1751,45 +1419,39 @@ Trucking Pros Financial Team
     }
   });
 
-  // Desktop installer download routes - these must come before catch-all routes
-  app.get('/api/download/windows', (req, res) => {
-    const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Windows-Portable.tar.gz');
+  app.get("/api/download/windows", (_req, res) => {
+    const filePath = path.resolve(process.cwd(), "electron-dist", "FactorFlux-Windows-Portable.tar.gz");
     if (fs.existsSync(filePath)) {
-      res.download(filePath, 'FactorFlux-Windows-Portable.tar.gz');
-    } else {
-      res.status(404).json({ message: "Windows installer not found" });
+      return res.download(filePath, "FactorFlux-Windows-Portable.tar.gz");
     }
+    return res.status(404).json({ message: "Windows installer not found" });
   });
 
-  app.get('/api/download/mac', (req, res) => {
-    const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Mac-Portable.tar.gz');
+  app.get("/api/download/mac", (_req, res) => {
+    const filePath = path.resolve(process.cwd(), "electron-dist", "FactorFlux-Mac-Portable.tar.gz");
     if (fs.existsSync(filePath)) {
-      res.download(filePath, 'FactorFlux-Mac-Portable.tar.gz');
-    } else {
-      res.status(404).json({ message: "Mac installer not found" });
+      return res.download(filePath, "FactorFlux-Mac-Portable.tar.gz");
     }
+    return res.status(404).json({ message: "Mac installer not found" });
   });
 
-  app.get('/api/download/linux', (req, res) => {
-    const filePath = path.resolve(process.cwd(), 'electron-dist', 'FactorFlux-Linux-Portable.tar.gz');
+  app.get("/api/download/linux", (_req, res) => {
+    const filePath = path.resolve(process.cwd(), "electron-dist", "FactorFlux-Linux-Portable.tar.gz");
     if (fs.existsSync(filePath)) {
-      res.download(filePath, 'FactorFlux-Linux-Portable.tar.gz');
-    } else {
-      res.status(404).json({ message: "Linux installer not found" });
+      return res.download(filePath, "FactorFlux-Linux-Portable.tar.gz");
     }
+    return res.status(404).json({ message: "Linux installer not found" });
   });
 
-  app.get('/api/download/guide', (req, res) => {
-    const filePath = path.resolve(process.cwd(), 'USER-INSTALLATION-GUIDE.md');
+  app.get("/api/download/guide", (_req, res) => {
+    const filePath = path.resolve(process.cwd(), "USER-INSTALLATION-GUIDE.md");
     if (fs.existsSync(filePath)) {
-      res.download(filePath, 'USER-INSTALLATION-GUIDE.md');
-    } else {
-      res.status(404).json({ message: "Installation guide not found" });
+      return res.download(filePath, "USER-INSTALLATION-GUIDE.md");
     }
+    return res.status(404).json({ message: "Installation guide not found" });
   });
 
-  // Download page for easy access
-  app.get('/api/downloads', (req, res) => {
+  app.get("/api/downloads", (_req, res) => {
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -1806,34 +1468,29 @@ Trucking Pros Financial Team
       <body>
         <h1>🚀 FactorFlux Desktop Installers</h1>
         <p>Download the portable desktop version for your operating system:</p>
-        
         <div class="download-card">
           <h3>🪟 Windows</h3>
           <p>For Windows 10 and later</p>
           <a href="/api/download/windows" class="download-btn">Download Windows Version</a>
           <span class="file-size">(5.7 MB)</span>
         </div>
-        
         <div class="download-card">
           <h3>🍎 Mac</h3>
           <p>For macOS 10.15 and later</p>
           <a href="/api/download/mac" class="download-btn">Download Mac Version</a>
           <span class="file-size">(5.7 MB)</span>
         </div>
-        
         <div class="download-card">
           <h3>🐧 Linux</h3>
           <p>For most Linux distributions</p>
           <a href="/api/download/linux" class="download-btn">Download Linux Version</a>
           <span class="file-size">(5.7 MB)</span>
         </div>
-        
         <div class="download-card">
           <h3>📖 Installation Guide</h3>
           <p>Complete setup instructions and troubleshooting</p>
           <a href="/api/download/guide" class="download-btn">Download Guide</a>
         </div>
-        
         <h2>🛠️ Quick Setup:</h2>
         <ol>
           <li>Download the file for your operating system</li>
@@ -1841,25 +1498,24 @@ Trucking Pros Financial Team
           <li>Run the startup script</li>
           <li>FactorFlux opens in your browser automatically</li>
         </ol>
-        
         <p><strong>Requirements:</strong> Node.js must be installed on your computer (download from <a href="https://nodejs.org/">nodejs.org</a>)</p>
       </body>
       </html>
     `);
   });
 
-  // Collections routes
-  app.get('/api/collections', async (req: any, res) => {
+  // Collections
+  app.get("/api/collections", async (_req: any, res) => {
     try {
-      const collections = await storage.getAllCollections();
-      res.json(collections);
+      const collectionsData = await storage.getAllCollections();
+      res.json(collectionsData);
     } catch (error) {
       console.error("Error fetching collections:", error);
       res.status(500).json({ message: "Failed to fetch collections" });
     }
   });
 
-  app.get('/api/collections/client-performance', async (req: any, res) => {
+  app.get("/api/collections/client-performance", async (_req: any, res) => {
     try {
       const performanceData = await storage.getClientPerformanceData();
       res.json(performanceData);
@@ -1869,13 +1525,15 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get('/api/collections/:id', async (req: any, res) => {
+  app.get("/api/collections/:id", async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       const collection = await storage.getCollection(id);
+
       if (!collection) {
         return res.status(404).json({ message: "Collection not found" });
       }
+
       res.json(collection);
     } catch (error) {
       console.error("Error fetching collection:", error);
@@ -1883,12 +1541,12 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post('/api/collections', requireAuth, async (req: any, res) => {
+  app.post("/api/collections", requireAuth, async (req: any, res) => {
     try {
       const collectionData = insertCollectionSchema.parse(req.body);
       const collection = await storage.createCollection({
         ...collectionData,
-        assignedTo: collectionData.assignedTo || req.user.id
+        assignedTo: collectionData.assignedTo || req.user.id,
       });
       res.status(201).json(collection);
     } catch (error) {
@@ -1900,11 +1558,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch('/api/collections/:id', requireAuth, async (req: any, res) => {
+  app.patch("/api/collections/:id", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const updates = req.body;
-      const collection = await storage.updateCollection(id, updates);
+      const id = parseInt(req.params.id, 10);
+      const collection = await storage.updateCollection(id, req.body);
       res.json(collection);
     } catch (error) {
       console.error("Error updating collection:", error);
@@ -1912,17 +1569,16 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete('/api/collections/:id', requireAuth, async (req: any, res) => {
+  app.delete("/api/collections/:id", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       await storage.deleteCollection(id);
-      
-      // Log activity
+
       await storage.createActivity({
         userId: req.user.id,
-        type: 'collection_deleted',
-        description: 'Deleted collection',
-        entityType: 'collection',
+        type: "collection_deleted",
+        description: "Deleted collection",
+        entityType: "collection",
         entityId: id,
       });
 
@@ -1933,14 +1589,14 @@ Trucking Pros Financial Team
     }
   });
 
-  // Client Vault routes - Secure storage for confidential information
-  app.get('/api/vault/:clientId', requireAuth, async (req: any, res) => {
+  // Vault
+  app.get("/api/vault/:clientId", requireAuth, async (req: any, res) => {
     try {
-      const clientId = parseInt(req.params.clientId);
-      if (isNaN(clientId)) {
+      const clientId = parseInt(req.params.clientId, 10);
+      if (Number.isNaN(clientId)) {
         return res.status(400).json({ message: "Invalid client ID" });
       }
-      
+
       const vaultEntries = await storage.getAllVaultEntries(clientId);
       res.json(vaultEntries);
     } catch (error) {
@@ -1949,21 +1605,19 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get('/api/vault/entry/:id', requireAuth, async (req: any, res) => {
+  app.get("/api/vault/entry/:id", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
         return res.status(400).json({ message: "Invalid vault entry ID" });
       }
-      
+
       const entry = await storage.getVaultEntry(id);
       if (!entry) {
         return res.status(404).json({ message: "Vault entry not found" });
       }
-      
-      // Record access for audit trail
+
       await storage.recordVaultAccess(id, req.user.id);
-      
       res.json(entry);
     } catch (error) {
       console.error("Error fetching vault entry:", error);
@@ -1971,13 +1625,13 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post('/api/vault', requireAuth, async (req: any, res) => {
+  app.post("/api/vault", requireAuth, async (req: any, res) => {
     try {
       const data = insertClientVaultSchema.parse({
         ...req.body,
-        createdBy: req.user.id
+        createdBy: req.user.id,
       });
-      
+
       const entry = await storage.createVaultEntry(data);
       res.status(201).json(entry);
     } catch (error) {
@@ -1986,19 +1640,18 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch('/api/vault/:id', requireAuth, async (req: any, res) => {
+  app.patch("/api/vault/:id", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
         return res.status(400).json({ message: "Invalid vault entry ID" });
       }
-      
-      const updates = {
+
+      const entry = await storage.updateVaultEntry(id, {
         ...req.body,
-        createdBy: req.user.id // For audit trail in update
-      };
-      
-      const entry = await storage.updateVaultEntry(id, updates);
+        createdBy: req.user.id,
+      });
+
       res.json(entry);
     } catch (error) {
       console.error("Error updating vault entry:", error);
@@ -2006,21 +1659,20 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete('/api/vault/:id', requireAuth, async (req: any, res) => {
+  app.delete("/api/vault/:id", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
         return res.status(400).json({ message: "Invalid vault entry ID" });
       }
-      
+
       await storage.deleteVaultEntry(id);
-      
-      // Log activity for security audit
+
       await storage.createActivity({
         userId: req.user.id,
-        type: 'vault_deleted',
-        description: 'Deleted confidential vault entry',
-        entityType: 'vault',
+        type: "vault_deleted",
+        description: "Deleted confidential vault entry",
+        entityType: "vault",
         entityId: id,
       });
 
@@ -2031,8 +1683,8 @@ Trucking Pros Financial Team
     }
   });
 
-  // Follow-up routes
-  app.get('/api/follow-ups', async (req: any, res) => {
+  // Follow-ups
+  app.get("/api/follow-ups", async (_req: any, res) => {
     try {
       const followUps = await storage.getAllFollowUps();
       res.json(followUps);
@@ -2042,17 +1694,16 @@ Trucking Pros Financial Team
     }
   });
 
-    app.post('/api/follow-ups', requireAuth, async (req: any, res) => {
+  app.post("/api/follow-ups", requireAuth, async (req: any, res) => {
     try {
       const data = insertFollowUpSchema.parse(req.body);
       const followUp = await storage.createFollowUp(data);
-      
-      // Log activity
+
       await storage.createActivity({
         userId: req.user.id,
-        type: 'follow_up_created',
+        type: "follow_up_created",
         description: `Created follow-up task: ${data.title}`,
-        entityType: 'follow_up',
+        entityType: "follow_up",
         entityId: followUp.id,
       });
 
@@ -2063,19 +1714,16 @@ Trucking Pros Financial Team
     }
   });
 
-    app.patch('/api/follow-ups/:id', requireAuth, async (req: any, res) => {
+  app.patch("/api/follow-ups/:id", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const updates = req.body;
-      
-      const followUp = await storage.updateFollowUp(id, updates);
-      
-      // Log activity
+      const id = parseInt(req.params.id, 10);
+      const followUp = await storage.updateFollowUp(id, req.body);
+
       await storage.createActivity({
         userId: req.user.id,
-        type: 'follow_up_updated',
+        type: "follow_up_updated",
         description: `Updated follow-up task: ${followUp.title}`,
-        entityType: 'follow_up',
+        entityType: "follow_up",
         entityId: followUp.id,
       });
 
@@ -2086,17 +1734,16 @@ Trucking Pros Financial Team
     }
   });
 
-    app.delete('/api/follow-ups/:id', requireAuth, async (req: any, res) => {
+  app.delete("/api/follow-ups/:id", requireAuth, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       await storage.deleteFollowUp(id);
-      
-      // Log activity
+
       await storage.createActivity({
         userId: req.user.id,
-        type: 'follow_up_deleted',
-        description: `Deleted follow-up task`,
-        entityType: 'follow_up',
+        type: "follow_up_deleted",
+        description: "Deleted follow-up task",
+        entityType: "follow_up",
         entityId: id,
       });
 
@@ -2107,290 +1754,316 @@ Trucking Pros Financial Team
     }
   });
 
-  // Portfolio route - serve the portfolio website
-  app.get('/portfolio', (req, res) => {
-    const portfolioPath = path.resolve(process.cwd(), 'portfolio-site', 'index.html');
+  // Portfolio / version / auth repair
+  app.get("/portfolio", (_req, res) => {
+    const portfolioPath = path.resolve(process.cwd(), "portfolio-site", "index.html");
     if (fs.existsSync(portfolioPath)) {
-      res.sendFile(portfolioPath);
-    } else {
-      res.status(404).json({ message: "Portfolio not found" });
+      return res.sendFile(portfolioPath);
     }
+    return res.status(404).json({ message: "Portfolio not found" });
   });
 
-  // Version check endpoint - FORCE DEPLOYMENT UPDATE v3
-  app.get('/api/version-check', (req, res) => {
+  app.get("/api/version-check", (_req, res) => {
     res.json({
       timestamp: new Date().toISOString(),
-      version: 'v3.0.0-WITH-BYPASS-' + Date.now(),
-      hasLocalAuth: !!app._router?.stack?.find((layer: any) => 
-        layer.route?.path === '/api/auth/local/login'
-      ),
-      environment: process.env.NODE_ENV || 'unknown',
+      version: `v3.0.0-WITH-BYPASS-${Date.now()}`,
+      hasLocalAuth: !!(app as any)._router?.stack?.find((layer: any) => layer.route?.path === "/api/auth/local/login"),
+      environment: process.env.NODE_ENV || "unknown",
       authEndpointExists: true,
-      bypassAdded: true
+      bypassAdded: true,
     });
   });
 
-  // EMERGENCY LOGIN BYPASS - TEMPORARY FIX FOR DEPLOYMENT ISSUES
-  app.post('/api/emergency-login', async (req, res) => {
+  app.post("/api/emergency-login", async (req, res) => {
     try {
       const { email, password, secret } = req.body;
-      
-      // Only allow admin with secret key
-      if (email === 'doshbarzanji@gmail.com' && password === 'admin@tpf2025' && secret === 'emergency-fix-2025') {
-        // Get user from database
-        const users = await db.select().from(userTable).where(
-          and(
-            eq(userTable.email, email),
-            eq(userTable.authType, 'local')
-          )
-        );
-        
-        if (users.length > 0) {
-          const user = users[0];
-          
-          // Create session manually
-          (req.session as any).passport = { user: user.id };
-          req.session.save((err) => {
-            if (err) {
-              return res.status(500).json({ message: 'Session error' });
-            }
-            
-            return res.json({
-              success: true,
-              message: 'Emergency login successful',
-              user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                authType: user.authType
-              }
-            });
-          });
-        } else {
-          return res.status(404).json({ message: 'User not found' });
-        }
-      } else {
-        return res.status(401).json({ message: 'Invalid emergency credentials' });
-      }
-    } catch (error) {
-      console.error('Emergency login error:', error);
-      res.status(500).json({ error: 'Emergency login failed' });
-    }
-  });
 
-  // Production authentication fix - comprehensive solution
-  app.post('/api/auth/production-fix', async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      
-      console.log('Production fix: attempting login for', email);
-      
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password required' });
-      }
-      
-      // Get user from database
-      const users = await db.select().from(userTable).where(
-        and(
-          eq(userTable.email, email),
-          eq(userTable.authType, 'local')
-        )
-      );
-      
-      console.log('Production fix: found users:', users.length);
-      
-      if (users.length === 0) {
-        // Create admin user if it's the expected admin email
-        if (email === 'doshbarzanji@gmail.com') {
-          console.log('Production fix: creating fresh admin user');
-          const hashedPassword = await bcrypt.hash('admin@tpf2025', 10);
-          
-          const newUser = await db.insert(userTable).values({
-            id: crypto.randomUUID(),
-            email: 'doshbarzanji@gmail.com',
-            password: hashedPassword,
-            authType: 'local',
-            role: 'admin',
-            firstName: 'Dosh',
-            lastName: 'Barzanji'
-          }).returning();
-          
-          // Login the new user using passport
-          req.login(newUser[0], (err) => {
-            if (err) {
-              console.error('Production fix: passport login error after creation', err);
-              return res.status(500).json({ message: 'Login failed after user creation' });
-            }
-            
-            console.log('Production fix: new admin user created and logged in');
-            return res.status(200).json({
-              message: 'Admin user created and authenticated',
-              user: {
-                id: newUser[0].id,
-                email: newUser[0].email,
-                firstName: newUser[0].firstName,
-                lastName: newUser[0].lastName,
-                role: newUser[0].role
-              }
-            });
-          });
-          return;
-        } else {
-          return res.status(404).json({ message: 'User not found' });
+      if (email === "doshbarzanji@gmail.com" && password === "admin@tpf2025" && secret === "emergency-fix-2025") {
+        const foundUsers = await db
+          .select()
+          .from(userTable)
+          .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
+
+        if (foundUsers.length === 0) {
+          return res.status(404).json({ message: "User not found" });
         }
-      }
-      
-      const user = users[0];
-      console.log('Production fix: found user, testing password');
-      
-      // Test password
-      const isValid = await bcrypt.compare(password, user.password!);
-      console.log('Production fix: password validation result:', isValid);
-      
-      if (isValid) {
-        // Use passport login for proper session handling
-        req.login(user, (err) => {
+
+        const user = foundUsers[0];
+        (req.session as any).passport = { user: user.id };
+
+        return req.session.save((err) => {
           if (err) {
-            console.error('Production fix: passport login error', err);
-            return res.status(500).json({ message: 'Session creation failed' });
+            return res.status(500).json({ message: "Session error" });
           }
-          
-          console.log('Production fix: authentication successful');
-          return res.status(200).json({
-            message: 'Authentication successful',
+
+          return res.json({
+            success: true,
+            message: "Emergency login successful",
             user: {
               id: user.id,
               email: user.email,
+              role: user.role,
               firstName: user.firstName,
               lastName: user.lastName,
-              role: user.role
-            }
+              authType: user.authType,
+            },
           });
         });
-      } else {
-        console.log('Production fix: invalid password');
-        return res.status(401).json({ message: 'Invalid credentials' });
       }
-      
+
+      return res.status(401).json({ message: "Invalid emergency credentials" });
     } catch (error) {
-      console.error('Production fix error:', error);
-      res.status(500).json({ 
-        message: 'Authentication failed',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      console.error("Emergency login error:", error);
+      res.status(500).json({ error: "Emergency login failed" });
     }
   });
 
-  // Direct authentication test endpoint - bypasses Passport entirely
-  app.post('/api/direct-auth-test', async (req, res) => {
+  app.post("/api/auth/production-fix", async (req, res) => {
     try {
       const { email, password } = req.body;
-      
-      console.log('Direct auth test for:', email);
-      
+
       if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password required' });
+        return res.status(400).json({ message: "Email and password required" });
       }
-      
-      // Get user directly from database
-      const users = await db.select().from(userTable).where(
-        and(
-          eq(userTable.email, email),
-          eq(userTable.authType, 'local')
-        )
-      );
-      
-      if (users.length === 0) {
-        return res.status(401).json({ message: 'User not found' });
+
+      const foundUsers = await db
+        .select()
+        .from(userTable)
+        .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
+
+      if (foundUsers.length === 0) {
+        if (email !== "doshbarzanji@gmail.com") {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        const hashedPassword = await bcrypt.hash("admin@tpf2025", 10);
+        const newUser = await db
+          .insert(userTable)
+          .values({
+            id: crypto.randomUUID(),
+            email: "doshbarzanji@gmail.com",
+            password: hashedPassword,
+            authType: "local",
+            role: "admin",
+            firstName: "Dosh",
+            lastName: "Barzanji",
+          })
+          .returning();
+
+        req.login(newUser[0], (err) => {
+          if (err) {
+            console.error("Production fix: passport login error after creation", err);
+            return res.status(500).json({ message: "Login failed after user creation" });
+          }
+
+          return res.status(200).json({
+            message: "Admin user created and authenticated",
+            user: {
+              id: newUser[0].id,
+              email: newUser[0].email,
+              firstName: newUser[0].firstName,
+              lastName: newUser[0].lastName,
+              role: newUser[0].role,
+            },
+          });
+        });
+        return;
       }
-      
-      const user = users[0];
-      console.log('Direct auth: found user', user.id);
-      
-      // Test password directly
+
+      const user = foundUsers[0];
       const isValid = await bcrypt.compare(password, user.password!);
-      console.log('Direct auth: password valid', isValid);
-      
-      if (isValid) {
-        return res.json({
-          success: true,
-          message: 'Direct authentication successful',
+
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      req.login(user, (err) => {
+        if (err) {
+          console.error("Production fix: passport login error", err);
+          return res.status(500).json({ message: "Session creation failed" });
+        }
+
+        return res.status(200).json({
+          message: "Authentication successful",
           user: {
             id: user.id,
             email: user.email,
-            role: user.role
-          }
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+          },
         });
-      } else {
-        return res.status(401).json({ message: 'Invalid password' });
-      }
-      
+      });
     } catch (error) {
-      console.error('Direct auth error:', error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Direct auth failed' });
+      console.error("Production fix error:", error);
+      res.status(500).json({
+        message: "Authentication failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   });
 
-  // Reset admin password with fresh hash
-  app.post('/api/reset-admin-password', async (req, res) => {
+  app.post("/api/direct-auth-test", async (req, res) => {
     try {
-      const { secret } = req.body;
-      
-      if (secret !== 'reset-admin-2025') {
-        return res.status(401).json({ message: 'Unauthorized' });
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password required" });
       }
 
-      console.log('Resetting admin password in production');
-      
-      // Generate a completely fresh hash for admintpf2025
-      const freshPassword = 'admintpf2025';
-      const freshHash = await bcrypt.hash(freshPassword, 12);
-      
-      console.log('Generated fresh hash for password reset');
-      
-      // Update admin user with the fresh hash
-      const result = await db.update(userTable).set({
-        password: freshHash
-      }).where(
-        and(
-          eq(userTable.email, 'doshbarzanji@gmail.com'),
-          eq(userTable.authType, 'local')
-        )
-      ).returning();
-      
-      if (result.length === 0) {
-        return res.status(404).json({ message: 'Admin user not found' });
+      const foundUsers = await db
+        .select()
+        .from(userTable)
+        .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
+
+      if (foundUsers.length === 0) {
+        return res.status(401).json({ message: "User not found" });
       }
-      
-      console.log('Admin password reset successfully');
-      
-      // Test the new password immediately
-      const testValid = await bcrypt.compare(freshPassword, freshHash);
-      
+
+      const user = foundUsers[0];
+      const isValid = await bcrypt.compare(password, user.password!);
+
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid password" });
+      }
+
       return res.json({
         success: true,
-        message: 'Admin password reset successfully',
+        message: "Direct authentication successful",
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      console.error("Direct auth error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Direct auth failed" });
+    }
+  });
+
+  app.post("/api/reset-admin-password", async (req, res) => {
+    try {
+      const { secret } = req.body;
+
+      if (secret !== "reset-admin-2025") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const freshPassword = "admintpf2025";
+      const freshHash = await bcrypt.hash(freshPassword, 12);
+
+      const result = await db
+        .update(userTable)
+        .set({ password: freshHash })
+        .where(and(eq(userTable.email, "doshbarzanji@gmail.com"), eq(userTable.authType, "local")))
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Admin user not found" });
+      }
+
+      const testValid = await bcrypt.compare(freshPassword, freshHash);
+
+      return res.json({
+        success: true,
+        message: "Admin password reset successfully",
         user: {
           id: result[0].id,
-          email: result[0].email
+          email: result[0].email,
         },
         passwordTest: testValid,
-        hashLength: freshHash.length
+        hashLength: freshHash.length,
       });
-      
     } catch (error) {
-      console.error('Password reset error:', error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Password reset failed'
+      console.error("Password reset error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Password reset failed",
       });
     }
   });
 
-  // Tasks routes
-  app.get('/api/tasks', requireAuth, async (req: any, res) => {
+  app.post("/api/test-login", async (req, res) => {
+    try {
+      const { email, password, secret } = req.body;
+
+      if (secret !== "test-login-tpf-2025") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const foundUsers = await db
+        .select()
+        .from(userTable)
+        .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
+
+      if (foundUsers.length === 0) {
+        return res.json({
+          success: false,
+          message: "User not found",
+          email,
+        });
+      }
+
+      const user = foundUsers[0];
+      const isValid = await bcrypt.compare(password, user.password!);
+
+      return res.json({
+        success: isValid,
+        message: isValid ? "Credentials valid" : "Password mismatch",
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        },
+        hashLength: user.password?.length,
+        passwordTested: password,
+      });
+    } catch (error) {
+      console.error("Test login error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Test failed",
+        details: error,
+      });
+    }
+  });
+
+  app.post("/api/migration/sync-admin", async (req, res) => {
+    try {
+      const { secret } = req.body;
+
+      if (secret !== "tpf-sync-admin-2025") {
+        return res.status(401).json({ message: "Unauthorized sync" });
+      }
+
+      const workingHash = "$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO";
+
+      const result = await db
+        .update(users)
+        .set({ password: workingHash })
+        .where(eq(users.email, "doshbarzanji@gmail.com"))
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Admin user not found" });
+      }
+
+      return res.json({
+        success: true,
+        message: "Admin password synchronized successfully",
+        user: {
+          id: result[0].id,
+          email: result[0].email,
+          role: result[0].role,
+        },
+      });
+    } catch (error) {
+      console.error("Sync error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Sync failed" });
+    }
+  });
+
+  // Tasks
+  app.get("/api/tasks", requireAuth, async (_req: any, res) => {
     try {
       const tasksData = await db
         .select({
@@ -2421,14 +2094,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get('/api/tasks/:id', requireAuth, async (req, res) => {
+  app.get("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const [task] = await db
-        .select()
-        .from(tasks)
-        .where(eq(tasks.id, id))
-        .limit(1);
+      const id = parseInt(req.params.id, 10);
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
 
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
@@ -2441,18 +2110,14 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post('/api/tasks', requireAuth, async (req: any, res) => {
+  app.post("/api/tasks", requireAuth, async (req: any, res) => {
     try {
       const taskData = insertTaskSchema.parse({
         ...req.body,
         assignedTo: req.user.id,
       });
 
-      const [newTask] = await db
-        .insert(tasks)
-        .values(taskData)
-        .returning();
-
+      const [newTask] = await db.insert(tasks).values(taskData).returning();
       res.status(201).json(newTask);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2463,9 +2128,9 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch('/api/tasks/:id', requireAuth, async (req, res) => {
+  app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       const updateData = insertTaskSchema.partial().parse(req.body);
 
       const [updatedTask] = await db
@@ -2488,13 +2153,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
+  app.delete("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const [deletedTask] = await db
-        .delete(tasks)
-        .where(eq(tasks.id, id))
-        .returning();
+      const id = parseInt(req.params.id, 10);
+      const [deletedTask] = await db.delete(tasks).where(eq(tasks.id, id)).returning();
 
       if (!deletedTask) {
         return res.status(404).json({ message: "Task not found" });
@@ -2507,14 +2169,10 @@ Trucking Pros Financial Team
     }
   });
 
-  // Brokers routes
-  app.get('/api/brokers', requireAuth, async (req, res) => {
+  // Brokers
+  app.get("/api/brokers", requireAuth, async (_req, res) => {
     try {
-      const brokersData = await db
-        .select()
-        .from(brokers)
-        .orderBy(brokers.name);
-
+      const brokersData = await db.select().from(brokers).orderBy(brokers.name);
       res.json(brokersData);
     } catch (error) {
       console.error("Error fetching brokers:", error);
@@ -2522,14 +2180,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get('/api/brokers/:id', requireAuth, async (req, res) => {
+  app.get("/api/brokers/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const [broker] = await db
-        .select()
-        .from(brokers)
-        .where(eq(brokers.id, id))
-        .limit(1);
+      const id = parseInt(req.params.id, 10);
+      const [broker] = await db.select().from(brokers).where(eq(brokers.id, id)).limit(1);
 
       if (!broker) {
         return res.status(404).json({ message: "Broker not found" });
@@ -2542,15 +2196,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post('/api/brokers', requireAuth, async (req, res) => {
+  app.post("/api/brokers", requireAuth, async (req, res) => {
     try {
       const brokerData = insertBrokerSchema.parse(req.body);
-
-      const [newBroker] = await db
-        .insert(brokers)
-        .values(brokerData)
-        .returning();
-
+      const [newBroker] = await db.insert(brokers).values(brokerData).returning();
       res.status(201).json(newBroker);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2561,9 +2210,9 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch('/api/brokers/:id', requireAuth, async (req, res) => {
+  app.patch("/api/brokers/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       const updateData = insertBrokerSchema.partial().parse(req.body);
 
       const [updatedBroker] = await db
@@ -2586,13 +2235,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete('/api/brokers/:id', requireAuth, async (req, res) => {
+  app.delete("/api/brokers/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const [deletedBroker] = await db
-        .delete(brokers)
-        .where(eq(brokers.id, id))
-        .returning();
+      const id = parseInt(req.params.id, 10);
+      const [deletedBroker] = await db.delete(brokers).where(eq(brokers.id, id)).returning();
 
       if (!deletedBroker) {
         return res.status(404).json({ message: "Broker not found" });
@@ -2605,8 +2251,8 @@ Trucking Pros Financial Team
     }
   });
 
-  // Fuel Advances routes
-  app.get('/api/fuel-advances', requireAuth, async (req, res) => {
+  // Fuel advances
+  app.get("/api/fuel-advances", requireAuth, async (_req, res) => {
     try {
       const fuelAdvancesData = await db
         .select({
@@ -2622,7 +2268,6 @@ Trucking Pros Financial Team
           status: fuelAdvances.status,
           createdAt: fuelAdvances.createdAt,
           updatedAt: fuelAdvances.updatedAt,
-          // Include agent name
           processedByName: users.firstName,
         })
         .from(fuelAdvances)
@@ -2636,9 +2281,9 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get('/api/fuel-advances/:id', requireAuth, async (req, res) => {
+  app.get("/api/fuel-advances/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       const [fuelAdvance] = await db
         .select({
           id: fuelAdvances.id,
@@ -2671,15 +2316,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post('/api/fuel-advances', requireAuth, async (req, res) => {
+  app.post("/api/fuel-advances", requireAuth, async (req, res) => {
     try {
       const fuelAdvanceData = insertFuelAdvanceSchema.parse(req.body);
-
-      const [newFuelAdvance] = await db
-        .insert(fuelAdvances)
-        .values(fuelAdvanceData)
-        .returning();
-
+      const [newFuelAdvance] = await db.insert(fuelAdvances).values(fuelAdvanceData).returning();
       res.status(201).json(newFuelAdvance);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2690,9 +2330,9 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch('/api/fuel-advances/:id', requireAuth, async (req, res) => {
+  app.patch("/api/fuel-advances/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       const updateData = insertFuelAdvanceSchema.partial().parse(req.body);
 
       const [updatedFuelAdvance] = await db
@@ -2715,13 +2355,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete('/api/fuel-advances/:id', requireAuth, async (req, res) => {
+  app.delete("/api/fuel-advances/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const [deletedFuelAdvance] = await db
-        .delete(fuelAdvances)
-        .where(eq(fuelAdvances.id, id))
-        .returning();
+      const id = parseInt(req.params.id, 10);
+      const [deletedFuelAdvance] = await db.delete(fuelAdvances).where(eq(fuelAdvances.id, id)).returning();
 
       if (!deletedFuelAdvance) {
         return res.status(404).json({ message: "Fuel advance not found" });
@@ -2734,110 +2371,6 @@ Trucking Pros Financial Team
     }
   });
 
-  // Simple test login endpoint to verify credentials
-  app.post('/api/test-login', async (req, res) => {
-    try {
-      const { email, password, secret } = req.body;
-      
-      if (secret !== 'test-login-tpf-2025') {
-        return res.status(401).json({ message: 'Unauthorized' });
-      }
-
-      console.log('Testing login for:', email);
-      
-      // Direct database query to find user
-      const users = await db.select().from(userTable).where(
-        and(
-          eq(userTable.email, email),
-          eq(userTable.authType, 'local')
-        )
-      );
-      
-      console.log('Found users:', users.length);
-      
-      if (users.length === 0) {
-        return res.json({ 
-          success: false, 
-          message: 'User not found',
-          email: email
-        });
-      }
-
-      const user = users[0];
-      console.log('User found:', user.id, 'password hash length:', user.password?.length);
-      
-      // Test password comparison
-      const isValid = await bcrypt.compare(password, user.password!);
-      console.log('Password valid:', isValid);
-      
-      return res.json({ 
-        success: isValid,
-        message: isValid ? 'Credentials valid' : 'Password mismatch',
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role
-        },
-        hashLength: user.password?.length,
-        passwordTested: password
-      });
-      
-    } catch (error) {
-      console.error('Test login error:', error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Test failed',
-        details: error
-      });
-    }
-  });
-
-  // Database migration endpoint - sync admin password with local
-  app.post('/api/migration/sync-admin', async (req, res) => {
-    try {
-      const { secret } = req.body;
-      
-      if (secret !== 'tpf-sync-admin-2025') {
-        return res.status(401).json({ message: 'Unauthorized sync' });
-      }
-
-      // Use the exact working password hash from local development
-      const workingHash = '$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO';
-      
-      try {
-        // Direct database query to update password hash
-        const result = await db.update(users)
-          .set({ password: workingHash })
-          .where(eq(users.email, 'doshbarzanji@gmail.com'))
-          .returning();
-        
-        if (result.length > 0) {
-          return res.json({ 
-            success: true, 
-            message: 'Admin password synchronized successfully',
-            user: { 
-              id: result[0].id, 
-              email: result[0].email, 
-              role: result[0].role 
-            } 
-          });
-        } else {
-          return res.status(404).json({ 
-            error: 'Admin user not found' 
-          });
-        }
-      } catch (error) {
-        console.error('Password sync failed:', error);
-        return res.status(500).json({ 
-          error: 'Failed to sync admin password',
-          details: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Sync failed' });
-    }
-  });
-
   const httpServer = createServer(app);
   return httpServer;
-} 
+}

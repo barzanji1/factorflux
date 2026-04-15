@@ -1,60 +1,55 @@
-import { firestore } from "../firebase";
+export async function deleteClientMirror(clientId: number) {
+  const clientIdStr = String(clientId);
 
-export async function upsertClientMirror(client: {
-  id: number | string;
-  name: string;
-  contactPerson?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  address?: string | null;
-  status?: string | null;
-  createdAt?: string | Date | null;
-}) {
-  const clientId = String(client.id);
-  const ref = firestore.collection("clients").doc(clientId);
+  try {
+    console.log(`[FIRESTORE DELETE] starting delete for clientId=${clientIdStr}`);
 
-  const payload = {
-    id: clientId,
-    name: client.name ?? "",
-    contactPerson: client.contactPerson ?? "",
-    email: client.email ?? "",
-    phone: client.phone ?? "",
-    address: client.address ?? "",
-    status: client.status ?? "active",
-    createdAt: client.createdAt
-      ? new Date(client.createdAt).toISOString()
-      : new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+    const directRef = db.collection("clients").doc(clientIdStr);
+    const directSnap = await directRef.get();
 
-  await ref.set(payload, { merge: true });
+    if (directSnap.exists) {
+      await directRef.delete();
+      console.log(`[FIRESTORE DELETE] deleted by doc id: ${clientIdStr}`);
+      return { deleted: true, method: "docId", count: 1 };
+    }
 
-  return payload;
-}
+    const stringMatchSnap = await db
+      .collection("clients")
+      .where("id", "==", clientIdStr)
+      .get();
 
-export async function addClientActivityLog(
-  clientId: number | string,
-  entry: {
-    type: string;
-    message: string;
+    if (!stringMatchSnap.empty) {
+      const batch = db.batch();
+      stringMatchSnap.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+
+      return {
+        deleted: true,
+        method: "query_string_id",
+        count: stringMatchSnap.docs.length,
+      };
+    }
+
+    const numberMatchSnap = await db
+      .collection("clients")
+      .where("id", "==", clientId)
+      .get();
+
+    if (!numberMatchSnap.empty) {
+      const batch = db.batch();
+      numberMatchSnap.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+
+      return {
+        deleted: true,
+        method: "query_numeric_id",
+        count: numberMatchSnap.docs.length,
+      };
+    }
+
+    return { deleted: false, method: "not_found", count: 0 };
+  } catch (error) {
+    console.error(`[FIRESTORE DELETE] failed for clientId=${clientIdStr}:`, error);
+    throw error;
   }
-) {
-  const id = String(clientId);
-
-  const ref = firestore
-    .collection("clients")
-    .doc(id)
-    .collection("activity")
-    .doc();
-
-  const payload = {
-    id: ref.id,
-    type: entry.type,
-    message: entry.message,
-    createdAt: new Date().toISOString(),
-  };
-
-  await ref.set(payload);
-
-  return payload;
 }

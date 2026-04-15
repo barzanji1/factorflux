@@ -36,24 +36,17 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { 
-  CreditCard, 
-  Fuel, 
-  MapPin, 
-  DollarSign, 
-  Hotel, 
-  Truck, 
-  Star,
+import {
+  CreditCard,
   Check,
   Plus,
   Eye,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Star,
 } from "lucide-react";
 
 const fuelCardApplicationSchema = z.object({
@@ -70,7 +63,23 @@ const fuelCardApplicationSchema = z.object({
   yearsInBusiness: z.string().min(1, "Years in business is required"),
 });
 
-type FuelCardApplication = z.infer<typeof fuelCardApplicationSchema>;
+type FuelCardApplicationForm = z.infer<typeof fuelCardApplicationSchema>;
+
+type FuelCardApplicationRecord = {
+  id: number;
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  fleetSize: string;
+  monthlyFuelSpend: string;
+  cardType: string;
+  businessType: string;
+  yearsInBusiness: string;
+  status: string;
+  notes?: string | null;
+  createdAt: string;
+};
 
 const cardTypes = [
   {
@@ -83,11 +92,11 @@ const cardTypes = [
       "Basic purchase controls",
       "Monthly spending reports",
       "24/7 customer support",
-      "Complimentary service - no fees"
+      "Complimentary service - no fees",
     ],
     color: "bg-blue-50 border-blue-200",
     iconBg: "bg-blue-100",
-    iconColor: "text-blue-600"
+    iconColor: "text-blue-600",
   },
   {
     id: "fleet",
@@ -102,12 +111,12 @@ const cardTypes = [
       "Driver ID verification",
       "Maintenance tracking integration",
       "10% discount on lodging at partner hotels",
-      "Complimentary service - no fees"
+      "Complimentary service - no fees",
     ],
     color: "bg-green-50 border-green-200",
     iconBg: "bg-green-100",
     iconColor: "text-green-600",
-    popular: true
+    popular: true,
   },
   {
     id: "premium",
@@ -124,26 +133,25 @@ const cardTypes = [
       "Free roadside assistance",
       "Advanced fraud protection",
       "Custom reporting & API access",
-      "Complimentary service - no fees"
+      "Complimentary service - no fees",
     ],
     color: "bg-purple-50 border-purple-200",
     iconBg: "bg-purple-100",
-    iconColor: "text-purple-600"
-  }
+    iconColor: "text-purple-600",
+  },
 ];
 
 export default function FuelCards() {
-  // All hooks at the top - no conditional hook calls
-  
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [showApplication, setShowApplication] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [selectedApplication, setSelectedApplication] =
+    useState<FuelCardApplicationRecord | null>(null);
   const [showApplicationDetails, setShowApplicationDetails] = useState(false);
 
-  const form = useForm<FuelCardApplication>({
+  const form = useForm<FuelCardApplicationForm>({
     resolver: zodResolver(fuelCardApplicationSchema),
     defaultValues: {
       companyName: "",
@@ -158,18 +166,39 @@ export default function FuelCards() {
     },
   });
 
+  const {
+    data: applications = [],
+    isLoading: applicationsLoading,
+    error: applicationsError,
+  } = useQuery<FuelCardApplicationRecord[]>({
     queryKey: ["/api/fuel-card-applications"],
+    queryFn: async () => {
+      const response = await fetch("/api/fuel-card-applications", {
+        credentials: "include",
+      });
+
+      if (response.status === 401) {
+        throw new Error("Unauthorized");
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch fuel card applications");
+      }
+
+      return response.json();
+    },
   });
 
   const submitApplication = useMutation({
-    mutationFn: async (data: FuelCardApplication) => {
+    mutationFn: async (data: FuelCardApplicationForm) => {
       const response = await apiRequest("POST", "/api/fuel-card-applications", data);
       return response.json();
     },
     onSuccess: () => {
       toast({
         title: "Application Submitted",
-        description: "Your fuel card application has been submitted successfully. We'll review it within 2-3 business days.",
+        description:
+          "Your fuel card application has been submitted successfully. We'll review it within 2-3 business days.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/fuel-card-applications"] });
       form.reset();
@@ -186,15 +215,20 @@ export default function FuelCards() {
   });
 
   useEffect(() => {
+    if (applicationsError instanceof Error && applicationsError.message === "Unauthorized") {
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
         variant: "destructive",
       });
-      setTimeout(() => {
+
+      const timeout = setTimeout(() => {
+        window.location.href = "/api/login";
       }, 500);
-      return;
+
+      return () => clearTimeout(timeout);
     }
+  }, [applicationsError, toast]);
 
   const handleCardSelect = (cardType: string) => {
     setSelectedCard(cardType);
@@ -202,34 +236,29 @@ export default function FuelCards() {
     setShowApplication(true);
   };
 
-  const onSubmit = (data: FuelCardApplication) => {
+  const onSubmit = (data: FuelCardApplicationForm) => {
     submitApplication.mutate(data);
   };
 
-  const handleViewApplication = (application: any) => {
+  const handleViewApplication = (application: FuelCardApplicationRecord) => {
     setSelectedApplication(application);
     setShowApplicationDetails(true);
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'approved':
+      case "approved":
         return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'rejected':
+      case "rejected":
         return <XCircle className="w-4 h-4 text-red-600" />;
       default:
         return <Clock className="w-4 h-4 text-yellow-600" />;
     }
   };
 
-  const typedApplications = applications as Array<{
-    id: number;
-    cardType: string;
-    status: string;
-    createdAt: string;
-  }> | undefined;
+  const typedApplications = applications as FuelCardApplicationRecord[];
 
-  // Loading state
+  if (applicationsLoading) {
     return (
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
         <Sidebar />
@@ -245,30 +274,29 @@ export default function FuelCards() {
     );
   }
 
-  // Not authenticated
-
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav 
-          title="TPF Fuel Card Services" 
+        <TopNav
+          title="TPF Fuel Card Services"
           subtitle="Complimentary fuel cards for our carriers with exclusive savings and fleet management benefits"
         />
-        
+
         <main className="flex-1 overflow-auto p-6">
           <div className="space-y-6">
-            {/* Header */}
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">TPF Fuel Card Services</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                TPF Fuel Card Services
+              </h1>
               <p className="mt-2 text-gray-600 dark:text-gray-400">
-                Complimentary fuel cards for our carriers with exclusive savings and fleet management benefits
+                Complimentary fuel cards for our carriers with exclusive savings and fleet
+                management benefits
               </p>
             </div>
 
-            {/* Current Applications Status */}
-            {typedApplications && typedApplications.length > 0 && (
+            {typedApplications.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -279,25 +307,38 @@ export default function FuelCards() {
                 <CardContent>
                   <div className="space-y-3">
                     {typedApplications.map((app) => (
-                      <div key={app.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div
+                        key={app.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                      >
                         <div className="flex items-center gap-3">
                           {getStatusIcon(app.status)}
                           <div>
-                            <p className="font-medium">{cardTypes.find(c => c.id === app.cardType)?.name}</p>
-                            <p className="text-sm text-gray-500">Applied {new Date(app.createdAt).toLocaleDateString()}</p>
+                            <p className="font-medium">
+                              {cardTypes.find((c) => c.id === app.cardType)?.name}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Applied {new Date(app.createdAt).toLocaleDateString()}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {app.status === 'approved' ? (
-                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
+                          {app.status === "approved" ? (
+                            <Badge
+                              variant="default"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
                               {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
                             </Badge>
-                          ) : app.status === 'rejected' ? (
+                          ) : app.status === "rejected" ? (
                             <Badge variant="destructive">
                               {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400">
+                            <Badge
+                              variant="outline"
+                              className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400"
+                            >
                               {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
                             </Badge>
                           )}
@@ -318,10 +359,12 @@ export default function FuelCards() {
               </Card>
             )}
 
-            {/* Card Options */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {cardTypes.map((card) => (
-                <Card key={card.id} className={`relative ${card.color} hover:shadow-lg transition-shadow cursor-pointer`}>
+                <Card
+                  key={card.id}
+                  className={`relative ${card.color} hover:shadow-lg transition-shadow cursor-pointer`}
+                >
                   {card.popular && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                       <Badge className="bg-orange-500 text-white px-3 py-1">
@@ -350,12 +393,14 @@ export default function FuelCards() {
                       {card.perks.map((perk, index) => (
                         <div key={index} className="flex items-start gap-2">
                           <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">{perk}</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {perk}
+                          </span>
                         </div>
                       ))}
                     </div>
-                    <Button 
-                      className="w-full mt-4" 
+                    <Button
+                      className="w-full mt-4"
                       onClick={() => handleCardSelect(card.id)}
                       variant={card.popular ? "default" : "outline"}
                     >
@@ -370,12 +415,11 @@ export default function FuelCards() {
         </main>
       </div>
 
-      {/* Application Form Dialog */}
       <Dialog open={showApplication} onOpenChange={setShowApplication}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Apply for {selectedCard && cardTypes.find(c => c.id === selectedCard)?.name}
+              Apply for {selectedCard && cardTypes.find((c) => c.id === selectedCard)?.name}
             </DialogTitle>
           </DialogHeader>
           <Form {...form}>
@@ -393,7 +437,7 @@ export default function FuelCards() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="contactName"
@@ -537,16 +581,16 @@ export default function FuelCards() {
               />
 
               <div className="flex gap-2 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setShowApplication(false)}
                   className="flex-1"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={submitApplication.isPending}
                   className="flex-1"
                 >
@@ -558,7 +602,6 @@ export default function FuelCards() {
         </DialogContent>
       </Dialog>
 
-      {/* Application Details Dialog */}
       <Dialog open={showApplicationDetails} onOpenChange={setShowApplicationDetails}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -570,28 +613,39 @@ export default function FuelCards() {
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white">Card Type</h4>
                   <p className="text-gray-600 dark:text-gray-400">
-                    {cardTypes.find(c => c.id === selectedApplication.cardType)?.name}
+                    {cardTypes.find((c) => c.id === selectedApplication.cardType)?.name}
                   </p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white">Company</h4>
-                  <p className="text-gray-600 dark:text-gray-400">{selectedApplication.companyName}</p>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    {selectedApplication.companyName}
+                  </p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white">Status</h4>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(selectedApplication.status)}
-                    {selectedApplication.status === 'approved' ? (
-                      <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
-                        {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                    {selectedApplication.status === "approved" ? (
+                      <Badge
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {selectedApplication.status.charAt(0).toUpperCase() +
+                          selectedApplication.status.slice(1)}
                       </Badge>
-                    ) : selectedApplication.status === 'rejected' ? (
+                    ) : selectedApplication.status === "rejected" ? (
                       <Badge variant="destructive">
-                        {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                        {selectedApplication.status.charAt(0).toUpperCase() +
+                          selectedApplication.status.slice(1)}
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400">
-                        {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                      <Badge
+                        variant="outline"
+                        className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400"
+                      >
+                        {selectedApplication.status.charAt(0).toUpperCase() +
+                          selectedApplication.status.slice(1)}
                       </Badge>
                     )}
                   </div>
@@ -602,33 +656,37 @@ export default function FuelCards() {
                     {new Date(selectedApplication.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                {selectedApplication.status === 'approved' && (
+
+                {selectedApplication.status === "approved" && (
                   <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                     <p className="text-green-800 dark:text-green-200 text-sm">
-                      🎉 Congratulations! Your application has been approved. You'll receive your fuel cards within 5-7 business days.
+                      🎉 Congratulations! Your application has been approved. You'll receive
+                      your fuel cards within 5-7 business days.
                     </p>
                   </div>
                 )}
-                {selectedApplication.status === 'rejected' && (
+
+                {selectedApplication.status === "rejected" && (
                   <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                     <p className="text-red-800 dark:text-red-200 text-sm">
-                      Unfortunately, your application was not approved at this time. Please contact support for more information.
+                      Unfortunately, your application was not approved at this time. Please
+                      contact support for more information.
                     </p>
                   </div>
                 )}
-                {selectedApplication.status === 'pending' && (
+
+                {selectedApplication.status === "pending" && (
                   <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-                      Your application is under review. We'll notify you within 2-3 business days.
+                      Your application is under review. We'll notify you within 2-3 business
+                      days.
                     </p>
                   </div>
                 )}
               </div>
+
               <div className="flex justify-end pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowApplicationDetails(false)}
-                >
+                <Button variant="outline" onClick={() => setShowApplicationDetails(false)}>
                   Close
                 </Button>
               </div>
