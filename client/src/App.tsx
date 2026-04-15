@@ -17,6 +17,7 @@ import Admin from "@/pages/admin";
 import Activities from "@/pages/activities";
 import Reports from "@/pages/reports";
 import FuelCardsInternal from "@/pages/fuel-cards-internal";
+import FuelAdvanceTracking from "@/pages/fuel-advance-tracking";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import DownloadPage from "@/pages/download";
@@ -119,6 +120,11 @@ function Router() {
       <Route path="/fuel-cards-internal">
         <ProtectedRoute>
           <FuelCardsInternal />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/fuel-advance">
+        <ProtectedRoute>
+          <FuelAdvanceTracking />
         </ProtectedRoute>
       </Route>
       <Route path="/profile">

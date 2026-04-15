@@ -85,7 +85,7 @@ interface User {
   id: string;
   firstName: string;
   lastName: string;
-  username: string;
+  email: string;
 }
 
 export default function FuelAdvanceTracking() {
@@ -537,7 +537,7 @@ export default function FuelAdvanceTracking() {
                         <SelectContent>
                           {users.map((user) => (
                             <SelectItem key={user.id} value={user.id}>
-                              {user.firstName} {user.lastName} ({user.username})
+                              {user.firstName} {user.lastName} ({user.email})
                             </SelectItem>
                           ))}
                         </SelectContent>

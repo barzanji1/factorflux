@@ -63,7 +63,7 @@ const navSections: NavSection[] = [
     title: "Finance",
     items: [
       { name: "Factoring", href: "/factoring", icon: DollarSign },
-      { name: "Fuel Advance", href: "/fuel-cards-internal", icon: Fuel },
+      { name: "Fuel Advance", href: "/fuel-advance", icon: Fuel },
       { name: "Collections", href: "/collections", icon: Phone },
       { name: "Reports", href: "/reports", icon: BarChart3 },
     ],
