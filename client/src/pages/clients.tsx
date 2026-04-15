@@ -37,68 +37,21 @@ export default function Clients() {
   const {
     data: clients = [],
     isLoading: clientsLoading,
+    isError: clientsError,
     refetch: refetchClients,
   } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
-    queryFn: async () => {
-      const res = await fetch("/api/clients", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
-      });
-
-      const contentType = res.headers.get("content-type") || "";
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Failed to fetch clients: ${res.status} ${text.slice(0, 200)}`);
-      }
-
-      if (!contentType.includes("application/json")) {
-        const text = await res.text();
-        throw new Error(`Expected JSON from /api/clients but got: ${text.slice(0, 200)}`);
-      }
-
-      const data = await res.json();
-      console.log("GET /api/clients response:", data);
-      return data;
-    },
   });
 
   const { data: searchResults = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients/search", searchQuery],
     enabled: searchQuery.trim().length > 0,
     queryFn: async () => {
-      const res = await fetch(
-        `/api/clients/search?q=${encodeURIComponent(searchQuery)}`,
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
-
-      const contentType = res.headers.get("content-type") || "";
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Failed to search clients: ${res.status} ${text.slice(0, 200)}`);
-      }
-
-      if (!contentType.includes("application/json")) {
-        const text = await res.text();
-        throw new Error(
-          `Expected JSON from /api/clients/search but got: ${text.slice(0, 200)}`
-        );
-      }
-
-      const data = await res.json();
-      console.log("GET /api/clients/search response:", data);
-      return data;
+      const res = await fetch(`/api/clients/search?q=${encodeURIComponent(searchQuery)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+      return res.json();
     },
   });
 
@@ -252,6 +205,20 @@ export default function Clients() {
                   {clientsLoading ? (
                     <div className="flex items-center justify-center py-16">
                       <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                    </div>
+                  ) : clientsError ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] border border-red-200 bg-red-50 text-red-500 dark:border-red-900/40 dark:bg-red-950/20">
+                        <Building2 className="h-6 w-6" />
+                      </div>
+                      <p className="font-semibold text-slate-900 dark:text-white">Failed to load clients</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Check your connection and try again.</p>
+                      <button
+                        onClick={() => refetchClients()}
+                        className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      >
+                        Retry
+                      </button>
                     </div>
                   ) : displayClients.length > 0 ? (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 2xl:grid-cols-3">

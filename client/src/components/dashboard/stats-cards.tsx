@@ -36,7 +36,7 @@ function formatCurrency(value: string | number | undefined) {
 }
 
 export default function StatsCards() {
-  const { data: stats, isLoading } = useQuery<DashboardStats>({
+  const { data: stats, isLoading, isError } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
@@ -48,6 +48,21 @@ export default function StatsCards() {
             key={i}
             className="h-[140px] animate-pulse rounded-[18px] border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
           />
+        ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex h-[140px] items-center justify-center rounded-[18px] border border-red-100 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/10"
+          >
+            <span className="text-xs text-red-500 dark:text-red-400">Failed to load</span>
+          </div>
         ))}
       </div>
     );

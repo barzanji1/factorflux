@@ -908,6 +908,16 @@ ${message}
   });
 
   // Invoices
+  app.get("/api/invoices", requireAuth, async (_req: any, res) => {
+    try {
+      const invoices = await storage.getInvoices();
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
       const invoiceData = insertInvoiceSchema.parse(req.body);
@@ -1710,7 +1720,7 @@ Trucking Pros Financial Team
   });
 
   // Follow-ups
-  app.get("/api/follow-ups", async (_req: any, res) => {
+  app.get("/api/follow-ups", requireAuth, async (_req: any, res) => {
     try {
       const followUps = await storage.getAllFollowUps();
       res.json(followUps);

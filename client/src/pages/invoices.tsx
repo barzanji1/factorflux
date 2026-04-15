@@ -32,16 +32,23 @@ export default function Invoices() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
-  const { data: invoices, isLoading: invoicesLoading } = useQuery<Invoice[]>({
+  const { data: invoices, isLoading: invoicesLoading, isError: invoicesError } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
   });
 
   const { data: searchResults } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices/search", { q: searchQuery }],
-    enabled: searchQuery.length > 0,
+    queryKey: ["/api/invoices/search", searchQuery],
+    enabled: searchQuery.trim().length > 0,
+    queryFn: async () => {
+      const res = await fetch(`/api/invoices/search?q=${encodeURIComponent(searchQuery)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
   });
 
-  const displayInvoices = searchQuery ? searchResults : invoices;
+  const displayInvoices = searchQuery.trim() ? searchResults : invoices;
   const invoiceList = displayInvoices || [];
 
   const handleCreateInvoice = () => {
@@ -222,6 +229,18 @@ export default function Invoices() {
                 {invoicesLoading ? (
                   <div className="flex items-center justify-center py-20">
                     <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                  </div>
+                ) : invoicesError ? (
+                  <div className="px-6 py-20 text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[22px] border border-red-200 bg-red-50 text-red-500 shadow-sm dark:border-red-900/40 dark:bg-red-950/20">
+                      <ReceiptText className="h-7 w-7" />
+                    </div>
+                    <p className="text-base font-semibold text-slate-900 dark:text-white">
+                      Failed to load invoices
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                      Check your connection and try refreshing the page.
+                    </p>
                   </div>
                 ) : invoiceList.length > 0 ? (
                   <div className="custom-scrollbar overflow-x-auto">

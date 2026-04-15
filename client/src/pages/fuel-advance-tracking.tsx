@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -257,17 +258,20 @@ export default function FuelAdvanceTracking() {
   };
 
   return (
-    <div className="w-full">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav
+          title="Fuel Advance Tracking"
+          subtitle="Monitor fuel advances by carrier, date, and processing agent"
+        />
+        <main className="custom-scrollbar flex-1 overflow-auto">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Fuel className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Fuel Advance Tracking</h1>
-                <p className="text-gray-600 mt-2">Monitor fuel advances by carrier, date, and processing agent</p>
-              </div>
             </div>
           </div>
           
@@ -675,6 +679,8 @@ export default function FuelAdvanceTracking() {
           </Form>
         </DialogContent>
       </Dialog>
+        </main>
+      </div>
     </div>
   );
 }
