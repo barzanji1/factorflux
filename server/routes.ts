@@ -426,7 +426,7 @@ ${message}
   });
 
   // Admin
-  app.get("/api/admin/users", async (_req: any, res) => {
+  app.get("/api/admin/users", requireAuth, async (_req: any, res) => {
     try {
       const allUsers = await storage.getAllUsers();
       res.json(allUsers);
@@ -437,7 +437,7 @@ ${message}
   });
 
   // Dashboard / Activities
-  app.get("/api/dashboard/stats", async (_req, res) => {
+  app.get("/api/dashboard/stats", requireAuth, async (_req: any, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -447,7 +447,7 @@ ${message}
     }
   });
 
-  app.get("/api/dashboard/recent-activities", async (_req, res) => {
+  app.get("/api/dashboard/recent-activities", requireAuth, async (_req: any, res) => {
     try {
       const activities = await storage.getActivities(10);
       res.json(activities);
@@ -457,7 +457,7 @@ ${message}
     }
   });
 
-  app.get("/api/activities", async (_req, res) => {
+  app.get("/api/activities", requireAuth, async (_req: any, res) => {
     try {
       const activities = await storage.getActivities();
       res.json(activities);
@@ -487,7 +487,7 @@ ${message}
   });
 
   // Documents
-  app.get("/api/documents", async (req, res) => {
+  app.get("/api/documents", requireAuth, async (req: any, res) => {
     try {
       const { load, invoice, entityType, entityId } = req.query;
       let documents;
@@ -512,7 +512,7 @@ ${message}
     }
   });
 
-  app.get("/api/documents/:id", async (req, res) => {
+  app.get("/api/documents/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const document = await storage.getDocument(id);
@@ -626,7 +626,7 @@ ${message}
     }
   });
 
-  app.get("/api/documents/:id/download", async (req, res) => {
+  app.get("/api/documents/:id/download", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const document = await storage.getDocument(id);
@@ -664,7 +664,7 @@ ${message}
     }
   });
 
-  app.get("/api/documents/:id/view", async (req, res) => {
+  app.get("/api/documents/:id/view", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const document = await storage.getDocument(id);
@@ -699,7 +699,7 @@ ${message}
   });
 
   // Clients
-  app.get("/api/clients", async (_req, res) => {
+  app.get("/api/clients", requireAuth, async (_req: any, res) => {
     try {
       const allClients = await storage.getClients();
       res.json(allClients);
@@ -709,7 +709,7 @@ ${message}
     }
   });
 
-  app.get("/api/clients/search", async (req, res) => {
+  app.get("/api/clients/search", requireAuth, async (req: any, res) => {
     try {
       const { q } = req.query;
 
@@ -730,12 +730,15 @@ ${message}
       const clientData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(clientData);
 
-      await upsertClientMirror(client);
-
-      await addClientActivityLog(client.id, {
-        type: "client_created",
-        message: `Client ${client.name} was created`,
-      });
+      try {
+        await upsertClientMirror(client);
+        await addClientActivityLog(client.id, {
+          type: "client_created",
+          message: `Client ${client.name} was created`,
+        });
+      } catch (fsErr) {
+        console.error(`[FIRESTORE] sync failed for new client id=${client.id}:`, fsErr);
+      }
 
       await storage.createActivity({
         userId: req.user.id,
@@ -781,12 +784,15 @@ ${message}
       const clientData = insertClientSchema.partial().parse(req.body);
       const client = await storage.updateClient(id, clientData);
 
-      await upsertClientMirror(client);
-
-      await addClientActivityLog(client.id, {
-        type: "client_updated",
-        message: `Client ${client.name} was updated`,
-      });
+      try {
+        await upsertClientMirror(client);
+        await addClientActivityLog(client.id, {
+          type: "client_updated",
+          message: `Client ${client.name} was updated`,
+        });
+      } catch (fsErr) {
+        console.error(`[FIRESTORE] sync failed for updated client id=${client.id}:`, fsErr);
+      }
 
       await storage.createActivity({
         userId: req.user.id,
@@ -848,7 +854,7 @@ ${message}
   });
 
   // Loads
-  app.get("/api/loads", async (_req, res) => {
+  app.get("/api/loads", requireAuth, async (_req: any, res) => {
     try {
       const loads = await storage.getLoads();
       res.json(loads);
@@ -979,7 +985,7 @@ ${message}
     }
   });
 
-  app.get("/api/invoices/search", async (req, res) => {
+  app.get("/api/invoices/search", requireAuth, async (req: any, res) => {
     try {
       const { q } = req.query;
       if (!q || typeof q !== "string") {
@@ -994,7 +1000,7 @@ ${message}
   });
 
   // Search
-  app.get("/api/search", async (req, res) => {
+  app.get("/api/search", requireAuth, async (req: any, res) => {
     try {
       const { q } = req.query;
       if (!q || typeof q !== "string") {
@@ -1019,7 +1025,7 @@ ${message}
   });
 
   // Fuel card applications
-  app.get("/api/fuel-card-applications", async (_req, res) => {
+  app.get("/api/fuel-card-applications", requireAuth, async (_req: any, res) => {
     try {
       const applications = await storage.getFuelCardApplications();
       res.json(applications);
@@ -1147,7 +1153,7 @@ ${message}
   });
 
   // Notifications
-  app.get("/api/notifications", async (req: any, res) => {
+  app.get("/api/notifications", requireAuth, async (req: any, res) => {
     try {
       const userId = "1";
       const limit = parseInt(req.query.limit as string, 10) || 20;
@@ -1159,7 +1165,7 @@ ${message}
     }
   });
 
-  app.get("/api/notifications/unread-count", async (_req: any, res) => {
+  app.get("/api/notifications/unread-count", requireAuth, async (_req: any, res) => {
     try {
       const count = await storage.getUnreadNotificationCount("1");
       res.json({ count });
@@ -1505,7 +1511,7 @@ Trucking Pros Financial Team
   });
 
   // Collections
-  app.get("/api/collections", async (_req: any, res) => {
+  app.get("/api/collections", requireAuth, async (_req: any, res) => {
     try {
       const collectionsData = await storage.getAllCollections();
       res.json(collectionsData);
@@ -1515,7 +1521,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get("/api/collections/client-performance", async (_req: any, res) => {
+  app.get("/api/collections/client-performance", requireAuth, async (_req: any, res) => {
     try {
       const performanceData = await storage.getClientPerformanceData();
       res.json(performanceData);
@@ -1525,7 +1531,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get("/api/collections/:id", async (req: any, res) => {
+  app.get("/api/collections/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const collection = await storage.getCollection(id);
