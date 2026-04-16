@@ -77,10 +77,11 @@ const PRODUCTION_USERS = [
     username: "agent1",
     password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla",
     name: "Production Agent",
-    role: "agent",
+    role: "employee",
     id: "prod-1",
     firstName: "TPF",
     lastName: "Agent",
+    verified: false,
   },
   {
     username: "manager1",
@@ -90,6 +91,7 @@ const PRODUCTION_USERS = [
     id: "prod-2",
     firstName: "TPF",
     lastName: "Manager",
+    verified: false,
   },
   {
     username: "admin1",
@@ -99,6 +101,7 @@ const PRODUCTION_USERS = [
     id: "prod-3",
     firstName: "System",
     lastName: "Admin",
+    verified: true,
   },
 ];
 
@@ -107,6 +110,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = (req.session as any)?.user;
     if (!user) {
       return res.status(401).json({ message: "Authentication required" });
+    }
+    req.user = user;
+    next();
+  };
+
+  const requireAdmin = (req: any, res: any, next: any) => {
+    const user = (req.session as any)?.user;
+    if (!user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
     }
     req.user = user;
     next();
@@ -133,6 +148,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
         name: user.name,
         role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        verified: user.verified,
       };
 
       res.json({
@@ -144,6 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: user.role,
           firstName: user.firstName,
           lastName: user.lastName,
+          verified: user.verified,
         },
       });
     } catch (error) {
@@ -426,7 +445,7 @@ ${message}
   });
 
   // Admin
-  app.get("/api/admin/users", requireAuth, async (_req: any, res) => {
+  app.get("/api/admin/users", requireAdmin, async (_req: any, res) => {
     try {
       const allUsers = await storage.getAllUsers();
       res.json(allUsers);
@@ -436,7 +455,7 @@ ${message}
     }
   });
 
-  app.patch("/api/admin/users/:id/role", requireAuth, async (req: any, res) => {
+  app.patch("/api/admin/users/:id/role", requireAdmin, async (req: any, res) => {
     try {
       const requestingUser = req.user;
       if (!requestingUser || (requestingUser.role !== "manager" && requestingUser.role !== "admin")) {

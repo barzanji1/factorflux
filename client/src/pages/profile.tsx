@@ -25,7 +25,8 @@ import {
   Briefcase, 
   Building,
   Calendar,
-  Shield
+  Shield,
+  BadgeCheck,
 } from "lucide-react";
 
 const departments = [
@@ -249,9 +250,14 @@ export default function Profile() {
                 
                 {/* Name and Job Title */}
                 <div className="text-center space-y-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {user.firstName} {user.lastName}
-                  </h3>
+                  <div className="flex items-center justify-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {user.firstName} {user.lastName}
+                    </h3>
+                    {user.verified && (
+                      <BadgeCheck className="h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                    )}
+                  </div>
                   {user.jobTitle && (
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       {user.jobTitle}
@@ -294,7 +300,15 @@ export default function Profile() {
                       <Shield className="w-4 h-4" />
                       Role
                     </Label>
-                    <p className="text-sm text-gray-900 dark:text-white mt-1 capitalize">{user.role}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-sm text-gray-900 dark:text-white capitalize">{user.role}</p>
+                      {user.verified && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
+                          <BadgeCheck className="h-3.5 w-3.5" />
+                          Verified
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500">Role is managed by administrators</p>
                   </div>
                 </div>

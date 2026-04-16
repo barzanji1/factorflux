@@ -1,0 +1,64 @@
+Assign my current account as a full admin user in FactorFlux and give it all admin privileges. Also mark my account as verified and display a filled verified checkmark badge in the UI.
+
+Goal:
+
+my current account should be recognized as admin everywhere in the system
+admin-only pages, actions, and controls should be fully accessible to my account
+my account should be marked as verified in the database/backend
+the UI should show a filled verified badge/checkmark for my account in all relevant locations
+
+Audit and update the following:
+
+user schema / database fields for role, admin status, permissions, and verified state
+seed logic or direct user update logic for my current account
+auth/session payload so frontend receives admin and verified flags
+route guards / middleware for admin access
+frontend permission checks so my account sees admin features
+profile/header/user display components so verified badge renders properly
+
+Requirements:
+
+set my account role to admin
+grant full admin privileges
+set verified = true
+ensure this persists in the database
+ensure it survives logout/login
+ensure backend and frontend both reflect the updated role and verified status
+ensure the verified badge is a filled checkmark, not outline-only
+
+Important:
+
+find my current account from the existing authenticated user / seeded user / active login flow
+do not hardcode fragile temporary logic unless absolutely necessary
+use the app’s real user model and auth flow
+preserve existing architecture
+
+Output:
+
+root cause if admin/verified support is incomplete
+exact files changed
+exact changes made
+verify that my account now has full admin access and verified badge rendering
+
+Then run this right after:
+
+Verify my account end to end:
+
+login with my current account
+confirm session includes admin privileges
+confirm admin-only UI is visible
+confirm admin-only backend routes allow access
+confirm verified state is true
+confirm filled verified checkmark appears in the correct UI locations
+confirm changes persist after refresh and re-login
+
+Use this if Replit needs to be more strict about permissions:
+
+Treat admin as a real system role, not just a frontend label.
+Ensure my account has full platform privileges across UI, API, and database behavior.
+Do not rely on visual-only admin state.
+The verified badge must be backed by actual account data and rendered consistently in the interface.
+
+Use this too if you want badge placement cleaned up:
+
+Add the verified filled checkmark badge to all relevant account display surfaces for my user, including any header profile area, account card, user menu, and admin/profile views where identity status should appear. Keep it clean, premium, and consistent with the current design system.

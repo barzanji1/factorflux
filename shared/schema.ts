@@ -56,6 +56,8 @@ export const users = pgTable("users", {
   theme: varchar("theme", { enum: ["light", "dark", "system"] }).default("system"),
   dateFormat: varchar("date_format").default("MM/dd/yyyy"),
   timeFormat: varchar("time_format", { enum: ["12h", "24h"] }).default("12h"),
+  // Verification status
+  verified: boolean("verified").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
