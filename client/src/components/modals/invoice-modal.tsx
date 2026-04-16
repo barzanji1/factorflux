@@ -459,7 +459,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-6xl border-slate-200/80 bg-[linear-gradient(to_bottom,_rgba(255,255,255,0.97),_rgba(248,250,252,0.98))] p-0 shadow-[0_30px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[hsl(var(--background))]">
+      <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-6xl flex-col border-slate-200/80 bg-[linear-gradient(to_bottom,_rgba(255,255,255,0.97),_rgba(248,250,252,0.98))] p-0 shadow-[0_30px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[hsl(var(--background))]">
         <DialogHeader className="shrink-0 border-b border-slate-200/70 px-8 pb-6 pt-8 dark:border-slate-800">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)]">
@@ -483,9 +483,9 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
           </DialogDescription>
         </DialogHeader>
 
-        <div className="custom-scrollbar max-h-[82vh] overflow-y-auto px-8 py-7">
+        <div className="custom-scrollbar flex-1 overflow-y-auto px-8 py-7">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit, onValidationError)} className="space-y-6">
+            <form id="invoice-form" onSubmit={form.handleSubmit(onSubmit, onValidationError)} className="space-y-6">
               {!invoice && (
                 <SectionCard
                   icon={<Upload className="h-5 w-5" />}
@@ -826,30 +826,32 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                 />
               </SectionCard>
 
-              <div className="sticky bottom-0 z-20 -mx-8 border-t border-slate-200/80 bg-white/90 px-8 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--background))]/90">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onClose}
-                    data-testid="button-cancel"
-                    className="h-11 rounded-2xl border-slate-200 px-5 dark:border-slate-700"
-                  >
-                    Cancel
-                  </Button>
-
-                  <Button
-                    type="submit"
-                    disabled={isSaving}
-                    data-testid="button-submit"
-                    className="h-11 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] hover:bg-blue-700"
-                  >
-                    {isSaving ? "Saving..." : invoice ? "Update Invoice" : "Create Invoice"}
-                  </Button>
-                </div>
-              </div>
             </form>
           </Form>
+        </div>
+
+        <div className="shrink-0 border-t border-slate-200/80 bg-white/90 px-8 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--background))]/90">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              data-testid="button-cancel"
+              className="h-11 rounded-2xl border-slate-200 px-5 dark:border-slate-700"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              form="invoice-form"
+              disabled={isSaving}
+              data-testid="button-submit"
+              className="h-11 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] hover:bg-blue-700"
+            >
+              {isSaving ? "Saving..." : invoice ? "Update Invoice" : "Create Invoice"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
