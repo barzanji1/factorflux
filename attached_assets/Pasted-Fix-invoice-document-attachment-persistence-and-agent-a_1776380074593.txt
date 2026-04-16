@@ -1,0 +1,110 @@
+Fix invoice document attachment persistence and agent access.
+
+Current issue:
+
+Invoice creation now works
+After submitting an invoice, the invoice record shows details like date and amount
+But uploaded PDF/documents are not attached to the invoice after save
+Agents cannot find, view, download, or export the uploaded documents from the system
+
+Goal:
+make uploaded invoice documents first-class records tied to each invoice and fully accessible to agents.
+
+Required outcome:
+
+every uploaded document is persisted correctly
+every uploaded document is linked to the correct invoice
+agents can open/view documents from the invoice page
+agents can download/export documents from the system
+documents remain available after refresh, logout/login, and across sessions
+invoice detail page clearly shows attached documents
+
+Audit the full document flow end to end:
+
+frontend file upload input
+upload request handling
+backend file upload route
+storage location / persistence
+database relation between invoice and uploaded documents
+invoice create flow and whether files are linked after invoice creation
+invoice detail/query response and whether attachments are returned
+UI rendering of attached files
+agent permissions to view/download/export files
+
+Specifically check for:
+
+files uploading only temporarily and not being persisted
+files stored but not linked to invoice ID
+invoice creation completing before document association happens
+uploaded file metadata not being saved in database
+backend response omitting attachments
+invoice details page not querying/rendering attachments
+static file serving or signed URL access not configured correctly
+documents saved under wrong path or inaccessible path
+PDF files upload successfully but are never displayed in the invoice record
+
+Requirements:
+
+create a real attachment model for invoice documents if missing
+each attachment should store enough metadata for operational use:
+invoice linkage
+original filename
+file type / mime type
+storage path or file URL
+uploaded timestamp
+uploader if available
+invoice detail page must show an “Attached Documents” section
+each attachment must have:
+View
+Download / Export
+agents must be able to access documents directly from the invoice workflow
+keep architecture production-ready, not temporary
+
+UX expectations:
+
+after invoice submission, the user can immediately see attached documents on that invoice
+agent can open a PDF in browser
+agent can download/export the original file
+empty state shows clearly when no docs exist
+upload failure shows a visible error
+
+Instructions:
+
+inspect the invoice form, upload logic, invoice create flow, backend storage logic, and invoice detail rendering
+find the exact point where attachments are being lost
+fix only what is necessary, but make the flow production-safe
+preserve existing invoice logic
+
+Output:
+
+root cause in 1–2 sentences
+exact files changed
+exact fixes applied
+confirm that invoice documents are now attached, viewable, downloadable, and persistent
+
+Then run this right after:
+
+Verify invoice document flow end to end:
+
+open create invoice
+upload one or more PDF/documents
+submit invoice
+confirm invoice is created
+confirm attachments are linked to the new invoice
+confirm invoice details page shows attached documents
+confirm agent can click View and open document
+confirm agent can click Download / Export and retrieve original file
+confirm documents persist after refresh and re-login
+confirm documents are still available in invoice list/detail workflows
+
+Use this too if you want the system to behave more like a real operating platform:
+
+Treat uploaded invoice documents as core operational records, not optional UI assets.
+Agents must be able to retrieve source documents at any time from the invoice record.
+Build this like a production document-access workflow for a financial operations platform.
+
+And this if Replit starts patching only the frontend:
+
+Do not fix this as a frontend-only issue.
+Trace the real lifecycle of uploaded documents from browser upload to backend persistence to database linkage to invoice retrieval and agent access.
+The fix is not complete unless documents survive refresh, appear on the invoice record, and are downloadable from the system.

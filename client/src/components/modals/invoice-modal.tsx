@@ -6,7 +6,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { insertInvoiceSchema, type Invoice, type Client } from "@shared/schema";
+import { insertInvoiceSchema, type Invoice, type Client, type Document } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,10 @@ import {
   Truck,
   CircleDollarSign,
   ClipboardList,
+  Eye,
+  Download,
+  Loader2,
+  Paperclip,
 } from "lucide-react";
 
 type DocKey = "rate_confirmation" | "bill_of_lading" | "lumper" | "receipts";
@@ -51,6 +55,13 @@ const DOC_SLOTS: { key: DocKey; label: string; hint: string }[] = [
   { key: "lumper", label: "Lumper Receipt", hint: "Any lumper receipt" },
   { key: "receipts", label: "Receipts", hint: "Additional receipts" },
 ];
+
+const DOC_TYPE_MAP: Record<DocKey, string> = {
+  rate_confirmation: "rate_confirmation",
+  bill_of_lading: "bill_of_lading",
+  lumper: "lumper_receipt",
+  receipts: "receipt",
+};
 
 function SectionCard({
   icon,
@@ -249,6 +260,16 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   });
   const [isUploading, setIsUploading] = useState(false);
 
+  const { data: invoiceDocuments, isLoading: docsLoading } = useQuery<Document[]>({
+    queryKey: ["/api/documents", "invoice", invoice?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/documents?invoice=${invoice!.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load documents");
+      return res.json();
+    },
+    enabled: !!invoice?.id && isOpen,
+  });
+
   const form = useForm<z.infer<typeof invoiceFormSchema>>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
@@ -345,7 +366,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
               const formData = new FormData();
               formData.append("file", file);
-              formData.append("documentType", key);
+              formData.append("documentType", DOC_TYPE_MAP[key]);
               formData.append("invoiceId", invoiceData.id.toString());
 
               await apiRequest("POST", "/api/documents/upload", formData);
@@ -393,12 +414,39 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     mutationFn: async (data: any) => {
       return await apiRequest("PUT", `/api/invoices/${invoice!.id}`, data);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      const hasFiles = Object.values(attachedFiles).some(Boolean);
+
+      if (hasFiles) {
+        setIsUploading(true);
+        try {
+          await Promise.all(
+            DOC_SLOTS.map(async ({ key }) => {
+              const file = attachedFiles[key];
+              if (!file) return;
+
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("documentType", DOC_TYPE_MAP[key]);
+              formData.append("invoiceId", invoice!.id.toString());
+
+              await apiRequest("POST", "/api/documents/upload", formData);
+            })
+          );
+        } catch (error) {
+          console.error("Error uploading documents:", error);
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
       toast({
         title: "Success",
         description: "Invoice updated successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", "invoice", invoice!.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       onClose();
     },
     onError: (error) => {
@@ -492,26 +540,92 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         <div className="custom-scrollbar flex-1 overflow-y-auto px-8 py-7">
           <Form {...form}>
             <form id="invoice-form" onSubmit={form.handleSubmit(onSubmit, onValidationError)} className="space-y-6">
-              {!invoice && (
-                <SectionCard
-                  icon={<Upload className="h-5 w-5" />}
-                  title="Attached Documents"
-                  description="Upload the core paperwork needed to process this invoice."
-                >
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    {DOC_SLOTS.map(({ key, label, hint }) => (
-                      <PremiumUploadTile
-                        key={key}
-                        label={label}
-                        hint={hint}
-                        file={attachedFiles[key]}
-                        onFile={(f) => setAttachedFiles((prev) => ({ ...prev, [key]: f }))}
-                        onRemove={() => setAttachedFiles((prev) => ({ ...prev, [key]: null }))}
-                      />
-                    ))}
+              <SectionCard
+                icon={<Upload className="h-5 w-5" />}
+                title="Attached Documents"
+                description={invoice ? "Documents linked to this invoice. Upload additional files below." : "Upload the core paperwork needed to process this invoice."}
+              >
+                {invoice && (
+                  <div className="mb-5">
+                    {docsLoading ? (
+                      <div className="flex items-center gap-2 py-3 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading documents...
+                      </div>
+                    ) : invoiceDocuments && invoiceDocuments.length > 0 ? (
+                      <div className="space-y-2">
+                        {invoiceDocuments.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
+                                <FileText className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                                  {doc.originalName}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                                  {doc.documentType?.replace(/_/g, " ")} &middot; {(doc.size / 1024).toFixed(0)} KB
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 rounded-xl border-slate-200 px-3 text-xs dark:border-slate-700"
+                                onClick={() => window.open(`/api/documents/${doc.id}/view`, "_blank")}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                View
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 rounded-xl border-slate-200 px-3 text-xs dark:border-slate-700"
+                                onClick={() => {
+                                  const a = document.createElement("a");
+                                  a.href = `/api/documents/${doc.id}/download`;
+                                  a.download = doc.originalName;
+                                  a.click();
+                                }}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                Download
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-5 dark:border-slate-700 dark:bg-slate-800/20">
+                        <Paperclip className="h-5 w-5 text-slate-400" />
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          No documents attached to this invoice yet.
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </SectionCard>
-              )}
+                )}
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {DOC_SLOTS.map(({ key, label, hint }) => (
+                    <PremiumUploadTile
+                      key={key}
+                      label={label}
+                      hint={hint}
+                      file={attachedFiles[key]}
+                      onFile={(f) => setAttachedFiles((prev) => ({ ...prev, [key]: f }))}
+                      onRemove={() => setAttachedFiles((prev) => ({ ...prev, [key]: null }))}
+                    />
+                  ))}
+                </div>
+              </SectionCard>
 
               <SectionCard
                 icon={<FileText className="h-5 w-5" />}
