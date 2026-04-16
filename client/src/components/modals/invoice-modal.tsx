@@ -427,6 +427,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       ...values,
       clientId: parseInt(values.clientId),
       amount: values.amount,
+      // Convert empty strings to undefined so enum/optional fields pass backend Zod validation
+      loadType: (values.loadType as string) || undefined,
+      bolNumber: values.bolNumber || undefined,
+      pickupLocation: values.pickupLocation || undefined,
+      deliveryLocation: values.deliveryLocation || undefined,
+      notes: values.notes || undefined,
     };
 
     if (invoice) {

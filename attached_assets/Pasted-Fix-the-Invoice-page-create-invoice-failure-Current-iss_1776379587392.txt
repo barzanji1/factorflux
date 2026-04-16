@@ -1,0 +1,76 @@
+Fix the Invoice page create-invoice failure.
+
+Current issue:
+
+User can open the create invoice form
+User can fill out the invoice fields
+User clicks the submit / create invoice button
+Invoice does NOT get created
+
+Goal:
+make the create-invoice flow fully functional end to end.
+
+Audit the full flow in this order:
+
+frontend submit handler
+form validation
+payload being sent
+API route being called
+backend request parsing
+database insert logic
+response handling
+frontend state refresh after success
+
+Specifically check for:
+
+submit button not actually triggering form submission
+preventDefault issues
+frontend validation silently blocking submit
+missing required fields in payload
+wrong field names between frontend and backend
+wrong endpoint path
+wrong HTTP method
+request body not parsed correctly
+backend route returning error without surfacing it in UI
+database insert failing because of schema mismatch
+numeric/date fields being sent in invalid format
+mutation succeeds but invoice list does not refresh
+
+Required outcome:
+
+clicking Create Invoice successfully creates the invoice
+errors are surfaced clearly if creation fails
+success updates the invoice list without manual refresh
+no silent failure
+loading state prevents duplicate submits
+
+Instructions:
+
+inspect the invoice page component, create invoice form/modal, submit handler, API route, and database create logic
+find the exact root cause
+fix only what is necessary
+preserve existing architecture
+return:
+root cause in 1–2 sentences
+exact files changed
+exact fixes applied
+confirmation that create-invoice now works end to end
+
+Then run this right after:
+
+Verify the create-invoice flow end to end:
+
+open invoice page
+click + New Invoice
+fill required fields
+click Create Invoice
+confirm API request succeeds
+confirm database row is created
+confirm success feedback appears
+confirm invoice list updates immediately
+confirm no duplicate invoice is created on repeated clicks during loading
+confirm invalid form input shows clear error states
+
+If Replit gives a vague answer, use this stricter prompt:
+
+Do not give generic advice. Trace the real failure through the actual codepath from submit button to database insert. Identify the exact breakpoint where invoice creation stops working, then fix that exact issue.
