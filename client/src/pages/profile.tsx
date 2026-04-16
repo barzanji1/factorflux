@@ -300,15 +300,7 @@ export default function Profile() {
                       <Shield className="w-4 h-4" />
                       Role
                     </Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="text-sm text-gray-900 dark:text-white capitalize">{user.role}</p>
-                      {user.verified && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
-                          <BadgeCheck className="h-3.5 w-3.5" />
-                          Verified
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-sm text-gray-900 dark:text-white capitalize mt-1">{user.role}</p>
                     <p className="text-xs text-gray-500">Role is managed by administrators</p>
                   </div>
                 </div>
