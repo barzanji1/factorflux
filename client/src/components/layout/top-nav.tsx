@@ -236,9 +236,23 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   const showHomeButton = pagesWithHomeButton.some((page) => location.startsWith(page));
 
   const authUserAny = authUser as any;
-  const fullName = `${authUserAny?.firstName || "Admin"} ${authUserAny?.lastName || "User"}`;
+
+  // Read the real display name from the profile store (same source as sidebar)
+  const profileData = (() => {
+    try {
+      const raw = window.localStorage.getItem("currentUser");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const displayFirstName = profileData?.firstName || authUserAny?.firstName || "Admin";
+  const displayLastName = profileData?.lastName || authUserAny?.lastName || "User";
+  const fullName = `${displayFirstName} ${displayLastName}`;
   const userRole = authUser?.role || "Employee";
   const avatarSrc =
+    profileData?.profileImageUrl ||
     authUserAny?.profileImageUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=2563EB&color=fff`;
 
