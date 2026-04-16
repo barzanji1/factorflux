@@ -14,6 +14,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 
 // Collection form schema
@@ -124,6 +125,26 @@ export default function CollectionsPage() {
     },
   });
 
+  // Delete collection mutation
+  const deleteCollectionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/collections/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to delete collection");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/collections/client-performance"] });
+      toast({ title: "Deleted", description: "Collection removed successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete collection", variant: "destructive" });
+    },
+  });
+
   // Update collection mutation
   const updateCollectionMutation = useMutation({
     mutationFn: async (data: { id: number; updates: Partial<CollectionFormData> }) => {
@@ -224,14 +245,17 @@ export default function CollectionsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopNav title="Collections" subtitle="Manage funds owed to TPF and track client performance" />
-      <main className="container mx-auto px-4 py-8">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Collections" subtitle="Manage funds owed to TPF and track client performance" />
+        <main className="custom-scrollbar flex-1 overflow-auto">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Collections</h1>
-            <p className="text-gray-600 mt-2">Manage funds owed to TPF and track client performance</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Collections</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">Manage funds owed to TPF and track client performance</p>
           </div>
           <Button onClick={openCreateDialog} data-testid="button-create-collection">
             <Plus className="h-4 w-4 mr-2" />
@@ -444,6 +468,20 @@ export default function CollectionsPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                          onClick={() => {
+                            if (confirm("Delete this collection record?")) {
+                              deleteCollectionMutation.mutate(collection.id);
+                            }
+                          }}
+                          disabled={deleteCollectionMutation.isPending}
+                          data-testid={`button-delete-${collection.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -626,7 +664,9 @@ export default function CollectionsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </main>
+      </div>
+        </main>
+      </div>
     </div>
   );
 }

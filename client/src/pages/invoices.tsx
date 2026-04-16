@@ -281,7 +281,7 @@ export default function Invoices() {
                             </td>
 
                             <td className="px-6 py-5 text-sm text-slate-600 dark:text-slate-300">
-                              #{invoice.loadId}
+                              {invoice.loadId ? `#${invoice.loadId}` : <span className="text-slate-400">—</span>}
                             </td>
 
                             <td className="px-6 py-5 text-sm font-semibold text-slate-900 dark:text-white">

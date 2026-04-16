@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -233,17 +234,20 @@ export default function Brokers() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopNav title="Brokers" subtitle="Manage freight broker relationships and contacts" />
-      <main className="container mx-auto px-4 py-8">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Brokers" subtitle="Manage freight broker relationships and contacts" />
+        <main className="custom-scrollbar flex-1 overflow-auto">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Building className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Brokers</h1>
-                <p className="text-gray-600 mt-2">Manage freight broker partnerships and relationships</p>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Brokers</h1>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">Manage freight broker partnerships and relationships</p>
               </div>
             </div>
           </div>
@@ -445,6 +449,7 @@ export default function Brokers() {
             )}
           </CardContent>
         </Card>
+      </div>
       </main>
 
       {/* Create/Edit Broker Dialog */}
@@ -708,6 +713,7 @@ export default function Brokers() {
           </Form>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

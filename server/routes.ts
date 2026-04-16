@@ -270,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Support
-  app.post("/api/support/contact", async (req, res) => {
+  app.post("/api/support/contact", requireAuth, async (req, res) => {
     try {
       const contactSchema = z.object({
         name: z.string().trim().min(1, "Name is required"),
@@ -342,7 +342,7 @@ ${message}
     }
   });
 
-  app.post("/api/support/messages", async (req, res) => {
+  app.post("/api/support/messages", requireAuth, async (req, res) => {
     try {
       const contactSchema = z.object({
         name: z.string().trim().min(1, "Name is required"),
@@ -415,7 +415,7 @@ ${message}
     }
   });
 
-  app.get("/api/support/messages", async (_req, res) => {
+  app.get("/api/support/messages", requireAuth, async (_req, res) => {
     try {
       const messages = await storage.getSupportMessages();
       res.json(messages);
@@ -1205,7 +1205,7 @@ ${message}
     }
   });
 
-  app.patch("/api/notifications/:id/read", async (req: any, res) => {
+  app.patch("/api/notifications/:id/read", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       await storage.markNotificationAsRead(id);
@@ -1216,7 +1216,7 @@ ${message}
     }
   });
 
-  app.patch("/api/notifications/mark-all-read", async (_req: any, res) => {
+  app.patch("/api/notifications/mark-all-read", requireAuth, async (_req: any, res) => {
     try {
       await storage.markAllNotificationsAsRead("1");
       res.json({ message: "All notifications marked as read" });
@@ -1810,293 +1810,7 @@ Trucking Pros Financial Team
     });
   });
 
-  app.post("/api/emergency-login", async (req, res) => {
-    try {
-      const { email, password, secret } = req.body;
 
-      if (email === "doshbarzanji@gmail.com" && password === "admin@tpf2025" && secret === "emergency-fix-2025") {
-        const foundUsers = await db
-          .select()
-          .from(userTable)
-          .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
-
-        if (foundUsers.length === 0) {
-          return res.status(404).json({ message: "User not found" });
-        }
-
-        const user = foundUsers[0];
-        (req.session as any).passport = { user: user.id };
-
-        return req.session.save((err) => {
-          if (err) {
-            return res.status(500).json({ message: "Session error" });
-          }
-
-          return res.json({
-            success: true,
-            message: "Emergency login successful",
-            user: {
-              id: user.id,
-              email: user.email,
-              role: user.role,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              authType: user.authType,
-            },
-          });
-        });
-      }
-
-      return res.status(401).json({ message: "Invalid emergency credentials" });
-    } catch (error) {
-      console.error("Emergency login error:", error);
-      res.status(500).json({ error: "Emergency login failed" });
-    }
-  });
-
-  app.post("/api/auth/production-fix", async (req, res) => {
-    try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password required" });
-      }
-
-      const foundUsers = await db
-        .select()
-        .from(userTable)
-        .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
-
-      if (foundUsers.length === 0) {
-        if (email !== "doshbarzanji@gmail.com") {
-          return res.status(404).json({ message: "User not found" });
-        }
-
-        const hashedPassword = await bcrypt.hash("admin@tpf2025", 10);
-        const newUser = await db
-          .insert(userTable)
-          .values({
-            id: crypto.randomUUID(),
-            email: "doshbarzanji@gmail.com",
-            password: hashedPassword,
-            authType: "local",
-            role: "admin",
-            firstName: "Dosh",
-            lastName: "Barzanji",
-          })
-          .returning();
-
-        req.login(newUser[0], (err) => {
-          if (err) {
-            console.error("Production fix: passport login error after creation", err);
-            return res.status(500).json({ message: "Login failed after user creation" });
-          }
-
-          return res.status(200).json({
-            message: "Admin user created and authenticated",
-            user: {
-              id: newUser[0].id,
-              email: newUser[0].email,
-              firstName: newUser[0].firstName,
-              lastName: newUser[0].lastName,
-              role: newUser[0].role,
-            },
-          });
-        });
-        return;
-      }
-
-      const user = foundUsers[0];
-      const isValid = await bcrypt.compare(password, user.password!);
-
-      if (!isValid) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      req.login(user, (err) => {
-        if (err) {
-          console.error("Production fix: passport login error", err);
-          return res.status(500).json({ message: "Session creation failed" });
-        }
-
-        return res.status(200).json({
-          message: "Authentication successful",
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-          },
-        });
-      });
-    } catch (error) {
-      console.error("Production fix error:", error);
-      res.status(500).json({
-        message: "Authentication failed",
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  });
-
-  app.post("/api/direct-auth-test", async (req, res) => {
-    try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password required" });
-      }
-
-      const foundUsers = await db
-        .select()
-        .from(userTable)
-        .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
-
-      if (foundUsers.length === 0) {
-        return res.status(401).json({ message: "User not found" });
-      }
-
-      const user = foundUsers[0];
-      const isValid = await bcrypt.compare(password, user.password!);
-
-      if (!isValid) {
-        return res.status(401).json({ message: "Invalid password" });
-      }
-
-      return res.json({
-        success: true,
-        message: "Direct authentication successful",
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        },
-      });
-    } catch (error) {
-      console.error("Direct auth error:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Direct auth failed" });
-    }
-  });
-
-  app.post("/api/reset-admin-password", async (req, res) => {
-    try {
-      const { secret } = req.body;
-
-      if (secret !== "reset-admin-2025") {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const freshPassword = "admintpf2025";
-      const freshHash = await bcrypt.hash(freshPassword, 12);
-
-      const result = await db
-        .update(userTable)
-        .set({ password: freshHash })
-        .where(and(eq(userTable.email, "doshbarzanji@gmail.com"), eq(userTable.authType, "local")))
-        .returning();
-
-      if (result.length === 0) {
-        return res.status(404).json({ message: "Admin user not found" });
-      }
-
-      const testValid = await bcrypt.compare(freshPassword, freshHash);
-
-      return res.json({
-        success: true,
-        message: "Admin password reset successfully",
-        user: {
-          id: result[0].id,
-          email: result[0].email,
-        },
-        passwordTest: testValid,
-        hashLength: freshHash.length,
-      });
-    } catch (error) {
-      console.error("Password reset error:", error);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : "Password reset failed",
-      });
-    }
-  });
-
-  app.post("/api/test-login", async (req, res) => {
-    try {
-      const { email, password, secret } = req.body;
-
-      if (secret !== "test-login-tpf-2025") {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const foundUsers = await db
-        .select()
-        .from(userTable)
-        .where(and(eq(userTable.email, email), eq(userTable.authType, "local")));
-
-      if (foundUsers.length === 0) {
-        return res.json({
-          success: false,
-          message: "User not found",
-          email,
-        });
-      }
-
-      const user = foundUsers[0];
-      const isValid = await bcrypt.compare(password, user.password!);
-
-      return res.json({
-        success: isValid,
-        message: isValid ? "Credentials valid" : "Password mismatch",
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        },
-        hashLength: user.password?.length,
-        passwordTested: password,
-      });
-    } catch (error) {
-      console.error("Test login error:", error);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : "Test failed",
-        details: error,
-      });
-    }
-  });
-
-  app.post("/api/migration/sync-admin", async (req, res) => {
-    try {
-      const { secret } = req.body;
-
-      if (secret !== "tpf-sync-admin-2025") {
-        return res.status(401).json({ message: "Unauthorized sync" });
-      }
-
-      const workingHash = "$2b$10$qca5rltTDf7A.k7UZjJphuIH.TjoX0RyX6BFVGhosWxgL3mObjXXO";
-
-      const result = await db
-        .update(users)
-        .set({ password: workingHash })
-        .where(eq(users.email, "doshbarzanji@gmail.com"))
-        .returning();
-
-      if (result.length === 0) {
-        return res.status(404).json({ error: "Admin user not found" });
-      }
-
-      return res.json({
-        success: true,
-        message: "Admin password synchronized successfully",
-        user: {
-          id: result[0].id,
-          email: result[0].email,
-          role: result[0].role,
-        },
-      });
-    } catch (error) {
-      console.error("Sync error:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Sync failed" });
-    }
-  });
 
   // Tasks
   app.get("/api/tasks", requireAuth, async (_req: any, res) => {

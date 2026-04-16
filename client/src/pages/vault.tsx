@@ -26,6 +26,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 
 // Vault form schema
@@ -247,17 +248,20 @@ export default function VaultPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopNav title="Client Vault" subtitle="Secure storage for confidential client information" />
-      <main className="container mx-auto px-4 py-8">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Client Vault" subtitle="Secure storage for confidential client information" />
+        <main className="custom-scrollbar flex-1 overflow-auto">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Shield className="h-8 w-8 text-red-600" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Client Vault</h1>
-                <p className="text-gray-600 mt-2">Secure storage for confidential client information</p>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Client Vault</h1>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">Secure storage for confidential client information</p>
               </div>
             </div>
           </div>
@@ -567,7 +571,9 @@ export default function VaultPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </main>
+      </div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -23,10 +23,18 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import InvoiceModal from "@/components/modals/invoice-modal";
 
 export default function Factoring() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("payments");
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+
+  const openInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setIsInvoiceModalOpen(true);
+  };
 
   const { data: invoices = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/invoices"],
@@ -302,10 +310,10 @@ export default function Factoring() {
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex gap-2">
-                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" data-testid={`button-view-${invoice.id}`}>
+                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" onClick={() => openInvoice(invoice)} title="View Invoice" data-testid={`button-view-${invoice.id}`}>
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" data-testid={`button-download-${invoice.id}`}>
+                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" onClick={() => openInvoice(invoice)} title="Edit Invoice" data-testid={`button-download-${invoice.id}`}>
                                         <Download className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -374,10 +382,10 @@ export default function Factoring() {
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex gap-2">
-                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" data-testid={`button-view-factored-${invoice.id}`}>
+                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" onClick={() => openInvoice(invoice)} title="View Invoice" data-testid={`button-view-factored-${invoice.id}`}>
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" data-testid={`button-download-factored-${invoice.id}`}>
+                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" onClick={() => openInvoice(invoice)} title="Edit Invoice" data-testid={`button-download-factored-${invoice.id}`}>
                                         <Download className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -482,10 +490,10 @@ export default function Factoring() {
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex gap-2">
-                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" data-testid={`button-view-revenue-${invoice.id}`}>
+                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" onClick={() => openInvoice(invoice)} title="View Invoice" data-testid={`button-view-revenue-${invoice.id}`}>
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" data-testid={`button-download-revenue-${invoice.id}`}>
+                                      <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl p-0" onClick={() => openInvoice(invoice)} title="Edit Invoice" data-testid={`button-download-revenue-${invoice.id}`}>
                                         <Download className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -510,6 +518,12 @@ export default function Factoring() {
           </div>
         </main>
       </div>
+
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => { setIsInvoiceModalOpen(false); setSelectedInvoice(null); }}
+        invoice={selectedInvoice}
+      />
     </div>
   );
 }

@@ -87,6 +87,14 @@ export default function CreditChecks() {
         />
         
         <main className="flex-1 overflow-auto p-6">
+          {/* Demo Data Notice */}
+          <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              <span className="font-semibold">Demo Data</span> — Credit check results shown below are sample data. Live credit bureau integration is coming soon.
+            </p>
+          </div>
+
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">

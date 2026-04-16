@@ -1,0 +1,65 @@
+Fix the Invoice page create flow.
+
+Current issue:
+
+On the Invoice page, clicking + New Invoice opens the invoice creation window correctly
+After the user fills in the invoice information, the page is missing the Submit / Create Invoice button
+This blocks the workflow completely
+
+Goal:
+
+make the invoice creation flow fully functional
+ensure there is a clear primary action button at the bottom of the form
+the button should be visible, properly aligned, and easy to find
+the button should submit the form and create the invoice correctly
+
+Audit and fix the following:
+
+whether the submit button was never added
+whether the button exists but is hidden by layout/styling
+whether the button is rendering outside the modal/form container
+whether conditional rendering is preventing it from showing
+whether the form/footer section is cut off because of modal height or overflow issues
+whether the action button is incorrectly placed in a scroll-hidden area
+
+Required outcome:
+
+invoice form has a visible primary submit button
+user can complete the form and create an invoice in one flow
+cancel and submit actions are both present if appropriate
+modal/drawer/form container is optimized so footer actions are always accessible
+form works well on desktop and does not hide the final action
+
+Instructions:
+
+inspect the Invoice page component and the create invoice modal/drawer/form component
+fix only what is necessary
+preserve existing invoice fields and logic
+return the exact files changed
+explain root cause briefly
+then implement the fix
+
+Use this too right after if needed:
+
+Now verify the full create-invoice workflow end to end:
+
+click + New Invoice
+form opens correctly
+all required fields are usable
+submit button is always visible
+clicking submit creates the invoice
+success updates the invoice list without manual refresh
+loading, success, and error states work properly
+no part of the modal/form is clipped or inaccessible
+
+And if you want a stricter UI fix prompt:
+
+Optimize the create-invoice form UI for operational use.
+Ensure the footer action area is always visible and includes:
+
+Cancel
+Create Invoice
+
+The primary submit button must never disappear after the form is filled out.
+If the form is long, keep the action area accessible with proper layout, spacing, scrolling, and container height behavior.
+Focus on usability and completion speed.
