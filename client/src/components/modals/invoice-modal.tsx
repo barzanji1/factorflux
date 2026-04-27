@@ -359,7 +359,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         try {
           const invoiceData = await response.json();
 
-          await Promise.all(
+          const results = await Promise.allSettled(
             DOC_SLOTS.map(async ({ key }) => {
               const file = attachedFiles[key];
               if (!file) return;
@@ -372,8 +372,23 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               await apiRequest("POST", "/api/documents/upload", formData);
             })
           );
-        } catch (error) {
+
+          const failures = results.filter((r) => r.status === "rejected");
+          if (failures.length > 0) {
+            const reason = (failures[0] as PromiseRejectedResult).reason;
+            toast({
+              title: "Document upload failed",
+              description: reason?.message || "One or more files could not be uploaded. Check file type and size.",
+              variant: "destructive",
+            });
+          }
+        } catch (error: any) {
           console.error("Error uploading documents:", error);
+          toast({
+            title: "Document upload failed",
+            description: error?.message || "Could not upload documents. Please try again.",
+            variant: "destructive",
+          });
         } finally {
           setIsUploading(false);
         }
@@ -420,7 +435,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       if (hasFiles) {
         setIsUploading(true);
         try {
-          await Promise.all(
+          const results = await Promise.allSettled(
             DOC_SLOTS.map(async ({ key }) => {
               const file = attachedFiles[key];
               if (!file) return;
@@ -433,8 +448,23 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               await apiRequest("POST", "/api/documents/upload", formData);
             })
           );
-        } catch (error) {
+
+          const failures = results.filter((r) => r.status === "rejected");
+          if (failures.length > 0) {
+            const reason = (failures[0] as PromiseRejectedResult).reason;
+            toast({
+              title: "Document upload failed",
+              description: reason?.message || "One or more files could not be uploaded. Check file type and size.",
+              variant: "destructive",
+            });
+          }
+        } catch (error: any) {
           console.error("Error uploading documents:", error);
+          toast({
+            title: "Document upload failed",
+            description: error?.message || "Could not upload documents. Please try again.",
+            variant: "destructive",
+          });
         } finally {
           setIsUploading(false);
         }

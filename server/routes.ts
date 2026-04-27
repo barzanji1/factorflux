@@ -42,7 +42,7 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf/;
+    const allowedTypes = /jpeg|jpg|png|pdf|tiff|tif/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
@@ -50,9 +50,21 @@ const upload = multer({
       return cb(null, true);
     }
 
-    cb(new Error("Only PDF, JPEG, JPG, and PNG files are allowed"));
+    cb(new Error("Only PDF, JPEG, JPG, PNG, and TIFF files are allowed"));
   },
 });
+
+function handleUpload(field: string) {
+  return (req: any, res: any, next: any) => {
+    upload.single(field)(req, res, (err: any) => {
+      if (!err) return next();
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ message: "File too large. Maximum size is 10MB." });
+      }
+      return res.status(400).json({ message: err.message || "File upload rejected." });
+    });
+  };
+}
 
 function sanitizeOriginalName(name: string) {
   return name
@@ -265,7 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/user/profile-image", upload.single("profileImage"), async (req: any, res) => {
+  app.post("/api/user/profile-image", handleUpload("profileImage"), async (req: any, res) => {
     try {
       const userId = "1";
 
@@ -551,6 +563,65 @@ ${message}
     }
   });
 
+  app.get("/api/invoices/:id/documents", requireAuth, async (req: any, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id, 10);
+      if (Number.isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
+      const docs = await storage.getDocumentsByInvoice(invoiceId);
+      res.json(docs);
+    } catch (error) {
+      console.error("Error fetching invoice documents:", error);
+      res.status(500).json({ message: "Failed to fetch invoice documents" });
+    }
+  });
+
+  app.post("/api/invoices/:id/documents", requireAuth, handleUpload("file"), async (req: any, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id, 10);
+      if (Number.isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { documentType, sourceChannel } = req.body;
+      const processedOriginalName = sanitizeOriginalName(req.file.originalname);
+
+      const documentData = {
+        filename: req.file.filename,
+        originalName: processedOriginalName,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        documentType: (documentType as any) || "other",
+        loadId: null,
+        invoiceId,
+        uploadedBy: req.user.id,
+        sourceChannel: (sourceChannel as any) || "manual",
+        status: "processing" as const,
+      };
+
+      const document = await storage.createDocument(documentData);
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "document_uploaded",
+        description: `Uploaded document: ${document.originalName}`,
+        entityType: "document",
+        entityId: document.id,
+        metadata: buildDocumentMetadata(document),
+      });
+
+      setTimeout(async () => {
+        try { await storage.updateDocument(document.id, { status: "processed" }); } catch {}
+      }, 2000);
+
+      res.status(201).json({ ...document, ...buildDocumentMetadata(document) });
+    } catch (error) {
+      console.error("Error uploading invoice document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
   app.get("/api/documents/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -567,7 +638,7 @@ ${message}
     }
   });
 
-  app.post("/api/documents/upload", requireAuth, upload.single("file"), async (req: any, res) => {
+  app.post("/api/documents/upload", requireAuth, handleUpload("file"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });

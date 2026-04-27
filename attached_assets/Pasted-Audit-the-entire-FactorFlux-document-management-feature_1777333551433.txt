@@ -1,0 +1,31 @@
+Audit the entire FactorFlux document management feature and make it production-ready. Here is exactly what needs to work:
+Core Requirements:
+
+Create an invoice with documents — files upload successfully during invoice creation
+Open that invoice — all uploaded documents are visible immediately, no refresh needed
+View — clicking View opens the PDF or image directly in the browser (authenticated route)
+Download — clicking Download pulls the original file to the user's machine
+Add documents to an existing invoice from the edit modal
+Documents survive refresh, logout, and re-login — stored in uploads/ directory, linked via invoiceId in the database permanently
+
+Audit Checklist — verify each of these:
+
+ documents table exists in Drizzle schema with id, invoiceId, filename, originalName, mimeType, size, uploadedAt, uploadedBy
+ Drizzle schema has been pushed (db:push run)
+ Multer is configured to store files in uploads/ with unique filenames (no collisions)
+ POST /api/invoices/:id/documents — authenticated, handles multipart/form-data, saves to DB
+ GET /api/invoices/:id/documents — returns all docs for an invoice
+ GET /api/documents/:id/view — streams file with correct Content-Type for inline browser viewing
+ GET /api/documents/:id/download — streams file with Content-Disposition: attachment
+ DELETE /api/documents/:id — removes file from disk and DB row
+ All document routes are protected by session auth middleware
+ uploads/ directory is excluded from .gitignore being wiped but persists on the server
+ Frontend invoice detail view fetches and displays documents via React Query
+ View and Download buttons call the correct authenticated endpoints
+ Edit modal includes a document upload section that posts to the existing invoice
+ React Query invalidates the document list after upload or delete so UI updates without refresh
+ File type validation — only allow PDF, JPG, PNG, TIFF (BOL and rate con formats)
+ File size limit enforced (recommend 10MB per file)
+ Error states handled on frontend — failed uploads show a toast/message
+
+Fix anything that is missing, broken, or incomplete. Do not skip any item on this checklist.
