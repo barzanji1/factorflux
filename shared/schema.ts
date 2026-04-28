@@ -324,6 +324,27 @@ export const supportMessages = pgTable("support_messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Client messages (outbound emails to clients/carriers)
+export const clientMessages = pgTable("client_messages", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  sentBy: varchar("sent_by").references(() => users.id).notNull(),
+  subject: varchar("subject").notNull(),
+  messageType: varchar("message_type", {
+    enum: ["request_documents", "payment_notice", "general_inquiry", "follow_up"],
+  }).notNull(),
+  body: text("body").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  status: varchar("status", { enum: ["sent", "failed"] }).default("sent").notNull(),
+});
+
+export const insertClientMessageSchema = createInsertSchema(clientMessages).omit({
+  id: true,
+  sentAt: true,
+});
+export type ClientMessage = typeof clientMessages.$inferSelect;
+export type InsertClientMessage = z.infer<typeof insertClientMessageSchema>;
+
 // Fuel card applications table
 export const fuelCardApplications = pgTable("fuel_card_applications", {
   id: integer("id").primaryKey(),

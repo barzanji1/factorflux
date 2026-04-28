@@ -17,6 +17,9 @@ import {
   followUps,
   collections,
   clientVault,
+  clientMessages,
+  type ClientMessage,
+  type InsertClientMessage,
   type User,
   type UpsertUser,
   type TimeEntry,
@@ -128,6 +131,10 @@ export interface IStorage {
   getSupportMessage(id: number): Promise<SupportMessage | undefined>;
   createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage>;
   deleteSupportMessage(id: number): Promise<void>;
+
+  // Client message operations (outbound to clients/carriers)
+  createClientMessage(message: InsertClientMessage): Promise<ClientMessage>;
+  getClientMessages(clientId?: number): Promise<ClientMessage[]>;
 
   // Dashboard statistics
   getDashboardStats(): Promise<{
@@ -794,6 +801,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSupportMessage(id: number): Promise<void> {
     await db.delete(supportMessages).where(eq(supportMessages.id, id));
+  }
+
+  async createClientMessage(message: InsertClientMessage): Promise<ClientMessage> {
+    const [row] = await db.insert(clientMessages).values(message).returning();
+    return row;
+  }
+
+  async getClientMessages(clientId?: number): Promise<ClientMessage[]> {
+    if (clientId) {
+      return await db
+        .select()
+        .from(clientMessages)
+        .where(eq(clientMessages.clientId, clientId))
+        .orderBy(desc(clientMessages.sentAt));
+    }
+    return await db.select().from(clientMessages).orderBy(desc(clientMessages.sentAt));
   }
 
   // Dashboard statistics

@@ -488,6 +488,99 @@ ${message}
     }
   });
 
+  // Client/Carrier messaging
+  app.post("/api/messages/send", requireAuth, async (req: any, res) => {
+    try {
+      const bodySchema = z.object({
+        clientId: z.number().int().positive(),
+        subject: z.string().trim().min(1, "Subject is required"),
+        messageType: z.enum(["request_documents", "payment_notice", "general_inquiry", "follow_up"]),
+        body: z.string().trim().min(1, "Message body is required"),
+      });
+
+      const { clientId, subject, messageType, body } = bodySchema.parse(req.body);
+      const userId = req.session?.user?.id || req.user?.id;
+
+      const [client] = await db.select().from(clients).where(eq(clients.id, clientId));
+      if (!client) return res.status(404).json({ error: "Client not found" });
+
+      let emailStatus: "sent" | "failed" = "failed";
+      let emailError = "";
+
+      if (client.email) {
+        const messageTypeLabel: Record<string, string> = {
+          request_documents: "Document Request",
+          payment_notice: "Payment Notice",
+          general_inquiry: "General Inquiry",
+          follow_up: "Follow Up",
+        };
+
+        const html = `
+          <div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:24px;">
+            <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
+              <h2 style="margin:0;font-size:20px;">Trucking Pros Financial</h2>
+              <p style="margin:4px 0 0;opacity:.8;font-size:13px;">${messageTypeLabel[messageType] || messageType}</p>
+            </div>
+            <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+              <p style="color:#374151;font-size:15px;margin:0 0 16px;">Dear ${client.name},</p>
+              <div style="white-space:pre-wrap;color:#111827;font-size:15px;line-height:1.6;">${body}</div>
+              <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;" />
+              <p style="color:#9ca3af;font-size:12px;margin:0;">Trucking Pros Financial &bull; Support@Truckingprosfinancial.com &bull; 385-495-4962</p>
+            </div>
+          </div>
+        `;
+
+        const sent = await sendEmail({
+          to: client.email,
+          from: "Support@Truckingprosfinancial.com",
+          subject,
+          text: body,
+          html,
+        });
+        emailStatus = sent ? "sent" : "failed";
+        if (!sent) emailError = "SendGrid delivery failed";
+      } else {
+        emailError = "Client has no email address on file";
+      }
+
+      const logged = await storage.createClientMessage({
+        clientId,
+        sentBy: userId,
+        subject,
+        messageType,
+        body,
+        status: emailStatus,
+      });
+
+      if (emailStatus === "failed") {
+        return res.status(207).json({
+          success: false,
+          error: emailError || "Email could not be delivered",
+          message: logged,
+        });
+      }
+
+      res.status(200).json({ success: true, message: logged });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message || "Invalid request" });
+      }
+      console.error("Client message send error:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/messages", requireAuth, async (req, res) => {
+    try {
+      const clientId = req.query.clientId ? Number(req.query.clientId) : undefined;
+      const messages = await storage.getClientMessages(clientId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching client messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
   // Admin
   app.get("/api/admin/users", requireAdmin, async (_req: any, res) => {
     try {

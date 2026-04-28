@@ -7,6 +7,8 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **April 28, 2026**: Client Messaging System implemented — agents can email clients/carriers directly from the Help Center Contact tab. Includes SendGrid delivery via Support@Truckingprosfinancial.com, client_messages table for audit logging (id, clientId, sentBy, subject, messageType, body, sentAt, status), GET /api/messages?clientId= and POST /api/messages/send routes, sent messages history log per client. Contact cards fixed (Primary Contact/Dosh Barzanji, Support Email, Emergency Line — no duplicates).
+- **April 28, 2026**: Vault feature fully debugged and operational — AES-256-GCM server-side encryption, auto-increment sequence added directly via SQL, Drizzle alias() fix for double leftJoin, route order fixed (entry/:id before :clientId wildcard), frontend rewritten to send plaintext to server.
 - **August 22, 2025**: Complete production authentication system implemented and time clock feature fully operational
 - Secure login page with professional design and form validation
 - Session-based authentication using express-session with bcrypt password hashing

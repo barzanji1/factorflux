@@ -6,6 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -57,25 +72,305 @@ import {
   Terminal,
   Server,
   MapPin,
+  Loader2,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+
+const MESSAGE_TYPE_LABELS: Record<string, string> = {
+  request_documents: "Request Documents",
+  payment_notice: "Payment Notice",
+  general_inquiry: "General Inquiry",
+  follow_up: "Follow Up",
+};
+
+function ContactTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [subject, setSubject] = useState("");
+  const [messageType, setMessageType] = useState<string>("");
+  const [body, setBody] = useState("");
+
+  const { data: clients = [] } = useQuery<Array<{ id: number; name: string; email?: string }>>({
+    queryKey: ["/api/clients"],
+  });
+
+  const { data: sentMessages = [], isLoading: messagesLoading } = useQuery<any[]>({
+    queryKey: ["/api/messages", selectedClientId],
+    queryFn: async () => {
+      const url = selectedClientId
+        ? `/api/messages?clientId=${selectedClientId}`
+        : "/api/messages";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch messages");
+      return res.json();
+    },
+    enabled: !!selectedClientId,
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          clientId: selectedClientId,
+          subject,
+          messageType,
+          body,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 207) throw new Error(data.error || "Failed to send");
+      if (res.status === 207) throw new Error(data.error || "Email delivery failed");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedClientId] });
+      toast({ title: "Message sent", description: "Email delivered to client successfully." });
+      setSubject("");
+      setMessageType("");
+      setBody("");
+    },
+    onError: (err: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedClientId] });
+      toast({ title: "Send failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const canSend =
+    !!selectedClientId &&
+    subject.trim().length > 0 &&
+    messageType.length > 0 &&
+    body.trim().length > 0 &&
+    !sendMutation.isPending;
+
+  return (
+    <div className="space-y-6">
+      {/* Contact Cards */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white text-center shadow-md dark:bg-[hsl(var(--card))]">
+          <CardHeader>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+              <Users className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-lg text-slate-900 dark:text-white">Primary Contact</CardTitle>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Main point of contact</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="font-medium text-blue-600 dark:text-blue-400">Dosh Barzanji</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Email: <span className="font-medium">Dosh@truckingprosfinancial.com</span>
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Phone: <span className="font-medium">385-495-4962</span>
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Internal use only</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white text-center shadow-md dark:bg-[hsl(var(--card))]">
+          <CardHeader>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+              <Mail className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-lg text-slate-900 dark:text-white">Support Email</CardTitle>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Client-facing support</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="font-medium text-emerald-600 dark:text-emerald-400">Support@Truckingprosfinancial.com</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Mon–Fri 7AM–3PM MST</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white text-center shadow-md dark:bg-[hsl(var(--card))]">
+          <CardHeader>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400">
+              <Phone className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-lg text-slate-900 dark:text-white">Emergency Line</CardTitle>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Urgent operational issues</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="font-medium text-red-600 dark:text-red-400">385-495-4962</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">24/7 availability</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Send Message Form */}
+      <Card className="mx-auto max-w-2xl rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
+            <Send className="h-5 w-5" />
+            Send a Message
+          </CardTitle>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Email a client or carrier directly. All messages are logged.
+          </p>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Client / Carrier
+              </label>
+              <Select
+                value={selectedClientId?.toString() ?? ""}
+                onValueChange={(v) => setSelectedClientId(Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client or carrier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                      {c.email ? "" : " (no email)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Message Type
+              </label>
+              <Select value={messageType} onValueChange={setMessageType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="request_documents">Request Documents</SelectItem>
+                  <SelectItem value="payment_notice">Payment Notice</SelectItem>
+                  <SelectItem value="general_inquiry">General Inquiry</SelectItem>
+                  <SelectItem value="follow_up">Follow Up</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Subject
+            </label>
+            <Input
+              placeholder="Message subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              disabled={sendMutation.isPending}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Message
+            </label>
+            <Textarea
+              placeholder="Type your message here..."
+              rows={5}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              disabled={sendMutation.isPending}
+            />
+          </div>
+
+          <Button
+            className="h-11 w-full rounded-xl"
+            disabled={!canSend}
+            onClick={() => sendMutation.mutate()}
+          >
+            {sendMutation.isPending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>
+            ) : (
+              <><Send className="mr-2 h-4 w-4" /> Send Message</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Sent Messages Log */}
+      {selectedClientId && (
+        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
+              <MessageCircle className="h-5 w-5" />
+              Sent Messages
+            </CardTitle>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Message history for {clients.find((c) => c.id === selectedClientId)?.name}
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            {messagesLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading messages...
+              </div>
+            ) : sentMessages.length === 0 ? (
+              <div className="py-10 text-center text-slate-500 text-sm">
+                No messages sent to this client yet.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sentMessages.map((msg: any) => (
+                    <TableRow key={msg.id}>
+                      <TableCell className="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        {new Date(msg.sentAt).toLocaleDateString()}{" "}
+                        {new Date(msg.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-900 dark:text-white max-w-[200px] truncate">
+                        {msg.subject}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-xs">
+                          {MESSAGE_TYPE_LABELS[msg.messageType] || msg.messageType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {msg.status === "sent" ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                            <CheckCircle className="h-3.5 w-3.5" /> Sent
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 text-sm font-medium">
+                            <XCircle className="h-3.5 w-3.5" /> Failed
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
 
 export default function HelpPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [featureSearchQuery, setFeatureSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-
-  const [contactName, setContactName] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactSubject, setContactSubject] = useState("");
-  const [contactMessage, setContactMessage] = useState("");
-  const [contactLoading, setContactLoading] = useState(false);
-  const [contactStatus, setContactStatus] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
 
   const quickStartGuides = [
     {
@@ -579,34 +874,6 @@ export default function HelpPage() {
     "Workflow",
   ];
 
-  const contactOptions = [
-    {
-      title: "Technical Support",
-      description: "Get help with system issues",
-      icon: Settings,
-      contact: "Dosh Barzanji",
-      email: "Dosh@truckingprosfinancial.com",
-      phone: "385-495-4962",
-      hours: "Internal use only",
-    },
-    {
-      title: "Account Management",
-      description: "Questions about your account",
-      icon: Users,
-      contact: "Support@Truckingprosfinancial.com",
-      hours: "Monday - Friday, 7 AM - 3 PM MST",
-    },
-    {
-      title: "Emergency Support",
-      description: "Urgent operational issues",
-      icon: Phone,
-      contact: "Dosh Barzanji",
-      email: "Dosh@truckingprosfinancial.com",
-      phone: "385-495-4962",
-      hours: "24/7 Emergency Line",
-    },
-  ];
-
   const filteredFAQ = faqItems.filter(
     (item) =>
       item.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -623,55 +890,6 @@ export default function HelpPage() {
       selectedCategory === "All" || feature.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
-
-      const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setContactLoading(true);
-        setContactStatus(null);
-
-        try {
-          const response = await fetch("/api/support/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              name: contactName.trim(),
-              email: contactEmail.trim(),
-              subject: contactSubject.trim(),
-              message: contactMessage.trim(),
-            }),
-          });
-
-          const data = await response.json().catch(() => null);
-
-          if (!response.ok) {
-            throw new Error(data?.error || "Failed to send message.");
-          }
-
-          setContactStatus({
-            type: "success",
-            message: data?.message || "Message sent successfully.",
-          });
-
-          setContactName("");
-          setContactEmail("");
-          setContactSubject("");
-          setContactMessage("");
-        } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Something went wrong while sending your message.";
-
-          setContactStatus({
-            type: "error",
-            message,
-          });
-        } finally {
-          setContactLoading(false);
-        }
-      };
 
   return (
     <AppShell
@@ -985,111 +1203,7 @@ export default function HelpPage() {
           </TabsContent>
 
           <TabsContent value="contact" className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {contactOptions.map((option, index) => (
-                <Card
-                  key={index}
-                  className="rounded-[24px] border border-[hsl(var(--border))] bg-white text-center shadow-md dark:bg-[hsl(var(--card))]"
-                >
-                  <CardHeader>
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
-                      <option.icon className="h-6 w-6" />
-                    </div>
-                    <CardTitle className="text-lg text-slate-900 dark:text-white">
-                      {option.title}
-                    </CardTitle>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {option.description}
-                    </p>
-                  </CardHeader>
-
-                  <CardContent className="space-y-2">
-                    <p className="font-medium text-blue-600 dark:text-blue-400">
-                      {option.contact}
-                    </p>
-                    {option.email && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Email:{" "}
-                        <span className="font-medium">{option.email}</span>
-                      </p>
-                    )}
-                    {option.phone && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Text: <span className="font-medium">{option.phone}</span>
-                      </p>
-                    )}
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {option.hours}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <Card className="mx-auto max-w-2xl rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
-                  <MessageCircle className="h-5 w-5" />
-                  <span>Send us a message</span>
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent className="p-6">
-                <form onSubmit={handleContactSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Input
-                      placeholder="Your Name"
-                      value={contactName}
-                      onChange={(e) => setContactName(e.target.value)}
-                      disabled={contactLoading}
-                    />
-                    <Input
-                      type="email"
-                      placeholder="Your Email"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                      disabled={contactLoading}
-                    />
-                  </div>
-
-                  <Input
-                    placeholder="Subject"
-                    value={contactSubject}
-                    onChange={(e) => setContactSubject(e.target.value)}
-                    disabled={contactLoading}
-                  />
-
-                  <Textarea
-                    placeholder="Describe your issue or question..."
-                    rows={4}
-                    value={contactMessage}
-                    onChange={(e) => setContactMessage(e.target.value)}
-                    disabled={contactLoading}
-                  />
-
-                  {contactStatus && (
-                    <div
-                      className={cn(
-                        "rounded-xl border px-4 py-3 text-sm",
-                        contactStatus.type === "success"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
-                          : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                      )}
-                    >
-                      {contactStatus.message}
-                    </div>
-                  )}
-
-                  <Button
-                    type="submit"
-                    className="h-11 w-full rounded-xl"
-                    disabled={contactLoading}
-                  >
-                    {contactLoading ? "Sending..." : "Send Message"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+            <ContactTab />
           </TabsContent>
 
           <TabsContent value="resources" className="space-y-6">
