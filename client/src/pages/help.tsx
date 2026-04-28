@@ -185,7 +185,7 @@ function ContactTab() {
             <p className="text-sm text-slate-500 dark:text-slate-400">Client-facing support</p>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="font-medium text-emerald-600 dark:text-emerald-400 break-all">Support@Truckingprosfinancial.com</p>
+            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Support@Truckingprosfinancial.com</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">Mon–Fri 7AM–3PM MST</p>
           </CardContent>
         </Card>
