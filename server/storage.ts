@@ -67,6 +67,8 @@ export interface IStorage {
   updateUserProfile(id: string, updates: Partial<User>): Promise<User>;
   getAllUsers(): Promise<User[]>;
   getUserByEmailAndType(email: string, authType: string): Promise<User[]>;
+  createAgent(data: { id: string; firstName: string; lastName: string; email: string; role: string; password: string; createdBy: string }): Promise<User>;
+  deleteUser(id: string): Promise<void>;
 
   // Client operations
   getClients(): Promise<Client[]>;
@@ -254,6 +256,26 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(and(eq(users.email, email), eq(users.authType, authType as "replit" | "local")));
+  }
+
+  async createAgent(data: { id: string; firstName: string; lastName: string; email: string; role: string; password: string; createdBy: string }): Promise<User> {
+    const [row] = await db.insert(users).values({
+      id: data.id,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      password: data.password,
+      role: data.role as "employee" | "manager" | "admin",
+      authType: "local",
+      status: "active",
+      createdBy: data.createdBy,
+      verified: true,
+    }).returning();
+    return row;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
   }
 
   // Client operations

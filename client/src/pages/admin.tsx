@@ -1,467 +1,535 @@
-import { useEffect, useState } from "react";
-// Authentication removed
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Users, Shield, UserCog, Mail, Copy } from "lucide-react";
-import { User } from "@shared/schema";
+import {
+  Users, Shield, UserPlus, Pencil, Trash2, Ban, CheckCircle,
+  Loader2, Mail,
+} from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from "@/components/ui/form";
 
+// ---------- Types ----------
+interface UserRecord {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role: string;
+  status?: string;
+  createdAt?: string;
+  jobTitle?: string;
+  department?: string;
+  profileImageUrl?: string;
+}
 
+// ---------- Schemas ----------
+const addAgentSchema = z.object({
+  firstName: z.string().min(1, "First name required"),
+  lastName: z.string().min(1, "Last name required"),
+  email: z.string().email("Valid email required"),
+  role: z.enum(["employee", "manager", "admin"]),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const editUserSchema = z.object({
+  firstName: z.string().min(1, "First name required"),
+  lastName: z.string().min(1, "Last name required"),
+  email: z.string().email("Valid email required"),
+  role: z.enum(["employee", "manager", "admin"]),
+});
+
+type AddAgentForm = z.infer<typeof addAgentSchema>;
+type EditUserForm = z.infer<typeof editUserSchema>;
+
+// ---------- Helpers ----------
+const ROLE_BADGE: Record<string, JSX.Element> = {
+  admin: <Badge className="bg-purple-600 hover:bg-purple-700 text-white">Admin</Badge>,
+  manager: <Badge className="bg-blue-600 hover:bg-blue-700 text-white">Manager</Badge>,
+  employee: <Badge variant="outline">Employee</Badge>,
+};
+
+const STATUS_BADGE: Record<string, JSX.Element> = {
+  active: <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300">Active</Badge>,
+  suspended: <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300">Suspended</Badge>,
+  inactive: <Badge variant="outline" className="text-slate-500">Inactive</Badge>,
+};
+
+// ---------- Component ----------
 export default function Admin() {
   const { toast } = useToast();
-  // Authentication removed - using mock admin user
-  const user = { id: "1", role: "admin", firstName: "Admin", lastName: "User" };
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
-  const [emailForm, setEmailForm] = useState({
-    email: '',
-    clientName: '',
-    message: ''
+  const queryClient = useQueryClient();
+
+  // Current session user
+  const { data: session } = useQuery<{ user: UserRecord }>({
+    queryKey: ["/api/auth/verify"],
   });
+  const currentUser = session?.user;
 
-  // Authentication system removed
+  // Guard: only admin
+  if (currentUser && currentUser.role !== "admin") {
+    return (
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <TopNav title="Admin Panel" subtitle="Access Denied" />
+          <main className="flex flex-1 items-center justify-center p-6">
+            <Card className="max-w-md w-full text-center">
+              <CardHeader>
+                <Shield className="h-12 w-12 mx-auto text-red-500 mb-2" />
+                <CardTitle className="text-red-600">Access Denied</CardTitle>
+                <CardDescription>Admin role required to access this panel.</CardDescription>
+              </CardHeader>
+            </Card>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
-  // Check if user is manager
-  useEffect(() => {
-    if (user && (user as any).role !== 'manager' && (user as any).role !== 'admin') {
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to access this page.",
-        variant: "destructive",
-      });
-    }
-  }, [user, toast]);
+  // ----- State -----
+  const [addOpen, setAddOpen] = useState(false);
+  const [editUser, setEditUser] = useState<UserRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
 
-  const { data: users, isLoading: isLoadingUsers } = useQuery({
+  // ----- Queries -----
+  const { data: users = [], isLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/admin/users"],
-    enabled: !!user && ((user as any).role === 'manager' || (user as any).role === 'admin'),
+    enabled: currentUser?.role === "admin",
   });
 
-  const updateUserRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const response = await apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role });
-      return response.json();
+  // ----- Mutations -----
+  const createMutation = useMutation({
+    mutationFn: async (data: AddAgentForm) => {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to create agent");
+      return json;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({
-        title: "Success",
-        description: "User role updated successfully",
-      });
+      setAddOpen(false);
+      toast({ title: "Agent created", description: "Welcome email sent with login credentials." });
     },
-    onError: (error: any) => {
-      const errorMessage = isUnauthorizedError(error) 
-        ? "You don't have permission to update user roles"
-        : "Failed to update user role";
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<UserRecord> }) => {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updates),
       });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to update user");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setEditUser(null);
+      toast({ title: "User updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to delete user");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setDeleteTarget(null);
+      toast({ title: "User removed" });
+    },
+    onError: (e: Error) => {
+      setDeleteTarget(null);
+      toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
 
-  const sendInstallerLinks = useMutation({
-    mutationFn: async (data: { email: string; clientName: string; message: string }) => {
-      const response = await apiRequest("POST", "/api/email/installer-links", data);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.emailContent) {
-        // Show email content in a modal or copy to clipboard
-        const emailText = `To: ${data.emailContent.to}\nSubject: ${data.emailContent.subject}\n\n${data.emailContent.text}`;
-        
-        // Try to copy to clipboard
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(emailText).then(() => {
-            toast({
-              title: "Email Copied to Clipboard!",
-              description: "Email content copied successfully. Paste it into your email client and send.",
-            });
-            console.log('Email content copied to clipboard:', emailText.substring(0, 200) + '...');
-          }).catch((error) => {
-            console.error('Clipboard failed:', error);
-            showEmailContentDialog(emailText);
-          });
-        } else {
-          console.log('Clipboard not available, showing email content');
-          showEmailContentDialog(emailText);
-        }
-      } else {
-        toast({
-          title: "Email Sent",
-          description: data.message,
-        });
-      }
-      setEmailForm({ email: '', clientName: '', message: '' });
-    },
-    onError: (error: any) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send installer links",
-        variant: "destructive",
-      });
-    },
+  // ----- Forms -----
+  const addForm = useForm<AddAgentForm>({
+    resolver: zodResolver(addAgentSchema),
+    defaultValues: { firstName: "", lastName: "", email: "", role: "employee", password: "" },
   });
 
-  const handleRoleChange = (userId: string, newRole: string) => {
-    setSelectedRoles(prev => ({ ...prev, [userId]: newRole }));
+  const editForm = useForm<EditUserForm>({
+    resolver: zodResolver(editUserSchema),
+    defaultValues: { firstName: "", lastName: "", email: "", role: "employee" },
+  });
+
+  const openEdit = (u: UserRecord) => {
+    setEditUser(u);
+    editForm.reset({
+      firstName: u.firstName || "",
+      lastName: u.lastName || "",
+      email: u.email || "",
+      role: (u.role as "employee" | "manager" | "admin") || "employee",
+    });
   };
 
-  const handleUpdateRole = (userId: string) => {
-    const newRole = selectedRoles[userId];
-    if (!newRole) return;
-
-    updateUserRole.mutate({ userId, role: newRole });
-  };
-
-  const showEmailContentDialog = (emailText: string) => {
-    // Create a simple dialog to show email content
-    const dialog = document.createElement('div');
-    dialog.style.cssText = `
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      background: white; border: 2px solid #ccc; border-radius: 8px;
-      padding: 20px; max-width: 80%; max-height: 80%; overflow: auto;
-      z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    `;
-    
-    dialog.innerHTML = `
-      <h3 style="margin-top: 0; color: #333;">Email Content Ready</h3>
-      <p style="color: #666; margin-bottom: 15px;">Copy this content and paste it into your email client:</p>
-      <textarea readonly style="width: 100%; height: 300px; font-family: monospace; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">${emailText}</textarea>
-      <div style="margin-top: 15px; text-align: right;">
-        <button onclick="this.parentElement.parentElement.remove()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Close</button>
-      </div>
-    `;
-    
-    document.body.appendChild(dialog);
-    
-    // Select all text in textarea
-    const textarea = dialog.querySelector('textarea');
-    if (textarea) {
-      textarea.select();
-      textarea.focus();
-    }
-  };
-
-  const handleSendEmail = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailForm.email) {
-      toast({
-        title: "Error",
-        description: "Email address is required",
-        variant: "destructive",
-      });
+  const handleSuspend = (u: UserRecord) => {
+    if (u.id === currentUser?.id) {
+      toast({ title: "Not allowed", description: "You cannot suspend your own account.", variant: "destructive" });
       return;
     }
-    sendInstallerLinks.mutate(emailForm);
+    const newStatus = u.status === "suspended" ? "active" : "suspended";
+    updateMutation.mutate({ id: u.id, updates: { status: newStatus } });
   };
 
-
-
-  if (isLoadingUsers) {
-    return (
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNav title="Admin Panel" subtitle="Loading..." />
-          <main className="flex-1 overflow-auto p-6">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-              <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user || ((user as any).role !== 'manager' && (user as any).role !== 'admin')) {
-    return (
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TopNav title="Admin Panel" subtitle="Access Denied" />
-          <main className="flex-1 overflow-auto p-6">
-            <Card className="max-w-md mx-auto">
-              <CardHeader className="text-center">
-                <Shield className="w-12 h-12 mx-auto text-red-500 mb-4" />
-                <CardTitle className="text-red-600">Access Denied</CardTitle>
-                <CardDescription>
-                  You don't have permission to access the admin panel. Manager role required.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </main>
-        </div>
-      </div>
-    );
-  }
+  const isSelf = (id: string) => id === currentUser?.id;
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav 
-          title="Admin Panel" 
-          subtitle="Manage user roles and permissions"
-        />
-        
-        <main className="flex-1 overflow-auto p-6">
-          <div className="space-y-6">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Admin Panel" subtitle="User and agent management" />
+        <main className="custom-scrollbar flex-1 overflow-auto p-6">
+          <div className="space-y-6 max-w-7xl mx-auto">
+
+            {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-2">
-                  Manage user roles and permissions
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">User Management</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  {users.length} {users.length === 1 ? "account" : "accounts"} in the system
                 </p>
               </div>
-              <div className="flex items-center space-x-2 text-blue-600">
-                <UserCog className="w-5 h-5" />
-                <span className="font-medium">Manager Dashboard</span>
-              </div>
+              <Button onClick={() => { addForm.reset(); setAddOpen(true); }} className="gap-2">
+                <UserPlus className="h-4 w-4" />
+                Add Agent
+              </Button>
             </div>
 
-            {/* Email Installer Links Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Mail className="w-5 h-5 mr-2" />
-                  Send FactorFlux Access
+            {/* Stats row */}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[
+                { label: "Total Users", value: users.length, color: "text-slate-900 dark:text-white" },
+                { label: "Admins", value: users.filter((u) => u.role === "admin").length, color: "text-purple-600 dark:text-purple-400" },
+                { label: "Managers", value: users.filter((u) => u.role === "manager").length, color: "text-blue-600 dark:text-blue-400" },
+                { label: "Suspended", value: users.filter((u) => u.status === "suspended").length, color: "text-amber-600 dark:text-amber-400" },
+              ].map((stat) => (
+                <Card key={stat.label} className="rounded-[20px] border border-[hsl(var(--border))]">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Users Table */}
+            <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  System Users
                 </CardTitle>
-                <CardDescription>
-                  Email FactorFlux access links and desktop installers to clients
-                </CardDescription>
+                <CardDescription>Manage roles, status, and access for all accounts</CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSendEmail} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Client Email Address *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="client@company.com"
-                        value={emailForm.email}
-                        onChange={(e) => setEmailForm(prev => ({ ...prev, email: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="clientName">Client Name (Optional)</Label>
-                      <Input
-                        id="clientName"
-                        placeholder="John Smith"
-                        value={emailForm.clientName}
-                        onChange={(e) => setEmailForm(prev => ({ ...prev, clientName: e.target.value }))}
-                      />
-                    </div>
+              <CardContent className="p-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-16 gap-2 text-slate-500">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Loading users...
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="message">Additional Message (Optional)</Label>
-                    <Textarea
-                      id="message"
-                      placeholder="Add any additional instructions or information for the client..."
-                      value={emailForm.message}
-                      onChange={(e) => setEmailForm(prev => ({ ...prev, message: e.target.value }))}
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Email content will be prepared and copied to clipboard for manual sending
-                    </div>
-                    <Button 
-                      type="submit" 
-                      disabled={sendInstallerLinks.isPending}
-                      className="flex items-center space-x-2"
-                    >
-                      {sendInstallerLinks.isPending ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span>Sending...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="w-4 h-4" />
-                          <span>Prepare Email</span>
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                    <div className="text-sm text-yellow-800 dark:text-yellow-200">
-                      <strong>Note:</strong> Email content will be prepared and copied to your clipboard. 
-                      You can then paste and send it through your preferred email client.
-                    </div>
-                  </div>
-                </form>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date Added</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((u) => (
+                        <TableRow key={u.id} className={u.status === "suspended" ? "opacity-60" : ""}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={u.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent((u.firstName || "?") + "+" + (u.lastName || ""))}&background=3B82F6&color=fff&size=32`}
+                                alt=""
+                                className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                              />
+                              <div>
+                                <div className="font-medium text-slate-900 dark:text-white">
+                                  {u.firstName} {u.lastName}
+                                  {isSelf(u.id) && <span className="ml-2 text-xs text-slate-400">(you)</span>}
+                                </div>
+                                {u.jobTitle && <div className="text-xs text-slate-500">{u.jobTitle}</div>}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-600 dark:text-slate-300 text-sm">
+                            {u.email || "—"}
+                          </TableCell>
+                          <TableCell>{ROLE_BADGE[u.role] || <Badge variant="outline">{u.role}</Badge>}</TableCell>
+                          <TableCell>{STATUS_BADGE[u.status || "active"] || STATUS_BADGE.active}</TableCell>
+                          <TableCell className="text-sm text-slate-500">
+                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Edit */}
+                              <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Edit">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {/* Suspend / Reactivate */}
+                              {!isSelf(u.id) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleSuspend(u)}
+                                  disabled={updateMutation.isPending}
+                                  title={u.status === "suspended" ? "Reactivate" : "Suspend"}
+                                >
+                                  {u.status === "suspended" ? (
+                                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                  ) : (
+                                    <Ban className="h-4 w-4 text-amber-600" />
+                                  )}
+                                </Button>
+                              )}
+                              {/* Delete */}
+                              {!isSelf(u.id) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteTarget(u)}
+                                  title="Remove"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+                {!isLoading && users.length === 0 && (
+                  <div className="py-12 text-center text-slate-500">No users found</div>
+                )}
               </CardContent>
             </Card>
-
-
-
-
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Users className="w-5 h-5 mr-2" />
-            User Management
-          </CardTitle>
-          <CardDescription>
-            View and manage user roles within the system
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Current Role</TableHead>
-                <TableHead>Change Role</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(users as User[])?.map((userData: User) => (
-                <TableRow key={userData.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={userData.profileImageUrl || `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=3B82F6&color=fff`}
-                        alt={`${userData.firstName} ${userData.lastName}`}
-                        className="w-8 h-8 rounded-full object-cover"
-                      />
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {userData.firstName} {userData.lastName}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {userData.jobTitle || "No job title"}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-600 dark:text-gray-300">
-                    {userData.email || "No email"}
-                  </TableCell>
-                  <TableCell className="text-gray-600 dark:text-gray-300">
-                    {userData.phone || "No phone"}
-                  </TableCell>
-                  <TableCell className="text-gray-600 dark:text-gray-300">
-                    {userData.department || "No department"}
-                  </TableCell>
-                  <TableCell>
-                    {userData.role === 'manager' ? (
-                      <Badge variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">
-                        Manager
-                      </Badge>
-                    ) : userData.role === 'admin' ? (
-                      <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
-                        Admin
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
-                        Employee
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {userData.id !== (user as any).id ? (
-                      <Select
-                        value={selectedRoles[userData.id] || userData.role || 'employee'}
-                        onValueChange={(value) => handleRoleChange(userData.id, value)}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="employee">Employee</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        (Your account)
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {userData.id !== (user as any).id && selectedRoles[userData.id] && selectedRoles[userData.id] !== userData.role ? (
-                      <Button
-                        size="sm"
-                        onClick={() => handleUpdateRole(userData.id)}
-                        disabled={updateUserRole.isPending}
-                      >
-                        {updateUserRole.isPending ? "Updating..." : "Update"}
-                      </Button>
-                    ) : userData.id === (user as any).id ? (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Cannot modify
-                      </span>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {!users || (users as User[]).length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              No users found
-            </div>
-          )}
-        </CardContent>
-      </Card>
           </div>
         </main>
       </div>
+
+      {/* ---- Add Agent Modal ---- */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Add New Agent
+            </DialogTitle>
+            <DialogDescription>
+              Create a new agent account. A welcome email with login credentials will be sent automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...addForm}>
+            <form onSubmit={addForm.handleSubmit((d) => createMutation.mutate(d))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={addForm.control} name="firstName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl><Input {...field} placeholder="Jane" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={addForm.control} name="lastName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl><Input {...field} placeholder="Doe" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={addForm.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Address</FormLabel>
+                  <FormControl><Input {...field} type="email" placeholder="jane.doe@example.com" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={addForm.control} name="role" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={addForm.control} name="password" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Temporary Password</FormLabel>
+                    <FormControl><Input {...field} type="password" placeholder="Min 6 characters" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/20 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
+                <Mail className="h-4 w-4 flex-shrink-0" />
+                Login credentials will be emailed to the agent automatically.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</> : "Create Agent"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---- Edit User Modal ---- */}
+      <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) setEditUser(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Edit User
+            </DialogTitle>
+            <DialogDescription>Update name, email, or role for {editUser?.firstName} {editUser?.lastName}.</DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit((d) => {
+              if (editUser) updateMutation.mutate({ id: editUser.id, updates: d });
+            })} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={editForm.control} name="firstName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="lastName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={editForm.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl><Input {...field} type="email" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={editForm.control} name="role" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={isSelf(editUser?.id || "")}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="employee">Employee</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {isSelf(editUser?.id || "") && (
+                    <p className="text-xs text-slate-500">You cannot change your own role.</p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---- Delete Confirmation ---- */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove User Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deleteTarget?.firstName} {deleteTarget?.lastName}</strong>'s account.
+              This action cannot be undone. Consider suspending the account instead if you may need to restore access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              {deleteMutation.isPending ? "Removing..." : "Remove User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

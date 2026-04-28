@@ -58,6 +58,9 @@ export const users = pgTable("users", {
   timeFormat: varchar("time_format", { enum: ["12h", "24h"] }).default("12h"),
   // Verification status
   verified: boolean("verified").default(false),
+  // Account status
+  status: varchar("status", { enum: ["active", "suspended", "inactive"] }).default("active").notNull(),
+  createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

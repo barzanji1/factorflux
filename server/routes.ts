@@ -175,40 +175,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      const user = PRODUCTION_USERS.find((u) => u.username === username);
 
-      if (!user) {
+      // 1. Check hardcoded production users first (by username)
+      const prodUser = PRODUCTION_USERS.find((u) => u.username === username);
+      if (prodUser) {
+        const isValid = await bcrypt.compare(password, prodUser.password);
+        if (!isValid) return res.status(401).json({ message: "Invalid credentials" });
+
+        // Check live DB status for prod users (allows admin to suspend them)
+        const dbRecord = await storage.getUser(prodUser.id);
+        if (dbRecord && (dbRecord as any).status === "suspended") {
+          return res.status(403).json({ message: "Your account has been suspended. Contact your administrator." });
+        }
+
+        const sessionUser = {
+          id: prodUser.id,
+          username: prodUser.username,
+          name: prodUser.name,
+          role: prodUser.role,
+          firstName: prodUser.firstName,
+          lastName: prodUser.lastName,
+          verified: prodUser.verified,
+        };
+        (req.session as any).user = sessionUser;
+        return res.json({ success: true, user: sessionUser });
+      }
+
+      // 2. Fall back to DB users (login with email as username)
+      const dbUser = await storage.getUserByEmail(username);
+      if (!dbUser || !dbUser.password) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const isValid = await bcrypt.compare(password, user.password);
+      const isValid = await bcrypt.compare(password, dbUser.password);
+      if (!isValid) return res.status(401).json({ message: "Invalid credentials" });
 
-      if (!isValid) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      if ((dbUser as any).status === "suspended") {
+        return res.status(403).json({ message: "Your account has been suspended. Contact your administrator." });
+      }
+      if ((dbUser as any).status === "inactive") {
+        return res.status(403).json({ message: "This account has been deactivated." });
       }
 
-      (req.session as any).user = {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        verified: user.verified,
+      const sessionUser = {
+        id: dbUser.id,
+        username: dbUser.email || dbUser.id,
+        name: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim(),
+        role: dbUser.role,
+        firstName: dbUser.firstName || "",
+        lastName: dbUser.lastName || "",
+        verified: dbUser.verified ?? false,
       };
-
-      res.json({
-        success: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          verified: user.verified,
-        },
-      });
+      (req.session as any).user = sessionUser;
+      return res.json({ success: true, user: sessionUser });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -581,7 +600,7 @@ ${message}
     }
   });
 
-  // Admin
+  // Admin — User Management
   app.get("/api/admin/users", requireAdmin, async (_req: any, res) => {
     try {
       const allUsers = await storage.getAllUsers();
@@ -592,24 +611,158 @@ ${message}
     }
   });
 
-  app.patch("/api/admin/users/:id/role", requireAdmin, async (req: any, res) => {
+  app.post("/api/admin/users", requireAdmin, async (req: any, res) => {
     try {
-      const requestingUser = req.user;
-      if (!requestingUser || (requestingUser.role !== "manager" && requestingUser.role !== "admin")) {
-        return res.status(403).json({ message: "Only managers and admins can update user roles" });
-      }
+      const schema = z.object({
+        firstName: z.string().trim().min(1, "First name required"),
+        lastName: z.string().trim().min(1, "Last name required"),
+        email: z.string().trim().email("Valid email required"),
+        role: z.enum(["employee", "manager", "admin"]),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+      });
+      const { firstName, lastName, email, role, password } = schema.parse(req.body);
+      const adminUser = req.user;
+
+      // Check for duplicate email
+      const existing = await storage.getUserByEmail(email);
+      if (existing) return res.status(409).json({ error: "An account with this email already exists" });
+
+      const id = `agent-${Date.now()}`;
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const newUser = await storage.createAgent({
+        id,
+        firstName,
+        lastName,
+        email,
+        role,
+        password: passwordHash,
+        createdBy: adminUser.id,
+      });
+
+      // Send welcome email
+      const welcomeHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;">
+          <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
+            <h2 style="margin:0;">Welcome to FactorFlux</h2>
+            <p style="margin:4px 0 0;opacity:.8;font-size:13px;">Trucking Pros Financial</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+            <p>Hi ${firstName},</p>
+            <p>Your FactorFlux account has been created. Here are your login credentials:</p>
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
+              <p style="margin:0 0 8px;"><strong>Login URL:</strong> ${req.protocol}://${req.get("host")}/login</p>
+              <p style="margin:0 0 8px;"><strong>Email:</strong> ${email}</p>
+              <p style="margin:0;"><strong>Temporary Password:</strong> ${password}</p>
+            </div>
+            <p>Please log in and change your password as soon as possible.</p>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb;" />
+            <p style="color:#9ca3af;font-size:12px;margin:0;">Trucking Pros Financial · Support@Truckingprosfinancial.com</p>
+          </div>
+        </div>
+      `;
+      await sendEmail({
+        to: email,
+        from: "Support@Truckingprosfinancial.com",
+        subject: "Your FactorFlux Account Has Been Created",
+        text: `Welcome to FactorFlux!\n\nEmail: ${email}\nTemporary Password: ${password}\n\nPlease log in at ${req.protocol}://${req.get("host")}/login`,
+        html: welcomeHtml,
+      });
+
+      await storage.createActivity({
+        userId: adminUser.id,
+        type: "user_created",
+        entityType: "user",
+        entityId: 0,
+        description: `Created new agent account: ${firstName} ${lastName} (${email}) with role: ${role}`,
+      });
+
+      res.status(201).json(newUser);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0]?.message });
+      console.error("Error creating agent:", error);
+      res.status(500).json({ error: "Failed to create agent" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const adminUser = req.user;
       const { id } = req.params;
-      const { role } = req.body;
-      const validRoles = ["employee", "agent", "manager", "admin"];
-      if (!role || !validRoles.includes(role)) {
-        return res.status(400).json({ message: "Invalid role. Must be one of: " + validRoles.join(", ") });
+      const schema = z.object({
+        firstName: z.string().trim().min(1).optional(),
+        lastName: z.string().trim().min(1).optional(),
+        email: z.string().trim().email().optional(),
+        role: z.enum(["employee", "manager", "admin"]).optional(),
+        status: z.enum(["active", "suspended", "inactive"]).optional(),
+      });
+      const updates = schema.parse(req.body);
+
+      // Guard: admin cannot suspend/deactivate their own account
+      if (id === adminUser.id && updates.status && updates.status !== "active") {
+        return res.status(400).json({ error: "You cannot suspend your own account" });
       }
-      const updatedUser = await storage.updateUserProfile(id, { role });
+
+      const updatedUser = await storage.updateUserProfile(id, updates as any);
+
+      await storage.createActivity({
+        userId: adminUser.id,
+        type: "user_updated",
+        entityType: "user",
+        entityId: 0,
+        description: `Updated user ${id}: ${JSON.stringify(updates)}`,
+      });
+
       res.json(updatedUser);
     } catch (error) {
-      console.error("Error updating user role:", error);
-      res.status(500).json({ message: "Failed to update user role" });
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0]?.message });
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
     }
+  });
+
+  app.delete("/api/admin/users/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const adminUser = req.user;
+      const { id } = req.params;
+
+      if (id === adminUser.id) {
+        return res.status(400).json({ error: "You cannot delete your own account" });
+      }
+
+      // Prevent deleting hardcoded production users
+      const isProdUser = ["prod-1", "prod-2", "prod-3"].includes(id);
+      if (isProdUser) {
+        return res.status(400).json({ error: "Cannot delete system production accounts. Use suspend instead." });
+      }
+
+      await storage.deleteUser(id);
+
+      await storage.createActivity({
+        userId: adminUser.id,
+        type: "user_deleted",
+        entityType: "user",
+        entityId: 0,
+        description: `Deleted user account: ${id}`,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Legacy role-only patch (kept for backwards compat)
+  app.patch("/api/admin/users/:id/role", requireAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const { role } = req.body;
+    const validRoles = ["employee", "manager", "admin"];
+    if (!role || !validRoles.includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+    const updatedUser = await storage.updateUserProfile(id, { role } as any);
+    res.json(updatedUser);
   });
 
   // Dashboard / Activities
