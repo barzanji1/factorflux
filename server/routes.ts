@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 
@@ -64,6 +65,37 @@ function handleUpload(field: string) {
       return res.status(400).json({ message: err.message || "File upload rejected." });
     });
   };
+}
+
+function vaultKey(): Buffer {
+  const secret = process.env.VAULT_SECRET || process.env.SESSION_SECRET || "vault-default-secret-key";
+  return crypto.scryptSync(secret, "vault-salt-v1", 32);
+}
+
+function encryptVault(plaintext: string): string {
+  const key = vaultKey();
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
+}
+
+function decryptVault(encryptedText: string): string {
+  try {
+    const key = vaultKey();
+    const parts = encryptedText.split(":");
+    if (parts.length !== 3) return "***LEGACY***";
+    const [ivHex, authTagHex, encryptedHex] = parts;
+    const iv = Buffer.from(ivHex, "hex");
+    const authTag = Buffer.from(authTagHex, "hex");
+    const encrypted = Buffer.from(encryptedHex, "hex");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+    return decipher.update(encrypted) + decipher.final("utf8");
+  } catch {
+    return "***DECRYPTION ERROR***";
+  }
 }
 
 function sanitizeOriginalName(name: string) {
@@ -1715,13 +1747,36 @@ Trucking Pros Financial Team
     }
   });
 
-  // Vault
+  // Vault — NOTE: specific sub-routes must be registered BEFORE the :clientId wildcard
+  app.get("/api/vault/entry/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
+
+      const entry = await storage.getVaultEntry(id);
+      if (!entry) return res.status(404).json({ message: "Vault entry not found" });
+
+      await storage.recordVaultAccess(id, req.user.id);
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "vault_accessed",
+        description: `Accessed vault entry: ${(entry as any).label}`,
+        entityType: "vault",
+        entityId: id,
+      });
+
+      const decryptedValue = decryptVault((entry as any).encryptedData);
+      res.json({ ...entry, decryptedValue });
+    } catch (error) {
+      console.error("Error fetching vault entry:", error);
+      res.status(500).json({ message: "Failed to fetch vault entry" });
+    }
+  });
+
   app.get("/api/vault/:clientId", requireAuth, async (req: any, res) => {
     try {
       const clientId = parseInt(req.params.clientId, 10);
-      if (Number.isNaN(clientId)) {
-        return res.status(400).json({ message: "Invalid client ID" });
-      }
+      if (Number.isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
 
       const vaultEntries = await storage.getAllVaultEntries(clientId);
       res.json(vaultEntries);
@@ -1731,37 +1786,39 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get("/api/vault/entry/:id", requireAuth, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) {
-        return res.status(400).json({ message: "Invalid vault entry ID" });
-      }
-
-      const entry = await storage.getVaultEntry(id);
-      if (!entry) {
-        return res.status(404).json({ message: "Vault entry not found" });
-      }
-
-      await storage.recordVaultAccess(id, req.user.id);
-      res.json(entry);
-    } catch (error) {
-      console.error("Error fetching vault entry:", error);
-      res.status(500).json({ message: "Failed to fetch vault entry" });
-    }
-  });
-
   app.post("/api/vault", requireAuth, async (req: any, res) => {
     try {
+      const { value, clientId, dataType, label, notes } = req.body;
+      if (!value) return res.status(400).json({ message: "Value is required" });
+      if (!clientId) return res.status(400).json({ message: "Client is required" });
+
+      const encryptedData = encryptVault(String(value));
+
       const data = insertClientVaultSchema.parse({
-        ...req.body,
+        clientId: parseInt(String(clientId), 10),
+        dataType: dataType || "other",
+        label,
+        encryptedData,
+        notes: notes || null,
         createdBy: req.user.id,
       });
 
       const entry = await storage.createVaultEntry(data);
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "vault_created",
+        description: `Created vault entry: ${label}`,
+        entityType: "vault",
+        entityId: entry.id,
+      });
+
       res.status(201).json(entry);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating vault entry:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid vault data", errors: error.errors });
+      }
       res.status(500).json({ message: "Failed to create vault entry" });
     }
   });
@@ -1769,13 +1826,22 @@ Trucking Pros Financial Team
   app.patch("/api/vault/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) {
-        return res.status(400).json({ message: "Invalid vault entry ID" });
-      }
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
 
-      const entry = await storage.updateVaultEntry(id, {
-        ...req.body,
-        createdBy: req.user.id,
+      const updates: any = {};
+      if (req.body.label) updates.label = req.body.label;
+      if (req.body.dataType) updates.dataType = req.body.dataType;
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.value) updates.encryptedData = encryptVault(String(req.body.value));
+
+      const entry = await storage.updateVaultEntry(id, updates);
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "vault_updated",
+        description: `Updated vault entry: ${entry.label}`,
+        entityType: "vault",
+        entityId: id,
       });
 
       res.json(entry);
@@ -1785,12 +1851,29 @@ Trucking Pros Financial Team
     }
   });
 
+  app.put("/api/vault/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
+
+      const updates: any = {};
+      if (req.body.label) updates.label = req.body.label;
+      if (req.body.dataType) updates.dataType = req.body.dataType;
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.value) updates.encryptedData = encryptVault(String(req.body.value));
+
+      const entry = await storage.updateVaultEntry(id, updates);
+      res.json(entry);
+    } catch (error) {
+      console.error("Error updating vault entry (PUT):", error);
+      res.status(500).json({ message: "Failed to update vault entry" });
+    }
+  });
+
   app.delete("/api/vault/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) {
-        return res.status(400).json({ message: "Invalid vault entry ID" });
-      }
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
 
       await storage.deleteVaultEntry(id);
 

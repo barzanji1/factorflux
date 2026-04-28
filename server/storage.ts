@@ -54,6 +54,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 export interface IStorage {
   // User operations
@@ -1215,6 +1216,8 @@ export class DatabaseStorage implements IStorage {
 
   // Client Vault operations
   async getAllVaultEntries(clientId: number): Promise<ClientVault[]> {
+    const createdByAlias = alias(users, "created_by_user");
+    const lastAccessedByAlias = alias(users, "last_accessed_by_user");
     return (await db
       .select({
         id: clientVault.id,
@@ -1234,20 +1237,20 @@ export class DatabaseStorage implements IStorage {
           name: clients.name,
         },
         createdByUser: {
-          id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          id: createdByAlias.id,
+          firstName: createdByAlias.firstName,
+          lastName: createdByAlias.lastName,
         },
         lastAccessedByUser: {
-          id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          id: lastAccessedByAlias.id,
+          firstName: lastAccessedByAlias.firstName,
+          lastName: lastAccessedByAlias.lastName,
         },
       })
       .from(clientVault)
       .leftJoin(clients, eq(clientVault.clientId, clients.id))
-      .leftJoin(users, eq(clientVault.createdBy, users.id))
-      .leftJoin(users, eq(clientVault.lastAccessedBy, users.id))
+      .leftJoin(createdByAlias, eq(clientVault.createdBy, createdByAlias.id))
+      .leftJoin(lastAccessedByAlias, eq(clientVault.lastAccessedBy, lastAccessedByAlias.id))
       .where(and(eq(clientVault.clientId, clientId), eq(clientVault.isActive, true)))
       .orderBy(desc(clientVault.createdAt))) as any;
   }
