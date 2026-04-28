@@ -727,13 +727,7 @@ ${message}
       const { id } = req.params;
 
       if (id === adminUser.id) {
-        return res.status(400).json({ error: "You cannot delete your own account" });
-      }
-
-      // Prevent deleting hardcoded production users
-      const isProdUser = ["prod-1", "prod-2", "prod-3"].includes(id);
-      if (isProdUser) {
-        return res.status(400).json({ error: "Cannot delete system production accounts. Use suspend instead." });
+        return res.status(400).json({ error: "You cannot delete your own account." });
       }
 
       await storage.deleteUser(id);

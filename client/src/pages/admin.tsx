@@ -513,10 +513,26 @@ export default function Admin() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove User Account</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete <strong>{deleteTarget?.firstName} {deleteTarget?.lastName}</strong>'s account.
-              This action cannot be undone. Consider suspending the account instead if you may need to restore access.
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Remove User Account
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Are you sure you want to permanently remove this account? This cannot be undone.</p>
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 space-y-1">
+                  <p className="font-semibold text-slate-900 dark:text-white text-sm">
+                    {deleteTarget?.firstName} {deleteTarget?.lastName}
+                  </p>
+                  {deleteTarget?.email && (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{deleteTarget.email}</p>
+                  )}
+                  <p className="text-xs text-slate-400 capitalize">{deleteTarget?.role}</p>
+                </div>
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  Tip: If you may need to restore access later, use <strong>Suspend</strong> instead.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -525,7 +541,7 @@ export default function Admin() {
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
             >
-              {deleteMutation.isPending ? "Removing..." : "Remove User"}
+              {deleteMutation.isPending ? "Removing..." : `Remove ${deleteTarget?.firstName}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
