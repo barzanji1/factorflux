@@ -906,7 +906,6 @@ export default function HelpPage() {
 
               <div>
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
-                  <Sparkles className="h-3.5 w-3.5" />
                   Support hub
                 </div>
 

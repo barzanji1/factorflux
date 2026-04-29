@@ -118,9 +118,6 @@ export default function Invoices() {
               <div className="flex flex-col gap-6 border-b border-slate-200/70 px-6 py-6 sm:px-7 xl:flex-row xl:items-center xl:justify-between dark:border-slate-800">
                 <div className="min-w-0">
                   <div className="mb-3 flex items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)]">
-                      <Sparkles className="h-4.5 w-4.5" />
-                    </div>
                     <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300">
                       Invoice workspace
                     </span>

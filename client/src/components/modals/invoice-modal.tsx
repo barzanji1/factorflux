@@ -546,9 +546,6 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-6xl flex-col border-slate-200/80 bg-[linear-gradient(to_bottom,_rgba(255,255,255,0.97),_rgba(248,250,252,0.98))] p-0 shadow-[0_30px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[hsl(var(--background))]">
         <DialogHeader className="shrink-0 border-b border-slate-200/70 px-8 pb-6 pt-8 dark:border-slate-800">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)]">
-              <Sparkles className="h-5 w-5" />
-            </div>
             <div>
               <div className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300">
                 Invoice workflow
