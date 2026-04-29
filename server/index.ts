@@ -1,5 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import path from "path";
 import fs from "fs";
 
@@ -10,6 +12,9 @@ import { log } from "./log";
 
 const app = express();
 
+// Trust Replit's HTTPS proxy so secure cookies work in production
+app.set("trust proxy", 1);
+
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -19,15 +24,32 @@ if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET must be set in environment variables");
 }
 
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL must be set in environment variables");
+}
+
+const PgSession = connectPgSimple(session);
+const pgPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+const isProduction = process.env.NODE_ENV === "production";
+
 app.use(
   session({
+    store: new PgSession({
+      pool: pgPool,
+      tableName: "sessions",
+      // Prune expired sessions every hour
+      pruneSessionInterval: 60 * 60,
+    }),
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: "lax",
+      maxAge: 8 * 60 * 60 * 1000, // 8 hours
     },
   })
 );
