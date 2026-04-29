@@ -150,6 +150,29 @@ const PRODUCTION_USERS = [
 ];
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Ensure production users exist in the DB so FK constraints (e.g. activities.user_id) never fail
+  try {
+    for (const u of PRODUCTION_USERS) {
+      await db
+        .insert(users)
+        .values({
+          id: u.id,
+          email: u.username === "agent1" ? "agent1@tpf.com" : u.username === "manager1" ? "manager1@tpf.com" : "admin1@tpf.com",
+          password: u.password,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          role: u.role as "employee" | "manager" | "admin",
+          authType: "local",
+          verified: u.verified,
+          status: "active",
+        })
+        .onConflictDoNothing();
+    }
+    console.log("[startup] Production users synced to DB");
+  } catch (err: any) {
+    console.warn("[startup] Could not sync production users (non-fatal):", err?.message);
+  }
+
   const requireAuth = (req: any, res: any, next: any) => {
     const user = (req.session as any)?.user;
     if (!user) {
@@ -1283,8 +1306,11 @@ ${message}
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
       const invoiceData = insertInvoiceSchema.parse(req.body);
+      // Always generate a unique invoice number server-side to prevent collisions
+      const invoiceNumber = await storage.getNextInvoiceNumber();
       const invoice = await storage.createInvoice({
         ...invoiceData,
+        invoiceNumber,
         loadId: null,
         submittedBy: req.user.id,
         submittedAt: new Date(),

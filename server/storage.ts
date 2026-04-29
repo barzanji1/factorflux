@@ -101,6 +101,7 @@ export interface IStorage {
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByStatus(status: string): Promise<Invoice[]>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  getNextInvoiceNumber(): Promise<string>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
   searchInvoices(query: string): Promise<Invoice[]>;
@@ -691,13 +692,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createActivity(activity: InsertActivity): Promise<Activity> {
-    const [newActivity] = await db.insert(activities).values(activity as any).returning();
+    try {
+      const [newActivity] = await db.insert(activities).values(activity as any).returning();
 
-    if (this.shouldCreateNotification(activity.type)) {
-      await this.createNotificationFromActivity(activity, newActivity);
+      if (this.shouldCreateNotification(activity.type)) {
+        await this.createNotificationFromActivity(activity, newActivity).catch((err: any) =>
+          console.warn("createNotificationFromActivity non-fatal error:", err?.message)
+        );
+      }
+
+      return newActivity;
+    } catch (err: any) {
+      // Activity logging is non-critical — log the error but never crash the calling request
+      console.warn("createActivity non-fatal error (activity not saved):", err?.message ?? err);
+      return {} as Activity;
     }
+  }
 
-    return newActivity;
+  async getNextInvoiceNumber(): Promise<string> {
+    const rows = await db
+      .select({ n: invoices.invoiceNumber })
+      .from(invoices)
+      .orderBy(desc(invoices.id));
+
+    let maxSeq = 0;
+    for (const { n } of rows) {
+      if (!n) continue;
+      const match = n.replace(/\D/g, "");
+      const num = parseInt(match, 10);
+      if (!isNaN(num) && num > maxSeq) maxSeq = num;
+    }
+    return `INV${String(maxSeq + 1).padStart(3, "0")}`;
   }
 
   async clearActivities(): Promise<void> {
