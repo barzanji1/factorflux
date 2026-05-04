@@ -795,6 +795,57 @@ export type InsertEventLedger = z.infer<typeof insertEventLedgerSchema>;
 
 export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 
+// ─── Payout Settings ──────────────────────────────────────────────────────────
+// One active row stores the current configurable factoring percentages
+export const payoutSettings = pgTable("payout_settings", {
+  id: serial("id").primaryKey(),
+  advanceRate: decimal("advance_rate", { precision: 5, scale: 2 }).notNull().default("90.00"),
+  feeRate: decimal("fee_rate", { precision: 5, scale: 2 }).notNull().default("3.00"),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPayoutSettingsSchema = createInsertSchema(payoutSettings).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+
+// ─── Payouts ──────────────────────────────────────────────────────────────────
+// One payout record per invoice; amounts are a snapshot at creation time
+export const payouts = pgTable("payouts", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id")
+    .references(() => invoices.id, { onDelete: "cascade" })
+    .notNull()
+    .unique(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  invoiceAmount: decimal("invoice_amount", { precision: 12, scale: 2 }).notNull(),
+  advanceRate: decimal("advance_rate", { precision: 5, scale: 2 }).notNull(),
+  feeRate: decimal("fee_rate", { precision: 5, scale: 2 }).notNull(),
+  advanceAmount: decimal("advance_amount", { precision: 12, scale: 2 }).notNull(),
+  feeAmount: decimal("fee_amount", { precision: 12, scale: 2 }).notNull(),
+  reserveAmount: decimal("reserve_amount", { precision: 12, scale: 2 }).notNull(),
+  netPayout: decimal("net_payout", { precision: 12, scale: 2 }).notNull(),
+  paymentStatus: varchar("payment_status", {
+    enum: ["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"],
+  }).default("pending_advance").notNull(),
+  advancePaidAt: timestamp("advance_paid_at"),
+  reserveReleasedAt: timestamp("reserve_released_at"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPayoutSchema = createInsertSchema(payouts).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+
+export type PayoutSettings = typeof payoutSettings.$inferSelect;
+export type InsertPayoutSettings = z.infer<typeof insertPayoutSettingsSchema>;
+export type Payout = typeof payouts.$inferSelect;
+export type InsertPayout = z.infer<typeof insertPayoutSchema>;
+
 export type FuelCardApplication = typeof fuelCardApplications.$inferSelect;
 export type InsertFuelCardApplication = typeof fuelCardApplications.$inferInsert;
 export type Client = typeof clients.$inferSelect;

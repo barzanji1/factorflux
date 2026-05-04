@@ -18,6 +18,12 @@ import {
   collections,
   clientVault,
   clientMessages,
+  payoutSettings,
+  payouts,
+  type PayoutSettings,
+  type InsertPayoutSettings,
+  type Payout,
+  type InsertPayout,
   type ClientMessage,
   type InsertClientMessage,
   type User,
@@ -178,6 +184,16 @@ export interface IStorage {
   createFollowUp(followUp: InsertFollowUp): Promise<FollowUp>;
   updateFollowUp(id: number, updates: Partial<InsertFollowUp>): Promise<FollowUp>;
   deleteFollowUp(id: number): Promise<void>;
+
+  // Payout Settings
+  getPayoutSettings(): Promise<PayoutSettings | undefined>;
+  upsertPayoutSettings(data: Partial<InsertPayoutSettings>): Promise<PayoutSettings>;
+
+  // Payouts
+  getPayouts(): Promise<Payout[]>;
+  getPayoutByInvoice(invoiceId: number): Promise<Payout | undefined>;
+  createPayout(data: InsertPayout): Promise<Payout>;
+  updatePayout(id: number, updates: Partial<InsertPayout>): Promise<Payout>;
 
   // Collections operations
   getAllCollections(): Promise<Collection[]>;
@@ -1120,6 +1136,54 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFollowUp(id: number): Promise<void> {
     await db.delete(followUps).where(eq(followUps.id, id));
+  }
+
+  // Payout Settings
+  async getPayoutSettings(): Promise<PayoutSettings | undefined> {
+    const [row] = await db.select().from(payoutSettings).orderBy(desc(payoutSettings.id)).limit(1);
+    return row;
+  }
+
+  async upsertPayoutSettings(data: Partial<InsertPayoutSettings>): Promise<PayoutSettings> {
+    const existing = await this.getPayoutSettings();
+    if (existing) {
+      const [updated] = await db
+        .update(payoutSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(payoutSettings.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(payoutSettings).values({
+      advanceRate: data.advanceRate ?? "90.00",
+      feeRate: data.feeRate ?? "3.00",
+      updatedBy: data.updatedBy,
+    }).returning();
+    return created;
+  }
+
+  // Payouts
+  async getPayouts(): Promise<Payout[]> {
+    return await db.select().from(payouts).orderBy(desc(payouts.createdAt));
+  }
+
+  async getPayoutByInvoice(invoiceId: number): Promise<Payout | undefined> {
+    const [row] = await db.select().from(payouts).where(eq(payouts.invoiceId, invoiceId));
+    return row;
+  }
+
+  async createPayout(data: InsertPayout): Promise<Payout> {
+    const [row] = await db.insert(payouts).values(data).returning();
+    return row;
+  }
+
+  async updatePayout(id: number, updates: Partial<InsertPayout>): Promise<Payout> {
+    const [row] = await db
+      .update(payouts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(payouts.id, id))
+      .returning();
+    return row;
   }
 
   // Collections operations

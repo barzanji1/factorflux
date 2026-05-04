@@ -17,6 +17,7 @@ import {
   Building,
   HelpCircle,
   Briefcase,
+  Wallet,
 } from "lucide-react";
 
 type UserRole = "manager" | "admin" | "employee";
@@ -63,6 +64,7 @@ const navSections: NavSection[] = [
     title: "Finance",
     items: [
       { name: "Factoring", href: "/factoring", icon: DollarSign },
+      { name: "Payouts", href: "/payouts", icon: Wallet },
       { name: "Fuel Advance", href: "/fuel-advance", icon: Fuel },
       { name: "Collections", href: "/collections", icon: Phone },
       { name: "Reports", href: "/reports", icon: BarChart3 },

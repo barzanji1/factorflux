@@ -6,7 +6,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -33,6 +33,8 @@ import {
   clients,
   brokers,
   fuelAdvances,
+  invoices,
+  payouts,
 } from "@shared/schema";
 
 import { sendEmail } from "./emailService";
@@ -2575,6 +2577,180 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // ─── Payout Settings ──────────────────────────────────────────────────────
+  app.get("/api/payout-settings", requireAuth, async (_req, res) => {
+    try {
+      let settings = await storage.getPayoutSettings();
+      if (!settings) {
+        // Seed defaults on first access
+        settings = await storage.upsertPayoutSettings({ advanceRate: "90.00", feeRate: "3.00" });
+      }
+      res.json(settings);
+    } catch (err) {
+      console.error("Error fetching payout settings:", err);
+      res.status(500).json({ message: "Failed to fetch payout settings" });
+    }
+  });
+
+  app.patch("/api/payout-settings", requireAuth, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        advanceRate: z.coerce.number().min(1).max(100),
+        feeRate: z.coerce.number().min(0).max(50),
+      });
+      const { advanceRate, feeRate } = schema.parse(req.body);
+      if (advanceRate + feeRate > 100) {
+        return res.status(400).json({ message: "Advance rate + fee rate cannot exceed 100%" });
+      }
+      const settings = await storage.upsertPayoutSettings({
+        advanceRate: String(advanceRate),
+        feeRate: String(feeRate),
+        updatedBy: req.user.id,
+      });
+      res.json(settings);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
+      console.error("Error updating payout settings:", err);
+      res.status(500).json({ message: "Failed to update payout settings" });
+    }
+  });
+
+  // ─── Payouts ──────────────────────────────────────────────────────────────
+  app.get("/api/payouts", requireAuth, async (_req, res) => {
+    try {
+      // Join with invoices and clients for display
+      const rows = await db
+        .select({
+          payout: {
+            id: payouts.id,
+            invoiceId: payouts.invoiceId,
+            clientId: payouts.clientId,
+            invoiceAmount: payouts.invoiceAmount,
+            advanceRate: payouts.advanceRate,
+            feeRate: payouts.feeRate,
+            advanceAmount: payouts.advanceAmount,
+            feeAmount: payouts.feeAmount,
+            reserveAmount: payouts.reserveAmount,
+            netPayout: payouts.netPayout,
+            paymentStatus: payouts.paymentStatus,
+            advancePaidAt: payouts.advancePaidAt,
+            reserveReleasedAt: payouts.reserveReleasedAt,
+            notes: payouts.notes,
+            createdAt: payouts.createdAt,
+            updatedAt: payouts.updatedAt,
+          },
+          invoiceNumber: invoices.invoiceNumber,
+          clientName: clients.name,
+        })
+        .from(payouts)
+        .leftJoin(invoices, eq(payouts.invoiceId, invoices.id))
+        .leftJoin(clients, eq(payouts.clientId, clients.id))
+        .orderBy(desc(payouts.createdAt));
+
+      res.json(rows.map((r) => ({ ...r.payout, invoiceNumber: r.invoiceNumber, clientName: r.clientName })));
+    } catch (err) {
+      console.error("Error fetching payouts:", err);
+      res.status(500).json({ message: "Failed to fetch payouts" });
+    }
+  });
+
+  app.get("/api/payouts/invoice/:invoiceId", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId, 10);
+      const payout = await storage.getPayoutByInvoice(invoiceId);
+      if (!payout) return res.status(404).json({ message: "No payout found for this invoice" });
+      res.json(payout);
+    } catch (err) {
+      console.error("Error fetching payout by invoice:", err);
+      res.status(500).json({ message: "Failed to fetch payout" });
+    }
+  });
+
+  app.post("/api/payouts", requireAuth, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        invoiceId: z.number().int().positive(),
+        notes: z.string().optional(),
+      });
+      const { invoiceId, notes } = schema.parse(req.body);
+
+      // Check no duplicate
+      const existing = await storage.getPayoutByInvoice(invoiceId);
+      if (existing) return res.status(409).json({ message: "A payout record already exists for this invoice" });
+
+      // Fetch invoice
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+      if (!inv) return res.status(404).json({ message: "Invoice not found" });
+
+      // Get current rates
+      let settings = await storage.getPayoutSettings();
+      if (!settings) settings = await storage.upsertPayoutSettings({ advanceRate: "90.00", feeRate: "3.00" });
+
+      const invoiceAmount = parseFloat(inv.amount);
+      const advanceRate = parseFloat(settings.advanceRate);
+      const feeRate = parseFloat(settings.feeRate);
+      const advanceAmount = +(invoiceAmount * advanceRate / 100).toFixed(2);
+      const feeAmount = +(invoiceAmount * feeRate / 100).toFixed(2);
+      const reserveAmount = +(invoiceAmount - advanceAmount).toFixed(2);
+      const netPayout = +(advanceAmount - feeAmount).toFixed(2);
+
+      const payout = await storage.createPayout({
+        invoiceId,
+        clientId: inv.clientId,
+        invoiceAmount: String(invoiceAmount),
+        advanceRate: String(advanceRate),
+        feeRate: String(feeRate),
+        advanceAmount: String(advanceAmount),
+        feeAmount: String(feeAmount),
+        reserveAmount: String(reserveAmount),
+        netPayout: String(netPayout),
+        paymentStatus: "pending_advance",
+        notes: notes ?? null,
+        createdBy: req.user.id,
+      });
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "invoice_created",
+        entityType: "invoice",
+        entityId: invoiceId,
+        description: `Created payout record for invoice ${inv.invoiceNumber}: net payout $${netPayout}`,
+      });
+
+      res.status(201).json(payout);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
+      console.error("Error creating payout:", err);
+      res.status(500).json({ message: "Failed to create payout" });
+    }
+  });
+
+  app.patch("/api/payouts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const schema = z.object({
+        paymentStatus: z.enum(["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"]).optional(),
+        notes: z.string().optional(),
+        advancePaidAt: z.string().datetime().optional(),
+        reserveReleasedAt: z.string().datetime().optional(),
+      });
+      const updates = schema.parse(req.body);
+
+      // Auto-timestamp status transitions
+      const now = new Date();
+      const extra: Record<string, any> = {};
+      if (updates.paymentStatus === "advance_paid" && !updates.advancePaidAt) extra.advancePaidAt = now;
+      if (updates.paymentStatus === "reserve_released" && !updates.reserveReleasedAt) extra.reserveReleasedAt = now;
+
+      const updated = await storage.updatePayout(id, { ...updates, ...extra } as any);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
+      console.error("Error updating payout:", err);
+      res.status(500).json({ message: "Failed to update payout" });
     }
   });
 

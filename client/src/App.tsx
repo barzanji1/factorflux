@@ -30,6 +30,7 @@ import Brokers from "@/pages/brokers";
 import FormDemo from "@/pages/form-demo";
 import LoginPage from "@/pages/login";
 import Help from "@/pages/help";
+import Payouts from "@/pages/payouts";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -80,6 +81,11 @@ function Router() {
       <Route path="/factoring">
         <ProtectedRoute>
           <Factoring />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/payouts">
+        <ProtectedRoute>
+          <Payouts />
         </ProtectedRoute>
       </Route>
       <Route path="/tasks">
