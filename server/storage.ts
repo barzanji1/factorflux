@@ -27,10 +27,13 @@ import {
   exceptions,
   brokerAuthorityChecks,
   brokerAuthorityAlerts,
+  complianceIntegrationRuns,
   type BrokerAuthorityCheck,
   type InsertBrokerAuthorityCheck,
   type BrokerAuthorityAlert,
   type InsertBrokerAuthorityAlert,
+  type ComplianceIntegrationRun,
+  type InsertComplianceIntegrationRun,
   type PayoutSettings,
   type InsertPayoutSettings,
   type Payout,
@@ -1728,6 +1731,23 @@ export class DatabaseStorage implements IStorage {
       .set({ resolvedAt: new Date(), resolvedBy, notes: notes ?? null })
       .where(eq(brokerAuthorityAlerts.id, id))
       .returning();
+    return row;
+  }
+
+  // ── Compliance Integration Runs ────────────────────────────────────────────────
+  async getIntegrationRuns(limit = 50): Promise<ComplianceIntegrationRun[]> {
+    return db
+      .select()
+      .from(complianceIntegrationRuns)
+      .orderBy(desc(complianceIntegrationRuns.startedAt))
+      .limit(limit);
+  }
+
+  async getIntegrationRun(id: number): Promise<ComplianceIntegrationRun | undefined> {
+    const [row] = await db
+      .select()
+      .from(complianceIntegrationRuns)
+      .where(eq(complianceIntegrationRuns.id, id));
     return row;
   }
 }

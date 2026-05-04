@@ -1007,31 +1007,84 @@ export const insertExceptionSchema = createInsertSchema(exceptions).omit({
 export type Exception = typeof exceptions.$inferSelect;
 export type InsertException = z.infer<typeof insertExceptionSchema>;
 
+// ─── Compliance Integration Runs ─────────────────────────────────────────────
+// Records every scheduled or manual FMCSA check run for audit/traceability.
+export const complianceIntegrationRuns = pgTable("compliance_integration_runs", {
+  id: serial("id").primaryKey(),
+  runType: varchar("run_type", { enum: ["scheduled", "manual"] }).notNull().default("scheduled"),
+  triggeredBy: varchar("triggered_by").notNull().default("system"),
+  status: varchar("status", {
+    enum: ["running", "completed", "failed"],
+  }).notNull().default("running"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  totalChecked: integer("total_checked").default(0),
+  successCount: integer("success_count").default(0),
+  failureCount: integer("failure_count").default(0),
+  notFoundCount: integer("not_found_count").default(0),
+  noKeyCount: integer("no_key_count").default(0),
+  alertsCreated: integer("alerts_created").default(0),
+  errorLog: jsonb("error_log"),
+});
+
+export const insertComplianceIntegrationRunSchema = createInsertSchema(complianceIntegrationRuns).omit({
+  id: true, startedAt: true,
+});
+export type ComplianceIntegrationRun = typeof complianceIntegrationRuns.$inferSelect;
+export type InsertComplianceIntegrationRun = z.infer<typeof insertComplianceIntegrationRunSchema>;
+
 // ─── FMCSA Broker Authority Checks ───────────────────────────────────────────
+// Append-only: every check is a new row. Never overwrite old records.
 export const brokerAuthorityChecks = pgTable("broker_authority_checks", {
   id: serial("id").primaryKey(),
+  // FK to source entity (one of these will be populated, the other null)
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  debtorId: integer("debtor_id").references(() => debtors.id, { onDelete: "set null" }),
+  // Generic entity reference (for querying across types)
   entityType: varchar("entity_type", { enum: ["broker", "debtor"] }).notNull(),
   entityId: integer("entity_id").notNull(),
   entityName: varchar("entity_name"),
+  // Identifiers
   mcNumber: varchar("mc_number"),
   dotNumber: varchar("dot_number"),
+  // FMCSA-returned identity fields
   legalName: varchar("legal_name"),
   dbaName: varchar("dba_name"),
+  // Authority status fields
   operatingStatus: varchar("operating_status"),
   commonAuthorityStatus: varchar("common_authority_status"),
   contractAuthorityStatus: varchar("contract_authority_status"),
   brokerAuthorityStatus: varchar("broker_authority_status"),
   allowedToOperate: boolean("allowed_to_operate"),
   carrierOperation: varchar("carrier_operation"),
+  // Insurance / bond fields
   bipdRequired: varchar("bipd_required"),
+  bipdInsuranceOnFile: varchar("bipd_insurance_on_file"),
+  cargoInsuranceRequired: varchar("cargo_insurance_required"),
+  cargoInsuranceOnFile: varchar("cargo_insurance_on_file"),
+  brokerBondStatus: varchar("broker_bond_status"),
+  bondAmount: decimal("bond_amount", { precision: 14, scale: 2 }),
+  // Integration run linkage
+  integrationRunId: integer("integration_run_id").references(() => complianceIntegrationRuns.id),
+  // Change detection
+  changeSummary: text("change_summary"),
+  // Raw source payload for audit/debugging
   rawResponse: jsonb("raw_response"),
+  // Outcome of this check
   checkStatus: varchar("check_status", {
     enum: ["success", "not_found", "api_error", "no_key"],
   }).default("success").notNull(),
   errorMessage: text("error_message"),
   checkedAt: timestamp("checked_at").defaultNow().notNull(),
   checkedBy: varchar("checked_by"),
-});
+}, (table) => ({
+  mcIdx: index("bac_mc_number_idx").on(table.mcNumber),
+  dotIdx: index("bac_dot_number_idx").on(table.dotNumber),
+  statusIdx: index("bac_check_status_idx").on(table.checkStatus),
+  checkedAtIdx: index("bac_checked_at_idx").on(table.checkedAt),
+  entityIdx: index("bac_entity_idx").on(table.entityType, table.entityId),
+  brokerIdx: index("bac_broker_id_idx").on(table.brokerId),
+}));
 
 export const insertBrokerAuthorityCheckSchema = createInsertSchema(brokerAuthorityChecks).omit({
   id: true, checkedAt: true,
@@ -1042,6 +1095,9 @@ export type InsertBrokerAuthorityCheck = z.infer<typeof insertBrokerAuthorityChe
 // ─── FMCSA Authority Alerts ───────────────────────────────────────────────────
 export const brokerAuthorityAlerts = pgTable("broker_authority_alerts", {
   id: serial("id").primaryKey(),
+  // FK to source entity
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  debtorId: integer("debtor_id").references(() => debtors.id, { onDelete: "set null" }),
   entityType: varchar("entity_type", { enum: ["broker", "debtor"] }).notNull(),
   entityId: integer("entity_id").notNull(),
   entityName: varchar("entity_name"),
@@ -1049,16 +1105,22 @@ export const brokerAuthorityAlerts = pgTable("broker_authority_alerts", {
   dotNumber: varchar("dot_number"),
   checkId: integer("check_id").references(() => brokerAuthorityChecks.id),
   alertType: varchar("alert_type", {
-    enum: ["became_inactive", "authority_revoked", "status_changed", "not_found", "api_error"],
+    enum: ["became_inactive", "authority_revoked", "status_changed", "not_found", "api_error", "insurance_lapsed"],
   }).notNull(),
   previousStatus: varchar("previous_status"),
   newStatus: varchar("new_status"),
   field: varchar("field"),
+  severity: varchar("severity", { enum: ["low", "medium", "high", "critical"] }).default("high").notNull(),
   resolvedAt: timestamp("resolved_at"),
   resolvedBy: varchar("resolved_by"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  entityAlertIdx: index("baa_entity_idx").on(table.entityType, table.entityId),
+  alertTypeIdx: index("baa_alert_type_idx").on(table.alertType),
+  resolvedIdx: index("baa_resolved_at_idx").on(table.resolvedAt),
+  brokerAlertIdx: index("baa_broker_id_idx").on(table.brokerId),
+}));
 
 export const insertBrokerAuthorityAlertSchema = createInsertSchema(brokerAuthorityAlerts).omit({
   id: true, createdAt: true, resolvedAt: true,

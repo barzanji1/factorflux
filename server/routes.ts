@@ -3063,6 +3063,13 @@ Trucking Pros Financial Team
     } catch (e) { res.status(500).json({ message: "Failed to save key" }); }
   });
 
+  app.get("/api/authority-checks/integration-runs", requireAuth, async (req, res) => {
+    try {
+      const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 100);
+      res.json(await storage.getIntegrationRuns(limit));
+    } catch (e) { res.status(500).json({ message: "Failed to fetch integration runs" }); }
+  });
+
   app.get("/api/authority-alerts", requireAuth, async (_req, res) => {
     try {
       res.json(await storage.getAuthorityAlerts());

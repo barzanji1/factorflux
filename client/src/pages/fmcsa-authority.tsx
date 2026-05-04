@@ -62,6 +62,16 @@ interface AuthorityCheck {
   brokerAuthorityStatus: string | null;
   allowedToOperate: boolean | null;
   carrierOperation: string | null;
+  // Insurance / bond
+  bipdRequired: string | null;
+  bipdInsuranceOnFile: string | null;
+  cargoInsuranceRequired: string | null;
+  cargoInsuranceOnFile: string | null;
+  brokerBondStatus: string | null;
+  bondAmount: string | null;
+  // Change tracking
+  changeSummary: string | null;
+  integrationRunId: number | null;
   checkStatus: "success" | "not_found" | "api_error" | "no_key";
   errorMessage: string | null;
   checkedAt: string;
@@ -79,13 +89,31 @@ interface AuthorityAlert {
   previousStatus: string | null;
   newStatus: string | null;
   field: string | null;
+  severity: "low" | "medium" | "high" | "critical" | null;
   resolvedAt: string | null;
   resolvedBy: string | null;
   notes: string | null;
   createdAt: string;
 }
 
+interface ComplianceIntegrationRun {
+  id: number;
+  runType: "scheduled" | "manual";
+  triggeredBy: string;
+  status: "running" | "completed" | "failed";
+  startedAt: string;
+  completedAt: string | null;
+  totalChecked: number | null;
+  successCount: number | null;
+  failureCount: number | null;
+  notFoundCount: number | null;
+  noKeyCount: number | null;
+  alertsCreated: number | null;
+  errorLog: string[] | null;
+}
+
 interface RunSummary {
+  runId: number;
   total: number;
   success: number;
   notFound: number;
@@ -145,10 +173,46 @@ function alertTypeBadge(type: string) {
     authority_revoked: "bg-red-100 text-red-700",
     status_changed: "bg-yellow-100 text-yellow-700",
     not_found: "bg-orange-100 text-orange-700",
+    insurance_lapsed: "bg-purple-100 text-purple-700",
     api_error: "bg-slate-100 text-slate-600",
   };
   const label = type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   return <Badge className={cn("text-xs", map[type] ?? "bg-slate-100 text-slate-600")}>{label}</Badge>;
+}
+
+function severityBadge(severity: string | null) {
+  const map: Record<string, string> = {
+    critical: "bg-red-100 text-red-800 border-red-300",
+    high: "bg-orange-100 text-orange-700 border-orange-300",
+    medium: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    low: "bg-slate-100 text-slate-600 border-slate-300",
+  };
+  if (!severity) return null;
+  return (
+    <Badge className={cn("text-[10px] uppercase tracking-wide", map[severity] ?? "bg-slate-100 text-slate-600")}>
+      {severity}
+    </Badge>
+  );
+}
+
+function insuranceBadge(onFile: string | null, label: string) {
+  if (!onFile) return null;
+  const ok = onFile === "Y";
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded",
+      ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
+      {label}: {ok ? "On File" : "Not On File"}
+    </span>
+  );
+}
+
+function runStatusBadge(status: string) {
+  const map: Record<string, string> = {
+    completed: "bg-green-100 text-green-700",
+    running: "bg-blue-100 text-blue-700",
+    failed: "bg-red-100 text-red-700",
+  };
+  return <Badge className={cn("text-xs capitalize", map[status] ?? "bg-slate-100 text-slate-600")}>{status}</Badge>;
 }
 
 export default function FmcsaAuthority() {
@@ -169,6 +233,10 @@ export default function FmcsaAuthority() {
     queryKey: ["/api/authority-alerts"],
   });
 
+  const { data: integrationRuns = [], isLoading: runsLoading } = useQuery<ComplianceIntegrationRun[]>({
+    queryKey: ["/api/authority-checks/integration-runs"],
+  });
+
   const { data: history } = useQuery<EntityHistory>({
     queryKey: ["/api/authority-checks/history", expandedHistory],
     enabled: !!expandedHistory,
@@ -179,9 +247,10 @@ export default function FmcsaAuthority() {
     onSuccess: async (data: RunSummary) => {
       queryClient.invalidateQueries({ queryKey: ["/api/authority-checks/latest"] });
       queryClient.invalidateQueries({ queryKey: ["/api/authority-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/authority-checks/integration-runs"] });
       toast({
         title: "Authority check complete",
-        description: `Checked ${data.total} entities — ${data.alertsCreated} alert(s) created`,
+        description: `Run #${data.runId} — ${data.total} entities checked, ${data.alertsCreated} alert(s) created`,
       });
     },
     onError: () => toast({ title: "Check failed", variant: "destructive" }),
@@ -354,6 +423,7 @@ export default function FmcsaAuthority() {
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="runs">Run History</TabsTrigger>
               </TabsList>
 
               {/* ── Status Tab ── */}
@@ -495,20 +565,45 @@ export default function FmcsaAuthority() {
                                       ) : history.checks.length === 0 ? (
                                         <p className="text-xs text-slate-400">No history found.</p>
                                       ) : (
-                                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                                        <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                                           {history.checks.map(h => (
                                             <div
                                               key={h.id}
-                                              className="flex items-center gap-3 text-xs py-1 border-b border-slate-100 dark:border-slate-700 last:border-0"
+                                              className="flex flex-col gap-1 text-xs py-2 border-b border-slate-100 dark:border-slate-700 last:border-0"
                                             >
-                                              <span className="text-slate-400 shrink-0 w-36">
-                                                {format(new Date(h.checkedAt), "MMM d, yyyy HH:mm")}
-                                              </span>
-                                              {statusBadge(h)}
-                                              <span className="text-slate-500">
-                                                {h.commonAuthorityStatus ?? h.errorMessage ?? "—"}
-                                              </span>
-                                              <span className="text-slate-400 ml-auto">{h.checkedBy ?? "system"}</span>
+                                              <div className="flex items-center gap-3">
+                                                <span className="text-slate-400 shrink-0 w-36">
+                                                  {format(new Date(h.checkedAt), "MMM d, yyyy HH:mm")}
+                                                </span>
+                                                {statusBadge(h)}
+                                                <span className="text-slate-500">
+                                                  {h.commonAuthorityStatus ?? h.errorMessage ?? "—"}
+                                                </span>
+                                                {h.integrationRunId && (
+                                                  <span className="text-slate-400 text-[10px]">Run #{h.integrationRunId}</span>
+                                                )}
+                                                <span className="text-slate-400 ml-auto">{h.checkedBy ?? "system"}</span>
+                                              </div>
+                                              {/* Insurance / bond pills */}
+                                              {(h.bipdInsuranceOnFile || h.cargoInsuranceOnFile || h.brokerBondStatus) && (
+                                                <div className="flex flex-wrap gap-1 pl-36">
+                                                  {insuranceBadge(h.bipdInsuranceOnFile, "BIPD")}
+                                                  {insuranceBadge(h.cargoInsuranceOnFile, "Cargo")}
+                                                  {h.brokerBondStatus && (
+                                                    <span className={cn(
+                                                      "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded",
+                                                      h.brokerBondStatus ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+                                                    )}>
+                                                      Bond: {h.brokerBondStatus}
+                                                      {h.bondAmount && ` ($${Number(h.bondAmount).toLocaleString()})`}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
+                                              {/* Change summary */}
+                                              {h.changeSummary && h.changeSummary !== "No changes detected." && (
+                                                <p className="pl-36 text-[10px] text-amber-700 italic">{h.changeSummary}</p>
+                                              )}
                                             </div>
                                           ))}
                                         </div>
@@ -517,6 +612,108 @@ export default function FmcsaAuthority() {
                                   </TableRow>
                                 )}
                               </>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ── Run History Tab ── */}
+              <TabsContent value="runs" className="mt-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-slate-500" />
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Every scheduled and manual FMCSA check run is recorded here for audit and traceability.
+                  </p>
+                </div>
+                <Card>
+                  <CardContent className="p-0">
+                    {runsLoading ? (
+                      <div className="flex items-center justify-center py-16 text-slate-400">
+                        <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading…
+                      </div>
+                    ) : integrationRuns.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
+                        <History className="h-10 w-10" />
+                        <p className="text-sm">No runs yet — click "Run Check Now" to start</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Run ID</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Checked</TableHead>
+                            <TableHead>Success</TableHead>
+                            <TableHead>Not Found</TableHead>
+                            <TableHead>Errors</TableHead>
+                            <TableHead>Alerts</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead>Started</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {integrationRuns.map(run => {
+                            const duration =
+                              run.completedAt
+                                ? Math.round(
+                                    (new Date(run.completedAt).getTime() -
+                                      new Date(run.startedAt).getTime()) / 1000,
+                                  )
+                                : null;
+                            return (
+                              <TableRow key={run.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                <TableCell>
+                                  <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
+                                    #{run.id}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={cn("text-xs capitalize",
+                                    run.runType === "manual"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-slate-100 text-slate-600"
+                                  )}>
+                                    {run.runType}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{runStatusBadge(run.status)}</TableCell>
+                                <TableCell className="text-sm">{run.totalChecked ?? 0}</TableCell>
+                                <TableCell>
+                                  <span className="text-green-700 font-medium text-sm">{run.successCount ?? 0}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-yellow-700 text-sm">{run.notFoundCount ?? 0}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className={cn("text-sm", (run.failureCount ?? 0) > 0 ? "text-red-600 font-medium" : "text-slate-400")}>
+                                    {run.failureCount ?? 0}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className={cn("text-sm", (run.alertsCreated ?? 0) > 0 ? "text-amber-600 font-medium" : "text-slate-400")}>
+                                    {run.alertsCreated ?? 0}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-xs text-slate-500">
+                                    {duration !== null ? `${duration}s` : "—"}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1 text-xs text-slate-500">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    {formatDistanceToNow(new Date(run.startedAt), { addSuffix: true })}
+                                    {run.triggeredBy !== "system" && (
+                                      <span className="text-slate-400">· {run.triggeredBy}</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
                             );
                           })}
                         </TableBody>
@@ -574,6 +771,7 @@ export default function FmcsaAuthority() {
                                 {a.entityName ?? `${a.entityType} #${a.entityId}`}
                               </span>
                               {alertTypeBadge(a.alertType)}
+                              {severityBadge(a.severity)}
                               {a.resolvedAt && (
                                 <Badge className="bg-green-100 text-green-700 text-xs">Resolved</Badge>
                               )}

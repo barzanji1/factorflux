@@ -1,8 +1,9 @@
 /**
  * FMCSA SAFER API wrapper.
  *
- * Official endpoint: https://mobile.fmcsa.dot.gov/qc/services/carriers/{DOT}?webKey={KEY}
- * Docket (MC) lookup: https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/{MC}?webKey={KEY}
+ * Official endpoints:
+ *   By DOT:  https://mobile.fmcsa.dot.gov/qc/services/carriers/{DOT}?webKey={KEY}
+ *   By MC:   https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/{MC}?webKey={KEY}
  *
  * Requires FMCSA_WEBKEY environment variable.
  * When the key is absent the service returns a synthetic "no_key" result so the
@@ -19,7 +20,14 @@ export interface FmcsaCarrier {
   contractAuthorityStatus?: string;
   brokerAuthorityStatus?: string;
   carrierOperation?: string;
+  // Insurance fields
   bipdRequired?: string;
+  bipdInsuranceOnFile?: string;
+  cargoInsuranceRequired?: string;
+  cargoInsuranceOnFile?: string;
+  // Broker bond / trust
+  brokerBondStatus?: string;
+  bondAmount?: string;
 }
 
 export type FmcsaCheckStatus = "success" | "not_found" | "api_error" | "no_key";
@@ -43,6 +51,31 @@ async function fetchJson(url: string): Promise<unknown> {
   return res.json();
 }
 
+function str(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  return String(v);
+}
+
+function parseBrokerBond(c: Record<string, unknown>): { status: string; amount: string } {
+  // FMCSA returns broker bond info in various shapes; handle the most common ones
+  const bond =
+    (c.brokerBipd as Record<string, unknown> | undefined) ??
+    (c.brokerBond as Record<string, unknown> | undefined) ??
+    (c.bipd as Record<string, unknown> | undefined);
+
+  if (bond && typeof bond === "object") {
+    const statusCode = str(bond.bipdRequired ?? bond.bondStatus ?? bond.status);
+    const amount = str(bond.bipdInsuranceOnFile ?? bond.bondAmount ?? bond.amount ?? "");
+    return { status: statusCode, amount };
+  }
+
+  // Flat fields on the carrier object
+  return {
+    status: str(c.brokerBondStatus ?? c.bondStatus ?? ""),
+    amount: str(c.bondAmount ?? ""),
+  };
+}
+
 function parseCarrier(data: unknown): FmcsaCarrier | undefined {
   if (!data || typeof data !== "object") return undefined;
   const d = data as Record<string, unknown>;
@@ -52,20 +85,29 @@ function parseCarrier(data: unknown): FmcsaCarrier | undefined {
   if (!carrier || typeof carrier !== "object") return undefined;
 
   const c = carrier as Record<string, unknown>;
+  const { status: brokerBondStatus, amount: bondAmount } = parseBrokerBond(c);
+
   return {
-    dotNumber: String(c.dotNumber ?? c.dot_number ?? ""),
-    legalName: String(c.legalName ?? c.legal_name ?? ""),
-    dbaName: String(c.dbaName ?? c.dba_name ?? ""),
+    dotNumber: str(c.dotNumber ?? c.dot_number),
+    legalName: str(c.legalName ?? c.legal_name),
+    dbaName: str(c.dbaName ?? c.dba_name),
     allowedToOperate: (c.allowedToOperate ?? c.allowed_to_operate) as "Y" | "N" | undefined,
-    operatingStatus: String(c.operatingStatus ?? ""),
-    commonAuthorityStatus: String(c.commonAuthorityStatus ?? ""),
-    contractAuthorityStatus: String(c.contractAuthorityStatus ?? ""),
-    brokerAuthorityStatus: String(c.brokerAuthorityStatus ?? ""),
+    operatingStatus: str(c.operatingStatus),
+    commonAuthorityStatus: str(c.commonAuthorityStatus),
+    contractAuthorityStatus: str(c.contractAuthorityStatus),
+    brokerAuthorityStatus: str(c.brokerAuthorityStatus),
     carrierOperation:
       typeof c.carrierOperation === "object" && c.carrierOperation !== null
-        ? String((c.carrierOperation as Record<string, unknown>).carrierOperationCode ?? "")
-        : String(c.carrierOperation ?? ""),
-    bipdRequired: String(c.bipdInsuranceRequired ?? c.bipdRequired ?? ""),
+        ? str((c.carrierOperation as Record<string, unknown>).carrierOperationCode)
+        : str(c.carrierOperation),
+    // Insurance
+    bipdRequired: str(c.bipdInsuranceRequired ?? c.bipdRequired),
+    bipdInsuranceOnFile: str(c.bipdInsuranceOnFile),
+    cargoInsuranceRequired: str(c.cargoInsuranceRequired),
+    cargoInsuranceOnFile: str(c.cargoInsuranceOnFile),
+    // Bond
+    brokerBondStatus,
+    bondAmount,
   };
 }
 
@@ -107,7 +149,10 @@ export async function queryByMc(mcNumber: string): Promise<FmcsaResult> {
 }
 
 /** Try DOT first, fall back to MC. */
-export async function queryEntity(dotNumber?: string | null, mcNumber?: string | null): Promise<FmcsaResult> {
+export async function queryEntity(
+  dotNumber?: string | null,
+  mcNumber?: string | null,
+): Promise<FmcsaResult> {
   if (dotNumber && dotNumber.trim()) {
     const r = await queryByDot(dotNumber.trim());
     if (r.status !== "not_found") return r;
