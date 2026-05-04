@@ -873,3 +873,136 @@ export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+// ─── Credit Checks ────────────────────────────────────────────────────────────
+export const creditChecks = pgTable("credit_checks", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type", { enum: ["broker", "debtor"] }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  entityName: varchar("entity_name").notNull(),
+  mcNumber: varchar("mc_number"),
+  dotNumber: varchar("dot_number"),
+  riskScore: integer("risk_score"),
+  riskTier: varchar("risk_tier", { enum: ["low", "medium", "high", "critical"] }),
+  creditLimit: decimal("credit_limit", { precision: 12, scale: 2 }),
+  recommendedCreditLimit: decimal("recommended_credit_limit", { precision: 12, scale: 2 }),
+  avgDaysToPay: integer("avg_days_to_pay"),
+  status: varchar("status", {
+    enum: ["pending", "approved", "approved_with_conditions", "declined", "expired"],
+  }).default("pending").notNull(),
+  expiresAt: timestamp("expires_at"),
+  checkedBy: varchar("checked_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCreditCheckSchema = createInsertSchema(creditChecks).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type CreditCheck = typeof creditChecks.$inferSelect;
+export type InsertCreditCheck = z.infer<typeof insertCreditCheckSchema>;
+
+// ─── ACH Settings ─────────────────────────────────────────────────────────────
+export const achSettings = pgTable("ach_settings", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull().unique(),
+  bankName: varchar("bank_name").notNull(),
+  routingNumber: varchar("routing_number").notNull(),
+  accountNumber: varchar("account_number").notNull(),
+  accountType: varchar("account_type", { enum: ["checking", "savings"] }).default("checking").notNull(),
+  accountHolderName: varchar("account_holder_name").notNull(),
+  status: varchar("status", { enum: ["active", "inactive", "pending_verification"] }).default("pending_verification").notNull(),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAchSettingsSchema = createInsertSchema(achSettings).omit({
+  id: true, createdAt: true, updatedAt: true, verifiedAt: true,
+});
+export type AchSettings = typeof achSettings.$inferSelect;
+export type InsertAchSettings = z.infer<typeof insertAchSettingsSchema>;
+
+// ─── Cash Applications (incoming payment records) ────────────────────────────
+export const cashApplications = pgTable("cash_applications", {
+  id: serial("id").primaryKey(),
+  paymentReference: varchar("payment_reference").unique().notNull(),
+  payorName: varchar("payor_name").notNull(),
+  debtorId: integer("debtor_id").references(() => debtors.id),
+  paymentDate: timestamp("payment_date").notNull(),
+  totalReceived: decimal("total_received", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method", {
+    enum: ["ach", "wire", "check", "other"],
+  }).default("ach").notNull(),
+  status: varchar("status", {
+    enum: ["unapplied", "partially_applied", "fully_applied", "overpaid"],
+  }).default("unapplied").notNull(),
+  notes: text("notes"),
+  processedBy: varchar("processed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCashApplicationSchema = createInsertSchema(cashApplications).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type CashApplication = typeof cashApplications.$inferSelect;
+export type InsertCashApplication = z.infer<typeof insertCashApplicationSchema>;
+
+// ─── Payment Application Lines (maps payment → invoice) ──────────────────────
+export const paymentApplicationLines = pgTable("payment_application_lines", {
+  id: serial("id").primaryKey(),
+  cashApplicationId: integer("cash_application_id")
+    .references(() => cashApplications.id, { onDelete: "cascade" }).notNull(),
+  invoiceId: integer("invoice_id").references(() => invoices.id).notNull(),
+  invoiceNumber: varchar("invoice_number").notNull(),
+  invoiceAmount: decimal("invoice_amount", { precision: 12, scale: 2 }).notNull(),
+  appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),
+  variance: decimal("variance", { precision: 12, scale: 2 }).default("0"),
+  varianceType: varchar("variance_type", {
+    enum: ["full_match", "short_pay", "overpay", "write_off"],
+  }).default("full_match").notNull(),
+  varianceReason: text("variance_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPaymentApplicationLineSchema = createInsertSchema(paymentApplicationLines).omit({
+  id: true, createdAt: true,
+});
+export type PaymentApplicationLine = typeof paymentApplicationLines.$inferSelect;
+export type InsertPaymentApplicationLine = z.infer<typeof insertPaymentApplicationLineSchema>;
+
+// ─── Exceptions ───────────────────────────────────────────────────────────────
+export const exceptions = pgTable("exceptions", {
+  id: serial("id").primaryKey(),
+  type: varchar("type", {
+    enum: ["short_pay", "overpay", "doc_missing", "credit_limit_exceeded", "duplicate_invoice", "unapplied_payment", "other"],
+  }).notNull(),
+  severity: varchar("severity", { enum: ["low", "medium", "high", "critical"] }).default("medium").notNull(),
+  entityType: varchar("entity_type", {
+    enum: ["invoice", "payment", "client", "debtor", "broker"],
+  }).notNull(),
+  entityId: integer("entity_id"),
+  entityRef: varchar("entity_ref"),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  status: varchar("status", {
+    enum: ["open", "under_review", "resolved", "waived"],
+  }).default("open").notNull(),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolution: text("resolution"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertExceptionSchema = createInsertSchema(exceptions).omit({
+  id: true, createdAt: true, updatedAt: true, resolvedAt: true,
+});
+export type Exception = typeof exceptions.$inferSelect;
+export type InsertException = z.infer<typeof insertExceptionSchema>;

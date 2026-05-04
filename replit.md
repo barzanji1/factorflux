@@ -7,6 +7,15 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **May 4, 2026**: Broker credit checking, audit logging, ACH payment settings, cash application/reconciliation, and exception management built
+  - **Credit Checks** (`/credit-checks`): Full rewrite with real DB — assess debtors/brokers with risk scores (0–100), visual score bar, risk tiers (Low/Medium/High/Critical), credit limits, avg days-to-pay, one-click Approve/Decline/Re-review workflow
+  - **Cash Application** (`/cash-application`): Record incoming ACH/wire/check payments, match them to invoices with short-pay/overpay variance detection, auto-creates exceptions on discrepancies, status tracks unapplied → partially → fully applied → overpaid
+  - **Exception Management** (`/exceptions`): Exception queue with severity tiers (Low/Medium/High/Critical), type-tagged (short pay, overpay, doc missing, credit limit, duplicate, unapplied payment), status workflow (Open → Under Review → Resolved/Waived), resolve dialog with notes
+  - **Audit Log** (`/audit-log`): Unified timeline combining eventLedger + invoice status history, filterable by entity type and actor (user/system), search, refresh, timeAgo display
+  - **ACH Settings**: GET/PUT `/api/ach-settings/:clientId` and verify endpoint for manager sign-off
+  - **New schema tables**: `credit_checks`, `ach_settings`, `cash_applications`, `payment_application_lines`, `exceptions`
+  - **New sidebar section**: "Risk & Compliance" with Credit Checks, Exceptions, Audit Log; Cash Application added to Finance section
+  - **Debtors API** now exposed: GET/POST/PATCH/DELETE `/api/debtors`
 - **April 28, 2026**: Client Messaging System implemented — agents can email clients/carriers directly from the Help Center Contact tab. Includes SendGrid delivery via Support@Truckingprosfinancial.com, client_messages table for audit logging (id, clientId, sentBy, subject, messageType, body, sentAt, status), GET /api/messages?clientId= and POST /api/messages/send routes, sent messages history log per client. Contact cards fixed (Primary Contact/Dosh Barzanji, Support Email, Emergency Line — no duplicates).
 - **April 28, 2026**: Vault feature fully debugged and operational — AES-256-GCM server-side encryption, auto-increment sequence added directly via SQL, Drizzle alias() fix for double leftJoin, route order fixed (entry/:id before :clientId wildcard), frontend rewritten to send plaintext to server.
 - **August 22, 2025**: Complete production authentication system implemented and time clock feature fully operational

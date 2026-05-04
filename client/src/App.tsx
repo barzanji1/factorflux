@@ -31,6 +31,9 @@ import FormDemo from "@/pages/form-demo";
 import LoginPage from "@/pages/login";
 import Help from "@/pages/help";
 import Payouts from "@/pages/payouts";
+import CashApplication from "@/pages/cash-application";
+import Exceptions from "@/pages/exceptions";
+import AuditLog from "@/pages/audit-log";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -101,6 +104,21 @@ function Router() {
       <Route path="/credit-checks">
         <ProtectedRoute>
           <CreditChecks />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cash-application">
+        <ProtectedRoute>
+          <CashApplication />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/exceptions">
+        <ProtectedRoute>
+          <Exceptions />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/audit-log">
+        <ProtectedRoute>
+          <AuditLog />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

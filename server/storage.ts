@@ -20,6 +20,11 @@ import {
   clientMessages,
   payoutSettings,
   payouts,
+  creditChecks,
+  achSettings,
+  cashApplications,
+  paymentApplicationLines,
+  exceptions,
   type PayoutSettings,
   type InsertPayoutSettings,
   type Payout,
@@ -60,6 +65,16 @@ import {
   type InsertCollection,
   type ClientVault,
   type InsertClientVault,
+  type CreditCheck,
+  type InsertCreditCheck,
+  type AchSettings,
+  type InsertAchSettings,
+  type CashApplication,
+  type InsertCashApplication,
+  type PaymentApplicationLine,
+  type InsertPaymentApplicationLine,
+  type Exception,
+  type InsertException,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql } from "drizzle-orm";
@@ -221,6 +236,35 @@ export interface IStorage {
   updateVaultEntry(id: number, updates: Partial<InsertClientVault>): Promise<ClientVault>;
   deleteVaultEntry(id: number): Promise<void>;
   recordVaultAccess(id: number, userId: string): Promise<void>;
+
+  // Credit Checks
+  getCreditChecks(): Promise<CreditCheck[]>;
+  getCreditCheck(id: number): Promise<CreditCheck | undefined>;
+  createCreditCheck(data: InsertCreditCheck): Promise<CreditCheck>;
+  updateCreditCheck(id: number, updates: Partial<InsertCreditCheck>): Promise<CreditCheck>;
+  deleteCreditCheck(id: number): Promise<void>;
+
+  // ACH Settings
+  getAchSettings(clientId: number): Promise<AchSettings | undefined>;
+  upsertAchSettings(clientId: number, data: Partial<InsertAchSettings>): Promise<AchSettings>;
+
+  // Cash Applications
+  getCashApplications(): Promise<CashApplication[]>;
+  getCashApplication(id: number): Promise<CashApplication | undefined>;
+  createCashApplication(data: InsertCashApplication): Promise<CashApplication>;
+  updateCashApplication(id: number, updates: Partial<InsertCashApplication>): Promise<CashApplication>;
+  applyPaymentToInvoices(cashApplicationId: number, lines: InsertPaymentApplicationLine[]): Promise<PaymentApplicationLine[]>;
+  getPaymentApplicationLines(cashApplicationId: number): Promise<PaymentApplicationLine[]>;
+
+  // Exceptions
+  getExceptions(): Promise<Exception[]>;
+  getException(id: number): Promise<Exception | undefined>;
+  createException(data: InsertException): Promise<Exception>;
+  updateException(id: number, updates: Partial<InsertException>): Promise<Exception>;
+
+  // Audit
+  getEventLedger(entityType?: string, limit?: number): Promise<EventLedger[]>;
+  getInvoiceStatusHistoryAll(): Promise<InvoiceStatusHistory[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1471,6 +1515,161 @@ export class DatabaseStorage implements IStorage {
         lastAccessedBy: userId,
       })
       .where(eq(clientVault.id, id));
+  }
+
+  // ── Credit Checks ────────────────────────────────────────────────────────────
+  async getCreditChecks(): Promise<CreditCheck[]> {
+    return db.select().from(creditChecks).orderBy(desc(creditChecks.createdAt));
+  }
+
+  async getCreditCheck(id: number): Promise<CreditCheck | undefined> {
+    const [row] = await db.select().from(creditChecks).where(eq(creditChecks.id, id));
+    return row;
+  }
+
+  async createCreditCheck(data: InsertCreditCheck): Promise<CreditCheck> {
+    const [row] = await db.insert(creditChecks).values(data).returning();
+    return row;
+  }
+
+  async updateCreditCheck(id: number, updates: Partial<InsertCreditCheck>): Promise<CreditCheck> {
+    const [row] = await db.update(creditChecks).set({ ...updates, updatedAt: new Date() }).where(eq(creditChecks.id, id)).returning();
+    return row;
+  }
+
+  async deleteCreditCheck(id: number): Promise<void> {
+    await db.delete(creditChecks).where(eq(creditChecks.id, id));
+  }
+
+  // ── ACH Settings ─────────────────────────────────────────────────────────────
+  async getAchSettings(clientId: number): Promise<AchSettings | undefined> {
+    const [row] = await db.select().from(achSettings).where(eq(achSettings.clientId, clientId));
+    return row;
+  }
+
+  async upsertAchSettings(clientId: number, data: Partial<InsertAchSettings>): Promise<AchSettings> {
+    const existing = await this.getAchSettings(clientId);
+    if (existing) {
+      const [row] = await db.update(achSettings).set({ ...data, updatedAt: new Date() }).where(eq(achSettings.clientId, clientId)).returning();
+      return row;
+    }
+    const [row] = await db.insert(achSettings).values({ clientId, ...data } as InsertAchSettings).returning();
+    return row;
+  }
+
+  // ── Cash Applications ────────────────────────────────────────────────────────
+  async getCashApplications(): Promise<CashApplication[]> {
+    return db.select().from(cashApplications).orderBy(desc(cashApplications.createdAt));
+  }
+
+  async getCashApplication(id: number): Promise<CashApplication | undefined> {
+    const [row] = await db.select().from(cashApplications).where(eq(cashApplications.id, id));
+    return row;
+  }
+
+  async createCashApplication(data: InsertCashApplication): Promise<CashApplication> {
+    const [row] = await db.insert(cashApplications).values(data).returning();
+    return row;
+  }
+
+  async updateCashApplication(id: number, updates: Partial<InsertCashApplication>): Promise<CashApplication> {
+    const [row] = await db.update(cashApplications).set({ ...updates, updatedAt: new Date() }).where(eq(cashApplications.id, id)).returning();
+    return row;
+  }
+
+  async applyPaymentToInvoices(cashApplicationId: number, lines: InsertPaymentApplicationLine[]): Promise<PaymentApplicationLine[]> {
+    const inserted = await db.insert(paymentApplicationLines).values(lines).returning();
+    // Recalculate application status
+    const totalReceived = (await db.select().from(cashApplications).where(eq(cashApplications.id, cashApplicationId)))[0]?.totalReceived;
+    const totalApplied = lines.reduce((s, l) => s + parseFloat(String(l.appliedAmount) || "0"), 0);
+    const received = parseFloat(String(totalReceived) || "0");
+    let status: CashApplication["status"] = "fully_applied";
+    if (totalApplied < received - 0.01) status = "partially_applied";
+    else if (totalApplied > received + 0.01) status = "overpaid";
+    await db.update(cashApplications).set({ status, updatedAt: new Date() }).where(eq(cashApplications.id, cashApplicationId));
+    // Auto-create exceptions for short-pays / overpays
+    for (const l of lines) {
+      if (l.varianceType === "short_pay" || l.varianceType === "overpay") {
+        await db.insert(exceptions).values({
+          type: l.varianceType,
+          severity: "medium",
+          entityType: "payment",
+          entityId: cashApplicationId,
+          entityRef: l.invoiceNumber,
+          title: `${l.varianceType === "short_pay" ? "Short Pay" : "Overpay"} on Invoice ${l.invoiceNumber}`,
+          description: l.varianceReason ?? `Variance of $${Math.abs(parseFloat(String(l.variance) || "0")).toFixed(2)}`,
+          status: "open",
+        });
+      }
+    }
+    return inserted;
+  }
+
+  async getPaymentApplicationLines(cashApplicationId: number): Promise<PaymentApplicationLine[]> {
+    return db.select().from(paymentApplicationLines).where(eq(paymentApplicationLines.cashApplicationId, cashApplicationId));
+  }
+
+  // ── Exceptions ────────────────────────────────────────────────────────────────
+  async getExceptions(): Promise<Exception[]> {
+    return db.select().from(exceptions).orderBy(desc(exceptions.createdAt));
+  }
+
+  async getException(id: number): Promise<Exception | undefined> {
+    const [row] = await db.select().from(exceptions).where(eq(exceptions.id, id));
+    return row;
+  }
+
+  async createException(data: InsertException): Promise<Exception> {
+    const [row] = await db.insert(exceptions).values(data).returning();
+    return row;
+  }
+
+  async updateException(id: number, updates: Partial<InsertException> & { resolvedAt?: Date | null }): Promise<Exception> {
+    const patch: Record<string, unknown> = { ...updates, updatedAt: new Date() };
+    if (updates.status === "resolved" && !updates.resolvedAt) patch.resolvedAt = new Date();
+    const [row] = await db.update(exceptions).set(patch).where(eq(exceptions.id, id)).returning();
+    return row;
+  }
+
+  // ── Audit ─────────────────────────────────────────────────────────────────────
+  async getEventLedger(entityType?: string, limit = 500): Promise<EventLedger[]> {
+    const baseQuery = db
+      .select({
+        id: eventLedger.id,
+        entityType: eventLedger.entityType,
+        entityId: eventLedger.entityId,
+        eventType: eventLedger.eventType,
+        actorType: eventLedger.actorType,
+        actorId: eventLedger.actorId,
+        payloadJson: eventLedger.payloadJson,
+        createdAt: eventLedger.createdAt,
+        actorName: sql<string | null>`CASE WHEN ${eventLedger.actorType} = 'user' THEN (SELECT concat(first_name, ' ', last_name) FROM users WHERE id = ${eventLedger.actorId}) ELSE NULL END`,
+      })
+      .from(eventLedger)
+      .orderBy(desc(eventLedger.createdAt))
+      .limit(limit);
+
+    if (entityType && entityType !== "all") {
+      return (baseQuery.where(eq(eventLedger.entityType, entityType as any))) as any;
+    }
+    return baseQuery as any;
+  }
+
+  async getInvoiceStatusHistoryAll(): Promise<InvoiceStatusHistory[]> {
+    return db
+      .select({
+        id: invoiceStatusHistory.id,
+        invoiceId: invoiceStatusHistory.invoiceId,
+        oldStatus: invoiceStatusHistory.oldStatus,
+        newStatus: invoiceStatusHistory.newStatus,
+        changedBy: invoiceStatusHistory.changedBy,
+        reason: invoiceStatusHistory.reason,
+        createdAt: invoiceStatusHistory.createdAt,
+        changedByName: sql<string | null>`(SELECT concat(first_name, ' ', last_name) FROM users WHERE id = ${invoiceStatusHistory.changedBy})`,
+      })
+      .from(invoiceStatusHistory)
+      .orderBy(desc(invoiceStatusHistory.createdAt))
+      .limit(500) as any;
   }
 }
 

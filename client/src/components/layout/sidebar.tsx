@@ -18,6 +18,10 @@ import {
   HelpCircle,
   Briefcase,
   Wallet,
+  ShieldCheck,
+  ArrowRightLeft,
+  AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 
 type UserRole = "manager" | "admin" | "employee";
@@ -65,9 +69,18 @@ const navSections: NavSection[] = [
     items: [
       { name: "Factoring", href: "/factoring", icon: DollarSign },
       { name: "Payouts", href: "/payouts", icon: Wallet },
+      { name: "Cash Application", href: "/cash-application", icon: ArrowRightLeft },
       { name: "Fuel Advance", href: "/fuel-advance", icon: Fuel },
       { name: "Collections", href: "/collections", icon: Phone },
       { name: "Reports", href: "/reports", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Risk & Compliance",
+    items: [
+      { name: "Credit Checks", href: "/credit-checks", icon: ShieldCheck },
+      { name: "Exceptions", href: "/exceptions", icon: AlertTriangle },
+      { name: "Audit Log", href: "/audit-log", icon: ClipboardList },
     ],
   },
   {

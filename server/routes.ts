@@ -2895,6 +2895,137 @@ Trucking Pros Financial Team
     }
   });
 
+  // ─── Debtors (expose existing storage) ────────────────────────────────────
+  app.get("/api/debtors", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getDebtors()); } catch (e) { res.status(500).json({ message: "Failed to fetch debtors" }); }
+  });
+  app.get("/api/debtors/:id", requireAuth, async (req, res) => {
+    try {
+      const d = await storage.getDebtor(Number(req.params.id));
+      if (!d) return res.status(404).json({ message: "Debtor not found" });
+      res.json(d);
+    } catch (e) { res.status(500).json({ message: "Failed to fetch debtor" }); }
+  });
+  app.post("/api/debtors", requireAuth, async (req: any, res) => {
+    try { res.status(201).json(await storage.createDebtor(req.body)); } catch (e) { res.status(500).json({ message: "Failed to create debtor" }); }
+  });
+  app.patch("/api/debtors/:id", requireAuth, async (req: any, res) => {
+    try { res.json(await storage.updateDebtor(Number(req.params.id), req.body)); } catch (e) { res.status(500).json({ message: "Failed to update debtor" }); }
+  });
+  app.delete("/api/debtors/:id", requireAuth, async (req, res) => {
+    try { await storage.deleteDebtor(Number(req.params.id)); res.json({ ok: true }); } catch (e) { res.status(500).json({ message: "Failed to delete debtor" }); }
+  });
+
+  // ─── Credit Checks ────────────────────────────────────────────────────────
+  app.get("/api/credit-checks", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getCreditChecks()); } catch (e) { res.status(500).json({ message: "Failed to fetch credit checks" }); }
+  });
+  app.get("/api/credit-checks/:id", requireAuth, async (req, res) => {
+    try {
+      const c = await storage.getCreditCheck(Number(req.params.id));
+      if (!c) return res.status(404).json({ message: "Not found" });
+      res.json(c);
+    } catch (e) { res.status(500).json({ message: "Failed to fetch credit check" }); }
+  });
+  app.post("/api/credit-checks", requireAuth, async (req: any, res) => {
+    try {
+      const check = await storage.createCreditCheck(req.body);
+      await storage.createActivity({ userId: req.user.id, type: "credit_check_created", description: `Credit check created for ${req.body.entityName}`, entityType: req.body.entityType, entityId: req.body.entityId });
+      res.status(201).json(check);
+    } catch (e) { res.status(500).json({ message: "Failed to create credit check" }); }
+  });
+  app.patch("/api/credit-checks/:id", requireAuth, async (req: any, res) => {
+    try {
+      const updated = await storage.updateCreditCheck(Number(req.params.id), req.body);
+      if (req.body.status) {
+        await storage.createActivity({ userId: req.user.id, type: "credit_check_updated", description: `Credit check status changed to ${req.body.status}`, entityType: "credit_check", entityId: updated.id });
+      }
+      res.json(updated);
+    } catch (e) { res.status(500).json({ message: "Failed to update credit check" }); }
+  });
+  app.delete("/api/credit-checks/:id", requireAdmin, async (req, res) => {
+    try { await storage.deleteCreditCheck(Number(req.params.id)); res.json({ ok: true }); } catch (e) { res.status(500).json({ message: "Failed to delete" }); }
+  });
+
+  // ─── ACH Settings ─────────────────────────────────────────────────────────
+  app.get("/api/ach-settings/:clientId", requireAuth, async (req, res) => {
+    try {
+      const s = await storage.getAchSettings(Number(req.params.clientId));
+      res.json(s ?? null);
+    } catch (e) { res.status(500).json({ message: "Failed to fetch ACH settings" }); }
+  });
+  app.put("/api/ach-settings/:clientId", requireAuth, async (req: any, res) => {
+    try {
+      const s = await storage.upsertAchSettings(Number(req.params.clientId), req.body);
+      await storage.createActivity({ userId: req.user.id, type: "ach_settings_updated", description: `ACH settings updated for client ${req.params.clientId}`, entityType: "client", entityId: Number(req.params.clientId) });
+      res.json(s);
+    } catch (e) { res.status(500).json({ message: "Failed to save ACH settings" }); }
+  });
+  app.patch("/api/ach-settings/:clientId/verify", requireAdmin, async (req: any, res) => {
+    try {
+      const s = await storage.upsertAchSettings(Number(req.params.clientId), { status: "active", verifiedBy: req.user.id } as any);
+      res.json(s);
+    } catch (e) { res.status(500).json({ message: "Failed to verify ACH" }); }
+  });
+
+  // ─── Cash Applications ────────────────────────────────────────────────────
+  app.get("/api/cash-applications", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getCashApplications()); } catch (e) { res.status(500).json({ message: "Failed to fetch" }); }
+  });
+  app.get("/api/cash-applications/:id", requireAuth, async (req, res) => {
+    try {
+      const c = await storage.getCashApplication(Number(req.params.id));
+      if (!c) return res.status(404).json({ message: "Not found" });
+      const lines = await storage.getPaymentApplicationLines(Number(req.params.id));
+      res.json({ ...c, lines });
+    } catch (e) { res.status(500).json({ message: "Failed to fetch" }); }
+  });
+  app.post("/api/cash-applications", requireAuth, async (req: any, res) => {
+    try {
+      const body = { ...req.body, processedBy: req.user.id, debtorId: req.body.debtorId ?? null };
+      const ca = await storage.createCashApplication(body);
+      await storage.createActivity({ userId: req.user.id, type: "payment_received", description: `Payment recorded: ${req.body.paymentReference} — $${req.body.totalReceived}`, entityType: "payment", entityId: ca.id });
+      res.status(201).json(ca);
+    } catch (e) { res.status(500).json({ message: "Failed to create" }); }
+  });
+  app.post("/api/cash-applications/:id/apply", requireAuth, async (req: any, res) => {
+    try {
+      const lines = await storage.applyPaymentToInvoices(Number(req.params.id), req.body.lines);
+      await storage.createActivity({ userId: req.user.id, type: "payment_applied", description: `Payment ${req.params.id} applied to ${lines.length} invoice(s)`, entityType: "payment", entityId: Number(req.params.id) });
+      res.json(lines);
+    } catch (e) { console.error(e); res.status(500).json({ message: "Failed to apply payment" }); }
+  });
+
+  // ─── Exceptions ───────────────────────────────────────────────────────────
+  app.get("/api/exceptions", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getExceptions()); } catch (e) { res.status(500).json({ message: "Failed to fetch" }); }
+  });
+  app.post("/api/exceptions", requireAuth, async (req: any, res) => {
+    try {
+      const exc = await storage.createException({ ...req.body, createdBy: req.user.id });
+      res.status(201).json(exc);
+    } catch (e) { res.status(500).json({ message: "Failed to create exception" }); }
+  });
+  app.patch("/api/exceptions/:id", requireAuth, async (req: any, res) => {
+    try {
+      const exc = await storage.updateException(Number(req.params.id), { ...req.body, resolvedBy: req.body.status === "resolved" ? req.user.id : undefined });
+      res.json(exc);
+    } catch (e) { res.status(500).json({ message: "Failed to update exception" }); }
+  });
+
+  // ─── Audit endpoints ──────────────────────────────────────────────────────
+  app.get("/api/audit/events", requireAuth, async (req, res) => {
+    try {
+      const entityType = (req.query.entityType as string) || undefined;
+      const limit = Math.min(parseInt((req.query.limit as string) || "500", 10), 500);
+      const rows = await storage.getEventLedger(entityType, limit);
+      res.json(rows);
+    } catch (e) { res.status(500).json({ message: "Failed to fetch events" }); }
+  });
+  app.get("/api/audit/status-history", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getInvoiceStatusHistoryAll()); } catch (e) { res.status(500).json({ message: "Failed to fetch status history" }); }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
