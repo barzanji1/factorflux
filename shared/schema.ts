@@ -390,10 +390,25 @@ export const notifications = pgTable("notifications", {
   message: text("message").notNull(),
   type: varchar("type", { enum: ["info", "success", "warning", "error"] }).default("info").notNull(),
   read: boolean("read").default(false).notNull(),
-  entityType: varchar("entity_type"), // Optional reference to related entity
-  entityId: integer("entity_id"), // Optional reference to related entity
+  entityType: varchar("entity_type"),
+  entityId: integer("entity_id"),
+  actionUrl: varchar("action_url"),
+  metadata: text("metadata"), // JSON string: emailSubject, emailBody, recipientEmail
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Document Requirements table (configurable checklist per workflow stage)
+export const docRequirements = pgTable("doc_requirements", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  stage: varchar("stage", { enum: ["submission", "approval", "factoring", "payout"] }).notNull(),
+  documentName: varchar("document_name").notNull(),
+  required: boolean("required").default(true).notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type DocRequirement = typeof docRequirements.$inferSelect;
+export type InsertDocRequirement = typeof docRequirements.$inferInsert;
 
 // Collections table
 export const collections = pgTable("collections", {

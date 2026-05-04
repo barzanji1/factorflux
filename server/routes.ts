@@ -35,6 +35,8 @@ import {
   fuelAdvances,
   invoices,
   payouts,
+  docRequirements,
+  activities,
 } from "@shared/schema";
 
 import { sendEmail } from "./emailService";
@@ -2746,11 +2748,150 @@ Trucking Pros Financial Team
       if (updates.paymentStatus === "reserve_released" && !updates.reserveReleasedAt) extra.reserveReleasedAt = now;
 
       const updated = await storage.updatePayout(id, { ...updates, ...extra } as any);
+
+      // Fire payout status notification
+      if (updates.paymentStatus) {
+        const statusLabels: Record<string, { title: string; message: string; type: "info" | "success" | "warning" | "error" }> = {
+          advance_paid: { title: "Advance Payment Sent", message: `Your advance payment has been processed for payout #${id}.`, type: "success" },
+          reserve_pending: { title: "Reserve Pending", message: `Your reserve is pending debtor payment for payout #${id}.`, type: "info" },
+          reserve_released: { title: "Reserve Released", message: `Your reserve funds have been released for payout #${id}.`, type: "success" },
+          complete: { title: "Payout Complete", message: `Payout #${id} is fully complete. All funds have been disbursed.`, type: "success" },
+        };
+        const notif = statusLabels[updates.paymentStatus];
+        if (notif) {
+          storage.createNotification({
+            userId: req.user.id,
+            title: notif.title,
+            message: notif.message,
+            type: notif.type,
+            entityType: "payout",
+            entityId: id,
+            actionUrl: "/payouts",
+            metadata: JSON.stringify({ emailSubject: notif.title, emailBody: notif.message, trigger: "payout_status_change" }),
+          } as any).catch(() => {});
+        }
+      }
+
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
       console.error("Error updating payout:", err);
       res.status(500).json({ message: "Failed to update payout" });
+    }
+  });
+
+  // ─── Notify: Admin requests more info ──────────────────────────────────────
+  app.post("/api/admin/notify-carrier", requireAdmin, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        userId: z.string().min(1),
+        subject: z.string().min(1).max(200),
+        message: z.string().min(1).max(2000),
+        entityType: z.string().optional(),
+        entityId: z.number().optional(),
+        actionUrl: z.string().optional(),
+      });
+      const body = schema.parse(req.body);
+
+      const notif = await storage.createNotification({
+        userId: body.userId,
+        title: body.subject,
+        message: body.message,
+        type: "warning",
+        entityType: body.entityType || null,
+        entityId: body.entityId || null,
+        actionUrl: body.actionUrl || null,
+        metadata: JSON.stringify({
+          emailSubject: body.subject,
+          emailBody: body.message,
+          trigger: "admin_request_info",
+          sentBy: req.user.id,
+        }),
+      } as any);
+
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "invoice_approved",
+        entityType: body.entityType || "notification",
+        entityId: body.entityId || null,
+        description: `Admin sent notification to user ${body.userId}: "${body.subject}"`,
+      });
+
+      res.status(201).json(notif);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
+      console.error("Error sending admin notification:", err);
+      res.status(500).json({ message: "Failed to send notification" });
+    }
+  });
+
+  // ─── Document Requirements ─────────────────────────────────────────────────
+  app.get("/api/admin/doc-requirements", requireAuth, async (_req, res) => {
+    try {
+      const rows = await db.select().from(docRequirements).orderBy(docRequirements.stage, docRequirements.documentName);
+      res.json(rows);
+    } catch (err) {
+      console.error("Error fetching doc requirements:", err);
+      res.status(500).json({ message: "Failed to fetch document requirements" });
+    }
+  });
+
+  app.put("/api/admin/doc-requirements", requireAdmin, async (req: any, res) => {
+    try {
+      const schema = z.array(z.object({
+        id: z.number().optional(),
+        stage: z.enum(["submission", "approval", "factoring", "payout"]),
+        documentName: z.string().min(1),
+        required: z.boolean(),
+        description: z.string().optional(),
+      }));
+      const items = schema.parse(req.body);
+
+      // Clear and re-insert for simplicity
+      await db.delete(docRequirements);
+      if (items.length > 0) {
+        await db.insert(docRequirements).values(items.map((i) => ({
+          stage: i.stage,
+          documentName: i.documentName,
+          required: i.required,
+          description: i.description || null,
+          updatedAt: new Date(),
+        })));
+      }
+
+      const rows = await db.select().from(docRequirements).orderBy(docRequirements.stage, docRequirements.documentName);
+      res.json(rows);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
+      console.error("Error saving doc requirements:", err);
+      res.status(500).json({ message: "Failed to save document requirements" });
+    }
+  });
+
+  // ─── Admin Audit Log ───────────────────────────────────────────────────────
+  app.get("/api/admin/audit-log", requireAdmin, async (req, res) => {
+    try {
+      const limit = Math.min(parseInt((req.query.limit as string) || "100", 10), 500);
+      const rows = await db
+        .select({
+          id: activities.id,
+          userId: activities.userId,
+          type: activities.type,
+          description: activities.description,
+          entityType: activities.entityType,
+          entityId: activities.entityId,
+          createdAt: activities.createdAt,
+          userName: users.firstName,
+          userLastName: users.lastName,
+        })
+        .from(activities)
+        .leftJoin(users, eq(activities.userId, users.id))
+        .orderBy(desc(activities.createdAt))
+        .limit(limit);
+      res.json(rows);
+    } catch (err) {
+      console.error("Error fetching audit log:", err);
+      res.status(500).json({ message: "Failed to fetch audit log" });
     }
   });
 

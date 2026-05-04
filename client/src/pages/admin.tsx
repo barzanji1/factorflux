@@ -22,19 +22,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Users, Shield, UserPlus, Pencil, Trash2, Ban, CheckCircle,
-  Loader2, Mail,
+  Loader2, Mail, Settings2, FileCheck, ClipboardList, Plus,
+  AlertCircle, Bell, TrendingUp, Clock, Activity,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
 } from "@/components/ui/form";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonRows } from "@/components/ui/skeleton-rows";
+import { cn } from "@/lib/utils";
 
-// ---------- Types ----------
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface UserRecord {
   id: string;
   firstName?: string;
@@ -44,11 +51,35 @@ interface UserRecord {
   status?: string;
   createdAt?: string;
   jobTitle?: string;
-  department?: string;
   profileImageUrl?: string;
 }
 
-// ---------- Schemas ----------
+interface DocRequirement {
+  id?: number;
+  stage: string;
+  documentName: string;
+  required: boolean;
+  description?: string;
+}
+
+interface AuditEntry {
+  id: number;
+  userId: string;
+  userName?: string;
+  userLastName?: string;
+  type: string;
+  description: string;
+  entityType?: string;
+  entityId?: number;
+  createdAt?: string;
+}
+
+interface PayoutSettings {
+  advanceRate: string;
+  feeRate: string;
+}
+
+// ─── Schemas ─────────────────────────────────────────────────────────────────
 const addAgentSchema = z.object({
   firstName: z.string().min(1, "First name required"),
   lastName: z.string().min(1, "Last name required"),
@@ -56,40 +87,94 @@ const addAgentSchema = z.object({
   role: z.enum(["employee", "manager", "admin"]),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
-
 const editUserSchema = z.object({
   firstName: z.string().min(1, "First name required"),
   lastName: z.string().min(1, "Last name required"),
   email: z.string().email("Valid email required"),
   role: z.enum(["employee", "manager", "admin"]),
 });
+const notifySchema = z.object({
+  userId: z.string().min(1, "Select a recipient"),
+  subject: z.string().min(1, "Subject required"),
+  message: z.string().min(1, "Message required"),
+});
+const ratesSchema = z.object({
+  advanceRate: z.coerce.number().min(1).max(99),
+  feeRate: z.coerce.number().min(0).max(50),
+}).refine((d) => d.advanceRate + d.feeRate <= 100, { message: "Advance + fee cannot exceed 100%", path: ["feeRate"] });
 
 type AddAgentForm = z.infer<typeof addAgentSchema>;
 type EditUserForm = z.infer<typeof editUserSchema>;
+type NotifyForm = z.infer<typeof notifySchema>;
+type RatesForm = z.infer<typeof ratesSchema>;
 
-// ---------- Helpers ----------
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 const ROLE_BADGE: Record<string, JSX.Element> = {
-  admin: <Badge className="bg-purple-600 hover:bg-purple-700 text-white">Admin</Badge>,
-  manager: <Badge className="bg-blue-600 hover:bg-blue-700 text-white">Manager</Badge>,
+  admin: <Badge className="bg-purple-600 text-white">Admin</Badge>,
+  manager: <Badge className="bg-blue-600 text-white">Manager</Badge>,
   employee: <Badge variant="outline">Employee</Badge>,
 };
-
 const STATUS_BADGE: Record<string, JSX.Element> = {
-  active: <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300">Active</Badge>,
-  suspended: <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300">Suspended</Badge>,
+  active: <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Active</Badge>,
+  suspended: <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Suspended</Badge>,
   inactive: <Badge variant="outline" className="text-slate-500">Inactive</Badge>,
 };
 
-// ---------- Component ----------
+const STAGE_LABELS: Record<string, string> = {
+  submission: "Submission",
+  approval: "Approval",
+  factoring: "Factoring",
+  payout: "Payout",
+};
+const STAGE_COLORS: Record<string, string> = {
+  submission: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300",
+  approval: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300",
+  factoring: "bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300",
+  payout: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
+};
+
+const DEFAULT_DOC_REQUIREMENTS: DocRequirement[] = [
+  { stage: "submission", documentName: "Rate Confirmation", required: true, description: "Signed rate confirmation from broker" },
+  { stage: "submission", documentName: "Bill of Lading", required: true, description: "Proof of freight delivery" },
+  { stage: "submission", documentName: "Proof of Delivery", required: true, description: "Signed POD from consignee" },
+  { stage: "approval", documentName: "Driver ID", required: true, description: "Valid government-issued photo ID" },
+  { stage: "approval", documentName: "Carrier Authority", required: true, description: "FMCSA carrier authority documentation" },
+  { stage: "factoring", documentName: "W-9 Form", required: true, description: "Tax information form" },
+  { stage: "factoring", documentName: "Carrier Setup Form", required: true, description: "TPF carrier onboarding form" },
+  { stage: "payout", documentName: "Bank Account Details", required: true, description: "ACH bank information for direct deposit" },
+];
+
+const ACTIVITY_ICONS: Record<string, { icon: typeof Activity; color: string }> = {
+  document_uploaded: { icon: FileCheck, color: "text-blue-500" },
+  invoice_created: { icon: ClipboardList, color: "text-violet-500" },
+  invoice_approved: { icon: CheckCircle, color: "text-emerald-500" },
+  client_created: { icon: UserPlus, color: "text-indigo-500" },
+  default: { icon: Activity, color: "text-slate-400" },
+};
+
+const TABS = [
+  { id: "users", label: "Users", icon: Users },
+  { id: "factoring", label: "Factoring Settings", icon: Settings2 },
+  { id: "documents", label: "Document Requirements", icon: FileCheck },
+  { id: "audit", label: "Audit Log", icon: ClipboardList },
+] as const;
+type Tab = typeof TABS[number]["id"];
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Current session user
-  const { data: session } = useQuery<{ user: UserRecord }>({
-    queryKey: ["/api/auth/verify"],
-  });
+  const { data: session } = useQuery<{ user: UserRecord }>({ queryKey: ["/api/auth/verify"] });
   const currentUser = session?.user;
+
+  const [activeTab, setActiveTab] = useState<Tab>("users");
+  const [addOpen, setAddOpen] = useState(false);
+  const [editUser, setEditUser] = useState<UserRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [docItems, setDocItems] = useState<DocRequirement[]>([]);
+  const [docsDirty, setDocsDirty] = useState(false);
 
   // Guard: only admin
   if (currentUser && currentUser.role !== "admin") {
@@ -97,7 +182,7 @@ export default function Admin() {
       <div className="flex h-screen">
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <TopNav title="Admin Panel" subtitle="Access Denied" />
+          <TopNav title="Admin Panel" />
           <main className="flex flex-1 items-center justify-center p-6">
             <Card className="max-w-md w-full text-center">
               <CardHeader>
@@ -112,18 +197,29 @@ export default function Admin() {
     );
   }
 
-  // ----- State -----
-  const [addOpen, setAddOpen] = useState(false);
-  const [editUser, setEditUser] = useState<UserRecord | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
-
-  // ----- Queries -----
-  const { data: users = [], isLoading } = useQuery<UserRecord[]>({
+  // ─── Queries ──────────────────────────────────────────────────────────────
+  const { data: users = [], isLoading: usersLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/admin/users"],
     enabled: currentUser?.role === "admin",
   });
 
-  // ----- Mutations -----
+  const { data: settings } = useQuery<PayoutSettings>({
+    queryKey: ["/api/payout-settings"],
+  });
+
+  const { data: docReqs = [], isLoading: docsLoading } = useQuery<DocRequirement[]>({
+    queryKey: ["/api/admin/doc-requirements"],
+  } as any);
+
+  const { data: auditLog = [], isLoading: auditLoading } = useQuery<AuditEntry[]>({
+    queryKey: ["/api/admin/audit-log"],
+    enabled: activeTab === "audit",
+  });
+
+  // Init doc items from fetched data
+  const effectiveDocItems = docsDirty ? docItems : (docReqs.length ? docReqs : DEFAULT_DOC_REQUIREMENTS);
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: async (data: AddAgentForm) => {
       const res = await fetch("/api/admin/users", {
@@ -185,226 +281,523 @@ export default function Admin() {
     },
   });
 
-  // ----- Forms -----
+  const ratesMutation = useMutation({
+    mutationFn: async (data: RatesForm) => {
+      const res = await fetch("/api/payout-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to save");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payout-settings"] });
+      toast({ title: "Rates saved", description: "New rates apply to future payouts." });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const notifyMutation = useMutation({
+    mutationFn: async (data: NotifyForm) => {
+      const res = await fetch("/api/admin/notify-carrier", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId: data.userId, subject: data.subject, message: data.message }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to send");
+      return json;
+    },
+    onSuccess: () => {
+      setNotifyOpen(false);
+      notifyForm.reset();
+      toast({ title: "Notification sent" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const saveDocsMutation = useMutation({
+    mutationFn: async (items: DocRequirement[]) => {
+      const res = await fetch("/api/admin/doc-requirements", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(items),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to save");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/doc-requirements"] });
+      setDocsDirty(false);
+      toast({ title: "Document requirements saved" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // ─── Forms ────────────────────────────────────────────────────────────────
   const addForm = useForm<AddAgentForm>({
     resolver: zodResolver(addAgentSchema),
     defaultValues: { firstName: "", lastName: "", email: "", role: "employee", password: "" },
   });
-
   const editForm = useForm<EditUserForm>({
     resolver: zodResolver(editUserSchema),
     defaultValues: { firstName: "", lastName: "", email: "", role: "employee" },
   });
+  const notifyForm = useForm<NotifyForm>({
+    resolver: zodResolver(notifySchema),
+    defaultValues: { userId: "", subject: "", message: "" },
+  });
+  const ratesForm = useForm<RatesForm>({
+    resolver: zodResolver(ratesSchema),
+    defaultValues: { advanceRate: 90, feeRate: 3 },
+    values: settings ? { advanceRate: Number(settings.advanceRate), feeRate: Number(settings.feeRate) } : undefined,
+  });
 
   const openEdit = (u: UserRecord) => {
     setEditUser(u);
-    editForm.reset({
-      firstName: u.firstName || "",
-      lastName: u.lastName || "",
-      email: u.email || "",
-      role: (u.role as "employee" | "manager" | "admin") || "employee",
-    });
+    editForm.reset({ firstName: u.firstName || "", lastName: u.lastName || "", email: u.email || "", role: u.role as any });
   };
-
   const handleSuspend = (u: UserRecord) => {
     if (u.id === currentUser?.id) {
       toast({ title: "Not allowed", description: "You cannot suspend your own account.", variant: "destructive" });
       return;
     }
-    const newStatus = u.status === "suspended" ? "active" : "suspended";
-    updateMutation.mutate({ id: u.id, updates: { status: newStatus } });
+    updateMutation.mutate({ id: u.id, updates: { status: u.status === "suspended" ? "active" : "suspended" } });
+  };
+  const isSelf = (id: string) => id === currentUser?.id;
+
+  // Doc requirement helpers
+  const updateDoc = (idx: number, patch: Partial<DocRequirement>) => {
+    setDocItems((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
+    setDocsDirty(true);
+  };
+  const addDocRow = (stage: string) => {
+    setDocItems((prev) => [...prev, { stage, documentName: "", required: true, description: "" }]);
+    setDocsDirty(true);
+  };
+  const removeDocRow = (idx: number) => {
+    setDocItems((prev) => prev.filter((_, i) => i !== idx));
+    setDocsDirty(true);
   };
 
-  const isSelf = (id: string) => id === currentUser?.id;
+  const stageGroups = ["submission", "approval", "factoring", "payout"];
+  const watchAdvance = ratesForm.watch("advanceRate") ?? 90;
+  const watchFee = ratesForm.watch("feeRate") ?? 3;
 
   return (
     <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Admin Panel" subtitle="User and agent management" />
+        <TopNav title="Admin Panel" subtitle="System management and configuration" />
         <main className="custom-scrollbar flex-1 overflow-auto p-6">
-          <div className="space-y-6 max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto space-y-6">
 
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">User Management</h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  {users.length} {users.length === 1 ? "account" : "accounts"} in the system
-                </p>
-              </div>
-              <Button onClick={() => { addForm.reset(); setAddOpen(true); }} className="gap-2">
-                <UserPlus className="h-4 w-4" />
-                Add Agent
-              </Button>
-            </div>
-
-            {/* Stats row */}
+            {/* ── Stats row ── */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {[
-                { label: "Total Users", value: users.length, color: "text-slate-900 dark:text-white" },
-                { label: "Admins", value: users.filter((u) => u.role === "admin").length, color: "text-purple-600 dark:text-purple-400" },
-                { label: "Managers", value: users.filter((u) => u.role === "manager").length, color: "text-blue-600 dark:text-blue-400" },
-                { label: "Suspended", value: users.filter((u) => u.status === "suspended").length, color: "text-amber-600 dark:text-amber-400" },
+                { label: "Total Users", value: users.length, icon: Users, color: "text-slate-700 dark:text-slate-300", bg: "bg-slate-50 dark:bg-slate-800/50" },
+                { label: "Admins", value: users.filter((u) => u.role === "admin").length, icon: Shield, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-950/30" },
+                { label: "Managers", value: users.filter((u) => u.role === "manager").length, icon: UserPlus, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/30" },
+                { label: "Suspended", value: users.filter((u) => u.status === "suspended").length, icon: Ban, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
               ].map((stat) => (
                 <Card key={stat.label} className="rounded-[20px] border border-[hsl(var(--border))]">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
-                    <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${stat.bg}`}>
+                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
+                      <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            {/* Users Table */}
-            <Card className="rounded-[24px] border border-[hsl(var(--border))]">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  System Users
-                </CardTitle>
-                <CardDescription>Manage roles, status, and access for all accounts</CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-16 gap-2 text-slate-500">
-                    <Loader2 className="h-5 w-5 animate-spin" /> Loading users...
+            {/* ── Tab Navigation ── */}
+            <div className="flex gap-1 rounded-2xl border border-[hsl(var(--border))] bg-slate-50 dark:bg-slate-900 p-1">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                    activeTab === tab.id
+                      ? "bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                  )}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* TAB: USERS                                                     */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {activeTab === "users" && (
+              <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        System Users
+                      </CardTitle>
+                      <CardDescription>Manage roles, status, and access for all accounts</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setNotifyOpen(true)} className="gap-2">
+                        <Bell className="h-4 w-4" />
+                        Notify User
+                      </Button>
+                      <Button size="sm" onClick={() => { addForm.reset(); setAddOpen(true); }} className="gap-2">
+                        <UserPlus className="h-4 w-4" />
+                        Add Agent
+                      </Button>
+                    </div>
                   </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date Added</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((u) => (
-                        <TableRow key={u.id} className={u.status === "suspended" ? "opacity-60" : ""}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={u.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent((u.firstName || "?") + "+" + (u.lastName || ""))}&background=3B82F6&color=fff&size=32`}
-                                alt=""
-                                className="h-8 w-8 rounded-full object-cover flex-shrink-0"
-                              />
-                              <div>
-                                <div className="font-medium text-slate-900 dark:text-white">
-                                  {u.firstName} {u.lastName}
-                                  {isSelf(u.id) && <span className="ml-2 text-xs text-slate-400">(you)</span>}
+                </CardHeader>
+                <CardContent className="p-0">
+                  {usersLoading ? (
+                    <SkeletonRows rows={6} cols={5} />
+                  ) : users.length === 0 ? (
+                    <EmptyState
+                      icon={Users}
+                      title="No users yet"
+                      description="Add the first agent to get started."
+                      action={{ label: "Add Agent", onClick: () => setAddOpen(true) }}
+                    />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Added</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {users.map((u) => (
+                            <TableRow key={u.id} className={u.status === "suspended" ? "opacity-60" : ""}>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={u.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent((u.firstName || "?") + "+" + (u.lastName || ""))}&background=3B82F6&color=fff&size=32`}
+                                    alt=""
+                                    className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                                  />
+                                  <div>
+                                    <div className="font-medium text-slate-900 dark:text-white text-sm">
+                                      {u.firstName} {u.lastName}
+                                      {isSelf(u.id) && <span className="ml-2 text-xs text-slate-400">(you)</span>}
+                                    </div>
+                                    {u.jobTitle && <div className="text-xs text-slate-400">{u.jobTitle}</div>}
+                                  </div>
                                 </div>
-                                {u.jobTitle && <div className="text-xs text-slate-500">{u.jobTitle}</div>}
+                              </TableCell>
+                              <TableCell className="text-slate-600 dark:text-slate-300 text-sm">{u.email || "—"}</TableCell>
+                              <TableCell>{ROLE_BADGE[u.role] || <Badge variant="outline">{u.role}</Badge>}</TableCell>
+                              <TableCell>{STATUS_BADGE[u.status || "active"] || STATUS_BADGE.active}</TableCell>
+                              <TableCell className="text-sm text-slate-500">
+                                {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Edit">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  {!isSelf(u.id) && (
+                                    <Button variant="ghost" size="sm" onClick={() => handleSuspend(u)} disabled={updateMutation.isPending} title={u.status === "suspended" ? "Reactivate" : "Suspend"}>
+                                      {u.status === "suspended" ? <CheckCircle className="h-4 w-4 text-emerald-600" /> : <Ban className="h-4 w-4 text-amber-600" />}
+                                    </Button>
+                                  )}
+                                  {!isSelf(u.id) && (
+                                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(u)} title="Remove">
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* TAB: FACTORING SETTINGS                                        */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {activeTab === "factoring" && (
+              <div className="space-y-5">
+                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Factoring Rate Configuration
+                    </CardTitle>
+                    <CardDescription>
+                      These rates apply to all new payout records. Existing payouts are not affected.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <Form {...ratesForm}>
+                      <form onSubmit={ratesForm.handleSubmit((d) => ratesMutation.mutate(d))} className="space-y-5">
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                          <FormField control={ratesForm.control} name="advanceRate" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Advance Rate (%)</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input {...field} type="number" step="0.1" min={1} max={99} className="pr-10" />
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span>
+                                </div>
+                              </FormControl>
+                              <FormDescription>Percentage of invoice paid to carrier upfront</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={ratesForm.control} name="feeRate" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Factoring Fee (%)</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input {...field} type="number" step="0.1" min={0} max={50} className="pr-10" />
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span>
+                                </div>
+                              </FormControl>
+                              <FormDescription>Factoring fee deducted from advance amount</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </div>
+
+                        {/* Live preview */}
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-5">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">Preview — $10,000 invoice</p>
+                          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                            {[
+                              { label: "Advance", value: `$${((10000 * watchAdvance) / 100).toFixed(2)}`, color: "text-blue-600 dark:text-blue-400" },
+                              { label: "Fee", value: `$${((10000 * watchFee) / 100).toFixed(2)}`, color: "text-amber-600 dark:text-amber-400" },
+                              { label: "Reserve", value: `$${((10000 * (100 - watchAdvance)) / 100).toFixed(2)}`, color: "text-violet-600 dark:text-violet-400" },
+                              { label: "Net Payout", value: `$${((10000 * watchAdvance / 100) - (10000 * watchFee / 100)).toFixed(2)}`, color: "text-emerald-600 dark:text-emerald-400" },
+                            ].map(({ label, value, color }) => (
+                              <div key={label} className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 text-center">
+                                <p className="text-xs text-slate-500 mb-1">{label}</p>
+                                <p className={`font-bold text-lg ${color}`}>{value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                          <Button type="submit" disabled={ratesMutation.isPending} className="gap-2">
+                            {ratesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings2 className="h-4 w-4" />}
+                            Save Rates
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+
+                {/* Info card */}
+                <Card className="rounded-[20px] border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20">
+                  <CardContent className="p-4 flex gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-700 dark:text-amber-300">
+                      <p className="font-semibold mb-1">Rate Change Notice</p>
+                      <p>Changing rates only affects new payout records created after this change. All existing payouts retain their original rate snapshot for accurate record-keeping.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* TAB: DOCUMENT REQUIREMENTS                                     */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {activeTab === "documents" && (
+              <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileCheck className="h-5 w-5" />
+                        Document Requirements
+                      </CardTitle>
+                      <CardDescription>Configure which documents are required at each workflow stage</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      {docsDirty && (
+                        <Button onClick={() => saveDocsMutation.mutate(effectiveDocItems)} disabled={saveDocsMutation.isPending} className="gap-2">
+                          {saveDocsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
+                          Save Changes
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-8">
+                  {stageGroups.map((stage) => {
+                    const stageDocs = effectiveDocItems.filter((d) => d.stage === stage);
+                    return (
+                      <div key={stage} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge className={cn("border-0", STAGE_COLORS[stage])}>
+                              {STAGE_LABELS[stage]}
+                            </Badge>
+                            <span className="text-xs text-slate-400">{stageDocs.length} document{stageDocs.length !== 1 ? "s" : ""}</span>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => addDocRow(stage)} className="gap-1 h-7 text-xs">
+                            <Plus className="h-3 w-3" /> Add
+                          </Button>
+                        </div>
+
+                        {stageDocs.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 py-4 text-center text-sm text-slate-400">
+                            No documents configured for this stage
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {stageDocs.map((doc, relIdx) => {
+                              const absIdx = effectiveDocItems.findIndex((d, gi) => d.stage === stage && effectiveDocItems.filter((x) => x.stage === stage).indexOf(d) === relIdx && gi >= 0);
+                              const globalIdx = effectiveDocItems.map((d, i) => ({ d, i })).filter(({ d }) => d.stage === stage)[relIdx]?.i ?? -1;
+                              return (
+                                <div key={relIdx} className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">
+                                  <Switch
+                                    checked={doc.required}
+                                    onCheckedChange={(v) => updateDoc(globalIdx, { required: v })}
+                                    className="mt-0.5 flex-shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                    <Input
+                                      value={doc.documentName}
+                                      onChange={(e) => updateDoc(globalIdx, { documentName: e.target.value })}
+                                      placeholder="Document name"
+                                      className="h-8 text-sm"
+                                    />
+                                    <Input
+                                      value={doc.description || ""}
+                                      onChange={(e) => updateDoc(globalIdx, { description: e.target.value })}
+                                      placeholder="Description (optional)"
+                                      className="h-8 text-sm"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <Badge variant={doc.required ? "default" : "outline"} className="text-xs hidden sm:inline-flex">
+                                      {doc.required ? "Required" : "Optional"}
+                                    </Badge>
+                                    <Button variant="ghost" size="sm" onClick={() => removeDocRow(globalIdx)} className="h-7 w-7 p-0 text-red-400 hover:text-red-600">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <Separator />
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* TAB: AUDIT LOG                                                 */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {activeTab === "audit" && (
+              <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5" />
+                    Audit Log
+                  </CardTitle>
+                  <CardDescription>Complete record of system events and user actions</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {auditLoading ? (
+                    <SkeletonRows rows={8} cols={4} />
+                  ) : auditLog.length === 0 ? (
+                    <EmptyState icon={ClipboardList} title="No audit events yet" description="System events will appear here as users perform actions." />
+                  ) : (
+                    <div className="custom-scrollbar max-h-[600px] overflow-y-auto">
+                      {auditLog.map((entry) => {
+                        const iconData = ACTIVITY_ICONS[entry.type] ?? ACTIVITY_ICONS.default;
+                        const IconComp = iconData.icon;
+                        return (
+                          <div key={entry.id} className="flex items-start gap-3 border-b border-slate-100 dark:border-slate-800 px-5 py-3 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
+                              <IconComp className={cn("h-4 w-4", iconData.color)} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm text-slate-800 dark:text-slate-200">{entry.description}</p>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                <span>{entry.userName && entry.userLastName ? `${entry.userName} ${entry.userLastName}` : entry.userId}</span>
+                                {entry.entityType && <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{entry.entityType}</Badge>}
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-slate-600 dark:text-slate-300 text-sm">
-                            {u.email || "—"}
-                          </TableCell>
-                          <TableCell>{ROLE_BADGE[u.role] || <Badge variant="outline">{u.role}</Badge>}</TableCell>
-                          <TableCell>{STATUS_BADGE[u.status || "active"] || STATUS_BADGE.active}</TableCell>
-                          <TableCell className="text-sm text-slate-500">
-                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Edit */}
-                              <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Edit">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              {/* Suspend / Reactivate */}
-                              {!isSelf(u.id) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleSuspend(u)}
-                                  disabled={updateMutation.isPending}
-                                  title={u.status === "suspended" ? "Reactivate" : "Suspend"}
-                                >
-                                  {u.status === "suspended" ? (
-                                    <CheckCircle className="h-4 w-4 text-emerald-600" />
-                                  ) : (
-                                    <Ban className="h-4 w-4 text-amber-600" />
-                                  )}
-                                </Button>
-                              )}
-                              {/* Delete */}
-                              {!isSelf(u.id) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDeleteTarget(u)}
-                                  title="Remove"
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              )}
+                            <div className="flex-shrink-0 flex items-center gap-1.5 text-xs text-slate-400">
+                              <Clock className="h-3 w-3" />
+                              {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "—"}
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-                {!isLoading && users.length === 0 && (
-                  <div className="py-12 text-center text-slate-500">No users found</div>
-                )}
-              </CardContent>
-            </Card>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
           </div>
         </main>
       </div>
 
-      {/* ---- Add Agent Modal ---- */}
+      {/* ── Add Agent ─────────────────────────────────────────────────────── */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Add New Agent
-            </DialogTitle>
-            <DialogDescription>
-              Create a new agent account. A welcome email with login credentials will be sent automatically.
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5" /> Add New Agent</DialogTitle>
+            <DialogDescription>Create a new agent account. A welcome email with login credentials will be sent automatically.</DialogDescription>
           </DialogHeader>
           <Form {...addForm}>
             <form onSubmit={addForm.handleSubmit((d) => createMutation.mutate(d))} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={addForm.control} name="firstName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl><Input {...field} placeholder="Jane" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} placeholder="Jane" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={addForm.control} name="lastName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl><Input {...field} placeholder="Doe" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} placeholder="Doe" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-
               <FormField control={addForm.control} name="email" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email Address</FormLabel>
-                  <FormControl><Input {...field} type="email" placeholder="jane.doe@example.com" /></FormControl>
-                  <FormMessage />
-                </FormItem>
+                <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} type="email" placeholder="jane.doe@example.com" /></FormControl><FormMessage /></FormItem>
               )} />
-
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={addForm.control} name="role" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                      </FormControl>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="employee">Employee</SelectItem>
                         <SelectItem value="manager">Manager</SelectItem>
@@ -415,20 +808,14 @@ export default function Admin() {
                   </FormItem>
                 )} />
                 <FormField control={addForm.control} name="password" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Temporary Password</FormLabel>
-                    <FormControl><Input {...field} type="password" placeholder="Min 6 characters" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input {...field} type="password" placeholder="Min 6 characters" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-
               <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/20 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
                 <Mail className="h-4 w-4 flex-shrink-0" />
                 Login credentials will be emailed to the agent automatically.
               </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={createMutation.isPending}>
                   {createMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</> : "Create Agent"}
@@ -439,66 +826,42 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-      {/* ---- Edit User Modal ---- */}
+      {/* ── Edit User ─────────────────────────────────────────────────────── */}
       <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) setEditUser(null); }}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5" />
-              Edit User
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5" /> Edit User</DialogTitle>
             <DialogDescription>Update name, email, or role for {editUser?.firstName} {editUser?.lastName}.</DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit((d) => {
-              if (editUser) updateMutation.mutate({ id: editUser.id, updates: d });
-            })} className="space-y-4">
+            <form onSubmit={editForm.handleSubmit((d) => { if (editUser) updateMutation.mutate({ id: editUser.id, updates: d }); })} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={editForm.control} name="firstName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={editForm.control} name="lastName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+                  <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-
               <FormField control={editForm.control} name="email" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl><Input {...field} type="email" /></FormControl>
-                  <FormMessage />
-                </FormItem>
+                <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} type="email" /></FormControl><FormMessage /></FormItem>
               )} />
-
               <FormField control={editForm.control} name="role" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={isSelf(editUser?.id || "")}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                    </FormControl>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       <SelectItem value="employee">Employee</SelectItem>
                       <SelectItem value="manager">Manager</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
-                  {isSelf(editUser?.id || "") && (
-                    <p className="text-xs text-slate-500">You cannot change your own role.</p>
-                  )}
+                  {isSelf(editUser?.id || "") && <p className="text-xs text-slate-500">You cannot change your own role.</p>}
                   <FormMessage />
                 </FormItem>
               )} />
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
                 <Button type="submit" disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
@@ -509,29 +872,21 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-      {/* ---- Delete Confirmation ---- */}
+      {/* ── Delete Confirm ────────────────────────────────────────────────── */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="h-5 w-5" />
-              Remove User Account
+              <Trash2 className="h-5 w-5" /> Remove User Account
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>Are you sure you want to permanently remove this account? This cannot be undone.</p>
-                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 space-y-1">
-                  <p className="font-semibold text-slate-900 dark:text-white text-sm">
-                    {deleteTarget?.firstName} {deleteTarget?.lastName}
-                  </p>
-                  {deleteTarget?.email && (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{deleteTarget.email}</p>
-                  )}
-                  <p className="text-xs text-slate-400 capitalize">{deleteTarget?.role}</p>
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3">
+                  <p className="font-semibold text-slate-900 dark:text-white text-sm">{deleteTarget?.firstName} {deleteTarget?.lastName}</p>
+                  {deleteTarget?.email && <p className="text-sm text-slate-500">{deleteTarget.email}</p>}
+                  {deleteTarget?.role && <p className="text-xs text-slate-400 capitalize mt-1">{deleteTarget.role}</p>}
                 </div>
-                <p className="text-sm text-amber-700 dark:text-amber-400">
-                  Tip: If you may need to restore access later, use <strong>Suspend</strong> instead.
-                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -539,13 +894,66 @@ export default function Admin() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              onClick={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
+              disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Removing..." : `Remove ${deleteTarget?.firstName}`}
+              {deleteMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removing...</> : "Remove Account"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Notify User ───────────────────────────────────────────────────── */}
+      <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Send Notification</DialogTitle>
+            <DialogDescription>Send an in-app notification to a user. Use this to request missing information or communicate important updates.</DialogDescription>
+          </DialogHeader>
+          <Form {...notifyForm}>
+            <form onSubmit={notifyForm.handleSubmit((d) => notifyMutation.mutate(d))} className="space-y-4">
+              <FormField control={notifyForm.control} name="userId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recipient</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select user…" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {users.filter((u) => !isSelf(u.id)).map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={notifyForm.control} name="subject" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subject</FormLabel>
+                  <FormControl><Input {...field} placeholder="e.g. Missing documentation required" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={notifyForm.control} name="message" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Message</FormLabel>
+                  <FormControl><Textarea {...field} rows={4} placeholder="Please provide the missing Bill of Lading for invoice INV-004…" className="resize-none" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                This will appear as a warning notification in the user's notification center.
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={() => setNotifyOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={notifyMutation.isPending}>
+                  {notifyMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : "Send Notification"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
