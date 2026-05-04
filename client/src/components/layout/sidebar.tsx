@@ -22,6 +22,7 @@ import {
   ArrowRightLeft,
   AlertTriangle,
   ClipboardList,
+  Radio,
 } from "lucide-react";
 
 type UserRole = "manager" | "admin" | "employee";
@@ -79,6 +80,7 @@ const navSections: NavSection[] = [
     title: "Risk & Compliance",
     items: [
       { name: "Credit Checks", href: "/credit-checks", icon: ShieldCheck },
+      { name: "FMCSA Authority", href: "/fmcsa-authority", icon: Radio },
       { name: "Exceptions", href: "/exceptions", icon: AlertTriangle },
       { name: "Audit Log", href: "/audit-log", icon: ClipboardList },
     ],

@@ -1006,3 +1006,62 @@ export const insertExceptionSchema = createInsertSchema(exceptions).omit({
 });
 export type Exception = typeof exceptions.$inferSelect;
 export type InsertException = z.infer<typeof insertExceptionSchema>;
+
+// ─── FMCSA Broker Authority Checks ───────────────────────────────────────────
+export const brokerAuthorityChecks = pgTable("broker_authority_checks", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type", { enum: ["broker", "debtor"] }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  entityName: varchar("entity_name"),
+  mcNumber: varchar("mc_number"),
+  dotNumber: varchar("dot_number"),
+  legalName: varchar("legal_name"),
+  dbaName: varchar("dba_name"),
+  operatingStatus: varchar("operating_status"),
+  commonAuthorityStatus: varchar("common_authority_status"),
+  contractAuthorityStatus: varchar("contract_authority_status"),
+  brokerAuthorityStatus: varchar("broker_authority_status"),
+  allowedToOperate: boolean("allowed_to_operate"),
+  carrierOperation: varchar("carrier_operation"),
+  bipdRequired: varchar("bipd_required"),
+  rawResponse: jsonb("raw_response"),
+  checkStatus: varchar("check_status", {
+    enum: ["success", "not_found", "api_error", "no_key"],
+  }).default("success").notNull(),
+  errorMessage: text("error_message"),
+  checkedAt: timestamp("checked_at").defaultNow().notNull(),
+  checkedBy: varchar("checked_by"),
+});
+
+export const insertBrokerAuthorityCheckSchema = createInsertSchema(brokerAuthorityChecks).omit({
+  id: true, checkedAt: true,
+});
+export type BrokerAuthorityCheck = typeof brokerAuthorityChecks.$inferSelect;
+export type InsertBrokerAuthorityCheck = z.infer<typeof insertBrokerAuthorityCheckSchema>;
+
+// ─── FMCSA Authority Alerts ───────────────────────────────────────────────────
+export const brokerAuthorityAlerts = pgTable("broker_authority_alerts", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type", { enum: ["broker", "debtor"] }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  entityName: varchar("entity_name"),
+  mcNumber: varchar("mc_number"),
+  dotNumber: varchar("dot_number"),
+  checkId: integer("check_id").references(() => brokerAuthorityChecks.id),
+  alertType: varchar("alert_type", {
+    enum: ["became_inactive", "authority_revoked", "status_changed", "not_found", "api_error"],
+  }).notNull(),
+  previousStatus: varchar("previous_status"),
+  newStatus: varchar("new_status"),
+  field: varchar("field"),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBrokerAuthorityAlertSchema = createInsertSchema(brokerAuthorityAlerts).omit({
+  id: true, createdAt: true, resolvedAt: true,
+});
+export type BrokerAuthorityAlert = typeof brokerAuthorityAlerts.$inferSelect;
+export type InsertBrokerAuthorityAlert = z.infer<typeof insertBrokerAuthorityAlertSchema>;

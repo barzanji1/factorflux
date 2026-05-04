@@ -34,6 +34,7 @@ import Payouts from "@/pages/payouts";
 import CashApplication from "@/pages/cash-application";
 import Exceptions from "@/pages/exceptions";
 import AuditLog from "@/pages/audit-log";
+import FmcsaAuthority from "@/pages/fmcsa-authority";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -119,6 +120,11 @@ function Router() {
       <Route path="/audit-log">
         <ProtectedRoute>
           <AuditLog />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/fmcsa-authority">
+        <ProtectedRoute>
+          <FmcsaAuthority />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

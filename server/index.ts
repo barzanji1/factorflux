@@ -9,6 +9,7 @@ import { registerRoutes } from "./routes";
 import { setupVite } from "./vite";
 import { serveStatic } from "./static";
 import { log } from "./log";
+import { startAuthorityScheduler } from "./services/authorityScheduler";
 
 const app = express();
 
@@ -129,6 +130,8 @@ export async function startServer(
       }
     );
   });
+
+  startAuthorityScheduler();
 
   return server;
 }

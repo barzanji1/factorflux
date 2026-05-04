@@ -3013,6 +3013,80 @@ Trucking Pros Financial Team
     } catch (e) { res.status(500).json({ message: "Failed to update exception" }); }
   });
 
+  // ─── FMCSA Authority Checks ───────────────────────────────────────────────
+  app.get("/api/authority-checks/latest", requireAuth, async (_req, res) => {
+    try {
+      res.json(await storage.getLatestAuthorityChecks());
+    } catch (e) { res.status(500).json({ message: "Failed to fetch authority checks" }); }
+  });
+
+  app.get("/api/authority-checks/history", requireAuth, async (req, res) => {
+    try {
+      const { entityType, entityId } = req.query as { entityType?: string; entityId?: string };
+      if (!entityType || !entityId) return res.status(400).json({ message: "entityType and entityId required" });
+      const checks = await storage.getAuthorityCheckHistory(entityType, Number(entityId));
+      res.json({
+        entityType,
+        entityId: Number(entityId),
+        entityName: checks[0]?.entityName ?? null,
+        checks,
+      });
+    } catch (e) { res.status(500).json({ message: "Failed to fetch history" }); }
+  });
+
+  app.post("/api/authority-checks/run", requireAdmin, async (req: any, res) => {
+    try {
+      const { runAllAuthorityChecks } = await import("./services/authorityScheduler");
+      const summary = await runAllAuthorityChecks(req.user.id);
+      res.json(summary);
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message ?? "Failed to run authority checks" });
+    }
+  });
+
+  app.post("/api/authority-checks/configure-key", requireAdmin, async (req: any, res) => {
+    try {
+      const { webKey } = req.body;
+      if (!webKey || typeof webKey !== "string" || webKey.trim().length < 8) {
+        return res.status(400).json({ message: "Invalid web key" });
+      }
+      // Store in process env for current session; persisting to env file is handled via Replit secrets
+      process.env.FMCSA_WEBKEY = webKey.trim();
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "fmcsa_key_configured",
+        description: "FMCSA API web key configured",
+        entityType: "user",
+        entityId: undefined,
+      });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ message: "Failed to save key" }); }
+  });
+
+  app.get("/api/authority-alerts", requireAuth, async (_req, res) => {
+    try {
+      res.json(await storage.getAuthorityAlerts());
+    } catch (e) { res.status(500).json({ message: "Failed to fetch alerts" }); }
+  });
+
+  app.patch("/api/authority-alerts/:id/resolve", requireAuth, async (req: any, res) => {
+    try {
+      const alert = await storage.resolveAuthorityAlert(
+        Number(req.params.id),
+        req.user.id,
+        req.body.notes
+      );
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "authority_alert_resolved",
+        description: `FMCSA authority alert resolved for ${alert.entityName ?? alert.entityType + " #" + alert.entityId}`,
+        entityType: "broker",
+        entityId: alert.entityType === "broker" ? alert.entityId : undefined,
+      });
+      res.json(alert);
+    } catch (e) { res.status(500).json({ message: "Failed to resolve alert" }); }
+  });
+
   // ─── Audit endpoints ──────────────────────────────────────────────────────
   app.get("/api/audit/events", requireAuth, async (req, res) => {
     try {

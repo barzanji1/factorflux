@@ -7,6 +7,14 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **May 4, 2026 (2)**: FMCSA daily broker authority check system added
+  - **FMCSA Authority page** (`/fmcsa-authority`): Admin dashboard with status table (color-coded Active/Inactive/Not Found), stat cards, history drill-down per entity, alerts panel with resolve workflow, and FMCSA web key configuration UI
+  - **FMCSA service** (`server/services/fmcsa.ts`): Wraps FMCSA SAFER REST API — query by DOT or MC number, parses `commonAuthorityStatus`, `brokerAuthorityStatus`, `allowedToOperate`, graceful `no_key` mode when `FMCSA_WEBKEY` is unset
+  - **Authority scheduler** (`server/services/authorityScheduler.ts`): `node-cron` daily job (06:00 UTC, configurable via `FMCSA_CRON`), diffs each check against the previous result, auto-creates `broker_authority_alerts` on status changes, inactive/revoked detections, or disappearing records
+  - **New DB tables**: `broker_authority_checks` (full FMCSA response per entity per check), `broker_authority_alerts` (change events with previous/new status, field, resolve workflow)
+  - **API endpoints**: `GET /api/authority-checks/latest`, `GET /api/authority-checks/history`, `POST /api/authority-checks/run` (admin — manual trigger), `POST /api/authority-checks/configure-key` (admin — set webkey), `GET /api/authority-alerts`, `PATCH /api/authority-alerts/:id/resolve`
+  - **Sidebar**: "FMCSA Authority" added to Risk & Compliance section
+  - **Env var**: `FMCSA_WEBKEY` — FMCSA developer web key (get from fmcsa.dot.gov/developer/qcapi); `FMCSA_CRON` — optional cron override
 - **May 4, 2026**: Broker credit checking, audit logging, ACH payment settings, cash application/reconciliation, and exception management built
   - **Credit Checks** (`/credit-checks`): Full rewrite with real DB — assess debtors/brokers with risk scores (0–100), visual score bar, risk tiers (Low/Medium/High/Critical), credit limits, avg days-to-pay, one-click Approve/Decline/Re-review workflow
   - **Cash Application** (`/cash-application`): Record incoming ACH/wire/check payments, match them to invoices with short-pay/overpay variance detection, auto-creates exceptions on discrepancies, status tracks unapplied → partially → fully applied → overpaid

@@ -25,6 +25,12 @@ import {
   cashApplications,
   paymentApplicationLines,
   exceptions,
+  brokerAuthorityChecks,
+  brokerAuthorityAlerts,
+  type BrokerAuthorityCheck,
+  type InsertBrokerAuthorityCheck,
+  type BrokerAuthorityAlert,
+  type InsertBrokerAuthorityAlert,
   type PayoutSettings,
   type InsertPayoutSettings,
   type Payout,
@@ -1670,6 +1676,59 @@ export class DatabaseStorage implements IStorage {
       .from(invoiceStatusHistory)
       .orderBy(desc(invoiceStatusHistory.createdAt))
       .limit(500) as any;
+  }
+
+  // ── FMCSA Authority Checks ────────────────────────────────────────────────────
+  async getLatestAuthorityChecks(): Promise<BrokerAuthorityCheck[]> {
+    // Return the most recent check per entity (entityType + entityId)
+    const rows = await db
+      .select()
+      .from(brokerAuthorityChecks)
+      .orderBy(desc(brokerAuthorityChecks.checkedAt));
+
+    const seen = new Map<string, BrokerAuthorityCheck>();
+    for (const row of rows) {
+      const key = `${row.entityType}-${row.entityId}`;
+      if (!seen.has(key)) seen.set(key, row);
+    }
+    return Array.from(seen.values());
+  }
+
+  async getAuthorityCheckHistory(entityType: string, entityId: number): Promise<BrokerAuthorityCheck[]> {
+    return db
+      .select()
+      .from(brokerAuthorityChecks)
+      .where(
+        and(
+          eq(brokerAuthorityChecks.entityType, entityType as "broker" | "debtor"),
+          eq(brokerAuthorityChecks.entityId, entityId)
+        )
+      )
+      .orderBy(desc(brokerAuthorityChecks.checkedAt))
+      .limit(50);
+  }
+
+  async createAuthorityCheck(data: InsertBrokerAuthorityCheck): Promise<BrokerAuthorityCheck> {
+    const [row] = await db.insert(brokerAuthorityChecks).values(data).returning();
+    return row;
+  }
+
+  async getAuthorityAlerts(includeResolved = false): Promise<BrokerAuthorityAlert[]> {
+    const rows = await db
+      .select()
+      .from(brokerAuthorityAlerts)
+      .orderBy(desc(brokerAuthorityAlerts.createdAt));
+    if (includeResolved) return rows;
+    return rows; // return all; UI filters
+  }
+
+  async resolveAuthorityAlert(id: number, resolvedBy: string, notes?: string): Promise<BrokerAuthorityAlert> {
+    const [row] = await db
+      .update(brokerAuthorityAlerts)
+      .set({ resolvedAt: new Date(), resolvedBy, notes: notes ?? null })
+      .where(eq(brokerAuthorityAlerts.id, id))
+      .returning();
+    return row;
   }
 }
 
