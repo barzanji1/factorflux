@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -28,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 export default function Invoices() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -304,6 +306,12 @@ export default function Invoices() {
 
                             <td className="px-6 py-5">
                               <div className="flex items-center gap-2">
+                                <ActionIconButton
+                                  title="View Full Detail"
+                                  onClick={() => navigate(`/invoices/${invoice.id}`)}
+                                  icon={<ChevronRight className="h-4 w-4" />}
+                                />
+
                                 <ActionIconButton
                                   title="View Invoice"
                                   onClick={() => handleEditInvoice(invoice)}

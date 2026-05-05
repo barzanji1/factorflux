@@ -7,6 +7,14 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **May 5, 2026**: Unified load-to-cash model implemented — full 8-stage factoring lifecycle wired across all modules
+  - **`factoringStage` field added to `invoices`** — 8-stage enum: `document_intake → verification → approval → advance → collections → payment_receipt → reconciliation → final_settlement`; DB schema pushed
+  - **`invoiceId` FK added to `collections`** — collections now link to a specific invoice (set null on delete) enabling per-invoice collection queries
+  - **Stage service** (`server/services/invoiceStage.ts`): `STAGE_META` definitions, `stageFromInvoiceStatus()` mapping, `advanceInvoiceStage()` (forward-only, writes to `eventLedger`), `getInvoiceDetail()` (invoice + all related records), `getInvoiceTimeline()` (merged events from 7 sources sorted by timestamp)
+  - **Auto-advancement hooks** wired into existing routes: invoice status PUT → deriveStage; invoice approve → "approval"; payout POST → "advance"; payout PATCH advance_paid → "collections", reserve_pending/released → "reconciliation", complete → "final_settlement"; cash-app apply → "payment_receipt" for each affected invoice
+  - **New API endpoints**: `GET /api/invoices/:id/detail` (full record with client, debtor, payout, docs, collections, cashAppLines, exceptions, statusHistory); `GET /api/invoices/:id/timeline` (unified event stream)
+  - **Invoice Detail page** (`/invoices/:id`, `client/src/pages/invoice-detail.tsx`): 8-step stage pipeline with connector line + step numbers, header card with quick stats (advance/fee/reserve/doc count), 7-tab layout (Overview | Documents | Payout | Collections | Cash Application | Exceptions | Timeline), timeline with color-coded event type icons, deep-links to existing module pages
+  - **Invoices list** updated: ChevronRight action button on each row navigates to `/invoices/:id` detail page
 - **May 4, 2026 (2)**: FMCSA daily broker authority check system added
   - **FMCSA Authority page** (`/fmcsa-authority`): Admin dashboard with status table (color-coded Active/Inactive/Not Found), stat cards, history drill-down per entity, alerts panel with resolve workflow, and FMCSA web key configuration UI
   - **FMCSA service** (`server/services/fmcsa.ts`): Wraps FMCSA SAFER REST API — query by DOT or MC number, parses `commonAuthorityStatus`, `brokerAuthorityStatus`, `allowedToOperate`, graceful `no_key` mode when `FMCSA_WEBKEY` is unset

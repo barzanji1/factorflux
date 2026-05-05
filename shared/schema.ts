@@ -221,6 +221,18 @@ export const invoices = pgTable("invoices", {
   })
     .default("draft")
     .notNull(),
+  factoringStage: varchar("factoring_stage", {
+    enum: [
+      "document_intake",
+      "verification",
+      "approval",
+      "advance",
+      "collections",
+      "payment_receipt",
+      "reconciliation",
+      "final_settlement",
+    ],
+  }).default("document_intake").notNull(),
   submittedBy: varchar("submitted_by").references(() => users.id),
   submittedAt: timestamp("submitted_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
@@ -422,6 +434,7 @@ export type InsertDocRequirement = typeof docRequirements.$inferInsert;
 export const collections = pgTable("collections", {
   id: integer("id").primaryKey(),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   description: text("description").notNull(),
   status: varchar("status", { enum: ["pending", "in_progress", "paid", "written_off"] }).default("pending").notNull(),

@@ -40,6 +40,12 @@ import {
 } from "@shared/schema";
 
 import { sendEmail } from "./emailService";
+import {
+  advanceInvoiceStage,
+  stageFromInvoiceStatus,
+  getInvoiceDetail,
+  getInvoiceTimeline,
+} from "./services/invoiceStage";
 
 const upload = multer({
   dest: "uploads/",
@@ -1368,6 +1374,11 @@ ${message}
         entityId: invoice.id,
       });
 
+      if (invoiceData.status) {
+        const derivedStage = stageFromInvoiceStatus(invoiceData.status);
+        advanceInvoiceStage(id, derivedStage, req.user.id, `Status changed to ${invoiceData.status}`).catch(() => {});
+      }
+
       res.json(invoice);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1400,10 +1411,37 @@ ${message}
         entityId: invoice.id,
       });
 
+      advanceInvoiceStage(id, "approval", req.user.id, "Invoice approved").catch(() => {});
+
       res.json(invoice);
     } catch (error) {
       console.error("Error approving invoice:", error);
       res.status(500).json({ message: "Failed to approve invoice" });
+    }
+  });
+
+  // ─── Invoice detail (all related data) ───────────────────────────────────
+  app.get("/api/invoices/:id/detail", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const detail = await getInvoiceDetail(id);
+      if (!detail) return res.status(404).json({ message: "Invoice not found" });
+      res.json(detail);
+    } catch (err) {
+      console.error("Error fetching invoice detail:", err);
+      res.status(500).json({ message: "Failed to fetch invoice detail" });
+    }
+  });
+
+  // ─── Invoice timeline (merged events) ────────────────────────────────────
+  app.get("/api/invoices/:id/timeline", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const timeline = await getInvoiceTimeline(id);
+      res.json(timeline);
+    } catch (err) {
+      console.error("Error fetching invoice timeline:", err);
+      res.status(500).json({ message: "Failed to fetch invoice timeline" });
     }
   });
 
@@ -2722,6 +2760,8 @@ Trucking Pros Financial Team
         description: `Created payout record for invoice ${inv.invoiceNumber}: net payout $${netPayout}`,
       });
 
+      advanceInvoiceStage(invoiceId, "advance", req.user.id, "Payout record created — advance processing").catch(() => {});
+
       res.status(201).json(payout);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
@@ -2769,6 +2809,20 @@ Trucking Pros Financial Team
             actionUrl: "/payouts",
             metadata: JSON.stringify({ emailSubject: notif.title, emailBody: notif.message, trigger: "payout_status_change" }),
           } as any).catch(() => {});
+        }
+      }
+
+      // Auto-advance factoring stage based on payout status
+      if (updates.paymentStatus && updated.invoiceId) {
+        const stageMap: Record<string, import("./services/invoiceStage").FactoringStage> = {
+          advance_paid:      "collections",
+          reserve_pending:   "reconciliation",
+          reserve_released:  "reconciliation",
+          complete:          "final_settlement",
+        };
+        const nextStage = stageMap[updates.paymentStatus];
+        if (nextStage) {
+          advanceInvoiceStage(updated.invoiceId, nextStage, req.user.id, `Payout status: ${updates.paymentStatus}`).catch(() => {});
         }
       }
 
@@ -2992,6 +3046,11 @@ Trucking Pros Financial Team
     try {
       const lines = await storage.applyPaymentToInvoices(Number(req.params.id), req.body.lines);
       await storage.createActivity({ userId: req.user.id, type: "payment_applied", description: `Payment ${req.params.id} applied to ${lines.length} invoice(s)`, entityType: "payment", entityId: Number(req.params.id) });
+      // Advance each affected invoice to payment_receipt stage
+      const uniqueInvoiceIds = [...new Set(lines.map((l: any) => l.invoiceId).filter(Boolean))];
+      for (const invId of uniqueInvoiceIds) {
+        advanceInvoiceStage(invId, "payment_receipt", req.user.id, "Payment applied via cash application").catch(() => {});
+      }
       res.json(lines);
     } catch (e) { console.error(e); res.status(500).json({ message: "Failed to apply payment" }); }
   });

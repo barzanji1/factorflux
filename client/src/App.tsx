@@ -35,6 +35,7 @@ import CashApplication from "@/pages/cash-application";
 import Exceptions from "@/pages/exceptions";
 import AuditLog from "@/pages/audit-log";
 import FmcsaAuthority from "@/pages/fmcsa-authority";
+import InvoiceDetail from "@/pages/invoice-detail";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -60,6 +61,11 @@ function Router() {
       <Route path="/invoices">
         <ProtectedRoute>
           <Invoices />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/invoices/:id">
+        <ProtectedRoute>
+          <InvoiceDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/documents">
