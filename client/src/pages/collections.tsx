@@ -1,36 +1,44 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, DollarSign, Users, Clock, Plus, Eye, Edit, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
+
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { FFBadge } from "@/components/ui/ff-badge";
+import { FFEmpty } from "@/components/ui/ff-empty";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from "@/components/ui/form";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import {
+  Plus, Search, Edit2, Trash2, AlertTriangle,
+  SquareCheck, Square, ChevronDown,
+} from "lucide-react";
 
-// Collection form schema
-const collectionFormSchema = z.object({
-  clientId: z.number().min(1, "Client is required"),
-  amount: z.string().min(1, "Amount is required"),
-  description: z.string().min(1, "Description is required"),
-  status: z.enum(["pending", "in_progress", "paid", "written_off"]).default("pending"),
-  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
-  dueDate: z.string().min(1, "Due date is required"),
-  notes: z.string().optional(),
-  assignedTo: z.string().optional(),
-});
+// ── Sticky-state hook ─────────────────────────────────────────────────────────
+function useStickyState<T>(key: string, def: T) {
+  const [v, setV] = useState<T>(() => {
+    try { const s = sessionStorage.getItem(key); return s ? JSON.parse(s) : def; } catch { return def; }
+  });
+  return [v, (val: T) => {
+    setV(val);
+    try { sessionStorage.setItem(key, JSON.stringify(val)); } catch {}
+  }] as const;
+}
 
-type CollectionFormData = z.infer<typeof collectionFormSchema>;
-
+// ── Types & helpers ───────────────────────────────────────────────────────────
 interface Collection {
   id: number;
   clientId: number;
@@ -44,205 +52,230 @@ interface Collection {
   assignedTo?: string;
   createdAt: string;
   updatedAt: string;
-  client?: {
-    id: number;
-    name: string;
-    email?: string;
-    status: string;
-  };
-  assignedUser?: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-  };
+  client?: { id: number; name: string; status: string };
+  assignedUser?: { id: string; firstName?: string; lastName?: string };
 }
 
-interface ClientPerformance {
-  clientId: number;
-  name: string;
-  lastLoadDate: string | null;
-  daysSinceLastLoad: number;
-  status: "active" | "warning" | "inactive";
-  totalOwed: string;
-  pendingCollections: number;
+const fmt = (n: string | number) =>
+  `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function overdueDays(dueDate: string): number {
+  return Math.floor((Date.now() - new Date(dueDate).getTime()) / 86_400_000);
 }
 
+function OverduePill({ dueDate }: { dueDate: string }) {
+  const days = overdueDays(dueDate);
+  if (days <= 0) {
+    const daysLeft = Math.abs(days);
+    return (
+      <span className="text-[11px] text-slate-400 dark:text-slate-500">
+        {daysLeft === 0 ? "Due today" : `${daysLeft}d left`}
+      </span>
+    );
+  }
+  if (days <= 7)  return <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">{days}d over</span>;
+  if (days <= 30) return (
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+      <AlertTriangle className="h-3 w-3" />{days}d over
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-red-600 dark:text-red-400">
+      <AlertTriangle className="h-3 w-3" />{days}d over
+    </span>
+  );
+}
+
+const PRIORITY_CLASS: Record<string, string> = {
+  low:    "text-slate-500 dark:text-slate-400",
+  medium: "text-blue-600 dark:text-blue-400",
+  high:   "text-orange-600 dark:text-orange-400",
+  urgent: "font-bold text-red-600 dark:text-red-400",
+};
+
+const QUEUE_TABS = [
+  { id: "all",         label: "All",         filter: null as null | string[] },
+  { id: "pending",     label: "Pending",     filter: ["pending"]     },
+  { id: "in_progress", label: "In Progress", filter: ["in_progress"] },
+  { id: "overdue",     label: "Overdue",     filter: ["pending", "in_progress"], overdueFn: true },
+  { id: "paid",        label: "Paid",        filter: ["paid"]        },
+  { id: "written_off", label: "Written Off", filter: ["written_off"] },
+] as const;
+
+type QTabId = typeof QUEUE_TABS[number]["id"];
+
+// ── Form schema ───────────────────────────────────────────────────────────────
+const collectionSchema = z.object({
+  clientId:  z.coerce.number().min(1, "Client required"),
+  amount:    z.string().min(1, "Amount required"),
+  description: z.string().min(1, "Description required"),
+  status:    z.enum(["pending", "in_progress", "paid", "written_off"]).default("pending"),
+  priority:  z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+  dueDate:   z.string().min(1, "Due date required"),
+  notes:     z.string().optional(),
+  assignedTo: z.string().optional(),
+});
+type CollectionForm = z.infer<typeof collectionSchema>;
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CollectionsPage() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
-  // Fetch collections
-  const { data: collections = [], isLoading: collectionsLoading } = useQuery<Collection[]>({
-    queryKey: ["/api/collections"],
+  const [activeTab, setActiveTab] = useStickyState<QTabId>("ff:collections:tab", "all");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [dlgOpen, setDlgOpen] = useState(false);
+  const [editing, setEditing] = useState<Collection | null>(null);
+  const [bulkStatusDlg, setBulkStatusDlg] = useState<string | null>(null);
+
+  const form = useForm<CollectionForm>({
+    resolver: zodResolver(collectionSchema),
+    defaultValues: { status: "pending", priority: "medium" },
   });
 
-  // Fetch client performance data
-  const { data: clientPerformance = [], isLoading: performanceLoading } = useQuery<ClientPerformance[]>({
-    queryKey: ["/api/collections/client-performance"],
-  });
+  // ── Queries ──────────────────────────────────────────────────────
+  const { data: collections = [], isLoading } = useQuery<Collection[]>({ queryKey: ["/api/collections"] });
+  const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
 
-  // Fetch clients for dropdown
-  const { data: clients = [] } = useQuery<any[]>({
-    queryKey: ["/api/clients"],
-  });
+  // ── Derived counts ───────────────────────────────────────────────
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: collections.length };
+    c.pending     = collections.filter(x => x.status === "pending").length;
+    c.in_progress = collections.filter(x => x.status === "in_progress").length;
+    c.overdue     = collections.filter(x =>
+      ["pending", "in_progress"].includes(x.status) && overdueDays(x.dueDate) > 0
+    ).length;
+    c.paid        = collections.filter(x => x.status === "paid").length;
+    c.written_off = collections.filter(x => x.status === "written_off").length;
+    return c;
+  }, [collections]);
 
-  // Form setup
-  const form = useForm<CollectionFormData>({
-    resolver: zodResolver(collectionFormSchema),
-    defaultValues: {
-      status: "pending",
-      priority: "medium",
-    },
-  });
+  const totalOwed = collections
+    .filter(c => ["pending", "in_progress"].includes(c.status))
+    .reduce((s, c) => s + Number(c.amount), 0);
 
-  // Create collection mutation
-  const createCollectionMutation = useMutation({
-    mutationFn: async (data: CollectionFormData) => {
-      const response = await fetch("/api/collections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          ...data,
-          clientId: Number(data.clientId),
-          dueDate: new Date(data.dueDate).toISOString(),
-        }),
-      });
-      if (!response.ok) throw new Error("Failed to create collection");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/collections/client-performance"] });
-      setIsDialogOpen(false);
-      form.reset();
-      toast({ title: "Success", description: "Collection created successfully" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create collection", variant: "destructive" });
-    },
-  });
-
-  // Delete collection mutation
-  const deleteCollectionMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/collections/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to delete collection");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/collections/client-performance"] });
-      toast({ title: "Deleted", description: "Collection removed successfully" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete collection", variant: "destructive" });
-    },
-  });
-
-  // Update collection mutation
-  const updateCollectionMutation = useMutation({
-    mutationFn: async (data: { id: number; updates: Partial<CollectionFormData> }) => {
-      const response = await fetch(`/api/collections/${data.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data.updates),
-      });
-      if (!response.ok) throw new Error("Failed to update collection");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/collections/client-performance"] });
-      setEditingCollection(null);
-      setIsDialogOpen(false);
-      form.reset();
-      toast({ title: "Success", description: "Collection updated successfully" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update collection", variant: "destructive" });
-    },
-  });
-
-  const onSubmit = (data: CollectionFormData) => {
-    if (editingCollection) {
-      updateCollectionMutation.mutate({ id: editingCollection.id, updates: data });
-    } else {
-      createCollectionMutation.mutate(data);
+  // ── Filtered rows ────────────────────────────────────────────────
+  const rows = useMemo(() => {
+    const tab = QUEUE_TABS.find(t => t.id === activeTab)!;
+    let items = tab.filter
+      ? collections.filter(c => (tab.filter as string[]).includes(c.status))
+      : collections;
+    if ((tab as any).overdueFn) items = items.filter(c => overdueDays(c.dueDate) > 0);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter(c =>
+        c.client?.name.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q)
+      );
     }
-  };
-
-  const openEditDialog = (collection: Collection) => {
-    setEditingCollection(collection);
-    form.reset({
-      clientId: collection.clientId,
-      amount: collection.amount,
-      description: collection.description,
-      status: collection.status,
-      priority: collection.priority,
-      dueDate: new Date(collection.dueDate).toISOString().split('T')[0],
-      notes: collection.notes || "",
-      assignedTo: collection.assignedTo || "",
+    // Sort by priority (urgent first), then by overdue days
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+    return [...items].sort((a, b) => {
+      const pd = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
+      if (pd !== 0) return pd;
+      return overdueDays(b.dueDate) - overdueDays(a.dueDate);
     });
-    setIsDialogOpen(true);
+  }, [collections, activeTab, search]);
+
+  // ── Mutations ────────────────────────────────────────────────────
+  const createMut = useMutation({
+    mutationFn: async (data: CollectionForm) => {
+      const res = await fetch("/api/collections", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...data, clientId: Number(data.clientId), dueDate: new Date(data.dueDate).toISOString() }),
+      });
+      if (!res.ok) throw new Error("Failed to create collection");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/collections"] });
+      setDlgOpen(false); form.reset();
+      toast({ title: "Collection created" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to create collection", variant: "destructive" }),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: async ({ id, updates }: { id: number; updates: Partial<CollectionForm> }) => {
+      const res = await fetch(`/api/collections/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Failed to update collection");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/collections"] });
+      setDlgOpen(false); setEditing(null); form.reset();
+      toast({ title: "Collection updated" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update collection", variant: "destructive" }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/collections/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Delete failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/collections"] });
+      toast({ title: "Collection deleted" });
+    },
+  });
+
+  const onSubmit = (data: CollectionForm) => {
+    if (editing) updateMut.mutate({ id: editing.id, updates: data });
+    else createMut.mutate(data);
   };
 
-  const openCreateDialog = () => {
-    setEditingCollection(null);
-    form.reset();
-    setIsDialogOpen(true);
+  const openCreate = () => { setEditing(null); form.reset({ status: "pending", priority: "medium" }); setDlgOpen(true); };
+  const openEdit = (c: Collection) => {
+    setEditing(c);
+    form.reset({
+      clientId: c.clientId, amount: c.amount, description: c.description,
+      status: c.status, priority: c.priority,
+      dueDate: new Date(c.dueDate).toISOString().split("T")[0],
+      notes: c.notes ?? "", assignedTo: c.assignedTo ?? "",
+    });
+    setDlgOpen(true);
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      pending: "outline",
-      in_progress: "default",
-      paid: "secondary",
-      written_off: "destructive",
-    };
-    return <Badge variant={variants[status] || "outline"}>{status.replace('_', ' ')}</Badge>;
+  const bulkUpdateStatus = useCallback((status: string) => {
+    Promise.all(Array.from(selected).map(id => updateMut.mutateAsync({ id, updates: { status: status as any } })))
+      .then(() => { toast({ title: `${selected.size} updated` }); setSelected(new Set()); setBulkStatusDlg(null); })
+      .catch(() => {});
+  }, [selected, updateMut, toast]);
+
+  const toggleAll = () =>
+    setSelected(selected.size === rows.length && rows.length > 0 ? new Set() : new Set(rows.map(c => c.id)));
+  const toggleRow = (id: number) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
   };
 
-  const getPriorityBadge = (priority: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      low: "outline",
-      medium: "default",
-      high: "secondary",
-      urgent: "destructive",
-    };
-    return <Badge variant={variants[priority] || "outline"}>{priority}</Badge>;
+  const STATUS_ACTIONS: Record<QTabId, Array<{ label: string; nextStatus: string }>> = {
+    all:         [],
+    pending:     [{ label: "Start", nextStatus: "in_progress" }],
+    in_progress: [{ label: "Mark Paid", nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
+    overdue:     [{ label: "Mark Paid", nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
+    paid:        [],
+    written_off: [],
   };
+  const rowStatusActions = STATUS_ACTIONS[activeTab];
 
-  const getPerformanceStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      active: "secondary",
-      warning: "default",
-      inactive: "destructive",
-    };
-    const colors: Record<string, string> = {
-      active: "text-green-700 bg-green-100",
-      warning: "text-yellow-700 bg-yellow-100",
-      inactive: "text-red-700 bg-red-100",
-    };
-    return <Badge className={colors[status]}>{status}</Badge>;
+  const BULK_STATUS: Record<QTabId, Array<{ label: string; nextStatus: string }>> = {
+    all:         [],
+    pending:     [{ label: "Start All", nextStatus: "in_progress" }],
+    in_progress: [{ label: "Mark Paid",  nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
+    overdue:     [{ label: "Mark Paid",  nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
+    paid:        [],
+    written_off: [],
   };
-
-  const getInactiveClients = () => {
-    return clientPerformance.filter(client => client.status === 'inactive');
-  };
-
-  const getTotalOwed = () => {
-    return collections
-      .filter(c => c.status === 'pending' || c.status === 'in_progress')
-      .reduce((total, c) => total + parseFloat(c.amount), 0)
-      .toFixed(2);
-  };
+  const bulkStatusActions = BULK_STATUS[activeTab];
 
   return (
     <div className="flex h-screen bg-[hsl(var(--background))]">
@@ -250,423 +283,322 @@ export default function CollectionsPage() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Collections" subtitle="Manage funds owed to TPF and track carrier performance" group="Recovery" />
         <main className="custom-scrollbar flex-1 overflow-auto">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Collections</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">Manage funds owed to TPF and track client performance</p>
-          </div>
-          <Button onClick={openCreateDialog} data-testid="button-create-collection">
-            <Plus className="h-4 w-4 mr-2" />
-            New Collection
-          </Button>
-        </div>
+          <div className="mx-auto w-full max-w-[1680px] space-y-5 p-6 xl:p-8">
 
-        {/* Performance Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Owed</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${getTotalOwed()}</div>
-              <p className="text-xs text-muted-foreground">
-                Pending collections
-              </p>
-            </CardContent>
-          </Card>
+            {/* ── Summary strip ──────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: "Total Owed",       value: fmt(totalOwed), sub: `${counts.pending + counts.in_progress} active cases` },
+                { label: "Pending",          value: counts.pending ?? 0, sub: "not yet started" },
+                { label: "In Progress",      value: counts.in_progress ?? 0, sub: "being worked" },
+                { label: "Overdue",          value: counts.overdue ?? 0, sub: "past due date", warn: (counts.overdue ?? 0) > 0 },
+              ].map(s => (
+                <div key={s.label} className="rounded-[12px] border border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
+                  <p className={cn("mt-0.5 text-[22px] font-bold tracking-tight", (s as any).warn ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white")}>{s.value}</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">{s.sub}</p>
+                </div>
+              ))}
+            </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Collections</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {collections.filter(c => c.status === 'pending' || c.status === 'in_progress').length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Open cases
-              </p>
-            </CardContent>
-          </Card>
+            {/* ── Queue card ─────────────────────────────────────────────── */}
+            <div className="overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inactive Clients</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {getInactiveClients().length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                30+ days no loads
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Days Overdue</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {collections.length > 0 
-                  ? Math.round(collections
-                      .filter(c => c.status === 'pending' || c.status === 'in_progress')
-                      .reduce((total, c) => {
-                        const daysPast = Math.max(0, (Date.now() - new Date(c.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-                        return total + daysPast;
-                      }, 0) / collections.filter(c => c.status === 'pending' || c.status === 'in_progress').length)
-                  : 0
-                }
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Days past due
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Client Performance Panel */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Client Performance</CardTitle>
-              <CardDescription>Track client activity and identify at-risk accounts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {performanceLoading ? (
-                <div className="text-center py-4">Loading client performance...</div>
-              ) : (
-                <div className="space-y-4">
-                  {clientPerformance.slice(0, 10).map((client) => (
-                    <div key={client.clientId} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <div className="font-medium">{client.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {client.lastLoadDate 
-                            ? `Last load: ${client.daysSinceLastLoad} days ago`
-                            : 'No loads recorded'
-                          }
-                        </div>
-                        {client.totalOwed !== '0' && (
-                          <div className="text-sm font-medium text-red-600">
-                            Owes: ${client.totalOwed}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {getPerformanceStatusBadge(client.status)}
-                        {client.pendingCollections > 0 && (
-                          <Badge variant="outline">{client.pendingCollections} collection(s)</Badge>
-                        )}
-                      </div>
+              {/* Sticky filter bar */}
+              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-sm dark:border-slate-800 dark:bg-[hsl(var(--card))/95]">
+                <div className="flex flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUEUE_TABS.map(tab => {
+                      const count = counts[tab.id] ?? 0;
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => { setActiveTab(tab.id); setSelected(new Set()); }}
+                          className={cn(
+                            "rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors",
+                            isActive
+                              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400",
+                            tab.id === "overdue" && !isActive && count > 0 && "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400"
+                          )}
+                        >
+                          {tab.label} <span className="opacity-60">{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search client or description…"
+                        className="h-8 w-[220px] rounded-full pl-9 text-[12px]"
+                      />
                     </div>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={openCreate}
+                      className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-blue-700"
+                    >
+                      <Plus className="h-3 w-3" /> New
+                    </button>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Active Collections Panel */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Collections</CardTitle>
-              <CardDescription>Current collection efforts and status</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {collectionsLoading ? (
-                <div className="text-center py-4">Loading collections...</div>
-              ) : (
-                <div className="space-y-4">
-                  {collections
-                    .filter(c => c.status === 'pending' || c.status === 'in_progress')
-                    .slice(0, 5)
-                    .map((collection) => (
-                      <div key={collection.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium">{collection.client?.name || 'Unknown Client'}</div>
-                          <div className="text-sm text-gray-500">{collection.description}</div>
-                          <div className="text-sm font-medium text-red-600">${collection.amount}</div>
-                          <div className="text-xs text-gray-400">
-                            Due: {new Date(collection.dueDate).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {getStatusBadge(collection.status)}
-                          {getPriorityBadge(collection.priority)}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(collection)}
-                            data-testid={`button-edit-collection-${collection.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+                {/* Bulk bar */}
+                {selected.size > 0 && (
+                  <div className="flex items-center gap-3 border-t border-blue-100 bg-blue-50/60 px-5 py-2 dark:border-blue-900/30 dark:bg-blue-950/10">
+                    <span className="text-[12px] font-semibold text-blue-700 dark:text-blue-300">{selected.size} selected</span>
+                    <div className="h-3.5 w-px bg-blue-200 dark:bg-blue-800" />
+                    {bulkStatusActions.map(a => (
+                      <button
+                        key={a.nextStatus}
+                        type="button"
+                        onClick={() => bulkUpdateStatus(a.nextStatus)}
+                        disabled={updateMut.isPending}
+                        className="rounded-md bg-blue-600 px-3 py-1 text-[11.5px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {a.label}
+                      </button>
                     ))}
+                    <button type="button" onClick={() => setSelected(new Set())} className="ml-auto text-[11.5px] font-medium text-blue-500 hover:text-blue-700">
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Table */}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                </div>
+              ) : rows.length === 0 ? (
+                <div className="py-16"><FFEmpty context="collections" size="md" /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="ff-data-table w-full min-w-[820px]">
+                    <thead>
+                      <tr>
+                        <th className="w-9 pl-5">
+                          <button type="button" onClick={toggleAll} className="text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300">
+                            {selected.size > 0 && selected.size === rows.length
+                              ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" />
+                              : <Square className="h-3.5 w-3.5" />}
+                          </button>
+                        </th>
+                        <th>Client</th>
+                        <th className="text-right">Amount</th>
+                        <th>Description</th>
+                        <th>Priority</th>
+                        <th>Due Date</th>
+                        <th>Overdue</th>
+                        <th>Status</th>
+                        <th>Owner</th>
+                        <th className="pr-5">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(c => {
+                        const isSel = selected.has(c.id);
+                        return (
+                          <tr key={c.id} className={cn(isSel && "!bg-blue-50/50 dark:!bg-blue-950/10")}>
+                            <td className="pl-5">
+                              <button type="button" onClick={() => toggleRow(c.id)} className="text-slate-400 hover:text-blue-600">
+                                {isSel ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" /> : <Square className="h-3.5 w-3.5" />}
+                              </button>
+                            </td>
+                            <td className="font-medium text-slate-900 dark:text-white">
+                              {c.client?.name ?? <span className="text-slate-400">Unknown</span>}
+                            </td>
+                            <td className="text-right font-semibold text-red-600 dark:text-red-400">
+                              {fmt(c.amount)}
+                            </td>
+                            <td className="max-w-[200px] truncate text-slate-600 dark:text-slate-400">
+                              {c.description}
+                            </td>
+                            <td>
+                              <span className={cn("text-[11.5px] font-semibold capitalize", PRIORITY_CLASS[c.priority])}>
+                                {c.priority}
+                              </span>
+                            </td>
+                            <td className="text-slate-500 dark:text-slate-400">
+                              {new Date(c.dueDate).toLocaleDateString()}
+                            </td>
+                            <td><OverduePill dueDate={c.dueDate} /></td>
+                            <td>
+                              <CollectionStatusBadge status={c.status} />
+                            </td>
+                            <td className="text-[11.5px] text-slate-500 dark:text-slate-400">
+                              {c.assignedUser
+                                ? `${c.assignedUser.firstName ?? ""} ${c.assignedUser.lastName ?? ""}`.trim() || "Assigned"
+                                : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                            </td>
+                            <td className="pr-5">
+                              <div className="flex items-center gap-1.5">
+                                {rowStatusActions.map(a => (
+                                  <button
+                                    key={a.nextStatus}
+                                    type="button"
+                                    onClick={() => updateMut.mutate({ id: c.id, updates: { status: a.nextStatus as any } })}
+                                    disabled={updateMut.isPending}
+                                    className={cn(
+                                      "rounded-md px-2 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors",
+                                      a.nextStatus === "paid" ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                        : a.nextStatus === "written_off" ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300"
+                                        : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300"
+                                    )}
+                                  >
+                                    {a.label}
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(c)}
+                                  className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { if (confirm("Delete this collection?")) deleteMut.mutate(c.id); }}
+                                  className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-red-400 hover:bg-red-50 dark:bg-slate-800 dark:text-red-400"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* All Collections Table */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>All Collections</CardTitle>
-            <CardDescription>Complete list of collection cases</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Assigned</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {collections.map((collection) => (
-                  <TableRow key={collection.id}>
-                    <TableCell className="font-medium">
-                      {collection.client?.name || 'Unknown Client'}
-                    </TableCell>
-                    <TableCell className="font-medium text-red-600">
-                      ${collection.amount}
-                    </TableCell>
-                    <TableCell>{collection.description}</TableCell>
-                    <TableCell>{getStatusBadge(collection.status)}</TableCell>
-                    <TableCell>{getPriorityBadge(collection.priority)}</TableCell>
-                    <TableCell>
-                      {new Date(collection.dueDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {collection.assignedUser 
-                        ? `${collection.assignedUser.firstName} ${collection.assignedUser.lastName}`
-                        : 'Unassigned'
-                      }
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditDialog(collection)}
-                          data-testid={`button-edit-${collection.id}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                          onClick={() => {
-                            if (confirm("Delete this collection record?")) {
-                              deleteCollectionMutation.mutate(collection.id);
-                            }
-                          }}
-                          disabled={deleteCollectionMutation.isPending}
-                          data-testid={`button-delete-${collection.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Create/Edit Collection Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>
-                {editingCollection ? "Edit Collection" : "Create New Collection"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingCollection 
-                  ? "Update collection details and status"
-                  : "Add a new collection case for funds owed to TPF"
-                }
-              </DialogDescription>
-            </DialogHeader>
-            
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select client" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {clients.map((client: any) => (
-                              <SelectItem key={client.id} value={client.id.toString()}>
-                                {client.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Amount Owed</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="number" step="0.01" placeholder="0.00" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              {rows.length > 0 && (
+                <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
+                  <span className="text-[11.5px] text-slate-400">{rows.length} items</span>
+                  <span className="text-[12px] font-semibold text-red-600 dark:text-red-400">
+                    {fmt(rows.filter(c => ["pending","in_progress"].includes(c.status)).reduce((s, c) => s + Number(c.amount), 0))} owed
+                  </span>
                 </div>
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Describe the collection case..." />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="written_off">Written Off</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Due Date</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Additional notes or contact history..." />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={createCollectionMutation.isPending || updateCollectionMutation.isPending}
-                    data-testid="button-save-collection"
-                  >
-                    {createCollectionMutation.isPending || updateCollectionMutation.isPending 
-                      ? "Saving..." 
-                      : editingCollection ? "Update Collection" : "Create Collection"
-                    }
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
+              )}
+            </div>
+          </div>
         </main>
       </div>
+
+      {/* ── Create / Edit dialog ──────────────────────────────────────────── */}
+      <Dialog open={dlgOpen} onOpenChange={o => { if (!o) { setDlgOpen(false); setEditing(null); } }}>
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit Collection" : "New Collection"}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="clientId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client</FormLabel>
+                    <Select onValueChange={v => field.onChange(Number(v))} value={field.value?.toString()}>
+                      <FormControl><SelectTrigger className="rounded-xl"><SelectValue placeholder="Select client" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {clients.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="amount" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" className="rounded-xl" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <FormField control={form.control} name="description" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl><Input {...field} placeholder="Describe the collection case…" className="rounded-xl" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="grid grid-cols-3 gap-4">
+                <FormField control={form.control} name="status" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="written_off">Written Off</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="priority" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="dueDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Due Date</FormLabel>
+                    <FormControl><Input {...field} type="date" className="rounded-xl" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl><textarea {...field} rows={2} placeholder="Optional notes…" className="w-full resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" /></FormControl>
+                </FormItem>
+              )} />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDlgOpen(false)} className="rounded-xl">Cancel</Button>
+                <Button type="submit" disabled={createMut.isPending || updateMut.isPending} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700">
+                  {(createMut.isPending || updateMut.isPending) ? "Saving…" : editing ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function CollectionStatusBadge({ status }: { status: string }) {
+  const MAP: Record<string, string> = {
+    pending:     "ff-badge ff-badge-pending",
+    in_progress: "ff-badge ff-badge-under_review",
+    paid:        "ff-badge ff-badge-paid",
+    written_off: "ff-badge ff-badge-rejected",
+  };
+  const LABELS: Record<string, string> = {
+    pending: "Pending", in_progress: "In Progress", paid: "Paid", written_off: "Written Off",
+  };
+  return <span className={MAP[status] ?? "ff-badge ff-badge-draft"}>{LABELS[status] ?? status}</span>;
 }

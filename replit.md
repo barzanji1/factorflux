@@ -7,6 +7,12 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **May 5, 2026**: Queue-first operations UI refactor — all three core operations pages rebuilt as work queues
+  - **`factoring.tsx`** — 7 queue-state tabs (All/New/Docs Pending/Under Review/Approved/Funded/Held), sticky filter bar, bulk actions, aging badges (`AgeBadge`), fast row actions via `POST /api/invoices/:id/transition`, reason dialog for reject/request_docs, pipeline summary strip
+  - **`collections.tsx`** — 6 queue tabs incl. Overdue pseudo-tab, priority-sorted dense table, bulk status updates, `OverduePill` aging indicator, create/edit dialog preserved, footer totals
+  - **`exceptions.tsx`** — Converted card-list → dense table, checkbox + bulk resolve/waive/review, aging column, severity left-border indicator (`border-l-[3px]`), `AgeBadge`, sticky filter bar retained
+  - All three pages use `useStickyState` hook (sessionStorage) to persist active queue tab across navigations
+  - All three pages use `ff-data-table` CSS class and `FFBadge`/`ff-badge-*` design system tokens
 - **May 5, 2026**: Unified load-to-cash model implemented — full 8-stage factoring lifecycle wired across all modules
   - **`factoringStage` field added to `invoices`** — 8-stage enum: `document_intake → verification → approval → advance → collections → payment_receipt → reconciliation → final_settlement`; DB schema pushed
   - **`invoiceId` FK added to `collections`** — collections now link to a specific invoice (set null on delete) enabling per-invoice collection queries
