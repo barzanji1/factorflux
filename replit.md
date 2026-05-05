@@ -7,6 +7,14 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **May 5, 2026**: Drag-and-drop OCR document intake pipeline built
+  - **4 new DB tables**: `doc_extraction_jobs`, `doc_extraction_results`, `doc_field_candidates`, `doc_reviews` — full extraction history preserved, all cascade on document delete
+  - **`server/services/documentExtraction.ts`** — PDF text extraction via `pdf-parse`, heuristic freight-field extractor (amount, load #, invoice #, MC/DOT, pickup/delivery location, date, doc type auto-classification), confidence scoring per field
+  - **8 new API endpoints** under `/api/load-documents/*`: `POST /intake` (upload + auto-queue extraction), `GET /:id/extraction-status` (polling), `GET /:id/extraction-result`, `GET /:id/field-candidates`, `GET /:id/review`, `POST /:id/review`, `POST /:id/retry-extraction`
+  - **`client/src/components/documents/document-intake-zone.tsx`** — drag-and-drop upload zone: multi-file, XHR progress bar, per-file extraction status badge with auto-polling (2.5 s interval stops on complete/failed), expand/collapse extraction results per file
+  - **`client/src/components/documents/extraction-result-panel.tsx`** — field candidates table (field name, value, confidence pip %), optional source snippet toggle, confirm/mark-unreadable review form
+  - **`invoice-detail.tsx`** Documents tab updated — `DocumentIntakeZone` added above the existing document list; uploads immediately linked to the invoice context
+  - `documents.sourceChannel` enum extended with `"drag_drop"` value
 - **May 5, 2026**: Unified record detail-page pattern built across all major entities
   - **`client/src/components/layout/record-detail.tsx`** — reusable layout component with: summary header card (icon, title, status badge, subtitle), 5-metric strip, optional status strip slot, two-column body (main tabs + sticky right rail), linked records panel, actions card, and right-rail extras; exports `DetailRow`, `DetailSection`, `EmptyTab` helpers
   - **`/brokers/:id`** — Broker Detail page: credit utilisation bar, linked invoices tab, notes tab, risk/exposure right-rail card, activate/suspend actions

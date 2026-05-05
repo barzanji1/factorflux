@@ -25,6 +25,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import DocumentIntakeZone from "@/components/documents/document-intake-zone";
 
 // ─── Stage constants ───────────────────────────────────────────────────────────
 
@@ -927,32 +928,52 @@ export default function InvoiceDetail() {
 
                     {/* Documents */}
                     <TabsContent value="documents" className="p-6">
-                      {!detail.documents?.length ? (
-                        <EmptyTabState icon={<FileText className="h-7 w-7" />} label="No documents uploaded for this invoice" />
-                      ) : (
-                        <div className="space-y-2">
-                          {detail.documents.map((doc: any) => (
-                            <div key={doc.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
-                              <div className="flex items-center gap-3">
-                                <FileCheck className="h-5 w-5 shrink-0 text-blue-500" />
-                                <div>
-                                  <p className="text-sm font-medium text-slate-800 dark:text-white">{doc.originalName}</p>
-                                  <p className="text-xs text-slate-400">{doc.documentType.replace(/_/g, " ")} · {(doc.size / 1024).toFixed(1)} KB</p>
-                                </div>
-                              </div>
-                              <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[11px]",
-                                doc.status === "processed" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>
-                                {doc.status}
-                              </Badge>
-                            </div>
-                          ))}
-                          <div className="pt-2">
-                            <Button variant="outline" size="sm" onClick={() => navigate("/documents")} className="gap-1.5 rounded-xl text-xs">
-                              <ExternalLink className="h-3.5 w-3.5" />Manage in Documents
-                            </Button>
-                          </div>
+                      <div className="space-y-6">
+                        {/* Drag-and-drop intake zone */}
+                        <div>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            Upload Documents
+                          </h3>
+                          <DocumentIntakeZone
+                            entityType="invoice"
+                            entityId={invoiceId}
+                            onUploadComplete={() => {
+                              qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+                            }}
+                          />
                         </div>
-                      )}
+
+                        {/* Existing documents list */}
+                        {!!detail.documents?.length && (
+                          <div>
+                            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                              Uploaded Documents ({detail.documents.length})
+                            </h3>
+                            <div className="space-y-2">
+                              {detail.documents.map((doc: any) => (
+                                <div key={doc.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+                                  <div className="flex items-center gap-3">
+                                    <FileCheck className="h-5 w-5 shrink-0 text-blue-500" />
+                                    <div>
+                                      <p className="text-sm font-medium text-slate-800 dark:text-white">{doc.originalName}</p>
+                                      <p className="text-xs text-slate-400">{doc.documentType.replace(/_/g, " ")} · {(doc.size / 1024).toFixed(1)} KB</p>
+                                    </div>
+                                  </div>
+                                  <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[11px]",
+                                    doc.status === "processed" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>
+                                    {doc.status}
+                                  </Badge>
+                                </div>
+                              ))}
+                              <div className="pt-1">
+                                <Button variant="outline" size="sm" onClick={() => navigate("/documents")} className="gap-1.5 rounded-xl text-xs">
+                                  <ExternalLink className="h-3.5 w-3.5" />Manage in Documents
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </TabsContent>
 
                     {/* Payout */}

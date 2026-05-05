@@ -269,7 +269,7 @@ export const documents = pgTable("documents", {
   invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
   sourceChannel: varchar("source_channel", {
-    enum: ["portal", "manual", "email", "api"],
+    enum: ["portal", "manual", "email", "api", "drag_drop"],
   }).default("manual"),
   status: varchar("status", {
     enum: ["processing", "processed", "failed"],
@@ -1187,3 +1187,84 @@ export const invoiceDocReviews = pgTable("invoice_doc_reviews", {
 export const insertInvoiceDocReviewSchema = createInsertSchema(invoiceDocReviews).omit({ id: true, createdAt: true });
 export type InvoiceDocReview = typeof invoiceDocReviews.$inferSelect;
 export type InsertInvoiceDocReview = z.infer<typeof insertInvoiceDocReviewSchema>;
+
+// ─── Document OCR / Extraction Pipeline ───────────────────────────────────────
+export const docExtractionJobs = pgTable("doc_extraction_jobs", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id")
+    .references(() => documents.id, { onDelete: "cascade" })
+    .notNull(),
+  jobType: varchar("job_type", {
+    enum: ["pdf_text", "ocr", "classify", "field_extract"],
+  }).default("pdf_text").notNull(),
+  status: varchar("status", {
+    enum: ["queued", "processing", "completed", "failed"],
+  }).default("queued").notNull(),
+  parserName: varchar("parser_name"),
+  attemptCount: integer("attempt_count").default(0),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  dejDocIdx:    index("dej_document_idx").on(table.documentId),
+  dejStatusIdx: index("dej_status_idx").on(table.status),
+}));
+
+export const docExtractionResults = pgTable("doc_extraction_results", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id")
+    .references(() => documents.id, { onDelete: "cascade" })
+    .notNull(),
+  jobId: integer("job_id")
+    .references(() => docExtractionJobs.id, { onDelete: "cascade" }),
+  fullText: text("full_text"),
+  rawPayloadJson: jsonb("raw_payload_json"),
+  confidenceScore: varchar("confidence_score"),
+  extractionMethod: varchar("extraction_method"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  derDocIdx: index("der_document_idx").on(table.documentId),
+}));
+
+export const docFieldCandidates = pgTable("doc_field_candidates", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id")
+    .references(() => documents.id, { onDelete: "cascade" })
+    .notNull(),
+  fieldName: varchar("field_name").notNull(),
+  fieldValue: text("field_value"),
+  normalizedValue: text("normalized_value"),
+  confidenceScore: varchar("confidence_score"),
+  pageNumber: integer("page_number"),
+  sourceSnippet: text("source_snippet"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  dfcDocIdx:   index("dfc_document_idx").on(table.documentId),
+  dfcFieldIdx: index("dfc_field_name_idx").on(table.fieldName),
+}));
+
+export const docReviews = pgTable("doc_reviews", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id")
+    .references(() => documents.id, { onDelete: "cascade" })
+    .notNull(),
+  reviewedByUserId: varchar("reviewed_by_user_id").references(() => users.id),
+  reviewStatus: varchar("review_status", {
+    enum: ["pending", "confirmed", "rejected", "unreadable"],
+  }).default("pending").notNull(),
+  reviewNotes: text("review_notes"),
+  finalFieldsJson: jsonb("final_fields_json"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  drDocIdx: index("dr_document_idx").on(table.documentId),
+}));
+
+export const insertDocExtractionJobSchema = createInsertSchema(docExtractionJobs).omit({ id: true, createdAt: true });
+export type DocExtractionJob  = typeof docExtractionJobs.$inferSelect;
+export type InsertDocExtractionJob = z.infer<typeof insertDocExtractionJobSchema>;
+
+export const insertDocReviewSchema = createInsertSchema(docReviews).omit({ id: true, createdAt: true, reviewedAt: true });
+export type DocReview = typeof docReviews.$inferSelect;
+export type InsertDocReview  = z.infer<typeof insertDocReviewSchema>;

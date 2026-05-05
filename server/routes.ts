@@ -37,7 +37,13 @@ import {
   payouts,
   docRequirements,
   activities,
+  docExtractionJobs,
+  docExtractionResults,
+  docFieldCandidates,
+  docReviews,
+  documents as documentsTable,
 } from "@shared/schema";
+import { runExtractionJob } from "./services/documentExtraction";
 
 import { sendEmail } from "./emailService";
 import {
@@ -3309,6 +3315,219 @@ Trucking Pros Financial Team
       });
       res.json(alert);
     } catch (e) { res.status(500).json({ message: "Failed to resolve alert" }); }
+  });
+
+  // ─── Document Intake + Extraction ────────────────────────────────────────
+  // POST /api/load-documents/intake — upload file, create doc record, kick off extraction job
+  app.post("/api/load-documents/intake", requireAuth, handleUpload("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      const { entityType, entityId } = req.body;
+      const validEntityTypes = ["invoice", "load", "client", "broker"];
+      if (!validEntityTypes.includes(entityType)) {
+        return res.status(400).json({ message: "Invalid entityType" });
+      }
+      const eid = parseInt(entityId, 10);
+      if (isNaN(eid)) return res.status(400).json({ message: "Invalid entityId" });
+
+      const docData: any = {
+        filename:     req.file.filename,
+        originalName: sanitizeOriginalName(req.file.originalname),
+        mimeType:     req.file.mimetype,
+        size:         req.file.size,
+        documentType: "other" as const,
+        uploadedBy:   req.user.id,
+        sourceChannel: "drag_drop" as const,
+        status:       "processing" as const,
+        loadId:    entityType === "load"    ? eid : null,
+        invoiceId: entityType === "invoice" ? eid : null,
+      };
+
+      const doc = await storage.createDocument(docData);
+
+      // Create extraction job (async — do not await runExtractionJob here)
+      const [job] = await db
+        .insert(docExtractionJobs)
+        .values({ documentId: doc.id, jobType: "pdf_text", status: "queued" })
+        .returning();
+
+      // Fire-and-forget extraction in background
+      const filePath = path.join("uploads", req.file.filename);
+      runExtractionJob(doc.id, job.id, filePath, req.file.mimetype).catch(() => {});
+
+      await storage.createActivity({
+        userId:      req.user.id,
+        type:        "document_uploaded",
+        description: `Uploaded via drag-drop: ${doc.originalName}`,
+        entityType:  "document",
+        entityId:    doc.id,
+        metadata:    buildDocumentMetadata(doc),
+      });
+
+      res.status(201).json({
+        documentId:    doc.id,
+        jobId:         job.id,
+        originalName:  doc.originalName,
+        mimeType:      doc.mimeType,
+        size:          doc.size,
+        extractionStatus: "queued",
+      });
+    } catch (err) {
+      console.error("Intake error:", err);
+      res.status(500).json({ message: "Failed to process document intake" });
+    }
+  });
+
+  // GET /api/load-documents/:id/extraction-status — poll extraction job status
+  app.get("/api/load-documents/:id/extraction-status", requireAuth, async (req, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      const jobs = await db
+        .select()
+        .from(docExtractionJobs)
+        .where(eq(docExtractionJobs.documentId, docId))
+        .orderBy(desc(docExtractionJobs.createdAt))
+        .limit(1);
+
+      if (!jobs.length) return res.json({ status: "queued" });
+
+      const job = jobs[0];
+      res.json({
+        status:      job.status,
+        jobId:       job.id,
+        parserName:  job.parserName,
+        startedAt:   job.startedAt,
+        completedAt: job.completedAt,
+        errorMessage: job.errorMessage,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch extraction status" });
+    }
+  });
+
+  // GET /api/load-documents/:id/extraction-result — full extracted text
+  app.get("/api/load-documents/:id/extraction-result", requireAuth, async (req, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      const results = await db
+        .select()
+        .from(docExtractionResults)
+        .where(eq(docExtractionResults.documentId, docId))
+        .orderBy(desc(docExtractionResults.createdAt))
+        .limit(1);
+
+      res.json(results[0] ?? null);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch extraction result" });
+    }
+  });
+
+  // GET /api/load-documents/:id/field-candidates — extracted field suggestions
+  app.get("/api/load-documents/:id/field-candidates", requireAuth, async (req, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      const candidates = await db
+        .select()
+        .from(docFieldCandidates)
+        .where(eq(docFieldCandidates.documentId, docId))
+        .orderBy(docFieldCandidates.fieldName);
+
+      res.json(candidates);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch field candidates" });
+    }
+  });
+
+  // GET /api/load-documents/:id/review — get existing review for a document
+  app.get("/api/load-documents/:id/review", requireAuth, async (req, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      const reviews = await db
+        .select()
+        .from(docReviews)
+        .where(eq(docReviews.documentId, docId))
+        .orderBy(desc(docReviews.createdAt))
+        .limit(1);
+
+      res.json(reviews[0] ?? null);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch review" });
+    }
+  });
+
+  // POST /api/load-documents/:id/review — submit review (confirm/reject/unreadable)
+  app.post("/api/load-documents/:id/review", requireAuth, async (req: any, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      const { reviewStatus, reviewNotes } = req.body;
+      const validStatuses = ["pending", "confirmed", "rejected", "unreadable"];
+      if (!validStatuses.includes(reviewStatus)) {
+        return res.status(400).json({ message: "Invalid reviewStatus" });
+      }
+
+      const [review] = await db
+        .insert(docReviews)
+        .values({
+          documentId:       docId,
+          reviewedByUserId: req.user.id,
+          reviewStatus,
+          reviewNotes:      reviewNotes ?? null,
+          reviewedAt:       new Date(),
+        })
+        .returning();
+
+      await storage.createActivity({
+        userId:      req.user.id,
+        type:        "document_reviewed",
+        description: `Document #${docId} marked as ${reviewStatus}`,
+        entityType:  "document",
+        entityId:    docId,
+      });
+
+      res.status(201).json(review);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to save review" });
+    }
+  });
+
+  // POST /api/load-documents/:id/retry-extraction — re-queue failed job
+  app.post("/api/load-documents/:id/retry-extraction", requireAuth, async (req: any, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      const docs = await db
+        .select()
+        .from(documentsTable)
+        .where(eq(documentsTable.id, docId))
+        .limit(1);
+
+      if (!docs.length) return res.status(404).json({ message: "Document not found" });
+      const doc = docs[0];
+
+      const [job] = await db
+        .insert(docExtractionJobs)
+        .values({ documentId: docId, jobType: "pdf_text", status: "queued" })
+        .returning();
+
+      const filePath = path.join("uploads", doc.filename);
+      runExtractionJob(docId, job.id, filePath, doc.mimeType).catch(() => {});
+
+      res.json({ jobId: job.id, status: "queued" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to retry extraction" });
+    }
   });
 
   // ─── Audit endpoints ──────────────────────────────────────────────────────
