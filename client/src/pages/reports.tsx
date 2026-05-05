@@ -45,7 +45,8 @@ export default function Reports() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
           title="Reports"
-          subtitle="Access Trucking Pros Financial payment views and reporting tools"
+          subtitle="Funding performance, portfolio views, and financial reporting"
+          group="Recovery"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">

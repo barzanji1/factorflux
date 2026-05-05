@@ -262,8 +262,9 @@ export default function FuelAdvanceTracking() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
-          title="Fuel Advance Tracking"
+          title="Fuel Advances"
           subtitle="Monitor fuel advances by carrier, date, and processing agent"
+          group="Funding"
         />
         <main className="custom-scrollbar flex-1 overflow-auto">
       <div className="container mx-auto px-4 py-6">

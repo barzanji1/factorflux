@@ -10,8 +10,9 @@ import { ShieldCheck } from "lucide-react";
 export default function Dashboard() {
   return (
     <AppShell
-      title="Command"
+      title="Dashboard"
       subtitle="Live freight operations — track, fund, and manage from one workspace"
+      group="Workspace"
     >
       <section className="relative mb-8 overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.06),transparent_45%),radial-gradient(ellipse_at_bottom_left,rgba(16,185,129,0.03),transparent_40%)]" />

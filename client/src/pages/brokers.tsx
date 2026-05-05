@@ -237,7 +237,7 @@ export default function Brokers() {
     <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Brokers" subtitle="Manage freight broker relationships and contacts" />
+        <TopNav title="Broker Desk" subtitle="Freight broker relationships, contacts, and risk ratings" group="Risk" />
         <main className="custom-scrollbar flex-1 overflow-auto">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}

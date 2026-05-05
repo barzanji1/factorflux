@@ -209,7 +209,7 @@ export default function CashApplication() {
     <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Cash Application" subtitle="Match incoming payments to invoices — handle short-pays, overpays, and reconciliation" />
+        <TopNav title="Cash Matching" subtitle="Match incoming payments to loads — handle short-pays, overpays, and reconciliation" group="Funding" />
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
 

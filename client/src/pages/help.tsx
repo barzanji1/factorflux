@@ -893,8 +893,9 @@ export default function HelpPage() {
 
   return (
     <AppShell
-      title="Help Center"
-      subtitle="Find answers, explore features, and get support for FactorFlux"
+      title="Support"
+      subtitle="Find answers, explore features, and get support"
+      group="Admin"
     >
       <div className="space-y-8">
         <section className="rounded-[28px] border border-[hsl(var(--border))] bg-white p-6 shadow-md dark:bg-[hsl(var(--card))] lg:p-8">

@@ -182,7 +182,7 @@ export default function Admin() {
       <div className="flex h-screen">
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <TopNav title="Admin Panel" />
+          <TopNav title="Team Settings" group="Admin" />
           <main className="flex flex-1 items-center justify-center p-6">
             <Card className="max-w-md w-full text-center">
               <CardHeader>
@@ -394,7 +394,7 @@ export default function Admin() {
     <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Admin Panel" subtitle="System management and configuration" />
+        <TopNav title="Team Settings" subtitle="User roles, permissions, and system configuration" group="Admin" />
         <main className="custom-scrollbar flex-1 overflow-auto p-6">
           <div className="max-w-7xl mx-auto space-y-6">
 

@@ -412,7 +412,7 @@ export default function Tasks() {
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Tasks" subtitle="Manage workflow, followups, calls, and assignments" />
+        <TopNav title="Tasks" subtitle="Workflow follow-ups, calls, and team assignments" group="Workspace" />
 
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">

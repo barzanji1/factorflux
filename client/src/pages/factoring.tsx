@@ -124,8 +124,9 @@ export default function Factoring() {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
-          title="Factoring"
-          subtitle="Payment processing, factored invoices, and revenue visibility"
+          title="Funding Queue"
+          subtitle="Review, approve, and advance factored loads"
+          group="Funding"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">

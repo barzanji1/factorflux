@@ -110,8 +110,9 @@ export default function Invoices() {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
-          title="Invoices"
-          subtitle="Manage invoice creation, review, status, and processing workflow"
+          title="Loads"
+          subtitle="Invoice creation, review, status, and processing workflow"
+          group="Workspace"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">

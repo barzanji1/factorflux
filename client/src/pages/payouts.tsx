@@ -245,7 +245,7 @@ export default function Payouts() {
     <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Payout Tracking" subtitle="Factoring advance & reserve management" />
+        <TopNav title="Payouts" subtitle="Advance disbursements and reserve management" group="Funding" />
         <main className="custom-scrollbar flex-1 overflow-auto p-6">
           <div className="max-w-7xl mx-auto space-y-6">
 

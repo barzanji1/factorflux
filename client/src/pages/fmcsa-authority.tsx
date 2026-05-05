@@ -324,7 +324,7 @@ export default function FmcsaAuthority() {
     <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopNav title="FMCSA Authority" />
+        <TopNav title="FMCSA Monitor" subtitle="Carrier authority status, safety ratings, and compliance alerts" group="Risk" />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-7xl space-y-6">
 

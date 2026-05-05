@@ -259,7 +259,7 @@ export default function VaultPage() {
     <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Client Vault" subtitle="Secure storage for confidential client information" />
+        <TopNav title="Vault" subtitle="Secure storage for confidential carrier and client records" group="Admin" />
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="container mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-8">

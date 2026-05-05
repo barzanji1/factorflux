@@ -333,8 +333,9 @@ export default function Documents() {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
-          title="Document Management"
-          subtitle="Manage freight paperwork, uploads, and supporting files"
+          title="Documents"
+          subtitle="Freight paperwork, uploads, and supporting files"
+          group="Workspace"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">

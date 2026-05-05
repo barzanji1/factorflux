@@ -178,7 +178,7 @@ export default function CreditChecks() {
     <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Credit Checks" subtitle="Broker and debtor risk assessments with approval indicators" />
+        <TopNav title="Credit Review" subtitle="Broker and debtor risk assessments with approval indicators" group="Risk" />
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
 

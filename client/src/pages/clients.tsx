@@ -98,8 +98,9 @@ export default function Clients() {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
-          title="Clients"
-          subtitle="Manage relationships, contacts, and client records"
+          title="Accounts"
+          subtitle="Carrier and client relationships, contacts, and records"
+          group="Workspace"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">
