@@ -291,8 +291,8 @@ export async function runAllAuthorityChecks(
   };
 
   try {
-    const allBrokers = await db.select().from(brokers);
-    const allDebtors = await db.select().from(debtors);
+    const allBrokers = await db.select().from(brokers).where(eq(brokers.status, "active"));
+    const allDebtors = await db.select().from(debtors).where(eq(debtors.status, "active"));
 
     const tasks: Array<{
       entityType: "broker" | "debtor";
