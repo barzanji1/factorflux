@@ -757,6 +757,8 @@ export const insertFuelAdvanceSchema = createInsertSchema(fuelAdvances).omit({
   id: true,
   createdAt: true,
   updatedAt: true
+}).extend({
+  advanceDate: z.coerce.date(),
 });
 
 // Types
@@ -1219,9 +1221,12 @@ export const docExtractionResults = pgTable("doc_extraction_results", {
   jobId: integer("job_id")
     .references(() => docExtractionJobs.id, { onDelete: "cascade" }),
   fullText: text("full_text"),
+  mainText: text("main_text"),
+  pageTexts: jsonb("page_texts"),
   rawPayloadJson: jsonb("raw_payload_json"),
   confidenceScore: varchar("confidence_score"),
   extractionMethod: varchar("extraction_method"),
+  pageCount: integer("page_count"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   derDocIdx: index("der_document_idx").on(table.documentId),

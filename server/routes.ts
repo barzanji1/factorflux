@@ -43,7 +43,7 @@ import {
   docReviews,
   documents as documentsTable,
 } from "@shared/schema";
-import { runExtractionJob } from "./services/documentExtraction";
+import { jobQueue } from "./services/jobQueue";
 
 import { sendEmail } from "./emailService";
 import {
@@ -1300,6 +1300,36 @@ ${message}
     } catch (error) {
       console.error("Error fetching loads:", error);
       res.status(500).json({ message: "Failed to fetch loads" });
+    }
+  });
+
+  app.get("/api/loads/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const load = await storage.getLoad(id);
+      if (!load) return res.status(404).json({ message: "Load not found" });
+
+      // Enrich with client name and linked invoice number
+      let clientName: string | null = null;
+      let invoiceId: number | null = null;
+      let invoiceNumber: string | null = null;
+
+      if (load.clientId) {
+        const client = await storage.getClient(load.clientId);
+        clientName = client?.companyName ?? null;
+      }
+
+      const allInvoices = await storage.getInvoices();
+      const linked = allInvoices.find((inv) => inv.loadId === id);
+      if (linked) {
+        invoiceId     = linked.id;
+        invoiceNumber = linked.invoiceNumber;
+      }
+
+      res.json({ ...load, clientName, invoiceId, invoiceNumber });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to fetch load" });
     }
   });
 
@@ -3346,15 +3376,14 @@ Trucking Pros Financial Team
 
       const doc = await storage.createDocument(docData);
 
-      // Create extraction job (async — do not await runExtractionJob here)
+      // Create extraction job and enqueue for background processing
       const [job] = await db
         .insert(docExtractionJobs)
         .values({ documentId: doc.id, jobType: "pdf_text", status: "queued" })
         .returning();
 
-      // Fire-and-forget extraction in background
       const filePath = path.join("uploads", req.file.filename);
-      runExtractionJob(doc.id, job.id, filePath, req.file.mimetype).catch(() => {});
+      jobQueue.enqueue({ jobId: job.id, documentId: doc.id, filePath, mimeType: req.file.mimetype });
 
       await storage.createActivity({
         userId:      req.user.id,
@@ -3522,7 +3551,7 @@ Trucking Pros Financial Team
         .returning();
 
       const filePath = path.join("uploads", doc.filename);
-      runExtractionJob(docId, job.id, filePath, doc.mimeType).catch(() => {});
+      jobQueue.enqueue({ jobId: job.id, documentId: docId, filePath, mimeType: doc.mimeType });
 
       res.json({ jobId: job.id, status: "queued" });
     } catch (err) {

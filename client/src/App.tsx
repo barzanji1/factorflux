@@ -41,6 +41,7 @@ import WorkflowBuilder from "@/pages/workflow-builder";
 import BrokerDetail from "@/pages/broker-detail";
 import ClientDetail from "@/pages/client-detail";
 import PayoutDetail from "@/pages/payout-detail";
+import LoadDetail from "@/pages/load-detail";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -216,6 +217,11 @@ function Router() {
       <Route path="/payouts/:id">
         <ProtectedRoute>
           <PayoutDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/loads/:id">
+        <ProtectedRoute>
+          <LoadDetail />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />
