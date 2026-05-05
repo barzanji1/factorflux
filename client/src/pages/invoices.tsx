@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { FFBadge } from "@/components/ui/ff-badge";
 import {
   Plus,
   Search,
@@ -289,14 +290,7 @@ export default function Invoices() {
                             </td>
 
                             <td className="px-6 py-5">
-                              <Badge
-                                className={cn(
-                                  "rounded-full border px-3 py-1 text-xs font-semibold shadow-sm",
-                                  getStatusColor(invoice.status)
-                                )}
-                              >
-                                {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                              </Badge>
+                              <FFBadge status={invoice.status} />
                             </td>
 
                             <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">

@@ -5,6 +5,7 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FFBadge } from "@/components/ui/ff-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -295,14 +296,7 @@ export default function Factoring() {
                                     {formatCurrency(parseFloat(invoice.amount || 0))}
                                   </TableCell>
                                   <TableCell>
-                                    <Badge
-                                      className={cn(
-                                        "rounded-full px-2.5 py-1 font-semibold",
-                                        getStatusColor(invoice.status)
-                                      )}
-                                    >
-                                      {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                                    </Badge>
+                                    <FFBadge status={invoice.status} />
                                   </TableCell>
                                   <TableCell>
                                     {invoice.submittedAt
@@ -376,10 +370,7 @@ export default function Factoring() {
                                       : "-"}
                                   </TableCell>
                                   <TableCell>
-                                    <Badge className="rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-                                      <CheckCircle className="mr-1 h-3 w-3" />
-                                      Paid
-                                    </Badge>
+                                    <FFBadge status="paid" dot />
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex gap-2">
@@ -480,14 +471,7 @@ export default function Factoring() {
                                       : "-"}
                                   </TableCell>
                                   <TableCell>
-                                    <Badge
-                                      className={cn(
-                                        "rounded-full px-2.5 py-1 font-semibold",
-                                        getStatusColor(invoice.status)
-                                      )}
-                                    >
-                                      {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                                    </Badge>
+                                    <FFBadge status={invoice.status} />
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex gap-2">

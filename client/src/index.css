@@ -2,104 +2,157 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── FactorFlux Design System v2 ─────────────────────────────────────────────
+   Calm operational UI. Premium but restrained. Minimal color used semantically.
+   ──────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  /* Core app colors */
-  --background: 210 33% 98%;
-  --foreground: 222 47% 11%;
+  /* ── Shadcn component variables ─────────────────────────────────────── */
+  --background:           215 20% 97%;
+  --foreground:           222 47% 11%;
 
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
+  --muted:                214 20% 94%;
+  --muted-foreground:     215 18% 48%;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover:              0 0% 100%;
+  --popover-foreground:   222 47% 11%;
 
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card:                 0 0% 100%;
+  --card-foreground:      222 47% 11%;
 
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
+  --border:               214 22% 89%;
+  --input:                214 22% 89%;
 
-  --primary: 217 91% 60%;
-  --primary-foreground: 0 0% 100%;
-  --primary-dark: 221 83% 53%;
+  --primary:              217 91% 48%;
+  --primary-foreground:   0 0% 100%;
+  --primary-dark:         221 83% 42%;
 
-  --secondary: 210 40% 96%;
+  --secondary:            214 20% 94%;
   --secondary-foreground: 222 47% 11%;
 
-  --accent: 188 95% 43%;
-  --accent-foreground: 0 0% 100%;
+  --accent:               214 20% 94%;
+  --accent-foreground:    222 47% 11%;
 
-  --violet: 262 83% 58%;
-  --violet-foreground: 0 0% 100%;
+  --violet:               262 83% 58%;
+  --violet-foreground:    0 0% 100%;
 
-  --destructive: 0 73% 48%;
+  --destructive:          0 72% 46%;
   --destructive-foreground: 0 0% 98%;
 
-  --success: 142 72% 29%;
-  --success-foreground: 0 0% 98%;
+  --success:              152 60% 30%;
+  --success-foreground:   0 0% 98%;
 
-  --warning: 36 100% 50%;
-  --warning-foreground: 0 0% 98%;
+  --warning:              36 94% 44%;
+  --warning-foreground:   0 0% 98%;
 
-  --ring: 217 91% 60%;
-  --surface: 0 0% 100%;
+  --ring:                 217 91% 48%;
+  --surface:              0 0% 100%;
 
-  --radius: 0.875rem;
-  --radius-sm: 0.625rem;
-  --radius-md: 0.875rem;
-  --radius-lg: 1.125rem;
-  --radius-xl: 1.375rem;
+  --radius:               0.75rem;
+  --radius-sm:            0.5rem;
+  --radius-md:            0.75rem;
+  --radius-lg:            1rem;
+  --radius-xl:            1.25rem;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.10);
-  --shadow-blue: 0 12px 30px rgba(37, 99, 235, 0.12);
+  /* ── FactorFlux design tokens ────────────────────────────────────────── */
 
-  --transition-fast: 180ms ease;
-  --transition-medium: 220ms ease;
+  /* Surfaces */
+  --ff-bg:                hsl(215, 20%, 97%);
+  --ff-surface:           #ffffff;
+  --ff-surface-subtle:    hsl(214, 20%, 96%);
+  --ff-surface-tint:      hsl(214, 20%, 93%);
+
+  /* Borders */
+  --ff-border:            hsl(214, 22%, 89%);
+  --ff-border-strong:     hsl(214, 18%, 80%);
+  --ff-border-focus:      hsl(217, 91%, 55%);
+
+  /* Text hierarchy */
+  --ff-text-0:            hsl(222, 47%, 11%);
+  --ff-text-1:            hsl(215, 22%, 35%);
+  --ff-text-2:            hsl(215, 16%, 52%);
+  --ff-text-3:            hsl(215, 12%, 70%);
+
+  /* Radius scale */
+  --ff-r-xs:              4px;
+  --ff-r-sm:              7px;
+  --ff-r-md:              10px;
+  --ff-r-lg:              14px;
+  --ff-r-xl:              20px;
+
+  /* Shadows — depth without blur-heavy effects */
+  --ff-shadow-xs:         0 1px 2px rgba(15, 23, 42, 0.04);
+  --ff-shadow-sm:         0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ff-shadow-md:         0 3px 8px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --ff-shadow-lg:         0 8px 20px rgba(15, 23, 42, 0.07), 0 3px 6px rgba(15, 23, 42, 0.04);
+
+  /* Legacy shadow aliases */
+  --shadow-sm:            var(--ff-shadow-xs);
+  --shadow-md:            var(--ff-shadow-md);
+  --shadow-lg:            var(--ff-shadow-lg);
+
+  /* Transitions */
+  --ff-ease:              cubic-bezier(0.4, 0, 0.2, 1);
+  --ff-duration:          140ms;
+
+  --transition-fast:      140ms ease;
+  --transition-medium:    200ms ease;
 }
 
 .dark {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 98%;
+  --background:           222 47% 7%;
+  --foreground:           210 40% 96%;
 
-  --muted: 217 33% 14%;
-  --muted-foreground: 215 20% 65%;
+  --muted:                217 33% 13%;
+  --muted-foreground:     215 20% 60%;
 
-  --popover: 222 47% 9%;
-  --popover-foreground: 210 40% 98%;
+  --popover:              222 47% 9%;
+  --popover-foreground:   210 40% 96%;
 
-  --card: 222 47% 10%;
-  --card-foreground: 210 40% 98%;
+  --card:                 222 47% 10%;
+  --card-foreground:      210 40% 96%;
 
-  --border: 217 33% 18%;
-  --input: 217 33% 18%;
+  --border:               217 33% 17%;
+  --input:                217 33% 17%;
 
-  --primary: 217 91% 60%;
-  --primary-foreground: 0 0% 100%;
-  --primary-dark: 221 83% 53%;
+  --primary:              217 91% 58%;
+  --primary-foreground:   0 0% 100%;
+  --primary-dark:         221 83% 50%;
 
-  --secondary: 217 33% 14%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary:            217 33% 13%;
+  --secondary-foreground: 210 40% 96%;
 
-  --accent: 188 95% 43%;
-  --accent-foreground: 0 0% 100%;
+  --accent:               217 33% 13%;
+  --accent-foreground:    210 40% 96%;
 
-  --violet: 262 83% 66%;
-  --violet-foreground: 0 0% 100%;
+  --violet:               262 83% 66%;
+  --violet-foreground:    0 0% 100%;
 
-  --destructive: 0 63% 40%;
+  --destructive:          0 63% 38%;
   --destructive-foreground: 0 0% 98%;
 
-  --success: 142 72% 35%;
-  --success-foreground: 0 0% 98%;
+  --success:              152 60% 36%;
+  --success-foreground:   0 0% 98%;
 
-  --warning: 36 100% 50%;
-  --warning-foreground: 0 0% 98%;
+  --warning:              36 94% 48%;
+  --warning-foreground:   0 0% 98%;
 
-  --ring: 217 91% 60%;
-  --surface: 222 47% 10%;
+  --ring:                 217 91% 58%;
+  --surface:              222 47% 10%;
+
+  --ff-bg:                hsl(222, 47%, 7%);
+  --ff-surface:           hsl(222, 47%, 10%);
+  --ff-surface-subtle:    hsl(222, 40%, 12%);
+  --ff-surface-tint:      hsl(222, 38%, 14%);
+  --ff-border:            hsl(217, 33%, 17%);
+  --ff-border-strong:     hsl(217, 28%, 24%);
+  --ff-text-0:            hsl(210, 40%, 96%);
+  --ff-text-1:            hsl(215, 20%, 74%);
+  --ff-text-2:            hsl(215, 16%, 54%);
+  --ff-text-3:            hsl(215, 12%, 38%);
 }
+
+/* ─── Base reset ──────────────────────────────────────────────────────────── */
 
 @layer base {
   * {
@@ -108,11 +161,15 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply antialiased bg-background text-foreground;
-    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    @apply bg-background text-foreground;
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system,
+      BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     min-height: 100vh;
     text-rendering: optimizeLegibility;
   }
@@ -121,268 +178,331 @@
     min-height: 100vh;
   }
 
-  button,
-  input,
-  textarea,
-  select {
+  button, input, textarea, select {
     font: inherit;
   }
 }
 
+/* ─── Component layer ─────────────────────────────────────────────────────── */
+
 @layer components {
-  .qc-card {
-    @apply bg-card border rounded-[18px];
-    box-shadow: var(--shadow-md);
+
+  /* ── Cards ─────────────────────────────────────────────────────────────── */
+
+  .ff-card {
+    @apply rounded-[16px] border border-[hsl(var(--border))] bg-card;
+    box-shadow: var(--ff-shadow-sm);
   }
 
-  .qc-card-hover {
-    transition:
-      transform var(--transition-fast),
-      box-shadow var(--transition-fast),
-      border-color var(--transition-fast),
-      background-color var(--transition-fast);
+  .ff-card-interactive {
+    transition: box-shadow var(--ff-duration) var(--ff-ease),
+                border-color var(--ff-duration) var(--ff-ease);
   }
 
-  .qc-card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-blue);
+  .ff-card-interactive:hover {
+    box-shadow: var(--ff-shadow-md);
+    border-color: hsl(var(--ff-border-strong));
   }
 
-  .qc-sidebar-item {
-    @apply flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-600;
-    transition:
-      background-color var(--transition-fast),
-      color var(--transition-fast),
-      transform var(--transition-fast);
+  /* Legacy aliases */
+  .qc-card { @apply ff-card; }
+  .qc-card-hover { @apply ff-card-interactive; }
+
+  /* ── Buttons ────────────────────────────────────────────────────────────── */
+
+  .ff-btn-primary {
+    @apply inline-flex items-center justify-center rounded-[9px] px-3.5 py-2 text-[13px] font-semibold text-white;
+    background: hsl(217, 91%, 48%);
+    transition: background-color var(--ff-duration) var(--ff-ease),
+                box-shadow var(--ff-duration) var(--ff-ease);
   }
 
-  .qc-sidebar-item:hover {
-    @apply bg-slate-100 text-slate-900;
-    transform: translateX(1px);
+  .ff-btn-primary:hover {
+    background: hsl(217, 91%, 43%);
+    box-shadow: var(--ff-shadow-sm);
   }
 
-  .qc-sidebar-item-active {
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(6, 182, 212, 0.08));
-    color: hsl(var(--primary-dark));
-    border: 1px solid rgba(37, 99, 235, 0.15);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  .ff-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-[9px] border bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-700;
+    border-color: hsl(var(--border));
+    transition: background-color var(--ff-duration) var(--ff-ease),
+                border-color var(--ff-duration) var(--ff-ease);
   }
+
+  .ff-btn-secondary:hover {
+    @apply bg-slate-50;
+    border-color: hsl(var(--ff-border-strong));
+  }
+
+  /* Legacy aliases */
+  .qc-button-primary   { @apply ff-btn-primary;    }
+  .qc-button-secondary { @apply ff-btn-secondary;  }
+
+  /* ── Search ─────────────────────────────────────────────────────────────── */
 
   .qc-topbar-search {
-    @apply w-full rounded-2xl border bg-white px-4 py-3 text-sm outline-none;
+    @apply w-full rounded-xl border bg-white px-4 py-2.5 text-[13px] text-slate-700 outline-none placeholder:text-slate-400;
     border-color: hsl(var(--border));
-    box-shadow: var(--shadow-sm);
-    transition:
-      border-color var(--transition-fast),
-      box-shadow var(--transition-fast),
-      background-color var(--transition-fast);
+    transition: border-color var(--ff-duration) var(--ff-ease),
+                box-shadow var(--ff-duration) var(--ff-ease);
   }
 
   .qc-topbar-search:focus {
-    border-color: hsl(var(--primary));
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.10);
+    border-color: hsl(217, 91%, 56%);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
   }
 
-  .qc-button-primary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-white;
-    background: linear-gradient(135deg, rgb(37 99 235), rgb(29 78 216));
-    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.20);
-    transition:
-      transform var(--transition-fast),
-      box-shadow var(--transition-fast),
-      filter var(--transition-fast);
+  /* ── Status badges ──────────────────────────────────────────────────────── */
+  /*
+     Usage: <span class="ff-badge ff-badge-funded">Funded</span>
+     Meanings:
+       draft       — created, not submitted
+       pending     — awaiting review
+       submitted   — in the queue
+       approved    — cleared for funding
+       funded      — advance disbursed (alias: paid)
+       rejected    — declined
+       hold        — flagged / suspended
+       processing  — actively being worked
+       overdue     — past due date
+       partial     — partially resolved
+  */
+
+  .ff-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[11px] font-semibold leading-none;
+    letter-spacing: 0.01em;
   }
 
-  .qc-button-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
-    filter: brightness(1.02);
+  .ff-badge-draft {
+    background: #F1F5F9;
+    color: #475569;
+    box-shadow: 0 0 0 1px #E2E8F0;
+  }
+  .ff-badge-pending {
+    background: #FFFBEB;
+    color: #92400E;
+    box-shadow: 0 0 0 1px #FDE68A;
+  }
+  .ff-badge-submitted {
+    background: #EFF6FF;
+    color: #1E40AF;
+    box-shadow: 0 0 0 1px #BFDBFE;
+  }
+  .ff-badge-approved {
+    background: #ECFEFF;
+    color: #155E75;
+    box-shadow: 0 0 0 1px #A5F3FC;
+  }
+  .ff-badge-funded {
+    background: #ECFDF5;
+    color: #065F46;
+    box-shadow: 0 0 0 1px #A7F3D0;
+  }
+  .ff-badge-rejected {
+    background: #FEF2F2;
+    color: #991B1B;
+    box-shadow: 0 0 0 1px #FECACA;
+  }
+  .ff-badge-hold {
+    background: #F5F3FF;
+    color: #5B21B6;
+    box-shadow: 0 0 0 1px #DDD6FE;
+  }
+  .ff-badge-processing {
+    background: #EEF2FF;
+    color: #3730A3;
+    box-shadow: 0 0 0 1px #C7D2FE;
+  }
+  .ff-badge-overdue {
+    background: #FFF7ED;
+    color: #9A3412;
+    box-shadow: 0 0 0 1px #FDBA74;
+  }
+  .ff-badge-partial {
+    background: #F0FDFA;
+    color: #134E4A;
+    box-shadow: 0 0 0 1px #99F6E4;
   }
 
-  .qc-button-secondary {
-    @apply inline-flex items-center justify-center rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold text-slate-700;
-    border-color: hsl(var(--border));
-    transition:
-      background-color var(--transition-fast),
-      border-color var(--transition-fast),
-      color var(--transition-fast);
-  }
+  /* Dark mode badge overrides */
+  .dark .ff-badge-draft      { background: rgba(71,85,105,0.18); color: #94A3B8; box-shadow: 0 0 0 1px rgba(71,85,105,0.28); }
+  .dark .ff-badge-pending    { background: rgba(180,83,9,0.18);  color: #FCD34D; box-shadow: 0 0 0 1px rgba(180,83,9,0.28); }
+  .dark .ff-badge-submitted  { background: rgba(29,78,216,0.16); color: #93C5FD; box-shadow: 0 0 0 1px rgba(29,78,216,0.28); }
+  .dark .ff-badge-approved   { background: rgba(8,145,178,0.16); color: #67E8F9; box-shadow: 0 0 0 1px rgba(8,145,178,0.28); }
+  .dark .ff-badge-funded     { background: rgba(5,150,105,0.16); color: #6EE7B7; box-shadow: 0 0 0 1px rgba(5,150,105,0.28); }
+  .dark .ff-badge-rejected   { background: rgba(185,28,28,0.16); color: #FCA5A5; box-shadow: 0 0 0 1px rgba(185,28,28,0.28); }
+  .dark .ff-badge-hold       { background: rgba(109,40,217,0.16); color: #C4B5FD; box-shadow: 0 0 0 1px rgba(109,40,217,0.28); }
+  .dark .ff-badge-processing { background: rgba(67,56,202,0.16); color: #A5B4FC; box-shadow: 0 0 0 1px rgba(67,56,202,0.28); }
+  .dark .ff-badge-overdue    { background: rgba(194,65,12,0.16); color: #FDBA74; box-shadow: 0 0 0 1px rgba(194,65,12,0.28); }
+  .dark .ff-badge-partial    { background: rgba(19,78,74,0.18);  color: #5EEAD4; box-shadow: 0 0 0 1px rgba(19,78,74,0.28); }
 
-  .qc-button-secondary:hover {
-    @apply bg-slate-50 text-slate-900;
-    border-color: rgba(37, 99, 235, 0.22);
-  }
-
-  .status-badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
-  }
-
+  /* Legacy badge aliases — maps old status classes to ff-badge system */
+  .status-badge             { @apply ff-badge; }
   .status-processed,
   .status-approved,
-  .status-active {
-    @apply bg-green-100 text-green-800;
-  }
-
+  .status-active            { @apply ff-badge-funded; }
   .status-processing,
-  .status-pending {
-    @apply bg-amber-100 text-amber-800;
-  }
-
+  .status-pending           { @apply ff-badge-pending; }
   .status-rejected,
-  .status-failed {
-    @apply bg-red-100 text-red-800;
+  .status-failed            { @apply ff-badge-rejected; }
+  .status-inactive          { @apply ff-badge-draft; }
+
+  /* ── Module section header ──────────────────────────────────────────────── */
+
+  .ff-section-header {
+    @apply mb-5 flex items-start justify-between gap-4;
   }
 
-  .status-inactive {
-    @apply bg-slate-100 text-slate-700;
+  .ff-section-title {
+    @apply text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white;
   }
-}
 
-@layer utilities {
+  .ff-section-meta {
+    @apply mt-0.5 text-[12.5px] text-slate-500 dark:text-slate-400;
+  }
+
+  /* ── Tables ─────────────────────────────────────────────────────────────── */
+  /*
+     Apply .ff-data-table to a <table> element for consistent queue readability.
+  */
+
+  .ff-data-table {
+    @apply w-full text-[13px];
+  }
+
+  .ff-data-table thead tr {
+    @apply border-b border-slate-200/80 dark:border-slate-700/60;
+  }
+
+  .ff-data-table thead th {
+    @apply px-3 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500;
+  }
+
+  .ff-data-table tbody tr {
+    @apply border-b border-slate-100 transition-colors duration-100 dark:border-slate-800/60;
+  }
+
+  .ff-data-table tbody tr:last-child {
+    @apply border-b-0;
+  }
+
+  .ff-data-table tbody tr:hover {
+    @apply bg-slate-50/80 dark:bg-slate-800/25;
+  }
+
+  .ff-data-table tbody td {
+    @apply px-3 py-3 text-slate-700 dark:text-slate-300;
+  }
+
+  /* ── Inputs ─────────────────────────────────────────────────────────────── */
+
+  .ff-input {
+    @apply w-full rounded-[9px] border bg-white px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400;
+    border-color: hsl(var(--border));
+    box-shadow: var(--ff-shadow-xs);
+    transition: border-color var(--ff-duration) var(--ff-ease),
+                box-shadow var(--ff-duration) var(--ff-ease);
+  }
+
+  .ff-input:focus {
+    border-color: hsl(217, 91%, 56%);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08), var(--ff-shadow-xs);
+  }
+
+  /* ── Page drag-and-drop zone ────────────────────────────────────────────── */
+
   .drag-over {
-    border-color: rgb(37 99 235) !important;
-    background: linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(6, 182, 212, 0.04)) !important;
+    border-color: hsl(217, 91%, 56%) !important;
+    background: rgba(37, 99, 235, 0.04) !important;
   }
 
   .file-item {
-    transition:
-      transform var(--transition-fast),
-      box-shadow var(--transition-fast),
-      background-color var(--transition-fast);
+    transition: background-color var(--ff-duration) var(--ff-ease),
+                box-shadow var(--ff-duration) var(--ff-ease);
   }
 
   .file-item:hover {
-    transform: translateY(-2px);
+    box-shadow: var(--ff-shadow-sm);
+  }
+}
+
+/* ─── Utilities ───────────────────────────────────────────────────────────── */
+
+@layer utilities {
+
+  /* Semantic text colors */
+  .text-ff-primary   { color: hsl(217, 91%, 48%); }
+  .text-ff-secondary { color: hsl(215, 16%, 52%); }
+  .text-ff-muted     { color: hsl(215, 12%, 70%); }
+  .text-ff-success   { color: hsl(152, 60%, 30%); }
+  .text-ff-warning   { color: hsl(36, 94%, 40%);  }
+  .text-ff-error     { color: hsl(0, 72%, 46%);   }
+
+  /* Legacy text aliases */
+  .text-primary      { color: hsl(217, 91%, 48%); }
+  .text-primary-dark { color: hsl(221, 83%, 42%); }
+  .text-secondary    { color: hsl(215, 16%, 45%); }
+  .text-success      { color: hsl(152, 60%, 30%); }
+  .text-warning      { color: hsl(36, 94%, 40%);  }
+  .text-error        { color: hsl(0, 72%, 46%);   }
+
+  /* Surface backgrounds */
+  .bg-ff-surface-0 { background-color: var(--ff-bg); }
+  .bg-ff-surface-1 { background-color: var(--ff-surface); }
+  .bg-ff-surface-2 { background-color: var(--ff-surface-subtle); }
+  .bg-surface      { background-color: hsl(var(--surface)); }
+  .bg-background   { background-color: hsl(var(--background)); }
+
+  /* Shadow utilities */
+  .shadow-ff-xs { box-shadow: var(--ff-shadow-xs); }
+  .shadow-ff-sm { box-shadow: var(--ff-shadow-sm); }
+  .shadow-ff-md { box-shadow: var(--ff-shadow-md); }
+  .shadow-ff-lg { box-shadow: var(--ff-shadow-lg); }
+
+  /* Legacy shadow aliases */
+  .shadow-sm    { box-shadow: var(--ff-shadow-xs); }
+  .shadow-md    { box-shadow: var(--ff-shadow-md); }
+  .shadow-lg    { box-shadow: var(--ff-shadow-lg); }
+
+  /* Table hover row */
+  .table-hover tbody tr:hover {
+    background-color: rgba(148, 163, 184, 0.07);
   }
 
-  .sidebar-active {
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(6, 182, 212, 0.08));
-    border: 1px solid rgba(37, 99, 235, 0.15);
-    color: rgb(29 78 216);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
-  }
-
-  .text-primary {
-    color: rgb(37 99 235);
-  }
-
-  .text-primary-dark {
-    color: rgb(29 78 216);
-  }
-
-  .text-secondary {
-    color: rgb(100 116 139);
-  }
-
-  .text-success {
-    color: rgb(22 163 74);
-  }
-
-  .text-warning {
-    color: rgb(245 158 11);
-  }
-
-  .text-error {
-    color: rgb(220 38 38);
-  }
-
-  .bg-primary {
-    background-color: rgb(37 99 235);
-  }
-
-  .bg-primary-dark {
-    background-color: rgb(29 78 216);
-  }
-
-  .bg-secondary {
-    background-color: rgb(15 23 42);
-  }
-
-  .bg-success {
-    background-color: rgb(22 163 74);
-  }
-
-  .bg-warning {
-    background-color: rgb(245 158 11);
-  }
-
-  .bg-error {
-    background-color: rgb(220 38 38);
-  }
-
-  .bg-surface {
-    background-color: hsl(var(--surface));
-  }
-
-  .bg-background {
-    background-color: hsl(var(--background));
-  }
-
+  /* Focus utilities */
   .focus-ring-primary:focus {
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.10);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
   }
 
   .focus-border-primary:focus {
-    border-color: rgb(37 99 235);
+    border-color: hsl(217, 91%, 56%);
   }
 
-  .table-hover tbody tr:hover {
-    background-color: rgba(148, 163, 184, 0.08);
-  }
-
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(148, 163, 184, 0.08);
-    border-radius: 999px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(100, 116, 139, 0.45);
-    border-radius: 999px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(71, 85, 105, 0.7);
-  }
-
-  .shadow-sm {
-    box-shadow: var(--shadow-sm);
-  }
-
-  .shadow-md {
-    box-shadow: var(--shadow-md);
-  }
-
-  .shadow-lg {
-    box-shadow: var(--shadow-lg);
-  }
-
+  /* Transition utilities */
   .transition-colors {
-    transition:
-      color var(--transition-fast),
-      background-color var(--transition-fast),
-      border-color var(--transition-fast);
+    transition: color var(--ff-duration) var(--ff-ease),
+                background-color var(--ff-duration) var(--ff-ease),
+                border-color var(--ff-duration) var(--ff-ease);
   }
 
   .transition-shadow {
-    transition: box-shadow var(--transition-fast);
+    transition: box-shadow var(--ff-duration) var(--ff-ease);
   }
 
-  .animate-spin-smooth {
-    animation: spin 1s linear infinite;
+  /* Scrollbars */
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; border-radius: 999px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(71, 85, 105, 0.55);
   }
 
-  /* Dark sidebar scrollbar — used by the FactorFlux nav rail */
-  .ff-sidebar-scroll::-webkit-scrollbar {
-    width: 4px;
-  }
-  .ff-sidebar-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  /* Dark sidebar scrollbar */
+  .ff-sidebar-scroll::-webkit-scrollbar { width: 3px; }
+  .ff-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
   .ff-sidebar-scroll::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.07);
     border-radius: 999px;
@@ -390,14 +510,23 @@
   .ff-sidebar-scroll::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.13);
   }
+
+  /* Sidebar active state (legacy, now managed inline in sidebar.tsx) */
+  .sidebar-active {
+    background: rgba(37, 99, 235, 0.08);
+    color: hsl(217, 91%, 48%);
+    border-left: 2px solid hsl(217, 91%, 60%);
+  }
+
+  /* Animation */
+  .animate-spin-smooth {
+    animation: spin 0.9s linear infinite;
+  }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
+/* ─── Keyframes ───────────────────────────────────────────────────────────── */
 
-  to {
-    transform: rotate(360deg);
-  }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
