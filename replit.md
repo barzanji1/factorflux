@@ -101,6 +101,7 @@ Layout preference: Modern dashboard with sidebar navigation (Dashboard, Clients,
 - **Navigation**: Standardized navigation using TopNav component across all pages, including a consistent Home button for quick dashboard access and streamlined settings menu access. Consolidated fuel card functionality into single "TPF Fuel Cards" tab with four main sections: Overview, Fuel Cards, Applications, and Analytics.
 - **Activity Log Management**: Option to reset activity history.
 - **TPF Form Integration**: Embedded form system from Trucking Pros Financial integrated within the Reports tab enabling direct integration of WordPress forms within FactorFlux interface with dynamic loading and error handling, plus backup native form implementation.
+- **Document-to-Approval Rules**: Configurable required-document checklist with `documentRules` and `invoiceDocReviews` DB tables, `docValidation` service, per-invoice completeness tracking, missing-document warnings, approval lock via lifecycle engine guards, reviewer notes for managers. `/document-rules` admin page (manager/admin), `Doc Checklist` tab on every invoice detail, DB-seeded defaults (Rate Confirmation + BOL for review; Invoice + POD for approval).
 
 ## External Dependencies
 

@@ -90,6 +90,7 @@ const navSections: NavSection[] = [
     items: [
       { name: "Brokers", href: "/brokers", icon: Building },
       { name: "Vault", href: "/vault", icon: Shield },
+      { name: "Doc Rules", href: "/document-rules", icon: ClipboardList, role: "manager" },
     ],
   },
   {

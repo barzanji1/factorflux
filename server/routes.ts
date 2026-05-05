@@ -50,6 +50,7 @@ import {
   getAvailableTransitions,
   performTransition,
 } from "./services/lifecycleEngine";
+import { getDocumentCompleteness } from "./services/docValidation";
 
 const upload = multer({
   dest: "uploads/",
@@ -1479,6 +1480,87 @@ ${message}
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
       console.error("Error performing transition:", err);
       res.status(500).json({ message: "Failed to perform transition" });
+    }
+  });
+
+  // ─── Document Rules (admin-configurable checklist) ───────────────────────
+  app.get("/api/document-rules", requireAuth, async (_req, res) => {
+    try { res.json(await storage.getDocumentRules()); }
+    catch (err) { res.status(500).json({ message: "Failed to fetch document rules" }); }
+  });
+
+  app.post("/api/document-rules", requireAuth, async (req: any, res) => {
+    if (req.user?.role !== "manager" && req.user?.role !== "admin")
+      return res.status(403).json({ message: "Manager or admin required" });
+    try {
+      const rule = await storage.createDocumentRule(req.body);
+      res.status(201).json(rule);
+    } catch (err) { res.status(500).json({ message: "Failed to create document rule" }); }
+  });
+
+  app.put("/api/document-rules/:id", requireAuth, async (req: any, res) => {
+    if (req.user?.role !== "manager" && req.user?.role !== "admin")
+      return res.status(403).json({ message: "Manager or admin required" });
+    try {
+      const rule = await storage.updateDocumentRule(parseInt(req.params.id), req.body);
+      res.json(rule);
+    } catch (err) { res.status(500).json({ message: "Failed to update document rule" }); }
+  });
+
+  app.delete("/api/document-rules/:id", requireAuth, async (req: any, res) => {
+    if (req.user?.role !== "admin")
+      return res.status(403).json({ message: "Admin required" });
+    try {
+      await storage.deleteDocumentRule(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ message: "Failed to delete document rule" }); }
+  });
+
+  // ─── Invoice document completeness status ─────────────────────────────────
+  app.get("/api/invoices/:id/document-status", requireAuth, async (req, res) => {
+    try {
+      const raw = await getDocumentCompleteness(parseInt(req.params.id));
+      // Flatten each DocRuleStatus so frontend gets one flat object per rule
+      const flatRules = raw.rules.map(rs => ({
+        documentType:    rs.rule.documentType,
+        label:           rs.rule.label,
+        description:     rs.rule.description,
+        required:        rs.rule.required,
+        requiredForStage: rs.rule.requiredForStage,
+        sortOrder:       rs.rule.sortOrder,
+        active:          rs.rule.active,
+        present:         rs.uploaded,
+        document:        rs.document ?? null,
+      }));
+      res.json({ ...raw, rules: flatRules });
+    } catch (err) { res.status(500).json({ message: "Failed to fetch document status" }); }
+  });
+
+  // ─── Invoice document reviews (reviewer notes) ────────────────────────────
+  app.get("/api/invoices/:id/doc-reviews", requireAuth, async (req, res) => {
+    try {
+      res.json(await storage.getDocReviews(parseInt(req.params.id)));
+    } catch (err) { res.status(500).json({ message: "Failed to fetch document reviews" }); }
+  });
+
+  app.post("/api/invoices/:id/doc-reviews", requireAuth, async (req: any, res) => {
+    if (req.user?.role !== "manager" && req.user?.role !== "admin")
+      return res.status(403).json({ message: "Manager or admin required" });
+    try {
+      const schema = z.object({
+        status: z.enum(["approved", "needs_revision", "incomplete"]),
+        notes: z.string().optional(),
+      });
+      const { status, notes } = schema.parse(req.body);
+      const review = await storage.createDocReview({
+        invoiceId: parseInt(req.params.id),
+        reviewedBy: req.user.id,
+        status, notes,
+      });
+      res.status(201).json(review);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
+      res.status(500).json({ message: "Failed to save review" });
     }
   });
 
@@ -3084,7 +3166,7 @@ Trucking Pros Financial Team
       const lines = await storage.applyPaymentToInvoices(Number(req.params.id), req.body.lines);
       await storage.createActivity({ userId: req.user.id, type: "payment_applied", description: `Payment ${req.params.id} applied to ${lines.length} invoice(s)`, entityType: "payment", entityId: Number(req.params.id) });
       // Advance each affected invoice to payment_receipt stage
-      const uniqueInvoiceIds = [...new Set(lines.map((l: any) => l.invoiceId).filter(Boolean))];
+      const uniqueInvoiceIds = Array.from(new Set(lines.map((l: any) => l.invoiceId).filter(Boolean)));
       for (const invId of uniqueInvoiceIds) {
         advanceInvoiceStage(invId, "payment_receipt", req.user.id, "Payment applied via cash application").catch(() => {});
       }

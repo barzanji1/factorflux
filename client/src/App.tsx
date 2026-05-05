@@ -36,6 +36,7 @@ import Exceptions from "@/pages/exceptions";
 import AuditLog from "@/pages/audit-log";
 import FmcsaAuthority from "@/pages/fmcsa-authority";
 import InvoiceDetail from "@/pages/invoice-detail";
+import DocumentRules from "@/pages/document-rules";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -186,6 +187,11 @@ function Router() {
       <Route path="/landing">
         <ProtectedRoute>
           <Landing />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/document-rules">
+        <ProtectedRoute>
+          <DocumentRules />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />

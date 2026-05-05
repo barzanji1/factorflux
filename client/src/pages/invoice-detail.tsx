@@ -20,8 +20,11 @@ import {
   CreditCard, Clock, TrendingUp, Package, User, Building2, Calendar,
   ExternalLink, FileCheck, ReceiptText, Banknote, ShieldAlert, Activity,
   ChevronRight, ArrowRight, Lock, TriangleAlert, Zap, XCircle, Info,
-  PlayCircle,
+  PlayCircle, ClipboardCheck, MessageSquare,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 // ─── Stage constants ───────────────────────────────────────────────────────────
 
@@ -409,6 +412,8 @@ export default function InvoiceDetail() {
 
   const [selectedTransition, setSelectedTransition] = useState<AvailableTransition | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [reviewNotes,  setReviewNotes]  = useState("");
+  const [reviewStatus, setReviewStatus] = useState<"approved"|"needs_revision"|"incomplete">("needs_revision");
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
     queryKey: ["/api/invoices", invoiceId, "detail"],
@@ -439,6 +444,30 @@ export default function InvoiceDetail() {
     },
     enabled: !isNaN(invoiceId),
     refetchOnMount: "always",
+  });
+
+  const { data: docStatus, isLoading: docStatusLoading } = useQuery<any>({
+    queryKey: ["/api/invoices", invoiceId, "document-status"],
+    queryFn: async () => {
+      const r = await fetch(`/api/invoices/${invoiceId}/document-status`, { credentials: "include" });
+      if (!r.ok) return null;
+      return r.json();
+    },
+    enabled: !isNaN(invoiceId),
+    refetchOnMount: "always",
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({ status, notes }: { status: string; notes: string }) => {
+      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/doc-reviews`, { status, notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Review note saved" });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
+      setReviewNotes(""); setReviewStatus("needs_revision");
+    },
+    onError: () => toast({ title: "Error saving note", variant: "destructive" }),
   });
 
   const transitionMutation = useMutation({
@@ -589,24 +618,243 @@ export default function InvoiceDetail() {
                     <div className="border-b border-slate-100 px-6 pt-5 dark:border-slate-800">
                       <TabsList className="h-auto gap-1 rounded-none bg-transparent p-0">
                         {[
-                          { value: "overview",    label: "Overview",     icon: <ReceiptText className="h-3.5 w-3.5" /> },
-                          { value: "documents",   label: "Documents",    icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length },
-                          { value: "payout",      label: "Payout",       icon: <Banknote className="h-3.5 w-3.5" /> },
-                          { value: "collections", label: "Collections",  icon: <CreditCard className="h-3.5 w-3.5" />,  count: detail.collections?.length },
-                          { value: "cashapp",     label: "Cash Applied", icon: <DollarSign className="h-3.5 w-3.5" />,  count: detail.cashAppLines?.length },
-                          { value: "exceptions",  label: "Exceptions",   icon: <ShieldAlert className="h-3.5 w-3.5" />, count: detail.exceptions?.length },
-                          { value: "timeline",    label: "Timeline",     icon: <Activity className="h-3.5 w-3.5" /> },
-                        ].map(({ value, label, icon, count }) => (
+                          { value: "overview",    label: "Overview",      icon: <ReceiptText className="h-3.5 w-3.5" /> },
+                          { value: "doccheck",    label: "Doc Checklist", icon: <ClipboardCheck className="h-3.5 w-3.5" />, alert: docStatus && !docStatus.canApprove },
+                          { value: "documents",   label: "Documents",     icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length },
+                          { value: "payout",      label: "Payout",        icon: <Banknote className="h-3.5 w-3.5" /> },
+                          { value: "collections", label: "Collections",   icon: <CreditCard className="h-3.5 w-3.5" />,  count: detail.collections?.length },
+                          { value: "cashapp",     label: "Cash Applied",  icon: <DollarSign className="h-3.5 w-3.5" />,  count: detail.cashAppLines?.length },
+                          { value: "exceptions",  label: "Exceptions",    icon: <ShieldAlert className="h-3.5 w-3.5" />, count: detail.exceptions?.length },
+                          { value: "timeline",    label: "Timeline",      icon: <Activity className="h-3.5 w-3.5" /> },
+                        ].map(({ value, label, icon, count, alert }: any) => (
                           <TabsTrigger key={value} value={value}
                             className="flex items-center gap-1.5 rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-xs font-semibold text-slate-500 transition-colors data-[state=active]:border-blue-600 data-[state=active]:text-blue-700 dark:text-slate-400 dark:data-[state=active]:text-blue-300">
                             {icon}{label}
                             {!!count && count > 0 && (
                               <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{count}</span>
                             )}
+                            {alert && (
+                              <span className="ml-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            )}
                           </TabsTrigger>
                         ))}
                       </TabsList>
                     </div>
+
+                    {/* Doc Checklist */}
+                    <TabsContent value="doccheck" className="p-6">
+                      {docStatusLoading ? (
+                        <div className="space-y-3">
+                          {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+                        </div>
+                      ) : !docStatus ? (
+                        <p className="text-sm text-slate-400">No checklist data available.</p>
+                      ) : (
+                        <div className="space-y-5">
+                          {/* Overall progress bar */}
+                          <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                            <div className="mb-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <ClipboardCheck className="h-4 w-4 text-blue-600" />
+                                <span className="text-sm font-semibold text-slate-800 dark:text-white">Overall Completeness</span>
+                              </div>
+                              <span className={cn(
+                                "rounded-full px-3 py-1 text-xs font-bold",
+                                docStatus.canApprove
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              )}>
+                                {docStatus.completenessPercent ?? 0}% complete
+                              </span>
+                            </div>
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                              <div
+                                className={cn("h-full rounded-full transition-all duration-500",
+                                  (docStatus.completenessPercent ?? 0) === 100 ? "bg-emerald-500" : "bg-blue-500"
+                                )}
+                                style={{ width: `${docStatus.completenessPercent ?? 0}%` }}
+                              />
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-3">
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                <span className={cn("font-semibold", docStatus.canStartReview ? "text-emerald-600" : "text-red-500")}>
+                                  {docStatus.canStartReview ? "✓" : "✗"}
+                                </span>
+                                Ready to Begin Review
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                <span className={cn("font-semibold", docStatus.canApprove ? "text-emerald-600" : "text-red-500")}>
+                                  {docStatus.canApprove ? "✓" : "✗"}
+                                </span>
+                                Ready for Approval
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Missing docs warnings */}
+                          {(docStatus.missingForReview?.length > 0 || docStatus.missingForApproval?.length > 0) && (
+                            <div className="space-y-2">
+                              {docStatus.missingForReview?.length > 0 && (
+                                <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Missing for Review</p>
+                                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                                      {docStatus.missingForReview.join(", ")}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {docStatus.missingForApproval?.length > 0 && (
+                                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/20">
+                                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-red-800 dark:text-red-300">Missing for Approval</p>
+                                    <p className="mt-0.5 text-xs text-red-700 dark:text-red-400">
+                                      {docStatus.missingForApproval.join(", ")}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* All-clear banner */}
+                          {docStatus.canApprove && (
+                            <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                              <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                                All required documents are present. This invoice can proceed to approval.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Per-rule breakdown */}
+                          {docStatus.rules?.length > 0 && (
+                            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                              <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+                                <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">Document Requirements</h3>
+                              </div>
+                              <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
+                                {docStatus.rules.map((rule: any) => (
+                                  <div key={rule.documentType} className="flex items-center gap-3 px-5 py-3.5">
+                                    <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-xl",
+                                      rule.present
+                                        ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                        : rule.required
+                                          ? "bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400"
+                                          : "bg-slate-100 text-slate-400 dark:bg-slate-800"
+                                    )}>
+                                      {rule.present
+                                        ? <CheckCircle2 className="h-4 w-4" />
+                                        : rule.required
+                                          ? <XCircle className="h-4 w-4" />
+                                          : <Circle className="h-3.5 w-3.5" />
+                                      }
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-xs font-semibold text-slate-800 dark:text-white">{rule.label}</span>
+                                        {rule.required ? (
+                                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-950/30 dark:text-red-400">Required</span>
+                                        ) : (
+                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-400 dark:bg-slate-800">Optional</span>
+                                        )}
+                                        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                                          rule.requiredForStage === "approve"
+                                            ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                            : "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
+                                        )}>
+                                          {rule.requiredForStage === "approve" ? "For Approval" : "For Review"}
+                                        </span>
+                                      </div>
+                                      {rule.description && (
+                                        <p className="mt-0.5 text-[11px] text-slate-400">{rule.description}</p>
+                                      )}
+                                    </div>
+                                    <span className={cn("shrink-0 text-xs font-semibold",
+                                      rule.present ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+                                    )}>
+                                      {rule.present ? "Uploaded" : "Missing"}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Reviewer notes (manager/admin only) */}
+                          {(user?.role === "manager" || user?.role === "admin") && (
+                            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                              <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+                                <div className="flex items-center gap-2">
+                                  <MessageSquare className="h-4 w-4 text-violet-600" />
+                                  <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">Reviewer Notes</h3>
+                                </div>
+                              </div>
+
+                              {/* Previous reviews */}
+                              {docStatus.reviews?.length > 0 && (
+                                <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
+                                  {docStatus.reviews.map((rev: any, idx: number) => (
+                                    <div key={idx} className="px-5 py-3.5">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold",
+                                          rev.status === "approved"
+                                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                            : rev.status === "needs_revision"
+                                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
+                                              : "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300"
+                                        )}>
+                                          {rev.status === "approved" ? "Approved" : rev.status === "needs_revision" ? "Needs Revision" : "Incomplete"}
+                                        </span>
+                                        <span className="text-[11px] text-slate-400">
+                                          {rev.reviewedBy} · {rev.reviewedAt ? new Date(rev.reviewedAt).toLocaleString() : ""}
+                                        </span>
+                                      </div>
+                                      {rev.notes && <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">{rev.notes}</p>}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Add new review note */}
+                              <div className="border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+                                <p className="mb-3 text-xs font-semibold text-slate-600 dark:text-slate-300">Add Review Note</p>
+                                <div className="space-y-3">
+                                  <Select value={reviewStatus} onValueChange={(v: any) => setReviewStatus(v)}>
+                                    <SelectTrigger className="rounded-xl border-slate-200 text-xs dark:border-slate-700">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="approved">Approved — all documents acceptable</SelectItem>
+                                      <SelectItem value="needs_revision">Needs Revision — documents need correction</SelectItem>
+                                      <SelectItem value="incomplete">Incomplete — documents still missing</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <textarea
+                                    value={reviewNotes}
+                                    onChange={e => setReviewNotes(e.target.value)}
+                                    rows={3}
+                                    placeholder="Add notes for the submitter or your team..."
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    disabled={reviewMutation.isPending}
+                                    onClick={() => reviewMutation.mutate({ status: reviewStatus, notes: reviewNotes })}
+                                    className="gap-2 rounded-xl bg-violet-600 text-xs text-white hover:bg-violet-700"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                    {reviewMutation.isPending ? "Saving..." : "Save Note"}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </TabsContent>
 
                     {/* Overview */}
                     <TabsContent value="overview" className="p-6">

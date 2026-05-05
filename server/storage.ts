@@ -85,6 +85,12 @@ import {
   type InsertPaymentApplicationLine,
   type Exception,
   type InsertException,
+  documentRules,
+  invoiceDocReviews,
+  type DocumentRule,
+  type InsertDocumentRule,
+  type InvoiceDocReview,
+  type InsertInvoiceDocReview,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql, inArray, isNotNull } from "drizzle-orm";
@@ -275,6 +281,17 @@ export interface IStorage {
   // Audit
   getEventLedger(entityType?: string, limit?: number): Promise<EventLedger[]>;
   getInvoiceStatusHistoryAll(): Promise<InvoiceStatusHistory[]>;
+
+  // Document Rules (configurable approval checklist)
+  getDocumentRules(): Promise<DocumentRule[]>;
+  getDocumentRule(id: number): Promise<DocumentRule | undefined>;
+  createDocumentRule(data: InsertDocumentRule): Promise<DocumentRule>;
+  updateDocumentRule(id: number, updates: Partial<InsertDocumentRule>): Promise<DocumentRule>;
+  deleteDocumentRule(id: number): Promise<void>;
+
+  // Invoice Document Reviews (reviewer notes)
+  getDocReviews(invoiceId: number): Promise<InvoiceDocReview[]>;
+  createDocReview(data: InsertInvoiceDocReview): Promise<InvoiceDocReview>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1749,6 +1766,45 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(complianceIntegrationRuns)
       .where(eq(complianceIntegrationRuns.id, id));
+    return row;
+  }
+
+  // ── Document Rules ──────────────────────────────────────────────────────────
+  async getDocumentRules(): Promise<DocumentRule[]> {
+    return db.select().from(documentRules).orderBy(documentRules.sortOrder);
+  }
+
+  async getDocumentRule(id: number): Promise<DocumentRule | undefined> {
+    const [row] = await db.select().from(documentRules).where(eq(documentRules.id, id));
+    return row;
+  }
+
+  async createDocumentRule(data: InsertDocumentRule): Promise<DocumentRule> {
+    const [row] = await db.insert(documentRules).values(data).returning();
+    return row;
+  }
+
+  async updateDocumentRule(id: number, updates: Partial<InsertDocumentRule>): Promise<DocumentRule> {
+    const [row] = await db.update(documentRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(documentRules.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteDocumentRule(id: number): Promise<void> {
+    await db.delete(documentRules).where(eq(documentRules.id, id));
+  }
+
+  // ── Invoice Document Reviews ────────────────────────────────────────────────
+  async getDocReviews(invoiceId: number): Promise<InvoiceDocReview[]> {
+    return db.select().from(invoiceDocReviews)
+      .where(eq(invoiceDocReviews.invoiceId, invoiceId))
+      .orderBy(desc(invoiceDocReviews.createdAt));
+  }
+
+  async createDocReview(data: InsertInvoiceDocReview): Promise<InvoiceDocReview> {
+    const [row] = await db.insert(invoiceDocReviews).values(data).returning();
     return row;
   }
 }

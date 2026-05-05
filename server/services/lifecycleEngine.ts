@@ -21,6 +21,7 @@ import {
 } from "../../shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { advanceInvoiceStage, type FactoringStage } from "./invoiceStage";
+import { guardDocsForReview, guardDocsForApproval } from "./docValidation";
 
 // ─── Blocker types ────────────────────────────────────────────────────────────
 
@@ -79,16 +80,10 @@ const guardHasAnyDocument: Guard = async ({ invoiceId }) => {
   return doc ? null : { code: "no_documents", message: "At least one document must be uploaded before submitting", severity: "error" };
 };
 
-const guardHasRequiredDocs: Guard = async ({ invoiceId }) => {
-  const docs = await db.select({ documentType: documents.documentType }).from(documents)
-    .where(eq(documents.invoiceId, invoiceId));
-  const types = new Set(docs.map(d => d.documentType));
-  const missing: string[] = [];
-  if (!types.has("rate_confirmation")) missing.push("Rate Confirmation");
-  if (!types.has("bill_of_lading"))    missing.push("Bill of Lading");
-  return missing.length === 0 ? null
-    : { code: "missing_required_docs", message: `Missing required documents: ${missing.join(", ")}`, severity: "error" };
-};
+// guardHasRequiredDocs and guardHasApprovalDocs now delegate to DB-driven rules
+// from docValidation.ts so admins can configure the checklist without code changes.
+const guardHasRequiredDocs: Guard = (ctx) => guardDocsForReview(ctx);
+const guardHasApprovalDocs: Guard = (ctx) => guardDocsForApproval(ctx);
 
 const guardNoOpenCriticalExceptions: Guard = async ({ invoiceId }) => {
   const [exc] = await db.select({ id: exceptions.id }).from(exceptions)
@@ -313,7 +308,7 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     description: "Approve this invoice for funding",
     requiredRole: "manager_or_admin",
     variant: "primary",
-    guards: [guardNoOpenCriticalExceptions, guardNoDeclinedCreditCheck],
+    guards: [guardHasApprovalDocs, guardNoOpenCriticalExceptions, guardNoDeclinedCreditCheck],
     sideEffects: [
       fxSetStatus("approved"),
       fxStage("approval"),

@@ -133,6 +133,11 @@ export async function startServer(
 
   startAuthorityScheduler();
 
+  // Seed default document validation rules (no-op if already seeded)
+  import("./services/docValidation").then(m => m.seedDocumentRules()).catch(e =>
+    console.warn("[docValidation] seed error:", e?.message)
+  );
+
   return server;
 }
 

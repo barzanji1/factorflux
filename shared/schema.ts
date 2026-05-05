@@ -1148,3 +1148,42 @@ export const insertBrokerAuthorityAlertSchema = createInsertSchema(brokerAuthori
 });
 export type BrokerAuthorityAlert = typeof brokerAuthorityAlerts.$inferSelect;
 export type InsertBrokerAuthorityAlert = z.infer<typeof insertBrokerAuthorityAlertSchema>;
+
+// ─── Document Validation Rules ────────────────────────────────────────────────
+// Admin-configurable checklist of documents required at each lifecycle stage.
+export const documentRules = pgTable("document_rules", {
+  id: serial("id").primaryKey(),
+  documentType: varchar("document_type").notNull().unique(),
+  label: varchar("label").notNull(),
+  description: text("description"),
+  required: boolean("required").default(true).notNull(),
+  requiredForStage: varchar("required_for_stage", {
+    enum: ["start_review", "approve"],
+  }).default("start_review").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  active: boolean("active").default(true).notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDocumentRuleSchema = createInsertSchema(documentRules).omit({ id: true, createdAt: true, updatedAt: true });
+export type DocumentRule = typeof documentRules.$inferSelect;
+export type InsertDocumentRule = z.infer<typeof insertDocumentRuleSchema>;
+
+// ─── Invoice Document Reviews ─────────────────────────────────────────────────
+// Reviewer notes and approval status per invoice (written by managers/admins).
+export const invoiceDocReviews = pgTable("invoice_doc_reviews", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  status: varchar("status", {
+    enum: ["approved", "needs_revision", "incomplete"],
+  }).default("incomplete").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvoiceDocReviewSchema = createInsertSchema(invoiceDocReviews).omit({ id: true, createdAt: true });
+export type InvoiceDocReview = typeof invoiceDocReviews.$inferSelect;
+export type InsertInvoiceDocReview = z.infer<typeof insertInvoiceDocReviewSchema>;
