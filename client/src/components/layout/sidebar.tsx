@@ -8,7 +8,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users,
+  RotateCcw, FileCheck2, Users, Workflow,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -87,7 +87,8 @@ const navSections: NavSection[] = [
       { name: "Vault",          href: "/vault",           icon: Lock                           },
       { name: "Support",        href: "/help",            icon: LifeBuoy                       },
       { name: "Team Settings",  href: "/admin",           icon: Settings2,  role: "manager"    },
-      { name: "Rules",          href: "/document-rules",  icon: FileCheck2, role: "manager"    },
+      { name: "Rules",           href: "/document-rules",   icon: FileCheck2, role: "manager" },
+      { name: "Pipeline Builder", href: "/workflow-builder", icon: Workflow,   role: "manager" },
     ],
   },
 ];

@@ -7,6 +7,15 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **May 5, 2026**: Workflow Builder page added (`/workflow-builder`) — drag-and-drop pipeline customization
+  - Native HTML5 drag-and-drop to reorder all 8 factoring stages without any extra library
+  - Per-stage configuration panel: SLA hours, auto-advance trigger condition, manager-gated toggle, entry/exit notifications, internal notes
+  - Live pipeline preview showing enabled stages in flow order with auto-advance and gate indicators
+  - Enable/disable individual stages (disabled stages are skipped in the pipeline)
+  - Changes auto-save to localStorage; explicit Save button required to commit; Reset to defaults dialog
+  - Read-only mode for employees; full edit access for managers and admins
+  - Linked from sidebar under Admin → "Pipeline Builder" (manager/admin only)
+  - Document rules integration: shows required docs for review/approval stages inline when expanded
 - **May 5, 2026**: Queue-first operations UI refactor — all three core operations pages rebuilt as work queues
   - **`factoring.tsx`** — 7 queue-state tabs (All/New/Docs Pending/Under Review/Approved/Funded/Held), sticky filter bar, bulk actions, aging badges (`AgeBadge`), fast row actions via `POST /api/invoices/:id/transition`, reason dialog for reject/request_docs, pipeline summary strip
   - **`collections.tsx`** — 6 queue tabs incl. Overdue pseudo-tab, priority-sorted dense table, bulk status updates, `OverduePill` aging indicator, create/edit dialog preserved, footer totals

@@ -37,6 +37,7 @@ import AuditLog from "@/pages/audit-log";
 import FmcsaAuthority from "@/pages/fmcsa-authority";
 import InvoiceDetail from "@/pages/invoice-detail";
 import DocumentRules from "@/pages/document-rules";
+import WorkflowBuilder from "@/pages/workflow-builder";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -192,6 +193,11 @@ function Router() {
       <Route path="/document-rules">
         <ProtectedRoute>
           <DocumentRules />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/workflow-builder">
+        <ProtectedRoute>
+          <WorkflowBuilder />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />
