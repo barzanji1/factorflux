@@ -3424,13 +3424,30 @@ Trucking Pros Financial Team
       if (!jobs.length) return res.json({ status: "queued" });
 
       const job = jobs[0];
+
+      // Also fetch classification info from the document
+      const docRows = await db
+        .select({
+          candidateDocumentType:   documentsTable.candidateDocumentType,
+          finalDocumentType:       documentsTable.finalDocumentType,
+          classificationConfidence: documentsTable.classificationConfidence,
+        })
+        .from(documentsTable)
+        .where(eq(documentsTable.id, docId))
+        .limit(1);
+
+      const docInfo = docRows[0] ?? {};
+
       res.json({
-        status:      job.status,
-        jobId:       job.id,
-        parserName:  job.parserName,
-        startedAt:   job.startedAt,
-        completedAt: job.completedAt,
+        status:       job.status,
+        jobId:        job.id,
+        parserName:   job.parserName,
+        startedAt:    job.startedAt,
+        completedAt:  job.completedAt,
         errorMessage: job.errorMessage,
+        candidateDocumentType:    docInfo.candidateDocumentType ?? null,
+        finalDocumentType:        docInfo.finalDocumentType ?? null,
+        classificationConfidence: docInfo.classificationConfidence ?? null,
       });
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch extraction status" });
@@ -3527,6 +3544,50 @@ Trucking Pros Financial Team
       res.status(201).json(review);
     } catch (err) {
       res.status(500).json({ message: "Failed to save review" });
+    }
+  });
+
+  // PATCH /api/load-documents/:id/document-type — agent override of classified doc type
+  app.patch("/api/load-documents/:id/document-type", requireAuth, async (req: any, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      const VALID_TYPES = [
+        "rate_confirmation", "bill_of_lading", "proof_of_delivery",
+        "lumper_receipt", "invoice", "receipt", "other",
+      ];
+      const { finalDocumentType } = req.body;
+      if (!VALID_TYPES.includes(finalDocumentType)) {
+        return res.status(400).json({ message: "Invalid document type" });
+      }
+
+      const [updated] = await db
+        .update(documentsTable)
+        .set({ finalDocumentType: finalDocumentType as any })
+        .where(eq(documentsTable.id, docId))
+        .returning({
+          id: documentsTable.id,
+          candidateDocumentType: documentsTable.candidateDocumentType,
+          finalDocumentType: documentsTable.finalDocumentType,
+          classificationConfidence: documentsTable.classificationConfidence,
+        });
+
+      if (!updated) return res.status(404).json({ message: "Document not found" });
+
+      await storage.createActivity({
+        userId:      req.user.id,
+        type:        "document_reviewed",
+        description: `Doc #${docId} type overridden to: ${finalDocumentType}`,
+        entityType:  "document",
+        entityId:    docId,
+        metadata:    { originalName: finalDocumentType } as any,
+      }).catch(() => {});
+
+      res.json(updated);
+    } catch (err) {
+      console.error("doc-type patch error:", err);
+      res.status(500).json({ message: "Failed to update document type" });
     }
   });
 

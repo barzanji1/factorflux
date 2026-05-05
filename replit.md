@@ -40,6 +40,8 @@ FactorFlux is a freight factoring workflow application that streamlines invoice 
 *   **API Design**: A RESTful API pattern is consistently applied across the backend for predictable and standardized resource interaction.
 *   **Session Management**: Express sessions with PostgreSQL storage are used for robust and scalable session persistence.
 *   **Document Processing**: Hybrid pipeline — `pdf-parse` native extraction first; Tesseract.js OCR fallback for scanned/image PDFs; image files OCR directly. Background job queue (`jobQueue.ts`) keeps all heavy OCR off the request cycle with retry + exponential backoff.
+*   **Document Classification**: Rule-based multi-signal scoring engine in `documentExtraction.ts` — 7 types (Rate Con, BOL, POD, Lumper, Invoice, Receipt, Other), confidence score, signal list. `candidateDocumentType` auto-set on extraction; `finalDocumentType` set by agent override via `PATCH /api/load-documents/:id/document-type`.
+*   **Field Extraction**: 16 named fields (amount, load#, invoice#, reference#, broker, carrier, MC/DOT, pickup/delivery location+date, BOL#, lumper amount, POD signature) saved to `doc_field_candidates` with confidence and source snippet.
 *   **Unified Workflow Model**: An 8-stage factoring lifecycle is implemented with `factoringStage` field on `invoices`, driving auto-advancement and providing a comprehensive invoice timeline.
 
 ## Product

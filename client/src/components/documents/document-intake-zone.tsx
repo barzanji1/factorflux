@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Zap,
   AlertTriangle,
+  Tag,
 } from "lucide-react";
 import ExtractionResultPanel from "./extraction-result-panel";
 
@@ -36,10 +37,32 @@ interface UploadedFile {
   status: "uploading" | "queued" | "processing" | "completed" | "failed";
   error?: string;
   expanded: boolean;
+  candidateDocumentType?: string | null;
+  finalDocumentType?: string | null;
 }
 
 const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/tiff"];
 const MAX_SIZE = 10 * 1024 * 1024;
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  rate_confirmation: "Rate Con",
+  bill_of_lading:    "BOL",
+  proof_of_delivery: "POD",
+  lumper_receipt:    "Lumper",
+  invoice:           "Invoice",
+  receipt:           "Receipt",
+  other:             "Other",
+};
+
+const DOC_TYPE_COLORS: Record<string, string> = {
+  rate_confirmation: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  bill_of_lading:    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  proof_of_delivery: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  lumper_receipt:    "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
+  invoice:           "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
+  receipt:           "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300",
+  other:             "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400",
+};
 
 function humanSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -67,12 +90,13 @@ function statusIcon(status: UploadedFile["status"]) {
   }
 }
 
+/** Polls extraction status and calls back with status + classification info */
 function ExtractionPoller({
   documentId,
   onStatusChange,
 }: {
   documentId: number;
-  onStatusChange: (s: UploadedFile["status"]) => void;
+  onStatusChange: (s: UploadedFile["status"], meta?: { candidateDocumentType?: string | null; finalDocumentType?: string | null }) => void;
 }) {
   useQuery({
     queryKey: ["/api/load-documents", documentId, "extraction-status"],
@@ -81,7 +105,11 @@ function ExtractionPoller({
         credentials: "include",
       });
       if (!r.ok) throw new Error("fetch failed");
-      return r.json() as Promise<{ status: string }>;
+      return r.json() as Promise<{
+        status: string;
+        candidateDocumentType?: string | null;
+        finalDocumentType?: string | null;
+      }>;
     },
     refetchInterval: (data) => {
       const s = (data as any)?.status;
@@ -89,7 +117,10 @@ function ExtractionPoller({
       return 2500;
     },
     select: (d) => {
-      onStatusChange(d.status as UploadedFile["status"]);
+      onStatusChange(d.status as UploadedFile["status"], {
+        candidateDocumentType: d.candidateDocumentType,
+        finalDocumentType:     d.finalDocumentType,
+      });
       return d;
     },
   });
@@ -108,12 +139,8 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
 
   const uploadFile = useCallback(
     async (file: File) => {
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        return;
-      }
-      if (file.size > MAX_SIZE) {
-        return;
-      }
+      if (!ALLOWED_TYPES.includes(file.type)) return;
+      if (file.size > MAX_SIZE) return;
 
       const localId = `${Date.now()}-${Math.random()}`;
       setFiles((prev) => [
@@ -126,6 +153,8 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           documentId: null,
           status: "uploading",
           expanded: false,
+          candidateDocumentType: null,
+          finalDocumentType: null,
         },
         ...prev,
       ]);
@@ -217,7 +246,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
         <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
           {dragActive ? "Drop files to upload" : "Drag & drop documents here"}
         </p>
-        <p className="mt-1 text-xs text-slate-400">PDF, JPG, PNG, TIFF · max 10 MB · multiple files OK</p>
+        <p className="mt-1 text-xs text-slate-400">PDF, JPG, PNG, TIFF · max 10 MB · auto-classified on upload</p>
         <Button
           variant="outline"
           size="sm"
@@ -231,71 +260,91 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
       {/* File list */}
       {files.length > 0 && (
         <div className="space-y-2">
-          {files.map((f) => (
-            <div
-              key={f.localId}
-              className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
-            >
-              {/* File row */}
-              <div className="flex items-center gap-3 px-4 py-3">
-                <FileText className="h-4 w-4 shrink-0 text-blue-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-800 dark:text-white">
-                    {f.name}
-                  </p>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <span className="text-xs text-slate-400">{humanSize(f.size)}</span>
-                    {f.status === "uploading" && (
-                      <Progress value={f.progress} className="h-1 w-24" />
-                    )}
+          {files.map((f) => {
+            const displayType = f.finalDocumentType || f.candidateDocumentType;
+            return (
+              <div
+                key={f.localId}
+                className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+              >
+                {/* File row */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <FileText className="h-4 w-4 shrink-0 text-blue-400" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-800 dark:text-white">
+                      {f.name}
+                    </p>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="text-xs text-slate-400">{humanSize(f.size)}</span>
+                      {f.status === "uploading" && (
+                        <Progress value={f.progress} className="h-1 w-24" />
+                      )}
+                    </div>
                   </div>
+
+                  {/* Classification badge — shown when extraction is complete */}
+                  {f.status === "completed" && displayType && (
+                    <Badge className={cn(
+                      "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium shrink-0",
+                      DOC_TYPE_COLORS[displayType] ?? DOC_TYPE_COLORS.other,
+                    )}>
+                      <Tag className="h-2.5 w-2.5" />
+                      {DOC_TYPE_LABELS[displayType] ?? displayType.replace(/_/g, " ")}
+                    </Badge>
+                  )}
+
+                  <Badge className={cn("flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium shrink-0", statusColor(f.status))}>
+                    {statusIcon(f.status)}
+                    {f.status === "uploading" ? `${f.progress}%` : f.status}
+                  </Badge>
+
+                  {f.documentId && f.status === "completed" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-slate-600"
+                      onClick={() => updateFile(f.localId, { expanded: !f.expanded })}
+                    >
+                      {f.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </Button>
+                  )}
                 </div>
 
-                <Badge className={cn("flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium", statusColor(f.status))}>
-                  {statusIcon(f.status)}
-                  {f.status === "uploading" ? `${f.progress}%` : f.status}
-                </Badge>
+                {/* Upload progress bar */}
+                {f.status === "uploading" && (
+                  <Progress value={f.progress} className="h-0.5 rounded-none" />
+                )}
 
-                {f.documentId && f.status === "completed" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-slate-600"
-                    onClick={() => updateFile(f.localId, { expanded: !f.expanded })}
-                  >
-                    {f.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                  </Button>
+                {/* Extraction polling — picks up classification on completion */}
+                {f.documentId && (f.status === "queued" || f.status === "processing") && (
+                  <ExtractionPoller
+                    documentId={f.documentId}
+                    onStatusChange={(s, meta) =>
+                      updateFile(f.localId, {
+                        status: s,
+                        candidateDocumentType: meta?.candidateDocumentType,
+                        finalDocumentType:     meta?.finalDocumentType,
+                      })
+                    }
+                  />
+                )}
+
+                {/* Extraction results panel */}
+                {f.documentId && f.expanded && f.status === "completed" && (
+                  <div className="border-t border-slate-100 dark:border-slate-800">
+                    <ExtractionResultPanel documentId={f.documentId} />
+                  </div>
+                )}
+
+                {f.status === "failed" && f.error && (
+                  <div className="flex items-center gap-2 border-t border-red-100 bg-red-50/50 px-4 py-2 text-xs text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    {f.error}
+                  </div>
                 )}
               </div>
-
-              {/* Upload progress bar */}
-              {f.status === "uploading" && (
-                <Progress value={f.progress} className="h-0.5 rounded-none" />
-              )}
-
-              {/* Extraction polling */}
-              {f.documentId && (f.status === "queued" || f.status === "processing") && (
-                <ExtractionPoller
-                  documentId={f.documentId}
-                  onStatusChange={(s) => updateFile(f.localId, { status: s })}
-                />
-              )}
-
-              {/* Extraction results panel */}
-              {f.documentId && f.expanded && f.status === "completed" && (
-                <div className="border-t border-slate-100 dark:border-slate-800">
-                  <ExtractionResultPanel documentId={f.documentId} />
-                </div>
-              )}
-
-              {f.status === "failed" && f.error && (
-                <div className="flex items-center gap-2 border-t border-red-100 bg-red-50/50 px-4 py-2 text-xs text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  {f.error}
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
