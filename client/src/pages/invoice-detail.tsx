@@ -26,6 +26,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import DocumentIntakeZone from "@/components/documents/document-intake-zone";
+import DocumentReviewDialog from "@/components/documents/document-review-dialog";
 
 // ─── Stage constants ───────────────────────────────────────────────────────────
 
@@ -415,6 +416,7 @@ export default function InvoiceDetail() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reviewNotes,  setReviewNotes]  = useState("");
   const [reviewStatus, setReviewStatus] = useState<"approved"|"needs_revision"|"incomplete">("needs_revision");
+  const [reviewDocId, setReviewDocId] = useState<number | null>(null);
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
     queryKey: ["/api/invoices", invoiceId, "detail"],
@@ -740,17 +742,21 @@ export default function InvoiceDetail() {
                                 {docStatus.rules.map((rule: any) => (
                                   <div key={rule.documentType} className="flex items-center gap-3 px-5 py-3.5">
                                     <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-xl",
-                                      rule.present
+                                      rule.confirmed
                                         ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
-                                        : rule.required
-                                          ? "bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400"
-                                          : "bg-slate-100 text-slate-400 dark:bg-slate-800"
+                                        : rule.present
+                                          ? "bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
+                                          : rule.required
+                                            ? "bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400"
+                                            : "bg-slate-100 text-slate-400 dark:bg-slate-800"
                                     )}>
-                                      {rule.present
+                                      {rule.confirmed
                                         ? <CheckCircle2 className="h-4 w-4" />
-                                        : rule.required
-                                          ? <XCircle className="h-4 w-4" />
-                                          : <Circle className="h-3.5 w-3.5" />
+                                        : rule.present
+                                          ? <FileCheck className="h-4 w-4" />
+                                          : rule.required
+                                            ? <XCircle className="h-4 w-4" />
+                                            : <Circle className="h-3.5 w-3.5" />
                                       }
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -768,16 +774,55 @@ export default function InvoiceDetail() {
                                         )}>
                                           {rule.requiredForStage === "approve" ? "For Approval" : "For Review"}
                                         </span>
+                                        {/* Review status badge */}
+                                        {rule.reviewStatus && (
+                                          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
+                                            rule.reviewStatus === "confirmed"
+                                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                              : rule.reviewStatus === "rejected"
+                                                ? "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400"
+                                                : rule.reviewStatus === "unreadable"
+                                                  ? "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
+                                                  : "bg-slate-100 text-slate-500"
+                                          )}>
+                                            {rule.reviewStatus === "confirmed" ? "✓ Agent Confirmed" : `Agent: ${rule.reviewStatus}`}
+                                          </span>
+                                        )}
                                       </div>
                                       {rule.description && (
                                         <p className="mt-0.5 text-[11px] text-slate-400">{rule.description}</p>
                                       )}
+                                      {rule.document?.originalName && (
+                                        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                          {rule.document.originalName}
+                                        </p>
+                                      )}
                                     </div>
-                                    <span className={cn("shrink-0 text-xs font-semibold",
-                                      rule.present ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
-                                    )}>
-                                      {rule.present ? "Uploaded" : "Missing"}
-                                    </span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {rule.document?.id && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className={cn(
+                                            "h-7 gap-1.5 rounded-lg px-2.5 text-[11px] font-medium",
+                                            rule.confirmed
+                                              ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300"
+                                              : "border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300"
+                                          )}
+                                          onClick={() => setReviewDocId(rule.document.id)}
+                                        >
+                                          <ClipboardCheck className="h-3 w-3" />
+                                          {rule.confirmed ? "Re-review" : "Review"}
+                                        </Button>
+                                      )}
+                                      <span className={cn("text-xs font-semibold",
+                                        rule.confirmed ? "text-emerald-600 dark:text-emerald-400"
+                                        : rule.present ? "text-blue-600 dark:text-blue-400"
+                                        : "text-red-500 dark:text-red-400"
+                                      )}>
+                                        {rule.confirmed ? "Confirmed" : rule.present ? "Uploaded" : "Missing"}
+                                      </span>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1019,6 +1064,29 @@ export default function InvoiceDetail() {
                           {detail.payout.notes && (
                             <p className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">{detail.payout.notes}</p>
                           )}
+                          {/* Document readiness for payment */}
+                          {docStatus && (
+                            <div className={cn(
+                              "flex items-center gap-3 rounded-xl border px-4 py-3",
+                              docStatus.canApprove
+                                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                                : "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
+                            )}>
+                              {docStatus.canApprove
+                                ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />}
+                              <div className="text-xs">
+                                <span className={cn("font-semibold",
+                                  docStatus.canApprove ? "text-emerald-800 dark:text-emerald-300" : "text-amber-800 dark:text-amber-300"
+                                )}>
+                                  {docStatus.canApprove
+                                    ? "All required documents confirmed — payment eligible"
+                                    : `Document readiness: ${docStatus.completenessPercent ?? 0}% — ${(docStatus.missingForApproval ?? []).join(", ") || "review required"}`
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                          )}
                           <Button variant="outline" size="sm" onClick={() => navigate("/payouts")} className="gap-1.5 rounded-xl text-xs">
                             <ExternalLink className="h-3.5 w-3.5" />Manage in Payouts
                           </Button>
@@ -1188,6 +1256,19 @@ export default function InvoiceDetail() {
         isPending={transitionMutation.isPending}
         isAdmin={isAdmin}
       />
+
+      {/* Document review dialog */}
+      {reviewDocId !== null && (
+        <DocumentReviewDialog
+          documentId={reviewDocId}
+          open={reviewDocId !== null}
+          onOpenChange={(open) => { if (!open) setReviewDocId(null); }}
+          onReviewComplete={() => {
+            qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
+            qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "available-transitions"] });
+          }}
+        />
+      )}
     </div>
   );
 }

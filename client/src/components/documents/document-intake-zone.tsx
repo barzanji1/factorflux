@@ -15,8 +15,10 @@ import {
   Zap,
   AlertTriangle,
   Tag,
+  ClipboardCheck,
 } from "lucide-react";
 import ExtractionResultPanel from "./extraction-result-panel";
+import DocumentReviewDialog from "./document-review-dialog";
 
 export type IntakeEntityType = "invoice" | "load" | "client" | "broker";
 
@@ -132,6 +134,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [reviewDocId, setReviewDocId] = useState<number | null>(null);
 
   const updateFile = useCallback((localId: string, patch: Partial<UploadedFile>) => {
     setFiles((prev) => prev.map((f) => (f.localId === localId ? { ...f, ...patch } : f)));
@@ -299,14 +302,26 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
                   </Badge>
 
                   {f.documentId && f.status === "completed" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-slate-600"
-                      onClick={() => updateFile(f.localId, { expanded: !f.expanded })}
-                    >
-                      {f.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1.5 rounded-lg px-2.5 text-[11px] bg-violet-600 hover:bg-violet-700 text-white font-medium"
+                        onClick={() => setReviewDocId(f.documentId!)}
+                        title="Open full document review panel"
+                      >
+                        <ClipboardCheck className="h-3 w-3" />
+                        Review
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-slate-600"
+                        onClick={() => updateFile(f.localId, { expanded: !f.expanded })}
+                        title="Toggle quick preview"
+                      >
+                        {f.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
                   )}
                 </div>
 
@@ -346,6 +361,21 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
             );
           })}
         </div>
+      )}
+
+      {/* Full document review dialog */}
+      {reviewDocId !== null && (
+        <DocumentReviewDialog
+          documentId={reviewDocId}
+          open={reviewDocId !== null}
+          onOpenChange={(open) => { if (!open) setReviewDocId(null); }}
+          onReviewComplete={(status, invoiceId) => {
+            if (invoiceId) {
+              qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "completeness"] });
+              qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+            }
+          }}
+        />
       )}
     </div>
   );

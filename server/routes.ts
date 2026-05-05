@@ -42,6 +42,7 @@ import {
   docFieldCandidates,
   docReviews,
   documents as documentsTable,
+  eventLedger,
 } from "@shared/schema";
 import { jobQueue } from "./services/jobQueue";
 
@@ -1568,19 +1569,50 @@ ${message}
   // ─── Invoice document completeness status ─────────────────────────────────
   app.get("/api/invoices/:id/document-status", requireAuth, async (req, res) => {
     try {
-      const raw = await getDocumentCompleteness(parseInt(req.params.id));
-      // Flatten each DocRuleStatus so frontend gets one flat object per rule
-      const flatRules = raw.rules.map(rs => ({
-        documentType:    rs.rule.documentType,
-        label:           rs.rule.label,
-        description:     rs.rule.description,
-        required:        rs.rule.required,
-        requiredForStage: rs.rule.requiredForStage,
-        sortOrder:       rs.rule.sortOrder,
-        active:          rs.rule.active,
-        present:         rs.uploaded,
-        document:        rs.document ?? null,
-      }));
+      const invoiceId = parseInt(req.params.id);
+      const raw = await getDocumentCompleteness(invoiceId);
+
+      // Fetch latest review per document to surface confirmation status
+      const docIds = raw.rules.map(rs => rs.document?.id).filter(Boolean) as number[];
+      const reviewsByDocId = new Map<number, { reviewStatus: string; reviewedAt: Date | null; reviewedByUserId: string | null }>();
+      if (docIds.length > 0) {
+        const latestReviews = await db
+          .select({
+            documentId:       docReviews.documentId,
+            reviewStatus:     docReviews.reviewStatus,
+            reviewedAt:       docReviews.reviewedAt,
+            reviewedByUserId: docReviews.reviewedByUserId,
+          })
+          .from(docReviews)
+          .orderBy(desc(docReviews.createdAt));
+        for (const rv of latestReviews) {
+          if (!reviewsByDocId.has(rv.documentId)) {
+            reviewsByDocId.set(rv.documentId, {
+              reviewStatus:     rv.reviewStatus,
+              reviewedAt:       rv.reviewedAt,
+              reviewedByUserId: rv.reviewedByUserId,
+            });
+          }
+        }
+      }
+
+      const flatRules = raw.rules.map(rs => {
+        const docReview = rs.document?.id ? reviewsByDocId.get(rs.document.id) : undefined;
+        return {
+          documentType:     rs.rule.documentType,
+          label:            rs.rule.label,
+          description:      rs.rule.description,
+          required:         rs.rule.required,
+          requiredForStage: rs.rule.requiredForStage,
+          sortOrder:        rs.rule.sortOrder,
+          active:           rs.rule.active,
+          present:          rs.uploaded,
+          document:         rs.document ?? null,
+          reviewStatus:     docReview?.reviewStatus ?? null,
+          reviewedAt:       docReview?.reviewedAt ?? null,
+          confirmed:        docReview?.reviewStatus === "confirmed",
+        };
+      });
       res.json({ ...raw, rules: flatRules });
     } catch (err) { res.status(500).json({ message: "Failed to fetch document status" }); }
   });
@@ -3510,16 +3542,59 @@ Trucking Pros Financial Team
     }
   });
 
-  // POST /api/load-documents/:id/review — submit review (confirm/reject/unreadable)
+  // GET /api/load-documents/:id/detail — document metadata for review panel
+  app.get("/api/load-documents/:id/detail", requireAuth, async (req, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+      const [doc] = await db.select().from(documentsTable).where(eq(documentsTable.id, docId));
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      res.json(doc);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch document detail" });
+    }
+  });
+
+  // PATCH /api/doc-field-candidates/:id — inline-edit a field value
+  app.patch("/api/doc-field-candidates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const candId = parseInt(req.params.id, 10);
+      if (isNaN(candId)) return res.status(400).json({ message: "Invalid id" });
+      const { fieldValue } = req.body;
+      const [updated] = await db
+        .update(docFieldCandidates)
+        .set({ fieldValue: fieldValue ?? null })
+        .where(eq(docFieldCandidates.id, candId))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Field candidate not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update field candidate" });
+    }
+  });
+
+  // POST /api/load-documents/:id/review — submit review (confirm/reject/unreadable/retry)
   app.post("/api/load-documents/:id/review", requireAuth, async (req: any, res) => {
     try {
       const docId = parseInt(req.params.id, 10);
       if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
 
-      const { reviewStatus, reviewNotes } = req.body;
+      const { reviewStatus, reviewNotes, finalFieldsJson } = req.body;
       const validStatuses = ["pending", "confirmed", "rejected", "unreadable"];
       if (!validStatuses.includes(reviewStatus)) {
         return res.status(400).json({ message: "Invalid reviewStatus" });
+      }
+
+      // Fetch the document to get its effective type + invoice linkage
+      const [doc] = await db.select().from(documentsTable).where(eq(documentsTable.id, docId));
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+
+      // When confirming: update documents.documentType so lifecycle guards work
+      if (reviewStatus === "confirmed") {
+        const effectiveType = (doc.finalDocumentType ?? doc.candidateDocumentType ?? "other") as any;
+        await db.update(documentsTable)
+          .set({ documentType: effectiveType })
+          .where(eq(documentsTable.id, docId));
       }
 
       const [review] = await db
@@ -3529,6 +3604,7 @@ Trucking Pros Financial Team
           reviewedByUserId: req.user.id,
           reviewStatus,
           reviewNotes:      reviewNotes ?? null,
+          finalFieldsJson:  finalFieldsJson ?? null,
           reviewedAt:       new Date(),
         })
         .returning();
@@ -3541,7 +3617,38 @@ Trucking Pros Financial Team
         entityId:    docId,
       });
 
-      res.status(201).json(review);
+      // Workflow integration — emit event + check completeness when confirming
+      if (reviewStatus === "confirmed" && doc.invoiceId) {
+        const effectiveType = doc.finalDocumentType ?? doc.candidateDocumentType ?? "other";
+        const completeness = await getDocumentCompleteness(doc.invoiceId);
+        await db.insert(eventLedger).values({
+          entityType:  "invoice",
+          entityId:    doc.invoiceId,
+          eventType:   "doc_confirmed",
+          actorType:   "user",
+          actorId:     req.user.id,
+          payloadJson: {
+            documentId:          docId,
+            documentType:        effectiveType,
+            completenessPercent: completeness.completenessPercent,
+            canStartReview:      completeness.canStartReview,
+            canApprove:          completeness.canApprove,
+          },
+        });
+        // Notify managers if completeness just reached a milestone
+        if (completeness.canStartReview || completeness.canApprove) {
+          const milestone = completeness.canApprove ? "ready for approval" : "ready for review";
+          await storage.createActivity({
+            userId:      req.user.id,
+            type:        "workflow_milestone",
+            description: `Invoice #${doc.invoiceId} is now ${milestone} — all required documents confirmed`,
+            entityType:  "invoice",
+            entityId:    doc.invoiceId,
+          });
+        }
+      }
+
+      res.status(201).json({ ...review, invoiceId: doc.invoiceId });
     } catch (err) {
       res.status(500).json({ message: "Failed to save review" });
     }
