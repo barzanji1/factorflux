@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useToast } from "@/hooks/use-toast";
+import InvoiceModal from "@/components/modals/invoice-modal";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +28,7 @@ import { cn } from "@/lib/utils";
 
 export default function Documents() {
   const { toast } = useToast();
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
   const { data: documents = [], isLoading: documentsLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
@@ -449,14 +452,8 @@ export default function Documents() {
                       </div>
 
                       <Button
-                        variant="outline"
-                        className="h-11 rounded-xl px-5"
-                        onClick={() =>
-                          toast({
-                            title: "Create Invoice",
-                            description: "Open the Create Invoice modal to upload supporting documents.",
-                          })
-                        }
+                        className="h-11 rounded-xl px-5 bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => setIsInvoiceModalOpen(true)}
                       >
                         Create Invoice
                         <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -613,6 +610,11 @@ export default function Documents() {
           </div>
         </main>
       </div>
+
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+      />
     </div>
   );
 }
