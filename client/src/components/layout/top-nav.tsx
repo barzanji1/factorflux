@@ -179,9 +179,9 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
   };
 
   const quickActions = [
-    { label: "New Invoice", icon: FileText, action: () => setLocation("/invoices") },
-    { label: "Add Client", icon: Users, action: () => setLocation("/clients") },
-    { label: "Upload Document", icon: FolderOpen, action: () => setLocation("/documents") },
+    { label: "New Load Entry",   icon: FileText,  action: () => setLocation("/invoices")  },
+    { label: "Add Carrier",      icon: Users,     action: () => setLocation("/clients")   },
+    { label: "Upload Evidence",  icon: FolderOpen, action: () => setLocation("/documents") },
   ];
 
   const pagesWithHomeButton = [
@@ -242,7 +242,7 @@ export default function TopNav({ title, subtitle }: TopNavProps) {
               <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 type="text"
-                placeholder="Search loads, invoices, clients..."
+                placeholder="Search carriers, load ledger, counterparties..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchEnabled && setShowSearchResults(true)}
