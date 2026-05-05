@@ -174,7 +174,7 @@ export const debtorContacts = pgTable("debtor_contacts", {
 export const loads = pgTable("loads", {
   id: integer("id").primaryKey(),
   loadNumber: varchar("load_number").unique().notNull(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   pickupLocation: text("pickup_location"),
   deliveryLocation: text("delivery_location"),
   pickupDate: timestamp("pickup_date"),
@@ -192,8 +192,8 @@ export const loads = pgTable("loads", {
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   invoiceNumber: varchar("invoice_number").unique().notNull(),
-  loadId: integer("load_id").references(() => loads.id),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  loadId: integer("load_id").references(() => loads.id, { onDelete: "set null" }),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   debtorId: integer("debtor_id").references(() => debtors.id),
   loadNumber: varchar("load_number"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
@@ -253,8 +253,8 @@ export const documents = pgTable("documents", {
       "other",
     ],
   }).notNull(),
-  loadId: integer("load_id").references(() => loads.id),
-  invoiceId: integer("invoice_id").references(() => invoices.id),
+  loadId: integer("load_id").references(() => loads.id, { onDelete: "cascade" }),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
   sourceChannel: varchar("source_channel", {
     enum: ["portal", "manual", "email", "api"],
@@ -338,7 +338,7 @@ export const supportMessages = pgTable("support_messages", {
 // Client messages (outbound emails to clients/carriers)
 export const clientMessages = pgTable("client_messages", {
   id: serial("id").primaryKey(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   sentBy: varchar("sent_by").references(() => users.id).notNull(),
   subject: varchar("subject").notNull(),
   messageType: varchar("message_type", {
@@ -421,7 +421,7 @@ export type InsertDocRequirement = typeof docRequirements.$inferInsert;
 // Collections table
 export const collections = pgTable("collections", {
   id: integer("id").primaryKey(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   description: text("description").notNull(),
   status: varchar("status", { enum: ["pending", "in_progress", "paid", "written_off"] }).default("pending").notNull(),
@@ -437,7 +437,7 @@ export const collections = pgTable("collections", {
 // Client Vault - Secure storage for confidential information
 export const clientVault = pgTable("client_vault", {
   id: integer("id").primaryKey(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   dataType: varchar("data_type", {
     enum: ["ssn", "bank_account", "password", "driver_license", "passport", "tax_documents", "insurance", "other"]
   }).notNull(),
@@ -461,7 +461,7 @@ export const tasks = pgTable("tasks", {
   priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium").notNull(),
   status: varchar("status", { enum: ["todo", "in_progress", "held", "completed"] }).default("todo").notNull(),
   dueDate: timestamp("due_date"),
-  clientId: integer("client_id").references(() => clients.id),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
   assignedTo: varchar("assigned_to").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -507,7 +507,7 @@ export const fuelAdvances = pgTable("fuel_advances", {
 // Follow-ups table
 export const followUps = pgTable("follow_ups", {
   id: integer("id").primaryKey(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   title: varchar("title").notNull(),
   description: text("description"),
   priority: varchar("priority", { enum: ["low", "medium", "high"] }).default("medium").notNull(),
@@ -841,7 +841,7 @@ export const payouts = pgTable("payouts", {
     .references(() => invoices.id, { onDelete: "cascade" })
     .notNull()
     .unique(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   invoiceAmount: decimal("invoice_amount", { precision: 12, scale: 2 }).notNull(),
   advanceRate: decimal("advance_rate", { precision: 5, scale: 2 }).notNull(),
   feeRate: decimal("fee_rate", { precision: 5, scale: 2 }).notNull(),
@@ -965,7 +965,7 @@ export const paymentApplicationLines = pgTable("payment_application_lines", {
   id: serial("id").primaryKey(),
   cashApplicationId: integer("cash_application_id")
     .references(() => cashApplications.id, { onDelete: "cascade" }).notNull(),
-  invoiceId: integer("invoice_id").references(() => invoices.id).notNull(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
   invoiceNumber: varchar("invoice_number").notNull(),
   invoiceAmount: decimal("invoice_amount", { precision: 12, scale: 2 }).notNull(),
   appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),

@@ -395,76 +395,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteClient(id: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      // Gather IDs of invoices and loads belonging to this client
-      const clientInvoices = await tx
-        .select({ id: invoices.id })
-        .from(invoices)
-        .where(eq(invoices.clientId, id));
-      const invoiceIds = clientInvoices.map((r) => r.id);
-
-      const clientLoads = await tx
-        .select({ id: loads.id })
-        .from(loads)
-        .where(eq(loads.clientId, id));
-      const loadIds = clientLoads.map((r) => r.id);
-
-      // 1. paymentApplicationLines → references invoices (no cascade from invoices side)
-      if (invoiceIds.length > 0) {
-        await tx
-          .delete(paymentApplicationLines)
-          .where(inArray(paymentApplicationLines.invoiceId, invoiceIds));
-      }
-
-      // 2. invoiceStatusHistory → references invoices
-      if (invoiceIds.length > 0) {
-        await tx
-          .delete(invoiceStatusHistory)
-          .where(inArray(invoiceStatusHistory.invoiceId, invoiceIds));
-      }
-
-      // 3. documents → references invoices and loads (gather doc IDs for documentLinks)
-      const allDocConditions: any[] = [];
-      if (invoiceIds.length > 0) allDocConditions.push(inArray(documents.invoiceId, invoiceIds));
-      if (loadIds.length > 0) allDocConditions.push(inArray(documents.loadId, loadIds));
-      if (allDocConditions.length > 0) {
-        const clientDocs = await tx
-          .select({ id: documents.id })
-          .from(documents)
-          .where(or(...allDocConditions));
-        const docIds = clientDocs.map((r) => r.id);
-        if (docIds.length > 0) {
-          await tx.delete(documentLinks).where(inArray(documentLinks.documentId, docIds));
-          await tx.delete(documents).where(inArray(documents.id, docIds));
-        }
-      }
-
-      // 4. payouts → references invoices AND clients (must go before invoices)
-      await tx.delete(payouts).where(eq(payouts.clientId, id));
-
-      // 5. invoices → references clients
-      await tx.delete(invoices).where(eq(invoices.clientId, id));
-
-      // 6. loads → references clients
-      await tx.delete(loads).where(eq(loads.clientId, id));
-
-      // 7. Direct client-FK tables
-      await tx.delete(followUps).where(eq(followUps.clientId, id));
-      await tx.delete(collections).where(eq(collections.clientId, id));
-      await tx.delete(clientVault).where(eq(clientVault.clientId, id));
-      await tx.delete(clientMessages).where(eq(clientMessages.clientId, id));
-
-      // 8. tasks.clientId is nullable — null it out to preserve the task record
-      await tx
-        .update(tasks)
-        .set({ clientId: null })
-        .where(eq(tasks.clientId, id));
-
-      // 9. achSettings cascades automatically via DB constraint — no action needed
-
-      // 10. Finally delete the client
-      await tx.delete(clients).where(eq(clients.id, id));
-    });
+    await db.delete(clients).where(eq(clients.id, id));
   }
 
   async searchClients(query: string): Promise<Client[]> {
