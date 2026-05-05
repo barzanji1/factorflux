@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import ExtractionResultPanel from "./extraction-result-panel";
 import DocumentReviewDialog from "./document-review-dialog";
+import { useSafeDrop } from "@/hooks/use-safe-drop";
 
 export type IntakeEntityType = "invoice" | "load" | "client" | "broker";
 
@@ -44,7 +45,7 @@ interface UploadedFile {
 }
 
 const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/tiff"];
-const MAX_SIZE = 10 * 1024 * 1024;
+const MAX_SIZE      = 10 * 1024 * 1024; // 10 MB
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   rate_confirmation: "Rate Con",
@@ -67,8 +68,8 @@ const DOC_TYPE_COLORS: Record<string, string> = {
 };
 
 function humanSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024)           return `${bytes} B`;
+  if (bytes < 1024 * 1024)   return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
@@ -130,42 +131,40 @@ function ExtractionPoller({
 }
 
 export default function DocumentIntakeZone({ entityType, entityId, onUploadComplete, compact }: Props) {
-  const qc = useQueryClient();
+  const qc       = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [files,       setFiles]       = useState<UploadedFile[]>([]);
   const [reviewDocId, setReviewDocId] = useState<number | null>(null);
+  const [rejectBanner, setRejectBanner] = useState<string | null>(null);
 
   const updateFile = useCallback((localId: string, patch: Partial<UploadedFile>) => {
     setFiles((prev) => prev.map((f) => (f.localId === localId ? { ...f, ...patch } : f)));
   }, []);
 
+  // ── Core upload function ─────────────────────────────────────────────────
   const uploadFile = useCallback(
     async (file: File) => {
-      if (!ALLOWED_TYPES.includes(file.type)) return;
-      if (file.size > MAX_SIZE) return;
-
       const localId = `${Date.now()}-${Math.random()}`;
       setFiles((prev) => [
         {
           localId,
-          name: file.name,
-          size: file.size,
+          name:     file.name,
+          size:     file.size,
           mimeType: file.type,
           progress: 0,
           documentId: null,
-          status: "uploading",
+          status:   "uploading",
           expanded: false,
           candidateDocumentType: null,
-          finalDocumentType: null,
+          finalDocumentType:     null,
         },
         ...prev,
       ]);
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file",       file);
       formData.append("entityType", entityType);
-      formData.append("entityId", String(entityId));
+      formData.append("entityId",   String(entityId));
 
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/load-documents/intake");
@@ -181,55 +180,88 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
         if (xhr.status >= 200 && xhr.status < 300) {
           const doc = JSON.parse(xhr.responseText);
           updateFile(localId, {
-            progress: 100,
+            progress:   100,
             documentId: doc.documentId,
-            status: "queued",
+            status:     "queued",
           });
           qc.invalidateQueries({ queryKey: ["/api/invoices", entityId, "detail"] });
           qc.invalidateQueries({ queryKey: ["/api/invoices", entityId, "documents"] });
           onUploadComplete?.(doc);
         } else {
-          updateFile(localId, { status: "failed", error: "Upload failed" });
+          let errMsg = "Upload failed";
+          try { errMsg = JSON.parse(xhr.responseText)?.message ?? errMsg; } catch {}
+          updateFile(localId, { status: "failed", error: errMsg });
         }
       };
 
-      xhr.onerror = () => updateFile(localId, { status: "failed", error: "Network error" });
+      xhr.onerror = () => updateFile(localId, { status: "failed", error: "Network error — check connection" });
       xhr.send(formData);
     },
     [entityType, entityId, updateFile, onUploadComplete, qc],
   );
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragActive(false);
-      Array.from(e.dataTransfer.files).forEach(uploadFile);
+  // ── Validate then upload ─────────────────────────────────────────────────
+  const handleFiles = useCallback(
+    (incoming: File[]) => {
+      setRejectBanner(null);
+      const rejected: string[] = [];
+
+      incoming.forEach((file) => {
+        if (!ALLOWED_TYPES.includes(file.type)) {
+          rejected.push(`${file.name} — unsupported type (use PDF, JPG, PNG)`);
+          return;
+        }
+        if (file.size > MAX_SIZE) {
+          rejected.push(`${file.name} — exceeds 10 MB limit`);
+          return;
+        }
+        uploadFile(file);
+      });
+
+      if (rejected.length > 0) {
+        setRejectBanner(rejected.join(" · "));
+        setTimeout(() => setRejectBanner(null), 6000);
+      }
     },
     [uploadFile],
   );
 
+  // ── Safe drop hook (fixes browser takeover + child-element flickering) ───
+  const { dropProps, isDragOver, isValidDrag } = useSafeDrop({
+    onFiles: handleFiles,
+    accept:  ALLOWED_TYPES,
+  });
+
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      Array.from(e.target.files ?? []).forEach(uploadFile);
+      handleFiles(Array.from(e.target.files ?? []));
       e.target.value = "";
     },
-    [uploadFile],
+    [handleFiles],
   );
 
   return (
     <div className="space-y-3">
+      {/* Rejection banner */}
+      {rejectBanner && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{rejectBanner}</span>
+        </div>
+      )}
+
       {/* Drop zone */}
       <div
+        {...dropProps}
         className={cn(
-          "relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-colors",
+          "relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-150",
           compact ? "py-6" : "py-10",
-          dragActive
-            ? "border-blue-400 bg-blue-50/60 dark:border-blue-500 dark:bg-blue-950/20"
-            : "border-slate-200 bg-slate-50/50 hover:border-blue-300 hover:bg-blue-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-blue-700",
+          isDragOver && isValidDrag
+            ? "border-blue-400 bg-blue-50/70 scale-[1.01] dark:border-blue-500 dark:bg-blue-950/25"
+            : isDragOver && !isValidDrag
+              ? "border-red-400 bg-red-50/60 dark:border-red-500 dark:bg-red-950/20"
+              : "border-slate-200 bg-slate-50/50 hover:border-blue-300 hover:bg-blue-50/30 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-blue-700",
         )}
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
       >
         <input
@@ -240,16 +272,34 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           className="hidden"
           onChange={handleInputChange}
         />
+
+        {/* Icon */}
         <div className={cn(
           "mb-3 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors",
-          dragActive ? "bg-blue-100 dark:bg-blue-900/40" : "bg-slate-100 dark:bg-slate-800",
+          isDragOver && isValidDrag
+            ? "bg-blue-100 dark:bg-blue-900/40"
+            : isDragOver && !isValidDrag
+              ? "bg-red-100 dark:bg-red-900/30"
+              : "bg-slate-100 dark:bg-slate-800",
         )}>
-          <Upload className={cn("h-5 w-5", dragActive ? "text-blue-500" : "text-slate-400")} />
+          <Upload className={cn(
+            "h-5 w-5",
+            isDragOver && isValidDrag   ? "text-blue-500"
+            : isDragOver && !isValidDrag ? "text-red-400"
+            :                             "text-slate-400",
+          )} />
         </div>
+
+        {/* Label */}
         <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-          {dragActive ? "Drop files to upload" : "Drag & drop documents here"}
+          {isDragOver && isValidDrag
+            ? "Release to upload"
+            : isDragOver && !isValidDrag
+              ? "File type not supported"
+              : "Drag & drop documents here"}
         </p>
-        <p className="mt-1 text-xs text-slate-400">PDF, JPG, PNG, TIFF · max 10 MB · auto-classified on upload</p>
+        <p className="mt-1 text-xs text-slate-400">PDF, JPG, PNG · max 10 MB · auto-classified on upload</p>
+
         <Button
           variant="outline"
           size="sm"
@@ -285,7 +335,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
                     </div>
                   </div>
 
-                  {/* Classification badge — shown when extraction is complete */}
+                  {/* Classification badge */}
                   {f.status === "completed" && displayType && (
                     <Badge className={cn(
                       "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium shrink-0",
@@ -307,7 +357,6 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
                         size="sm"
                         className="h-7 gap-1.5 rounded-lg px-2.5 text-[11px] bg-violet-600 hover:bg-violet-700 text-white font-medium"
                         onClick={() => setReviewDocId(f.documentId!)}
-                        title="Open full document review panel"
                       >
                         <ClipboardCheck className="h-3 w-3" />
                         Review
@@ -317,7 +366,6 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
                         size="sm"
                         className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-slate-600"
                         onClick={() => updateFile(f.localId, { expanded: !f.expanded })}
-                        title="Toggle quick preview"
                       >
                         {f.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                       </Button>
@@ -330,13 +378,13 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
                   <Progress value={f.progress} className="h-0.5 rounded-none" />
                 )}
 
-                {/* Extraction polling — picks up classification on completion */}
+                {/* Extraction polling */}
                 {f.documentId && (f.status === "queued" || f.status === "processing") && (
                   <ExtractionPoller
                     documentId={f.documentId}
                     onStatusChange={(s, meta) =>
                       updateFile(f.localId, {
-                        status: s,
+                        status:                s,
                         candidateDocumentType: meta?.candidateDocumentType,
                         finalDocumentType:     meta?.finalDocumentType,
                       })
@@ -351,6 +399,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
                   </div>
                 )}
 
+                {/* Error row */}
                 {f.status === "failed" && f.error && (
                   <div className="flex items-center gap-2 border-t border-red-100 bg-red-50/50 px-4 py-2 text-xs text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
