@@ -43,6 +43,7 @@ import {
   docReviews,
   documents as documentsTable,
   eventLedger,
+  loads,
 } from "@shared/schema";
 import { jobQueue } from "./services/jobQueue";
 
@@ -3738,6 +3739,32 @@ Trucking Pros Financial Team
   });
   app.get("/api/audit/status-history", requireAuth, async (_req, res) => {
     try { res.json(await storage.getInvoiceStatusHistoryAll()); } catch (e) { res.status(500).json({ message: "Failed to fetch status history" }); }
+  });
+
+  // ── Demo seed ──────────────────────────────────────────────────────────────
+  app.post("/api/admin/seed-demo", requireAdmin, async (req: any, res) => {
+    try {
+      const { seedDemoData } = await import("./services/demoSeed");
+      const agentId = req.user?.id ?? "prod-1";
+      const result  = await seedDemoData(agentId);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[Demo Seed] failed:", err?.message);
+      res.status(500).json({ message: "Seed failed", error: err?.message });
+    }
+  });
+
+  app.get("/api/admin/seed-demo/status", requireAdmin, async (_req, res) => {
+    try {
+      const existing = await db
+        .select({ id: loads.id })
+        .from(loads)
+        .where(eq(loads.loadNumber, "DEMO-2024-001"))
+        .limit(1);
+      res.json({ seeded: existing.length > 0 });
+    } catch (err: any) {
+      res.status(500).json({ message: "Status check failed", error: err?.message });
+    }
   });
 
   const httpServer = createServer(app);

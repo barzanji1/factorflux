@@ -1,15 +1,14 @@
 /**
  * documentExtraction.ts
  * ─────────────────────
- * Hybrid extraction pipeline:
- *   PDF  → native text (pdf-parse) → OCR fallback if text is too short
- *   Image → OCR directly via Tesseract.js
+ * Hybrid extraction pipeline backed by the OCR provider abstraction.
+ * Provider is selected via EXTRACTION_PROVIDER env var (default: "hybrid").
+ * See server/services/ocr/registry.ts for available providers.
  *
  * Classification: rule-based multi-signal scoring over 7 document types.
  * Field extraction: 16 named fields saved as doc_field_candidates.
  */
 
-import fs from "fs";
 import { db } from "../db";
 import {
   docExtractionJobs,
@@ -18,24 +17,12 @@ import {
   documents,
 } from "../../shared/schema";
 import { eq } from "drizzle-orm";
+import { getExtractionProvider } from "./ocr/registry";
+
+// Re-export PageResult so existing callers (e.g. document-review-dialog) keep working
+export type { PageResult } from "./ocr/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export interface PageResult {
-  page:       number;
-  text:       string;
-  method:     string;
-  confidence: number;
-}
-
-interface ExtractionOutput {
-  fullText:   string;
-  mainText:   string;
-  method:     string;
-  confidence: number;
-  pageTexts:  PageResult[];
-  pageCount:  number;
-}
-
 export interface ClassificationResult {
   docType:    string;
   confidence: number;
@@ -43,7 +30,6 @@ export interface ClassificationResult {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const NATIVE_TEXT_THRESHOLD = 150;
 
 // ─── Document classification rules ───────────────────────────────────────────
 /**
@@ -78,63 +64,56 @@ const DOC_TYPE_SIGNALS: Record<
   ],
   lumper_receipt: [
     { patterns: ["lumper receipt", "lumper fee", "lumper service"],     weight: 1.0 },
-    { patterns: ["lumper", "unloading fee", "unloading receipt"],        weight: 0.9 },
-    { patterns: ["warehouse labor", "unloading labor", "loading fee"],   weight: 0.7 },
-    { patterns: ["detention", "layover", "unload"],                      weight: 0.3 },
+    { patterns: ["unloading fee", "unload service", "lumper"],          weight: 0.9 },
+    { patterns: ["warehouse", "dock", "receiving"],                     weight: 0.3 },
   ],
-  invoice: [
-    { patterns: ["invoice number", "invoice #", "inv #", "inv#"],       weight: 1.0 },
-    { patterns: ["bill to", "invoice date", "invoice total"],            weight: 0.85 },
-    { patterns: ["amount due", "payment due", "remit to"],               weight: 0.8 },
-    { patterns: ["net 30", "net 60", "due upon receipt"],                weight: 0.5 },
-    { patterns: ["invoice", "billing statement"],                        weight: 0.3 },
+  freight_invoice: [
+    { patterns: ["freight invoice", "carrier invoice", "invoice #"],    weight: 1.0 },
+    { patterns: ["invoice date", "invoice number", "inv #"],            weight: 0.9 },
+    { patterns: ["amount due", "payment due", "remit to"],              weight: 0.7 },
+    { patterns: ["freight charges", "fuel surcharge", "accessorial"],   weight: 0.6 },
+    { patterns: ["total amount", "subtotal", "net amount"],             weight: 0.4 },
   ],
   receipt: [
-    { patterns: ["payment receipt", "receipt number", "receipt #"],     weight: 1.0 },
-    { patterns: ["payment received", "received payment"],                weight: 0.9 },
-    { patterns: ["transaction id", "transaction number"],                weight: 0.8 },
-    { patterns: ["total paid", "amount paid", "cash receipt"],          weight: 0.6 },
+    { patterns: ["receipt", "payment receipt", "cash receipt"],         weight: 1.0 },
+    { patterns: ["received payment", "amount received"],                weight: 0.8 },
+    { patterns: ["paid", "payment date", "transaction"],                weight: 0.5 },
+  ],
+  other: [
+    { patterns: ["miscellaneous", "general document"],                  weight: 0.3 },
   ],
 };
 
-/** Max possible score per type (sum of all weights). */
-const DOC_TYPE_MAX_SCORES: Record<string, number> = Object.fromEntries(
-  Object.entries(DOC_TYPE_SIGNALS).map(([type, rules]) => [
-    type,
-    rules.reduce((s, r) => s + r.weight, 0),
-  ]),
-);
-
+/**
+ * Classify document text by scoring signals for each doc type.
+ * Returns the best match or "other" if nothing scores.
+ */
 export function classifyDocument(text: string): ClassificationResult {
   const lower = text.toLowerCase();
-  let bestType   = "other";
-  let bestScore  = 0;
+
+  let bestType    = "other";
+  let bestScore   = 0;
   let bestSignals: string[] = [];
 
-  for (const [type, rules] of Object.entries(DOC_TYPE_SIGNALS)) {
+  for (const [docType, signalGroups] of Object.entries(DOC_TYPE_SIGNALS)) {
     let score   = 0;
-    const hits: string[] = [];
+    let maxPoss = 0;
+    const matched: string[] = [];
 
-    for (const rule of rules) {
-      const matched = rule.patterns.find((p) => lower.includes(p));
-      if (matched) {
-        score += rule.weight;
-        hits.push(matched);
+    for (const group of signalGroups) {
+      maxPoss += group.weight;
+      if (group.patterns.some(p => lower.includes(p))) {
+        score += group.weight;
+        matched.push(group.patterns[0]);
       }
     }
 
-    const normalised = score / (DOC_TYPE_MAX_SCORES[type] ?? 1);
+    const normalised = maxPoss > 0 ? score / maxPoss : 0;
     if (normalised > bestScore) {
       bestScore   = normalised;
-      bestType    = type;
-      bestSignals = hits;
+      bestType    = docType;
+      bestSignals = matched;
     }
-  }
-
-  // Require a minimum confidence to assign a type; otherwise "other"
-  const MIN_CONFIDENCE = 0.15;
-  if (bestScore < MIN_CONFIDENCE) {
-    return { docType: "other", confidence: 0, signals: [] };
   }
 
   // Cap confidence at 0.97 to be honest about rule-based limits
@@ -142,140 +121,6 @@ export function classifyDocument(text: string): ClassificationResult {
     docType:    bestType,
     confidence: Math.min(bestScore, 0.97),
     signals:    bestSignals,
-  };
-}
-
-// ─── OCR via Tesseract.js ─────────────────────────────────────────────────────
-async function runOcr(
-  filePath: string,
-): Promise<{ text: string; confidence: number }> {
-  try {
-    const { recognize } = await import("tesseract.js");
-    const result = await recognize(filePath, "eng", { logger: () => {} });
-    const text       = result.data.text ?? "";
-    const confidence = (result.data.confidence ?? 0) / 100;
-    return { text, confidence };
-  } catch (err: any) {
-    console.warn("[OCR] Tesseract.recognize failed:", err?.message);
-    return { text: "", confidence: 0 };
-  }
-}
-
-// ─── Native PDF extraction (pdf-parse) ───────────────────────────────────────
-async function extractPdfNative(filePath: string): Promise<{
-  text:      string;
-  pageCount: number;
-  pages:     PageResult[];
-}> {
-  try {
-    const pdfParse = (await import("pdf-parse")).default;
-    const buffer   = fs.readFileSync(filePath);
-
-    const rawPages: string[] = [];
-    const data = await pdfParse(buffer, {
-      pagerender(pageData: any) {
-        return pageData.getTextContent().then((tc: any) => {
-          const pageText: string = tc.items
-            .map((i: any) => (typeof i.str === "string" ? i.str : ""))
-            .join(" ")
-            .trim();
-          rawPages.push(pageText);
-          return pageText;
-        });
-      },
-    });
-
-    const fullText  = data.text ?? "";
-    const pageCount = data.numpages ?? Math.max(rawPages.length, 1);
-    const pageSources: string[] =
-      rawPages.length > 0 ? rawPages : splitByFormFeed(fullText, pageCount);
-
-    const pages: PageResult[] = pageSources.map((t, i) => ({
-      page:       i + 1,
-      text:       t,
-      method:     "native_pdf",
-      confidence: t.trim().length > 50 ? 0.9 : 0.4,
-    }));
-
-    return { text: fullText, pageCount, pages };
-  } catch (err: any) {
-    console.warn("[PDF] pdf-parse failed:", err?.message);
-    return { text: "", pageCount: 0, pages: [] };
-  }
-}
-
-function splitByFormFeed(text: string, pageCount: number): string[] {
-  const ff = text.split("\x0c");
-  if (ff.length === pageCount) return ff;
-  const chunkSize = Math.ceil(text.length / Math.max(pageCount, 1));
-  const chunks: string[] = [];
-  for (let i = 0; i < pageCount; i++) {
-    chunks.push(text.slice(i * chunkSize, (i + 1) * chunkSize));
-  }
-  return chunks;
-}
-
-// ─── Hybrid pipeline entry point ─────────────────────────────────────────────
-async function hybridExtract(
-  filePath: string,
-  mimeType: string,
-): Promise<ExtractionOutput> {
-  const isPdf =
-    mimeType === "application/pdf" || filePath.toLowerCase().endsWith(".pdf");
-
-  if (isPdf) {
-    const native      = await extractPdfNative(filePath);
-    const cleanNative = native.text.replace(/\s+/g, " ").trim();
-
-    if (cleanNative.length >= NATIVE_TEXT_THRESHOLD) {
-      return {
-        fullText:   native.text,
-        mainText:   cleanNative,
-        method:     "native_pdf",
-        confidence: 0.9,
-        pageTexts:  native.pages,
-        pageCount:  native.pageCount,
-      };
-    }
-
-    console.log(
-      `[Extraction] PDF native text only ${cleanNative.length} chars — running OCR fallback`,
-    );
-    const ocr = await runOcr(filePath);
-
-    const bestText = ocr.text.trim().length > cleanNative.length
-      ? ocr.text
-      : native.text;
-
-    const ocrPages: PageResult[] = ocr.text.trim().length > 0
-      ? [{ page: 1, text: ocr.text, method: "ocr", confidence: ocr.confidence }]
-      : [];
-
-    const pages = [
-      ...native.pages.filter(p => p.text.trim().length > 10),
-      ...ocrPages,
-    ];
-
-    return {
-      fullText:   bestText,
-      mainText:   bestText.replace(/\s{3,}/g, "\n\n").trim(),
-      method:     ocrPages.length > 0 ? "hybrid_ocr" : "native_pdf_low_confidence",
-      confidence: ocrPages.length > 0 ? ocr.confidence : 0.25,
-      pageTexts:  pages.length > 0
-        ? pages
-        : [{ page: 1, text: bestText, method: "hybrid_ocr", confidence: ocr.confidence }],
-      pageCount: Math.max(native.pageCount, 1),
-    };
-  }
-
-  const ocr = await runOcr(filePath);
-  return {
-    fullText:   ocr.text,
-    mainText:   ocr.text.replace(/\s{3,}/g, "\n\n").trim(),
-    method:     "image_ocr",
-    confidence: ocr.confidence,
-    pageTexts:  [{ page: 1, text: ocr.text, method: "image_ocr", confidence: ocr.confidence }],
-    pageCount:  1,
   };
 }
 
@@ -364,19 +209,6 @@ function extractDeliveryLocation(text: string): FieldResult {
     : null;
 }
 
-/** Parse dates in MM/DD/YYYY, MM-DD-YYYY, YYYY-MM-DD formats. */
-function parseDate(raw: string): string {
-  const parts = raw.split(/[\/\-]/);
-  if (parts.length === 3) {
-    const [a, b, c] = parts;
-    // YYYY-MM-DD
-    if (a.length === 4) return `${a}-${b.padStart(2,"0")}-${c.padStart(2,"0")}`;
-    // MM/DD/YYYY
-    if (c.length === 4) return `${c}-${a.padStart(2,"0")}-${b.padStart(2,"0")}`;
-  }
-  return raw;
-}
-
 function extractPickupDate(text: string): FieldResult {
   const m = text.match(
     /(?:pickup\s*date|ship\s*date|p\/u\s*date|pickup)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
@@ -423,6 +255,17 @@ function extractPodSignature(text: string): FieldResult {
   return { value: "Yes", normalized: "true", confidence: 0.7 };
 }
 
+/** Parse dates in MM/DD/YYYY, MM-DD-YYYY, YYYY-MM-DD formats. */
+function parseDate(raw: string): string {
+  const parts = raw.split(/[\/\-]/);
+  if (parts.length === 3) {
+    const [a, b, c] = parts;
+    if (a.length === 4) return `${a}-${b.padStart(2,"0")}-${c.padStart(2,"0")}`;
+    if (c.length === 4) return `${c}-${a.padStart(2,"0")}-${b.padStart(2,"0")}`;
+  }
+  return raw;
+}
+
 // ─── Main job handler (called by jobQueue) ────────────────────────────────────
 export async function runExtractionJob(
   documentId: number,
@@ -430,17 +273,20 @@ export async function runExtractionJob(
   filePath:    string,
   mimeType:    string,
 ): Promise<void> {
+  const provider = getExtractionProvider();
+
   try {
     await db
       .update(docExtractionJobs)
       .set({
         status:     "processing",
         startedAt:  new Date(),
-        parserName: "pdf-parse+tesseract-hybrid",
+        parserName: provider.key,
       })
       .where(eq(docExtractionJobs.id, jobId));
 
-    const extracted = await hybridExtract(filePath, mimeType);
+    // ── Extraction via provider ────────────────────────────────────────────────
+    const extracted = await provider.extractText(filePath, mimeType);
     const t = extracted.mainText || extracted.fullText;
 
     // ── Classification ────────────────────────────────────────────────────────
@@ -458,6 +304,7 @@ export async function runExtractionJob(
         charCount:      extracted.fullText.length,
         pageCount:      extracted.pageCount,
         pagesExtracted: extracted.pageTexts.length,
+        providerKey:    extracted.providerKey,
         classification: {
           docType:    classification.docType,
           confidence: classification.confidence,
