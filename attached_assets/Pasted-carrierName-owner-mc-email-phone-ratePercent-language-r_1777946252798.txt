@@ -1,0 +1,24 @@
+carrierName,owner,mc,email,phone,ratePercent,language,reviewed,nextReview,reserves,shorts
+AMARANTE TRUCKING GROUP INC DBA JDA TRANSPORTATION,Jose N Duran,588781,jose.duran56@yahoo.com,(626) 523-0554,3.50,Spanish,05/01/2026,06/01/2026,0.00,0.00
+ABO TRANSPORT LLC,Oscar D Mendoza Galeano,1012418,abotransport2019@gmail.com,(801) 856-6686,2.50,English,04/27/2026,05/27/2026,0.00,0.00
+AAJ TRANSPORT INC,Alyvs Luis L Gonzalez,1006181,AAJtransportinc@gmail.com,(801) 919-5074,2.50,Spanish,02/12/2026,03/12/2026,0.00,0.00
+ALTA EXPRESS TRANSPORT INC,Cervi Parrado Herrera,135788,cerviparrado1972@gmail.com,(956) 652-0354,2.50,English,04/27/2026,05/27/2026,150.00,0.00
+ALEX G MOLINA DBA AGM TRUCKING,Alex Geovani Molina,713402,agmtrucking@yahoo.com,(214) 315-2363,2.50,Spanish,01/22/2026,02/22/2026,43.50,0.00
+ALPHA1 TRANSPORT LLC,Jose G Hernandez,1024489,1alphatransport@gmail.com,(385) 271-3844,3.50,Spanish,04/17/2026,05/17/2026,244.78,0.00
+AGP TRUCKING TRANSPORTATION LLC,Arnulfo Gomez Plascencia,1461483,agptranspllc@gmail.com,(385) 230-9363,3.00,English,04/13/2026,05/13/2026,138.75,0.00
+ALEJANDRE TRANSPORT LLC,Jose M Alejandre,1265023,alejandret800@gmail.com,(951) 492-9706,2.50,English,02/12/2026,03/12/2026,0.00,0.00
+AMERICAN GENERATION TRUCKING LLC,Edgar Macias,N/A,amgenerationtruckingllc@gmail.com,(801) 686-5548,4.50,English,03/02/2026,04/02/2026,0.00,0.00
+ALPHA CONTRACTORS LLC,Maryury C Sanjuan,N/A,alphahaulersut@gmail.com,(801) 889-0825,4.50,English,02/12/2026,03/12/2026,0.00,46.25
+ALEX TRANSPORT LLC,Wilder A Flores Salguero,N/A,alextransport801@gmail.com,(385) 490-5879,4.50,English,01/21/2026,02/21/2026,0.00,0.00
+AUSA TRANSPORT LLC,Noel Dominguez Barcallao,1682170,ausatransportllc@gmail.com,(385) 457-1386,3.00,English,03/18/2026,04/18/2026,0.00,0.00
+AL KHAIR TRANSPORT LLC,Ahmed Y Bisharo,1227773,alkhairtransportllc@gmail.com,(720) 919-5828,3.00,English,02/11/2026,03/11/2026,0.00,0.00
+AV TRUCKING LLC,Armando Velazco Ortiz,N/A,armandovelazco2001@gmail.com,(801) 865-1002,5.00,English,05/01/2026,06/01/2026,348.75,0.00
+ANGELL TRANSPORT LLC,Rayne Lee James Angell,N/A,rayne.angell@gmail.com,(385) 222-5355,5.00,English,01/22/2026,02/22/2026,51.25,0.00
+ALL DESTINATIONS TRUCKING LLC,Brandon Liborio-Rendon,1740245,alldestinationstrkngllc@gmail.com,(385) 506-9990,4.00,English,04/27/2026,05/27/2026,0.00,0.00
+ARNOLDS LLC,Cody J Arnold,N/A,arnoldsllc801@gmail.com,(801) 879-2507,5.50,English,03/30/2026,04/30/2026,0.00,0.00
+AB & SONS TRUCKING LLC,Alexandra B Romero Gomez,N/A,abandsonstruckingllc@gmail.com,(801) 648-0686,5.50,English,04/13/2026,05/13/2026,0.00,615.81
+AREVALO’S TRUCKING LLC,Darwuin A Arevalo Ropero,1629798,arevalostruckingllc@gmail.com,(801) 661-5421,2.70,English,02/26/2026,03/26/2026,0.00,145.00
+ALBRETSEN’S CONCRETE & CONSTRUCTION L.L.C.,Shane J Albretsen,N/A,albretsenconcrete@yahoo.com,(801) 706-4421,5.50,English,01/22/2026,02/22/2026,0.00,0.00
+A QUALITY CARRIERS LLC,Enrique F Marsenaro,N/A,aqctow@gmail.com,(801) 759-8248,5.50,English,04/03/2026,05/03/2026,0.00,0.00
+ADF CONSTRUCTION LLC,Adrian Contreras-Hernandez,1473522,adfconstruction36@gmail.com,(385) 236-7234,5.50,English,04/17/2026,05/17/2026,0.00,0.00
+AJM TRANSPORT LLC,Mariela Rodriguez Hernandez,1764124,ajmtransport686@gmail.com,(385) 389-0511,3.00,English,04/22/2026,05/22/2026,0.00,0.00
