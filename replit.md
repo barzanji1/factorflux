@@ -7,6 +7,13 @@ FactorFlux is a comprehensive freight factoring workflow application designed to
 Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
+- **May 5, 2026**: Unified record detail-page pattern built across all major entities
+  - **`client/src/components/layout/record-detail.tsx`** — reusable layout component with: summary header card (icon, title, status badge, subtitle), 5-metric strip, optional status strip slot, two-column body (main tabs + sticky right rail), linked records panel, actions card, and right-rail extras; exports `DetailRow`, `DetailSection`, `EmptyTab` helpers
+  - **`/brokers/:id`** — Broker Detail page: credit utilisation bar, linked invoices tab, notes tab, risk/exposure right-rail card, activate/suspend actions
+  - **`/clients/:id`** — Client Detail page: outstanding vs funded metrics, invoice history tab, documents tab, notes tab, activate/deactivate actions
+  - **`/payouts/:id`** — Payout Detail page: 5-step status pipeline progress strip, fund breakdown right-rail card, lifecycle action buttons (admin only), linked invoice tab
+  - **Backend**: Added `GET /api/clients/:id` and `GET /api/payouts/:id` (enriched with invoice number + client name) endpoints
+  - **List pages**: Added "View" navigation button to Brokers table, Clients cards, and Payouts table rows — all route to their `:id` detail page
 - **May 5, 2026**: Workflow Builder page added (`/workflow-builder`) — drag-and-drop pipeline customization
   - Native HTML5 drag-and-drop to reorder all 8 factoring stages without any extra library
   - Per-stage configuration panel: SLA hours, auto-advance trigger condition, manager-gated toggle, entry/exit notifications, internal notes

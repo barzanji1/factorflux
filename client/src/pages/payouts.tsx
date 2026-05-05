@@ -25,9 +25,10 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useLocation } from "wouter";
 import {
   DollarSign, TrendingUp, PiggyBank, CheckCircle2, Plus,
-  Settings2, Loader2, RefreshCw, Info,
+  Settings2, Loader2, RefreshCw, Info, ExternalLink,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -106,6 +107,7 @@ type CreatePayoutForm = z.infer<typeof createPayoutSchema>;
 export default function Payouts() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -422,6 +424,16 @@ export default function Payouts() {
                                   ))}
                                 </SelectContent>
                               </Select>
+                            </TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate(`/payouts/${p.id}`)}
+                                className="h-7 gap-1.5 rounded-lg px-2 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/20"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />Detail
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}

@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { 
   Building, 
   Plus, 
@@ -27,7 +28,8 @@ import {
   TrendingUp,
   Users,
   DollarSign,
-  Calendar
+  Calendar,
+  ExternalLink,
 } from "lucide-react";
 
 // Broker form schema
@@ -76,6 +78,7 @@ export default function Brokers() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   // Fetch brokers
   const { data: brokers = [], isLoading } = useQuery<Broker[]>({
@@ -410,12 +413,21 @@ export default function Brokers() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/brokers/${broker.id}`)}
+                            className="h-8 gap-1.5 rounded-lg px-2 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/20"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />View
+                          </Button>
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             onClick={() => openEditDialog(broker)}
                             data-testid={`button-edit-${broker.id}`}
+                            className="h-8 w-8 rounded-lg p-0"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -428,6 +440,7 @@ export default function Brokers() {
                               }
                             }}
                             data-testid={`button-delete-${broker.id}`}
+                            className="h-8 w-8 rounded-lg p-0"
                           >
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>

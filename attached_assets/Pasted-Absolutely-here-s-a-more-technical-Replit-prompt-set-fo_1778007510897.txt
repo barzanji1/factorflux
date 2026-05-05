@@ -1,0 +1,305 @@
+Absolutely — here’s a more technical Replit prompt set for the drag-and-drop OCR/document-reading feature. The recommended architecture is a hybrid pipeline: use PDF.js for native PDF text extraction, fall back to OCR for scanned PDFs and images, and store both raw extracted text and structured results so agents can review and correct them later.
+
+Recommended stack
+Use this stack for the first version:
+
+Frontend drag-and-drop: native HTML5 drag-and-drop or React dropzone.
+
+PDF text extraction: PDF.js, which is commonly used to read machine-text PDFs in the browser or app layer.
+
+OCR fallback: Tesseract.js for a low-cost initial OCR layer, especially for scanned PDFs and images.
+
+Database: PostgreSQL with JSON/JSONB columns for raw OCR payloads and extracted field maps, which is a common fit for document-processing systems.
+
+Background jobs: async processing queue for OCR jobs so heavy document parsing does not block the UI, and separating OCR workers from the main app server is a common recommendation for performance and stability.
+
+Recommended tables
+Use these table names:
+
+load_documents
+
+document_pages
+
+document_extraction_jobs
+
+document_extraction_results
+
+document_field_candidates
+
+document_reviews
+
+document_links
+
+document_audit_events
+
+Suggested purpose:
+
+load_documents: one row per uploaded file attached to a load, invoice, or payout workflow.
+
+document_pages: one row per rendered page if you split PDFs into pages.
+
+document_extraction_jobs: tracks queued/running/completed OCR or parsing jobs.
+
+document_extraction_results: stores full extracted text, raw JSON payload, confidence, parser used.
+
+document_field_candidates: stores suggested values like invoice number, load number, broker, amount, POD flag.
+
+document_reviews: stores agent-confirmed edits and approvals.
+
+document_links: links a document to load, invoice, client, broker, payout, or exception.
+
+document_audit_events: tracks uploads, extraction runs, review actions, and corrections.
+
+Suggested schema fields
+A practical schema would include:
+
+load_documents
+id
+
+load_id nullable
+
+invoice_id nullable
+
+client_id nullable
+
+broker_id nullable
+
+document_type nullable, enum-like string
+
+original_filename
+
+mime_type
+
+storage_key
+
+file_size_bytes
+
+page_count
+
+upload_source such as drag_drop or manual_upload
+
+uploaded_by_user_id
+
+created_at
+
+document_extraction_jobs
+id
+
+document_id
+
+job_type such as pdf_text, ocr, classify, field_extract
+
+status such as queued, processing, completed, failed
+
+parser_name
+
+attempt_count
+
+started_at
+
+completed_at
+
+error_message
+
+document_extraction_results
+id
+
+document_id
+
+job_id
+
+full_text
+
+main_text
+
+raw_payload_json
+
+confidence_score
+
+extraction_method such as native_pdf, ocr, hybrid
+
+language
+
+created_at
+
+document_field_candidates
+id
+
+document_id
+
+field_name
+
+field_value
+
+normalized_value
+
+confidence_score
+
+page_number
+
+source_snippet
+
+created_at
+
+document_reviews
+id
+
+document_id
+
+reviewed_by_user_id
+
+review_status such as pending, confirmed, rejected, unreadable
+
+review_notes
+
+final_fields_json
+
+reviewed_at
+
+Recommended backend routes
+Use route groups like this:
+
+Upload and intake
+POST /api/load-documents/upload
+
+POST /api/load-documents/drag-drop-intake
+
+GET /api/load-documents/:id
+
+GET /api/load-documents/:id/file
+
+DELETE /api/load-documents/:id
+
+Extraction jobs
+POST /api/load-documents/:id/extract
+
+GET /api/load-documents/:id/extraction-status
+
+GET /api/load-documents/:id/extraction-result
+
+POST /api/load-documents/:id/retry-extraction
+
+Classification and field extraction
+POST /api/load-documents/:id/classify
+
+POST /api/load-documents/:id/extract-fields
+
+GET /api/load-documents/:id/field-candidates
+
+Review and confirmation
+POST /api/load-documents/:id/review
+
+PATCH /api/load-documents/:id/confirm-fields
+
+PATCH /api/load-documents/:id/mark-unreadable
+
+POST /api/load-documents/:id/attach-to-load
+
+Batch load workflow
+POST /api/loads/:loadId/documents/bulk-intake
+
+GET /api/loads/:loadId/documents
+
+GET /api/loads/:loadId/document-completeness
+
+Processing flow
+Use this logic:
+
+User drops file onto load or invoice page.
+
+Save file metadata to load_documents.
+
+Create document_extraction_jobs row with queued.
+
+If PDF, attempt native text extraction first with PDF.js.
+
+If extracted text is too short or low quality, render pages and OCR them with Tesseract.js.
+
+Save extracted text and raw output to document_extraction_results.
+
+Run classification and field extraction.
+
+Show results in review UI.
+
+Agent confirms or edits fields.
+
+Confirmed values update the load/invoice workflow.
+
+OCR strategy options
+Here are the best options:
+
+Option A: Lowest cost MVP
+PDF.js + Tesseract.js
+
+Pros: cheap, open source, fast to implement.
+
+Cons: weaker accuracy on messy scans, handwriting, skewed receipts, and multi-layout freight docs.
+
+Option B: Better production approach
+PDF.js for native extraction.
+
+Tesseract.js for fallback.
+
+Optional server-side OCR vendor later for hard cases.
+
+Pros: good balance of cost and control.
+
+Cons: more architecture work.
+
+Option C: Vendor-enhanced later
+Keep your intake schema and routes the same, but abstract OCR provider so you can swap in a stronger provider later for difficult documents.
+
+Pros: future-proof.
+
+Cons: do not overbuild this on day one.
+
+My recommendation: start with Option B.
+
+Technical prompt set
+Prompt 1: Database schema
+Add a document-intake and extraction schema for FactorFlux loads and invoice workflows. Create tables named load_documents, document_pages, document_extraction_jobs, document_extraction_results, document_field_candidates, document_reviews, document_links, and document_audit_events. Use JSON/JSONB fields for raw extraction payloads and final reviewed field maps so the schema can support multiple parser versions and document types.
+
+Must-haves:
+
+Migrations for all tables.
+
+Foreign keys to loads, invoices, brokers, clients, and users where relevant.
+
+Indexes on document_id, load_id, invoice_id, status, and created_at.
+
+Append-only audit events.
+
+Support for multiple extraction attempts per document.
+
+Constraints:
+
+Do not break existing document records.
+
+Keep the schema extensible for future OCR providers.
+
+Preserve original files and all extraction history.
+
+Prompt 2: Drag-and-drop intake UI
+Add a drag-and-drop document intake area to load and invoice detail pages in FactorFlux. Support PDF, JPG, JPEG, PNG, and common scan file types. Show drag-over state, upload progress, document preview, and extraction status after file drop.
+
+Must-haves:
+
+Drop zone on load and invoice pages.
+
+Multi-file upload support.
+
+File validation and size limits.
+
+Progress indicators.
+
+Success and failure states.
+
+Immediate attachment to the current load or invoice context.
+
+Constraints:
+
+Reuse current design system.
+
+Keep the drop zone obvious but not intrusive.
+
+Do not require a separate upload page.

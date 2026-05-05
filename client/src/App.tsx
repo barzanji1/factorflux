@@ -38,6 +38,9 @@ import FmcsaAuthority from "@/pages/fmcsa-authority";
 import InvoiceDetail from "@/pages/invoice-detail";
 import DocumentRules from "@/pages/document-rules";
 import WorkflowBuilder from "@/pages/workflow-builder";
+import BrokerDetail from "@/pages/broker-detail";
+import ClientDetail from "@/pages/client-detail";
+import PayoutDetail from "@/pages/payout-detail";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -198,6 +201,21 @@ function Router() {
       <Route path="/workflow-builder">
         <ProtectedRoute>
           <WorkflowBuilder />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/brokers/:id">
+        <ProtectedRoute>
+          <BrokerDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/clients/:id">
+        <ProtectedRoute>
+          <ClientDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/payouts/:id">
+        <ProtectedRoute>
+          <PayoutDetail />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />

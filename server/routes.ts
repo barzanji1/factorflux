@@ -1129,6 +1129,19 @@ ${message}
     }
   });
 
+  app.get("/api/clients/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid client id" });
+      const client = await storage.getClient(id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      res.json(client);
+    } catch (error) {
+      console.error("Error fetching client:", error);
+      res.status(500).json({ message: "Failed to fetch client" });
+    }
+  });
+
   app.get("/api/clients/search", requireAuth, async (req: any, res) => {
     try {
       const { q } = req.query;
@@ -2886,6 +2899,32 @@ Trucking Pros Financial Team
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
       console.error("Error creating payout:", err);
       res.status(500).json({ message: "Failed to create payout" });
+    }
+  });
+
+  app.get("/api/payouts/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid payout id" });
+      const [payout] = await db.select().from(payouts).where(eq(payouts.id, id)).limit(1);
+      if (!payout) return res.status(404).json({ message: "Payout not found" });
+      // Enrich with invoice + client info
+      let invoiceNumber: string | null = null;
+      let clientName: string | null = null;
+      if (payout.invoiceId) {
+        const [inv] = await db.select().from(invoices).where(eq(invoices.id, payout.invoiceId)).limit(1);
+        if (inv) {
+          invoiceNumber = inv.invoiceNumber;
+          if (inv.clientId) {
+            const cl = await storage.getClient(inv.clientId);
+            if (cl) clientName = cl.name;
+          }
+        }
+      }
+      res.json({ ...payout, invoiceNumber, clientName });
+    } catch (error) {
+      console.error("Error fetching payout:", error);
+      res.status(500).json({ message: "Failed to fetch payout" });
     }
   });
 

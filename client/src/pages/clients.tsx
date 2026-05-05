@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useLocation } from "wouter";
 import {
   Plus,
   Search,
@@ -21,6 +22,7 @@ import {
   ArrowRight,
   MapPin,
   CircleCheck,
+  ExternalLink,
 } from "lucide-react";
 import ClientModal from "@/components/modals/client-modal";
 import type { Client } from "@shared/schema";
@@ -29,6 +31,7 @@ import { cn } from "@/lib/utils";
 export default function Clients() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -308,6 +311,15 @@ export default function Clients() {
                               </span>
 
                               <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => navigate(`/clients/${client.id}`)}
+                                  className="h-9 rounded-xl px-3 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/20"
+                                >
+                                  <ExternalLink className="mr-1.5 h-4 w-4" />
+                                  View
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
