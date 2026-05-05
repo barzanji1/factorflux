@@ -46,6 +46,10 @@ import {
   getInvoiceDetail,
   getInvoiceTimeline,
 } from "./services/invoiceStage";
+import {
+  getAvailableTransitions,
+  performTransition,
+} from "./services/lifecycleEngine";
 
 const upload = multer({
   dest: "uploads/",
@@ -1442,6 +1446,39 @@ ${message}
     } catch (err) {
       console.error("Error fetching invoice timeline:", err);
       res.status(500).json({ message: "Failed to fetch invoice timeline" });
+    }
+  });
+
+  // ─── Available lifecycle transitions ─────────────────────────────────────
+  app.get("/api/invoices/:id/available-transitions", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const transitions = await getAvailableTransitions(id, req.user?.role ?? "employee");
+      res.json(transitions);
+    } catch (err) {
+      console.error("Error fetching transitions:", err);
+      res.status(500).json({ message: "Failed to fetch available transitions" });
+    }
+  });
+
+  // ─── Perform a lifecycle transition ──────────────────────────────────────
+  app.post("/api/invoices/:id/transition", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const schema = z.object({
+        transitionId: z.string().min(1),
+        reason: z.string().optional(),
+        force: z.boolean().optional(),
+      });
+      const { transitionId, reason, force } = schema.parse(req.body);
+      const result = await performTransition(
+        id, transitionId, req.user.id, req.user.role ?? "employee", reason, force,
+      );
+      res.json(result);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
+      console.error("Error performing transition:", err);
+      res.status(500).json({ message: "Failed to perform transition" });
     }
   });
 
