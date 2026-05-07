@@ -6,10 +6,10 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FFEmpty } from "@/components/ui/ff-empty";
 import {
   Dialog,
   DialogContent,
@@ -26,19 +26,15 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  DollarSign,
   Plus,
   Search,
   ArrowRightLeft,
-  AlertTriangle,
   TrendingDown,
   TrendingUp,
   CheckCircle2,
-  Clock,
   Banknote,
   XCircle,
-  ChevronRight,
-  Eye,
+  AlertTriangle,
 } from "lucide-react";
 
 type CashApplication = {
@@ -78,23 +74,52 @@ type Invoice = {
 
 type Debtor = { id: number; name: string; };
 
-const STATUS_STYLE: Record<string, string> = {
-  unapplied: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  partially_applied: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  fully_applied: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-  overpaid: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-};
-
 const VARIANCE_STYLE: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   full_match: { label: "Full Match", color: "text-emerald-600 dark:text-emerald-400", icon: CheckCircle2 },
-  short_pay: { label: "Short Pay", color: "text-red-600 dark:text-red-400", icon: TrendingDown },
-  overpay: { label: "Overpay", color: "text-purple-600 dark:text-purple-400", icon: TrendingUp },
-  write_off: { label: "Write-off", color: "text-slate-500 dark:text-slate-400", icon: XCircle },
+  short_pay:  { label: "Short Pay",  color: "text-red-600 dark:text-red-400",         icon: TrendingDown },
+  overpay:    { label: "Overpay",    color: "text-purple-600 dark:text-purple-400",    icon: TrendingUp   },
+  write_off:  { label: "Write-off",  color: "text-slate-500 dark:text-slate-400",      icon: XCircle      },
 };
 
 function fmtMoney(v: string | number | null | undefined) {
   if (v == null || v === "") return "—";
   return `$${parseFloat(String(v)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function paymentAgeDays(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
+}
+
+function AgePill({ dateStr }: { dateStr: string }) {
+  const d = paymentAgeDays(dateStr);
+  if (d === 0) return <span className="text-[11px] text-slate-400">Today</span>;
+  if (d <= 2)  return <span className="text-[11px] text-slate-500">{d}d</span>;
+  if (d <= 5)  return (
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+      <AlertTriangle className="h-3 w-3" />{d}d
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-red-600 dark:text-red-400">
+      <AlertTriangle className="h-3 w-3" />{d}d
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: CashApplication["status"] }) {
+  const map: Record<CashApplication["status"], string> = {
+    unapplied:         "ff-badge ff-badge-pending",
+    partially_applied: "ff-badge ff-badge-partial",
+    fully_applied:     "ff-badge ff-badge-funded",
+    overpaid:          "ff-badge ff-badge-hold",
+  };
+  const labels: Record<CashApplication["status"], string> = {
+    unapplied:         "Unapplied",
+    partially_applied: "Partial",
+    fully_applied:     "Applied",
+    overpaid:          "Overpaid",
+  };
+  return <span className={map[status]}>{labels[status]}</span>;
 }
 
 export default function CashApplication() {
@@ -205,115 +230,183 @@ export default function CashApplication() {
     applyMutation.mutate({ id: selectedPayment.id, lines });
   }
 
+  const needsAttention = stats.unapplied + stats.partial + stats.overpaid;
+
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Cash Matching" subtitle="Match incoming payments to loads — handle short-pays, overpays, and reconciliation" group="Funding" />
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            {/* Stats strip */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {[
-                { label: "Total Received", value: fmtMoney(stats.totalReceived), wide: true },
-                { label: "Total Payments", value: stats.total },
-                { label: "Unapplied", value: stats.unapplied, warn: stats.unapplied > 0 },
-                { label: "Partial", value: stats.partial, warn: stats.partial > 0 },
-                { label: "Overpaid", value: stats.overpaid, warn: stats.overpaid > 0 },
+                { label: "Total Received",  value: fmtMoney(stats.totalReceived), warn: false },
+                { label: "Total Payments",  value: stats.total,     warn: false },
+                { label: "Unapplied",       value: stats.unapplied, warn: stats.unapplied > 0 },
+                { label: "Partial",         value: stats.partial,   warn: stats.partial > 0 },
+                { label: "Overpaid",        value: stats.overpaid,  warn: stats.overpaid > 0 },
               ].map(s => (
-                <Card key={s.label} className="rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <CardContent className="p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
-                    <p className={cn("mt-1 text-2xl font-bold", s.warn ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white")}>{s.value}</p>
-                  </CardContent>
-                </Card>
+                <div
+                  key={s.label}
+                  className={cn(
+                    "rounded-[12px] border px-4 py-3",
+                    s.warn
+                      ? "border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/10"
+                      : "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]"
+                  )}
+                >
+                  <p className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
+                  <p className={cn(
+                    "mt-0.5 text-[22px] font-bold tracking-tight",
+                    s.warn ? "text-amber-700 dark:text-amber-400" : "text-slate-900 dark:text-white"
+                  )}>
+                    {s.value}
+                  </p>
+                </div>
               ))}
             </div>
 
-            {/* Main Table */}
-            <Card className="rounded-[28px] border border-slate-200/80 bg-white/85 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-              <CardHeader className="border-b border-slate-200/70 px-6 py-5 dark:border-slate-800">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">Incoming Payments</CardTitle>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                      <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search payor or ref…" className="h-10 pl-9 w-56 rounded-xl" />
-                    </div>
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger className="h-10 w-40 rounded-xl"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="unapplied">Unapplied</SelectItem>
-                        <SelectItem value="partially_applied">Partially Applied</SelectItem>
-                        <SelectItem value="fully_applied">Fully Applied</SelectItem>
-                        <SelectItem value="overpaid">Overpaid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button onClick={() => setShowNewPayment(true)} className="h-10 rounded-xl bg-blue-600 px-4 text-white hover:bg-blue-700">
-                      <Plus className="mr-1.5 h-4 w-4" /> Record Payment
-                    </Button>
+            {/* Attention nudge */}
+            {needsAttention > 0 && (
+              <div className="flex items-center gap-2 rounded-[10px] border border-amber-200 bg-amber-50/70 px-4 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/10">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-[12.5px] font-medium text-amber-800 dark:text-amber-300">
+                  <span className="font-bold">{needsAttention} payment{needsAttention !== 1 ? "s" : ""}</span> need matching — apply them to close out open invoices.
+                </p>
+              </div>
+            )}
+
+            {/* Main table card */}
+            <div className="overflow-hidden rounded-[16px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+              {/* Toolbar */}
+              <div className="flex flex-col gap-4 border-b border-slate-200/70 px-5 py-4 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+                <h2 className="text-[15px] font-semibold text-slate-900 dark:text-white">Incoming Payments</h2>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                    <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search payor or ref…" className="h-9 pl-9 w-52 rounded-full text-[12px]" />
                   </div>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="h-9 w-40 rounded-full text-[12px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="unapplied">Unapplied</SelectItem>
+                      <SelectItem value="partially_applied">Partially Applied</SelectItem>
+                      <SelectItem value="fully_applied">Fully Applied</SelectItem>
+                      <SelectItem value="overpaid">Overpaid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <button
+                    onClick={() => setShowNewPayment(true)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-blue-600 px-4 text-[12px] font-semibold text-white transition-colors hover:bg-blue-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Record Payment
+                  </button>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-20">
-                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
-                  </div>
-                ) : filtered.length === 0 ? (
-                  <div className="py-20 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[22px] border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                      <Banknote className="h-7 w-7 text-slate-400" />
-                    </div>
-                    <p className="text-base font-semibold text-slate-900 dark:text-white">No payments recorded</p>
-                    <p className="mt-1 text-sm text-slate-500">Record incoming payments to start matching them to invoices.</p>
-                    <Button onClick={() => setShowNewPayment(true)} className="mt-6 h-10 rounded-xl bg-blue-600 px-5 text-white hover:bg-blue-700">
-                      <Plus className="mr-1.5 h-4 w-4" /> Record Payment
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="custom-scrollbar overflow-x-auto">
-                    <table className="w-full min-w-[860px]">
-                      <thead>
-                        <tr className="border-b border-slate-200/70 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/40">
-                          {["Reference", "Payor", "Date", "Amount", "Method", "Status", "Actions"].map(h => (
-                            <th key={h} className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filtered.map(p => (
-                          <tr key={p.id} className="border-b border-slate-100/90 hover:bg-slate-50/70 dark:border-slate-800 dark:hover:bg-slate-900/30 transition-colors">
-                            <td className="px-5 py-4 font-mono text-sm font-semibold text-slate-900 dark:text-white">{p.paymentReference}</td>
-                            <td className="px-5 py-4 text-sm font-medium text-slate-800 dark:text-slate-200">{p.payorName}</td>
-                            <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{new Date(p.paymentDate).toLocaleDateString()}</td>
-                            <td className="px-5 py-4 text-sm font-bold text-slate-900 dark:text-white">{fmtMoney(p.totalReceived)}</td>
-                            <td className="px-5 py-4 text-sm capitalize text-slate-600 dark:text-slate-300">{p.paymentMethod.replace("_", " ")}</td>
-                            <td className="px-5 py-4">
-                              <span className={cn("inline-block rounded-full px-2.5 py-1 text-xs font-semibold", STATUS_STYLE[p.status])}>
-                                {p.status.replace(/_/g, " ")}
-                              </span>
+              </div>
+
+              {/* Body */}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <FFEmpty
+                  context="generic"
+                  icon={Banknote}
+                  title="No payments recorded"
+                  detail="Record incoming payments to start matching them to invoices."
+                  actions={[{
+                    label: "Record Payment",
+                    onClick: () => setShowNewPayment(true),
+                    primary: true,
+                  }]}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="ff-data-table w-full min-w-[820px]">
+                    <thead>
+                      <tr>
+                        <th>Reference</th>
+                        <th>Payor</th>
+                        <th>Date</th>
+                        <th>Age</th>
+                        <th className="text-right">Amount</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                        <th className="pr-5">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map(p => {
+                        const age = paymentAgeDays(p.paymentDate);
+                        const needsAction = p.status === "unapplied" || p.status === "partially_applied";
+                        const isUrgent = needsAction && age >= 6;
+                        const isStale  = needsAction && !isUrgent && age >= 3;
+                        return (
+                          <tr
+                            key={p.id}
+                            className={cn(
+                              isUrgent ? "ff-row-urgent" :
+                              isStale  ? "ff-row-stale"  : ""
+                            )}
+                          >
+                            <td className="font-mono text-[12px] font-semibold text-slate-900 dark:text-white">
+                              {p.paymentReference}
                             </td>
-                            <td className="px-5 py-4">
-                              {(p.status === "unapplied" || p.status === "partially_applied") && (
+                            <td className="font-medium text-slate-800 dark:text-slate-200">
+                              {p.payorName}
+                            </td>
+                            <td className="text-slate-500 dark:text-slate-400">
+                              {new Date(p.paymentDate).toLocaleDateString()}
+                            </td>
+                            <td>
+                              {needsAction
+                                ? <AgePill dateStr={p.paymentDate} />
+                                : <span className="text-[11px] text-slate-300 dark:text-slate-600">—</span>
+                              }
+                            </td>
+                            <td className="text-right font-semibold text-slate-900 dark:text-white">
+                              {fmtMoney(p.totalReceived)}
+                            </td>
+                            <td className="capitalize text-slate-500 dark:text-slate-400">
+                              {p.paymentMethod.replace("_", " ")}
+                            </td>
+                            <td>
+                              <StatusBadge status={p.status} />
+                            </td>
+                            <td className="pr-5">
+                              {needsAction && (
                                 <button
                                   onClick={() => handleApplyOpen(p)}
-                                  className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-400"
+                                  className="inline-flex items-center gap-1.5 rounded-[8px] bg-blue-600 px-3 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:bg-blue-700"
                                 >
-                                  <ArrowRightLeft className="h-3.5 w-3.5" /> Apply
+                                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                                  Match
                                 </button>
                               )}
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Footer count */}
+              {filtered.length > 0 && (
+                <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
+                  <span className="text-[11.5px] text-slate-400 dark:text-slate-500">{filtered.length} payments</span>
+                  <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-300">
+                    {fmtMoney(filtered.reduce((s, p) => s + parseFloat(p.totalReceived || "0"), 0))}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </main>
       </div>
@@ -382,7 +475,7 @@ export default function CashApplication() {
       <Dialog open={showApplyDialog} onOpenChange={setShowApplyDialog}>
         <DialogContent className="max-w-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Apply Payment: {selectedPayment?.paymentReference}</DialogTitle>
+            <DialogTitle>Match Payment: {selectedPayment?.paymentReference}</DialogTitle>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Total received: <span className="font-semibold text-slate-900 dark:text-white">{fmtMoney(selectedPayment?.totalReceived)}</span>
             </p>

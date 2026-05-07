@@ -195,12 +195,16 @@ export default function Factoring() {
   const bulkActions = BULK_ACTIONS[activeTab];
 
   const actionBtn = (action: RowAction) => cn(
-    "rounded-md px-2 py-1 text-[11px] font-semibold transition-colors whitespace-nowrap",
+    "rounded-[7px] px-2.5 py-1.5 text-[11px] font-semibold transition-colors whitespace-nowrap",
     action.danger
-      ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300"
-      : action.tid === "start_review" || action.tid === "approve" || action.tid === "fund"
-        ? "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300"
-        : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300"
+      ? "bg-red-600 text-white hover:bg-red-700"
+      : action.tid === "fund"
+        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+        : action.tid === "approve"
+          ? "bg-blue-600 text-white hover:bg-blue-700"
+          : action.tid === "start_review"
+            ? "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300"
+            : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300"
   );
 
   return (

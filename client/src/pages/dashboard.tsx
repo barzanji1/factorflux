@@ -12,7 +12,7 @@ import {
   FileText, DollarSign, ShieldAlert, FileX,
   Upload, UserPlus, Activity as ActivityIcon,
   TrendingUp, RotateCcw, ChevronRight,
-  CircleSlash, Banknote, Eye,
+  CircleSlash, Banknote, Eye, Zap,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -25,6 +25,11 @@ function fmtShort(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}K`;
   return `$${n.toFixed(0)}`;
+}
+
+function getAgeDays(d: string | Date | null | undefined): number | null {
+  if (!d) return null;
+  return Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000);
 }
 
 function getAge(d: string | Date | null | undefined): string | null {
@@ -162,6 +167,15 @@ export default function Dashboard() {
     [fundedItems]
   );
 
+  const approvedCount = useMemo(
+    () => queueItems.filter(i => i.status === "approved").length,
+    [queueItems]
+  );
+  const staleCount = useMemo(
+    () => queueItems.filter(i => (getAgeDays(i.submittedAt) ?? 0) >= 2).length,
+    [queueItems]
+  );
+
   // ── Urgency tile config ───────────────────────────────────────────────────
 
   type Level = "neutral" | "info" | "warn" | "critical" | "positive";
@@ -169,6 +183,7 @@ export default function Dashboard() {
   const tiles: {
     label: string; value: number; sub: string;
     href: string; level: Level; icon: typeof Clock3;
+    pulse?: boolean;
   }[] = [
     {
       label: "In Queue",
@@ -185,6 +200,7 @@ export default function Dashboard() {
       href: "/documents",
       level: docsItems.length > 0 ? "warn" : "neutral",
       icon: FileX,
+      pulse: docsItems.length > 0,
     },
     {
       label: "Held Loads",
@@ -193,6 +209,7 @@ export default function Dashboard() {
       href: "/exceptions",
       level: heldItems.length > 0 ? "critical" : "neutral",
       icon: CircleSlash,
+      pulse: heldItems.length > 0,
     },
     {
       label: "Open Exceptions",
@@ -201,6 +218,7 @@ export default function Dashboard() {
       href: "/exceptions",
       level: openExceptions.length > 0 ? "critical" : "neutral",
       icon: AlertCircle,
+      pulse: openExceptions.length > 0,
     },
     {
       label: "Funded Today",
@@ -212,12 +230,27 @@ export default function Dashboard() {
     },
   ];
 
-  const levelStyles: Record<Level, { tile: string; num: string; icon: string }> = {
-    neutral:  { tile: "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))] hover:border-slate-300",       num: "text-slate-800 dark:text-white",  icon: "text-slate-400" },
-    info:     { tile: "border-blue-200/60 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-950/10 hover:bg-blue-50/70",            num: "text-blue-700 dark:text-blue-300", icon: "text-blue-400" },
-    warn:     { tile: "border-amber-200/60 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/10 hover:bg-amber-50/70",       num: "text-amber-700 dark:text-amber-300", icon: "text-amber-400" },
-    critical: { tile: "border-red-200/60 bg-red-50/40 dark:border-red-900/40 dark:bg-red-950/10 hover:bg-red-50/70",                num: "text-red-700 dark:text-red-300",  icon: "text-red-400" },
-    positive: { tile: "border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/10 hover:bg-emerald-50/70", num: "text-emerald-700 dark:text-emerald-300", icon: "text-emerald-400" },
+  const levelStyles: Record<Level, { tile: string; num: string; icon: string; pulse: string }> = {
+    neutral:  {
+      tile: "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))] hover:border-slate-300",
+      num: "text-slate-800 dark:text-white", icon: "text-slate-400", pulse: "bg-slate-400",
+    },
+    info: {
+      tile: "border-blue-200/60 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-950/10 hover:bg-blue-50/70",
+      num: "text-blue-700 dark:text-blue-300", icon: "text-blue-400", pulse: "bg-blue-400",
+    },
+    warn: {
+      tile: "border-amber-200/60 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/10 hover:bg-amber-50/70",
+      num: "text-amber-700 dark:text-amber-300", icon: "text-amber-400", pulse: "bg-amber-400",
+    },
+    critical: {
+      tile: "border-red-200/60 bg-red-50/40 dark:border-red-900/40 dark:bg-red-950/10 hover:bg-red-50/70",
+      num: "text-red-700 dark:text-red-300", icon: "text-red-400", pulse: "bg-red-500",
+    },
+    positive: {
+      tile: "border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/10 hover:bg-emerald-50/70",
+      num: "text-emerald-700 dark:text-emerald-300", icon: "text-emerald-400", pulse: "bg-emerald-400",
+    },
   };
 
   // ── Exception severity label ──────────────────────────────────────────────
@@ -246,17 +279,24 @@ export default function Dashboard() {
           {tiles.map(tile => {
             const s = levelStyles[tile.level];
             const Icon = tile.icon;
+            const showPulse = tile.pulse && tile.value > 0;
             return (
               <button
                 key={tile.label}
                 type="button"
                 onClick={() => go(tile.href)}
                 className={cn(
-                  "group flex flex-col rounded-[12px] border p-4 text-left transition-all duration-150",
+                  "group relative flex flex-col rounded-[12px] border p-4 text-left transition-all duration-150",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30",
                   s.tile
                 )}
               >
+                {showPulse && (
+                  <span className="absolute right-3 top-3 flex h-2 w-2">
+                    <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", s.pulse)} />
+                    <span className={cn("relative inline-flex h-2 w-2 rounded-full", s.pulse)} />
+                  </span>
+                )}
                 <div className="mb-3 flex items-start justify-between">
                   <Icon className={cn("h-[15px] w-[15px]", s.icon)} />
                   <ArrowRight className="h-3 w-3 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-600" />
@@ -276,6 +316,34 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {/* ── Action nudges (only when actionable items exist) ──────────────── */}
+      {(approvedCount > 0 || staleCount > 0) && (
+        <section className="mb-5 flex flex-wrap gap-2">
+          {approvedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => go("/factoring")}
+              className="flex items-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-[12px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
+            >
+              <Zap className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              {approvedCount} load{approvedCount !== 1 ? "s" : ""} approved — ready to fund
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          )}
+          {staleCount > 0 && (
+            <button
+              type="button"
+              onClick={() => go("/factoring")}
+              className="flex items-center gap-2 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2 text-[12px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
+            >
+              <Clock3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              {staleCount} item{staleCount !== 1 ? "s" : ""} sitting 2+ days in queue
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          )}
+        </section>
+      )}
+
       {/* ── Main work area ────────────────────────────────────────────────── */}
       <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
 
@@ -288,7 +356,14 @@ export default function Dashboard() {
           />
 
           {queueItems.length === 0 ? (
-            <FFEmpty context="funding" size="sm" />
+            <FFEmpty
+              context="funding"
+              size="sm"
+              actions={[
+                { label: "Go to Funding Queue", onClick: () => go("/factoring"), primary: true },
+                { label: "Upload Documents", onClick: () => go("/documents") },
+              ]}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="ff-data-table w-full">
@@ -304,10 +379,20 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {queueItems.slice(0, 10).map(inv => {
+                    const ageDays = getAgeDays(inv.submittedAt);
                     const age = getAge(inv.submittedAt);
-                    const isStale = age && (age.endsWith("d") && parseInt(age) >= 2);
+                    const isUrgent = (ageDays ?? 0) >= 3;
+                    const isStale  = !isUrgent && (ageDays ?? 0) >= 2;
+                    const isReady  = inv.status === "approved";
                     return (
-                      <tr key={inv.id}>
+                      <tr
+                        key={inv.id}
+                        className={cn(
+                          isUrgent ? "ff-row-urgent" :
+                          isStale  ? "ff-row-stale"  :
+                          isReady  ? "ff-row-ready"  : ""
+                        )}
+                      >
                         <td className="font-mono text-[12px] font-semibold text-slate-800 dark:text-slate-200">
                           {inv.invoiceNumber}
                         </td>
@@ -321,7 +406,9 @@ export default function Dashboard() {
                           {age ? (
                             <span className={cn(
                               "text-[11px] font-semibold",
-                              isStale ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400"
+                              isUrgent ? "text-red-600 dark:text-red-400" :
+                              isStale  ? "text-amber-600 dark:text-amber-400" :
+                              "text-slate-500 dark:text-slate-400"
                             )}>
                               {age}
                             </span>
@@ -334,10 +421,15 @@ export default function Dashboard() {
                           <button
                             type="button"
                             onClick={() => go(`/invoices/${inv.id}`)}
-                            className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/20"
+                            className={cn(
+                              "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
+                              isReady
+                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400"
+                                : "bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400"
+                            )}
                           >
                             <Eye className="h-3 w-3" />
-                            Review
+                            {isReady ? "Fund" : "Review"}
                           </button>
                         </td>
                       </tr>
@@ -363,7 +455,19 @@ export default function Dashboard() {
           {/* Queue total */}
           {queueItems.length > 0 && (
             <div className="mt-3 flex items-center justify-between rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800/40">
-              <span className="text-[11.5px] text-slate-500 dark:text-slate-400">Total in queue</span>
+              <div className="flex items-center gap-3 text-[11.5px] text-slate-500 dark:text-slate-400">
+                <span>Total in queue</span>
+                {approvedCount > 0 && (
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                    {approvedCount} approved
+                  </span>
+                )}
+                {staleCount > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10.5px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                    {staleCount} stale
+                  </span>
+                )}
+              </div>
               <span className="text-[13px] font-semibold text-slate-900 dark:text-white">{fmt(queueTotal)}</span>
             </div>
           )}
@@ -374,7 +478,11 @@ export default function Dashboard() {
           <SectionHeader title="Recent Funding" href="/factoring" />
 
           {fundedItems.length === 0 ? (
-            <FFEmpty context="payouts" size="sm" />
+            <FFEmpty
+              context="payouts"
+              size="sm"
+              actions={[{ label: "View Funding Queue", onClick: () => go("/factoring"), primary: true }]}
+            />
           ) : (
             <div className="space-y-0.5">
               {fundedItems.map(inv => (
@@ -408,7 +516,7 @@ export default function Dashboard() {
               <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-semibold">
                 Total shown
               </span>
-              <span className="text-[12.5px] font-bold text-slate-900 dark:text-white">
+              <span className="text-[12.5px] font-bold text-emerald-700 dark:text-emerald-400">
                 {fmt(fundedTotal)}
               </span>
             </div>
@@ -433,7 +541,6 @@ export default function Dashboard() {
                 const isLast = i === Math.min(activities.length, 10) - 1;
                 return (
                   <div key={act.id} className="flex gap-3">
-                    {/* Timeline line */}
                     <div className="flex flex-col items-center">
                       <div className={cn("mt-2 h-2 w-2 shrink-0 rounded-full", cfg.dot)} />
                       {!isLast && <div className="mt-1 w-px flex-1 bg-slate-100 dark:bg-slate-800" />}
