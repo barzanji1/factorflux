@@ -385,6 +385,33 @@ export default function Documents() {
               </div>
             </section>
 
+            {/* ── Failed / processing docs nudge ─────────────────────────── */}
+            {(() => {
+              const failedDocs = documents.filter(d => d.status === "failed");
+              const processingDocs = documents.filter(d => d.status === "processing");
+              if (failedDocs.length === 0 && processingDocs.length === 0) return null;
+              return (
+                <div className="mb-6 space-y-2">
+                  {failedDocs.length > 0 && (
+                    <div className="flex items-center gap-3 rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/10">
+                      <Activity className="h-4 w-4 shrink-0 text-red-500" />
+                      <p className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
+                        <span className="font-bold">{failedDocs.length} document{failedDocs.length !== 1 ? "s" : ""}</span> failed OCR processing — review and re-upload if needed
+                      </p>
+                    </div>
+                  )}
+                  {processingDocs.length > 0 && (
+                    <div className="flex items-center gap-3 rounded-[12px] border border-amber-200/60 bg-amber-50/50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/10">
+                      <Clock3 className="h-4 w-4 shrink-0 text-amber-500" />
+                      <p className="text-[12.5px] font-medium text-amber-800 dark:text-amber-300">
+                        <span className="font-bold">{processingDocs.length} document{processingDocs.length !== 1 ? "s" : ""}</span> currently being processed — check back shortly
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {loads.length > 0 && (
               <section className="mb-8">
                 <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">

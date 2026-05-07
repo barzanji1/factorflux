@@ -270,6 +270,42 @@ export default function Dashboard() {
       subtitle={`${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · Freight Operations Center`}
       group="Workspace"
     >
+      {/* ── Critical alerts (shown only when blocking items exist) ────────── */}
+      {(heldItems.length > 0 || openExceptions.filter(e => (e as any).severity === "critical").length > 0) && (
+        <section className="mb-5 space-y-2">
+          {heldItems.length > 0 && (
+            <button
+              type="button"
+              onClick={() => go("/exceptions")}
+              className="flex w-full items-center gap-3 rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
+            >
+              <CircleSlash className="h-4 w-4 shrink-0 text-red-500" />
+              <span className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
+                <span className="font-bold">{heldItems.length} load{heldItems.length !== 1 ? "s" : ""}</span> blocked from funding — resolve holds to continue
+              </span>
+              <span className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-red-600 dark:text-red-400">
+                View exceptions <ArrowRight className="h-3 w-3" />
+              </span>
+            </button>
+          )}
+          {openExceptions.filter(e => (e as any).severity === "critical").length > 0 && (
+            <button
+              type="button"
+              onClick={() => go("/exceptions")}
+              className="flex w-full items-center gap-3 rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+              <span className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
+                <span className="font-bold">{openExceptions.filter(e => (e as any).severity === "critical").length} critical exception{openExceptions.filter(e => (e as any).severity === "critical").length !== 1 ? "s" : ""}</span> need immediate attention
+              </span>
+              <span className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-red-600 dark:text-red-400">
+                Resolve now <ArrowRight className="h-3 w-3" />
+              </span>
+            </button>
+          )}
+        </section>
+      )}
+
       {/* ── Today at a Glance ─────────────────────────────────────────────── */}
       <section className="mb-6">
         <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500">

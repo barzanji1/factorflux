@@ -6,8 +6,8 @@ import { z } from "zod";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { FFBadge } from "@/components/ui/ff-badge";
 import { FFEmpty } from "@/components/ui/ff-empty";
+import { FFOnboarding } from "@/components/ui/ff-onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,9 +23,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  Plus, Search, Edit2, Trash2, AlertTriangle,
-  SquareCheck, Square, ChevronDown,
+  Plus, Search, Edit2, Trash2, AlertTriangle, DollarSign,
+  SquareCheck, Square,
 } from "lucide-react";
+import { useSavedViews, type SavedView } from "@/hooks/use-saved-views";
 
 // ── Sticky-state hook ─────────────────────────────────────────────────────────
 function useStickyState<T>(key: string, def: T) {
@@ -86,6 +87,15 @@ function OverduePill({ dueDate }: { dueDate: string }) {
   );
 }
 
+function rowUrgencyClass(c: Collection): string {
+  const od = overdueDays(c.dueDate);
+  const active = ["pending", "in_progress"].includes(c.status);
+  if (!active) return "";
+  if ((c.priority === "urgent" && od > 0) || od > 30) return "ff-row-urgent";
+  if (c.priority === "high" || od > 7) return "ff-row-stale";
+  return "";
+}
+
 const PRIORITY_CLASS: Record<string, string> = {
   low:    "text-slate-500 dark:text-slate-400",
   medium: "text-blue-600 dark:text-blue-400",
@@ -106,14 +116,14 @@ type QTabId = typeof QUEUE_TABS[number]["id"];
 
 // ── Form schema ───────────────────────────────────────────────────────────────
 const collectionSchema = z.object({
-  clientId:  z.coerce.number().min(1, "Client required"),
-  amount:    z.string().min(1, "Amount required"),
+  clientId:    z.coerce.number().min(1, "Client required"),
+  amount:      z.string().min(1, "Amount required"),
   description: z.string().min(1, "Description required"),
-  status:    z.enum(["pending", "in_progress", "paid", "written_off"]).default("pending"),
-  priority:  z.enum(["low", "medium", "high", "urgent"]).default("medium"),
-  dueDate:   z.string().min(1, "Due date required"),
-  notes:     z.string().optional(),
-  assignedTo: z.string().optional(),
+  status:      z.enum(["pending", "in_progress", "paid", "written_off"]).default("pending"),
+  priority:    z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+  dueDate:     z.string().min(1, "Due date required"),
+  notes:       z.string().optional(),
+  assignedTo:  z.string().optional(),
 });
 type CollectionForm = z.infer<typeof collectionSchema>;
 
@@ -127,7 +137,7 @@ export default function CollectionsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [dlgOpen, setDlgOpen] = useState(false);
   const [editing, setEditing] = useState<Collection | null>(null);
-  const [bulkStatusDlg, setBulkStatusDlg] = useState<string | null>(null);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   const form = useForm<CollectionForm>({
     resolver: zodResolver(collectionSchema),
@@ -137,6 +147,15 @@ export default function CollectionsPage() {
   // ── Queries ──────────────────────────────────────────────────────
   const { data: collections = [], isLoading } = useQuery<Collection[]>({ queryKey: ["/api/collections"] });
   const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
+
+  // Saved views
+  const { allViews: savedViews } = useSavedViews("collections");
+
+  function applyView(view: SavedView) {
+    if (view.filters.tab) setActiveTab(view.filters.tab as QTabId);
+    setActiveViewId(view.id);
+    setSelected(new Set());
+  }
 
   // ── Derived counts ───────────────────────────────────────────────
   const counts = useMemo(() => {
@@ -155,6 +174,10 @@ export default function CollectionsPage() {
     .filter(c => ["pending", "in_progress"].includes(c.status))
     .reduce((s, c) => s + Number(c.amount), 0);
 
+  const overdueAmount = collections
+    .filter(c => ["pending", "in_progress"].includes(c.status) && overdueDays(c.dueDate) > 0)
+    .reduce((s, c) => s + Number(c.amount), 0);
+
   // ── Filtered rows ────────────────────────────────────────────────
   const rows = useMemo(() => {
     const tab = QUEUE_TABS.find(t => t.id === activeTab)!;
@@ -169,7 +192,6 @@ export default function CollectionsPage() {
         c.description.toLowerCase().includes(q)
       );
     }
-    // Sort by priority (urgent first), then by overdue days
     const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
     return [...items].sort((a, b) => {
       const pd = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
@@ -245,7 +267,7 @@ export default function CollectionsPage() {
 
   const bulkUpdateStatus = useCallback((status: string) => {
     Promise.all(Array.from(selected).map(id => updateMut.mutateAsync({ id, updates: { status: status as any } })))
-      .then(() => { toast({ title: `${selected.size} updated` }); setSelected(new Set()); setBulkStatusDlg(null); })
+      .then(() => { toast({ title: `${selected.size} updated` }); setSelected(new Set()); })
       .catch(() => {});
   }, [selected, updateMut, toast]);
 
@@ -270,8 +292,8 @@ export default function CollectionsPage() {
   const BULK_STATUS: Record<QTabId, Array<{ label: string; nextStatus: string }>> = {
     all:         [],
     pending:     [{ label: "Start All", nextStatus: "in_progress" }],
-    in_progress: [{ label: "Mark Paid",  nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
-    overdue:     [{ label: "Mark Paid",  nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
+    in_progress: [{ label: "Mark Paid", nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
+    overdue:     [{ label: "Mark Paid", nextStatus: "paid" }, { label: "Write Off", nextStatus: "written_off" }],
     paid:        [],
     written_off: [],
   };
@@ -283,15 +305,33 @@ export default function CollectionsPage() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Collections" subtitle="Manage funds owed to TPF and track carrier performance" group="Recovery" />
         <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1680px] space-y-5 p-6 xl:p-8">
+          <div className="mx-auto w-full max-w-[1680px] space-y-4 p-6 xl:p-8">
+
+            {/* ── Overdue nudge banner ────────────────────────────────────── */}
+            {counts.overdue > 0 && (
+              <div className="flex items-center gap-3 rounded-[12px] border border-amber-200/60 bg-amber-50/50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/10">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                <p className="text-[12.5px] font-medium text-amber-800 dark:text-amber-300">
+                  <span className="font-bold">{counts.overdue} account{counts.overdue !== 1 ? "s" : ""}</span> overdue —{" "}
+                  <span className="font-semibold">{fmt(overdueAmount)}</span> at risk
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab("overdue"); setActiveViewId("overdue"); setSelected(new Set()); }}
+                  className="ml-auto whitespace-nowrap text-[11.5px] font-semibold text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                >
+                  View overdue →
+                </button>
+              </div>
+            )}
 
             {/* ── Summary strip ──────────────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { label: "Total Owed",       value: fmt(totalOwed), sub: `${counts.pending + counts.in_progress} active cases` },
-                { label: "Pending",          value: counts.pending ?? 0, sub: "not yet started" },
-                { label: "In Progress",      value: counts.in_progress ?? 0, sub: "being worked" },
-                { label: "Overdue",          value: counts.overdue ?? 0, sub: "past due date", warn: (counts.overdue ?? 0) > 0 },
+                { label: "Total Owed",  value: fmt(totalOwed),             sub: `${(counts.pending ?? 0) + (counts.in_progress ?? 0)} active cases` },
+                { label: "Pending",     value: counts.pending ?? 0,        sub: "not yet started" },
+                { label: "In Progress", value: counts.in_progress ?? 0,    sub: "being worked" },
+                { label: "Overdue",     value: counts.overdue ?? 0,        sub: "past due date", warn: (counts.overdue ?? 0) > 0 },
               ].map(s => (
                 <div key={s.label} className="rounded-[12px] border border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                   <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
@@ -306,7 +346,28 @@ export default function CollectionsPage() {
 
               {/* Sticky filter bar */}
               <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-sm dark:border-slate-800 dark:bg-[hsl(var(--card))/95]">
-                <div className="flex flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
+
+                {/* Saved view pills */}
+                <div className="flex items-center gap-1.5 px-5 pt-3 pb-1.5">
+                  <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-600">Views</span>
+                  {savedViews.map(view => (
+                    <button
+                      key={view.id}
+                      type="button"
+                      onClick={() => applyView(view)}
+                      className={cn(
+                        "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+                        activeViewId === view.id
+                          ? "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-400"
+                      )}
+                    >
+                      <span>{view.emoji}</span> {view.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-3 px-5 py-2.5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap gap-1.5">
                     {QUEUE_TABS.map(tab => {
                       const count = counts[tab.id] ?? 0;
@@ -315,7 +376,7 @@ export default function CollectionsPage() {
                         <button
                           key={tab.id}
                           type="button"
-                          onClick={() => { setActiveTab(tab.id); setSelected(new Set()); }}
+                          onClick={() => { setActiveTab(tab.id); setSelected(new Set()); setActiveViewId(null); }}
                           className={cn(
                             "rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors",
                             isActive
@@ -360,7 +421,12 @@ export default function CollectionsPage() {
                         type="button"
                         onClick={() => bulkUpdateStatus(a.nextStatus)}
                         disabled={updateMut.isPending}
-                        className="rounded-md bg-blue-600 px-3 py-1 text-[11.5px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                        className={cn(
+                          "rounded-[7px] px-3 py-1 text-[11.5px] font-semibold text-white disabled:opacity-50",
+                          a.nextStatus === "paid" ? "bg-emerald-600 hover:bg-emerald-700"
+                            : a.nextStatus === "written_off" ? "bg-slate-600 hover:bg-slate-700"
+                            : "bg-blue-600 hover:bg-blue-700"
+                        )}
                       >
                         {a.label}
                       </button>
@@ -378,7 +444,34 @@ export default function CollectionsPage() {
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
                 </div>
               ) : rows.length === 0 ? (
-                <div className="py-16"><FFEmpty context="collections" size="md" /></div>
+                <div className="px-8 py-10">
+                  {collections.length === 0 ? (
+                    <FFOnboarding
+                      title="No collection cases yet"
+                      description="Track funds owed to TPF — from first contact to final payment or write-off."
+                      icon={DollarSign}
+                      steps={[
+                        { label: "Create a case for each outstanding debt", detail: "Include amount, client, and a due date" },
+                        { label: "Set priority — urgent cases surface first in the queue" },
+                        { label: "Work the case: update status as you make contact" },
+                        { label: "Mark paid or write off when resolved" },
+                      ]}
+                      primaryAction={{ label: "New Collection", onClick: openCreate }}
+                      hint="Tip: Collections are sorted by priority and overdue days — most urgent cases always appear first."
+                    />
+                  ) : (
+                    <div className="py-8 text-center">
+                      <FFEmpty context="collections" size="md" />
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab("all"); setSearch(""); setActiveViewId(null); }}
+                        className="mt-3 text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Clear filters
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="ff-data-table w-full min-w-[820px]">
@@ -406,7 +499,7 @@ export default function CollectionsPage() {
                       {rows.map(c => {
                         const isSel = selected.has(c.id);
                         return (
-                          <tr key={c.id} className={cn(isSel && "!bg-blue-50/50 dark:!bg-blue-950/10")}>
+                          <tr key={c.id} className={cn(rowUrgencyClass(c), isSel && "!bg-blue-50/50 dark:!bg-blue-950/10")}>
                             <td className="pl-5">
                               <button type="button" onClick={() => toggleRow(c.id)} className="text-slate-400 hover:text-blue-600">
                                 {isSel ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" /> : <Square className="h-3.5 w-3.5" />}
@@ -447,10 +540,12 @@ export default function CollectionsPage() {
                                     onClick={() => updateMut.mutate({ id: c.id, updates: { status: a.nextStatus as any } })}
                                     disabled={updateMut.isPending}
                                     className={cn(
-                                      "rounded-md px-2 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors",
-                                      a.nextStatus === "paid" ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300"
-                                        : a.nextStatus === "written_off" ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300"
-                                        : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300"
+                                      "rounded-[7px] px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors disabled:opacity-50",
+                                      a.nextStatus === "paid"
+                                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                        : a.nextStatus === "written_off"
+                                          ? "bg-slate-600 text-white hover:bg-slate-700"
+                                          : "bg-blue-600 text-white hover:bg-blue-700"
                                     )}
                                   >
                                     {a.label}

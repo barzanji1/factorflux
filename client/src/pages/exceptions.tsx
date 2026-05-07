@@ -1,10 +1,13 @@
 import { useState, useMemo, useCallback } from "react";
+import type { ElementType } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { FFEmpty } from "@/components/ui/ff-empty";
+import { FFOnboarding } from "@/components/ui/ff-onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +24,7 @@ import {
   CheckCircle2, FileWarning, DollarSign, CopyX, Inbox,
   HelpCircle, ShieldAlert, SquareCheck, Square,
 } from "lucide-react";
+import { useSavedViews, type SavedView } from "@/hooks/use-saved-views";
 
 // ── Sticky-state hook ─────────────────────────────────────────────────────────
 function useStickyState<T>(key: string, def: T) {
@@ -60,13 +64,13 @@ type Exception = {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SEV = {
-  low:      { icon: Info,          dot: "bg-slate-400",   text: "text-slate-600 dark:text-slate-400",   row: "border-l-slate-300 dark:border-l-slate-700" },
-  medium:   { icon: AlertTriangle, dot: "bg-amber-500",   text: "text-amber-700 dark:text-amber-400",   row: "border-l-amber-400 dark:border-l-amber-600"  },
-  high:     { icon: AlertOctagon,  dot: "bg-orange-500",  text: "text-orange-700 dark:text-orange-400", row: "border-l-orange-500 dark:border-l-orange-600" },
-  critical: { icon: Flame,         dot: "bg-red-600",     text: "text-red-700 dark:text-red-400",       row: "border-l-red-500 dark:border-l-red-600"      },
+  low:      { icon: Info,          dot: "bg-slate-400",   text: "text-slate-600 dark:text-slate-400",   row: "border-l-slate-300 dark:border-l-slate-700",  bg: "" },
+  medium:   { icon: AlertTriangle, dot: "bg-amber-500",   text: "text-amber-700 dark:text-amber-400",   row: "border-l-amber-400 dark:border-l-amber-600",  bg: "" },
+  high:     { icon: AlertOctagon,  dot: "bg-orange-500",  text: "text-orange-700 dark:text-orange-400", row: "border-l-orange-500 dark:border-l-orange-600", bg: "bg-amber-50/30 dark:bg-amber-950/[0.06]" },
+  critical: { icon: Flame,         dot: "bg-red-600",     text: "text-red-700 dark:text-red-400",       row: "border-l-red-500 dark:border-l-red-600",       bg: "bg-red-50/40 dark:bg-red-950/[0.08]" },
 };
 
-const TYPE_META: Record<ExcType, { label: string; icon: React.ElementType }> = {
+const TYPE_META: Record<ExcType, { label: string; icon: ElementType }> = {
   short_pay:             { label: "Short Pay",          icon: DollarSign  },
   overpay:               { label: "Overpay",            icon: DollarSign  },
   doc_missing:           { label: "Doc Missing",        icon: FileWarning },
@@ -127,6 +131,7 @@ export default function Exceptions() {
   const [filterSeverity, setFilterSeverity] = useState("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   // Create dialog
   const [showCreate, setShowCreate] = useState(false);
@@ -139,12 +144,18 @@ export default function Exceptions() {
   const [resolveTarget, setResolveTarget] = useState<Exception | null>(null);
   const [resolution, setResolution] = useState("");
 
-  // Bulk assign dialog
-  const [bulkAssignDlg, setBulkAssignDlg] = useState(false);
-  const [assignInput, setAssignInput] = useState("");
-
   // Data
   const { data: exceptions = [], isLoading } = useQuery<Exception[]>({ queryKey: ["/api/exceptions"] });
+
+  // Saved views
+  const { allViews: savedViews } = useSavedViews("exceptions");
+
+  function applyView(view: SavedView) {
+    if (view.filters.tab) setActiveTab(view.filters.tab as STabId);
+    if (view.filters.severity) setFilterSeverity(view.filters.severity);
+    setActiveViewId(view.id);
+    setSelected(new Set());
+  }
 
   // ── Counts ───────────────────────────────────────────────────────
   const counts = useMemo(() => {
@@ -156,6 +167,7 @@ export default function Exceptions() {
   }, [exceptions]);
 
   const criticalCount = exceptions.filter(e => e.severity === "critical" && e.status !== "resolved" && e.status !== "waived").length;
+  const openCount = exceptions.filter(e => e.status === "open").length;
 
   // ── Filtered rows ────────────────────────────────────────────────
   const rows = useMemo(() => {
@@ -170,7 +182,6 @@ export default function Exceptions() {
         (e.description?.toLowerCase().includes(q) ?? false)
       );
     }
-    // Sort: critical first, then open, then age
     const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     const statOrder = { open: 0, under_review: 1, resolved: 2, waived: 3 };
     return [...items].sort((a, b) => {
@@ -224,7 +235,27 @@ export default function Exceptions() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Exceptions" subtitle="Track and resolve short-pays, overpays, missing docs, and workflow holds" group="Risk" />
         <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1680px] space-y-5 p-6 xl:p-8">
+          <div className="mx-auto w-full max-w-[1680px] space-y-4 p-6 xl:p-8">
+
+            {/* ── Critical nudge banner ───────────────────────────────────── */}
+            {criticalCount > 0 && (
+              <div className="flex items-center gap-3 rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/10">
+                <Flame className="h-4 w-4 shrink-0 text-red-500" />
+                <p className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
+                  <span className="font-bold">{criticalCount} critical exception{criticalCount !== 1 ? "s" : ""}</span> require immediate attention
+                  {openCount > criticalCount && (
+                    <span className="ml-1 text-red-600/70">· {openCount - criticalCount} other open</span>
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab("open"); setFilterSeverity("critical"); setActiveViewId("open_critical"); }}
+                  className="ml-auto whitespace-nowrap text-[11.5px] font-semibold text-red-600 hover:text-red-700 dark:text-red-400"
+                >
+                  View critical →
+                </button>
+              </div>
+            )}
 
             {/* ── Summary strip ──────────────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -252,7 +283,28 @@ export default function Exceptions() {
 
               {/* Sticky filter bar */}
               <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-sm dark:border-slate-800 dark:bg-[hsl(var(--card))/95]">
-                <div className="flex flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
+
+                {/* Saved view pills */}
+                <div className="flex items-center gap-1.5 px-5 pt-3 pb-1.5">
+                  <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-600">Views</span>
+                  {savedViews.map(view => (
+                    <button
+                      key={view.id}
+                      type="button"
+                      onClick={() => applyView(view)}
+                      className={cn(
+                        "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+                        activeViewId === view.id
+                          ? "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-400"
+                      )}
+                    >
+                      <span>{view.emoji}</span> {view.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-3 px-5 py-2.5 lg:flex-row lg:items-center lg:justify-between">
                   {/* Status tabs */}
                   <div className="flex flex-wrap gap-1.5">
                     {STATUS_TABS.map(tab => {
@@ -262,12 +314,13 @@ export default function Exceptions() {
                         <button
                           key={tab.id}
                           type="button"
-                          onClick={() => { setActiveTab(tab.id); setSelected(new Set()); }}
+                          onClick={() => { setActiveTab(tab.id); setSelected(new Set()); setActiveViewId(null); }}
                           className={cn(
                             "rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors",
                             isActive
                               ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400",
+                            tab.id === "open" && !isActive && count > 0 && "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400"
                           )}
                         >
                           {tab.label} <span className="opacity-60">{count}</span>
@@ -282,7 +335,7 @@ export default function Exceptions() {
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                       <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className="h-8 w-[180px] rounded-full pl-9 text-[12px]" />
                     </div>
-                    <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+                    <Select value={filterSeverity} onValueChange={v => { setFilterSeverity(v); setActiveViewId(null); }}>
                       <SelectTrigger className="h-8 w-[130px] rounded-full text-[12px]"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All severities</SelectItem>
@@ -338,20 +391,40 @@ export default function Exceptions() {
                 )}
               </div>
 
-              {/* Table */}
+              {/* Table / Empty */}
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
                 </div>
               ) : rows.length === 0 ? (
-                <div className="py-16 text-center">
-                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-[18px] border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    No exceptions {activeTab !== "all" ? `in "${activeTab.replace("_", " ")}"` : "found"}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Everything looks clean.</p>
+                <div className="px-8 py-10">
+                  {exceptions.length === 0 ? (
+                    <FFOnboarding
+                      title="Queue is clean"
+                      description="No exceptions logged. Exceptions auto-create when the system detects issues, or you can log one manually."
+                      icon={CheckCircle2}
+                      steps={[
+                        { label: "Review new invoices for short-pays or overcharges", detail: "System flags automatically when amounts mismatch" },
+                        { label: "Check for unapplied payments in Cash Application" },
+                        { label: "Monitor missing docs in the Factoring queue" },
+                      ]}
+                      primaryAction={{ label: "Log Exception", onClick: () => setShowCreate(true) }}
+                      hint="Tip: Critical exceptions block funding until resolved — check your queue daily."
+                    />
+                  ) : (
+                    <div className="py-8 text-center">
+                      <CheckCircle2 className="mx-auto mb-3 h-8 w-8 text-emerald-500" />
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">No exceptions match these filters</p>
+                      <p className="mt-1 text-sm text-slate-400">Try a different filter or clear your search.</p>
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab("all"); setFilterSeverity("all"); setSearch(""); setActiveViewId(null); }}
+                        className="mt-3 text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Clear all filters
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -381,12 +454,14 @@ export default function Exceptions() {
                         const TypeMeta = TYPE_META[exc.type];
                         const TypeIcon = TypeMeta.icon;
                         const isSel = selected.has(exc.id);
+                        const isActive = exc.status !== "resolved" && exc.status !== "waived";
                         return (
                           <tr
                             key={exc.id}
                             className={cn(
                               "border-l-[3px]",
                               sev.row,
+                              isActive && sev.bg,
                               isSel && "!bg-blue-50/50 dark:!bg-blue-950/10"
                             )}
                           >
@@ -431,7 +506,7 @@ export default function Exceptions() {
                                     type="button"
                                     onClick={() => updateMut.mutate({ id: exc.id, status: "under_review" })}
                                     disabled={updateMut.isPending}
-                                    className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300"
+                                    className="rounded-[7px] bg-amber-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
                                   >
                                     Review
                                   </button>
@@ -440,7 +515,7 @@ export default function Exceptions() {
                                   <button
                                     type="button"
                                     onClick={() => { setResolveTarget(exc); setResolution(""); }}
-                                    className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                    className="rounded-[7px] bg-emerald-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700"
                                   >
                                     Resolve
                                   </button>
@@ -473,6 +548,11 @@ export default function Exceptions() {
               {rows.length > 0 && (
                 <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
                   <span className="text-[11.5px] text-slate-400">{rows.length} items</span>
+                  {criticalCount > 0 && (
+                    <span className="text-[11.5px] font-semibold text-red-600 dark:text-red-400">
+                      {criticalCount} critical
+                    </span>
+                  )}
                 </div>
               )}
             </div>

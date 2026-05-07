@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FFOnboarding } from "@/components/ui/ff-onboarding";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { useSavedViews, type SavedView } from "@/hooks/use-saved-views";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -76,9 +76,20 @@ export default function Brokers() {
   const [isBrokerDialogOpen, setIsBrokerDialogOpen] = useState(false);
   const [editingBroker, setEditingBroker] = useState<Broker | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+
+  // Saved views
+  const { allViews: savedViews } = useSavedViews("brokers");
+
+  function applyView(view: SavedView) {
+    if (view.filters.status) setStatusFilter(view.filters.status);
+    if (view.filters.terms) setStatusFilter("quickpay_" + view.filters.terms);
+    setActiveViewId(view.id);
+  }
 
   // Fetch brokers
   const { data: brokers = [], isLoading } = useQuery<Broker[]>({
@@ -95,12 +106,18 @@ export default function Brokers() {
     },
   });
 
-  // Filter brokers based on search term
-  const filteredBrokers = brokers.filter(broker =>
-    broker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    broker.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    broker.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter brokers
+  const filteredBrokers = brokers.filter(broker => {
+    const matchesSearch =
+      broker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      broker.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      broker.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" ? true
+      : statusFilter === "quickpay" ? broker.paymentTerms === "quickpay"
+      : broker.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   // Create broker mutation
   const createBrokerMutation = useMutation({
@@ -206,16 +223,12 @@ export default function Brokers() {
     setIsBrokerDialogOpen(true);
   };
 
-  const getStatusColor = (status: string) => {
+  const getBrokerBadge = (status: string) => {
     switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "inactive":
-        return "bg-gray-100 text-gray-800";
-      case "suspended":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case "active":    return "ff-badge ff-badge-paid";
+      case "inactive":  return "ff-badge ff-badge-draft";
+      case "suspended": return "ff-badge ff-badge-rejected";
+      default:          return "ff-badge ff-badge-draft";
     }
   };
 
@@ -242,226 +255,232 @@ export default function Brokers() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Broker Desk" subtitle="Freight broker relationships, contacts, and risk ratings" group="Risk" />
         <main className="custom-scrollbar flex-1 overflow-auto">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Building className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Brokers</h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-2">Manage freight broker partnerships and relationships</p>
+          <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
+        {/* ── Stats strip ──────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
+          {[
+            { label: "Total Brokers",      value: brokers.length,                                         icon: Building    },
+            { label: "Active",             value: brokers.filter(b => b.status === "active").length,       icon: TrendingUp  },
+            { label: "Total Credit Limit", value: `$${brokers.reduce((s,b) => s+(b.creditLimit||0), 0).toLocaleString()}`, icon: DollarSign },
+            { label: "Quick Pay",          value: brokers.filter(b => b.paymentTerms === "quickpay").length, icon: Calendar  },
+          ].map(s => {
+            const Icon = s.icon;
+            return (
+              <div key={s.label} className="rounded-[12px] border border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
+                <p className="mt-0.5 text-[22px] font-bold tracking-tight text-slate-900 dark:text-white">{s.value}</p>
               </div>
-            </div>
+            );
+          })}
+        </div>
+
+        {/* ── Search + filter bar ──────────────────────────────────────── */}
+        <div className="mb-5 overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+          {/* Saved view pills */}
+          <div className="flex items-center gap-1.5 px-5 pt-3 pb-1.5 border-b border-slate-100 dark:border-slate-800">
+            <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-600">Views</span>
+            {savedViews.map(view => (
+              <button
+                key={view.id}
+                type="button"
+                onClick={() => applyView(view)}
+                className={`flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                  activeViewId === view.id
+                    ? "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-400"
+                }`}
+              >
+                <span>{view.emoji}</span> {view.label}
+              </button>
+            ))}
           </div>
-          
-          <Button onClick={openCreateDialog} data-testid="button-create-broker">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Broker
-          </Button>
-        </div>
-
-        {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Brokers</p>
-                  <p className="text-2xl font-bold text-blue-600">{brokers.length}</p>
-                </div>
-                <Building className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Active Brokers</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {brokers.filter(b => b.status === 'active').length}
-                  </p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Credit Limit</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    ${brokers.reduce((sum, b) => sum + (b.creditLimit || 0), 0).toLocaleString()}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Quick Pay</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {brokers.filter(b => b.paymentTerms === 'quickpay').length}
-                  </p>
-                </div>
-                <Calendar className="h-8 w-8 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search and Filter */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Search Brokers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex space-x-4">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search by name, contact person, or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  data-testid="input-search-brokers"
-                />
-              </div>
+          <div className="flex items-center gap-3 px-5 py-3">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Search by name, contact, or email…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                data-testid="input-search-brokers"
+                className="h-8 rounded-full pl-9 text-[12px]"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex gap-1.5">
+              {(["all","active","suspended","inactive"] as const).map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => { setStatusFilter(s); setActiveViewId(null); }}
+                  className={`rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors capitalize ${
+                    statusFilter === s
+                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                  }`}
+                >
+                  {s === "all" ? `All ${brokers.length}` : s}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={openCreateDialog}
+              data-testid="button-create-broker"
+              className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-blue-700"
+            >
+              <Plus className="h-3 w-3" /> Add Broker
+            </button>
+          </div>
+        </div>
 
-        {/* Brokers Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Broker Directory</CardTitle>
-            <CardDescription>Manage your freight broker partnerships</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Broker Name</TableHead>
-                    <TableHead>Contact Person</TableHead>
-                    <TableHead>Contact Info</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Payment Terms</TableHead>
-                    <TableHead>Credit Limit</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+        {/* ── Broker table ─────────────────────────────────────────────── */}
+        <div className="overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+            </div>
+          ) : filteredBrokers.length === 0 ? (
+            <div className="px-8 py-10">
+              {brokers.length === 0 ? (
+                <FFOnboarding
+                  title="No brokers yet"
+                  description="Add freight broker contacts to track relationships, credit limits, and payment terms in one place."
+                  icon={Building}
+                  steps={[
+                    { label: "Add your first broker with contact details", detail: "Name, email, phone, and MC/DOT number" },
+                    { label: "Set payment terms and credit limit", detail: "Net 15, 30, 45, 60, or Quick Pay" },
+                    { label: "Link brokers to loads and invoices for tracking" },
+                    { label: "Monitor broker status — active, inactive, or suspended" },
+                  ]}
+                  primaryAction={{ label: "Add First Broker", onClick: openCreateDialog }}
+                  hint="Tip: Quick Pay brokers are flagged separately so your team can prioritize them."
+                />
+              ) : (
+                <div className="py-8 text-center">
+                  <Building className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No brokers match your search</p>
+                  <button
+                    type="button"
+                    onClick={() => { setSearchTerm(""); setStatusFilter("all"); setActiveViewId(null); }}
+                    className="mt-2 text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="ff-data-table w-full min-w-[860px]">
+                <thead>
+                  <tr>
+                    <th>Broker</th>
+                    <th>Contact Person</th>
+                    <th>Contact Info</th>
+                    <th>Location</th>
+                    <th>Terms</th>
+                    <th className="text-right">Credit Limit</th>
+                    <th>Status</th>
+                    <th className="pr-5">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filteredBrokers.map((broker) => (
-                    <TableRow key={broker.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center space-x-2">
-                          <Building className="h-4 w-4 text-blue-600" />
+                    <tr
+                      key={broker.id}
+                      className={broker.status === "suspended" ? "ff-row-urgent" : broker.status === "inactive" ? "ff-row-stale" : ""}
+                    >
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                            <Building className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                          </div>
                           <div>
-                            <p className="font-medium">{broker.name}</p>
+                            <p className="font-medium text-slate-900 dark:text-white">{broker.name}</p>
                             {broker.mcNumber && (
-                              <p className="text-sm text-gray-500">MC: {broker.mcNumber}</p>
+                              <p className="text-[10.5px] text-slate-400 dark:text-slate-500">MC: {broker.mcNumber}</p>
                             )}
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>{broker.contactPerson}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-1">
-                            <Phone className="h-3 w-3 text-gray-400" />
-                            <span className="text-sm">{broker.phone}</span>
+                      </td>
+                      <td className="text-slate-700 dark:text-slate-300">{broker.contactPerson}</td>
+                      <td>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="h-3 w-3 text-slate-400" />
+                            <span className="text-[11.5px] text-slate-600 dark:text-slate-400">{broker.phone}</span>
                           </div>
-                          <div className="flex items-center space-x-1">
-                            <Mail className="h-3 w-3 text-gray-400" />
-                            <span className="text-sm">{broker.email}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="h-3 w-3 text-slate-400" />
+                            <span className="text-[11.5px] text-slate-600 dark:text-slate-400">{broker.email}</span>
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td>
                         {broker.city && broker.state ? (
-                          <div className="flex items-center space-x-1">
-                            <MapPin className="h-3 w-3 text-gray-400" />
-                            <span className="text-sm">{broker.city}, {broker.state}</span>
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-slate-400" />
+                            <span className="text-[11.5px] text-slate-600 dark:text-slate-400">{broker.city}, {broker.state}</span>
                           </div>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-slate-300 dark:text-slate-600">—</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
+                      </td>
+                      <td>
+                        <span className={broker.paymentTerms === "quickpay"
+                          ? "ff-badge ff-badge-overdue"
+                          : "ff-badge ff-badge-draft"
+                        }>
                           {getPaymentTermsLabel(broker.paymentTerms)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {broker.creditLimit ? `$${broker.creditLimit.toLocaleString()}` : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(broker.status)}>
+                        </span>
+                      </td>
+                      <td className="text-right font-semibold text-slate-700 dark:text-slate-300">
+                        {broker.creditLimit ? `$${broker.creditLimit.toLocaleString()}` : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td>
+                        <span className={getBrokerBadge(broker.status)}>
                           {broker.status.charAt(0).toUpperCase() + broker.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
+                        </span>
+                      </td>
+                      <td className="pr-5">
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <button
+                            type="button"
                             onClick={() => navigate(`/brokers/${broker.id}`)}
-                            className="h-8 gap-1.5 rounded-lg px-2 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/20"
+                            className="flex h-7 items-center gap-1 rounded-[7px] bg-blue-50 px-2 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-300"
                           >
-                            <ExternalLink className="h-3.5 w-3.5" />View
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                            <ExternalLink className="h-3 w-3" /> View
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => openEditDialog(broker)}
                             data-testid={`button-edit-${broker.id}`}
-                            className="h-8 w-8 rounded-lg p-0"
+                            className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
                           >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => {
-                              if (confirm("Are you sure you want to delete this broker?")) {
-                                deleteBrokerMutation.mutate(broker.id);
-                              }
-                            }}
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { if (confirm("Delete this broker?")) deleteBrokerMutation.mutate(broker.id); }}
                             data-testid={`button-delete-${broker.id}`}
-                            className="h-8 w-8 rounded-lg p-0"
+                            className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-slate-100 text-red-400 hover:bg-red-50 dark:bg-slate-800 dark:text-red-400"
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
-            )}
-            
-            {filteredBrokers.length === 0 && !isLoading && (
-              <div className="text-center py-12">
-                <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">
-                  {searchTerm ? "No brokers found matching your search" : "No brokers found"}
-                </p>
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
+                <span className="text-[11.5px] text-slate-400">{filteredBrokers.length} broker{filteredBrokers.length !== 1 ? "s" : ""}</span>
+                <span className="text-[11.5px] text-slate-400">
+                  ${filteredBrokers.reduce((s, b) => s + (b.creditLimit || 0), 0).toLocaleString()} total credit
+                </span>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
       </div>
       </main>
 
