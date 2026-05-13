@@ -27,6 +27,7 @@ import {
   insertTaskSchema,
   insertBrokerSchema,
   insertFuelAdvanceSchema,
+  insertBrokerFollowUpSchema,
   users,
   users as userTable,
   tasks,
@@ -44,7 +45,9 @@ import {
   documents as documentsTable,
   eventLedger,
   loads,
+  brokerFollowUps,
 } from "@shared/schema";
+import { triggerBrokerFollowUp } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
 
 import { sendEmail } from "./emailService";
@@ -2469,6 +2472,116 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deleting follow-up:", error);
       res.status(500).json({ message: "Failed to delete follow-up" });
+    }
+  });
+
+  // ── Broker Follow-Up Automation Engine ─────────────────────────────────────
+
+  // List all broker follow-ups (joined with invoice + client)
+  app.get("/api/broker-follow-ups", requireAuth, async (_req: any, res) => {
+    try {
+      const records = await db
+        .select({
+          id: brokerFollowUps.id,
+          invoiceId: brokerFollowUps.invoiceId,
+          clientId: brokerFollowUps.clientId,
+          brokerId: brokerFollowUps.brokerId,
+          triggerType: brokerFollowUps.triggerType,
+          triggerStatus: brokerFollowUps.triggerStatus,
+          subject: brokerFollowUps.subject,
+          body: brokerFollowUps.body,
+          status: brokerFollowUps.status,
+          sentAt: brokerFollowUps.sentAt,
+          acknowledgedAt: brokerFollowUps.acknowledgedAt,
+          sentBy: brokerFollowUps.sentBy,
+          notes: brokerFollowUps.notes,
+          createdAt: brokerFollowUps.createdAt,
+          updatedAt: brokerFollowUps.updatedAt,
+          invoiceNumber: invoices.invoiceNumber,
+          invoiceAmount: invoices.amount,
+          loadNumber: invoices.loadNumber,
+          clientName: clients.name,
+        })
+        .from(brokerFollowUps)
+        .leftJoin(invoices, eq(brokerFollowUps.invoiceId, invoices.id))
+        .leftJoin(clients, eq(brokerFollowUps.clientId, clients.id))
+        .orderBy(desc(brokerFollowUps.createdAt));
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching broker follow-ups:", error);
+      res.status(500).json({ message: "Failed to fetch broker follow-ups" });
+    }
+  });
+
+  // Get broker follow-ups for a specific invoice
+  app.get("/api/broker-follow-ups/invoice/:invoiceId", requireAuth, async (req: any, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId, 10);
+      const records = await db
+        .select()
+        .from(brokerFollowUps)
+        .where(eq(brokerFollowUps.invoiceId, invoiceId))
+        .orderBy(desc(brokerFollowUps.createdAt));
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch follow-ups for invoice" });
+    }
+  });
+
+  // Manually trigger a broker follow-up for an invoice
+  app.post("/api/broker-follow-ups/trigger", requireAuth, async (req: any, res) => {
+    try {
+      const { invoiceId } = z.object({ invoiceId: z.number() }).parse(req.body);
+      const id = await triggerBrokerFollowUp(invoiceId, req.user.id, "funded", "manual");
+      if (!id) return res.status(404).json({ message: "Invoice not found" });
+      const [record] = await db
+        .select()
+        .from(brokerFollowUps)
+        .where(eq(brokerFollowUps.id, id));
+      res.json(record);
+    } catch (error) {
+      console.error("Error triggering broker follow-up:", error);
+      res.status(500).json({ message: "Failed to trigger follow-up" });
+    }
+  });
+
+  // Update a broker follow-up (acknowledge, add notes, change status)
+  app.patch("/api/broker-follow-ups/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const updates: Record<string, unknown> = { ...req.body, updatedAt: new Date() };
+      if (updates.status === "acknowledged" && !updates.acknowledgedAt) {
+        updates.acknowledgedAt = new Date();
+      }
+      const [updated] = await db
+        .update(brokerFollowUps)
+        .set(updates as any)
+        .where(eq(brokerFollowUps.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      await storage.createActivity({
+        userId: req.user.id as string,
+        type: "broker_followup_updated",
+        description: `Broker follow-up #${id} status changed to ${updates.status ?? "updated"}`,
+        entityType: "invoice",
+        entityId: updated.invoiceId,
+      } as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating broker follow-up:", error);
+      res.status(500).json({ message: "Failed to update broker follow-up" });
+    }
+  });
+
+  // Delete a broker follow-up
+  app.delete("/api/broker-follow-ups/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      await db.delete(brokerFollowUps).where(eq(brokerFollowUps.id, id));
+      res.json({ message: "Broker follow-up deleted" });
+    } catch (error) {
+      console.error("Error deleting broker follow-up:", error);
+      res.status(500).json({ message: "Failed to delete broker follow-up" });
     }
   });
 

@@ -1296,3 +1296,37 @@ export type InsertDocExtractionJob = z.infer<typeof insertDocExtractionJobSchema
 export const insertDocReviewSchema = createInsertSchema(docReviews).omit({ id: true, createdAt: true, reviewedAt: true });
 export type DocReview = typeof docReviews.$inferSelect;
 export type InsertDocReview  = z.infer<typeof insertDocReviewSchema>;
+
+// ─── Broker Follow-Up Automation Engine ──────────────────────────────────────
+// Auto-created when a funded invoice enters collections-ready state.
+// Also supports manual triggers from agents.
+
+export const brokerFollowUps = pgTable("broker_follow_ups", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id")
+    .references(() => invoices.id, { onDelete: "cascade" })
+    .notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  triggerType: varchar("trigger_type", { enum: ["auto", "manual"] }).default("auto").notNull(),
+  triggerStatus: varchar("trigger_status").default("funded").notNull(),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  status: varchar("status", {
+    enum: ["pending", "sent", "acknowledged", "failed"],
+  }).default("pending").notNull(),
+  sentAt: timestamp("sent_at"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  sentBy: varchar("sent_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBrokerFollowUpSchema = createInsertSchema(brokerFollowUps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type BrokerFollowUp = typeof brokerFollowUps.$inferSelect;
+export type InsertBrokerFollowUp = z.infer<typeof insertBrokerFollowUpSchema>;

@@ -22,6 +22,7 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 import { advanceInvoiceStage, type FactoringStage } from "./invoiceStage";
 import { guardDocsForReview, guardDocsForApproval } from "./docValidation";
+import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
 
 // ─── Blocker types ────────────────────────────────────────────────────────────
 
@@ -361,6 +362,10 @@ export const TRANSITION_DEFS: TransitionDef[] = [
         ctx => `Invoice Funded — ${ctx.invoice.invoiceNumber}`,
         ctx => `Invoice ${ctx.invoice.invoiceNumber} has been funded. Your advance payment is being processed.`,
       ),
+      // Auto-trigger broker follow-up: invoice is now collections-ready
+      async ({ invoiceId, actorId }) => {
+        triggerBrokerFollowUp(invoiceId, actorId, "funded", "auto").catch(() => {});
+      },
     ],
   },
 

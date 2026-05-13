@@ -25,6 +25,7 @@ import {
   Shield,
   Activity,
   RefreshCw,
+  Mail,
 } from "lucide-react";
 
 type AuditEntry = {
@@ -76,6 +77,17 @@ const EVENT_ICON: Record<string, React.ElementType> = {
   payment: DollarSign,
 };
 
+// Event-type-specific icon overrides (take precedence over entity-type icons)
+const EVENT_TYPE_ICON: Record<string, React.ElementType> = {
+  broker_followup_triggered: Mail,
+  broker_followup_updated: Mail,
+};
+
+const EVENT_TYPE_COLOR: Record<string, string> = {
+  broker_followup_triggered: "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
+  broker_followup_updated:   "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
+};
+
 const ENTITY_COLOR: Record<string, string> = {
   invoice: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400",
   client: "bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400",
@@ -105,15 +117,21 @@ function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): U
   const fromEvents: UnifiedEntry[] = events.map(e => ({
     id: `ev-${e.id}`,
     kind: "event",
-    title: formatEventType(e.eventType),
-    detail: e.entityType.charAt(0).toUpperCase() + e.entityType.slice(1) + (e.entityId ? ` #${e.entityId}` : ""),
+    title: e.eventType === "broker_followup_triggered"
+      ? `Broker Follow-Up Triggered — ${(e.payloadJson as any)?.invoiceNumber ?? `Invoice #${e.entityId}`}`
+      : e.eventType === "broker_followup_updated"
+      ? `Broker Follow-Up Updated — Invoice #${e.entityId}`
+      : formatEventType(e.eventType),
+    detail: e.eventType === "broker_followup_triggered"
+      ? `${(e.payloadJson as any)?.clientName ?? ""} · ${(e.payloadJson as any)?.triggerType === "auto" ? "Auto-triggered on funding" : "Manually triggered"}`
+      : e.entityType.charAt(0).toUpperCase() + e.entityType.slice(1) + (e.entityId ? ` #${e.entityId}` : ""),
     entityType: e.entityType,
     entityId: e.entityId,
     actorName: e.actorName ?? e.actorId ?? null,
     actorType: e.actorType,
     createdAt: e.createdAt,
-    icon: EVENT_ICON[e.entityType] ?? Activity,
-    color: ENTITY_COLOR[e.entityType] ?? "bg-slate-100 text-slate-600",
+    icon: EVENT_TYPE_ICON[e.eventType] ?? EVENT_ICON[e.entityType] ?? Activity,
+    color: EVENT_TYPE_COLOR[e.eventType] ?? ENTITY_COLOR[e.entityType] ?? "bg-slate-100 text-slate-600",
   }));
 
   const fromStatus: UnifiedEntry[] = statusHistory.map(s => ({

@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Plus, Search, Edit2, Trash2, AlertTriangle, DollarSign,
-  SquareCheck, Square,
+  SquareCheck, Square, Mail,
 } from "lucide-react";
 import { useSavedViews, type SavedView } from "@/hooks/use-saved-views";
 
@@ -43,6 +43,7 @@ function useStickyState<T>(key: string, def: T) {
 interface Collection {
   id: number;
   clientId: number;
+  invoiceId?: number;
   amount: string;
   description: string;
   status: "pending" | "in_progress" | "paid" | "written_off";
@@ -147,6 +148,16 @@ export default function CollectionsPage() {
   // ── Queries ──────────────────────────────────────────────────────
   const { data: collections = [], isLoading } = useQuery<Collection[]>({ queryKey: ["/api/collections"] });
   const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
+  const { data: brokerFollowUps = [] } = useQuery<{ invoiceId: number; status: string }[]>({
+    queryKey: ["/api/broker-follow-ups"],
+    select: (data: any[]) => data.map((d: any) => ({ invoiceId: d.invoiceId, status: d.status })),
+  });
+
+  // Derive a set of invoiceIds with active (non-acknowledged) broker follow-ups
+  const followUpInvoiceIds = useMemo(
+    () => new Set(brokerFollowUps.filter(b => b.status !== "acknowledged").map(b => b.invoiceId)),
+    [brokerFollowUps],
+  );
 
   // Saved views
   const { allViews: savedViews } = useSavedViews("collections");
@@ -506,7 +517,18 @@ export default function CollectionsPage() {
                               </button>
                             </td>
                             <td className="font-medium text-slate-900 dark:text-white">
-                              {c.client?.name ?? <span className="text-slate-400">Unknown</span>}
+                              <div className="flex items-center gap-1.5">
+                                {c.client?.name ?? <span className="text-slate-400">Unknown</span>}
+                                {c.invoiceId && followUpInvoiceIds.has(c.invoiceId) && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400 px-1.5 py-0.5 text-[9.5px] font-bold border border-orange-200 dark:border-orange-800"
+                                    title="Active broker follow-up pending"
+                                  >
+                                    <Mail className="h-2.5 w-2.5" />
+                                    Follow-up
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="text-right font-semibold text-red-600 dark:text-red-400">
                               {fmt(c.amount)}
