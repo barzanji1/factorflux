@@ -28,6 +28,8 @@ import {
   insertBrokerSchema,
   insertFuelAdvanceSchema,
   insertBrokerFollowUpSchema,
+  insertBrokerFollowUpReminderSchema,
+  brokerFollowUpReminders,
   users,
   users as userTable,
   tasks,
@@ -47,7 +49,7 @@ import {
   loads,
   brokerFollowUps,
 } from "@shared/schema";
-import { triggerBrokerFollowUp } from "./services/brokerFollowUpEngine";
+import { triggerBrokerFollowUp, processScheduledReminders } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
 
 import { sendEmail } from "./emailService";
@@ -2582,6 +2584,54 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deleting broker follow-up:", error);
       res.status(500).json({ message: "Failed to delete broker follow-up" });
+    }
+  });
+
+  // ── Broker Follow-Up Reminders (cadence instances) ──────────────────────────
+
+  // Get all reminders for a follow-up
+  app.get("/api/broker-follow-ups/:id/reminders", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const reminders = await db
+        .select()
+        .from(brokerFollowUpReminders)
+        .where(eq(brokerFollowUpReminders.followUpId, id))
+        .orderBy(brokerFollowUpReminders.sequenceNumber);
+      res.json(reminders);
+    } catch (error) {
+      console.error("Error fetching reminders:", error);
+      res.status(500).json({ message: "Failed to fetch reminders" });
+    }
+  });
+
+  // Update a reminder (skip, cancel, restore, reschedule)
+  app.patch("/api/broker-follow-up-reminders/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const updates: Record<string, unknown> = { ...req.body, updatedAt: new Date() };
+      const [updated] = await db
+        .update(brokerFollowUpReminders)
+        .set(updates as any)
+        .where(eq(brokerFollowUpReminders.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Reminder not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating reminder:", error);
+      res.status(500).json({ message: "Failed to update reminder" });
+    }
+  });
+
+  // Admin: manually trigger the reminder scheduler
+  app.post("/api/broker-follow-up-reminders/process", requireAuth, async (req: any, res) => {
+    try {
+      if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+      const result = await processScheduledReminders();
+      res.json({ message: "Reminders processed", ...result });
+    } catch (error) {
+      console.error("Error processing reminders:", error);
+      res.status(500).json({ message: "Failed to process reminders" });
     }
   });
 

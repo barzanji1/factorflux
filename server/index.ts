@@ -133,6 +133,10 @@ export async function startServer(
 
   startAuthorityScheduler();
 
+  import("./services/brokerFollowUpEngine")
+    .then(m => m.startReminderScheduler())
+    .catch(e => console.warn("[reminderScheduler] startup error:", e?.message));
+
   // Seed default document validation rules (no-op if already seeded)
   import("./services/docValidation").then(m => m.seedDocumentRules()).catch(e =>
     console.warn("[docValidation] seed error:", e?.message)

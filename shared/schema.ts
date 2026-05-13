@@ -1299,7 +1299,15 @@ export type InsertDocReview  = z.infer<typeof insertDocReviewSchema>;
 
 // ─── Broker Follow-Up Automation Engine ──────────────────────────────────────
 // Auto-created when a funded invoice enters collections-ready state.
-// Also supports manual triggers from agents.
+// Supports configurable reminder cadences (immediate, due-date, overdue, weekly).
+
+export interface CadenceConfig {
+  sendImmediately: boolean;
+  sendOnDueDate: boolean;
+  overdueIntervals: number[];  // days past due date, e.g. [3, 7]
+  weeklyCount: number;         // weekly reminders after last overdue step
+  paused: boolean;
+}
 
 export const brokerFollowUps = pgTable("broker_follow_ups", {
   id: serial("id").primaryKey(),
@@ -1319,6 +1327,7 @@ export const brokerFollowUps = pgTable("broker_follow_ups", {
   acknowledgedAt: timestamp("acknowledged_at"),
   sentBy: varchar("sent_by").references(() => users.id),
   notes: text("notes"),
+  cadenceConfig: jsonb("cadence_config").$type<CadenceConfig>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1330,3 +1339,35 @@ export const insertBrokerFollowUpSchema = createInsertSchema(brokerFollowUps).om
 });
 export type BrokerFollowUp = typeof brokerFollowUps.$inferSelect;
 export type InsertBrokerFollowUp = z.infer<typeof insertBrokerFollowUpSchema>;
+
+// ─── Broker Follow-Up Reminders (cadence instances) ──────────────────────────
+
+export const brokerFollowUpReminders = pgTable("broker_follow_up_reminders", {
+  id: serial("id").primaryKey(),
+  followUpId: integer("follow_up_id")
+    .references(() => brokerFollowUps.id, { onDelete: "cascade" })
+    .notNull(),
+  sequenceNumber: integer("sequence_number").notNull(),
+  reminderType: varchar("reminder_type").notNull(),
+  // reminderType values: immediate | due_date | 3d_overdue | 7d_overdue | weekly
+  intervalDays: integer("interval_days"),
+  // intervalDays = days from invoice due date (null for immediate)
+  scheduledSendAt: timestamp("scheduled_send_at").notNull(),
+  actualSendAt: timestamp("actual_send_at"),
+  status: varchar("status", {
+    enum: ["scheduled", "sent", "skipped", "paused", "canceled"],
+  }).default("scheduled").notNull(),
+  skipReason: varchar("skip_reason"),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBrokerFollowUpReminderSchema = createInsertSchema(brokerFollowUpReminders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type BrokerFollowUpReminder = typeof brokerFollowUpReminders.$inferSelect;
+export type InsertBrokerFollowUpReminder = z.infer<typeof insertBrokerFollowUpReminderSchema>;

@@ -1,27 +1,32 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Clock, Plus, Search, Calendar, AlertCircle, CheckCircle, User, FileText,
-  Mail, Zap, CheckCheck, RefreshCw,
+  Mail, Zap, CheckCheck, RefreshCw, ChevronDown, ChevronUp, Ban, SkipForward,
+  RotateCcw, Settings2, Pause, Play, Send,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, formatDistanceToNow, isPast } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { cn } from "@/lib/utils";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 const followUpSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
@@ -32,7 +37,15 @@ const followUpSchema = z.object({
   status: z.enum(["pending", "in-progress", "completed"]).default("pending"),
 });
 
-type FollowUp = {
+interface CadenceConfig {
+  sendImmediately: boolean;
+  sendOnDueDate: boolean;
+  overdueIntervals: number[];
+  weeklyCount: number;
+  paused: boolean;
+}
+
+interface FollowUp {
   id: number;
   clientId: number;
   title: string;
@@ -43,9 +56,9 @@ type FollowUp = {
   createdAt: string;
   updatedAt: string;
   client?: { id: number; name: string; email: string };
-};
+}
 
-type BrokerFollowUp = {
+interface BrokerFollowUp {
   id: number;
   invoiceId: number;
   clientId: number | null;
@@ -58,14 +71,56 @@ type BrokerFollowUp = {
   acknowledgedAt: string | null;
   sentBy: string | null;
   notes: string | null;
+  cadenceConfig: CadenceConfig | null;
   createdAt: string;
   invoiceNumber: string | null;
   invoiceAmount: string | null;
   loadNumber: string | null;
   clientName: string | null;
+}
+
+interface BrokerFollowUpReminder {
+  id: number;
+  followUpId: number;
+  sequenceNumber: number;
+  reminderType: string;
+  intervalDays: number | null;
+  scheduledSendAt: string;
+  actualSendAt: string | null;
+  status: "scheduled" | "sent" | "skipped" | "paused" | "canceled";
+  skipReason: string | null;
+  subject: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Label/color helpers ──────────────────────────────────────────────────────
+
+function reminderTypeLabel(type: string): string {
+  if (type === "immediate")  return "Immediate (Funding)";
+  if (type === "due_date")   return "Due Date";
+  const od = type.match(/^(\d+)d_overdue$/);
+  if (od) return `${od[1]} Days Overdue`;
+  const wk = type.match(/^weekly_(\d+)$/);
+  if (wk) return `Weekly #${wk[1]}`;
+  return type;
+}
+
+const REMINDER_STATUS_COLOR: Record<string, string> = {
+  scheduled: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800",
+  sent:      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800",
+  skipped:   "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800",
+  paused:    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+  canceled:  "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800",
 };
 
-// ─── Status helpers ───────────────────────────────────────────────────────────
+const BFU_STATUS_COLOR: Record<string, string> = {
+  pending:      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400",
+  sent:         "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400",
+  acknowledged: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400",
+  failed:       "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400",
+};
 
 function getPriorityColor(priority: string) {
   switch (priority) {
@@ -78,39 +133,365 @@ function getPriorityColor(priority: string) {
 
 function getStatusColor(status: string) {
   switch (status) {
-    case "completed":  return "bg-green-100 text-green-800 border-green-200";
+    case "completed":   return "bg-green-100 text-green-800 border-green-200";
     case "in-progress": return "bg-blue-100 text-blue-800 border-blue-200";
-    case "pending":    return "bg-gray-100 text-gray-800 border-gray-200";
-    default:           return "bg-gray-100 text-gray-800 border-gray-200";
+    default:            return "bg-gray-100 text-gray-800 border-gray-200";
   }
 }
 
 function getStatusIcon(status: string) {
   switch (status) {
-    case "completed":  return <CheckCircle className="h-4 w-4" />;
+    case "completed":   return <CheckCircle className="h-4 w-4" />;
     case "in-progress": return <Clock className="h-4 w-4" />;
-    case "pending":    return <AlertCircle className="h-4 w-4" />;
-    default:           return <AlertCircle className="h-4 w-4" />;
+    default:            return <AlertCircle className="h-4 w-4" />;
   }
 }
 
-const BFU_STATUS_COLOR: Record<string, string> = {
-  pending:      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400",
-  sent:         "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400",
-  acknowledged: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400",
-  failed:       "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400",
-};
+// ─── Reminder timeline component ──────────────────────────────────────────────
+
+function ReminderTimeline({
+  bfuId,
+  cadenceConfig,
+  onCadenceChange,
+}: {
+  bfuId: number;
+  cadenceConfig: CadenceConfig | null;
+  onCadenceChange: (cfg: CadenceConfig) => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [editingCadence, setEditingCadence] = useState(false);
+  const [localCadence, setLocalCadence] = useState<CadenceConfig>(
+    cadenceConfig ?? {
+      sendImmediately: true,
+      sendOnDueDate: true,
+      overdueIntervals: [3, 7],
+      weeklyCount: 4,
+      paused: false,
+    },
+  );
+  const [overdueInput, setOverdueInput] = useState(
+    (cadenceConfig?.overdueIntervals ?? [3, 7]).join(", "),
+  );
+
+  const { data: reminders = [], isLoading } = useQuery<BrokerFollowUpReminder[]>({
+    queryKey: ["/api/broker-follow-ups", bfuId, "reminders"],
+    queryFn: () => fetch(`/api/broker-follow-ups/${bfuId}/reminders`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  const updateReminder = useMutation({
+    mutationFn: ({ id, updates }: { id: number; updates: Record<string, unknown> }) =>
+      apiRequest("PATCH", `/api/broker-follow-up-reminders/${id}`, updates),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups", bfuId, "reminders"] });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update reminder", variant: "destructive" }),
+  });
+
+  const updateCadenceMut = useMutation({
+    mutationFn: (cfg: CadenceConfig) =>
+      apiRequest("PATCH", `/api/broker-follow-ups/${bfuId}`, { cadenceConfig: cfg }),
+    onSuccess: (_, cfg) => {
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
+      onCadenceChange(cfg);
+      setEditingCadence(false);
+      toast({ title: "Cadence saved" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save cadence", variant: "destructive" }),
+  });
+
+  function handleReminderAction(reminder: BrokerFollowUpReminder, action: "skip" | "cancel" | "restore") {
+    const statusMap = { skip: "skipped", cancel: "canceled", restore: "scheduled" } as const;
+    updateReminder.mutate({ id: reminder.id, updates: { status: statusMap[action] } });
+  }
+
+  function saveCadence() {
+    const intervals = overdueInput
+      .split(/[\s,]+/)
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n) && n > 0)
+      .sort((a, b) => a - b);
+    const cfg = { ...localCadence, overdueIntervals: intervals };
+    setLocalCadence(cfg);
+    updateCadenceMut.mutate(cfg);
+  }
+
+  const isPaused = cadenceConfig?.paused ?? false;
+
+  function togglePause() {
+    const cfg: CadenceConfig = { ...(cadenceConfig ?? localCadence), paused: !isPaused };
+    updateCadenceMut.mutate(cfg);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-3 text-[12px] text-slate-400">
+        <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Loading reminder schedule…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Reminder Cadence
+          <span className="ml-2 text-[10px] font-normal normal-case text-slate-400">
+            {reminders.length} step{reminders.length !== 1 ? "s" : ""}
+          </span>
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className={cn(
+              "h-6 px-2 text-[10.5px] gap-1",
+              isPaused
+                ? "border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400",
+            )}
+            onClick={togglePause}
+            disabled={updateCadenceMut.isPending}
+          >
+            {isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+            {isPaused ? "Resume" : "Pause All"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[10.5px] gap-1"
+            onClick={() => setEditingCadence(v => !v)}
+          >
+            <Settings2 className="h-3 w-3" />
+            Edit Cadence
+          </Button>
+        </div>
+      </div>
+
+      {/* Cadence editor */}
+      {editingCadence && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40 p-3 space-y-3">
+          <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Cadence Settings</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+            <div className="flex items-center gap-2">
+              <Switch
+                id={`si-${bfuId}`}
+                checked={localCadence.sendImmediately}
+                onCheckedChange={v => setLocalCadence(c => ({ ...c, sendImmediately: v }))}
+              />
+              <Label htmlFor={`si-${bfuId}`} className="text-[12px] cursor-pointer">Send Immediately</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id={`sd-${bfuId}`}
+                checked={localCadence.sendOnDueDate}
+                onCheckedChange={v => setLocalCadence(c => ({ ...c, sendOnDueDate: v }))}
+              />
+              <Label htmlFor={`sd-${bfuId}`} className="text-[12px] cursor-pointer">Send on Due Date</Label>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-[11px] text-slate-500 mb-1 block">Overdue Intervals (days, comma-separated)</Label>
+              <Input
+                value={overdueInput}
+                onChange={e => setOverdueInput(e.target.value)}
+                placeholder="3, 7, 14"
+                className="h-7 text-[12px]"
+              />
+            </div>
+            <div>
+              <Label className="text-[11px] text-slate-500 mb-1 block">Weekly Reminders (count)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={12}
+                value={localCadence.weeklyCount}
+                onChange={e => setLocalCadence(c => ({ ...c, weeklyCount: parseInt(e.target.value) || 0 }))}
+                className="h-7 text-[12px] w-20"
+              />
+            </div>
+          </div>
+          <p className="text-[10.5px] text-amber-600 dark:text-amber-400">
+            Note: editing cadence only affects future unsent reminders. Already-sent reminders are unchanged.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <Button
+              size="sm"
+              className="h-7 px-3 text-[11px]"
+              onClick={saveCadence}
+              disabled={updateCadenceMut.isPending}
+            >
+              {updateCadenceMut.isPending ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-3 text-[11px]" onClick={() => setEditingCadence(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline */}
+      {reminders.length === 0 ? (
+        <p className="text-[12px] text-slate-400 italic">No reminders scheduled.</p>
+      ) : (
+        <div className="relative space-y-0">
+          {/* Vertical connector line */}
+          <div className="absolute left-[15px] top-5 bottom-5 w-px bg-slate-200 dark:bg-slate-700" />
+          {reminders.map((r, idx) => {
+            const isLast  = idx === reminders.length - 1;
+            const canSkip = r.status === "scheduled" || r.status === "paused";
+            const canCancel = r.status === "scheduled" || r.status === "paused" || r.status === "skipped";
+            const canRestore = r.status === "canceled" || r.status === "skipped";
+            const overdue = r.status === "scheduled" && isPast(new Date(r.scheduledSendAt));
+
+            return (
+              <div
+                key={r.id}
+                className={cn(
+                  "relative flex gap-3 py-2",
+                  r.status === "canceled" && "opacity-50",
+                )}
+              >
+                {/* Step dot */}
+                <div className={cn(
+                  "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold",
+                  r.status === "sent"     ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300" :
+                  r.status === "canceled" ? "border-red-300 bg-red-50 text-red-400 dark:bg-red-950/20" :
+                  r.status === "skipped"  ? "border-amber-300 bg-amber-50 text-amber-600 dark:bg-amber-950/20" :
+                  overdue                 ? "border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-950/30 animate-pulse" :
+                  "border-slate-300 bg-white text-slate-500 dark:border-slate-600 dark:bg-slate-800"
+                )}>
+                  {r.sequenceNumber}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[12.5px] font-semibold text-slate-800 dark:text-white">
+                      {reminderTypeLabel(r.reminderType)}
+                    </span>
+                    <span className={cn(
+                      "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold capitalize",
+                      REMINDER_STATUS_COLOR[r.status],
+                    )}>
+                      {r.status === "sent" && <CheckCheck className="mr-0.5 h-2.5 w-2.5" />}
+                      {r.status === "canceled" && <Ban className="mr-0.5 h-2.5 w-2.5" />}
+                      {r.status === "skipped" && <SkipForward className="mr-0.5 h-2.5 w-2.5" />}
+                      {r.status === "paused" && <Pause className="mr-0.5 h-2.5 w-2.5" />}
+                      {r.status}
+                    </span>
+                    {overdue && (
+                      <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
+                        ⚠ {formatDistanceToNow(new Date(r.scheduledSendAt))} overdue
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Scheduled: {format(new Date(r.scheduledSendAt), "MMM d, yyyy HH:mm")}
+                    </span>
+                    {r.actualSendAt && (
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                        <Send className="h-3 w-3" />
+                        Sent: {format(new Date(r.actualSendAt), "MMM d, yyyy HH:mm")}
+                      </span>
+                    )}
+                  </div>
+                  {r.skipReason && (
+                    <p className="mt-0.5 text-[11px] italic text-slate-400">{r.skipReason}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-start gap-1 pt-0.5 shrink-0">
+                  {canRestore && (
+                    <button
+                      type="button"
+                      onClick={() => handleReminderAction(r, "restore")}
+                      disabled={updateReminder.isPending}
+                      className="flex items-center gap-0.5 rounded-md bg-slate-100 px-2 py-1 text-[10.5px] font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-50"
+                      title="Restore to scheduled"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Restore
+                    </button>
+                  )}
+                  {canSkip && (
+                    <button
+                      type="button"
+                      onClick={() => handleReminderAction(r, "skip")}
+                      disabled={updateReminder.isPending}
+                      className="flex items-center gap-0.5 rounded-md bg-amber-50 px-2 py-1 text-[10.5px] font-medium text-amber-700 hover:bg-amber-100 dark:bg-amber-950/20 dark:text-amber-400 disabled:opacity-50"
+                      title="Skip this reminder"
+                    >
+                      <SkipForward className="h-3 w-3" /> Skip
+                    </button>
+                  )}
+                  {canCancel && (
+                    <button
+                      type="button"
+                      onClick={() => handleReminderAction(r, "cancel")}
+                      disabled={updateReminder.isPending}
+                      className="flex items-center gap-0.5 rounded-md bg-red-50 px-2 py-1 text-[10.5px] font-medium text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 disabled:opacity-50"
+                      title="Cancel this reminder"
+                    >
+                      <Ban className="h-3 w-3" /> Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Inline note editor ───────────────────────────────────────────────────────
+
+function NoteEditor({
+  bfu, onSave, saving,
+}: { bfu: BrokerFollowUp; onSave: (notes: string) => void; saving: boolean }) {
+  const [notes, setNotes] = useState(bfu.notes ?? "");
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Agent Notes</p>
+      <Textarea
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        rows={3}
+        placeholder="Add notes about this follow-up…"
+        className="text-[12px] resize-none"
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        className="mt-1.5 h-7 px-3 text-[11px]"
+        disabled={saving || notes === (bfu.notes ?? "")}
+        onClick={() => onSave(notes)}
+      >
+        {saving ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
+        Save Notes
+      </Button>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function FollowUpPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm]     = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [isAddingFollowUp, setIsAddingFollowUp] = useState(false);
-  const [bfuSearch, setBfuSearch] = useState("");
+  const [bfuSearch, setBfuSearch]         = useState("");
   const [bfuStatusFilter, setBfuStatusFilter] = useState("all");
-  const [expandedBfu, setExpandedBfu] = useState<number | null>(null);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [expandedBfu, setExpandedBfu]     = useState<number | null>(null);
+  const [localCadences, setLocalCadences] = useState<Record<number, CadenceConfig>>({});
+  const { toast }  = useToast();
+  const qc = useQueryClient();
 
   const form = useForm<z.infer<typeof followUpSchema>>({
     resolver: zodResolver(followUpSchema),
@@ -118,8 +499,8 @@ export default function FollowUpPage() {
   });
 
   // ── Queries ──────────────────────────────────────────────────────────────────
-  const { data: followUps = [], isLoading } = useQuery<FollowUp[]>({ queryKey: ["/api/follow-ups"] });
-  const { data: clients = [] } = useQuery({ queryKey: ["/api/clients"] });
+  const { data: followUps = [], isLoading }  = useQuery<FollowUp[]>({ queryKey: ["/api/follow-ups"] });
+  const { data: clients = [] }               = useQuery({ queryKey: ["/api/clients"] });
   const { data: brokerFollowUps = [], isLoading: bfuLoading } = useQuery<BrokerFollowUp[]>({
     queryKey: ["/api/broker-follow-ups"],
   });
@@ -128,21 +509,19 @@ export default function FollowUpPage() {
   const addFollowUpMutation = useMutation({
     mutationFn: (data: z.infer<typeof followUpSchema>) => apiRequest("POST", "/api/follow-ups", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/follow-ups"] });
+      qc.invalidateQueries({ queryKey: ["/api/follow-ups"] });
       form.reset();
       setIsAddingFollowUp(false);
       toast({ title: "Success", description: "Follow-up task created successfully" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create follow-up task", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Error", description: "Failed to create follow-up task", variant: "destructive" }),
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       apiRequest("PATCH", `/api/follow-ups/${id}`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/follow-ups"] });
+      qc.invalidateQueries({ queryKey: ["/api/follow-ups"] });
       toast({ title: "Success", description: "Follow-up status updated" });
     },
   });
@@ -151,7 +530,7 @@ export default function FollowUpPage() {
   const acknowledgeMutation = useMutation({
     mutationFn: (id: number) => apiRequest("PATCH", `/api/broker-follow-ups/${id}`, { status: "acknowledged" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
       toast({ title: "Acknowledged", description: "Broker follow-up marked as acknowledged" });
     },
   });
@@ -160,34 +539,39 @@ export default function FollowUpPage() {
     mutationFn: ({ id, notes }: { id: number; notes: string }) =>
       apiRequest("PATCH", `/api/broker-follow-ups/${id}`, { notes }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
       toast({ title: "Saved", description: "Notes saved" });
     },
   });
 
+  const handleCadenceChange = useCallback((bfuId: number, cfg: CadenceConfig) => {
+    setLocalCadences(prev => ({ ...prev, [bfuId]: cfg }));
+  }, []);
+
   const onSubmit = (data: z.infer<typeof followUpSchema>) => addFollowUpMutation.mutate(data);
 
   // ── Filtered lists ────────────────────────────────────────────────────────────
-  const filteredFollowUps = (followUps as FollowUp[]).filter((f) => {
+  const filteredFollowUps = (followUps as FollowUp[]).filter(f => {
     const matchesSearch =
       f.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       f.client?.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus   = statusFilter === "all"   || f.status === statusFilter;
-    const matchesPriority = priorityFilter === "all" || f.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch &&
+      (statusFilter === "all"   || f.status === statusFilter) &&
+      (priorityFilter === "all" || f.priority === priorityFilter);
   });
 
-  const filteredBfu = (brokerFollowUps as BrokerFollowUp[]).filter((b) => {
+  const filteredBfu = (brokerFollowUps as BrokerFollowUp[]).filter(b => {
     const q = bfuSearch.toLowerCase();
     const matchesSearch = !q ||
       (b.invoiceNumber ?? "").toLowerCase().includes(q) ||
       (b.clientName ?? "").toLowerCase().includes(q) ||
       (b.loadNumber ?? "").toLowerCase().includes(q);
-    const matchesStatus = bfuStatusFilter === "all" || b.status === bfuStatusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesSearch && (bfuStatusFilter === "all" || b.status === bfuStatusFilter);
   });
 
-  const pendingBfuCount = (brokerFollowUps as BrokerFollowUp[]).filter(b => b.status === "pending" || b.status === "sent").length;
+  const pendingBfuCount = (brokerFollowUps as BrokerFollowUp[]).filter(
+    b => b.status !== "acknowledged",
+  ).length;
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -206,7 +590,7 @@ export default function FollowUpPage() {
                   Follow Up Tasks
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  Manage client follow-ups, pending tasks, and broker automations
+                  Manage client follow-ups, tasks, and broker payment reminder cadences
                 </p>
               </div>
               <Dialog open={isAddingFollowUp} onOpenChange={setIsAddingFollowUp}>
@@ -246,7 +630,7 @@ export default function FollowUpPage() {
                       <FormField control={form.control} name="description" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Description</FormLabel>
-                          <FormControl><Textarea placeholder="Additional details about the follow-up task" {...field} /></FormControl>
+                          <FormControl><Textarea placeholder="Additional details…" {...field} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
@@ -290,21 +674,24 @@ export default function FollowUpPage() {
                   <Clock className="h-4 w-4" />
                   Manual Tasks
                   {filteredFollowUps.length > 0 && (
-                    <span className="ml-1 rounded-full bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold">{filteredFollowUps.length}</span>
+                    <span className="ml-1 rounded-full bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold">
+                      {filteredFollowUps.length}
+                    </span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="broker" className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   Broker Automations
                   {pendingBfuCount > 0 && (
-                    <span className="ml-1 rounded-full bg-orange-500 text-white px-1.5 py-0.5 text-[10px] font-bold">{pendingBfuCount}</span>
+                    <span className="ml-1 rounded-full bg-orange-500 text-white px-1.5 py-0.5 text-[10px] font-bold">
+                      {pendingBfuCount}
+                    </span>
                   )}
                 </TabsTrigger>
               </TabsList>
 
-              {/* ── Manual follow-ups tab ─────────────────────────────────────── */}
+              {/* ── Manual follow-ups ─────────────────────────────────────────── */}
               <TabsContent value="manual" className="space-y-4">
-                {/* Filters */}
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
@@ -313,7 +700,7 @@ export default function FollowUpPage() {
                         <Input
                           placeholder="Search follow-ups..."
                           value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
+                          onChange={e => setSearchTerm(e.target.value)}
                         />
                       </div>
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -338,7 +725,6 @@ export default function FollowUpPage() {
                   </CardContent>
                 </Card>
 
-                {/* Follow-up cards */}
                 <div className="grid gap-4">
                   {isLoading ? (
                     <div className="text-center py-8">
@@ -352,13 +738,13 @@ export default function FollowUpPage() {
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No follow-ups found</h3>
                         <p className="text-gray-600 dark:text-gray-400">
                           {searchTerm || statusFilter !== "all" || priorityFilter !== "all"
-                            ? "Try adjusting your filters or search terms"
+                            ? "Try adjusting your filters"
                             : "Create your first follow-up task to get started"}
                         </p>
                       </CardContent>
                     </Card>
                   ) : (
-                    filteredFollowUps.map((followUp) => (
+                    filteredFollowUps.map(followUp => (
                       <Card key={followUp.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between">
@@ -378,8 +764,7 @@ export default function FollowUpPage() {
                               )}
                               <div className="flex items-center gap-4 text-sm text-gray-500">
                                 <div className="flex items-center gap-1">
-                                  <User className="h-4 w-4" />
-                                  {followUp.client?.name}
+                                  <User className="h-4 w-4" />{followUp.client?.name}
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <Calendar className="h-4 w-4" />
@@ -409,18 +794,16 @@ export default function FollowUpPage() {
                 </div>
               </TabsContent>
 
-              {/* ── Broker automations tab ────────────────────────────────────── */}
+              {/* ── Broker automations ────────────────────────────────────────── */}
               <TabsContent value="broker" className="space-y-4">
-                {/* Info banner */}
                 <div className="flex items-start gap-3 rounded-xl border border-orange-200/70 bg-orange-50/60 px-4 py-3 dark:border-orange-900/40 dark:bg-orange-950/10">
                   <Zap className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
                   <p className="text-[12.5px] text-orange-800 dark:text-orange-300">
-                    <span className="font-semibold">Automated follow-ups</span> are triggered when an invoice is funded (enters collections-ready state).
-                    An email is sent to the broker/debtor and the event is logged to the Audit Trail.
+                    <span className="font-semibold">Automated follow-ups</span> are triggered when an invoice is funded.
+                    Each follow-up runs a configurable reminder cadence — immediate, due date, overdue intervals, and weekly reminders.
                   </p>
                 </div>
 
-                {/* Filters */}
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
@@ -429,11 +812,11 @@ export default function FollowUpPage() {
                         <Input
                           placeholder="Search by invoice, carrier, load…"
                           value={bfuSearch}
-                          onChange={(e) => setBfuSearch(e.target.value)}
+                          onChange={e => setBfuSearch(e.target.value)}
                         />
                       </div>
                       <Select value={bfuStatusFilter} onValueChange={setBfuStatusFilter}>
-                        <SelectTrigger className="w-48"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+                        <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Status</SelectItem>
                           <SelectItem value="pending">Pending</SelectItem>
@@ -446,11 +829,9 @@ export default function FollowUpPage() {
                   </CardContent>
                 </Card>
 
-                {/* Broker follow-up table */}
                 {bfuLoading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto" />
-                    <p className="text-gray-600 dark:text-gray-400 mt-2">Loading broker automations...</p>
                   </div>
                 ) : filteredBfu.length === 0 ? (
                   <Card>
@@ -465,166 +846,153 @@ export default function FollowUpPage() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-[13px]">
-                        <thead className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                          <tr>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Invoice</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Carrier</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Load #</th>
-                            <th className="text-right px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Amount</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Trigger</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Status</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Created</th>
-                            <th className="text-right px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {filteredBfu.map((bfu) => (
-                            <>
-                              <tr
-                                key={bfu.id}
-                                className="hover:bg-slate-50/60 dark:hover:bg-slate-900/30 transition-colors cursor-pointer"
-                                onClick={() => setExpandedBfu(expandedBfu === bfu.id ? null : bfu.id)}
-                              >
-                                <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
-                                  {bfu.invoiceNumber ?? `#${bfu.invoiceId}`}
-                                </td>
-                                <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                                  {bfu.clientName ?? <span className="text-slate-400">—</span>}
-                                </td>
-                                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                                  {bfu.loadNumber ?? <span className="text-slate-400">—</span>}
-                                </td>
-                                <td className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
-                                  {bfu.invoiceAmount
-                                    ? `$${Number(bfu.invoiceAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                                    : "—"}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className={cn(
-                                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border",
-                                    bfu.triggerType === "auto"
-                                      ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400"
-                                      : "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/20 dark:text-violet-400"
-                                  )}>
-                                    {bfu.triggerType === "auto" ? <Zap className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                                    {bfu.triggerType}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className={cn(
-                                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border capitalize",
-                                    BFU_STATUS_COLOR[bfu.status] ?? "bg-gray-50 text-gray-600 border-gray-200"
-                                  )}>
-                                    {bfu.status === "acknowledged" && <CheckCheck className="h-3 w-3" />}
-                                    {bfu.status === "sent" && <Mail className="h-3 w-3" />}
-                                    {bfu.status}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-[12px]">
-                                  {bfu.createdAt ? format(new Date(bfu.createdAt), "MMM d, yyyy") : "—"}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <div className="flex items-center gap-1.5 justify-end" onClick={e => e.stopPropagation()}>
-                                    {bfu.status !== "acknowledged" && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-7 px-2.5 text-[11px]"
-                                        disabled={acknowledgeMutation.isPending}
-                                        onClick={() => acknowledgeMutation.mutate(bfu.id)}
-                                      >
-                                        <CheckCheck className="h-3 w-3 mr-1" />
-                                        Acknowledge
-                                      </Button>
+                  <div className="space-y-3">
+                    {filteredBfu.map(bfu => {
+                      const isExpanded = expandedBfu === bfu.id;
+                      const cadence = localCadences[bfu.id] ?? bfu.cadenceConfig;
+                      return (
+                        <Card key={bfu.id} className={cn(
+                          "overflow-hidden transition-shadow",
+                          isExpanded && "ring-1 ring-orange-200 dark:ring-orange-800",
+                        )}>
+                          {/* Row header */}
+                          <div
+                            className="flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-900/30"
+                            onClick={() => setExpandedBfu(isExpanded ? null : bfu.id)}
+                          >
+                            {/* Invoice # */}
+                            <div className="min-w-[110px]">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Invoice</p>
+                              <p className="text-[13px] font-bold text-slate-900 dark:text-white">
+                                {bfu.invoiceNumber ?? `#${bfu.invoiceId}`}
+                              </p>
+                            </div>
+                            {/* Carrier */}
+                            <div className="min-w-[130px]">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Carrier</p>
+                              <p className="text-[13px] text-slate-700 dark:text-slate-300 truncate">
+                                {bfu.clientName ?? "—"}
+                              </p>
+                            </div>
+                            {/* Amount */}
+                            <div className="min-w-[90px]">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Amount</p>
+                              <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
+                                {bfu.invoiceAmount
+                                  ? `$${Number(bfu.invoiceAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                                  : "—"}
+                              </p>
+                            </div>
+                            {/* Trigger */}
+                            <div>
+                              <span className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold border",
+                                bfu.triggerType === "auto"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400"
+                                  : "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/20 dark:text-violet-400",
+                              )}>
+                                {bfu.triggerType === "auto" ? <Zap className="h-3 w-3" /> : <User className="h-3 w-3" />}
+                                {bfu.triggerType}
+                              </span>
+                            </div>
+                            {/* Status */}
+                            <div>
+                              <span className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold border capitalize",
+                                BFU_STATUS_COLOR[bfu.status] ?? "bg-gray-50 text-gray-600 border-gray-200",
+                              )}>
+                                {bfu.status === "acknowledged" && <CheckCheck className="h-3 w-3" />}
+                                {bfu.status === "sent" && <Mail className="h-3 w-3" />}
+                                {bfu.status}
+                              </span>
+                            </div>
+                            {/* Cadence paused badge */}
+                            {cadence?.paused && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 text-[10px] font-bold">
+                                <Pause className="h-2.5 w-2.5" /> Paused
+                              </span>
+                            )}
+                            {/* Created */}
+                            <div className="ml-auto text-[11px] text-slate-400 whitespace-nowrap">
+                              {bfu.createdAt ? format(new Date(bfu.createdAt), "MMM d, yyyy") : "—"}
+                            </div>
+                            {/* Chevron */}
+                            <div className="ml-2 text-slate-400">
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </div>
+                          </div>
+
+                          {/* Expanded detail */}
+                          {isExpanded && (
+                            <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 px-5 py-4">
+                              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+                                {/* Left: reminder timeline */}
+                                <ReminderTimeline
+                                  bfuId={bfu.id}
+                                  cadenceConfig={cadence}
+                                  onCadenceChange={cfg => handleCadenceChange(bfu.id, cfg)}
+                                />
+
+                                {/* Right: email preview + notes + actions */}
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Initial Email Subject</p>
+                                    <p className="text-[13px] text-slate-700 dark:text-slate-300">{bfu.subject}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Email Body Preview</p>
+                                    <pre className="text-[11.5px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-sans bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700 max-h-48 overflow-auto">
+                                      {bfu.body}
+                                    </pre>
+                                  </div>
+                                  <NoteEditor
+                                    bfu={bfu}
+                                    onSave={notes => saveNotesMutation.mutate({ id: bfu.id, notes })}
+                                    saving={saveNotesMutation.isPending}
+                                  />
+                                  {/* Timestamps */}
+                                  <div className="grid grid-cols-2 gap-2 text-[12px]">
+                                    {bfu.sentAt && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sent At</p>
+                                        <p className="text-slate-600 dark:text-slate-300">{format(new Date(bfu.sentAt), "MMM d, yyyy HH:mm")}</p>
+                                      </div>
                                     )}
+                                    {bfu.acknowledgedAt && (
+                                      <div>
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Acknowledged</p>
+                                        <p className="text-slate-600 dark:text-slate-300">{format(new Date(bfu.acknowledgedAt), "MMM d, yyyy HH:mm")}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* Acknowledge button */}
+                                  {bfu.status !== "acknowledged" && (
                                     <Button
                                       size="sm"
-                                      variant="ghost"
-                                      className="h-7 px-2 text-[11px]"
-                                      onClick={() => setExpandedBfu(expandedBfu === bfu.id ? null : bfu.id)}
+                                      variant="outline"
+                                      className="h-8 px-3 text-[12px] w-full"
+                                      disabled={acknowledgeMutation.isPending}
+                                      onClick={e => { e.stopPropagation(); acknowledgeMutation.mutate(bfu.id); }}
                                     >
-                                      {expandedBfu === bfu.id ? "Collapse" : "Details"}
+                                      <CheckCheck className="h-3.5 w-3.5 mr-1.5" />
+                                      Acknowledge Follow-Up
                                     </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                              {expandedBfu === bfu.id && (
-                                <tr key={`${bfu.id}-detail`} className="bg-slate-50/80 dark:bg-slate-900/40">
-                                  <td colSpan={8} className="px-6 py-4">
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                      <div>
-                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Email Subject</p>
-                                        <p className="text-[13px] text-slate-700 dark:text-slate-300">{bfu.subject}</p>
-                                        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Email Body</p>
-                                        <pre className="text-[11.5px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-sans bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700 max-h-52 overflow-auto">
-                                          {bfu.body}
-                                        </pre>
-                                      </div>
-                                      <div>
-                                        <NoteEditor bfu={bfu} onSave={(notes) => saveNotesMutation.mutate({ id: bfu.id, notes })} saving={saveNotesMutation.isPending} />
-                                        <div className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
-                                          {bfu.sentAt && (
-                                            <div>
-                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sent At</p>
-                                              <p className="text-slate-600 dark:text-slate-300">{format(new Date(bfu.sentAt), "MMM d, yyyy HH:mm")}</p>
-                                            </div>
-                                          )}
-                                          {bfu.acknowledgedAt && (
-                                            <div>
-                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Acknowledged</p>
-                                              <p className="text-slate-600 dark:text-slate-300">{format(new Date(bfu.acknowledgedAt), "MMM d, yyyy HH:mm")}</p>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>
           </div>
         </main>
       </div>
-    </div>
-  );
-}
-
-// ─── Inline note editor ───────────────────────────────────────────────────────
-function NoteEditor({
-  bfu, onSave, saving,
-}: { bfu: BrokerFollowUp; onSave: (notes: string) => void; saving: boolean }) {
-  const [notes, setNotes] = useState(bfu.notes ?? "");
-  return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Agent Notes</p>
-      <Textarea
-        value={notes}
-        onChange={e => setNotes(e.target.value)}
-        rows={3}
-        placeholder="Add notes about this follow-up…"
-        className="text-[12px] resize-none"
-      />
-      <Button
-        size="sm"
-        variant="outline"
-        className="mt-1.5 h-7 px-3 text-[11px]"
-        disabled={saving || notes === (bfu.notes ?? "")}
-        onClick={() => onSave(notes)}
-      >
-        {saving ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
-        Save Notes
-      </Button>
     </div>
   );
 }
