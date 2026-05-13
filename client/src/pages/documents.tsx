@@ -1,334 +1,469 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-
-import { useToast } from "@/hooks/use-toast";
-import InvoiceModal from "@/components/modals/invoice-modal";
-import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Eye,
   Download,
-  Calendar,
-  Truck,
-  FileCheck,
-  DollarSign,
-  MapPin,
-  Activity,
-  ReceiptText,
-  FolderOpen,
-  Clock3,
-  ArrowUpRight,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Sparkles,
+  BookOpen,
+  UserCheck,
   FileText,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  SlidersHorizontal,
+  Brain,
+  FileQuestion,
 } from "lucide-react";
-import type { Document, Invoice, Load } from "@shared/schema";
-import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import Sidebar from "@/components/layout/sidebar";
+import TopNav from "@/components/layout/top-nav";
+import type { Document } from "@shared/schema";
+
+// ─── Extended document type with AI fields ────────────────────────────────────
+interface AIDocument extends Document {
+  aiDocumentType:             string | null;
+  aiClassificationConfidence: string | null;
+  aiClassificationSignals:    string[] | null;
+  allClassificationScores:    Record<string, number> | null;
+  classificationSource:       "rules" | "ai" | "agent" | null;
+  aiClassifiedAt:             string | null;
+  aiClassificationModel:      string | null;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  rate_confirmation: "Rate Confirmation",
+  bill_of_lading:    "Bill of Lading",
+  proof_of_delivery: "Proof of Delivery",
+  lumper_receipt:    "Lumper Receipt",
+  invoice:           "Invoice",
+  freight_invoice:   "Freight Invoice",
+  receipt:           "Receipt",
+  driver_id:         "Driver ID",
+  carrier_setup:     "Carrier Setup",
+  other:             "Other",
+};
+
+const DOC_TYPE_COLORS: Record<string, string> = {
+  rate_confirmation: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  bill_of_lading:    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  proof_of_delivery: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  lumper_receipt:    "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
+  invoice:           "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
+  freight_invoice:   "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
+  receipt:           "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300",
+  other:             "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
+};
+
+const BAR_COLORS: Record<string, string> = {
+  rate_confirmation: "bg-blue-500",
+  bill_of_lading:    "bg-violet-500",
+  proof_of_delivery: "bg-emerald-500",
+  lumper_receipt:    "bg-orange-500",
+  freight_invoice:   "bg-indigo-500",
+  receipt:           "bg-teal-500",
+  other:             "bg-slate-400",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function typeLabel(v: string | null | undefined) {
+  if (!v) return "Unclassified";
+  return DOC_TYPE_LABELS[v] ?? v.replace(/_/g, " ");
+}
+
+function fileSize(bytes: number) {
+  if (!bytes) return "—";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+function confidenceColor(score: number) {
+  if (score >= 0.80) return "bg-emerald-500";
+  if (score >= 0.60) return "bg-amber-400";
+  if (score >= 0.40) return "bg-orange-500";
+  return "bg-red-500";
+}
+
+function confidenceTextColor(score: number) {
+  if (score >= 0.80) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 0.60) return "text-amber-600 dark:text-amber-400";
+  if (score >= 0.40) return "text-orange-600 dark:text-orange-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SourceBadge({ source, model }: { source: string | null; model?: string | null }) {
+  if (source === "ai") return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge className="gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 cursor-default">
+            <Sparkles className="h-2.5 w-2.5" /> AI
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">{model ?? "GPT-4o-mini"}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+  if (source === "agent") return (
+    <Badge className="gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+      <UserCheck className="h-2.5 w-2.5" /> Agent
+    </Badge>
+  );
+  return (
+    <Badge className="gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      <BookOpen className="h-2.5 w-2.5" /> Rules
+    </Badge>
+  );
+}
+
+function ConfidenceBar({ score }: { score: number }) {
+  const pct = Math.round(score * 100);
+  return (
+    <div className="flex items-center gap-2 min-w-[90px]">
+      <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all", confidenceColor(score))}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className={cn("text-[11px] font-semibold w-8 text-right shrink-0", confidenceTextColor(score))}>
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
+function AllScoresRow({ scores }: { scores: Record<string, number> }) {
+  const sorted = Object.entries(scores).sort(([, a], [, b]) => b - a).slice(0, 7);
+  const max = sorted[0]?.[1] ?? 1;
+  return (
+    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+      {sorted.map(([t, s]) => (
+        <div key={t} className="flex items-center gap-2">
+          <span className="w-28 shrink-0 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+            {typeLabel(t)}
+          </span>
+          <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div
+              className={cn("h-full rounded-full", BAR_COLORS[t] ?? "bg-slate-400")}
+              style={{ width: `${max > 0 ? Math.round((s / max) * 100) : 0}%` }}
+            />
+          </div>
+          <span className="w-8 shrink-0 text-right text-[11px] font-medium text-slate-600 dark:text-slate-300">
+            {Math.round(s * 100)}%
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Document row ─────────────────────────────────────────────────────────────
+
+function DocumentRow({ doc, onView, onDownload }: {
+  doc: AIDocument;
+  onView: (id: number) => void;
+  onDownload: (id: number) => void;
+}) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [expanded, setExpanded] = useState(false);
+
+  const displayType   = doc.finalDocumentType || doc.candidateDocumentType;
+  const confidence    = doc.classificationConfidence ? parseFloat(doc.classificationConfidence) : null;
+  const source        = doc.classificationSource ?? "rules";
+  const hasBreakdown  = !!(doc.allClassificationScores || (doc.aiClassificationSignals?.length));
+
+  const reclassifyMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/load-documents/${doc.id}/ai-classify`, {}),
+    onSuccess: () => {
+      toast({ title: "Re-classified", description: `${doc.originalName} re-classified successfully.` });
+      qc.invalidateQueries({ queryKey: ["/api/documents"] });
+    },
+    onError: () => toast({ title: "Error", description: "Re-classification failed.", variant: "destructive" }),
+  });
+
+  return (
+    <>
+      {/* ── Main row ──────────────────────────────────────────────────────── */}
+      <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group">
+
+        {/* Expand toggle + filename */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              onClick={() => setExpanded(v => !v)}
+              disabled={!hasBreakdown}
+              className={cn(
+                "shrink-0 rounded p-0.5 transition-colors",
+                hasBreakdown
+                  ? "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  : "text-slate-200 dark:text-slate-700 cursor-default",
+              )}
+            >
+              {expanded
+                ? <ChevronDown className="h-3.5 w-3.5" />
+                : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+            <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100 max-w-[220px]">
+                {doc.originalName}
+              </p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                {fileSize(doc.size)} · {doc.invoiceId ? `Invoice #${doc.invoiceId}` : doc.loadId ? `Load #${doc.loadId}` : "No link"}
+              </p>
+            </div>
+          </div>
+        </td>
+
+        {/* Classification type */}
+        <td className="px-4 py-3">
+          {displayType ? (
+            <Badge className={cn(
+              "rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
+              DOC_TYPE_COLORS[displayType] ?? DOC_TYPE_COLORS.other,
+            )}>
+              {typeLabel(displayType)}
+            </Badge>
+          ) : (
+            <span className="text-[11px] text-slate-400 italic">Not classified</span>
+          )}
+        </td>
+
+        {/* Confidence */}
+        <td className="px-4 py-3 w-36">
+          {confidence !== null
+            ? <ConfidenceBar score={confidence} />
+            : <span className="text-[11px] text-slate-400">—</span>}
+        </td>
+
+        {/* Source */}
+        <td className="px-4 py-3">
+          <SourceBadge source={source} model={doc.aiClassificationModel} />
+        </td>
+
+        {/* Status */}
+        <td className="px-4 py-3">
+          <Badge className={cn(
+            "rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize",
+            doc.status === "processed"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+              : doc.status === "processing"
+              ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+              : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300",
+          )}>
+            {doc.status}
+          </Badge>
+        </td>
+
+        {/* Uploaded */}
+        <td className="px-4 py-3 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+          {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : "—"}
+        </td>
+
+        {/* Actions */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost" size="sm"
+                    className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-600"
+                    onClick={() => reclassifyMutation.mutate()}
+                    disabled={reclassifyMutation.isPending}
+                  >
+                    {reclassifyMutation.isPending
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <RefreshCw className="h-3.5 w-3.5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Re-classify with AI</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost" size="sm"
+                    className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-600"
+                    onClick={() => onView(doc.id)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">View document</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost" size="sm"
+                    className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-600"
+                    onClick={() => onDownload(doc.id)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Download</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </td>
+      </tr>
+
+      {/* ── Expanded breakdown row ─────────────────────────────────────────── */}
+      {expanded && hasBreakdown && (
+        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30">
+          <td colSpan={7} className="px-10 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
+              {/* All-scores chart */}
+              {doc.allClassificationScores && Object.keys(doc.allClassificationScores).length > 0 && (
+                <div className="flex-1 min-w-0">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    All Type Scores
+                  </p>
+                  <AllScoresRow scores={doc.allClassificationScores} />
+                </div>
+              )}
+
+              {/* Signals */}
+              {doc.aiClassificationSignals && doc.aiClassificationSignals.length > 0 && (
+                <div className="sm:max-w-xs">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    Matched Signals
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {doc.aiClassificationSignals.map((s, i) => (
+                      <span key={i} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                  {doc.aiClassificationModel && (
+                    <p className="mt-2 text-[10px] text-slate-400">Engine: {doc.aiClassificationModel}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Documents() {
   const { toast } = useToast();
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const qc = useQueryClient();
 
-  const { data: documents = [], isLoading: documentsLoading } = useQuery<Document[]>({
+  const [search,     setSearch]     = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [srcFilter,  setSrcFilter]  = useState("all");
+  const [confFilter, setConfFilter] = useState("all");
+
+  const { data: documents = [], isLoading } = useQuery<AIDocument[]>({
     queryKey: ["/api/documents"],
   });
 
-  const { data: invoices = [] } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
-  });
-
-  const { data: loads = [] } = useQuery<Load[]>({
-    queryKey: ["/api/loads"],
-  });
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-  };
-
-  const getDocumentIcon = (type: string) => {
-    switch (type) {
-      case "rate_confirmation":
-        return <FileCheck className="h-5 w-5" />;
-      case "bill_of_lading":
-      case "lumper_receipt":
-        return <ReceiptText className="h-5 w-5" />;
-      case "fuel_receipt":
-        return <DollarSign className="h-5 w-5" />;
-      case "driver_docs":
-      case "driver_id":
-      case "carrier_setup":
-        return <Truck className="h-5 w-5" />;
-      default:
-        return <FolderOpen className="h-5 w-5" />;
-    }
-  };
-
-  const formatDocumentType = (type: string) => {
-    switch (type) {
-      case "rate_confirmation":
-        return "Rate Confirmation";
-      case "bill_of_lading":
-        return "Bill of Lading";
-      case "lumper_receipt":
-        return "Lumper Receipt";
-      case "fuel_receipt":
-        return "Fuel Receipt";
-      case "driver_docs":
-        return "Carrier / Driver Docs";
-      case "driver_id":
-        return "Driver ID";
-      case "carrier_setup":
-        return "Carrier Setup";
-      default:
-        return "Other Document";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "processed":
-      case "completed":
-        return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300";
-      case "processing":
-        return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300";
-      case "failed":
-        return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300";
-      default:
-        return "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
-    }
-  };
-
-  const handleViewDocument = async (documentId: number) => {
-    try {
-      const response = await fetch(`/api/documents/${documentId}/view`, {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to view document");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-    } catch {
-      toast({
-        title: "View Error",
-        description: "Failed to view document. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDownloadDocument = async (documentId: number) => {
-    try {
-      const response = await fetch(`/api/documents/${documentId}/download`, {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to download document");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `document_${documentId}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Success",
-        description: "Document downloaded successfully",
-      });
-    } catch {
-      toast({
-        title: "Download Error",
-        description: "Failed to download document. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const sectionDocuments = (sectionKey: string) => {
-    switch (sectionKey) {
-      case "rate_confirmation":
-        return documents.filter((doc) => doc.documentType === "rate_confirmation");
-      case "bill_of_lading":
-        return documents.filter((doc) => doc.documentType === "bill_of_lading");
-      case "lumper_receipt":
-        return documents.filter((doc) => doc.documentType === "lumper_receipt");
-      case "fuel_receipt":
-        return documents.filter((doc) => (doc.documentType as string) === "fuel_receipt");
-      case "driver_docs":
-        return documents.filter(
-          (doc) =>
-            (doc.documentType as string) === "driver_docs" ||
-            doc.documentType === "driver_id" ||
-            doc.documentType === "carrier_setup"
-        );
-      case "other_docs":
-        return documents.filter((doc) => doc.documentType === "other");
-      default:
-        return [];
-    }
-  };
-
-  const renderDocumentGrid = (docs: Document[], title: string) => {
-    if (documentsLoading) {
-      return (
-        <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">
-              {title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-5">
-            <div className="grid grid-cols-1 gap-4">
-              {[...Array(2)].map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-[18px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/30"
-                >
-                  <div className="animate-pulse space-y-3">
-                    <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
-                    <div className="h-3 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
-                    <div className="h-8 w-full rounded bg-slate-200 dark:bg-slate-700" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+  // ── Batch re-classify all docs that have no AI result yet ──────────────────
+  const batchMutation = useMutation({
+    mutationFn: async () => {
+      const pending = documents.filter(d => !d.aiClassificationModel && d.status === "processed");
+      await Promise.allSettled(
+        pending.map(d => apiRequest("POST", `/api/load-documents/${d.id}/ai-classify`, {}))
       );
+    },
+    onSuccess: () => {
+      toast({ title: "Batch complete", description: "All documents re-classified." });
+      qc.invalidateQueries({ queryKey: ["/api/documents"] });
+    },
+  });
+
+  // ── View / Download ────────────────────────────────────────────────────────
+  const handleView = async (id: number) => {
+    try {
+      const r = await fetch(`/api/documents/${id}/view`, { credentials: "include" });
+      if (!r.ok) throw new Error();
+      window.open(URL.createObjectURL(await r.blob()), "_blank");
+    } catch {
+      toast({ title: "Error", description: "Could not open document.", variant: "destructive" });
     }
-
-    return (
-      <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">
-              {title}
-            </CardTitle>
-            <Badge className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              {docs.length}
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-5">
-          {docs.length === 0 ? (
-            <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center dark:border-slate-800 dark:bg-slate-900/30">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                <FolderOpen className="h-5 w-5" />
-              </div>
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                No documents yet
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Upload files to populate this category.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {docs.map((document) => (
-                <Card
-                  key={document.id}
-                  className="rounded-[18px] border border-slate-200/80 bg-white shadow-sm transition dark:border-slate-800 dark:bg-transparent"
-                >
-                  <CardContent className="p-5">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          {getDocumentIcon(document.documentType)}
-                        </div>
-
-                        <div className="min-w-0">
-                          <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                            {document.originalName}
-                          </h3>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            {formatDocumentType(document.documentType)} • {formatFileSize(document.size)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <Badge
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 font-medium",
-                          getStatusColor(document.status)
-                        )}
-                      >
-                        {document.status}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                      {document.loadId && (
-                        <div className="flex items-center gap-2">
-                          <Truck className="h-4 w-4 text-slate-400" />
-                          <span>Load #{document.loadId}</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-slate-400" />
-                        <span>{new Date(document.createdAt!).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Ready for review
-                      </span>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewDocument(document.id)}
-                          className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-                          title="View Document"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDownloadDocument(document.id)}
-                          className="h-9 w-9 rounded-xl border border-transparent p-0 text-slate-500 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-                          title="Download Document"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
   };
 
-  const recentUploads = documents
-    .slice()
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    )
-    .slice(0, 5);
+  const handleDownload = async (id: number) => {
+    try {
+      const r = await fetch(`/api/documents/${id}/download`, { credentials: "include" });
+      if (!r.ok) throw new Error();
+      const a = Object.assign(document.createElement("a"), {
+        href: URL.createObjectURL(await r.blob()),
+        download: `document_${id}`,
+      });
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast({ title: "Downloaded" });
+    } catch {
+      toast({ title: "Error", description: "Download failed.", variant: "destructive" });
+    }
+  };
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const total         = documents.length;
+  const aiCount       = documents.filter(d => d.classificationSource === "ai").length;
+  const rulesCount    = documents.filter(d => d.classificationSource === "rules" || !d.classificationSource).length;
+  const agentCount    = documents.filter(d => d.classificationSource === "agent").length;
+  const lowConf       = documents.filter(d => {
+    const c = d.classificationConfidence ? parseFloat(d.classificationConfidence) : null;
+    return c !== null && c < 0.6;
+  }).length;
+
+  // ── Filtered docs ──────────────────────────────────────────────────────────
+  const filtered = documents.filter(doc => {
+    const displayType = doc.finalDocumentType || doc.candidateDocumentType;
+    const conf        = doc.classificationConfidence ? parseFloat(doc.classificationConfidence) : null;
+    const src         = doc.classificationSource ?? "rules";
+
+    if (search && !doc.originalName.toLowerCase().includes(search.toLowerCase())) return false;
+    if (typeFilter !== "all" && displayType !== typeFilter) return false;
+    if (srcFilter  !== "all" && src !== srcFilter) return false;
+    if (confFilter === "high"   && (conf === null || conf <  0.8))  return false;
+    if (confFilter === "medium" && (conf === null || conf >= 0.8 || conf < 0.6)) return false;
+    if (confFilter === "low"    && (conf === null || conf >= 0.6))  return false;
+    return true;
+  });
 
   return (
     <div className="flex h-screen bg-[hsl(var(--background))]">
@@ -337,311 +472,173 @@ export default function Documents() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
           title="Documents"
-          subtitle="Freight paperwork, uploads, and supporting files"
+          subtitle="AI-powered classification center"
           group="Workspace"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
-            <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  <Clock3 className="h-5 w-5" />
+          <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
+
+            {/* ── Stats row ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+              {[
+                { label: "Total Documents",    value: total,      icon: <FileText className="h-4 w-4" />,    color: "text-slate-600 dark:text-slate-300",   bg: "bg-slate-100 dark:bg-slate-800" },
+                { label: "AI Classified",       value: aiCount,    icon: <Sparkles className="h-4 w-4" />,    color: "text-purple-600 dark:text-purple-400",  bg: "bg-purple-50 dark:bg-purple-950/40" },
+                { label: "Rules Engine",        value: rulesCount, icon: <BookOpen className="h-4 w-4" />,    color: "text-slate-600 dark:text-slate-300",   bg: "bg-slate-100 dark:bg-slate-800" },
+                { label: "Agent Overrides",     value: agentCount, icon: <UserCheck className="h-4 w-4" />,  color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
+                { label: "Low Confidence",      value: lowConf,    icon: <AlertTriangle className="h-4 w-4" />, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
+              ].map(s => (
+                <div key={s.label} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                  <div className={cn("mb-2 flex h-8 w-8 items-center justify-center rounded-lg", s.bg, s.color)}>
+                    {s.icon}
+                  </div>
+                  <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{s.value}</p>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Pending Invoices</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                  {invoices.filter((inv) => inv.status === "submitted").length}
-                </p>
+              ))}
+            </div>
+
+            {/* ── Toolbar ────────────────────────────────────────────────── */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Search by filename…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-8 h-9 rounded-xl text-sm"
+                />
               </div>
 
-              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  <DollarSign className="h-5 w-5" />
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="h-9 w-44 rounded-xl text-sm">
+                  <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
+                  <SelectItem value="bill_of_lading">Bill of Lading</SelectItem>
+                  <SelectItem value="proof_of_delivery">Proof of Delivery</SelectItem>
+                  <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
+                  <SelectItem value="invoice">Invoice</SelectItem>
+                  <SelectItem value="receipt">Receipt</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={srcFilter} onValueChange={setSrcFilter}>
+                <SelectTrigger className="h-9 w-36 rounded-xl text-sm">
+                  <Brain className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="All sources" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All sources</SelectItem>
+                  <SelectItem value="ai">AI only</SelectItem>
+                  <SelectItem value="rules">Rules only</SelectItem>
+                  <SelectItem value="agent">Agent only</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={confFilter} onValueChange={setConfFilter}>
+                <SelectTrigger className="h-9 w-40 rounded-xl text-sm">
+                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="All confidence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All confidence</SelectItem>
+                  <SelectItem value="high">High (≥80%)</SelectItem>
+                  <SelectItem value="medium">Medium (60–80%)</SelectItem>
+                  <SelectItem value="low">Low (&lt;60%)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 rounded-xl text-sm ml-auto"
+                onClick={() => batchMutation.mutate()}
+                disabled={batchMutation.isPending}
+              >
+                {batchMutation.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Sparkles className="h-3.5 w-3.5 text-purple-500" />}
+                Re-classify all
+              </Button>
+            </div>
+
+            {/* ── Table ──────────────────────────────────────────────────── */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))] overflow-hidden">
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading documents…
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Processed Invoices</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                  {invoices.filter((inv) => inv.status === "paid").length}
-                </p>
-              </div>
-
-              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  <FileText className="h-5 w-5" />
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                    <FileQuestion className="h-6 w-6 text-slate-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    {documents.length === 0 ? "No documents uploaded yet" : "No documents match your filters"}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {documents.length === 0
+                      ? "Upload documents through an invoice to see AI classification here."
+                      : "Try adjusting the search or filters above."}
+                  </p>
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Total Documents</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                  {documents.length}
-                </p>
-              </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Document
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Classification
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Confidence
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Source
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Status
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Uploaded
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(doc => (
+                      <DocumentRow
+                        key={doc.id}
+                        doc={doc}
+                        onView={handleView}
+                        onDownload={handleDownload}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              )}
 
-              <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  <Truck className="h-5 w-5" />
+              {/* Footer count */}
+              {!isLoading && filtered.length > 0 && (
+                <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-2.5 text-[11px] text-slate-400">
+                  Showing {filtered.length} of {documents.length} document{documents.length !== 1 ? "s" : ""}
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Tracked Loads</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                  {loads.length}
-                </p>
-              </div>
-            </section>
+              )}
+            </div>
 
-            {/* ── Failed / processing docs nudge ─────────────────────────── */}
-            {(() => {
-              const failedDocs = documents.filter(d => d.status === "failed");
-              const processingDocs = documents.filter(d => d.status === "processing");
-              if (failedDocs.length === 0 && processingDocs.length === 0) return null;
-              return (
-                <div className="mb-6 space-y-2">
-                  {failedDocs.length > 0 && (
-                    <div className="flex items-center gap-3 rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/10">
-                      <Activity className="h-4 w-4 shrink-0 text-red-500" />
-                      <p className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
-                        <span className="font-bold">{failedDocs.length} document{failedDocs.length !== 1 ? "s" : ""}</span> failed OCR processing — review and re-upload if needed
-                      </p>
-                    </div>
-                  )}
-                  {processingDocs.length > 0 && (
-                    <div className="flex items-center gap-3 rounded-[12px] border border-amber-200/60 bg-amber-50/50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/10">
-                      <Clock3 className="h-4 w-4 shrink-0 text-amber-500" />
-                      <p className="text-[12.5px] font-medium text-amber-800 dark:text-amber-300">
-                        <span className="font-bold">{processingDocs.length} document{processingDocs.length !== 1 ? "s" : ""}</span> currently being processed — check back shortly
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {loads.length > 0 && (
-              <section className="mb-8">
-                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        <MapPin className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Recent Load Details
-                        </CardTitle>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Quick reference for recently tracked loads
-                        </p>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                      {loads.slice(0, 3).map((load) => (
-                        <div
-                          key={load.id}
-                          className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/30"
-                        >
-                          <div className="mb-3 flex items-center justify-between">
-                            <span className="font-semibold text-slate-900 dark:text-white">
-                              Load #{load.id}
-                            </span>
-                            <Badge className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                              {load.status}
-                            </Badge>
-                          </div>
-
-                          <p className="text-sm text-slate-600 dark:text-slate-300">
-                            {load.pickupLocation} → {load.deliveryLocation}
-                          </p>
-
-                          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                            {load.pickupDate
-                              ? new Date(load.pickupDate).toLocaleDateString()
-                              : "No pickup date"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-              <div className="space-y-6 xl:col-span-8">
-                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Supporting Documents
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Upload rate confirmations, BOLs, lumpers, and receipts during invoice creation.
-                        </p>
-                      </div>
-
-                      <Button
-                        className="h-11 rounded-xl px-5 bg-blue-600 hover:bg-blue-700 text-white"
-                        onClick={() => setIsInvoiceModalOpen(true)}
-                      >
-                        Create Invoice
-                        <ArrowUpRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="space-y-6">
-                  {renderDocumentGrid(sectionDocuments("rate_confirmation"), "Rate Confirmations")}
-                  {renderDocumentGrid(sectionDocuments("bill_of_lading"), "Bills of Lading")}
-                  {renderDocumentGrid(sectionDocuments("lumper_receipt"), "Lumper Receipts")}
-                  {renderDocumentGrid(sectionDocuments("fuel_receipt"), "Fuel Receipts")}
-                  {renderDocumentGrid(sectionDocuments("driver_docs"), "Carrier / Driver Docs")}
-                  {renderDocumentGrid(sectionDocuments("other_docs"), "Other Documents")}
-                </div>
-              </div>
-
-              <div className="space-y-6 xl:col-span-4">
-                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        <Activity className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Recent Uploads
-                        </CardTitle>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Latest document activity
-                        </p>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-3 p-6">
-                    {recentUploads.length > 0 ? (
-                      recentUploads.map((document) => (
-                        <div
-                          key={document.id}
-                          className="flex items-center gap-3 rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/30"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                            {getDocumentIcon(document.documentType)}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
-                              {document.originalName}
-                            </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {new Date(document.createdAt!).toLocaleString()}
-                            </p>
-                          </div>
-
-                          <Badge
-                            className={cn(
-                              "rounded-full border px-2.5 py-1 font-medium",
-                              getStatusColor(document.status)
-                            )}
-                          >
-                            {document.status}
-                          </Badge>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="rounded-[18px] border border-dashed border-slate-200 px-6 py-10 text-center dark:border-slate-800">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          No recent uploads yet
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        <DollarSign className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Payment Status
-                        </CardTitle>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Quick funding visibility
-                        </p>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4 p-6">
-                    <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/30">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            Recent Payment
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Load #12345
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-semibold text-slate-900 dark:text-white">
-                            $2,450
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            2 days ago
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/30">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            Pending Payment
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Load #12346
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-semibold text-slate-900 dark:text-white">
-                            $1,850
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Processing
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      className="h-11 w-full rounded-xl"
-                      onClick={() =>
-                        toast({
-                          title: "Payment Overview",
-                          description: "Opening payment details soon.",
-                        })
-                      }
-                    >
-                      Open Payment Overview
-                      <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </section>
           </div>
         </main>
       </div>
-
-      <InvoiceModal
-        isOpen={isInvoiceModalOpen}
-        onClose={() => setIsInvoiceModalOpen(false)}
-      />
     </div>
   );
 }
