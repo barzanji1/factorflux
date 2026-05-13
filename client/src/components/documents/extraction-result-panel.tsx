@@ -1,17 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   CheckCircle2,
   XCircle,
@@ -21,11 +13,14 @@ import {
   ClipboardCheck,
   Eye,
   EyeOff,
-  Tag,
-  Edit3,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import ClassificationPanel, { type ClassificationData } from "./classification-panel";
+
+export type { ClassificationData };
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FieldCandidate {
   id: number;
@@ -44,36 +39,11 @@ interface ReviewData {
   reviewedAt: string;
 }
 
-interface ClassificationData {
-  candidateDocumentType: string | null;
-  finalDocumentType: string | null;
-  classificationConfidence: string | null;
-}
-
 interface Props {
   documentId: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const DOC_TYPES = [
-  { value: "rate_confirmation",  label: "Rate Confirmation" },
-  { value: "bill_of_lading",     label: "Bill of Lading" },
-  { value: "proof_of_delivery",  label: "Proof of Delivery" },
-  { value: "lumper_receipt",     label: "Lumper Receipt" },
-  { value: "invoice",            label: "Invoice" },
-  { value: "receipt",            label: "Receipt" },
-  { value: "other",              label: "Other" },
-] as const;
-
-const DOC_TYPE_COLORS: Record<string, string> = {
-  rate_confirmation: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
-  bill_of_lading:    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
-  proof_of_delivery: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
-  lumper_receipt:    "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
-  invoice:           "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
-  receipt:           "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300",
-  other:             "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
-};
 
 const FIELD_LABELS: Record<string, string> = {
   amount:            "Rate / Amount",
@@ -95,17 +65,12 @@ const FIELD_LABELS: Record<string, string> = {
   document_type:     "Doc Type (auto)",
 };
 
-function docTypeLabel(value: string | null | undefined): string {
-  if (!value) return "Unknown";
-  return DOC_TYPES.find((t) => t.value === value)?.label ?? value.replace(/_/g, " ");
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ConfidencePip({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
-    pct >= 80 ? "bg-emerald-500"
-    : pct >= 60 ? "bg-amber-400"
-    : "bg-red-400";
+    pct >= 80 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-400" : "bg-red-400";
   return (
     <div className="flex items-center gap-1.5">
       <div className={cn("h-2 w-2 rounded-full", color)} />
@@ -114,13 +79,15 @@ function ConfidencePip({ score }: { score: number }) {
   );
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function ExtractionResultPanel({ documentId }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes]             = useState("");
   const [showSnippets, setShowSnippets] = useState(false);
-  const [editingType, setEditingType] = useState(false);
-  const [pendingType, setPendingType] = useState<string>("");
+
+  // ── Queries ──────────────────────────────────────────────────────────────────
 
   const { data: candidates, isLoading: candidatesLoading } = useQuery<FieldCandidate[]>({
     queryKey: ["/api/load-documents", documentId, "field-candidates"],
@@ -142,10 +109,17 @@ export default function ExtractionResultPanel({ documentId }: Props) {
       if (!r.ok) throw new Error("fetch failed");
       return r.json();
     },
-    select: (d: any) => ({
-      candidateDocumentType:    d.candidateDocumentType ?? null,
-      finalDocumentType:        d.finalDocumentType ?? null,
-      classificationConfidence: d.classificationConfidence ?? null,
+    select: (d: any): ClassificationData => ({
+      candidateDocumentType:      d.candidateDocumentType ?? null,
+      finalDocumentType:          d.finalDocumentType ?? null,
+      classificationConfidence:   d.classificationConfidence ?? null,
+      aiDocumentType:             d.aiDocumentType ?? null,
+      aiClassificationConfidence: d.aiClassificationConfidence ?? null,
+      aiClassificationSignals:    d.aiClassificationSignals ?? null,
+      allClassificationScores:    d.allClassificationScores ?? null,
+      classificationSource:       d.classificationSource ?? "rules",
+      aiClassifiedAt:             d.aiClassifiedAt ?? null,
+      aiClassificationModel:      d.aiClassificationModel ?? null,
     }),
   });
 
@@ -160,6 +134,8 @@ export default function ExtractionResultPanel({ documentId }: Props) {
     },
   });
 
+  // ── Mutations ─────────────────────────────────────────────────────────────────
+
   const reviewMutation = useMutation({
     mutationFn: (payload: { reviewStatus: string; reviewNotes: string }) =>
       apiRequest("POST", `/api/load-documents/${documentId}/review`, payload),
@@ -167,19 +143,11 @@ export default function ExtractionResultPanel({ documentId }: Props) {
       toast({ title: "Review saved", description: "Document fields confirmed." });
       qc.invalidateQueries({ queryKey: ["/api/load-documents", documentId, "review"] });
     },
-    onError: () => toast({ title: "Error", description: "Could not save review.", variant: "destructive" }),
+    onError: () =>
+      toast({ title: "Error", description: "Could not save review.", variant: "destructive" }),
   });
 
-  const docTypeMutation = useMutation({
-    mutationFn: (finalDocumentType: string) =>
-      apiRequest("PATCH", `/api/load-documents/${documentId}/document-type`, { finalDocumentType }),
-    onSuccess: () => {
-      toast({ title: "Document type saved", description: "Classification updated." });
-      qc.invalidateQueries({ queryKey: ["/api/load-documents", documentId, "extraction-status"] });
-      setEditingType(false);
-    },
-    onError: () => toast({ title: "Error", description: "Could not update document type.", variant: "destructive" }),
-  });
+  // ── Derived state ─────────────────────────────────────────────────────────────
 
   if (candidatesLoading || classLoading) {
     return (
@@ -190,95 +158,18 @@ export default function ExtractionResultPanel({ documentId }: Props) {
     );
   }
 
-  const hasCandidates = candidates && candidates.length > 0;
-  const displayType   = classificationData?.finalDocumentType || classificationData?.candidateDocumentType;
-  const confidence    = classificationData?.classificationConfidence
-    ? parseFloat(classificationData.classificationConfidence)
-    : null;
-  const isOverridden  = !!classificationData?.finalDocumentType;
-
-  // Exclude the document_type field from the regular table (shown in classification header)
-  const fieldCandidates = candidates?.filter((c) => c.fieldName !== "document_type") ?? [];
+  const hasCandidates   = candidates && candidates.length > 0;
+  const fieldCandidates = candidates?.filter(c => c.fieldName !== "document_type") ?? [];
 
   return (
     <div className="px-4 py-4 space-y-4">
 
-      {/* ── Classification Banner ────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-        <div className="flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/40 px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <Tag className="h-3.5 w-3.5 text-slate-500" />
-            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
-              Document Classification
-            </span>
-            {isOverridden && (
-              <Badge className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-600 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-                overridden
-              </Badge>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 gap-1 px-2 text-[11px] text-slate-400 hover:text-slate-600"
-            onClick={() => {
-              setPendingType(displayType ?? "other");
-              setEditingType((v) => !v);
-            }}
-          >
-            <Edit3 className="h-3 w-3" />
-            {editingType ? "Cancel" : "Override"}
-          </Button>
-        </div>
-
-        <div className="px-3 py-2.5 space-y-2">
-          {/* Current type badge */}
-          {displayType ? (
-            <div className="flex items-center gap-3">
-              <Badge className={cn(
-                "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                DOC_TYPE_COLORS[displayType] ?? DOC_TYPE_COLORS.other,
-              )}>
-                {docTypeLabel(displayType)}
-              </Badge>
-              {confidence !== null && (
-                <div className="flex items-center gap-1.5">
-                  <ConfidencePip score={confidence} />
-                  <span className="text-[11px] text-slate-400">classification confidence</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400 italic">Not yet classified — extraction may still be running.</p>
-          )}
-
-          {/* Override select */}
-          {editingType && (
-            <div className="flex items-center gap-2 pt-1">
-              <Select value={pendingType} onValueChange={setPendingType}>
-                <SelectTrigger className="h-7 w-48 rounded-lg text-xs">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOC_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value} className="text-xs">
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                className="h-7 rounded-lg px-3 text-xs"
-                disabled={docTypeMutation.isPending || !pendingType}
-                onClick={() => docTypeMutation.mutate(pendingType)}
-              >
-                {docTypeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Classification Panel (AI-powered) ────────────────────────────── */}
+      <ClassificationPanel
+        documentId={documentId}
+        classificationData={classificationData ?? null}
+        isLoading={classLoading}
+      />
 
       {/* ── Field candidates ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
@@ -288,9 +179,9 @@ export default function ExtractionResultPanel({ documentId }: Props) {
             Extracted Fields
           </span>
           {hasCandidates && (
-            <Badge className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0 text-[11px] text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
+            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0 text-[11px] text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
               {fieldCandidates.length} field{fieldCandidates.length !== 1 ? "s" : ""}
-            </Badge>
+            </span>
           )}
         </div>
         {hasCandidates && (
@@ -298,7 +189,7 @@ export default function ExtractionResultPanel({ documentId }: Props) {
             variant="ghost"
             size="sm"
             className="h-6 gap-1 px-2 text-[11px] text-slate-400 hover:text-slate-600"
-            onClick={() => setShowSnippets((v) => !v)}
+            onClick={() => setShowSnippets(v => !v)}
           >
             {showSnippets ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
             {showSnippets ? "Hide" : "Show"} snippets
@@ -328,7 +219,9 @@ export default function ExtractionResultPanel({ documentId }: Props) {
                     key={c.id}
                     className={cn(
                       "border-b border-slate-50 dark:border-slate-800/60",
-                      i % 2 === 0 ? "bg-white dark:bg-slate-900/20" : "bg-slate-50/40 dark:bg-slate-900/40",
+                      i % 2 === 0
+                        ? "bg-white dark:bg-slate-900/20"
+                        : "bg-slate-50/40 dark:bg-slate-900/40",
                     )}
                   >
                     <td className="px-3 py-2 font-medium text-slate-600 dark:text-slate-300">
@@ -386,7 +279,7 @@ export default function ExtractionResultPanel({ documentId }: Props) {
             rows={2}
             className="resize-none rounded-xl text-xs"
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={e => setNotes(e.target.value)}
           />
           <div className="flex gap-2">
             <Button
@@ -395,11 +288,9 @@ export default function ExtractionResultPanel({ documentId }: Props) {
               disabled={reviewMutation.isPending}
               onClick={() => reviewMutation.mutate({ reviewStatus: "confirmed", reviewNotes: notes })}
             >
-              {reviewMutation.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ClipboardCheck className="h-3.5 w-3.5" />
-              )}
+              {reviewMutation.isPending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <ClipboardCheck className="h-3.5 w-3.5" />}
               Confirm fields
             </Button>
             <Button

@@ -18,6 +18,7 @@ import {
 } from "../../shared/schema";
 import { eq } from "drizzle-orm";
 import { getExtractionProvider } from "./ocr/registry";
+import { classifyDocumentAI } from "./aiClassifier";
 
 // Re-export PageResult so existing callers (e.g. document-review-dialog) keep working
 export type { PageResult } from "./ocr/types";
@@ -316,12 +317,37 @@ export async function runExtractionJob(
       pageCount:        extracted.pageCount,
     });
 
+    // ── AI classification (best-effort, won't block extraction) ──────────────
+    let aiResult: Awaited<ReturnType<typeof classifyDocumentAI>> | null = null;
+    try {
+      aiResult = await classifyDocumentAI(t, classification);
+    } catch (err: any) {
+      console.warn(`[Extraction] AI classification failed for doc ${documentId}:`, err?.message);
+    }
+
+    // Prefer AI result when it has higher confidence
+    const finalDocType =
+      aiResult && aiResult.confidence > classification.confidence
+        ? aiResult.docType
+        : classification.docType;
+    const finalConfidence =
+      aiResult && aiResult.confidence > classification.confidence
+        ? aiResult.confidence
+        : classification.confidence;
+
     // ── Update document with candidate classification ─────────────────────────
     await db
       .update(documents)
       .set({
-        candidateDocumentType:   classification.docType as any,
-        classificationConfidence: String(classification.confidence),
+        candidateDocumentType:      finalDocType as any,
+        classificationConfidence:   String(finalConfidence),
+        aiDocumentType:             aiResult?.docType ?? null,
+        aiClassificationConfidence: aiResult ? String(aiResult.confidence) : null,
+        aiClassificationSignals:    aiResult?.signals ?? null,
+        allClassificationScores:    aiResult?.allScores ?? null,
+        classificationSource:       (aiResult?.source ?? "rules") as any,
+        aiClassifiedAt:             aiResult ? new Date() : null,
+        aiClassificationModel:      aiResult?.model ?? null,
         status: "processed",
       })
       .where(eq(documents.id, documentId));

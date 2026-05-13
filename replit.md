@@ -44,14 +44,14 @@ FactorFlux is a freight factoring workflow application that streamlines invoice 
 *   **Session Management**: Express sessions with PostgreSQL storage.
 *   **OCR Provider Abstraction**: `ExtractionProvider` interface in `server/services/ocr/types.ts`. Three built-in providers (`native_pdf`, `tesseract_ocr`, `hybrid`). Config-driven via `EXTRACTION_PROVIDER` env var. Adding a new provider (e.g. Google Document AI) requires only a new file + one registry entry — no UI or route changes.
 *   **Document Processing**: Hybrid pipeline — native pdf-parse first; Tesseract.js OCR fallback for scanned/image PDFs. Background job queue keeps OCR off the request cycle with retry + exponential backoff. Provider key written to `doc_extraction_jobs.parser_name` for audit traceability.
-*   **Document Classification**: Rule-based multi-signal scoring — 7 types, confidence score, signal list. `candidateDocumentType` auto-set on extraction; `finalDocumentType` set by agent override.
+*   **Document Classification**: Two-pass AI-powered pipeline. Pass 1: enhanced rule-based multi-signal scoring (7 types, expanded vocabulary, structural signals). Pass 2: OpenAI GPT-4o-mini via `OPENAI_API_KEY` env var (graceful fallback to enhanced rules if key absent). Both passes return all-type score breakdowns stored in `documents.allClassificationScores` (jsonb). Best result (highest confidence) wins and is stored as `candidateDocumentType`. Agent override sets `finalDocumentType` and marks `classificationSource = agent`. On-demand re-classify: `POST /api/load-documents/:id/ai-classify`.
 *   **Field Extraction**: 16 named fields saved to `doc_field_candidates` with confidence and source snippet.
 *   **Unified Workflow Model**: 8-stage factoring lifecycle on `invoices.factoring_stage`, driving auto-advancement.
 
 ## Product
 
 *   **Invoice Processing**: End-to-end management from intake to final settlement.
-*   **Document Management**: Secure upload, categorization, OCR extraction, side-by-side review dialog.
+*   **Document Management**: Secure upload, categorization, OCR extraction, side-by-side review dialog. Each document shows a rich `ClassificationPanel` — confidence meter, all-types score bars, matched signal badges, AI/Rules/Agent source badge, Re-classify button.
 *   **Document Review Panel**: Per-doc Review/Re-review button in invoice detail; Confirm/Reject/Unreadable/Retry actions; confidence warnings; saves to `doc_reviews`; updates `documents.documentType` to trigger lifecycle guards.
 *   **Client & Broker Management**: Profiles, credit checks, FMCSA authority monitoring.
 *   **Financial Operations**: Cash application, exception management, payout tracking with doc readiness indicator.

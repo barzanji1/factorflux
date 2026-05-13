@@ -288,6 +288,16 @@ export const documents = pgTable("documents", {
     ],
   }),
   classificationConfidence: decimal("classification_confidence", { precision: 5, scale: 4 }),
+  // AI classification fields
+  aiDocumentType: varchar("ai_document_type"),
+  aiClassificationConfidence: decimal("ai_classification_confidence", { precision: 5, scale: 4 }),
+  aiClassificationSignals: jsonb("ai_classification_signals").$type<string[]>(),
+  allClassificationScores: jsonb("all_classification_scores").$type<Record<string, number>>(),
+  classificationSource: varchar("classification_source", {
+    enum: ["rules", "ai", "agent"],
+  }).default("rules"),
+  aiClassifiedAt: timestamp("ai_classified_at"),
+  aiClassificationModel: varchar("ai_classification_model"),
   loadId: integer("load_id").references(() => loads.id, { onDelete: "cascade" }),
   invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),

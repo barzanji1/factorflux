@@ -52,6 +52,7 @@ import {
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
+import { classifyDocumentAI } from "./services/aiClassifier";
 
 import { sendEmail } from "./emailService";
 import {
@@ -3694,9 +3695,16 @@ Trucking Pros Financial Team
       // Also fetch classification info from the document
       const docRows = await db
         .select({
-          candidateDocumentType:   documentsTable.candidateDocumentType,
-          finalDocumentType:       documentsTable.finalDocumentType,
-          classificationConfidence: documentsTable.classificationConfidence,
+          candidateDocumentType:      documentsTable.candidateDocumentType,
+          finalDocumentType:          documentsTable.finalDocumentType,
+          classificationConfidence:   documentsTable.classificationConfidence,
+          aiDocumentType:             documentsTable.aiDocumentType,
+          aiClassificationConfidence: documentsTable.aiClassificationConfidence,
+          aiClassificationSignals:    documentsTable.aiClassificationSignals,
+          allClassificationScores:    documentsTable.allClassificationScores,
+          classificationSource:       documentsTable.classificationSource,
+          aiClassifiedAt:             documentsTable.aiClassifiedAt,
+          aiClassificationModel:      documentsTable.aiClassificationModel,
         })
         .from(documentsTable)
         .where(eq(documentsTable.id, docId))
@@ -3711,12 +3719,82 @@ Trucking Pros Financial Team
         startedAt:    job.startedAt,
         completedAt:  job.completedAt,
         errorMessage: job.errorMessage,
-        candidateDocumentType:    docInfo.candidateDocumentType ?? null,
-        finalDocumentType:        docInfo.finalDocumentType ?? null,
-        classificationConfidence: docInfo.classificationConfidence ?? null,
+        candidateDocumentType:      docInfo.candidateDocumentType ?? null,
+        finalDocumentType:          docInfo.finalDocumentType ?? null,
+        classificationConfidence:   docInfo.classificationConfidence ?? null,
+        aiDocumentType:             docInfo.aiDocumentType ?? null,
+        aiClassificationConfidence: docInfo.aiClassificationConfidence ?? null,
+        aiClassificationSignals:    docInfo.aiClassificationSignals ?? null,
+        allClassificationScores:    docInfo.allClassificationScores ?? null,
+        classificationSource:       docInfo.classificationSource ?? "rules",
+        aiClassifiedAt:             docInfo.aiClassifiedAt ?? null,
+        aiClassificationModel:      docInfo.aiClassificationModel ?? null,
       });
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch extraction status" });
+    }
+  });
+
+  // POST /api/load-documents/:id/ai-classify — trigger on-demand AI classification
+  app.post("/api/load-documents/:id/ai-classify", requireAuth, async (req, res) => {
+    try {
+      const docId = parseInt(req.params.id, 10);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+
+      // Fetch the document and its most recent extraction text
+      const docRows = await db
+        .select()
+        .from(documentsTable)
+        .where(eq(documentsTable.id, docId))
+        .limit(1);
+      if (!docRows.length) return res.status(404).json({ message: "Document not found" });
+
+      const extractionRows = await db
+        .select()
+        .from(docExtractionResults)
+        .where(eq(docExtractionResults.documentId, docId))
+        .orderBy(desc(docExtractionResults.createdAt))
+        .limit(1);
+
+      const text = extractionRows[0]?.mainText || extractionRows[0]?.fullText;
+      if (!text) return res.status(422).json({ message: "No extracted text available — run extraction first" });
+
+      const aiResult = await classifyDocumentAI(text);
+
+      // Persist AI result back to the document
+      await db
+        .update(documentsTable)
+        .set({
+          aiDocumentType:             aiResult.docType,
+          aiClassificationConfidence: String(aiResult.confidence),
+          aiClassificationSignals:    aiResult.signals,
+          allClassificationScores:    aiResult.allScores,
+          classificationSource:       aiResult.source as any,
+          aiClassifiedAt:             new Date(),
+          aiClassificationModel:      aiResult.model,
+          // Promote to candidate if AI is more confident
+          candidateDocumentType:
+            aiResult.confidence > parseFloat(docRows[0].classificationConfidence ?? "0")
+              ? (aiResult.docType as any)
+              : docRows[0].candidateDocumentType,
+          classificationConfidence:
+            aiResult.confidence > parseFloat(docRows[0].classificationConfidence ?? "0")
+              ? String(aiResult.confidence)
+              : docRows[0].classificationConfidence,
+        })
+        .where(eq(documentsTable.id, docId));
+
+      res.json({
+        docType:    aiResult.docType,
+        confidence: aiResult.confidence,
+        signals:    aiResult.signals,
+        allScores:  aiResult.allScores,
+        model:      aiResult.model,
+        source:     aiResult.source,
+      });
+    } catch (err: any) {
+      console.error("[ai-classify] error:", err?.message);
+      res.status(500).json({ message: "AI classification failed", detail: err?.message });
     }
   });
 

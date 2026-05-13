@@ -710,7 +710,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
-    const [newDocument] = await db.insert(documents).values(document).returning();
+    const [newDocument] = await db.insert(documents).values(document as any).returning();
 
     if (newDocument.invoiceId) {
       await this.linkDocument({
@@ -748,7 +748,7 @@ export class DatabaseStorage implements IStorage {
   async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document> {
     const [updatedDocument] = await db
       .update(documents)
-      .set(document)
+      .set(document as any)
       .where(eq(documents.id, id))
       .returning();
 
