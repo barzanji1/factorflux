@@ -1371,3 +1371,22 @@ export const insertBrokerFollowUpReminderSchema = createInsertSchema(brokerFollo
 });
 export type BrokerFollowUpReminder = typeof brokerFollowUpReminders.$inferSelect;
 export type InsertBrokerFollowUpReminder = z.infer<typeof insertBrokerFollowUpReminderSchema>;
+
+// ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
+
+export const workflowConfigs = pgTable("workflow_configs", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").default("default").notNull(),
+  stagesJson: jsonb("stages_json").notNull(),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorkflowConfigSchema = createInsertSchema(workflowConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type WorkflowConfig = typeof workflowConfigs.$inferSelect;
+export type InsertWorkflowConfig = z.infer<typeof insertWorkflowConfigSchema>;

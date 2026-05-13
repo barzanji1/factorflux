@@ -30,6 +30,7 @@ import {
   insertBrokerFollowUpSchema,
   insertBrokerFollowUpReminderSchema,
   brokerFollowUpReminders,
+  workflowConfigs,
   users,
   users as userTable,
   tasks,
@@ -2632,6 +2633,75 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error processing reminders:", error);
       res.status(500).json({ message: "Failed to process reminders" });
+    }
+  });
+
+  // ── Workflow Config ─────────────────────────────────────────────────────────
+
+  // Get the current workflow pipeline config (default or saved)
+  app.get("/api/workflow-config", requireAuth, async (req: any, res) => {
+    try {
+      const [config] = await db
+        .select()
+        .from(workflowConfigs)
+        .where(eq(workflowConfigs.name, "default"))
+        .limit(1);
+      if (!config) {
+        return res.json(null);
+      }
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching workflow config:", error);
+      res.status(500).json({ message: "Failed to fetch workflow config" });
+    }
+  });
+
+  // Save / upsert the workflow pipeline config (manager+ only)
+  app.put("/api/workflow-config", requireAuth, async (req: any, res) => {
+    try {
+      if (req.user.role !== "manager" && req.user.role !== "admin") {
+        return res.status(403).json({ message: "Manager or Admin role required" });
+      }
+      const { stagesJson } = req.body;
+      if (!Array.isArray(stagesJson)) {
+        return res.status(400).json({ message: "stagesJson must be an array" });
+      }
+
+      // Upsert: update existing "default" row, or insert a new one
+      const [existing] = await db
+        .select({ id: workflowConfigs.id })
+        .from(workflowConfigs)
+        .where(eq(workflowConfigs.name, "default"))
+        .limit(1);
+
+      let result;
+      if (existing) {
+        [result] = await db
+          .update(workflowConfigs)
+          .set({ stagesJson, updatedBy: req.user.id, updatedAt: new Date() })
+          .where(eq(workflowConfigs.id, existing.id))
+          .returning();
+      } else {
+        [result] = await db
+          .insert(workflowConfigs)
+          .values({ name: "default", stagesJson, updatedBy: req.user.id })
+          .returning();
+      }
+
+      // Write audit event
+      await db.insert(eventLedger).values({
+        entityType: "system",
+        entityId:   0,
+        eventType:  "workflow_config_saved",
+        actorType:  "user",
+        actorId:    req.user.id,
+        payloadJson: { stageCount: stagesJson.length },
+      }).catch(() => {});
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error saving workflow config:", error);
+      res.status(500).json({ message: "Failed to save workflow config" });
     }
   });
 

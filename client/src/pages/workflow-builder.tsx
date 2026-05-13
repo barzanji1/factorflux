@@ -8,7 +8,6 @@ import TopNav from "@/components/layout/top-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -17,22 +16,22 @@ import { cn } from "@/lib/utils";
 import {
   GripVertical, Settings2, Zap, ChevronRight, CheckCircle2,
   FileText, Clock, AlertTriangle, Eye, EyeOff, Save,
-  RotateCcw, Info, ChevronDown, ChevronUp, ArrowRight,
+  RotateCcw, Info, ChevronDown, ChevronUp, ArrowUp, ArrowDown,
   Shield, ClipboardCheck, Wallet, ReceiptText, BarChart2,
-  Package, FileCheck, Layers, Sparkles,
+  Package, FileCheck, Layers, Sparkles, Undo2, Redo2,
+  ToggleLeft, ToggleRight, Hash, Database, CheckCheck,
 } from "lucide-react";
 
-// ─── Stage definitions (mirrors server/services/invoiceStage.ts) ──────────────
+// ─── Stage definitions ────────────────────────────────────────────────────────
 
 type StageColor = "slate" | "amber" | "blue" | "violet" | "orange" | "teal" | "indigo" | "emerald";
 
-interface StageConfig {
+export interface StageConfig {
   id: string;
   label: string;
   description: string;
   color: StageColor;
   step: number;
-  // Configurable fields
   enabled: boolean;
   slaHours: number;
   autoAdvance: boolean;
@@ -43,184 +42,70 @@ interface StageConfig {
   notifyOnExit: boolean;
 }
 
-const DEFAULT_STAGES: StageConfig[] = [
-  {
-    id: "document_intake",
-    label: "Document Intake",
-    description: "Receiving and organizing carrier documents",
-    color: "slate",
-    step: 1,
-    enabled: true,
-    slaHours: 4,
-    autoAdvance: false,
-    autoAdvanceCondition: "all_docs_uploaded",
-    notes: "",
-    requiresApproval: false,
-    notifyOnEnter: true,
-    notifyOnExit: false,
-  },
-  {
-    id: "verification",
-    label: "Verification",
-    description: "Verifying docs, credit, and broker authority",
-    color: "amber",
-    step: 2,
-    enabled: true,
-    slaHours: 8,
-    autoAdvance: false,
-    autoAdvanceCondition: "credit_approved",
-    notes: "",
-    requiresApproval: true,
-    notifyOnEnter: true,
-    notifyOnExit: true,
-  },
-  {
-    id: "approval",
-    label: "Approval",
-    description: "Factor review and funding decision",
-    color: "blue",
-    step: 3,
-    enabled: true,
-    slaHours: 24,
-    autoAdvance: false,
-    autoAdvanceCondition: "",
-    notes: "",
-    requiresApproval: true,
-    notifyOnEnter: true,
-    notifyOnExit: true,
-  },
-  {
-    id: "advance",
-    label: "Advance",
-    description: "Advance payment sent to carrier",
-    color: "violet",
-    step: 4,
-    enabled: true,
-    slaHours: 4,
-    autoAdvance: true,
-    autoAdvanceCondition: "payout_created",
-    notes: "",
-    requiresApproval: true,
-    notifyOnEnter: true,
-    notifyOnExit: true,
-  },
-  {
-    id: "collections",
-    label: "Collections",
-    description: "Collecting payment from broker/debtor",
-    color: "orange",
-    step: 5,
-    enabled: true,
-    slaHours: 720,
-    autoAdvance: false,
-    autoAdvanceCondition: "payment_applied",
-    notes: "",
-    requiresApproval: false,
-    notifyOnEnter: false,
-    notifyOnExit: true,
-  },
-  {
-    id: "payment_receipt",
-    label: "Payment Receipt",
-    description: "Payment received from broker/debtor",
-    color: "teal",
-    step: 6,
-    enabled: true,
-    slaHours: 24,
-    autoAdvance: true,
-    autoAdvanceCondition: "payment_matched",
-    notes: "",
-    requiresApproval: false,
-    notifyOnEnter: true,
-    notifyOnExit: false,
-  },
-  {
-    id: "reconciliation",
-    label: "Reconciliation",
-    description: "Matching payment to outstanding balance",
-    color: "indigo",
-    step: 7,
-    enabled: true,
-    slaHours: 48,
-    autoAdvance: false,
-    autoAdvanceCondition: "",
-    notes: "",
-    requiresApproval: true,
-    notifyOnEnter: false,
-    notifyOnExit: false,
-  },
-  {
-    id: "final_settlement",
-    label: "Final Settlement",
-    description: "Reserve released — invoice fully settled",
-    color: "emerald",
-    step: 8,
-    enabled: true,
-    slaHours: 24,
-    autoAdvance: true,
-    autoAdvanceCondition: "reserve_released",
-    notes: "",
-    requiresApproval: true,
-    notifyOnEnter: true,
-    notifyOnExit: true,
-  },
+export const DEFAULT_STAGES: StageConfig[] = [
+  { id: "document_intake",  label: "Document Intake",  description: "Receiving and organizing carrier documents",   color: "slate",   step: 1, enabled: true, slaHours: 4,   autoAdvance: false, autoAdvanceCondition: "all_docs_uploaded", notes: "", requiresApproval: false, notifyOnEnter: true,  notifyOnExit: false },
+  { id: "verification",     label: "Verification",     description: "Verifying docs, credit, and broker authority", color: "amber",   step: 2, enabled: true, slaHours: 8,   autoAdvance: false, autoAdvanceCondition: "credit_approved",   notes: "", requiresApproval: true,  notifyOnEnter: true,  notifyOnExit: true  },
+  { id: "approval",         label: "Approval",         description: "Factor review and funding decision",           color: "blue",    step: 3, enabled: true, slaHours: 24,  autoAdvance: false, autoAdvanceCondition: "",                  notes: "", requiresApproval: true,  notifyOnEnter: true,  notifyOnExit: true  },
+  { id: "advance",          label: "Advance",          description: "Advance payment sent to carrier",              color: "violet",  step: 4, enabled: true, slaHours: 4,   autoAdvance: true,  autoAdvanceCondition: "payout_created",    notes: "", requiresApproval: true,  notifyOnEnter: true,  notifyOnExit: true  },
+  { id: "collections",      label: "Collections",      description: "Collecting payment from broker/debtor",        color: "orange",  step: 5, enabled: true, slaHours: 720, autoAdvance: false, autoAdvanceCondition: "payment_applied",   notes: "", requiresApproval: false, notifyOnEnter: false, notifyOnExit: true  },
+  { id: "payment_receipt",  label: "Payment Receipt",  description: "Payment received from broker/debtor",          color: "teal",    step: 6, enabled: true, slaHours: 24,  autoAdvance: true,  autoAdvanceCondition: "payment_matched",   notes: "", requiresApproval: false, notifyOnEnter: true,  notifyOnExit: false },
+  { id: "reconciliation",   label: "Reconciliation",   description: "Matching payment to outstanding balance",      color: "indigo",  step: 7, enabled: true, slaHours: 48,  autoAdvance: false, autoAdvanceCondition: "",                  notes: "", requiresApproval: true,  notifyOnEnter: false, notifyOnExit: false },
+  { id: "final_settlement", label: "Final Settlement", description: "Reserve released — invoice fully settled",     color: "emerald", step: 8, enabled: true, slaHours: 24,  autoAdvance: true,  autoAdvanceCondition: "reserve_released",  notes: "", requiresApproval: true,  notifyOnEnter: true,  notifyOnExit: true  },
 ];
 
 const STORAGE_KEY = "ff:workflow-builder:stages";
+
 const AUTO_ADVANCE_OPTIONS = [
-  { value: "all_docs_uploaded",  label: "All documents uploaded" },
-  { value: "credit_approved",    label: "Credit check approved" },
-  { value: "payout_created",     label: "Payout record created" },
-  { value: "payment_applied",    label: "Payment applied" },
-  { value: "payment_matched",    label: "Payment fully matched" },
-  { value: "reserve_released",   label: "Reserve balance released" },
-  { value: "",                   label: "— none —" },
+  { value: "all_docs_uploaded", label: "All documents uploaded" },
+  { value: "credit_approved",   label: "Credit check approved" },
+  { value: "payout_created",    label: "Payout record created" },
+  { value: "payment_applied",   label: "Payment applied" },
+  { value: "payment_matched",   label: "Payment fully matched" },
+  { value: "reserve_released",  label: "Reserve balance released" },
+  { value: "",                  label: "— none —" },
 ];
 
-// ─── Color helpers ────────────────────────────────────────────────────────────
+// ─── Color maps ───────────────────────────────────────────────────────────────
 
 const COLOR_DOT: Record<StageColor, string> = {
-  slate:   "bg-slate-400",
-  amber:   "bg-amber-500",
-  blue:    "bg-blue-500",
-  violet:  "bg-violet-500",
-  orange:  "bg-orange-500",
-  teal:    "bg-teal-500",
-  indigo:  "bg-indigo-500",
-  emerald: "bg-emerald-500",
+  slate: "bg-slate-400", amber: "bg-amber-500", blue: "bg-blue-500", violet: "bg-violet-500",
+  orange: "bg-orange-500", teal: "bg-teal-500", indigo: "bg-indigo-500", emerald: "bg-emerald-500",
 };
-
 const COLOR_BG: Record<StageColor, string> = {
-  slate:   "bg-slate-50 border-slate-200 dark:bg-slate-900/30 dark:border-slate-700",
-  amber:   "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/40",
-  blue:    "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/40",
-  violet:  "bg-violet-50 border-violet-200 dark:bg-violet-950/20 dark:border-violet-900/40",
-  orange:  "bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-900/40",
-  teal:    "bg-teal-50 border-teal-200 dark:bg-teal-950/20 dark:border-teal-900/40",
-  indigo:  "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/20 dark:border-indigo-900/40",
+  slate:   "bg-slate-50   border-slate-200   dark:bg-slate-900/30   dark:border-slate-700",
+  amber:   "bg-amber-50   border-amber-200   dark:bg-amber-950/20   dark:border-amber-900/40",
+  blue:    "bg-blue-50    border-blue-200    dark:bg-blue-950/20    dark:border-blue-900/40",
+  violet:  "bg-violet-50  border-violet-200  dark:bg-violet-950/20  dark:border-violet-900/40",
+  orange:  "bg-orange-50  border-orange-200  dark:bg-orange-950/20  dark:border-orange-900/40",
+  teal:    "bg-teal-50    border-teal-200    dark:bg-teal-950/20    dark:border-teal-900/40",
+  indigo:  "bg-indigo-50  border-indigo-200  dark:bg-indigo-950/20  dark:border-indigo-900/40",
   emerald: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40",
 };
-
 const COLOR_TEXT: Record<StageColor, string> = {
-  slate:   "text-slate-600 dark:text-slate-300",
-  amber:   "text-amber-700 dark:text-amber-400",
-  blue:    "text-blue-700 dark:text-blue-400",
-  violet:  "text-violet-700 dark:text-violet-400",
-  orange:  "text-orange-700 dark:text-orange-400",
-  teal:    "text-teal-700 dark:text-teal-400",
-  indigo:  "text-indigo-700 dark:text-indigo-400",
-  emerald: "text-emerald-700 dark:text-emerald-400",
+  slate: "text-slate-600 dark:text-slate-300", amber: "text-amber-700 dark:text-amber-400",
+  blue: "text-blue-700 dark:text-blue-400", violet: "text-violet-700 dark:text-violet-400",
+  orange: "text-orange-700 dark:text-orange-400", teal: "text-teal-700 dark:text-teal-400",
+  indigo: "text-indigo-700 dark:text-indigo-400", emerald: "text-emerald-700 dark:text-emerald-400",
 };
-
 const COLOR_ICON: Record<StageColor, string> = {
-  slate:   "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-  amber:   "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",
-  blue:    "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400",
-  violet:  "bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400",
-  orange:  "bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400",
-  teal:    "bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400",
-  indigo:  "bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400",
+  slate:   "bg-slate-100   text-slate-500   dark:bg-slate-800   dark:text-slate-400",
+  amber:   "bg-amber-100   text-amber-600   dark:bg-amber-950/40  dark:text-amber-400",
+  blue:    "bg-blue-100    text-blue-600    dark:bg-blue-950/40   dark:text-blue-400",
+  violet:  "bg-violet-100  text-violet-600  dark:bg-violet-950/40 dark:text-violet-400",
+  orange:  "bg-orange-100  text-orange-600  dark:bg-orange-950/40 dark:text-orange-400",
+  teal:    "bg-teal-100    text-teal-600    dark:bg-teal-950/40   dark:text-teal-400",
+  indigo:  "bg-indigo-100  text-indigo-600  dark:bg-indigo-950/40 dark:text-indigo-400",
   emerald: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400",
+};
+const COLOR_BADGE: Record<StageColor, string> = {
+  slate:   "border-slate-200   bg-slate-50   text-slate-600   dark:border-slate-700   dark:bg-slate-800   dark:text-slate-400",
+  amber:   "border-amber-200   bg-amber-50   text-amber-700   dark:border-amber-800   dark:bg-amber-950/20 dark:text-amber-400",
+  blue:    "border-blue-200    bg-blue-50    text-blue-700    dark:border-blue-800    dark:bg-blue-950/20  dark:text-blue-400",
+  violet:  "border-violet-200  bg-violet-50  text-violet-700  dark:border-violet-800  dark:bg-violet-950/20 dark:text-violet-400",
+  orange:  "border-orange-200  bg-orange-50  text-orange-700  dark:border-orange-800  dark:bg-orange-950/20 dark:text-orange-400",
+  teal:    "border-teal-200    bg-teal-50    text-teal-700    dark:border-teal-800    dark:bg-teal-950/20  dark:text-teal-400",
+  indigo:  "border-indigo-200  bg-indigo-50  text-indigo-700  dark:border-indigo-800  dark:bg-indigo-950/20 dark:text-indigo-400",
+  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400",
 };
 
 const STAGE_ICONS: Record<string, React.ElementType> = {
@@ -234,203 +119,238 @@ const STAGE_ICONS: Record<string, React.ElementType> = {
   final_settlement: CheckCircle2,
 };
 
-// ─── Persistence helpers ──────────────────────────────────────────────────────
+// ─── Persistence ──────────────────────────────────────────────────────────────
 
-function loadStages(): StageConfig[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const saved: StageConfig[] = JSON.parse(raw);
-      // Merge with defaults so new fields are picked up
-      return saved.map(s => ({ ...DEFAULT_STAGES.find(d => d.id === s.id) ?? s, ...s }));
-    }
-  } catch {}
-  return DEFAULT_STAGES.map(s => ({ ...s }));
+function mergeWithDefaults(saved: StageConfig[]): StageConfig[] {
+  return saved.map(s => ({ ...DEFAULT_STAGES.find(d => d.id === s.id) ?? s, ...s }));
 }
 
-function saveStages(stages: StageConfig[]) {
+function localSave(stages: StageConfig[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stages)); } catch {}
+}
+
+// ─── SLA label ────────────────────────────────────────────────────────────────
+
+function slaLabel(h: number) {
+  if (h < 1)   return `${Math.round(h * 60)}m`;
+  if (h < 24)  return `${h}h`;
+  if (h < 168) return `${Math.round(h / 24)}d`;
+  return `${Math.round(h / 168)}w`;
 }
 
 // ─── Stage card ───────────────────────────────────────────────────────────────
 
-interface StageCardProps {
+function StageCard({
+  stage, index, total, expanded, dragging, dropBefore, invoiceCount, disabled,
+  onToggleExpand, onChange, onMoveUp, onMoveDown,
+  onDragStart, onDragEnd, onDragEnter, onDragLeave, onDrop,
+}: {
   stage: StageConfig;
   index: number;
   total: number;
   expanded: boolean;
   dragging: boolean;
-  dragOver: boolean;
+  dropBefore: boolean;
+  invoiceCount: number;
+  disabled: boolean;
   onToggleExpand: () => void;
-  onChange: (updates: Partial<StageConfig>) => void;
-  onDragStart: (e: React.DragEvent, idx: number) => void;
+  onChange: (u: Partial<StageConfig>) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDragStart: (e: React.DragEvent, i: number) => void;
   onDragEnd: () => void;
-  onDragOver: (e: React.DragEvent, idx: number) => void;
-  onDrop: (e: React.DragEvent, idx: number) => void;
-}
-
-function StageCard({
-  stage, index, total, expanded, dragging, dragOver,
-  onToggleExpand, onChange,
-  onDragStart, onDragEnd, onDragOver, onDrop,
-}: StageCardProps) {
+  onDragEnter: (e: React.DragEvent, i: number) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent, i: number) => void;
+}) {
   const Icon = STAGE_ICONS[stage.id] ?? Layers;
-
-  const slaLabel =
-    stage.slaHours < 1    ? `${stage.slaHours * 60}m`
-    : stage.slaHours < 24  ? `${stage.slaHours}h`
-    : stage.slaHours < 168 ? `${Math.round(stage.slaHours / 24)}d`
-    :                        `${Math.round(stage.slaHours / 168)}w`;
+  const enabledSeq = index + 1;
 
   return (
-    <div
-      draggable
-      onDragStart={e => onDragStart(e, index)}
-      onDragEnd={onDragEnd}
-      onDragOver={e => { e.preventDefault(); onDragOver(e, index); }}
-      onDrop={e => onDrop(e, index)}
-      className={cn(
-        "group rounded-[14px] border transition-all duration-150 select-none",
-        dragOver
-          ? "border-blue-400 bg-blue-50/60 shadow-[0_0_0_2px_rgba(59,130,246,0.25)] dark:border-blue-600 dark:bg-blue-950/20"
-          : "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]",
-        dragging ? "opacity-40 scale-[0.98]" : "opacity-100",
-        !stage.enabled && "opacity-60",
-      )}
-    >
-      {/* ── Header row ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        {/* Drag handle */}
-        <div
-          className="cursor-grab touch-none active:cursor-grabbing"
-          title="Drag to reorder"
-        >
-          <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-slate-400 dark:text-slate-700 dark:group-hover:text-slate-500" />
-        </div>
+    <div className="relative">
+      {/* ── Drop indicator line ──────────────────────────────────────── */}
+      <div className={cn(
+        "absolute -top-[3px] left-8 right-0 h-[3px] rounded-full transition-all duration-100",
+        dropBefore
+          ? "bg-blue-500 opacity-100 shadow-[0_0_6px_rgba(59,130,246,0.6)]"
+          : "opacity-0",
+      )} />
 
-        {/* Step number */}
-        <div className={cn(
-          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-          stage.enabled
-            ? `${COLOR_ICON[stage.color]}`
-            : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600"
-        )}>
-          {stage.enabled ? index + 1 : <EyeOff className="h-3 w-3" />}
-        </div>
+      <div
+        draggable={!disabled}
+        onDragStart={e => onDragStart(e, index)}
+        onDragEnd={onDragEnd}
+        onDragEnter={e => { e.preventDefault(); onDragEnter(e, index); }}
+        onDragLeave={onDragLeave}
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => onDrop(e, index)}
+        className={cn(
+          "group rounded-[14px] border transition-all duration-150 select-none",
+          dragging
+            ? "opacity-30 scale-[0.97] border-slate-300 dark:border-slate-700"
+            : "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]",
+          !stage.enabled && !dragging && "opacity-60",
+        )}
+      >
+        {/* ── Header row ──────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2.5 px-4 py-3">
 
-        {/* Icon */}
-        <div className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]",
-          COLOR_ICON[stage.color],
-          !stage.enabled && "!bg-slate-100 !text-slate-400 dark:!bg-slate-800 dark:!text-slate-600"
-        )}>
-          <Icon className="h-4 w-4" />
-        </div>
-
-        {/* Label + badges */}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={cn(
-              "text-[13.5px] font-semibold",
-              stage.enabled ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-600"
-            )}>
-              {stage.label}
-            </span>
-            {stage.autoAdvance && (
-              <span className="inline-flex items-center gap-0.5 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10.5px] font-semibold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-400">
-                <Zap className="h-2.5 w-2.5" /> Auto
-              </span>
-            )}
-            {stage.requiresApproval && (
-              <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10.5px] font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-400">
-                <Shield className="h-2.5 w-2.5" /> Gated
-              </span>
-            )}
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-              SLA {slaLabel}
-            </span>
+          {/* Drag handle + move buttons */}
+          <div className="flex shrink-0 flex-col items-center gap-0.5">
+            <div
+              className={cn(
+                "cursor-grab touch-none active:cursor-grabbing",
+                disabled && "cursor-default opacity-30",
+              )}
+              title="Drag to reorder"
+            >
+              <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-slate-400 dark:text-slate-700 dark:group-hover:text-slate-500 transition-colors" />
+            </div>
           </div>
-          <p className="mt-0.5 truncate text-[11.5px] text-slate-400 dark:text-slate-500">
-            {stage.description}
-          </p>
-        </div>
 
-        {/* Controls */}
-        <div className="flex shrink-0 items-center gap-3">
-          {/* Enable toggle */}
-          <label className="flex cursor-pointer items-center gap-1.5" onClick={e => e.stopPropagation()}>
-            <Switch
-              checked={stage.enabled}
-              onCheckedChange={v => onChange({ enabled: v })}
-              className="data-[state=checked]:bg-emerald-500"
-            />
-            <span className="hidden text-[11px] text-slate-400 sm:inline">
-              {stage.enabled ? "On" : "Off"}
-            </span>
-          </label>
+          {/* Up/Down buttons */}
+          <div className="flex shrink-0 flex-col gap-0.5">
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={disabled || index === 0}
+              className="flex h-4 w-4 items-center justify-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-20 dark:hover:bg-slate-800 dark:hover:text-slate-400 transition-colors"
+              title="Move up"
+            >
+              <ArrowUp className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={disabled || index === total - 1}
+              className="flex h-4 w-4 items-center justify-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-20 dark:hover:bg-slate-800 dark:hover:text-slate-400 transition-colors"
+              title="Move down"
+            >
+              <ArrowDown className="h-3 w-3" />
+            </button>
+          </div>
 
-          {/* Expand toggle */}
-          <button
-            type="button"
-            onClick={onToggleExpand}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            title={expanded ? "Collapse" : "Configure"}
-          >
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
+          {/* Step number */}
+          <div className={cn(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+            stage.enabled ? COLOR_ICON[stage.color] : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600",
+          )}>
+            {stage.enabled ? enabledSeq : <EyeOff className="h-3 w-3" />}
+          </div>
 
-      {/* ── Expanded config ─────────────────────────────────────────── */}
-      {expanded && (
-        <div className={cn(
-          "border-t px-4 pb-4 pt-3",
-          "border-slate-100 dark:border-slate-800"
-        )}>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Icon */}
+          <div className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]",
+            COLOR_ICON[stage.color],
+            !stage.enabled && "!bg-slate-100 !text-slate-400 dark:!bg-slate-800 dark:!text-slate-600",
+          )}>
+            <Icon className="h-4 w-4" />
+          </div>
 
-            {/* SLA */}
-            <div>
-              <label className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                <Clock className="h-3 w-3" /> SLA (hours)
-              </label>
-              <Input
-                type="number"
-                min={0}
-                value={stage.slaHours}
-                onChange={e => onChange({ slaHours: Number(e.target.value) || 0 })}
-                className="h-8 rounded-lg text-sm"
+          {/* Label + badges */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={cn(
+                "text-[13.5px] font-semibold",
+                stage.enabled ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-600",
+              )}>
+                {stage.label}
+              </span>
+              {stage.autoAdvance && (
+                <span className="inline-flex items-center gap-0.5 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-400">
+                  <Zap className="h-2.5 w-2.5" /> Auto
+                </span>
+              )}
+              {stage.requiresApproval && (
+                <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-400">
+                  <Shield className="h-2.5 w-2.5" /> Gated
+                </span>
+              )}
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                SLA {slaLabel(stage.slaHours)}
+              </span>
+              {invoiceCount > 0 && (
+                <span className={cn(
+                  "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-bold",
+                  COLOR_BADGE[stage.color],
+                )}>
+                  <Hash className="h-2.5 w-2.5" />{invoiceCount} active
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 truncate text-[11.5px] text-slate-400 dark:text-slate-500">
+              {stage.description}
+            </p>
+          </div>
+
+          {/* Controls */}
+          <div className="flex shrink-0 items-center gap-2.5">
+            <label className="flex cursor-pointer items-center gap-1.5" onClick={e => e.stopPropagation()}>
+              <Switch
+                checked={stage.enabled}
+                onCheckedChange={v => onChange({ enabled: v })}
+                disabled={disabled}
+                className="data-[state=checked]:bg-emerald-500"
               />
-              <p className="mt-1 text-[10.5px] text-slate-400">
-                Alert when stage exceeds this duration
-              </p>
-            </div>
+              <span className="hidden text-[11px] text-slate-400 sm:inline">
+                {stage.enabled ? "On" : "Off"}
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+              title={expanded ? "Collapse" : "Configure"}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
 
-            {/* Auto-advance condition */}
-            <div>
-              <label className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                <Zap className="h-3 w-3" /> Auto-advance condition
-              </label>
-              <select
-                value={stage.autoAdvanceCondition}
-                onChange={e => onChange({ autoAdvanceCondition: e.target.value, autoAdvance: !!e.target.value })}
-                className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {AUTO_ADVANCE_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-              <p className="mt-1 text-[10.5px] text-slate-400">
-                Move automatically when condition is met
-              </p>
-            </div>
+        {/* ── Expanded config ──────────────────────────────────────────── */}
+        {expanded && (
+          <div className="border-t border-slate-100 dark:border-slate-800 px-4 pb-4 pt-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
-            {/* Toggles */}
-            <div className="space-y-2.5">
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Options
-              </label>
+              {/* SLA */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <Clock className="h-3 w-3" /> SLA (hours)
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={stage.slaHours}
+                  onChange={e => onChange({ slaHours: Number(e.target.value) || 0 })}
+                  disabled={disabled}
+                  className="h-8 rounded-lg text-sm"
+                />
+                <p className="mt-1 text-[10.5px] text-slate-400">Alert when stage exceeds this</p>
+              </div>
+
+              {/* Auto-advance */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <Zap className="h-3 w-3" /> Auto-advance condition
+                </label>
+                <select
+                  value={stage.autoAdvanceCondition}
+                  onChange={e => onChange({ autoAdvanceCondition: e.target.value, autoAdvance: !!e.target.value })}
+                  disabled={disabled}
+                  className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                >
+                  {AUTO_ADVANCE_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[10.5px] text-slate-400">Move automatically when met</p>
+              </div>
+
+              {/* Toggles */}
               <div className="space-y-2">
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Options
+                </label>
                 {[
                   { field: "requiresApproval" as keyof StageConfig, label: "Requires manager approval", icon: Shield },
                   { field: "notifyOnEnter"    as keyof StageConfig, label: "Notify on stage entry",      icon: Info  },
@@ -438,143 +358,153 @@ function StageCard({
                 ].map(({ field, label, icon: Ico }) => (
                   <label key={field} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/30 dark:hover:border-slate-700">
                     <span className="flex items-center gap-1.5 text-[12px] text-slate-600 dark:text-slate-400">
-                      <Ico className="h-3 w-3" />
-                      {label}
+                      <Ico className="h-3 w-3" />{label}
                     </span>
                     <Switch
                       checked={!!stage[field]}
                       onCheckedChange={v => onChange({ [field]: v })}
+                      disabled={disabled}
                       className="shrink-0 data-[state=checked]:bg-blue-600"
                     />
                   </label>
                 ))}
               </div>
+
+              {/* Notes */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <FileText className="h-3 w-3" /> Stage notes
+                </label>
+                <Textarea
+                  value={stage.notes}
+                  onChange={e => onChange({ notes: e.target.value })}
+                  disabled={disabled}
+                  rows={2}
+                  placeholder="Internal notes shown to agents when a load enters this stage…"
+                  className="resize-none rounded-lg text-sm"
+                />
+              </div>
             </div>
 
-            {/* Notes (spans full width) */}
-            <div className="sm:col-span-2 lg:col-span-3">
-              <label className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                <FileText className="h-3 w-3" /> Stage notes
-              </label>
-              <Textarea
-                value={stage.notes}
-                onChange={e => onChange({ notes: e.target.value })}
-                rows={2}
-                placeholder="Internal notes about this stage — shown to agents when a load enters it…"
-                className="resize-none rounded-lg text-sm"
-              />
-            </div>
+            {/* Required docs hint */}
+            <DocRulesHint stageId={stage.id} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Doc rules hint ───────────────────────────────────────────────────────────
+
+interface DocumentRule {
+  id: number; documentType: string; label: string; required: boolean;
+  requiredForStage: "start_review" | "approve"; active: boolean; sortOrder: number;
+}
+
+function DocRulesHint({ stageId }: { stageId: string }) {
+  const { data: rules = [] } = useQuery<DocumentRule[]>({ queryKey: ["/api/document-rules"] });
+  const stageLabel =
+    stageId === "document_intake" || stageId === "verification" ? "start_review" :
+    stageId === "approval" ? "approve" : null;
+  if (!stageLabel) return null;
+  const relevant = (rules as DocumentRule[]).filter(r => r.requiredForStage === stageLabel && r.active);
+  if (relevant.length === 0) return null;
+  return (
+    <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/20">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        Required documents for this stage
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {relevant.map(r => (
+          <span key={r.id} className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] dark:border-emerald-900/40 dark:bg-emerald-950/20">
+            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            <span className="text-slate-600 dark:text-slate-400">{r.label}</span>
+            {!r.required && <span className="text-[10px] text-slate-400">(opt)</span>}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
 // ─── Pipeline preview ─────────────────────────────────────────────────────────
 
-function PipelinePreview({ stages }: { stages: StageConfig[] }) {
+function PipelinePreview({
+  stages, stageCounts,
+}: { stages: StageConfig[]; stageCounts: Record<string, number> }) {
   const enabled = stages.filter(s => s.enabled);
+  const totalSla = enabled.reduce((s, x) => s + x.slaHours, 0);
+  const totalActive = enabled.reduce((s, x) => s + (stageCounts[x.id] ?? 0), 0);
+
   return (
-    <div className="rounded-[14px] border border-slate-200/80 bg-white p-5 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-      <p className="mb-4 text-[11px] font-bold uppercase tracking-wide text-slate-400">Live Pipeline Preview</p>
-      <div className="flex flex-wrap items-center gap-y-3">
-        {enabled.map((s, i) => {
-          const Icon = STAGE_ICONS[s.id] ?? Layers;
-          return (
-            <div key={s.id} className="flex items-center">
-              {/* Node */}
-              <div className="flex flex-col items-center gap-1">
-                <div className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-xl border",
-                  COLOR_BG[s.color],
-                  COLOR_TEXT[s.color],
-                )}>
-                  <Icon className="h-4 w-4" />
+    <div className="rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+      <div className="border-b border-slate-100 dark:border-slate-800 px-5 py-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Live Pipeline Preview</p>
+      </div>
+      <div className="p-4 overflow-x-auto">
+        <div className="flex items-start gap-1 min-w-max">
+          {enabled.map((s, i) => {
+            const Icon = STAGE_ICONS[s.id] ?? Layers;
+            const count = stageCounts[s.id] ?? 0;
+            return (
+              <div key={s.id} className="flex items-center">
+                <div className="flex flex-col items-center gap-1.5 w-[76px]">
+                  <div className={cn(
+                    "relative flex h-10 w-10 items-center justify-center rounded-xl border-2 transition-all",
+                    COLOR_BG[s.color], COLOR_TEXT[s.color],
+                  )}>
+                    <Icon className="h-4.5 w-4.5" />
+                    {count > 0 && (
+                      <span className={cn(
+                        "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border text-[9px] font-bold",
+                        COLOR_BADGE[s.color],
+                      )}>
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-center text-[9.5px] font-semibold leading-tight text-slate-500 dark:text-slate-400 max-w-[72px]">
+                    {s.label}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {s.autoAdvance && <Zap className="h-2.5 w-2.5 text-violet-500" title="Auto-advance" />}
+                    {s.requiresApproval && <Shield className="h-2.5 w-2.5 text-blue-500" title="Requires approval" />}
+                  </div>
+                  <span className="text-[9px] text-slate-400">{slaLabel(s.slaHours)}</span>
                 </div>
-                <span className="max-w-[68px] text-center text-[9.5px] font-semibold leading-tight text-slate-500 dark:text-slate-400">
-                  {s.label}
-                </span>
-                {s.autoAdvance && (
-                  <span className="text-[9px] text-violet-500"><Zap className="inline h-2.5 w-2.5" /></span>
+                {i < enabled.length - 1 && (
+                  <ChevronRight className="mx-0.5 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-700" />
                 )}
               </div>
-              {/* Arrow */}
-              {i < enabled.length - 1 && (
-                <ChevronRight className="mx-1 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-700" />
-              )}
-            </div>
-          );
-        })}
-        {enabled.length === 0 && (
-          <p className="text-sm text-slate-400">All stages are disabled.</p>
-        )}
+            );
+          })}
+          {enabled.length === 0 && (
+            <p className="py-4 text-sm text-slate-400">All stages are disabled.</p>
+          )}
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Stat label="Active stages" value={enabled.length} />
-        <Stat label="Auto-advance" value={enabled.filter(s => s.autoAdvance).length} color="violet" />
-        <Stat label="Manager-gated" value={enabled.filter(s => s.requiresApproval).length} color="blue" />
-        <Stat label="Max SLA" value={`${enabled.reduce((mx, s) => Math.max(mx, s.slaHours), 0)}h`} color="amber" />
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, color = "slate" }: { label: string; value: string | number; color?: string }) {
-  const cls: Record<string, string> = {
-    slate:  "text-slate-700 dark:text-slate-300",
-    violet: "text-violet-700 dark:text-violet-400",
-    blue:   "text-blue-700 dark:text-blue-400",
-    amber:  "text-amber-700 dark:text-amber-400",
-  };
-  return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900/30">
-      <p className="text-[10px] text-slate-400">{label}</p>
-      <p className={cn("text-[14px] font-bold", cls[color] ?? cls.slate)}>{value}</p>
-    </div>
-  );
-}
-
-// ─── Document rules mini panel ────────────────────────────────────────────────
-
-interface DocumentRule {
-  id: number;
-  documentType: string;
-  label: string;
-  required: boolean;
-  requiredForStage: "start_review" | "approve";
-  active: boolean;
-  sortOrder: number;
-}
-
-function DocRulesPanel({ stageId }: { stageId: string | null }) {
-  const { data: rules = [] } = useQuery<DocumentRule[]>({ queryKey: ["/api/document-rules"] });
-  if (!stageId) return null;
-
-  const stageLabel =
-    stageId === "document_intake" || stageId === "verification" ? "start_review" :
-    stageId === "approval" ? "approve" : null;
-
-  if (!stageLabel) return null;
-
-  const relevant = rules.filter(r => r.requiredForStage === stageLabel && r.active);
-  if (relevant.length === 0) return null;
-
-  return (
-    <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/20">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-        Required Documents for this stage
-      </p>
-      <div className="space-y-1">
-        {relevant.map(r => (
-          <div key={r.id} className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-            <span className="text-[11.5px] text-slate-600 dark:text-slate-400">{r.label}</span>
-            {!r.required && (
-              <span className="text-[10px] text-slate-400">(optional)</span>
-            )}
+      {/* Stats row */}
+      <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3 flex flex-wrap gap-3">
+        {[
+          { label: "Active stages",  value: enabled.length,                                         color: "slate"  },
+          { label: "Active invoices",value: totalActive,                                             color: "blue"   },
+          { label: "Auto-advance",   value: enabled.filter(s => s.autoAdvance).length,              color: "violet" },
+          { label: "Manager-gated",  value: enabled.filter(s => s.requiresApproval).length,         color: "blue"   },
+          { label: "Total SLA",      value: slaLabel(totalSla),                                     color: "amber"  },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900/30">
+            <p className="text-[10px] text-slate-400">{label}</p>
+            <p className={cn(
+              "text-[14px] font-bold",
+              color === "slate"  ? "text-slate-700 dark:text-slate-300" :
+              color === "violet" ? "text-violet-700 dark:text-violet-400" :
+              color === "blue"   ? "text-blue-700 dark:text-blue-400" :
+              color === "amber"  ? "text-amber-700 dark:text-amber-400" : "",
+            )}>
+              {value}
+            </p>
           </div>
         ))}
       </div>
@@ -584,46 +514,158 @@ function DocRulesPanel({ stageId }: { stageId: string | null }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const MAX_HISTORY = 30;
+
 export default function WorkflowBuilder() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isManager = user?.role === "manager" || user?.role === "admin";
 
-  const [stages, setStages] = useState<StageConfig[]>(loadStages);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // ── Server config ───────────────────────────────────────────────────────────
+  const { data: serverConfig, isLoading: configLoading } = useQuery<{ stagesJson: StageConfig[] }>({
+    queryKey: ["/api/workflow-config"],
+  });
+
+  // ── Invoice counts per stage ────────────────────────────────────────────────
+  const { data: invoices = [] } = useQuery<{ factoringStage: string | null }[]>({
+    queryKey: ["/api/invoices"],
+    select: (data: any[]) => data.map((d: any) => ({ factoringStage: d.factoringStage })),
+  });
+  const stageCounts: Record<string, number> = {};
+  for (const inv of invoices as any[]) {
+    if (inv.factoringStage) {
+      stageCounts[inv.factoringStage] = (stageCounts[inv.factoringStage] ?? 0) + 1;
+    }
+  }
+
+  // ── Stage state + history ───────────────────────────────────────────────────
+  const [stages, setStages]         = useState<StageConfig[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return mergeWithDefaults(JSON.parse(raw));
+    } catch {}
+    return DEFAULT_STAGES.map(s => ({ ...s }));
+  });
+  const [history, setHistory]       = useState<StageConfig[][]>([]);
+  const [future, setFuture]         = useState<StageConfig[][]>([]);
   const [hasUnsaved, setHasUnsaved] = useState(false);
-  const [showReset, setShowReset] = useState(false);
+  const [savedToDb, setSavedToDb]   = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showReset, setShowReset]   = useState(false);
 
   // Drag state
-  const dragIdx = useRef<number | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const dragIdx     = useRef<number | null>(null);
+  const [draggingId, setDraggingId]   = useState<string | null>(null);
+  const [dropBeforeIdx, setDropBeforeIdx] = useState<number | null>(null);
 
-  // ── Helpers ────────────────────────────────────────────────────
-  const updateStage = useCallback((id: string, updates: Partial<StageConfig>) => {
-    setStages(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-    setHasUnsaved(true);
+  // ── Populate stages from server on first load ───────────────────────────────
+  useEffect(() => {
+    if (serverConfig?.stagesJson?.length) {
+      const merged = mergeWithDefaults(serverConfig.stagesJson);
+      setStages(merged);
+      localSave(merged);
+      setHasUnsaved(false);
+    }
+  }, [serverConfig]);
+
+  // ── Auto-save to localStorage ───────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => { if (hasUnsaved) localSave(stages); }, 600);
+    return () => clearTimeout(t);
+  }, [stages, hasUnsaved]);
+
+  // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Y / Ctrl+S) ──────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!isManager) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); if (hasUnsaved) save(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+
+  // ── History helpers ─────────────────────────────────────────────────────────
+  const pushHistory = useCallback((prev: StageConfig[]) => {
+    setHistory(h => [...h.slice(-MAX_HISTORY + 1), prev]);
+    setFuture([]);
   }, []);
 
+  const applyStages = useCallback((next: StageConfig[], fromHistory = false) => {
+    if (!fromHistory) pushHistory(stages);
+    setStages(next);
+    setHasUnsaved(true);
+    setSavedToDb(false);
+  }, [stages, pushHistory]);
+
+  const undo = useCallback(() => {
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    setFuture(f => [stages, ...f]);
+    setHistory(h => h.slice(0, -1));
+    setStages(prev);
+    setHasUnsaved(true);
+    setSavedToDb(false);
+  }, [history, stages]);
+
+  const redo = useCallback(() => {
+    if (future.length === 0) return;
+    const next = future[0];
+    setHistory(h => [...h, stages]);
+    setFuture(f => f.slice(1));
+    setStages(next);
+    setHasUnsaved(true);
+    setSavedToDb(false);
+  }, [future, stages]);
+
+  const updateStage = useCallback((id: string, updates: Partial<StageConfig>) => {
+    applyStages(stages.map(s => s.id === id ? { ...s, ...updates } : s));
+  }, [stages, applyStages]);
+
+  const moveStage = useCallback((fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    const next = [...stages];
+    const [moved] = next.splice(fromIdx, 1);
+    const insertAt = toIdx > fromIdx ? toIdx - 1 : toIdx;
+    next.splice(insertAt, 0, moved);
+    applyStages(next.map((s, i) => ({ ...s, step: i + 1 })));
+  }, [stages, applyStages]);
+
+  const moveUp   = useCallback((idx: number) => moveStage(idx, idx - 1), [moveStage]);
+  const moveDown = useCallback((idx: number) => moveStage(idx, idx + 2), [moveStage]);
+
+  // ── Save mutation ───────────────────────────────────────────────────────────
+  const saveMutation = useMutation({
+    mutationFn: (numbered: StageConfig[]) =>
+      apiRequest("PUT", "/api/workflow-config", { stagesJson: numbered }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workflow-config"] });
+      setHasUnsaved(false);
+      setSavedToDb(true);
+      toast({ title: "Workflow saved", description: "Pipeline configuration saved to database." });
+      setTimeout(() => setSavedToDb(false), 3000);
+    },
+    onError: () => {
+      toast({ title: "Save failed", description: "Could not save to database. Changes are stored locally.", variant: "destructive" });
+    },
+  });
+
   const save = useCallback(() => {
-    // Reassign step numbers based on current order
     const numbered = stages.map((s, i) => ({ ...s, step: i + 1 }));
     setStages(numbered);
-    saveStages(numbered);
-    setHasUnsaved(false);
-    toast({ title: "Workflow saved", description: "Pipeline configuration stored locally." });
-  }, [stages, toast]);
+    localSave(numbered);
+    saveMutation.mutate(numbered);
+  }, [stages, saveMutation]);
 
   const reset = useCallback(() => {
     const fresh = DEFAULT_STAGES.map(s => ({ ...s }));
-    setStages(fresh);
-    saveStages(fresh);
-    setHasUnsaved(false);
+    applyStages(fresh);
     setShowReset(false);
-    toast({ title: "Workflow reset to defaults" });
-  }, [toast]);
+    toast({ title: "Reset to defaults" });
+  }, [applyStages, toast]);
 
-  // ── Drag-and-drop ──────────────────────────────────────────────
+  // ── Drag handlers ───────────────────────────────────────────────────────────
   const onDragStart = useCallback((e: React.DragEvent, idx: number) => {
     dragIdx.current = idx;
     setDraggingId(stages[idx].id);
@@ -634,34 +676,30 @@ export default function WorkflowBuilder() {
   const onDragEnd = useCallback(() => {
     dragIdx.current = null;
     setDraggingId(null);
-    setDragOverIdx(null);
+    setDropBeforeIdx(null);
   }, []);
 
-  const onDragOver = useCallback((_e: React.DragEvent, idx: number) => {
-    setDragOverIdx(idx);
+  const onDragEnter = useCallback((_e: React.DragEvent, idx: number) => {
+    setDropBeforeIdx(idx);
+  }, []);
+
+  const onDragLeave = useCallback(() => {
+    // Only clear if not immediately re-entering another card
   }, []);
 
   const onDrop = useCallback((_e: React.DragEvent, dropIdx: number) => {
     const fromIdx = dragIdx.current;
-    if (fromIdx === null || fromIdx === dropIdx) {
-      setDragOverIdx(null);
-      return;
-    }
-    setStages(prev => {
-      const next = [...prev];
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(dropIdx, 0, moved);
-      return next;
-    });
-    setHasUnsaved(true);
-    setDragOverIdx(null);
-  }, []);
+    setDropBeforeIdx(null);
+    if (fromIdx === null || fromIdx === dropIdx) return;
+    const next = [...stages];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(dropIdx, 0, moved);
+    applyStages(next.map((s, i) => ({ ...s, step: i + 1 })));
+  }, [stages, applyStages]);
 
-  // Auto-save to localStorage on any change (debounced)
-  useEffect(() => {
-    const t = setTimeout(() => { if (hasUnsaved) saveStages(stages); }, 800);
-    return () => clearTimeout(t);
-  }, [stages, hasUnsaved]);
+  // ── Bulk actions ────────────────────────────────────────────────────────────
+  const enableAll  = () => applyStages(stages.map(s => ({ ...s, enabled: true  })));
+  const disableAll = () => applyStages(stages.map(s => ({ ...s, enabled: false })));
 
   const enabledCount = stages.filter(s => s.enabled).length;
 
@@ -671,178 +709,255 @@ export default function WorkflowBuilder() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
           title="Workflow Builder"
-          subtitle="Drag to reorder stages, configure SLA targets, auto-advance rules, and approval gates"
+          subtitle="Drag to reorder · configure SLA targets · auto-advance rules · approval gates"
           group="Admin"
         />
 
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1200px] p-6 xl:p-8">
 
-            {/* ── Top bar ─────────────────────────────────────────────────── */}
-            <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.25)]">
-                    <Layers className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <h1 className="text-[18px] font-bold tracking-tight text-slate-900 dark:text-white">
-                      Factoring Pipeline
-                    </h1>
-                    <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                      {enabledCount} of {stages.length} stages active
-                    </p>
-                  </div>
+            {/* ── Top bar ───────────────────────────────────────────────────── */}
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.25)]">
+                  <Layers className="h-[18px] w-[18px]" />
+                </div>
+                <div>
+                  <h1 className="text-[18px] font-bold tracking-tight text-slate-900 dark:text-white">
+                    Factoring Pipeline
+                  </h1>
+                  <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                    {enabledCount} of {stages.length} stages active
+                    {savedToDb && (
+                      <span className="ml-2 inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+                        <CheckCheck className="h-3 w-3" /> Saved to database
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
-                {hasUnsaved && (
-                  <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11.5px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-400">
-                    <AlertTriangle className="h-3 w-3" /> Unsaved changes
-                  </span>
-                )}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Undo / Redo */}
+                <button
+                  type="button"
+                  onClick={undo}
+                  disabled={!isManager || history.length === 0}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+                  title="Undo (Ctrl+Z)"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={redo}
+                  disabled={!isManager || future.length === 0}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+                  title="Redo (Ctrl+Y)"
+                >
+                  <Redo2 className="h-3.5 w-3.5" />
+                </button>
+
+                <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
+
+                {/* Bulk */}
                 <Button
                   variant="outline"
-                  onClick={() => setShowReset(true)}
-                  className="gap-1.5 rounded-xl text-xs"
+                  size="sm"
+                  onClick={enableAll}
                   disabled={!isManager}
+                  className="gap-1 text-[11.5px] rounded-lg h-8"
+                >
+                  <ToggleRight className="h-3.5 w-3.5 text-emerald-500" /> Enable All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={disableAll}
+                  disabled={!isManager}
+                  className="gap-1 text-[11.5px] rounded-lg h-8"
+                >
+                  <ToggleLeft className="h-3.5 w-3.5 text-slate-400" /> Disable All
+                </Button>
+
+                <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReset(true)}
+                  disabled={!isManager}
+                  className="gap-1.5 text-[11.5px] rounded-lg h-8"
                 >
                   <RotateCcw className="h-3.5 w-3.5" /> Reset
                 </Button>
                 <Button
+                  size="sm"
                   onClick={save}
-                  disabled={!hasUnsaved || !isManager}
-                  className="gap-1.5 rounded-xl bg-blue-600 text-xs text-white hover:bg-blue-700 shadow-[0_4px_12px_rgba(37,99,235,0.22)]"
+                  disabled={!hasUnsaved || !isManager || saveMutation.isPending}
+                  className={cn(
+                    "gap-1.5 text-[11.5px] rounded-lg h-8 transition-all",
+                    hasUnsaved
+                      ? "bg-blue-600 text-white hover:bg-blue-700 shadow-[0_4px_12px_rgba(37,99,235,0.22)]"
+                      : "bg-slate-100 text-slate-400 dark:bg-slate-800",
+                  )}
+                  title="Save (Ctrl+S)"
                 >
-                  <Save className="h-3.5 w-3.5" />
+                  {saveMutation.isPending ? (
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
                   {hasUnsaved ? "Save Changes" : "Saved"}
                 </Button>
               </div>
             </div>
 
-            {/* ── Info banner ──────────────────────────────────────────────── */}
-            <div className="mb-5 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+            {/* ── Banners ───────────────────────────────────────────────────── */}
+            {hasUnsaved && (
+              <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span className="text-[12px] text-amber-700 dark:text-amber-400">
+                  You have unsaved changes —
+                  <button onClick={save} className="ml-1 font-semibold underline-offset-2 hover:underline" disabled={saveMutation.isPending}>
+                    save now
+                  </button>
+                  {" "}or press <kbd className="rounded bg-amber-100 px-1 py-0.5 text-[10px] dark:bg-amber-900/40">Ctrl+S</kbd>
+                </span>
+              </div>
+            )}
+
+            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-950/20">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-              <div className="text-xs text-blue-700 dark:text-blue-300">
-                <span className="font-semibold">Drag stages to reorder · </span>
-                Toggle stages on/off to hide them from the pipeline ·
-                Configure SLA alerts, auto-advance triggers, and approval gates per stage ·
-                Changes are saved locally and applied to the pipeline preview in real time.
+              <div className="text-[12px] text-blue-700 dark:text-blue-300">
+                <span className="font-semibold">Drag stages to reorder · use ▲▼ buttons for precise ordering · </span>
+                toggle stages on/off · configure SLA, auto-advance, and approval gates per stage ·
+                changes are auto-saved locally and can be committed to the database with Save.
+                <span className="ml-1 font-medium">Undo/redo supported (Ctrl+Z / Ctrl+Y).</span>
               </div>
             </div>
 
             {!isManager && (
-              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  You are viewing in read-only mode. Manager or Admin role required to make changes.
+                <p className="text-[12px] text-amber-700 dark:text-amber-400">
+                  Read-only mode — Manager or Admin role required to make changes.
                 </p>
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
-              {/* ── Left: stage list ───────────────────────────────────────── */}
-              <div className="space-y-2.5">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_330px]">
+
+              {/* ── Left: stage list ─────────────────────────────────────────── */}
+              <div
+                className="space-y-2"
+                onDragLeave={e => {
+                  // If leaving the list container entirely, clear drop indicator
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setDropBeforeIdx(null);
+                  }
+                }}
+              >
                 {stages.map((stage, index) => (
-                  <div key={stage.id}>
-                    <StageCard
-                      stage={stage}
-                      index={index}
-                      total={stages.length}
-                      expanded={expandedId === stage.id}
-                      dragging={draggingId === stage.id}
-                      dragOver={dragOverIdx === index}
-                      onToggleExpand={() => setExpandedId(expandedId === stage.id ? null : stage.id)}
-                      onChange={isManager ? (updates) => updateStage(stage.id, updates) : () => {}}
-                      onDragStart={isManager ? onDragStart : () => {}}
-                      onDragEnd={onDragEnd}
-                      onDragOver={isManager ? onDragOver : () => {}}
-                      onDrop={isManager ? onDrop : () => {}}
-                    />
-                    {/* Doc rules hint when expanded */}
-                    {expandedId === stage.id && (
-                      <div className="ml-[60px]">
-                        <DocRulesPanel stageId={stage.id} />
-                      </div>
-                    )}
-                  </div>
+                  <StageCard
+                    key={stage.id}
+                    stage={stage}
+                    index={index}
+                    total={stages.length}
+                    expanded={expandedId === stage.id}
+                    dragging={draggingId === stage.id}
+                    dropBefore={dropBeforeIdx === index && draggingId !== stage.id}
+                    invoiceCount={stageCounts[stage.id] ?? 0}
+                    disabled={!isManager}
+                    onToggleExpand={() => setExpandedId(expandedId === stage.id ? null : stage.id)}
+                    onChange={updates => updateStage(stage.id, updates)}
+                    onMoveUp={() => moveUp(index)}
+                    onMoveDown={() => moveDown(index)}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onDragEnter={onDragEnter}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                  />
                 ))}
 
-                {/* Drop zone at end */}
+                {/* End drop zone */}
                 {isManager && (
                   <div
-                    onDragOver={e => { e.preventDefault(); setDragOverIdx(stages.length); }}
-                    onDrop={e => onDrop(e, stages.length - 1)}
+                    onDragOver={e => { e.preventDefault(); setDropBeforeIdx(stages.length); }}
+                    onDragLeave={() => setDropBeforeIdx(null)}
+                    onDrop={e => { e.preventDefault(); onDrop(e, stages.length - 1); }}
                     className={cn(
-                      "rounded-[14px] border-2 border-dashed py-4 text-center text-[12px] text-slate-300 transition-colors dark:text-slate-700",
-                      dragOverIdx === stages.length
-                        ? "border-blue-400 text-blue-400 dark:border-blue-600 dark:text-blue-400"
-                        : "border-slate-200 dark:border-slate-800"
+                      "relative rounded-[14px] border-2 border-dashed py-4 text-center text-[12px] transition-colors",
+                      dropBeforeIdx === stages.length
+                        ? "border-blue-400 bg-blue-50/40 text-blue-500 dark:border-blue-600 dark:bg-blue-950/10"
+                        : "border-slate-200 text-slate-300 dark:border-slate-800 dark:text-slate-700",
                     )}
                   >
-                    Drop here to move to end
+                    Drop here to place at end
                   </div>
                 )}
               </div>
 
-              {/* ── Right: preview + legend ────────────────────────────────── */}
+              {/* ── Right: preview panel ─────────────────────────────────────── */}
               <div className="space-y-4">
-                {/* Pipeline flow preview */}
-                <PipelinePreview stages={stages} />
+                {configLoading ? (
+                  <div className="flex items-center gap-2 rounded-[14px] border border-slate-200 bg-white p-4 text-[12px] text-slate-400 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                    Loading saved config…
+                  </div>
+                ) : (
+                  <PipelinePreview stages={stages} stageCounts={stageCounts} />
+                )}
 
-                {/* Legend */}
-                <div className="rounded-[14px] border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Legend</p>
-                  <div className="space-y-2.5">
-                    {[
-                      {
-                        icon: <GripVertical className="h-4 w-4 text-slate-400" />,
-                        label: "Drag to reorder",
-                        sub: "Grab the handle and drag a stage up or down",
-                      },
-                      {
-                        icon: <Zap className="h-4 w-4 text-violet-500" />,
-                        label: "Auto-advance",
-                        sub: "Stage advances automatically when condition is met",
-                      },
-                      {
-                        icon: <Shield className="h-4 w-4 text-blue-500" />,
-                        label: "Manager-gated",
-                        sub: "Requires manager or admin to approve progression",
-                      },
-                      {
-                        icon: <Clock className="h-4 w-4 text-amber-500" />,
-                        label: "SLA alert",
-                        sub: "Triggers alert when duration exceeds threshold",
-                      },
-                      {
-                        icon: <EyeOff className="h-4 w-4 text-slate-400" />,
-                        label: "Disabled stage",
-                        sub: "Hidden from pipeline — loads skip this stage",
-                      },
-                    ].map(item => (
-                      <div key={item.label} className="flex items-start gap-2.5">
-                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/30">
-                          {item.icon}
-                        </div>
-                        <div>
-                          <p className="text-[12px] font-semibold text-slate-700 dark:text-slate-300">{item.label}</p>
-                          <p className="text-[11px] text-slate-400 dark:text-slate-500">{item.sub}</p>
+                {/* Config summary card */}
+                <div className="rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                  <div className="border-b border-slate-100 dark:border-slate-800 px-5 py-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Config Summary</p>
+                  </div>
+                  <div className="divide-y divide-slate-50 dark:divide-slate-800">
+                    {stages.map((s, i) => (
+                      <div key={s.id} className="flex items-center gap-2.5 px-4 py-2">
+                        <span className={cn(
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold",
+                          s.enabled ? COLOR_ICON[s.color] : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600",
+                        )}>
+                          {s.enabled ? i + 1 : "–"}
+                        </span>
+                        <span className={cn(
+                          "flex-1 truncate text-[12px] font-medium",
+                          s.enabled ? "text-slate-700 dark:text-slate-300" : "text-slate-400 dark:text-slate-600",
+                        )}>
+                          {s.label}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {s.autoAdvance    && <Zap    className="h-3 w-3 text-violet-400" title="Auto-advance" />}
+                          {s.requiresApproval && <Shield className="h-3 w-3 text-blue-400"   title="Requires approval" />}
+                          <span className="text-[10px] text-slate-400">{slaLabel(s.slaHours)}</span>
+                          {!s.enabled && <EyeOff className="h-3 w-3 text-slate-300" />}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Quick tip */}
-                <div className="flex items-start gap-2.5 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 dark:border-violet-900/40 dark:bg-violet-950/10">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
-                  <p className="text-[11.5px] text-violet-700 dark:text-violet-400">
-                    <span className="font-semibold">Pro tip:</span> Combine auto-advance + SLA alerts for hands-off
-                    stages like Payment Receipt and Final Settlement — the system handles transitions automatically
-                    and only alerts when something gets stuck.
-                  </p>
+                {/* Keyboard shortcuts cheatsheet */}
+                <div className="rounded-[14px] border border-slate-200/80 bg-white px-5 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">Keyboard Shortcuts</p>
+                  {[
+                    ["Ctrl+S", "Save to database"],
+                    ["Ctrl+Z", "Undo last change"],
+                    ["Ctrl+Y", "Redo"],
+                    ["▲▼ buttons", "Move stage up/down"],
+                    ["Drag handle", "Free reorder by drag"],
+                  ].map(([key, desc]) => (
+                    <div key={key} className="flex items-center justify-between py-0.5">
+                      <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-mono text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                        {key}
+                      </kbd>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">{desc}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -850,29 +965,18 @@ export default function WorkflowBuilder() {
         </main>
       </div>
 
-      {/* ── Reset confirmation dialog ─────────────────────────────────────── */}
+      {/* Reset confirmation dialog */}
       <Dialog open={showReset} onOpenChange={setShowReset}>
-        <DialogContent className="max-w-sm rounded-2xl">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <RotateCcw className="h-5 w-5 text-amber-500" />
-              Reset to defaults?
-            </DialogTitle>
+            <DialogTitle>Reset to Default Pipeline?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-500">
-            This will restore all stage settings to their original defaults and discard any customizations
-            you've made. This action cannot be undone.
+          <p className="text-[13px] text-slate-600 dark:text-slate-400">
+            This will restore all 8 stages to their factory settings. Your current configuration will be lost unless you saved it to the database first.
           </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReset(false)} className="rounded-xl">
-              Cancel
-            </Button>
-            <Button
-              onClick={reset}
-              className="rounded-xl bg-amber-500 text-white hover:bg-amber-600"
-            >
-              Reset Pipeline
-            </Button>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowReset(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={reset}>Reset to Defaults</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
