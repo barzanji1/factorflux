@@ -30,6 +30,7 @@ import {
   DollarSign,
   Calendar,
   ExternalLink,
+  Search,
 } from "lucide-react";
 
 // Broker form schema
