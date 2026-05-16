@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Clock, Plus, Search, Calendar, AlertCircle, CheckCircle, User, FileText,
   Mail, Zap, CheckCheck, RefreshCw, ChevronDown, ChevronUp, Ban, SkipForward,
-  RotateCcw, Settings2, Pause, Play, Send,
+  RotateCcw, Settings2, Pause, Play, Send, LayoutTemplate, Star, Trash2,
+  Eye, Pencil, Copy, ShieldOff,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -79,6 +80,17 @@ interface BrokerFollowUp {
   clientName: string | null;
 }
 
+interface BrokerFollowUpTemplate {
+  id: number;
+  name: string;
+  triggerType: "immediate" | "due_date" | "overdue" | "escalation";
+  subject: string;
+  body: string;
+  isDefault: boolean;
+  createdAt: string;
+  createdBy: string | null;
+}
+
 interface BrokerFollowUpReminder {
   id: number;
   followUpId: number;
@@ -93,6 +105,247 @@ interface BrokerFollowUpReminder {
   body: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── Template constants ───────────────────────────────────────────────────────
+
+const TRIGGER_TYPE_LABELS: Record<string, string> = {
+  immediate:  "Initial Funding Notice",
+  due_date:   "Payment Due Reminder",
+  overdue:    "Overdue Reminder",
+  escalation: "Escalation Notice",
+};
+
+const TRIGGER_TYPE_COLORS: Record<string, string> = {
+  immediate:  "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800",
+  due_date:   "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/20 dark:text-violet-400 dark:border-violet-800",
+  overdue:    "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-800",
+  escalation: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800",
+};
+
+const PLACEHOLDERS = [
+  "{{brokerName}}",
+  "{{invoiceNumber}}",
+  "{{loadNumber}}",
+  "{{amountDue}}",
+  "{{dueDate}}",
+  "{{paymentInstructions}}",
+  "{{contactName}}",
+];
+
+const SAMPLE_VARS: Record<string, string> = {
+  "{{brokerName}}":          "Acme Brokerage LLC",
+  "{{invoiceNumber}}":       "INV-2024-001",
+  "{{loadNumber}}":          "LD-5892",
+  "{{amountDue}}":           "$4,250.00",
+  "{{dueDate}}":             "Jun 15, 2024",
+  "{{paymentInstructions}}": "ACH to: Trucking Pros Financial — Routing: 021000021 · Account: 1234567890",
+  "{{contactName}}":         "Collections Team",
+};
+
+function applyPreview(text: string): string {
+  return Object.entries(SAMPLE_VARS).reduce(
+    (t, [k, v]) => t.replaceAll(k, v),
+    text,
+  );
+}
+
+const templateSchema = z.object({
+  name:        z.string().min(1, "Name is required"),
+  triggerType: z.enum(["immediate", "due_date", "overdue", "escalation"]),
+  subject:     z.string().min(1, "Subject is required"),
+  body:        z.string().min(1, "Body is required"),
+  isDefault:   z.boolean().default(false),
+});
+
+// ─── Template editor dialog ───────────────────────────────────────────────────
+
+function TemplateDialog({
+  open, onOpenChange, initial, onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initial?: BrokerFollowUpTemplate | null;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [preview, setPreview] = useState(false);
+  const isEdit = !!initial;
+
+  const form = useForm<z.infer<typeof templateSchema>>({
+    resolver: zodResolver(templateSchema),
+    defaultValues: {
+      name:        initial?.name        ?? "",
+      triggerType: initial?.triggerType ?? "immediate",
+      subject:     initial?.subject     ?? "",
+      body:        initial?.body        ?? "",
+      isDefault:   initial?.isDefault   ?? false,
+    },
+  });
+
+  // Reset form when dialog opens/closes or initial changes
+  const resetForm = () => {
+    form.reset({
+      name:        initial?.name        ?? "",
+      triggerType: initial?.triggerType ?? "immediate",
+      subject:     initial?.subject     ?? "",
+      body:        initial?.body        ?? "",
+      isDefault:   initial?.isDefault   ?? false,
+    });
+    setPreview(false);
+  };
+
+  const saveMut = useMutation({
+    mutationFn: (data: z.infer<typeof templateSchema>) => isEdit
+      ? apiRequest("PATCH", `/api/broker-follow-up-templates/${initial!.id}`, data)
+      : apiRequest("POST",  "/api/broker-follow-up-templates", data),
+    onSuccess: () => {
+      toast({ title: isEdit ? "Template updated" : "Template created" });
+      onSaved();
+      onOpenChange(false);
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save template", variant: "destructive" }),
+  });
+
+  const body    = form.watch("body");
+  const subject = form.watch("subject");
+
+  function insertPlaceholder(ph: string) {
+    const ta = document.getElementById("tpl-body") as HTMLTextAreaElement | null;
+    if (!ta) { form.setValue("body", body + ph); return; }
+    const start = ta.selectionStart ?? body.length;
+    const end   = ta.selectionEnd   ?? body.length;
+    const next  = body.slice(0, start) + ph + body.slice(end);
+    form.setValue("body", next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + ph.length, start + ph.length);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { onOpenChange(v); if (!v) resetForm(); }}>
+      <DialogContent className="sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Edit Template" : "New Template"}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(d => saveMut.mutate(d))} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Template Name</FormLabel>
+                  <FormControl><Input placeholder="e.g. Overdue – Firm Tone" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="triggerType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Trigger Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="immediate">Immediate (Funding)</SelectItem>
+                      <SelectItem value="due_date">Payment Due</SelectItem>
+                      <SelectItem value="overdue">Overdue Reminder</SelectItem>
+                      <SelectItem value="escalation">Escalation Notice</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            <FormField control={form.control} name="subject" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email Subject</FormLabel>
+                <FormControl><Input placeholder="e.g. Payment Due — Invoice {{invoiceNumber}}" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {/* Placeholder chips */}
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                Click to insert placeholder
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {PLACEHOLDERS.map(ph => (
+                  <button
+                    key={ph}
+                    type="button"
+                    onClick={() => insertPlaceholder(ph)}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-mono text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors"
+                  >
+                    {ph}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <FormField control={form.control} name="body" render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between mb-1">
+                  <FormLabel>Email Body</FormLabel>
+                  <button
+                    type="button"
+                    onClick={() => setPreview(v => !v)}
+                    className="flex items-center gap-1 text-[11px] text-blue-600 hover:underline"
+                  >
+                    <Eye className="h-3 w-3" />
+                    {preview ? "Edit" : "Preview"}
+                  </button>
+                </div>
+                {preview ? (
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-2">
+                    <p className="text-[11px] font-semibold text-slate-500">Subject:</p>
+                    <p className="text-[13px] text-slate-800 dark:text-slate-200">{applyPreview(subject)}</p>
+                    <hr className="border-slate-200 dark:border-slate-700" />
+                    <pre className="text-[12px] whitespace-pre-wrap font-sans text-slate-700 dark:text-slate-300 max-h-52 overflow-auto">
+                      {applyPreview(body)}
+                    </pre>
+                  </div>
+                ) : (
+                  <FormControl>
+                    <Textarea
+                      id="tpl-body"
+                      rows={10}
+                      placeholder="Email body…"
+                      className="font-mono text-[12px] resize-y"
+                      {...field}
+                    />
+                  </FormControl>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="isDefault" render={({ field }) => (
+              <FormItem className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-3 py-2.5">
+                <Switch checked={field.value} onCheckedChange={field.onChange} id="tpl-default" />
+                <div>
+                  <Label htmlFor="tpl-default" className="text-sm font-medium cursor-pointer">
+                    Set as default for this trigger type
+                  </Label>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Only one template per trigger type can be the default used by the automation engine.
+                  </p>
+                </div>
+              </FormItem>
+            )} />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button type="submit" disabled={saveMut.isPending}>
+                {saveMut.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                {isEdit ? "Save Changes" : "Create Template"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ─── Label/color helpers ──────────────────────────────────────────────────────
@@ -490,6 +743,9 @@ export default function FollowUpPage() {
   const [bfuStatusFilter, setBfuStatusFilter] = useState("all");
   const [expandedBfu, setExpandedBfu]     = useState<number | null>(null);
   const [localCadences, setLocalCadences] = useState<Record<number, CadenceConfig>>({});
+  const [tplDialogOpen, setTplDialogOpen] = useState(false);
+  const [editingTpl, setEditingTpl]       = useState<BrokerFollowUpTemplate | null>(null);
+  const [previewTpl, setPreviewTpl]       = useState<BrokerFollowUpTemplate | null>(null);
   const { toast }  = useToast();
   const qc = useQueryClient();
 
@@ -503,6 +759,9 @@ export default function FollowUpPage() {
   const { data: clients = [] }               = useQuery({ queryKey: ["/api/clients"] });
   const { data: brokerFollowUps = [], isLoading: bfuLoading } = useQuery<BrokerFollowUp[]>({
     queryKey: ["/api/broker-follow-ups"],
+  });
+  const { data: templates = [], isLoading: tplLoading } = useQuery<BrokerFollowUpTemplate[]>({
+    queryKey: ["/api/broker-follow-up-templates"],
   });
 
   // ── Manual follow-up mutations ────────────────────────────────────────────────
@@ -542,6 +801,34 @@ export default function FollowUpPage() {
       qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
       toast({ title: "Saved", description: "Notes saved" });
     },
+  });
+
+  const suppressMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/broker-follow-ups/${id}/suppress`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
+      toast({ title: "Suppressed", description: "All pending reminders cancelled." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to suppress cadence", variant: "destructive" }),
+  });
+
+  // ── Template mutations ────────────────────────────────────────────────────────
+  const deleteTplMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/broker-follow-up-templates/${id}`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-up-templates"] });
+      toast({ title: "Template deleted" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete template", variant: "destructive" }),
+  });
+
+  const setDefaultTplMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/broker-follow-up-templates/${id}/set-default`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-up-templates"] });
+      toast({ title: "Default set", description: "Automation engine will use this template." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to set default", variant: "destructive" }),
   });
 
   const handleCadenceChange = useCallback((bfuId: number, cfg: CadenceConfig) => {
@@ -687,6 +974,13 @@ export default function FollowUpPage() {
                       {pendingBfuCount}
                     </span>
                   )}
+                </TabsTrigger>
+                <TabsTrigger value="templates" className="flex items-center gap-2">
+                  <LayoutTemplate className="h-4 w-4" />
+                  Templates
+                  <span className="ml-1 rounded-full bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold">
+                    {templates.length}
+                  </span>
                 </TabsTrigger>
               </TabsList>
 
@@ -979,6 +1273,17 @@ export default function FollowUpPage() {
                                       Acknowledge Follow-Up
                                     </Button>
                                   )}
+                                  {/* Suppress cadence button */}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-3 text-[12px] w-full border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/20"
+                                    disabled={suppressMutation.isPending}
+                                    onClick={e => { e.stopPropagation(); if (confirm("Cancel all pending reminders for this follow-up?")) suppressMutation.mutate(bfu.id); }}
+                                  >
+                                    <ShieldOff className="h-3.5 w-3.5 mr-1.5" />
+                                    Suppress All Reminders
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -989,7 +1294,213 @@ export default function FollowUpPage() {
                   </div>
                 )}
               </TabsContent>
+
+              {/* ── Templates tab ─────────────────────────────────────────── */}
+              <TabsContent value="templates" className="space-y-4">
+                {/* Header row */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Email Templates</h2>
+                    <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Customise the email subject and body sent at each trigger point. The automation engine uses the
+                      default template for each trigger type.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="flex items-center gap-1.5"
+                    onClick={() => { setEditingTpl(null); setTplDialogOpen(true); }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    New Template
+                  </Button>
+                </div>
+
+                {tplLoading ? (
+                  <div className="flex items-center justify-center h-40 text-slate-400">
+                    <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading templates…
+                  </div>
+                ) : templates.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-16 text-slate-400">
+                      <LayoutTemplate className="h-10 w-10 mb-3 opacity-40" />
+                      <p className="text-sm font-medium">No templates yet</p>
+                      <p className="text-[12px] mt-1">Create your first template above to override the built-in defaults.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  /* Group templates by trigger type */
+                  (["immediate", "due_date", "overdue", "escalation"] as const).map(tt => {
+                    const group = (templates as BrokerFollowUpTemplate[]).filter(t => t.triggerType === tt);
+                    if (group.length === 0) return null;
+                    return (
+                      <div key={tt}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={cn(
+                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                            TRIGGER_TYPE_COLORS[tt],
+                          )}>
+                            {TRIGGER_TYPE_LABELS[tt]}
+                          </span>
+                          <span className="text-[11px] text-slate-400">{group.length} template{group.length !== 1 ? "s" : ""}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {group.map(tpl => (
+                            <Card
+                              key={tpl.id}
+                              className={cn(
+                                "border transition-colors",
+                                tpl.isDefault && "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/10",
+                              )}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-[13px] font-semibold text-slate-900 dark:text-white">{tpl.name}</span>
+                                      {tpl.isDefault && (
+                                        <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-300 bg-blue-100 dark:border-blue-700 dark:bg-blue-900/30 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">
+                                          <Star className="h-2.5 w-2.5" /> Default
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                                      <span className="font-medium text-slate-600 dark:text-slate-300">Subject: </span>
+                                      {tpl.subject}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-xl">
+                                      {tpl.body.slice(0, 120)}{tpl.body.length > 120 ? "…" : ""}
+                                    </p>
+                                  </div>
+                                  {/* Actions */}
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {!tpl.isDefault && (
+                                      <button
+                                        type="button"
+                                        title="Set as default"
+                                        disabled={setDefaultTplMutation.isPending}
+                                        onClick={() => setDefaultTplMutation.mutate(tpl.id)}
+                                        className="flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                                      >
+                                        <Star className="h-3 w-3" /> Set default
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      title="Preview"
+                                      onClick={() => setPreviewTpl(tpl)}
+                                      className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Edit"
+                                      onClick={() => { setEditingTpl(tpl); setTplDialogOpen(true); }}
+                                      className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1.5 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Delete"
+                                      disabled={deleteTplMutation.isPending}
+                                      onClick={() => { if (confirm(`Delete template "${tpl.name}"?`)) deleteTplMutation.mutate(tpl.id); }}
+                                      className="rounded-md border border-red-200 dark:border-red-800 bg-white dark:bg-slate-800 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                {/* Placeholder legend */}
+                <Card className="border-dashed border-slate-300 dark:border-slate-700">
+                  <CardContent className="p-4">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Available placeholders</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PLACEHOLDERS.map(ph => (
+                        <span
+                          key={ph}
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-mono text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        >
+                          <Copy className="h-2.5 w-2.5 opacity-50" />
+                          {ph}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      Placeholders are substituted at send time from invoice and broker data.
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
+
+            {/* ── Template create/edit dialog ───────────────────────────────── */}
+            <TemplateDialog
+              open={tplDialogOpen}
+              onOpenChange={setTplDialogOpen}
+              initial={editingTpl}
+              onSaved={() => qc.invalidateQueries({ queryKey: ["/api/broker-follow-up-templates"] })}
+            />
+
+            {/* ── Template preview dialog ───────────────────────────────────── */}
+            <Dialog open={!!previewTpl} onOpenChange={v => { if (!v) setPreviewTpl(null); }}>
+              <DialogContent className="sm:max-w-[580px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Eye className="h-4 w-4" />
+                    Template Preview — {previewTpl?.name}
+                  </DialogTitle>
+                </DialogHeader>
+                {previewTpl && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                        TRIGGER_TYPE_COLORS[previewTpl.triggerType],
+                      )}>
+                        {TRIGGER_TYPE_LABELS[previewTpl.triggerType]}
+                      </span>
+                      {previewTpl.isDefault && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-300 bg-blue-100 dark:border-blue-700 dark:bg-blue-900/30 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">
+                          <Star className="h-2.5 w-2.5" /> Default
+                        </span>
+                      )}
+                    </div>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Subject</p>
+                        <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200">
+                          {applyPreview(previewTpl.subject)}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-white dark:bg-slate-900">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Body (sample data)</p>
+                        <pre className="text-[12px] whitespace-pre-wrap font-sans text-slate-700 dark:text-slate-300 max-h-72 overflow-auto leading-relaxed">
+                          {applyPreview(previewTpl.body)}
+                        </pre>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-1">
+                      <p className="text-[11px] text-slate-400">
+                        Sample data shown. Actual values filled at send time.
+                      </p>
+                      <Button size="sm" variant="outline" onClick={() => setPreviewTpl(null)}>Close</Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
           </div>
         </main>
       </div>

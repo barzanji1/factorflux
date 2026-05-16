@@ -1368,6 +1368,8 @@ export const brokerFollowUpReminders = pgTable("broker_follow_up_reminders", {
     enum: ["scheduled", "sent", "skipped", "paused", "canceled"],
   }).default("scheduled").notNull(),
   skipReason: varchar("skip_reason"),
+  stopReason: varchar("stop_reason"),
+  // stopReason values: invoice_paid | invoice_settled | exception_raised | cash_applied | agent_suppressed
   subject: varchar("subject").notNull(),
   body: text("body").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -1381,6 +1383,29 @@ export const insertBrokerFollowUpReminderSchema = createInsertSchema(brokerFollo
 });
 export type BrokerFollowUpReminder = typeof brokerFollowUpReminders.$inferSelect;
 export type InsertBrokerFollowUpReminder = z.infer<typeof insertBrokerFollowUpReminderSchema>;
+
+// ─── Broker Follow-Up Templates ───────────────────────────────────────────────
+
+export const brokerFollowUpTemplates = pgTable("broker_follow_up_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  triggerType: varchar("trigger_type", {
+    enum: ["immediate", "due_date", "overdue", "escalation"],
+  }).notNull(),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  // Placeholders: {{brokerName}} {{invoiceNumber}} {{loadNumber}} {{amountDue}} {{dueDate}} {{paymentInstructions}} {{contactName}}
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const insertBrokerFollowUpTemplateSchema = createInsertSchema(brokerFollowUpTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+export type BrokerFollowUpTemplate = typeof brokerFollowUpTemplates.$inferSelect;
+export type InsertBrokerFollowUpTemplate = z.infer<typeof insertBrokerFollowUpTemplateSchema>;
 
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 

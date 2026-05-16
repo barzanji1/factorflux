@@ -10,19 +10,29 @@
  *
  * All reminder instances are stored in `broker_follow_up_reminders` and
  * processed by a background scheduler (startReminderScheduler).
+ *
+ * Templates: subject/body are resolved from `broker_follow_up_templates` at
+ * schedule-build time, with hardcoded strings as fallback if no template exists.
+ *
+ * Auto-Stop: checkAndStopCadence() cancels all pending reminders when the
+ * invoice reaches a terminal state (paid, settled, exception, cash-applied,
+ * or agent-suppressed).
  */
 
 import { db } from "../db";
 import {
   brokerFollowUps,
   brokerFollowUpReminders,
+  brokerFollowUpTemplates,
   invoices,
   clients,
   debtors,
   eventLedger,
+  exceptions,
+  paymentApplicationLines,
   type CadenceConfig,
 } from "../../shared/schema";
-import { eq, and, lte, inArray } from "drizzle-orm";
+import { eq, and, lte, inArray, ne } from "drizzle-orm";
 import { storage } from "../storage";
 import { sendEmail } from "../emailService";
 
@@ -36,6 +46,78 @@ export const DEFAULT_CADENCE: CadenceConfig = {
   paused: false,
 };
 
+// ─── Placeholder rendering ────────────────────────────────────────────────────
+
+const PAYMENT_INSTRUCTIONS =
+  "ACH to: Trucking Pros Financial — Routing: 021000021 · Account: 1234567890\n" +
+  "Or mail check to: 1234 Factoring Lane, Suite 100, Dallas TX 75201";
+
+export interface TemplateVars {
+  brokerName:          string;
+  invoiceNumber:       string;
+  loadNumber:          string;
+  amountDue:           string;
+  dueDate:             string;
+  paymentInstructions: string;
+  contactName:         string;
+}
+
+export function renderTemplate(text: string, vars: TemplateVars): string {
+  return text
+    .replace(/\{\{brokerName\}\}/g,          vars.brokerName)
+    .replace(/\{\{invoiceNumber\}\}/g,        vars.invoiceNumber)
+    .replace(/\{\{loadNumber\}\}/g,           vars.loadNumber)
+    .replace(/\{\{amountDue\}\}/g,            vars.amountDue)
+    .replace(/\{\{dueDate\}\}/g,              vars.dueDate)
+    .replace(/\{\{paymentInstructions\}\}/g,  vars.paymentInstructions)
+    .replace(/\{\{contactName\}\}/g,          vars.contactName);
+}
+
+// ─── Map reminder type → template trigger type ────────────────────────────────
+
+function reminderTriggerType(reminderType: string): "immediate" | "due_date" | "overdue" | "escalation" {
+  if (reminderType === "immediate") return "immediate";
+  if (reminderType === "due_date")  return "due_date";
+  if (/d_overdue$/.test(reminderType)) return "overdue";
+  return "escalation";
+}
+
+// ─── Template cache (in-memory, refreshed per scheduler tick) ─────────────────
+
+let _templateCache: Record<string, { subject: string; body: string } | null> = {};
+let _cacheTs = 0;
+const CACHE_TTL_MS = 60_000; // 1 min
+
+async function getTemplate(
+  triggerType: "immediate" | "due_date" | "overdue" | "escalation",
+): Promise<{ subject: string; body: string } | null> {
+  const now = Date.now();
+  if (now - _cacheTs > CACHE_TTL_MS) {
+    _templateCache = {};
+    _cacheTs = now;
+  }
+  if (triggerType in _templateCache) return _templateCache[triggerType];
+
+  const [tpl] = await db
+    .select({ subject: brokerFollowUpTemplates.subject, body: brokerFollowUpTemplates.body })
+    .from(brokerFollowUpTemplates)
+    .where(
+      and(
+        eq(brokerFollowUpTemplates.triggerType, triggerType),
+        eq(brokerFollowUpTemplates.isDefault, true),
+      ),
+    )
+    .limit(1);
+
+  _templateCache[triggerType] = tpl ?? null;
+  return tpl ?? null;
+}
+
+export function invalidateTemplateCache() {
+  _templateCache = {};
+  _cacheTs = 0;
+}
+
 // ─── Label helpers ────────────────────────────────────────────────────────────
 
 function reminderTypeLabel(type: string): string {
@@ -48,9 +130,9 @@ function reminderTypeLabel(type: string): string {
   return type;
 }
 
-// ─── Email content builders ───────────────────────────────────────────────────
+// ─── Hardcoded fallback builders ──────────────────────────────────────────────
 
-function buildReminderSubject(
+function fallbackSubject(
   type: string,
   weekNum: number,
   invoiceNumber: string,
@@ -64,7 +146,7 @@ function buildReminderSubject(
   return `Payment Still Outstanding — Invoice ${invoiceNumber} (Week ${weekNum}) ${tag}`;
 }
 
-function buildReminderBody(
+function fallbackBody(
   type: string,
   seqNumber: number,
   weekNum: number,
@@ -75,8 +157,8 @@ function buildReminderBody(
 ): string {
   const amtFmt = `$${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
   const urgencyLine =
-    type === "immediate"   ? "The carrier advance has been processed and payment is now due." :
-    type === "due_date"    ? "This invoice is due today. Please remit payment immediately." :
+    type === "immediate"     ? "The carrier advance has been processed and payment is now due." :
+    type === "due_date"      ? "This invoice is due today. Please remit payment immediately." :
     type.includes("overdue") ? `This invoice is now ${type.replace("d_overdue","").replace("_","")} days past due. Immediate payment is required.` :
     `This is reminder #${seqNumber} — this invoice remains unpaid. Please contact us to resolve.`;
 
@@ -98,6 +180,44 @@ function buildReminderBody(
   ].join("\n");
 }
 
+// ─── Template-aware subject/body resolver ─────────────────────────────────────
+
+async function resolveSubjectBody(
+  reminderType: string,
+  weekNum: number,
+  seqNumber: number,
+  invoiceNumber: string,
+  amount: string,
+  loadNumber: string | null | undefined,
+  clientName: string,
+  dueDate: Date | null,
+  debtorName?: string,
+): Promise<{ subject: string; body: string }> {
+  const triggerType = reminderTriggerType(reminderType);
+  const tpl = await getTemplate(triggerType);
+
+  if (tpl) {
+    const vars: TemplateVars = {
+      brokerName:          debtorName ?? clientName,
+      invoiceNumber,
+      loadNumber:          loadNumber ?? "N/A",
+      amountDue:           `$${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      dueDate:             dueDate ? dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "N/A",
+      paymentInstructions: PAYMENT_INSTRUCTIONS,
+      contactName:         "Collections Team",
+    };
+    return {
+      subject: renderTemplate(tpl.subject, vars),
+      body:    renderTemplate(tpl.body,    vars),
+    };
+  }
+
+  return {
+    subject: fallbackSubject(reminderType, weekNum, invoiceNumber, clientName),
+    body:    fallbackBody(reminderType, seqNumber, weekNum, invoiceNumber, amount, loadNumber, clientName),
+  };
+}
+
 // ─── Reminder schedule builder ────────────────────────────────────────────────
 
 interface ReminderSpec {
@@ -110,78 +230,56 @@ interface ReminderSpec {
   weekNum: number;
 }
 
-function buildReminderSchedule(
+async function buildReminderSchedule(
   cadence: CadenceConfig,
   invoiceNumber: string,
   amount: string,
   loadNumber: string | null | undefined,
   clientName: string,
   dueDate: Date | null,
-): ReminderSpec[] {
+  debtorName?: string,
+): Promise<ReminderSpec[]> {
   const specs: ReminderSpec[] = [];
   const now = new Date();
-  // Fallback: if no due date, assume 30 days from now
   const effectiveDue = dueDate ?? new Date(now.getTime() + 30 * 86_400_000);
   let seq = 1;
 
   // ① Immediate
   if (cadence.sendImmediately) {
-    specs.push({
-      sequenceNumber: seq++,
-      reminderType: "immediate",
-      intervalDays: null,
-      scheduledSendAt: now,
-      subject: buildReminderSubject("immediate", 0, invoiceNumber, clientName),
-      body: buildReminderBody("immediate", 1, 0, invoiceNumber, amount, loadNumber, clientName),
-      weekNum: 0,
-    });
+    const { subject, body } = await resolveSubjectBody(
+      "immediate", 0, seq, invoiceNumber, amount, loadNumber, clientName, dueDate, debtorName,
+    );
+    specs.push({ sequenceNumber: seq++, reminderType: "immediate", intervalDays: null, scheduledSendAt: now, subject, body, weekNum: 0 });
   }
 
   // ② Due date
   if (cadence.sendOnDueDate && effectiveDue > now) {
-    specs.push({
-      sequenceNumber: seq++,
-      reminderType: "due_date",
-      intervalDays: 0,
-      scheduledSendAt: new Date(effectiveDue),
-      subject: buildReminderSubject("due_date", 0, invoiceNumber, clientName),
-      body: buildReminderBody("due_date", seq - 1, 0, invoiceNumber, amount, loadNumber, clientName),
-      weekNum: 0,
-    });
+    const { subject, body } = await resolveSubjectBody(
+      "due_date", 0, seq, invoiceNumber, amount, loadNumber, clientName, dueDate, debtorName,
+    );
+    specs.push({ sequenceNumber: seq++, reminderType: "due_date", intervalDays: 0, scheduledSendAt: new Date(effectiveDue), subject, body, weekNum: 0 });
   }
 
   // ③ Overdue intervals
   for (const days of cadence.overdueIntervals) {
     const sendAt = new Date(effectiveDue.getTime() + days * 86_400_000);
-    const type = `${days}d_overdue`;
-    specs.push({
-      sequenceNumber: seq++,
-      reminderType: type,
-      intervalDays: days,
-      scheduledSendAt: sendAt,
-      subject: buildReminderSubject(type, 0, invoiceNumber, clientName),
-      body: buildReminderBody(type, seq - 1, 0, invoiceNumber, amount, loadNumber, clientName),
-      weekNum: 0,
-    });
+    const type   = `${days}d_overdue`;
+    const { subject, body } = await resolveSubjectBody(
+      type, 0, seq, invoiceNumber, amount, loadNumber, clientName, dueDate, debtorName,
+    );
+    specs.push({ sequenceNumber: seq++, reminderType: type, intervalDays: days, scheduledSendAt: sendAt, subject, body, weekNum: 0 });
   }
 
   // ④ Weekly thereafter
-  const lastOverdueDays = cadence.overdueIntervals.length > 0
-    ? Math.max(...cadence.overdueIntervals)
-    : 0;
+  const lastOverdueDays = cadence.overdueIntervals.length > 0 ? Math.max(...cadence.overdueIntervals) : 0;
   const weeklyBase = new Date(effectiveDue.getTime() + lastOverdueDays * 86_400_000);
   for (let w = 1; w <= cadence.weeklyCount; w++) {
     const sendAt = new Date(weeklyBase.getTime() + w * 7 * 86_400_000);
-    const type = `weekly_${w}`;
-    specs.push({
-      sequenceNumber: seq++,
-      reminderType: type,
-      intervalDays: lastOverdueDays + w * 7,
-      scheduledSendAt: sendAt,
-      subject: buildReminderSubject(type, w, invoiceNumber, clientName),
-      body: buildReminderBody(type, seq - 1, w, invoiceNumber, amount, loadNumber, clientName),
-      weekNum: w,
-    });
+    const type   = `weekly_${w}`;
+    const { subject, body } = await resolveSubjectBody(
+      type, w, seq, invoiceNumber, amount, loadNumber, clientName, dueDate, debtorName,
+    );
+    specs.push({ sequenceNumber: seq++, reminderType: type, intervalDays: lastOverdueDays + w * 7, scheduledSendAt: sendAt, subject, body, weekNum: w });
   }
 
   return specs;
@@ -197,26 +295,143 @@ async function scheduleReminders(
   loadNumber: string | null | undefined,
   clientName: string,
   dueDate: Date | null,
+  debtorName?: string,
 ): Promise<void> {
-  const specs = buildReminderSchedule(cadence, invoiceNumber, amount, loadNumber, clientName, dueDate);
+  const specs = await buildReminderSchedule(cadence, invoiceNumber, amount, loadNumber, clientName, dueDate, debtorName);
   if (specs.length === 0) return;
 
   for (const s of specs) {
-    // Immediate reminder is already "sent" by the parent trigger flow
-    const status = s.reminderType === "immediate" ? "sent" : "scheduled";
+    const status      = s.reminderType === "immediate" ? "sent" : "scheduled";
     const actualSendAt = s.reminderType === "immediate" ? new Date() : null;
     await db.insert(brokerFollowUpReminders).values({
       followUpId,
       sequenceNumber: s.sequenceNumber,
-      reminderType: s.reminderType,
-      intervalDays: s.intervalDays ?? null,
+      reminderType:   s.reminderType,
+      intervalDays:   s.intervalDays ?? null,
       scheduledSendAt: s.scheduledSendAt,
-      actualSendAt: actualSendAt ?? undefined,
+      actualSendAt:    actualSendAt ?? undefined,
       status,
       subject: s.subject,
-      body: s.body,
+      body:    s.body,
     });
   }
+}
+
+// ─── Auto-stop: check & cancel pending reminders ──────────────────────────────
+
+/**
+ * Checks if the invoice for a given follow-up has reached a terminal state.
+ * If so, cancels all pending/scheduled reminders and logs to the event ledger.
+ *
+ * @returns The stop reason string if stopped, null if cadence should continue.
+ */
+export async function checkAndStopCadence(
+  followUpId: number,
+  invoiceId: number,
+): Promise<string | null> {
+  const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+  if (!inv) return null;
+
+  let stopReason: string | null = null;
+
+  // 1. Invoice paid or settled
+  if (inv.status === "paid" || inv.status === "settled") {
+    stopReason = "invoice_paid";
+  }
+
+  // 2. Final settlement factoring stage
+  if (!stopReason && inv.factoringStage === "final_settlement") {
+    stopReason = "invoice_settled";
+  }
+
+  // 3. Open exception raised against this invoice
+  if (!stopReason) {
+    const [exc] = await db
+      .select({ id: exceptions.id })
+      .from(exceptions)
+      .where(
+        and(
+          eq(exceptions.entityType, "invoice"),
+          eq(exceptions.entityId, invoiceId),
+          eq(exceptions.status, "open"),
+        ),
+      )
+      .limit(1);
+    if (exc) stopReason = "exception_raised";
+  }
+
+  // 4. Fully-applied cash (payment line exists for this invoice)
+  if (!stopReason) {
+    const [line] = await db
+      .select({ id: paymentApplicationLines.id })
+      .from(paymentApplicationLines)
+      .where(eq(paymentApplicationLines.invoiceId, invoiceId))
+      .limit(1);
+    if (line) stopReason = "cash_applied";
+  }
+
+  if (!stopReason) return null;
+
+  // Cancel all pending/scheduled reminders for this follow-up
+  await db
+    .update(brokerFollowUpReminders)
+    .set({
+      status:     "canceled",
+      stopReason,
+      updatedAt:  new Date(),
+    })
+    .where(
+      and(
+        eq(brokerFollowUpReminders.followUpId, followUpId),
+        inArray(brokerFollowUpReminders.status, ["scheduled", "paused"]),
+      ),
+    );
+
+  // Log to event ledger
+  try {
+    await db.insert(eventLedger).values({
+      entityType:  "invoice",
+      entityId:    invoiceId,
+      eventType:   "broker_followup_auto_stopped",
+      actorType:   "system",
+      actorId:     "system",
+      payloadJson: { followUpId, stopReason, invoiceStatus: inv.status, factoringStage: inv.factoringStage },
+    });
+  } catch (_) { /* best-effort */ }
+
+  return stopReason;
+}
+
+/**
+ * Agent-initiated suppress: cancels all pending reminders for a follow-up
+ * and logs the agent who suppressed it.
+ */
+export async function suppressCadence(followUpId: number, invoiceId: number, actorId: string): Promise<void> {
+  await db
+    .update(brokerFollowUpReminders)
+    .set({ status: "canceled", stopReason: "agent_suppressed", updatedAt: new Date() })
+    .where(
+      and(
+        eq(brokerFollowUpReminders.followUpId, followUpId),
+        inArray(brokerFollowUpReminders.status, ["scheduled", "paused"]),
+      ),
+    );
+
+  // Pause the parent follow-up cadence too
+  const [bfu] = await db.select({ cadenceConfig: brokerFollowUps.cadenceConfig }).from(brokerFollowUps).where(eq(brokerFollowUps.id, followUpId));
+  const cfg = { ...(bfu?.cadenceConfig ?? {}), paused: true } as CadenceConfig;
+  await db.update(brokerFollowUps).set({ cadenceConfig: cfg, updatedAt: new Date() }).where(eq(brokerFollowUps.id, followUpId));
+
+  try {
+    await db.insert(eventLedger).values({
+      entityType:  "invoice",
+      entityId:    invoiceId,
+      eventType:   "broker_followup_suppressed",
+      actorType:   "user",
+      actorId,
+      payloadJson: { followUpId, stopReason: "agent_suppressed" },
+    });
+  } catch (_) { /* best-effort */ }
 }
 
 // ─── Core trigger function ────────────────────────────────────────────────────
@@ -254,25 +469,29 @@ export async function triggerBrokerFollowUp(
     if (existing) return existing.id;
   }
 
-  // 3. Resolve cadence + carrier name
+  // 3. Resolve cadence + carrier/debtor names
   const cadence: CadenceConfig = { ...DEFAULT_CADENCE, ...cadenceOverride };
 
-  let clientName = "Carrier";
+  let clientName  = "Carrier";
+  let debtorName: string | undefined;
+  let debtorEmail: string | null = null;
+
   if (inv.clientId) {
     const [cl] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, inv.clientId));
     if (cl) clientName = cl.name;
   }
-
-  let debtorEmail: string | null = null;
   if (inv.debtorId) {
-    const [d] = await db.select({ email: debtors.email }).from(debtors).where(eq(debtors.id, inv.debtorId));
+    const [d] = await db.select({ email: debtors.email, name: debtors.name }).from(debtors).where(eq(debtors.id, inv.debtorId));
     if (d?.email) debtorEmail = d.email;
+    if (d?.name)  debtorName  = d.name;
   }
 
-  const immediateSubject = buildReminderSubject("immediate", 0, inv.invoiceNumber, clientName);
-  const immediateBody    = buildReminderBody("immediate", 1, 0, inv.invoiceNumber, inv.amount, inv.loadNumber, clientName);
+  // 4. Build immediate email content (template-aware)
+  const { subject: immediateSubject, body: immediateBody } = await resolveSubjectBody(
+    "immediate", 0, 1, inv.invoiceNumber, inv.amount, inv.loadNumber, clientName, inv.dueDate ?? null, debtorName,
+  );
 
-  // 4. Insert broker_follow_up parent record
+  // 5. Insert broker_follow_up parent record
   const [record] = await db
     .insert(brokerFollowUps)
     .values({
@@ -289,7 +508,7 @@ export async function triggerBrokerFollowUp(
     })
     .returning({ id: brokerFollowUps.id });
 
-  // 5. Build reminder sequence
+  // 6. Build reminder sequence (async, template-aware)
   await scheduleReminders(
     record.id,
     cadence,
@@ -298,9 +517,10 @@ export async function triggerBrokerFollowUp(
     inv.loadNumber,
     clientName,
     inv.dueDate ?? null,
+    debtorName,
   );
 
-  // 6. Write to event_ledger
+  // 7. Write to event_ledger
   await db.insert(eventLedger).values({
     entityType: "invoice",
     entityId:   invoiceId,
@@ -318,7 +538,7 @@ export async function triggerBrokerFollowUp(
     },
   });
 
-  // 7. Activity feed
+  // 8. Activity feed
   try {
     await storage.createActivity({
       userId:      actorId,
@@ -329,10 +549,11 @@ export async function triggerBrokerFollowUp(
     } as any);
   } catch (_) { /* best-effort */ }
 
-  // 8. Send immediate email (best-effort)
+  // 9. Send immediate email (best-effort)
   if (cadence.sendImmediately && debtorEmail) {
     try {
       await sendEmail({
+        from:    "noreply@truckingprosfinancial.com",
         to:      debtorEmail,
         subject: immediateSubject,
         html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${immediateBody}</pre>`,
@@ -353,29 +574,31 @@ let _schedulerHandle: NodeJS.Timeout | null = null;
 /**
  * Check for scheduled reminders whose `scheduledSendAt` has passed and send them.
  * Skips reminders belonging to paused follow-ups.
+ * Runs checkAndStopCadence() before sending each reminder.
  */
-export async function processScheduledReminders(): Promise<{ sent: number; skipped: number }> {
+export async function processScheduledReminders(): Promise<{ sent: number; skipped: number; stopped: number }> {
   const now = new Date();
-  let sent = 0;
+  let sent    = 0;
   let skipped = 0;
+  let stopped = 0;
 
   // Fetch due reminders with their parent follow-up data
   const dueReminders = await db
     .select({
-      reminderId:    brokerFollowUpReminders.id,
-      followUpId:    brokerFollowUpReminders.followUpId,
-      reminderType:  brokerFollowUpReminders.reminderType,
+      reminderId:     brokerFollowUpReminders.id,
+      followUpId:     brokerFollowUpReminders.followUpId,
+      reminderType:   brokerFollowUpReminders.reminderType,
       sequenceNumber: brokerFollowUpReminders.sequenceNumber,
-      subject:       brokerFollowUpReminders.subject,
-      body:          brokerFollowUpReminders.body,
-      invoiceId:     brokerFollowUps.invoiceId,
-      cadenceConfig: brokerFollowUps.cadenceConfig,
-      debtorId:      invoices.debtorId,
-      invoiceNumber: invoices.invoiceNumber,
+      subject:        brokerFollowUpReminders.subject,
+      body:           brokerFollowUpReminders.body,
+      invoiceId:      brokerFollowUps.invoiceId,
+      cadenceConfig:  brokerFollowUps.cadenceConfig,
+      debtorId:       invoices.debtorId,
+      invoiceNumber:  invoices.invoiceNumber,
     })
     .from(brokerFollowUpReminders)
-    .innerJoin(brokerFollowUps,  eq(brokerFollowUpReminders.followUpId, brokerFollowUps.id))
-    .innerJoin(invoices,         eq(brokerFollowUps.invoiceId, invoices.id))
+    .innerJoin(brokerFollowUps, eq(brokerFollowUpReminders.followUpId, brokerFollowUps.id))
+    .innerJoin(invoices,        eq(brokerFollowUps.invoiceId, invoices.id))
     .where(
       and(
         eq(brokerFollowUpReminders.status, "scheduled"),
@@ -384,7 +607,15 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
     );
 
   for (const r of dueReminders) {
-    // Skip if cadence is globally paused
+    // ── Auto-stop check ────────────────────────────────────────────────────────
+    const stopReason = await checkAndStopCadence(r.followUpId, r.invoiceId);
+    if (stopReason) {
+      console.log(`[reminderScheduler] auto-stopped follow-up ${r.followUpId} — reason: ${stopReason}`);
+      stopped++;
+      continue;
+    }
+
+    // ── Cadence globally paused check ──────────────────────────────────────────
     const cfg = r.cadenceConfig as CadenceConfig | null;
     if (cfg?.paused) {
       await db.update(brokerFollowUpReminders)
@@ -394,7 +625,7 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
       continue;
     }
 
-    // Try to send email
+    // ── Try to send email ──────────────────────────────────────────────────────
     let emailSent = false;
     if (r.debtorId) {
       try {
@@ -405,6 +636,7 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
 
         if (debtor?.email) {
           await sendEmail({
+            from:    "noreply@truckingprosfinancial.com",
             to:      debtor.email,
             subject: r.subject,
             html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${r.body}</pre>`,
@@ -415,11 +647,7 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
     }
 
     await db.update(brokerFollowUpReminders)
-      .set({
-        status:       "sent",
-        actualSendAt: new Date(),
-        updatedAt:    new Date(),
-      })
+      .set({ status: "sent", actualSendAt: new Date(), updatedAt: new Date() })
       .where(eq(brokerFollowUpReminders.id, r.reminderId));
 
     // Write audit event
@@ -431,12 +659,12 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
         actorType:   "system",
         actorId:     "system",
         payloadJson: {
-          followUpId:    r.followUpId,
-          reminderId:    r.reminderId,
-          reminderType:  r.reminderType,
+          followUpId:     r.followUpId,
+          reminderId:     r.reminderId,
+          reminderType:   r.reminderType,
           sequenceNumber: r.sequenceNumber,
           emailSent,
-          invoiceNumber: r.invoiceNumber,
+          invoiceNumber:  r.invoiceNumber,
         },
       });
     } catch (_) { /* best-effort */ }
@@ -444,7 +672,7 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
     sent++;
   }
 
-  return { sent, skipped };
+  return { sent, skipped, stopped };
 }
 
 /**
@@ -453,7 +681,6 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
  */
 export function startReminderScheduler(intervalMs = 15 * 60 * 1000): void {
   if (_schedulerHandle) return;
-  // Run once immediately on startup (catch up on any missed reminders)
   processScheduledReminders().catch(e =>
     console.warn("[reminderScheduler] initial run error:", e?.message),
   );

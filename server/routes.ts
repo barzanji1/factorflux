@@ -30,6 +30,8 @@ import {
   insertBrokerFollowUpSchema,
   insertBrokerFollowUpReminderSchema,
   brokerFollowUpReminders,
+  brokerFollowUpTemplates,
+  insertBrokerFollowUpTemplateSchema,
   workflowConfigs,
   users,
   users as userTable,
@@ -50,7 +52,7 @@ import {
   loads,
   brokerFollowUps,
 } from "@shared/schema";
-import { triggerBrokerFollowUp, processScheduledReminders } from "./services/brokerFollowUpEngine";
+import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
 import { classifyDocumentAI } from "./services/aiClassifier";
 
@@ -2634,6 +2636,111 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error processing reminders:", error);
       res.status(500).json({ message: "Failed to process reminders" });
+    }
+  });
+
+  // Agent suppress: cancel all pending reminders for a follow-up
+  app.post("/api/broker-follow-ups/:id/suppress", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [bfu] = await db.select({ invoiceId: brokerFollowUps.invoiceId }).from(brokerFollowUps).where(eq(brokerFollowUps.id, id));
+      if (!bfu) return res.status(404).json({ message: "Follow-up not found" });
+      await suppressCadence(id, bfu.invoiceId, req.user.id);
+      res.json({ message: "Cadence suppressed", followUpId: id, stopReason: "agent_suppressed" });
+    } catch (error) {
+      console.error("Error suppressing cadence:", error);
+      res.status(500).json({ message: "Failed to suppress cadence" });
+    }
+  });
+
+  // ── Broker Follow-Up Templates ─────────────────────────────────────────────
+
+  // List all templates
+  app.get("/api/broker-follow-up-templates", requireAuth, async (_req: any, res) => {
+    try {
+      const templates = await db
+        .select()
+        .from(brokerFollowUpTemplates)
+        .orderBy(brokerFollowUpTemplates.triggerType, brokerFollowUpTemplates.name);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+      res.status(500).json({ message: "Failed to fetch templates" });
+    }
+  });
+
+  // Create template
+  app.post("/api/broker-follow-up-templates", requireAuth, async (req: any, res) => {
+    try {
+      const data = insertBrokerFollowUpTemplateSchema.parse({ ...req.body, createdBy: req.user.id });
+      // If setting as default, clear existing default for this triggerType
+      if (data.isDefault) {
+        await db
+          .update(brokerFollowUpTemplates)
+          .set({ isDefault: false })
+          .where(eq(brokerFollowUpTemplates.triggerType, data.triggerType));
+      }
+      const [tpl] = await db.insert(brokerFollowUpTemplates).values(data).returning();
+      invalidateTemplateCache();
+      res.status(201).json(tpl);
+    } catch (error) {
+      console.error("Error creating template:", error);
+      res.status(500).json({ message: "Failed to create template" });
+    }
+  });
+
+  // Update template
+  app.patch("/api/broker-follow-up-templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const updates = req.body as Record<string, unknown>;
+      // If setting as default, clear existing default for this triggerType first
+      if (updates.isDefault && updates.triggerType) {
+        await db
+          .update(brokerFollowUpTemplates)
+          .set({ isDefault: false })
+          .where(eq(brokerFollowUpTemplates.triggerType, updates.triggerType as "immediate" | "due_date" | "overdue" | "escalation"));
+      }
+      const [updated] = await db
+        .update(brokerFollowUpTemplates)
+        .set(updates as any)
+        .where(eq(brokerFollowUpTemplates.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Template not found" });
+      invalidateTemplateCache();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating template:", error);
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+
+  // Delete template
+  app.delete("/api/broker-follow-up-templates/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      await db.delete(brokerFollowUpTemplates).where(eq(brokerFollowUpTemplates.id, id));
+      invalidateTemplateCache();
+      res.json({ message: "Template deleted" });
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
+  // Set a template as default for its trigger type
+  app.post("/api/broker-follow-up-templates/:id/set-default", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [tpl] = await db.select().from(brokerFollowUpTemplates).where(eq(brokerFollowUpTemplates.id, id));
+      if (!tpl) return res.status(404).json({ message: "Template not found" });
+      await db.update(brokerFollowUpTemplates).set({ isDefault: false }).where(eq(brokerFollowUpTemplates.triggerType, tpl.triggerType));
+      const [updated] = await db.update(brokerFollowUpTemplates).set({ isDefault: true }).where(eq(brokerFollowUpTemplates.id, id)).returning();
+      invalidateTemplateCache();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error setting default template:", error);
+      res.status(500).json({ message: "Failed to set default template" });
     }
   });
 

@@ -137,6 +137,10 @@ export async function startServer(
     .then(m => m.startReminderScheduler())
     .catch(e => console.warn("[reminderScheduler] startup error:", e?.message));
 
+  import("./services/seedTemplates").then(m => m.seedDefaultTemplates()).catch(e =>
+    console.warn("[templateSeed] error:", e?.message)
+  );
+
   // Seed default document validation rules (no-op if already seeded)
   import("./services/docValidation").then(m => m.seedDocumentRules()).catch(e =>
     console.warn("[docValidation] seed error:", e?.message)
