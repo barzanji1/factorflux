@@ -79,13 +79,25 @@ const EVENT_ICON: Record<string, React.ElementType> = {
 
 // Event-type-specific icon overrides (take precedence over entity-type icons)
 const EVENT_TYPE_ICON: Record<string, React.ElementType> = {
-  broker_followup_triggered: Mail,
-  broker_followup_updated: Mail,
+  broker_followup_triggered:           Mail,
+  broker_followup_updated:             Mail,
+  broker_followup_reminder_sent:       Mail,
+  broker_followup_delivery_delivered:  Mail,
+  broker_followup_delivery_bounced:    Mail,
+  broker_followup_delivery_failed:     Mail,
+  broker_followup_delivery_spam:       Mail,
+  broker_followup_delivery_unsubscribed: Mail,
 };
 
 const EVENT_TYPE_COLOR: Record<string, string> = {
-  broker_followup_triggered: "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
-  broker_followup_updated:   "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
+  broker_followup_triggered:           "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
+  broker_followup_updated:             "bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
+  broker_followup_reminder_sent:       "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400",
+  broker_followup_delivery_delivered:  "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400",
+  broker_followup_delivery_bounced:    "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400",
+  broker_followup_delivery_failed:     "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400",
+  broker_followup_delivery_spam:       "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400",
+  broker_followup_delivery_unsubscribed: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
 };
 
 const ENTITY_COLOR: Record<string, string> = {
@@ -118,12 +130,28 @@ function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): U
     id: `ev-${e.id}`,
     kind: "event",
     title: e.eventType === "broker_followup_triggered"
-      ? `Broker Follow-Up Triggered — ${(e.payloadJson as any)?.invoiceNumber ?? `Invoice #${e.entityId}`}`
+      ? `Follow-Up Triggered — ${(e.payloadJson as any)?.invoiceNumber ?? `Invoice #${e.entityId}`}`
       : e.eventType === "broker_followup_updated"
-      ? `Broker Follow-Up Updated — Invoice #${e.entityId}`
+      ? `Follow-Up Updated — Invoice #${e.entityId}`
+      : e.eventType === "broker_followup_reminder_sent"
+      ? `Reminder Sent — Invoice #${e.entityId}`
+      : e.eventType === "broker_followup_delivery_delivered"
+      ? `Email Delivered — Invoice #${e.entityId}`
+      : e.eventType === "broker_followup_delivery_bounced"
+      ? `⚠ Email Bounced — Invoice #${e.entityId}`
+      : e.eventType === "broker_followup_delivery_failed"
+      ? `⚠ Email Failed — Invoice #${e.entityId}`
+      : e.eventType === "broker_followup_delivery_spam"
+      ? `⚠ Marked as Spam — Invoice #${e.entityId}`
+      : e.eventType === "broker_followup_delivery_unsubscribed"
+      ? `Unsubscribed — Invoice #${e.entityId}`
       : formatEventType(e.eventType),
     detail: e.eventType === "broker_followup_triggered"
       ? `${(e.payloadJson as any)?.clientName ?? ""} · ${(e.payloadJson as any)?.triggerType === "auto" ? "Auto-triggered on funding" : "Manually triggered"}`
+      : e.eventType.startsWith("broker_followup_delivery_")
+      ? `Reminder #${(e.payloadJson as any)?.reminderId ?? "?"} · ${(e.payloadJson as any)?.email ?? ""}`
+      : e.eventType === "broker_followup_reminder_sent"
+      ? `Step #${(e.payloadJson as any)?.sequenceNumber ?? "?"} · ${(e.payloadJson as any)?.reminderType ?? ""}`
       : e.entityType.charAt(0).toUpperCase() + e.entityType.slice(1) + (e.entityId ? ` #${e.entityId}` : ""),
     entityType: e.entityType,
     entityId: e.entityId,

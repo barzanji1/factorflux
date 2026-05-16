@@ -6,7 +6,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -4182,6 +4182,91 @@ Trucking Pros Financial Team
       res.json({ seeded: existing.length > 0 });
     } catch (err: any) {
       res.status(500).json({ message: "Status check failed", error: err?.message });
+    }
+  });
+
+  // ── SendGrid delivery webhook (no auth) ────────────────────────────────────
+  app.post("/api/webhooks/sendgrid", async (req: any, res) => {
+    try {
+      const events: any[] = Array.isArray(req.body) ? req.body : [];
+      let matched = 0;
+
+      for (const event of events) {
+        const sgMsgId: string | undefined = event.sg_message_id;
+        if (!sgMsgId) continue;
+
+        const evtMap: Record<string, string> = {
+          delivered:   "delivered",
+          bounce:      "bounced",
+          dropped:     "failed",
+          spamreport:  "spam",
+          unsubscribe: "unsubscribed",
+        };
+        const deliveryStatus = evtMap[event.event as string];
+        if (!deliveryStatus) continue;
+
+        // Find reminder whose stored sendgridMessageId is a prefix of the incoming sg_message_id
+        const [reminder] = await db
+          .select({
+            id:        brokerFollowUpReminders.id,
+            followUpId: brokerFollowUpReminders.followUpId,
+            invoiceId: brokerFollowUps.invoiceId,
+          })
+          .from(brokerFollowUpReminders)
+          .innerJoin(brokerFollowUps, eq(brokerFollowUpReminders.followUpId, brokerFollowUps.id))
+          .where(sql`${sgMsgId} LIKE ${brokerFollowUpReminders.sendgridMessageId} || '%'`)
+          .limit(1);
+
+        if (!reminder) continue;
+
+        await db
+          .update(brokerFollowUpReminders)
+          .set({ deliveryStatus, updatedAt: new Date() })
+          .where(eq(brokerFollowUpReminders.id, reminder.id));
+
+        // Write to event ledger
+        await db.insert(eventLedger).values({
+          entityType:  "invoice",
+          entityId:    reminder.invoiceId,
+          eventType:   `broker_followup_delivery_${deliveryStatus}`,
+          actorType:   "system",
+          actorId:     "sendgrid",
+          payloadJson: {
+            reminderId:     reminder.id,
+            followUpId:     reminder.followUpId,
+            sgMessageId:    sgMsgId,
+            deliveryStatus,
+            originalEvent:  event.event,
+            email:          event.email,
+          },
+        });
+
+        matched++;
+      }
+
+      res.status(200).json({ received: events.length, matched });
+    } catch (error: any) {
+      console.error("[sendgrid-webhook]", error?.message);
+      res.status(500).json({ message: "Webhook processing error" });
+    }
+  });
+
+  // ── Bounce/failure summary for follow-up header ─────────────────────────────
+  app.get("/api/broker-follow-up-reminders/delivery-summary", requireAuth, async (_req, res) => {
+    try {
+      const rows = await db
+        .select({ deliveryStatus: brokerFollowUpReminders.deliveryStatus })
+        .from(brokerFollowUpReminders)
+        .where(
+          inArray(brokerFollowUpReminders.deliveryStatus as any, ["bounced", "failed", "spam"]),
+        );
+
+      const bounced = rows.filter(r => r.deliveryStatus === "bounced").length;
+      const failed  = rows.filter(r => r.deliveryStatus === "failed").length;
+      const spam    = rows.filter(r => r.deliveryStatus === "spam").length;
+      res.json({ bounced, failed, spam, total: bounced + failed + spam });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch delivery summary" });
     }
   });
 

@@ -15,6 +15,33 @@ interface EmailParams {
   }>;
 }
 
+export async function sendEmailTracked(params: EmailParams): Promise<{ success: boolean; messageId?: string }> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (apiKey) {
+    try {
+      const sgMail = (await import("@sendgrid/mail")).default;
+      sgMail.setApiKey(apiKey);
+      const msg = {
+        to:      params.to,
+        from:    params.from,
+        subject: params.subject,
+        text:    params.text ?? params.html ?? " ",
+        html:    params.html,
+      };
+      const [response] = await sgMail.send(msg as any);
+      const messageId = (response.headers as Record<string, string>)?.["x-message-id"];
+      console.log(`[sendEmailTracked] sent → ${params.to} | msgId=${messageId ?? "none"}`);
+      return { success: true, messageId };
+    } catch (err: any) {
+      console.error("[sendEmailTracked] SendGrid error:", err?.response?.body ?? err?.message);
+      return { success: false };
+    }
+  }
+  // No API key — log only
+  console.log("[sendEmailTracked] no SENDGRID_API_KEY — log-only", { to: params.to, subject: params.subject });
+  return { success: true };
+}
+
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   try {
     console.log("========================================");

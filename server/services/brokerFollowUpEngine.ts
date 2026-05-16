@@ -34,7 +34,7 @@ import {
 } from "../../shared/schema";
 import { eq, and, lte, inArray, ne } from "drizzle-orm";
 import { storage } from "../storage";
-import { sendEmail } from "../emailService";
+import { sendEmailTracked } from "../emailService";
 
 // ─── Default cadence ──────────────────────────────────────────────────────────
 
@@ -549,18 +549,40 @@ export async function triggerBrokerFollowUp(
     } as any);
   } catch (_) { /* best-effort */ }
 
-  // 9. Send immediate email (best-effort)
+  // 9. Send immediate email (best-effort) and capture SendGrid messageId
   if (cadence.sendImmediately && debtorEmail) {
     try {
-      await sendEmail({
+      const { success, messageId } = await sendEmailTracked({
         from:    "noreply@truckingprosfinancial.com",
         to:      debtorEmail,
         subject: immediateSubject,
         html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${immediateBody}</pre>`,
       });
-      await db.update(brokerFollowUps)
-        .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
-        .where(eq(brokerFollowUps.id, record.id));
+      if (success) {
+        await db.update(brokerFollowUps)
+          .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+          .where(eq(brokerFollowUps.id, record.id));
+        // Update the immediate reminder row with delivery tracking
+        const [immReminder] = await db
+          .select({ id: brokerFollowUpReminders.id })
+          .from(brokerFollowUpReminders)
+          .where(and(
+            eq(brokerFollowUpReminders.followUpId, record.id),
+            eq(brokerFollowUpReminders.reminderType, "immediate"),
+          ))
+          .limit(1);
+        if (immReminder) {
+          await db.update(brokerFollowUpReminders)
+            .set({
+              status:            "sent",
+              actualSendAt:      new Date(),
+              sendgridMessageId: messageId ?? null,
+              deliveryStatus:    messageId ? "pending" : "sent",
+              updatedAt:         new Date(),
+            })
+            .where(eq(brokerFollowUpReminders.id, immReminder.id));
+        }
+      }
     } catch (_) { /* email failure is non-fatal */ }
   }
 
@@ -626,7 +648,8 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
     }
 
     // ── Try to send email ──────────────────────────────────────────────────────
-    let emailSent = false;
+    let emailSent  = false;
+    let messageId: string | undefined;
     if (r.debtorId) {
       try {
         const [debtor] = await db
@@ -635,19 +658,26 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
           .where(eq(debtors.id, r.debtorId));
 
         if (debtor?.email) {
-          await sendEmail({
+          const result = await sendEmailTracked({
             from:    "noreply@truckingprosfinancial.com",
             to:      debtor.email,
             subject: r.subject,
             html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${r.body}</pre>`,
           });
-          emailSent = true;
+          emailSent = result.success;
+          messageId  = result.messageId;
         }
       } catch (_) { /* email failure is non-fatal */ }
     }
 
     await db.update(brokerFollowUpReminders)
-      .set({ status: "sent", actualSendAt: new Date(), updatedAt: new Date() })
+      .set({
+        status:            "sent",
+        actualSendAt:      new Date(),
+        sendgridMessageId: messageId ?? null,
+        deliveryStatus:    messageId ? "pending" : "sent",
+        updatedAt:         new Date(),
+      })
       .where(eq(brokerFollowUpReminders.id, r.reminderId));
 
     // Write audit event

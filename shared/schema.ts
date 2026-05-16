@@ -1372,6 +1372,9 @@ export const brokerFollowUpReminders = pgTable("broker_follow_up_reminders", {
   // stopReason values: invoice_paid | invoice_settled | exception_raised | cash_applied | agent_suppressed
   subject: varchar("subject").notNull(),
   body: text("body").notNull(),
+  sendgridMessageId: text("sendgrid_message_id"),
+  deliveryStatus: varchar("delivery_status").default("pending"),
+  // deliveryStatus values: pending | delivered | bounced | failed | spam | unsubscribed
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -103,6 +103,8 @@ interface BrokerFollowUpReminder {
   skipReason: string | null;
   subject: string;
   body: string;
+  sendgridMessageId: string | null;
+  deliveryStatus: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -634,6 +636,41 @@ function ReminderTimeline({
                       {r.status === "paused" && <Pause className="mr-0.5 h-2.5 w-2.5" />}
                       {r.status}
                     </span>
+                    {/* Delivery status badge */}
+                    {r.status === "sent" && (() => {
+                      const ds = r.deliveryStatus;
+                      if (!ds || ds === "pending") return (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                          🕐 Pending
+                        </span>
+                      );
+                      if (ds === "delivered") return (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                          ✅ Delivered
+                        </span>
+                      );
+                      if (ds === "bounced") return (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
+                          ❌ Bounced
+                        </span>
+                      );
+                      if (ds === "failed") return (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
+                          ❌ Failed
+                        </span>
+                      );
+                      if (ds === "spam") return (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                          ⚠ Spam
+                        </span>
+                      );
+                      if (ds === "unsubscribed") return (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                          Unsubscribed
+                        </span>
+                      );
+                      return null;
+                    })()}
                     {overdue && (
                       <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
                         ⚠ {formatDistanceToNow(new Date(r.scheduledSendAt))} overdue
@@ -860,6 +897,11 @@ export default function FollowUpPage() {
     b => b.status !== "acknowledged",
   ).length;
 
+  const { data: deliverySummary } = useQuery<{ bounced: number; failed: number; spam: number; total: number }>({
+    queryKey: ["/api/broker-follow-up-reminders/delivery-summary"],
+    refetchInterval: 60_000,
+  });
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
@@ -879,6 +921,16 @@ export default function FollowUpPage() {
                 <p className="text-gray-600 dark:text-gray-400 mt-1">
                   Manage client follow-ups, tasks, and broker payment reminder cadences
                 </p>
+                {deliverySummary && deliverySummary.total > 0 && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 px-3 py-1 text-[12px] font-medium text-red-700 dark:text-red-400">
+                    ❌ {deliverySummary.total} delivery issue{deliverySummary.total !== 1 ? "s" : ""} —&nbsp;
+                    {deliverySummary.bounced > 0 && `${deliverySummary.bounced} bounced`}
+                    {deliverySummary.bounced > 0 && deliverySummary.failed > 0 && ", "}
+                    {deliverySummary.failed > 0 && `${deliverySummary.failed} failed`}
+                    {(deliverySummary.bounced > 0 || deliverySummary.failed > 0) && deliverySummary.spam > 0 && ", "}
+                    {deliverySummary.spam > 0 && `${deliverySummary.spam} spam`}
+                  </div>
+                )}
               </div>
               <Dialog open={isAddingFollowUp} onOpenChange={setIsAddingFollowUp}>
                 <DialogTrigger asChild>
