@@ -49,8 +49,8 @@ const navSections: NavSection[] = [
     title: "Workspace",
     items: [
       { name: "Dashboard",  href: "/",          icon: LayoutDashboard },
-      { name: "Accounts",   href: "/clients",   icon: Users           },
-      { name: "Loads",      href: "/invoices",  icon: FileText        },
+      { name: "Carriers",   href: "/clients",   icon: Users           },
+      { name: "Invoices",   href: "/invoices",  icon: FileText        },
       { name: "Documents",  href: "/documents", icon: Archive         },
       { name: "Tasks",      href: "/tasks",     icon: ListTodo        },
     ],
@@ -58,26 +58,26 @@ const navSections: NavSection[] = [
   {
     title: "Funding",
     items: [
-      { name: "Funding Queue",  href: "/factoring",        icon: TrendingUp     },
-      { name: "Payouts",        href: "/payouts",           icon: Wallet         },
-      { name: "Cash Matching",  href: "/cash-application",  icon: ArrowRightLeft },
-      { name: "Fuel Advances",  href: "/fuel-advance",      icon: Fuel           },
+      { name: "Factoring",      href: "/factoring",        icon: TrendingUp     },
+      { name: "Payments",       href: "/payouts",           icon: Wallet         },
+      { name: "Lockbox",        href: "/cash-application",  icon: ArrowRightLeft },
+      { name: "Fuel Advance",   href: "/fuel-advance",      icon: Fuel           },
     ],
   },
   {
     title: "Risk",
     items: [
-      { name: "Broker Desk",    href: "/brokers",          icon: Building2   },
-      { name: "Credit Review",  href: "/credit-checks",    icon: ShieldCheck },
-      { name: "FMCSA Monitor",  href: "/fmcsa-authority",  icon: Radio       },
-      { name: "Exceptions",     href: "/exceptions",       icon: AlertCircle },
-      { name: "Audit Trail",    href: "/audit-log",        icon: Activity    },
+      { name: "Brokers",     href: "/brokers",          icon: Building2   },
+      { name: "C/B Reviews", href: "/credit-checks",    icon: ShieldCheck },
+      { name: "MC Check",    href: "/fmcsa-authority",  icon: Radio       },
+      { name: "Held",        href: "/exceptions",       icon: AlertCircle },
+      { name: "Logs",        href: "/audit-log",        icon: Activity    },
     ],
   },
   {
     title: "Recovery",
     items: [
-      { name: "Collections",  href: "/collections",  icon: RotateCcw },
+      { name: "Followups",    href: "/collections",  icon: RotateCcw },
       { name: "Reports",      href: "/reports",       icon: BarChart3 },
     ],
   },
@@ -85,10 +85,10 @@ const navSections: NavSection[] = [
     title: "Admin",
     items: [
       { name: "Vault",          href: "/vault",           icon: Lock                           },
-      { name: "Support",        href: "/help",            icon: LifeBuoy                       },
-      { name: "Team Settings",  href: "/admin",           icon: Settings2,  role: "manager"    },
-      { name: "Rules",           href: "/document-rules",   icon: FileCheck2, role: "manager" },
-      { name: "Pipeline Builder", href: "/workflow-builder", icon: Workflow,   role: "manager" },
+      { name: "Help",             href: "/help",            icon: LifeBuoy                       },
+      { name: "Settings",         href: "/admin",           icon: Settings2,  role: "manager"    },
+      { name: "Rules",            href: "/document-rules",  icon: FileCheck2, role: "manager"    },
+      { name: "Workflow Builder", href: "/workflow-builder", icon: Workflow,   role: "manager"    },
     ],
   },
 ];
