@@ -42,6 +42,7 @@ import BrokerDetail from "@/pages/broker-detail";
 import ClientDetail from "@/pages/client-detail";
 import PayoutDetail from "@/pages/payout-detail";
 import LoadDetail from "@/pages/load-detail";
+import Lockbox from "@/pages/lockbox";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -122,6 +123,11 @@ function Router() {
       <Route path="/cash-application">
         <ProtectedRoute>
           <CashApplication />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/lockbox">
+        <ProtectedRoute>
+          <Lockbox />
         </ProtectedRoute>
       </Route>
       <Route path="/exceptions">

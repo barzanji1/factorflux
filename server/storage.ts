@@ -22,6 +22,7 @@ import {
   payouts,
   creditChecks,
   achSettings,
+  lockboxEntries,
   cashApplications,
   paymentApplicationLines,
   exceptions,
@@ -79,6 +80,8 @@ import {
   type InsertCreditCheck,
   type AchSettings,
   type InsertAchSettings,
+  type LockboxEntry,
+  type InsertLockboxEntry,
   type CashApplication,
   type InsertCashApplication,
   type PaymentApplicationLine,
@@ -263,6 +266,14 @@ export interface IStorage {
   // ACH Settings
   getAchSettings(clientId: number): Promise<AchSettings | undefined>;
   upsertAchSettings(clientId: number, data: Partial<InsertAchSettings>): Promise<AchSettings>;
+
+  // Lockbox
+  getLockboxEntries(filters?: { status?: string; dateFrom?: string; dateTo?: string }): Promise<LockboxEntry[]>;
+  getLockboxEntry(id: number): Promise<LockboxEntry | undefined>;
+  createLockboxEntry(data: InsertLockboxEntry): Promise<LockboxEntry>;
+  updateLockboxEntry(id: number, updates: Partial<InsertLockboxEntry>): Promise<LockboxEntry>;
+  deleteLockboxEntry(id: number): Promise<void>;
+  matchLockboxEntry(entryId: number, matches: Array<{ invoiceId: number; invoiceNumber: string; invoiceAmount: number; appliedAmount: number; varianceType: string; varianceReason?: string }>, userId: string, paymentMethod: string): Promise<{ cashApplication: CashApplication; lines: PaymentApplicationLine[] }>;
 
   // Cash Applications
   getCashApplications(): Promise<CashApplication[]>;
@@ -1634,6 +1645,92 @@ export class DatabaseStorage implements IStorage {
 
   async getPaymentApplicationLines(cashApplicationId: number): Promise<PaymentApplicationLine[]> {
     return db.select().from(paymentApplicationLines).where(eq(paymentApplicationLines.cashApplicationId, cashApplicationId));
+  }
+
+  // ── Lockbox ───────────────────────────────────────────────────────────────────
+  async getLockboxEntries(filters?: { status?: string; dateFrom?: string; dateTo?: string }): Promise<LockboxEntry[]> {
+    let query = db.select().from(lockboxEntries).orderBy(desc(lockboxEntries.receivedDate)) as any;
+    const conditions: any[] = [];
+    if (filters?.status && filters.status !== "all") {
+      conditions.push(eq(lockboxEntries.status, filters.status as any));
+    }
+    if (filters?.dateFrom) {
+      conditions.push(sql`${lockboxEntries.receivedDate} >= ${new Date(filters.dateFrom)}`);
+    }
+    if (filters?.dateTo) {
+      conditions.push(sql`${lockboxEntries.receivedDate} <= ${new Date(filters.dateTo)}`);
+    }
+    if (conditions.length > 0) {
+      query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions));
+    }
+    return query;
+  }
+
+  async getLockboxEntry(id: number): Promise<LockboxEntry | undefined> {
+    const [row] = await db.select().from(lockboxEntries).where(eq(lockboxEntries.id, id));
+    return row;
+  }
+
+  async createLockboxEntry(data: InsertLockboxEntry): Promise<LockboxEntry> {
+    const [row] = await db.insert(lockboxEntries).values(data).returning();
+    return row;
+  }
+
+  async updateLockboxEntry(id: number, updates: Partial<InsertLockboxEntry>): Promise<LockboxEntry> {
+    const [row] = await db.update(lockboxEntries).set(updates).where(eq(lockboxEntries.id, id)).returning();
+    return row;
+  }
+
+  async deleteLockboxEntry(id: number): Promise<void> {
+    await db.delete(lockboxEntries).where(eq(lockboxEntries.id, id));
+  }
+
+  async matchLockboxEntry(
+    entryId: number,
+    matches: Array<{ invoiceId: number; invoiceNumber: string; invoiceAmount: number; appliedAmount: number; varianceType: string; varianceReason?: string }>,
+    userId: string,
+    paymentMethod: string,
+  ): Promise<{ cashApplication: CashApplication; lines: PaymentApplicationLine[] }> {
+    const entry = await this.getLockboxEntry(entryId);
+    if (!entry) throw new Error(`Lockbox entry ${entryId} not found`);
+
+    const totalApplied = matches.reduce((s, m) => s + m.appliedAmount, 0);
+    const received = parseFloat(String(entry.amount));
+
+    const ref = `LBX-${entryId}-${Date.now()}`;
+    const [ca] = await db.insert(cashApplications).values({
+      lockboxEntryId: entryId,
+      paymentReference: ref,
+      payorName: entry.payorName,
+      paymentDate: entry.receivedDate,
+      totalReceived: entry.amount,
+      paymentMethod: paymentMethod as any,
+      status: "unapplied",
+      processedBy: userId,
+      notes: entry.notes ?? null,
+    }).returning();
+
+    const lineValues = matches.map(m => ({
+      cashApplicationId: ca.id,
+      invoiceId: m.invoiceId,
+      invoiceNumber: m.invoiceNumber,
+      invoiceAmount: String(m.invoiceAmount),
+      appliedAmount: String(m.appliedAmount),
+      variance: String(Math.round((m.invoiceAmount - m.appliedAmount) * 100) / 100),
+      varianceType: m.varianceType as any,
+      varianceReason: m.varianceReason ?? null,
+    }));
+    const lines = await db.insert(paymentApplicationLines).values(lineValues).returning();
+
+    let caStatus: CashApplication["status"] = "fully_applied";
+    if (totalApplied < received - 0.01) caStatus = "partially_applied";
+    else if (totalApplied > received + 0.01) caStatus = "overpaid";
+    await db.update(cashApplications).set({ status: caStatus, updatedAt: new Date() }).where(eq(cashApplications.id, ca.id));
+
+    const entryStatus: LockboxEntry["status"] = totalApplied >= received - 0.01 ? "matched" : "partial";
+    await db.update(lockboxEntries).set({ status: entryStatus }).where(eq(lockboxEntries.id, entryId));
+
+    return { cashApplication: { ...ca, status: caStatus }, lines };
   }
 
   // ── Exceptions ────────────────────────────────────────────────────────────────

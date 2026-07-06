@@ -982,9 +982,32 @@ export const insertAchSettingsSchema = createInsertSchema(achSettings).omit({
 export type AchSettings = typeof achSettings.$inferSelect;
 export type InsertAchSettings = z.infer<typeof insertAchSettingsSchema>;
 
+// ─── Lockbox Entries (raw incoming bank / remittance rows) ───────────────────
+export const lockboxEntries = pgTable("lockbox_entries", {
+  id: serial("id").primaryKey(),
+  receivedDate: timestamp("received_date").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  payorName: varchar("payor_name").notNull(),
+  payorReference: varchar("payor_reference"),
+  bankReference: varchar("bank_reference"),
+  status: varchar("status", {
+    enum: ["unmatched", "matched", "partial", "exception"],
+  }).default("unmatched").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const insertLockboxEntrySchema = createInsertSchema(lockboxEntries).omit({
+  id: true, createdAt: true,
+});
+export type LockboxEntry = typeof lockboxEntries.$inferSelect;
+export type InsertLockboxEntry = z.infer<typeof insertLockboxEntrySchema>;
+
 // ─── Cash Applications (incoming payment records) ────────────────────────────
 export const cashApplications = pgTable("cash_applications", {
   id: serial("id").primaryKey(),
+  lockboxEntryId: integer("lockbox_entry_id").references(() => lockboxEntries.id, { onDelete: "set null" }),
   paymentReference: varchar("payment_reference").unique().notNull(),
   payorName: varchar("payor_name").notNull(),
   debtorId: integer("debtor_id").references(() => debtors.id),

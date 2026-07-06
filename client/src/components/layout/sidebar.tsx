@@ -60,7 +60,7 @@ const navSections: NavSection[] = [
     items: [
       { name: "Factoring",      href: "/factoring",        icon: TrendingUp     },
       { name: "Payments",       href: "/payouts",           icon: Wallet         },
-      { name: "Lockbox",        href: "/cash-application",  icon: ArrowRightLeft },
+      { name: "Lockbox",        href: "/lockbox",           icon: ArrowRightLeft },
       { name: "Fuel Advance",   href: "/fuel-advance",      icon: Fuel           },
     ],
   },

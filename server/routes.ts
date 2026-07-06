@@ -29,6 +29,7 @@ import {
   insertFuelAdvanceSchema,
   insertBrokerFollowUpSchema,
   insertBrokerFollowUpReminderSchema,
+  insertLockboxEntrySchema,
   brokerFollowUpReminders,
   brokerFollowUpTemplates,
   insertBrokerFollowUpTemplateSchema,
@@ -3588,6 +3589,58 @@ Trucking Pros Financial Team
       const s = await storage.upsertAchSettings(Number(req.params.clientId), { status: "active", verifiedBy: req.user.id } as any);
       res.json(s);
     } catch (e) { res.status(500).json({ message: "Failed to verify ACH" }); }
+  });
+
+  // ─── Lockbox ──────────────────────────────────────────────────────────────
+  app.get("/api/lockbox", requireAuth, async (req: any, res) => {
+    try {
+      const { status, dateFrom, dateTo } = req.query as Record<string, string>;
+      const entries = await storage.getLockboxEntries({ status, dateFrom, dateTo });
+      res.json(entries);
+    } catch (e) { res.status(500).json({ message: "Failed to fetch lockbox entries" }); }
+  });
+
+  app.post("/api/lockbox", requireAuth, async (req: any, res) => {
+    try {
+      const parsed = insertLockboxEntrySchema.safeParse({ ...req.body, createdBy: req.user.id });
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
+      const entry = await storage.createLockboxEntry(parsed.data);
+      await storage.createActivity({ userId: req.user.id, type: "lockbox_entry_created", description: `Lockbox entry from ${entry.payorName} — $${entry.amount}`, entityType: "payment", entityId: entry.id });
+      res.status(201).json(entry);
+    } catch (e) { res.status(500).json({ message: "Failed to create lockbox entry" }); }
+  });
+
+  app.patch("/api/lockbox/:id", requireAuth, async (req: any, res) => {
+    try {
+      const entry = await storage.getLockboxEntry(Number(req.params.id));
+      if (!entry) return res.status(404).json({ message: "Entry not found" });
+      const updated = await storage.updateLockboxEntry(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (e) { res.status(500).json({ message: "Failed to update lockbox entry" }); }
+  });
+
+  app.post("/api/lockbox/:id/match", requireAuth, async (req: any, res) => {
+    try {
+      const { matches, paymentMethod = "ach" } = req.body as { matches: Array<{ invoiceId: number; invoiceNumber: string; invoiceAmount: number; appliedAmount: number; varianceType: string; varianceReason?: string }>; paymentMethod?: string };
+      if (!matches?.length) return res.status(400).json({ message: "No invoice matches provided" });
+      const result = await storage.matchLockboxEntry(Number(req.params.id), matches, req.user.id, paymentMethod);
+      // Advance matched invoices to payment_receipt stage
+      for (const line of result.lines) {
+        advanceInvoiceStage(line.invoiceId, "payment_receipt", req.user.id, "Payment matched via lockbox").catch(() => {});
+      }
+      await storage.createActivity({ userId: req.user.id, type: "lockbox_matched", description: `Lockbox entry #${req.params.id} matched to ${matches.length} invoice(s)`, entityType: "payment", entityId: result.cashApplication.id });
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to match entry" }); }
+  });
+
+  app.delete("/api/lockbox/:id", requireAuth, async (req: any, res) => {
+    try {
+      const entry = await storage.getLockboxEntry(Number(req.params.id));
+      if (!entry) return res.status(404).json({ message: "Entry not found" });
+      if (entry.status !== "unmatched") return res.status(409).json({ message: "Only unmatched entries can be deleted" });
+      await storage.deleteLockboxEntry(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ message: "Failed to delete lockbox entry" }); }
   });
 
   // ─── Cash Applications ────────────────────────────────────────────────────
