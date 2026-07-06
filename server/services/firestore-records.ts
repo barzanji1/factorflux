@@ -10,6 +10,11 @@ export async function upsertClientMirror(client: {
   status?: string | null;
   createdAt?: string | Date | null;
 }) {
+  if (!firestore) {
+    console.warn("[Firestore] upsertClientMirror skipped — Firestore not initialized.");
+    return null;
+  }
+
   const clientId = String(client.id);
   const ref = firestore.collection("clients").doc(clientId);
 
@@ -39,6 +44,11 @@ export async function addClientActivityLog(
     message: string;
   }
 ) {
+  if (!firestore) {
+    console.warn("[Firestore] addClientActivityLog skipped — Firestore not initialized.");
+    return null;
+  }
+
   const id = String(clientId);
 
   const ref = firestore

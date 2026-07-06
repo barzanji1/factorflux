@@ -230,6 +230,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // ─── Health check — must be first, no auth, always 200 ───────────────────
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok", ts: Date.now() });
+  });
+
   // Auth
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -328,6 +333,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/firebase-test", async (_req, res) => {
+    if (!firestore) {
+      return res.status(503).json({ error: "Firestore not configured — FIREBASE_SERVICE_ACCOUNT not set." });
+    }
     try {
       const testRef = firestore.collection("test").doc("ping");
 
@@ -1217,6 +1225,9 @@ ${message}
   });
 
   app.get("/api/firebase-clients", async (_req: any, res) => {
+    if (!firestore) {
+      return res.status(503).json({ error: "Firestore not configured — FIREBASE_SERVICE_ACCOUNT not set." });
+    }
     try {
       const snap = await firestore.collection("clients").get();
       const data = snap.docs.map((doc) => doc.data());

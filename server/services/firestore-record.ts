@@ -1,6 +1,10 @@
 import { firestore as db } from "../firebase";
 
-async function deleteActivitySubcollection(clientIdStr: string): Promise<number> {
+async function deleteActivitySubcollection(
+  clientIdStr: string
+): Promise<number> {
+  if (!db) return 0;
+
   const activityRefs = await db
     .collection("clients")
     .doc(clientIdStr)
@@ -20,13 +24,17 @@ async function deleteActivitySubcollection(clientIdStr: string): Promise<number>
 }
 
 export async function deleteClientMirror(clientId: number) {
+  if (!db) {
+    console.warn("[Firestore] deleteClientMirror skipped — Firestore not initialized.");
+    return { deleted: false, method: "firestore_disabled", count: 0 };
+  }
+
   const clientIdStr = String(clientId);
 
   try {
     console.log(`[FIRESTORE DELETE] starting delete for clientId=${clientIdStr}`);
 
-    // 1. Try direct document ID lookup — this is the expected path since
-    //    upsertClientMirror always writes doc(String(id)).
+    // 1. Try direct document ID lookup
     const directRef = db.collection("clients").doc(clientIdStr);
     const directSnap = await directRef.get();
 
@@ -41,23 +49,18 @@ export async function deleteClientMirror(clientId: number) {
       `[FIRESTORE DELETE] doc not found at id=${clientIdStr}, running fallback field queries in parallel`
     );
 
-    // 2. Fallback: run both string and numeric field queries in parallel.
-    //    Deduplicate with a Map so a doc matching both queries isn't double-deleted.
+    // 2. Fallback: run both string and numeric field queries in parallel
     const [stringSnap, numericSnap] = await Promise.all([
       db.collection("clients").where("id", "==", clientIdStr).get(),
       db.collection("clients").where("id", "==", clientId).get(),
     ]);
 
-    const allDocs = new Map<
-      string,
-      FirebaseFirestore.QueryDocumentSnapshot
-    >();
+    const allDocs = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
     [...stringSnap.docs, ...numericSnap.docs].forEach((doc) =>
       allDocs.set(doc.id, doc)
     );
 
     if (allDocs.size > 0) {
-      // Clean up activity subcollections for each matched doc
       await Promise.all(
         Array.from(allDocs.keys()).map((docId) =>
           deleteActivitySubcollection(docId)
