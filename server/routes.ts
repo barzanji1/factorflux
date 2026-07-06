@@ -6,7 +6,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { z } from "zod";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, notInArray } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -52,6 +52,9 @@ import {
   eventLedger,
   loads,
   brokerFollowUps,
+  debtors,
+  paymentApplicationLines,
+  cashApplications,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -4360,6 +4363,257 @@ Trucking Pros Financial Team
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch delivery summary" });
     }
+  });
+
+  // ─── Reports API ──────────────────────────────────────────────────────────────
+
+  // Aging Report
+  app.get("/api/reports/aging", requireAuth, async (_req, res) => {
+    try {
+      const allInvoices = await db
+        .select({
+          id: invoices.id,
+          invoiceNumber: invoices.invoiceNumber,
+          amount: invoices.amount,
+          status: invoices.status,
+          invoiceDate: invoices.invoiceDate,
+          dueDate: invoices.dueDate,
+          createdAt: invoices.createdAt,
+          clientId: invoices.clientId,
+          debtorId: invoices.debtorId,
+          clientName: clients.name,
+          debtorName: debtors.name,
+        })
+        .from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .where(notInArray(invoices.status, ["paid", "settled", "funded", "rejected"] as any[]));
+
+      const now = Date.now();
+      const bucket = (inv: typeof allInvoices[0]) => {
+        const base = inv.dueDate ?? inv.invoiceDate ?? inv.createdAt ?? new Date();
+        const days = Math.floor((now - new Date(base).getTime()) / 86400000);
+        if (days <= 30) return "0-30";
+        if (days <= 60) return "31-60";
+        if (days <= 90) return "61-90";
+        return "90+";
+      };
+
+      const buckets: Record<string, { count: number; total: number; carriers: Record<string, number>; brokers: Record<string, number> }> = {
+        "0-30": { count: 0, total: 0, carriers: {}, brokers: {} },
+        "31-60": { count: 0, total: 0, carriers: {}, brokers: {} },
+        "61-90": { count: 0, total: 0, carriers: {}, brokers: {} },
+        "90+": { count: 0, total: 0, carriers: {}, brokers: {} },
+      };
+
+      for (const inv of allInvoices) {
+        const b = bucket(inv);
+        const amt = parseFloat(String(inv.amount));
+        buckets[b].count++;
+        buckets[b].total += amt;
+        const carrier = inv.clientName ?? `Carrier #${inv.clientId}`;
+        const broker = inv.debtorName ?? (inv.debtorId ? `Broker #${inv.debtorId}` : "Unknown");
+        buckets[b].carriers[carrier] = (buckets[b].carriers[carrier] ?? 0) + amt;
+        buckets[b].brokers[broker] = (buckets[b].brokers[broker] ?? 0) + amt;
+      }
+
+      res.json(buckets);
+    } catch (e) { res.status(500).json({ message: "Failed to generate aging report" }); }
+  });
+
+  // Agent Report
+  app.get("/api/reports/agent", requireAuth, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      let q = db
+        .select({
+          id: invoices.id,
+          amount: invoices.amount,
+          status: invoices.status,
+          createdAt: invoices.createdAt,
+          approvedAt: invoices.approvedAt,
+          agentId: invoices.assignedTo,
+          agentName: sql<string>`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        })
+        .from(invoices)
+        .leftJoin(users, eq(invoices.assignedTo, users.id))
+        .$dynamic();
+
+      const conds: any[] = [];
+      if (startDate) conds.push(sql`${invoices.createdAt} >= ${new Date(startDate)}`);
+      if (endDate)   conds.push(sql`${invoices.createdAt} <= ${new Date(endDate)}`);
+      if (conds.length) q = q.where(and(...conds));
+
+      const rows = await q;
+      const agentMap: Record<string, { agentId: string | null; agentName: string; count: number; totalFunded: number; totalAmount: number; timesToFund: number[] }> = {};
+
+      for (const row of rows) {
+        const key = row.agentId ?? "unassigned";
+        if (!agentMap[key]) agentMap[key] = { agentId: row.agentId, agentName: row.agentName ?? "Unassigned", count: 0, totalFunded: 0, totalAmount: 0, timesToFund: [] };
+        const a = agentMap[key];
+        a.count++;
+        a.totalAmount += parseFloat(String(row.amount));
+        if (row.status === "funded" || row.status === "paid" || row.status === "settled") {
+          a.totalFunded += parseFloat(String(row.amount));
+          if (row.approvedAt && row.createdAt) {
+            const days = (new Date(row.approvedAt).getTime() - new Date(row.createdAt).getTime()) / 86400000;
+            a.timesToFund.push(Math.max(0, days));
+          }
+        }
+      }
+
+      const result = Object.values(agentMap).map(a => ({
+        ...a,
+        avgDaysToFund: a.timesToFund.length ? +(a.timesToFund.reduce((s, v) => s + v, 0) / a.timesToFund.length).toFixed(2) : null,
+        timesToFund: undefined,
+      }));
+
+      res.json(result);
+    } catch (e) { res.status(500).json({ message: "Failed to generate agent report" }); }
+  });
+
+  // Broker Report
+  app.get("/api/reports/broker", requireAuth, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const rows = await db
+        .select({
+          id: invoices.id,
+          amount: invoices.amount,
+          status: invoices.status,
+          createdAt: invoices.createdAt,
+          debtorId: invoices.debtorId,
+          brokerName: debtors.name,
+          creditLimit: debtors.creditLimit,
+          avgDaysToPay: debtors.averageDaysToPay,
+        })
+        .from(invoices)
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+
+      const brokerMap: Record<string, { debtorId: number | null; brokerName: string; invoiceCount: number; totalVolume: number; outstanding: number; paid: number; creditLimit: number | null; avgDaysToPay: number | null }> = {};
+
+      for (const row of rows) {
+        if (startDate && new Date(row.createdAt!) < new Date(startDate)) continue;
+        if (endDate   && new Date(row.createdAt!) > new Date(endDate))   continue;
+        const key = String(row.debtorId ?? 0);
+        if (!brokerMap[key]) brokerMap[key] = { debtorId: row.debtorId, brokerName: row.brokerName ?? "Unknown", invoiceCount: 0, totalVolume: 0, outstanding: 0, paid: 0, creditLimit: row.creditLimit ? parseFloat(String(row.creditLimit)) : null, avgDaysToPay: row.avgDaysToPay };
+        const b = brokerMap[key];
+        const amt = parseFloat(String(row.amount));
+        b.invoiceCount++;
+        b.totalVolume += amt;
+        if (["paid", "settled", "funded"].includes(row.status)) b.paid += amt;
+        else b.outstanding += amt;
+      }
+
+      res.json(Object.values(brokerMap).sort((a, b) => b.totalVolume - a.totalVolume));
+    } catch (e) { res.status(500).json({ message: "Failed to generate broker report" }); }
+  });
+
+  // Carrier Report
+  app.get("/api/reports/carrier", requireAuth, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const rows = await db
+        .select({
+          id: invoices.id,
+          amount: invoices.amount,
+          status: invoices.status,
+          createdAt: invoices.createdAt,
+          clientId: invoices.clientId,
+          carrierName: clients.name,
+        })
+        .from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id));
+
+      const carrierMap: Record<string, { clientId: number; carrierName: string; invoiceCount: number; totalFunded: number; outstanding: number; amounts: number[] }> = {};
+
+      for (const row of rows) {
+        if (startDate && new Date(row.createdAt!) < new Date(startDate)) continue;
+        if (endDate   && new Date(row.createdAt!) > new Date(endDate))   continue;
+        const key = String(row.clientId);
+        if (!carrierMap[key]) carrierMap[key] = { clientId: row.clientId, carrierName: row.carrierName ?? `Carrier #${row.clientId}`, invoiceCount: 0, totalFunded: 0, outstanding: 0, amounts: [] };
+        const c = carrierMap[key];
+        const amt = parseFloat(String(row.amount));
+        c.invoiceCount++;
+        c.amounts.push(amt);
+        if (["funded", "paid", "settled"].includes(row.status)) c.totalFunded += amt;
+        else c.outstanding += amt;
+      }
+
+      const result = Object.values(carrierMap).map(c => ({
+        ...c,
+        avgInvoiceSize: c.amounts.length ? +(c.amounts.reduce((s, v) => s + v, 0) / c.amounts.length).toFixed(2) : 0,
+        amounts: undefined,
+      })).sort((a, b) => b.totalFunded - a.totalFunded);
+
+      res.json(result);
+    } catch (e) { res.status(500).json({ message: "Failed to generate carrier report" }); }
+  });
+
+  // Daily AR
+  app.get("/api/reports/daily-ar", requireAuth, async (_req, res) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+
+      const allInvoices = await db.select({ amount: invoices.amount, status: invoices.status, createdAt: invoices.createdAt }).from(invoices);
+      const todayPayments = await db.select({ appliedAmount: paymentApplicationLines.appliedAmount, createdAt: cashApplications.createdAt })
+        .from(paymentApplicationLines)
+        .innerJoin(cashApplications, eq(paymentApplicationLines.cashApplicationId, cashApplications.id))
+        .where(and(sql`${cashApplications.createdAt} >= ${today}`, sql`${cashApplications.createdAt} < ${tomorrow}`));
+
+      const totalAR = allInvoices
+        .filter(i => !["paid", "settled", "rejected"].includes(i.status))
+        .reduce((s, i) => s + parseFloat(String(i.amount)), 0);
+
+      const outstanding = allInvoices
+        .filter(i => !["paid", "settled", "funded", "rejected"].includes(i.status))
+        .reduce((s, i) => s + parseFloat(String(i.amount)), 0);
+
+      const collectedToday = todayPayments.reduce((s, p) => s + parseFloat(String(p.appliedAmount)), 0);
+
+      const newToday = allInvoices
+        .filter(i => i.createdAt && new Date(i.createdAt) >= today && new Date(i.createdAt) < tomorrow)
+        .reduce((s, i) => s + parseFloat(String(i.amount)), 0);
+
+      res.json({ totalAR, outstanding, collectedToday, newToday, date: today.toISOString() });
+    } catch (e) { res.status(500).json({ message: "Failed to generate daily AR" }); }
+  });
+
+  // Monthly Summary
+  app.get("/api/reports/monthly", requireAuth, async (req: any, res) => {
+    try {
+      const year = parseInt(req.query.year ?? String(new Date().getFullYear()));
+
+      const rows = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${payouts.createdAt})`,
+          invoiceCount: sql<number>`COUNT(*)`,
+          totalVolume: sql<string>`SUM(${payouts.invoiceAmount})`,
+          totalFees: sql<string>`SUM(${payouts.feeAmount})`,
+          totalAdvanced: sql<string>`SUM(${payouts.advanceAmount})`,
+        })
+        .from(payouts)
+        .where(sql`EXTRACT(YEAR FROM ${payouts.createdAt}) = ${year}`)
+        .groupBy(sql`EXTRACT(MONTH FROM ${payouts.createdAt})`)
+        .orderBy(sql`EXTRACT(MONTH FROM ${payouts.createdAt})`);
+
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const result = months.map((label, idx) => {
+        const row = rows.find(r => Number(r.month) === idx + 1);
+        return {
+          month: idx + 1,
+          label,
+          invoiceCount: row ? Number(row.invoiceCount) : 0,
+          totalVolume: row ? parseFloat(String(row.totalVolume)) : 0,
+          totalFees: row ? parseFloat(String(row.totalFees)) : 0,
+          totalAdvanced: row ? parseFloat(String(row.totalAdvanced)) : 0,
+        };
+      });
+
+      res.json({ year, months: result });
+    } catch (e) { res.status(500).json({ message: "Failed to generate monthly summary" }); }
   });
 
   const httpServer = createServer(app);
