@@ -217,10 +217,16 @@ export const invoices = pgTable("invoices", {
       "funded",
       "settled",
       "paid",
+      "held",
     ],
   })
     .default("draft")
     .notNull(),
+  heldReason: text("held_reason"),
+  heldAt: timestamp("held_at"),
+  heldBy: varchar("held_by").references(() => users.id),
+  heldNotes: text("held_notes"),
+  previousStatus: varchar("previous_status"),
   factoringStage: varchar("factoring_stage", {
     enum: [
       "document_intake",

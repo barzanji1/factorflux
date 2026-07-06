@@ -1369,6 +1369,45 @@ ${message}
   });
 
   // Invoices
+  // ─── Held Queue ──────────────────────────────────────────────────────────────
+  app.get("/api/held", requireAuth, async (_req: any, res) => {
+    try {
+      const held = await storage.getHeldInvoices();
+      // Enrich with client/broker names by joining the full invoice detail
+      const enriched = await Promise.all(held.map(async (inv) => {
+        try {
+          const client = inv.clientId ? await storage.getClient(inv.clientId) : null;
+          const broker = inv.debtorId ? await storage.getDebtor(inv.debtorId) : null;
+          return {
+            ...inv,
+            clientName: client?.name ?? null,
+            brokerName: broker?.name ?? null,
+          };
+        } catch { return inv; }
+      }));
+      res.json(enriched);
+    } catch (e) { res.status(500).json({ message: "Failed to fetch held invoices" }); }
+  });
+
+  app.post("/api/invoices/:id/hold", requireAuth, async (req: any, res) => {
+    try {
+      const { reason, notes } = req.body as { reason: string; notes?: string };
+      if (!reason?.trim()) return res.status(400).json({ message: "Hold reason is required" });
+      const inv = await storage.holdInvoice(Number(req.params.id), reason, req.user.id, notes);
+      await storage.createActivity({ userId: req.user.id, type: "invoice_held", description: `Invoice #${inv.invoiceNumber} placed on hold: ${reason}`, entityType: "invoice", entityId: inv.id });
+      res.json(inv);
+    } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to hold invoice" }); }
+  });
+
+  app.post("/api/invoices/:id/release", requireAuth, async (req: any, res) => {
+    try {
+      const { releaseNote } = req.body as { releaseNote?: string };
+      const inv = await storage.releaseInvoice(Number(req.params.id), req.user.id, releaseNote);
+      await storage.createActivity({ userId: req.user.id, type: "invoice_released", description: `Invoice #${inv.invoiceNumber} released from hold`, entityType: "invoice", entityId: inv.id });
+      res.json(inv);
+    } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to release invoice" }); }
+  });
+
   app.get("/api/invoices", requireAuth, async (_req: any, res) => {
     try {
       const invoices = await storage.getInvoices();

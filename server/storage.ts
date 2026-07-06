@@ -140,6 +140,9 @@ export interface IStorage {
   getInvoice(id: number): Promise<Invoice | undefined>;
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByStatus(status: string): Promise<Invoice[]>;
+  getHeldInvoices(): Promise<Invoice[]>;
+  holdInvoice(id: number, reason: string, heldBy: string, notes?: string): Promise<Invoice>;
+  releaseInvoice(id: number, releasedBy: string, releaseNote?: string): Promise<Invoice>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   getNextInvoiceNumber(): Promise<string>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
@@ -556,6 +559,67 @@ export class DatabaseStorage implements IStorage {
       .from(invoices)
       .where(eq(invoices.status, status as any))
       .orderBy(desc(invoices.createdAt));
+  }
+
+  async getHeldInvoices(): Promise<Invoice[]> {
+    return await db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.status, "held" as any))
+      .orderBy(desc(invoices.heldAt));
+  }
+
+  async holdInvoice(id: number, reason: string, heldBy: string, notes?: string): Promise<Invoice> {
+    const existing = await this.getInvoice(id);
+    if (!existing) throw new Error(`Invoice ${id} not found`);
+    const [updated] = await db
+      .update(invoices)
+      .set({
+        previousStatus: existing.status,
+        status: "held" as any,
+        heldReason: reason,
+        heldAt: new Date(),
+        heldBy,
+        heldNotes: notes ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(invoices.id, id))
+      .returning();
+    await this.createInvoiceStatusHistory({
+      invoiceId: id,
+      oldStatus: existing.status,
+      newStatus: "held",
+      changedBy: heldBy,
+      reason: `Held: ${reason}`,
+    });
+    return updated;
+  }
+
+  async releaseInvoice(id: number, releasedBy: string, releaseNote?: string): Promise<Invoice> {
+    const existing = await this.getInvoice(id);
+    if (!existing) throw new Error(`Invoice ${id} not found`);
+    const restoreStatus = (existing.previousStatus as any) ?? "submitted";
+    const [updated] = await db
+      .update(invoices)
+      .set({
+        status: restoreStatus,
+        heldReason: null,
+        heldAt: null,
+        heldBy: null,
+        heldNotes: null,
+        previousStatus: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(invoices.id, id))
+      .returning();
+    await this.createInvoiceStatusHistory({
+      invoiceId: id,
+      oldStatus: "held",
+      newStatus: restoreStatus,
+      changedBy: releasedBy,
+      reason: releaseNote ? `Released: ${releaseNote}` : "Released from hold",
+    });
+    return updated;
   }
 
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {

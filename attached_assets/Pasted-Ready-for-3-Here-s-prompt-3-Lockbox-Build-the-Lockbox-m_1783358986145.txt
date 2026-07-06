@@ -1,0 +1,90 @@
+Ready for 3
+
+Here's prompt #3 — Lockbox:
+
+Build the Lockbox module end-to-end. This is a cash application tool — agents match incoming payments from brokers/debtors against open invoices.
+
+Database
+
+ Create lockbox_entries table: id, receivedDate, amount, payorName, payorReference, bankReference, status (unmatched/matched/partial/exception), notes, createdAt, createdBy
+ cash_applications table may already exist — confirm and extend if needed with lockboxEntryId foreign key
+ Run db:push
+Backend
+
+ GET /api/lockbox — list all entries, filterable by status and date range
+ POST /api/lockbox — create new entry (manual or batch paste)
+ PATCH /api/lockbox/:id — update status, notes
+ POST /api/lockbox/:id/match — match entry to one or more invoices, creates cash application lines, updates invoice balance
+ DELETE /api/lockbox/:id — remove unmatched entry only
+ All routes require requireAuth
+Frontend (/lockbox)
+
+ Table view: received date, payor, amount, bank reference, status badge, actions
+ Unmatched entries highlighted in yellow
+ Match button opens modal — search open invoices by carrier/broker/amount, select one or multiple, confirm match
+ Partial match supported — remaining balance stays unmatched
+ Exception flag for entries that can't be matched
+ Summary bar: total received today, total unmatched, total matched
+ Register /lockbox route in App.tsx and add to sidebar under the correct nav label
+Run it, report back.
+
+Let me check the existing schema and sidebar before writing anything:
+13 actions
+Good. cash_applications exists and is solid. I need to add lockbox_entries, link them, wire the routes, and build the page. Let me read the sidebar and existing cash-application page for patterns:
+4 actions
+I have everything I need. Building all layers in parallel — schema, storage, routes, page, routing:
+3 actions
+Now I have the full picture. Building all layers simultaneously:
+2 actions
+Now I'll update storage, routes, create the page, and update App.tsx + sidebar all at once:
+4 actions
+Let me find the right insertion points in storage.ts and routes.ts simultaneously:
+9 actions
+Adding all implementation, routes, page, and router wiring in parallel:
+6 actions
+Now creating the lockbox page, updating App.tsx, sidebar, and running db:push all at once:
+2 actions
+Now registering the route in App.tsx, updating the sidebar link, and pushing the schema:
+10 actions
+Let me verify everything compiles correctly:
+2 actions
+Just one new error from my code — TopNav needs a title prop. Let me fix that quickly:
+6 actions
+No lockbox errors — the module is clean. Let me take a final screenshot:
+2 actions
+Does the Lockbox module look and work the way you'd expect?
+
+Show more
+Did it work? Share the screenshot Replit took or send your own.
+
+Screenshot 2026-07-06 at 11.21.40 AM.png
+Lockbox is live. Sidebar labels are still wrong though — showing "Carriers" and "Invoices" instead of the renamed labels. Did the sidebar rename prompt ever get run?
+
+Ready for prompt #4 — Held queue?
+
+ready
+
+Here's prompt #4 — Held queue:
+
+Build the Held queue module end-to-end. Held is a dedicated view for invoices that are blocked from funding due to missing docs, disputes, verification failures, or manual holds.
+
+Database
+
+ Add heldReason (text), heldAt (timestamp), heldBy (userId), heldNotes (text) columns to existing invoices table
+ Add held as a valid invoice status if not already present
+ Run db:push
+Backend
+
+ GET /api/held — returns all invoices with status held, includes carrier name, broker name, amount, heldReason, heldAt, heldBy
+ POST /api/invoices/:id/hold — moves invoice to held, requires reason in body, logs to audit trail
+ POST /api/invoices/:id/release — releases invoice from held back to previous status, logs to audit trail
+ All routes require requireAuth
+Frontend (/held)
+
+ Table: invoice#, carrier, broker, amount, hold reason, held date, held by, days on hold
+ Days on hold column — color coded: green 0-3, yellow 4-7, red 8+
+ Release button per row — confirmation dialog, optional release note
+ Add Hold from invoice detail page — button that posts to /api/invoices/:id/hold
+ Filter by hold reason
+ Summary bar: total held, total dollar amount held, average days on hold
+ Register /held route in App.tsx — sidebar already shows "Held"

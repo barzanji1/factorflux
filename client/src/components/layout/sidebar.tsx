@@ -70,7 +70,7 @@ const navSections: NavSection[] = [
       { name: "Brokers",     href: "/brokers",          icon: Building2   },
       { name: "C/B Reviews", href: "/credit-checks",    icon: ShieldCheck },
       { name: "MC Check",    href: "/fmcsa-authority",  icon: Radio       },
-      { name: "Held",        href: "/exceptions",       icon: AlertCircle },
+      { name: "Held",        href: "/held",              icon: AlertCircle },
       { name: "Logs",        href: "/audit-log",        icon: Activity    },
     ],
   },

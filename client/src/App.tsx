@@ -43,6 +43,7 @@ import ClientDetail from "@/pages/client-detail";
 import PayoutDetail from "@/pages/payout-detail";
 import LoadDetail from "@/pages/load-detail";
 import Lockbox from "@/pages/lockbox";
+import HeldQueue from "@/pages/held";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -128,6 +129,11 @@ function Router() {
       <Route path="/lockbox">
         <ProtectedRoute>
           <Lockbox />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/held">
+        <ProtectedRoute>
+          <HeldQueue />
         </ProtectedRoute>
       </Route>
       <Route path="/exceptions">
