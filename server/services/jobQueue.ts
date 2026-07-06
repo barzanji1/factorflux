@@ -8,10 +8,11 @@
  * runExtractionJob's own status updates.
  */
 
+import path from "path";
 import { runExtractionJob } from "./documentExtraction";
 import { db } from "../db";
-import { docExtractionJobs } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import { docExtractionJobs, documents } from "../../shared/schema";
+import { eq, inArray } from "drizzle-orm";
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS  = [3_000, 10_000, 30_000] as const;
@@ -88,6 +89,64 @@ class ExtractionJobQueue {
   get pendingCount() {
     return this.queue.length;
   }
+
+  /**
+   * Called once at server startup.
+   * Finds any doc_extraction_jobs rows that are stuck in "queued" or
+   * "processing" (which means the server died mid-job), resets
+   * "processing" back to "queued" in the DB, then re-enqueues all of them.
+   */
+  async recoverStuckJobs(): Promise<void> {
+    try {
+      // 1. Find all stuck jobs
+      const stuck = await db
+        .select({
+          jobId:      docExtractionJobs.id,
+          documentId: docExtractionJobs.documentId,
+          status:     docExtractionJobs.status,
+          filename:   documents.filename,
+          mimeType:   documents.mimeType,
+        })
+        .from(docExtractionJobs)
+        .innerJoin(documents, eq(documents.id, docExtractionJobs.documentId))
+        .where(inArray(docExtractionJobs.status, ["queued", "processing"]));
+
+      if (stuck.length === 0) {
+        console.log("[JobQueue] No stuck OCR jobs found at startup.");
+        return;
+      }
+
+      // 2. Reset any "processing" rows back to "queued" so they're safe to retry
+      const processingIds = stuck
+        .filter(j => j.status === "processing")
+        .map(j => j.jobId);
+
+      if (processingIds.length > 0) {
+        await db
+          .update(docExtractionJobs)
+          .set({ status: "queued", startedAt: null })
+          .where(inArray(docExtractionJobs.id, processingIds));
+      }
+
+      // 3. Re-enqueue all stuck jobs
+      for (const job of stuck) {
+        const filePath = path.join("uploads", job.filename);
+        this.queue.push({ jobId: job.jobId, documentId: job.documentId, filePath, mimeType: job.mimeType, attempt: 1 });
+      }
+
+      console.log(`[JobQueue] Re-enqueued ${stuck.length} stuck OCR job(s) at startup (${processingIds.length} reset from "processing").`);
+
+      // 4. Kick off the worker
+      this._scheduleProcess();
+    } catch (err: any) {
+      console.error("[JobQueue] Failed to recover stuck jobs at startup:", err?.message ?? err);
+    }
+  }
 }
 
 export const jobQueue = new ExtractionJobQueue();
+
+/** Convenience wrapper — call this once at server startup. */
+export async function recoverStuckOcrJobs(): Promise<void> {
+  return jobQueue.recoverStuckJobs();
+}

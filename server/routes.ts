@@ -4254,6 +4254,31 @@ Trucking Pros Financial Team
     try { res.json(await storage.getInvoiceStatusHistoryAll()); } catch (e) { res.status(500).json({ message: "Failed to fetch status history" }); }
   });
 
+  // ─── Stuck OCR jobs monitoring ─────────────────────────────────────────────
+  app.get("/api/documents/stuck-jobs", requireAdmin, async (_req, res) => {
+    try {
+      const stuck = await db
+        .select({
+          jobId:      docExtractionJobs.id,
+          documentId: docExtractionJobs.documentId,
+          status:     docExtractionJobs.status,
+          jobType:    docExtractionJobs.jobType,
+          attemptCount: docExtractionJobs.attemptCount,
+          createdAt:  docExtractionJobs.createdAt,
+          startedAt:  docExtractionJobs.startedAt,
+          filename:   documentsTable.filename,
+          originalName: documentsTable.originalName,
+        })
+        .from(docExtractionJobs)
+        .innerJoin(documentsTable, eq(documentsTable.id, docExtractionJobs.documentId))
+        .where(inArray(docExtractionJobs.status, ["queued", "processing"]));
+
+      res.json({ count: stuck.length, jobs: stuck });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to query stuck jobs", error: err?.message });
+    }
+  });
+
   // ── Demo seed ──────────────────────────────────────────────────────────────
   app.post("/api/admin/seed-demo", requireAdmin, async (req: any, res) => {
     try {

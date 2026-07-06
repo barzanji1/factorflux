@@ -10,6 +10,7 @@ import { setupVite } from "./vite";
 import { serveStatic } from "./static";
 import { log } from "./log";
 import { startAuthorityScheduler } from "./services/authorityScheduler";
+import { recoverStuckOcrJobs } from "./services/jobQueue";
 
 const app = express();
 
@@ -132,6 +133,11 @@ export async function startServer(
   });
 
   startAuthorityScheduler();
+
+  // Recover any jobs that were stuck in "queued"/"processing" before the restart
+  recoverStuckOcrJobs().catch(e =>
+    console.warn("[JobQueue] Startup recovery error:", e?.message)
+  );
 
   import("./services/brokerFollowUpEngine")
     .then(m => m.startReminderScheduler())
