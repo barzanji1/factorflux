@@ -44,6 +44,7 @@ import LoadDetail from "@/pages/load-detail";
 import Lockbox from "@/pages/lockbox";
 import HeldQueue from "@/pages/held";
 import Dispatchers from "@/pages/dispatchers";
+import Trucks from "@/pages/trucks";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -234,6 +235,11 @@ function Router() {
       <Route path="/dispatchers">
         <ProtectedRoute>
           <Dispatchers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/trucks">
+        <ProtectedRoute>
+          <Trucks />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />

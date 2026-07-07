@@ -57,6 +57,8 @@ import {
   cashApplications,
   dispatchers,
   insertDispatcherSchema,
+  trucks,
+  insertTruckSchema,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -4724,6 +4726,75 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deactivating dispatcher:", error);
       res.status(500).json({ message: "Failed to deactivate dispatcher" });
+    }
+  });
+
+  // ─── Trucks ────────────────────────────────────────────────────────────────
+  app.get("/api/trucks", requireAuth, async (req, res) => {
+    try {
+      const { carrierId, dispatcherId, status } = req.query;
+      const conditions: any[] = [];
+      if (carrierId) conditions.push(eq(trucks.carrierId, parseInt(carrierId as string, 10)));
+      if (dispatcherId) conditions.push(eq(trucks.dispatcherId, parseInt(dispatcherId as string, 10)));
+      if (status && status !== "all") conditions.push(eq(trucks.status, status as any));
+      const rows = conditions.length
+        ? await db.select().from(trucks).where(and(...conditions)).orderBy(trucks.truckNumber)
+        : await db.select().from(trucks).orderBy(trucks.truckNumber);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching trucks:", error);
+      res.status(500).json({ message: "Failed to fetch trucks" });
+    }
+  });
+
+  app.get("/api/trucks/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [row] = await db.select().from(trucks).where(eq(trucks.id, id)).limit(1);
+      if (!row) return res.status(404).json({ message: "Truck not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Error fetching truck:", error);
+      res.status(500).json({ message: "Failed to fetch truck" });
+    }
+  });
+
+  app.post("/api/trucks", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const data = insertTruckSchema.parse({ ...req.body, createdBy: userId });
+      const [row] = await db.insert(trucks).values(data).returning();
+      res.status(201).json(row);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error creating truck:", error);
+      res.status(500).json({ message: "Failed to create truck" });
+    }
+  });
+
+  app.patch("/api/trucks/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const data = insertTruckSchema.partial().parse(req.body);
+      const [row] = await db.update(trucks).set(data).where(eq(trucks.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "Truck not found" });
+      res.json(row);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error updating truck:", error);
+      res.status(500).json({ message: "Failed to update truck" });
+    }
+  });
+
+  app.delete("/api/trucks/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [row] = await db.update(trucks).set({ status: "inactive" }).where(eq(trucks.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "Truck not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Error deactivating truck:", error);
+      res.status(500).json({ message: "Failed to deactivate truck" });
     }
   });
 

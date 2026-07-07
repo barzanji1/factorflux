@@ -8,7 +8,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,6 +68,7 @@ const navSections: NavSection[] = [
     title: "Operations",
     items: [
       { name: "Dispatchers", href: "/dispatchers", icon: Headset },
+      { name: "Trucks",      href: "/trucks",      icon: Truck  },
     ],
   },
   {

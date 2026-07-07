@@ -1322,6 +1322,32 @@ export const insertDispatcherSchema = createInsertSchema(dispatchers).omit({
 export type Dispatcher = typeof dispatchers.$inferSelect;
 export type InsertDispatcher = z.infer<typeof insertDispatcherSchema>;
 
+// ─── Trucks ───────────────────────────────────────────────────────────────────
+export const trucks = pgTable("trucks", {
+  id: serial("id").primaryKey(),
+  truckNumber: varchar("truck_number").notNull(),
+  vin: varchar("vin"),
+  make: varchar("make"),
+  model: varchar("model"),
+  year: integer("year"),
+  licensePlate: varchar("license_plate"),
+  state: varchar("state"),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "set null" }),
+  dispatcherId: integer("dispatcher_id").references(() => dispatchers.id, { onDelete: "set null" }),
+  status: varchar("status", { enum: ["active", "inactive", "out-of-service"] }).default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const insertTruckSchema = createInsertSchema(trucks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Truck = typeof trucks.$inferSelect;
+export type InsertTruck = z.infer<typeof insertTruckSchema>;
+
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 
 export const workflowConfigs = pgTable("workflow_configs", {
