@@ -2,11 +2,9 @@ import {
   users,
   clients,
   debtors,
-  debtorContacts,
   loads,
   invoices,
   documents,
-  documentLinks,
   invoiceStatusHistory,
   eventLedger,
   activities,
@@ -56,8 +54,6 @@ import {
   type InsertInvoice,
   type Document,
   type InsertDocument,
-  type DocumentLink,
-  type InsertDocumentLink,
   type InvoiceStatusHistory,
   type InsertInvoiceStatusHistory,
   type EventLedger,
@@ -158,8 +154,6 @@ export interface IStorage {
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document>;
   deleteDocument(id: number): Promise<void>;
-  getDocumentLinks(documentId: number): Promise<DocumentLink[]>;
-  linkDocument(link: InsertDocumentLink): Promise<DocumentLink>;
 
   // Activity operations
   getActivities(limit?: number): Promise<Activity[]>;
@@ -754,54 +748,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocumentsByEntity(entityType: string, entityId: number): Promise<Document[]> {
-    const rows = await db
-      .select({
-        id: documents.id,
-        companyId: documents.companyId,
-        filename: documents.filename,
-        originalName: documents.originalName,
-        mimeType: documents.mimeType,
-        size: documents.size,
-        storageKey: documents.storageKey,
-        documentType: documents.documentType,
-        loadId: documents.loadId,
-        invoiceId: documents.invoiceId,
-        uploadedBy: documents.uploadedBy,
-        sourceChannel: documents.sourceChannel,
-        status: documents.status,
-        createdAt: documents.createdAt,
-      })
-      .from(documentLinks)
-      .innerJoin(documents, eq(documentLinks.documentId, documents.id))
-      .where(
-        and(
-          eq(documentLinks.entityType, entityType as any),
-          eq(documentLinks.entityId, entityId)
-        )
-      )
-      .orderBy(desc(documents.createdAt));
-
-    return rows as Document[];
+    if (entityType === "invoice") {
+      return this.getDocumentsByInvoice(entityId);
+    }
+    if (entityType === "load") {
+      return this.getDocumentsByLoad(entityId);
+    }
+    return [];
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
     const [newDocument] = await db.insert(documents).values(document as any).returning();
-
-    if (newDocument.invoiceId) {
-      await this.linkDocument({
-        documentId: newDocument.id,
-        entityType: "invoice",
-        entityId: newDocument.invoiceId,
-      });
-    }
-
-    if (newDocument.loadId) {
-      await this.linkDocument({
-        documentId: newDocument.id,
-        entityType: "load",
-        entityId: newDocument.loadId,
-      });
-    }
 
     await this.createEvent({
       entityType: "document",
@@ -832,19 +789,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDocument(id: number): Promise<void> {
     await db.delete(documents).where(eq(documents.id, id));
-  }
-
-  async getDocumentLinks(documentId: number): Promise<DocumentLink[]> {
-    return await db
-      .select()
-      .from(documentLinks)
-      .where(eq(documentLinks.documentId, documentId))
-      .orderBy(desc(documentLinks.createdAt));
-  }
-
-  async linkDocument(link: InsertDocumentLink): Promise<DocumentLink> {
-    const [newLink] = await db.insert(documentLinks).values(link).returning();
-    return newLink;
   }
 
   // Activity operations

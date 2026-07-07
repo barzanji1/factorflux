@@ -1784,7 +1784,7 @@ ${message}
     }
   });
 
-  app.patch("/api/fuel-card-applications/:id", async (req, res) => {
+  app.patch("/api/fuel-card-applications/:id", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.claims?.sub;
       if (!userId) {

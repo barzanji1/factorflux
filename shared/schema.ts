@@ -65,54 +65,6 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// New addition to users table for role-based permissions
-export const roles = pgTable("roles", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", {
-    enum: [
-      "admin",
-      "operations_manager",
-      "funding_specialist",
-      "underwriter",
-      "account_manager",
-      "client_user",
-    ],
-  }).notNull().unique(),
-  description: text("description"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const permissions = pgTable("permissions", {
-  id: serial("id").primaryKey(),
-  key: varchar("key").notNull().unique(),
-  description: text("description"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const userRoles = pgTable(
-  "user_roles",
-  {
-    userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-    roleId: integer("role_id").references(() => roles.id, { onDelete: "cascade" }).notNull(),
-    createdAt: timestamp("created_at").defaultNow(),
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.userId, table.roleId] }),
-  })
-);
-
-export const rolePermissions = pgTable(
-  "role_permissions",
-  {
-    roleId: integer("role_id").references(() => roles.id, { onDelete: "cascade" }).notNull(),
-    permissionId: integer("permission_id").references(() => permissions.id, { onDelete: "cascade" }).notNull(),
-    createdAt: timestamp("created_at").defaultNow(),
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.roleId, table.permissionId] }),
-  })
-);
-
 // Clients table
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
@@ -152,20 +104,6 @@ export const debtors = pgTable("debtors", {
     .default("active")
     .notNull(),
   notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const debtorContacts = pgTable("debtor_contacts", {
-  id: serial("id").primaryKey(),
-  debtorId: integer("debtor_id")
-    .references(() => debtors.id, { onDelete: "cascade" })
-    .notNull(),
-  fullName: varchar("full_name").notNull(),
-  title: varchar("title"),
-  email: varchar("email"),
-  phone: varchar("phone"),
-  isPrimary: boolean("is_primary").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -315,18 +253,6 @@ export const documents = pgTable("documents", {
   }).default("processing").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
-export const documentLinks = pgTable("document_links", {
-  id: serial("id").primaryKey(),
-  documentId: integer("document_id")
-    .references(() => documents.id, { onDelete: "cascade" })
-    .notNull(),
-  entityType: varchar("entity_type", {
-    enum: ["client", "debtor", "invoice", "load"],
-  }).notNull(),
-  entityId: integer("entity_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
 // New addition for document processing status
 export const invoiceStatusHistory = pgTable("invoice_status_history", {
   id: serial("id").primaryKey(),
@@ -578,33 +504,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   notifications: many(notifications),
 }));
 
-// New relations for role-based permissions 3/29/26
-export const rolesRelations = relations(roles, ({ many }) => ({
-  userRoles: many(userRoles),
-  rolePermissions: many(rolePermissions),
-}));
-
-export const permissionsRelations = relations(permissions, ({ many }) => ({
-  rolePermissions: many(rolePermissions),
-}));
-
-export const userRolesRelations = relations(userRoles, ({ one }) => ({
-  user: one(users, { fields: [userRoles.userId], references: [users.id] }),
-  role: one(roles, { fields: [userRoles.roleId], references: [roles.id] }),
-}));
-
-export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
-  role: one(roles, { fields: [rolePermissions.roleId], references: [roles.id] }),
-  permission: one(permissions, { fields: [rolePermissions.permissionId], references: [permissions.id] }),
-}));
-
 export const debtorsRelations = relations(debtors, ({ many }) => ({
-  contacts: many(debtorContacts),
   invoices: many(invoices),
-}));
-
-export const debtorContactsRelations = relations(debtorContacts, ({ one }) => ({
-  debtor: one(debtors, { fields: [debtorContacts.debtorId], references: [debtors.id] }),
 }));
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -628,11 +529,6 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   approvedByUser: one(users, { fields: [invoices.approvedBy], references: [users.id] }),
   assignedToUser: one(users, { fields: [invoices.assignedTo], references: [users.id] }),
   documents: many(documents),
-}));
-
-// Added new document relations 3/29/26
-export const documentLinksRelations = relations(documentLinks, ({ one }) => ({
-  document: one(documents, { fields: [documentLinks.documentId], references: [documents.id] }),
 }));
 
 export const invoiceStatusHistoryRelations = relations(invoiceStatusHistory, ({ one }) => ({
@@ -702,32 +598,10 @@ export const insertSupportMessageSchema = createInsertSchema(supportMessages).om
   id: true,
   createdAt: true,
 });
-// New insert schemas 3/29/26
-export const insertRoleSchema = createInsertSchema(roles).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertPermissionSchema = createInsertSchema(permissions).omit({
-  id: true,
-  createdAt: true,
-});
-
 export const insertDebtorSchema = createInsertSchema(debtors).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-});
-
-export const insertDebtorContactSchema = createInsertSchema(debtorContacts).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertDocumentLinkSchema = createInsertSchema(documentLinks).omit({
-  id: true,
-  createdAt: true,
 });
 
 export const insertInvoiceStatusHistorySchema = createInsertSchema(invoiceStatusHistory).omit({
@@ -848,21 +722,8 @@ export const updateUserProfileSchema = createInsertSchema(users).pick({
   department: z.string().optional(),
 });
 
-// User settings update schema 3/29/26
-export type Role = typeof roles.$inferSelect;
-export type InsertRole = z.infer<typeof insertRoleSchema>;
-
-export type Permission = typeof permissions.$inferSelect;
-export type InsertPermission = z.infer<typeof insertPermissionSchema>;
-
 export type Debtor = typeof debtors.$inferSelect;
 export type InsertDebtor = z.infer<typeof insertDebtorSchema>;
-
-export type DebtorContact = typeof debtorContacts.$inferSelect;
-export type InsertDebtorContact = z.infer<typeof insertDebtorContactSchema>;
-
-export type DocumentLink = typeof documentLinks.$inferSelect;
-export type InsertDocumentLink = z.infer<typeof insertDocumentLinkSchema>;
 
 export type InvoiceStatusHistory = typeof invoiceStatusHistory.$inferSelect;
 export type InsertInvoiceStatusHistory = z.infer<typeof insertInvoiceStatusHistorySchema>;
