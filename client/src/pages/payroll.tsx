@@ -169,7 +169,11 @@ export default function Payroll() {
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/payroll", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/payroll"] }); setDialogOpen(false); form.reset(); toast({ title: "Payroll entry created" }); },
-    onError: () => toast({ title: "Failed to create entry", variant: "destructive" }),
+    onError: async (e: any) => {
+      let msg = "Failed to create entry";
+      try { const j = await e?.response?.json?.(); if (j?.message) msg = j.message; } catch {}
+      toast({ title: msg, variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
@@ -222,11 +226,17 @@ export default function Payroll() {
     const gross = calcGross(data.regularHours, data.overtimeHours, data.hourlyRate);
     const dedTotal = data.deductions.reduce((s, d) => s + Number(d.amount), 0);
     const payload = {
-      ...data,
+      employeeId: data.employeeId,
+      payPeriodStart: data.payPeriodStart,
+      payPeriodEnd: data.payPeriodEnd,
+      regularHours: String(data.regularHours),
+      overtimeHours: String(data.overtimeHours),
+      hourlyRate: String(data.hourlyRate),
       grossPay: gross.toFixed(2),
-      deductions: dedTotal.toFixed(2),
+      deductionsTotal: dedTotal.toFixed(2),
       netPay: (gross - dedTotal).toFixed(2),
-      deductions: data.deductions,
+      notes: data.notes ?? "",
+      deductionItems: data.deductions,
     };
     if (editing) updateMutation.mutate({ id: editing.id, data: payload });
     else createMutation.mutate(payload);

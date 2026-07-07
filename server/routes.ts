@@ -4769,24 +4769,35 @@ Trucking Pros Financial Team
 
   app.post("/api/payroll", requireAuth, async (req: any, res) => {
     try {
+      console.log("[POST /api/payroll] req.body:", JSON.stringify(req.body, null, 2));
       const userId = req.user?.claims?.sub ?? req.user?.id;
-      const { deductions: deductionList, payPeriodStart, payPeriodEnd, ...rest } = req.body;
+      const { deductionItems, deductionsTotal, payPeriodStart, payPeriodEnd, ...rest } = req.body;
       const data = insertPayrollEntrySchema.parse({
         ...rest,
+        deductions: deductionsTotal ?? "0",
         payPeriodStart: new Date(payPeriodStart),
         payPeriodEnd: new Date(payPeriodEnd),
         createdBy: userId,
       });
       const [entry] = await db.insert(payrollEntries).values(data).returning();
-      if (Array.isArray(deductionList) && deductionList.length > 0) {
-        const rows = deductionList.map((d: any) => insertPayrollDeductionSchema.parse({ ...d, payrollEntryId: entry.id }));
+      const deductionList = Array.isArray(deductionItems) ? deductionItems : [];
+      if (deductionList.length > 0) {
+        const rows = deductionList.map((d: any) => insertPayrollDeductionSchema.parse({
+          deductionType: d.deductionType,
+          amount: String(d.amount),
+          description: d.description ?? null,
+          payrollEntryId: entry.id,
+        }));
         await db.insert(payrollDeductions).values(rows);
       }
       const deductions = await db.select().from(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, entry.id));
       res.status(201).json({ ...entry, deductions });
     } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      console.error("Error creating payroll entry:", error);
+      if (error instanceof z.ZodError) {
+        console.error("[POST /api/payroll] Zod validation error:", JSON.stringify(error.errors, null, 2));
+        return res.status(400).json({ message: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), errors: error.errors });
+      }
+      console.error("[POST /api/payroll] Error creating payroll entry:", error);
       res.status(500).json({ message: "Failed to create payroll entry" });
     }
   });
@@ -4796,32 +4807,47 @@ Trucking Pros Financial Team
       const id = parseInt(req.params.id, 10);
       const [existing] = await db.select().from(payrollEntries).where(eq(payrollEntries.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "Payroll entry not found" });
-      const { status, deductions: deductionList, payPeriodStart, payPeriodEnd, ...rest } = req.body;
+      const { status, deductionItems, deductionsTotal, payPeriodStart, payPeriodEnd, ...rest } = req.body;
       const userRole = req.user?.role;
-      // approve/pay requires admin or manager
       if ((status === "approved" || status === "paid") && userRole !== "admin" && userRole !== "manager") {
         return res.status(403).json({ message: "Only managers/admins can approve or mark paid" });
       }
       if (existing.status !== "draft" && !["approved", "paid"].includes(status ?? "")) {
         return res.status(400).json({ message: "Only draft entries can be edited" });
       }
-      const updates: any = { ...rest };
+      const updates: any = {};
+      if (rest.employeeId) updates.employeeId = rest.employeeId;
+      if (rest.regularHours !== undefined) updates.regularHours = String(rest.regularHours);
+      if (rest.overtimeHours !== undefined) updates.overtimeHours = String(rest.overtimeHours);
+      if (rest.hourlyRate !== undefined) updates.hourlyRate = String(rest.hourlyRate);
+      if (rest.grossPay !== undefined) updates.grossPay = String(rest.grossPay);
+      if (rest.netPay !== undefined) updates.netPay = String(rest.netPay);
+      if (rest.notes !== undefined) updates.notes = rest.notes;
+      if (deductionsTotal !== undefined) updates.deductions = String(deductionsTotal);
       if (status) updates.status = status;
       if (status === "paid" && !existing.paidAt) updates.paidAt = new Date();
       if (payPeriodStart) updates.payPeriodStart = new Date(payPeriodStart);
       if (payPeriodEnd) updates.payPeriodEnd = new Date(payPeriodEnd);
       const [entry] = await db.update(payrollEntries).set(updates).where(eq(payrollEntries.id, id)).returning();
-      if (Array.isArray(deductionList)) {
+      if (Array.isArray(deductionItems)) {
         await db.delete(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, id));
-        if (deductionList.length > 0) {
-          const rows = deductionList.map((d: any) => insertPayrollDeductionSchema.parse({ ...d, payrollEntryId: id }));
+        if (deductionItems.length > 0) {
+          const rows = deductionItems.map((d: any) => insertPayrollDeductionSchema.parse({
+            deductionType: d.deductionType,
+            amount: String(d.amount),
+            description: d.description ?? null,
+            payrollEntryId: id,
+          }));
           await db.insert(payrollDeductions).values(rows);
         }
       }
       const deductions = await db.select().from(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, id));
       res.json({ ...entry, deductions });
     } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      if (error instanceof z.ZodError) {
+        console.error("[PATCH /api/payroll] Zod error:", JSON.stringify(error.errors, null, 2));
+        return res.status(400).json({ message: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), errors: error.errors });
+      }
       console.error("Error updating payroll entry:", error);
       res.status(500).json({ message: "Failed to update payroll entry" });
     }
