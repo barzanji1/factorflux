@@ -65,6 +65,10 @@ import {
   payrollDeductions,
   insertPayrollEntrySchema,
   insertPayrollDeductionSchema,
+  bulkInvoiceBatches,
+  bulkInvoiceItems,
+  insertBulkInvoiceBatchSchema,
+  insertBulkInvoiceItemSchema,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -4732,6 +4736,111 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deactivating dispatcher:", error);
       res.status(500).json({ message: "Failed to deactivate dispatcher" });
+    }
+  });
+
+  // ─── Bulk Invoices ─────────────────────────────────────────────────────────
+  app.get("/api/bulk-invoices", requireAuth, async (req, res) => {
+    try {
+      const { carrierId, status } = req.query;
+      const conditions: any[] = [];
+      if (carrierId) conditions.push(eq(bulkInvoiceBatches.carrierId, parseInt(carrierId as string, 10)));
+      if (status && status !== "all") conditions.push(eq(bulkInvoiceBatches.status, status as any));
+      const rows = conditions.length
+        ? await db.select().from(bulkInvoiceBatches).where(and(...conditions)).orderBy(desc(bulkInvoiceBatches.createdAt))
+        : await db.select().from(bulkInvoiceBatches).orderBy(desc(bulkInvoiceBatches.createdAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching bulk invoices:", error);
+      res.status(500).json({ message: "Failed to fetch bulk invoices" });
+    }
+  });
+
+  app.get("/api/bulk-invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [batch] = await db.select().from(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id)).limit(1);
+      if (!batch) return res.status(404).json({ message: "Batch not found" });
+      const items = await db.select().from(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, id));
+      res.json({ ...batch, items });
+    } catch (error) {
+      console.error("Error fetching bulk invoice batch:", error);
+      res.status(500).json({ message: "Failed to fetch batch" });
+    }
+  });
+
+  app.post("/api/bulk-invoices", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const { items: itemList, ...batchBody } = req.body;
+      const parsedItems = Array.isArray(itemList) ? itemList : [];
+      const totalAmount = parsedItems.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+      const batch = insertBulkInvoiceBatchSchema.parse({
+        batchName: batchBody.batchName,
+        carrierId: parseInt(batchBody.carrierId, 10),
+        totalAmount: totalAmount.toFixed(2),
+        invoiceCount: parsedItems.length,
+        status: "draft",
+        createdBy: userId,
+      });
+      const [created] = await db.insert(bulkInvoiceBatches).values(batch).returning();
+      if (parsedItems.length > 0) {
+        const rows = parsedItems.map((i: any) => insertBulkInvoiceItemSchema.parse({
+          batchId: created.id,
+          invoiceNumber: i.invoiceNumber,
+          loadNumber: i.loadNumber ?? null,
+          amount: String(Number(i.amount).toFixed(2)),
+          brokerName: i.brokerName ?? null,
+          status: "pending",
+          notes: i.notes ?? null,
+        }));
+        await db.insert(bulkInvoiceItems).values(rows);
+      }
+      const items = await db.select().from(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, created.id));
+      res.status(201).json({ ...created, items });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error("[POST /api/bulk-invoices] Zod error:", error.errors);
+        return res.status(400).json({ message: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), errors: error.errors });
+      }
+      console.error("Error creating bulk invoice batch:", error);
+      res.status(500).json({ message: "Failed to create batch" });
+    }
+  });
+
+  app.patch("/api/bulk-invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select().from(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Batch not found" });
+      const { status, batchName } = req.body;
+      const updates: any = {};
+      if (batchName) updates.batchName = batchName;
+      if (status) {
+        updates.status = status;
+        if (status === "submitted" && !existing.submittedAt) updates.submittedAt = new Date();
+      }
+      const [updated] = await db.update(bulkInvoiceBatches).set(updates).where(eq(bulkInvoiceBatches.id, id)).returning();
+      const items = await db.select().from(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, id));
+      res.json({ ...updated, items });
+    } catch (error) {
+      console.error("Error updating bulk invoice batch:", error);
+      res.status(500).json({ message: "Failed to update batch" });
+    }
+  });
+
+  app.delete("/api/bulk-invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select().from(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Batch not found" });
+      if (existing.status !== "draft") return res.status(400).json({ message: "Only draft batches can be deleted" });
+      await db.delete(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, id));
+      await db.delete(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id));
+      res.json({ message: "Deleted" });
+    } catch (error) {
+      console.error("Error deleting bulk invoice batch:", error);
+      res.status(500).json({ message: "Failed to delete batch" });
     }
   });
 

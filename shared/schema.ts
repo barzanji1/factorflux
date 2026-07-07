@@ -1408,6 +1408,38 @@ export type InsertPayrollEntry = z.infer<typeof insertPayrollEntrySchema>;
 export type PayrollDeduction = typeof payrollDeductions.$inferSelect;
 export type InsertPayrollDeduction = z.infer<typeof insertPayrollDeductionSchema>;
 
+// ─── Bulk Invoices ────────────────────────────────────────────────────────────
+export const bulkInvoiceBatches = pgTable("bulk_invoice_batches", {
+  id: serial("id").primaryKey(),
+  batchName: varchar("batch_name").notNull(),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 14, scale: 2 }).default("0").notNull(),
+  invoiceCount: integer("invoice_count").default(0).notNull(),
+  status: varchar("status", { enum: ["draft", "submitted", "processing", "completed", "failed"] }).default("draft").notNull(),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const bulkInvoiceItems = pgTable("bulk_invoice_items", {
+  id: serial("id").primaryKey(),
+  batchId: integer("batch_id").references(() => bulkInvoiceBatches.id, { onDelete: "cascade" }).notNull(),
+  invoiceNumber: varchar("invoice_number").notNull(),
+  loadNumber: varchar("load_number"),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  brokerName: varchar("broker_name"),
+  status: varchar("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
+  notes: text("notes"),
+});
+
+export const insertBulkInvoiceBatchSchema = createInsertSchema(bulkInvoiceBatches).omit({ id: true, createdAt: true });
+export const insertBulkInvoiceItemSchema = createInsertSchema(bulkInvoiceItems).omit({ id: true });
+
+export type BulkInvoiceBatch = typeof bulkInvoiceBatches.$inferSelect;
+export type InsertBulkInvoiceBatch = z.infer<typeof insertBulkInvoiceBatchSchema>;
+export type BulkInvoiceItem = typeof bulkInvoiceItems.$inferSelect;
+export type InsertBulkInvoiceItem = z.infer<typeof insertBulkInvoiceItemSchema>;
+
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 
 export const workflowConfigs = pgTable("workflow_configs", {

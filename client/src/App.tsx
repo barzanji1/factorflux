@@ -47,6 +47,7 @@ import Dispatchers from "@/pages/dispatchers";
 import Trucks from "@/pages/trucks";
 import BankTransfers from "@/pages/bank-transfers";
 import Payroll from "@/pages/payroll";
+import BulkInvoices from "@/pages/bulk-invoices";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -252,6 +253,11 @@ function Router() {
       <Route path="/payroll">
         <ProtectedRoute>
           <Payroll />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/bulk-invoices">
+        <ProtectedRoute>
+          <BulkInvoices />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />
