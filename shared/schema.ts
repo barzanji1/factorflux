@@ -1440,6 +1440,25 @@ export type InsertBulkInvoiceBatch = z.infer<typeof insertBulkInvoiceBatchSchema
 export type BulkInvoiceItem = typeof bulkInvoiceItems.$inferSelect;
 export type InsertBulkInvoiceItem = z.infer<typeof insertBulkInvoiceItemSchema>;
 
+// ─── Release Letters ──────────────────────────────────────────────────────────
+export const releaseLetters = pgTable("release_letters", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  letterType: varchar("letter_type", { enum: ["standard", "conditional", "final"] }).default("standard").notNull(),
+  status: varchar("status", { enum: ["draft", "sent", "acknowledged"] }).default("draft").notNull(),
+  sentAt: timestamp("sent_at"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const insertReleaseLetterSchema = createInsertSchema(releaseLetters).omit({ id: true, createdAt: true });
+export type ReleaseLetter = typeof releaseLetters.$inferSelect;
+export type InsertReleaseLetter = z.infer<typeof insertReleaseLetterSchema>;
+
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 
 export const workflowConfigs = pgTable("workflow_configs", {

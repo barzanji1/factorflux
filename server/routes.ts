@@ -69,6 +69,8 @@ import {
   bulkInvoiceItems,
   insertBulkInvoiceBatchSchema,
   insertBulkInvoiceItemSchema,
+  releaseLetters,
+  insertReleaseLetterSchema,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -4736,6 +4738,126 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deactivating dispatcher:", error);
       res.status(500).json({ message: "Failed to deactivate dispatcher" });
+    }
+  });
+
+  // ─── Release Letters ───────────────────────────────────────────────────────
+  app.get("/api/release-letters", requireAuth, async (req, res) => {
+    try {
+      const { carrierId, status, brokerId, dateFrom, dateTo } = req.query;
+      const conditions: any[] = [];
+      if (carrierId) conditions.push(eq(releaseLetters.carrierId, parseInt(carrierId as string, 10)));
+      if (brokerId) conditions.push(eq(releaseLetters.brokerId, parseInt(brokerId as string, 10)));
+      if (status && status !== "all") conditions.push(eq(releaseLetters.status, status as any));
+      if (dateFrom) conditions.push(sql`${releaseLetters.createdAt} >= ${new Date(dateFrom as string)}`);
+      if (dateTo) conditions.push(sql`${releaseLetters.createdAt} <= ${new Date(dateTo as string)}`);
+      const rows = conditions.length
+        ? await db.select().from(releaseLetters).where(and(...conditions)).orderBy(desc(releaseLetters.createdAt))
+        : await db.select().from(releaseLetters).orderBy(desc(releaseLetters.createdAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching release letters:", error);
+      res.status(500).json({ message: "Failed to fetch release letters" });
+    }
+  });
+
+  app.get("/api/release-letters/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [letter] = await db.select().from(releaseLetters).where(eq(releaseLetters.id, id)).limit(1);
+      if (!letter) return res.status(404).json({ message: "Release letter not found" });
+      res.json(letter);
+    } catch (error) {
+      console.error("Error fetching release letter:", error);
+      res.status(500).json({ message: "Failed to fetch release letter" });
+    }
+  });
+
+  app.post("/api/release-letters", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const { invoiceId, carrierId, brokerId, letterType, content } = req.body;
+      const data = insertReleaseLetterSchema.parse({
+        invoiceId: invoiceId ? parseInt(invoiceId, 10) : null,
+        carrierId: parseInt(carrierId, 10),
+        brokerId: brokerId ? parseInt(brokerId, 10) : null,
+        letterType: letterType ?? "standard",
+        status: "draft",
+        content,
+        createdBy: userId,
+      });
+      const [letter] = await db.insert(releaseLetters).values(data).returning();
+      res.status(201).json(letter);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") });
+      }
+      console.error("Error creating release letter:", error);
+      res.status(500).json({ message: "Failed to create release letter" });
+    }
+  });
+
+  app.patch("/api/release-letters/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select().from(releaseLetters).where(eq(releaseLetters.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Release letter not found" });
+      const { status, content, letterType } = req.body;
+      const updates: any = {};
+      if (content !== undefined) updates.content = content;
+      if (letterType) updates.letterType = letterType;
+      if (status) {
+        updates.status = status;
+        if (status === "acknowledged" && !existing.acknowledgedAt) updates.acknowledgedAt = new Date();
+      }
+      const [updated] = await db.update(releaseLetters).set(updates).where(eq(releaseLetters.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating release letter:", error);
+      res.status(500).json({ message: "Failed to update release letter" });
+    }
+  });
+
+  app.post("/api/release-letters/:id/send", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [letter] = await db.select().from(releaseLetters).where(eq(releaseLetters.id, id)).limit(1);
+      if (!letter) return res.status(404).json({ message: "Release letter not found" });
+      if (letter.status === "sent") return res.status(400).json({ message: "Letter already sent" });
+
+      // Fetch broker email if brokerId present
+      let brokerEmail: string | null = null;
+      let brokerName = "Broker";
+      if (letter.brokerId) {
+        const [broker] = await db.select().from(brokers).where(eq(brokers.id, letter.brokerId)).limit(1);
+        if (broker) { brokerEmail = broker.email; brokerName = broker.name; }
+      }
+      // Override with provided email if passed
+      const toEmail = req.body?.email ?? brokerEmail;
+      if (!toEmail) return res.status(400).json({ message: "No broker email available. Add email to broker profile or pass email in body." });
+
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL ?? "noreply@factorflux.com";
+      const subject = `Release Letter — ${letter.letterType.charAt(0).toUpperCase() + letter.letterType.slice(1)}`;
+      const html = `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:24px;">
+        <h2 style="color:#1a1a1a;">Release Letter</h2>
+        <p><strong>Type:</strong> ${letter.letterType.charAt(0).toUpperCase() + letter.letterType.slice(1)}</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;" />
+        <div style="white-space:pre-wrap;line-height:1.6;">${letter.content}</div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;" />
+        <p style="color:#6b7280;font-size:13px;">Sent via FactorFlux — Trucking Pros Financial</p>
+      </div>`;
+
+      const sent = await sendEmail({ to: toEmail, from: fromEmail, subject, html, text: letter.content });
+      const [updated] = await db.update(releaseLetters)
+        .set({ status: "sent", sentAt: new Date() })
+        .where(eq(releaseLetters.id, id))
+        .returning();
+
+      console.log(`[release-letters] ${sent ? "✓ sent" : "⚠ log-only"} → ${toEmail}`);
+      res.json({ ...updated, emailSent: sent, to: toEmail });
+    } catch (error) {
+      console.error("Error sending release letter:", error);
+      res.status(500).json({ message: "Failed to send release letter" });
     }
   });
 
