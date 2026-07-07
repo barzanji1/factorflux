@@ -55,6 +55,8 @@ import {
   debtors,
   paymentApplicationLines,
   cashApplications,
+  dispatchers,
+  insertDispatcherSchema,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -4650,6 +4652,79 @@ Trucking Pros Financial Team
 
       res.json({ year, months: result });
     } catch (e) { res.status(500).json({ message: "Failed to generate monthly summary" }); }
+  });
+
+  // ─── Dispatchers ──────────────────────────────────────────────────────────
+  app.get("/api/dispatchers", requireAuth, async (req, res) => {
+    try {
+      const { carrierId, status } = req.query;
+      let query = db.select().from(dispatchers);
+      const conditions: any[] = [];
+      if (carrierId) conditions.push(eq(dispatchers.carrierId, parseInt(carrierId as string, 10)));
+      if (status && status !== "all") conditions.push(eq(dispatchers.status, status as any));
+      const rows = conditions.length
+        ? await db.select().from(dispatchers).where(and(...conditions)).orderBy(dispatchers.lastName)
+        : await db.select().from(dispatchers).orderBy(dispatchers.lastName);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching dispatchers:", error);
+      res.status(500).json({ message: "Failed to fetch dispatchers" });
+    }
+  });
+
+  app.get("/api/dispatchers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [row] = await db.select().from(dispatchers).where(eq(dispatchers.id, id)).limit(1);
+      if (!row) return res.status(404).json({ message: "Dispatcher not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Error fetching dispatcher:", error);
+      res.status(500).json({ message: "Failed to fetch dispatcher" });
+    }
+  });
+
+  app.post("/api/dispatchers", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const data = insertDispatcherSchema.parse({ ...req.body, createdBy: userId });
+      const [row] = await db.insert(dispatchers).values(data).returning();
+      res.status(201).json(row);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error creating dispatcher:", error);
+      res.status(500).json({ message: "Failed to create dispatcher" });
+    }
+  });
+
+  app.patch("/api/dispatchers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const data = insertDispatcherSchema.partial().parse(req.body);
+      const [row] = await db.update(dispatchers).set(data).where(eq(dispatchers.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "Dispatcher not found" });
+      res.json(row);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error updating dispatcher:", error);
+      res.status(500).json({ message: "Failed to update dispatcher" });
+    }
+  });
+
+  app.delete("/api/dispatchers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [row] = await db
+        .update(dispatchers)
+        .set({ status: "inactive" })
+        .where(eq(dispatchers.id, id))
+        .returning();
+      if (!row) return res.status(404).json({ message: "Dispatcher not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Error deactivating dispatcher:", error);
+      res.status(500).json({ message: "Failed to deactivate dispatcher" });
+    }
   });
 
   const httpServer = createServer(app);

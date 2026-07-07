@@ -43,6 +43,7 @@ import PayoutDetail from "@/pages/payout-detail";
 import LoadDetail from "@/pages/load-detail";
 import Lockbox from "@/pages/lockbox";
 import HeldQueue from "@/pages/held";
+import Dispatchers from "@/pages/dispatchers";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -228,6 +229,11 @@ function Router() {
       <Route path="/loads/:id">
         <ProtectedRoute>
           <LoadDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dispatchers">
+        <ProtectedRoute>
+          <Dispatchers />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />

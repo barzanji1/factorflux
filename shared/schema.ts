@@ -1300,6 +1300,28 @@ export const insertBrokerFollowUpTemplateSchema = createInsertSchema(brokerFollo
 export type BrokerFollowUpTemplate = typeof brokerFollowUpTemplates.$inferSelect;
 export type InsertBrokerFollowUpTemplate = z.infer<typeof insertBrokerFollowUpTemplateSchema>;
 
+// ─── Dispatchers ──────────────────────────────────────────────────────────────
+export const dispatchers = pgTable("dispatchers", {
+  id: serial("id").primaryKey(),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "set null" }),
+  status: varchar("status", { enum: ["active", "inactive"] }).default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const insertDispatcherSchema = createInsertSchema(dispatchers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Dispatcher = typeof dispatchers.$inferSelect;
+export type InsertDispatcher = z.infer<typeof insertDispatcherSchema>;
+
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 
 export const workflowConfigs = pgTable("workflow_configs", {
