@@ -8,7 +8,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -92,6 +92,7 @@ const navSections: NavSection[] = [
   {
     title: "Admin",
     items: [
+      { name: "Payroll",        href: "/payroll",         icon: BadgeDollarSign, role: "manager" },
       { name: "Vault",          href: "/vault",           icon: Lock                           },
       { name: "Help",             href: "/help",            icon: LifeBuoy                       },
       { name: "Settings",         href: "/admin",           icon: Settings2,  role: "manager"    },

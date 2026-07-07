@@ -61,6 +61,10 @@ import {
   insertTruckSchema,
   bankTransfers,
   insertBankTransferSchema,
+  payrollEntries,
+  payrollDeductions,
+  insertPayrollEntrySchema,
+  insertPayrollDeductionSchema,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -4728,6 +4732,113 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deactivating dispatcher:", error);
       res.status(500).json({ message: "Failed to deactivate dispatcher" });
+    }
+  });
+
+  // ─── Payroll ───────────────────────────────────────────────────────────────
+  app.get("/api/payroll", requireAuth, async (req, res) => {
+    try {
+      const { employeeId, status, dateFrom, dateTo } = req.query;
+      const conditions: any[] = [];
+      if (employeeId) conditions.push(eq(payrollEntries.employeeId, employeeId as string));
+      if (status && status !== "all") conditions.push(eq(payrollEntries.status, status as any));
+      if (dateFrom) conditions.push(sql`${payrollEntries.payPeriodStart} >= ${new Date(dateFrom as string)}`);
+      if (dateTo) conditions.push(sql`${payrollEntries.payPeriodEnd} <= ${new Date(dateTo as string)}`);
+      const rows = conditions.length
+        ? await db.select().from(payrollEntries).where(and(...conditions)).orderBy(desc(payrollEntries.payPeriodStart))
+        : await db.select().from(payrollEntries).orderBy(desc(payrollEntries.payPeriodStart));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching payroll:", error);
+      res.status(500).json({ message: "Failed to fetch payroll" });
+    }
+  });
+
+  app.get("/api/payroll/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [entry] = await db.select().from(payrollEntries).where(eq(payrollEntries.id, id)).limit(1);
+      if (!entry) return res.status(404).json({ message: "Payroll entry not found" });
+      const deductions = await db.select().from(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, id));
+      res.json({ ...entry, deductions });
+    } catch (error) {
+      console.error("Error fetching payroll entry:", error);
+      res.status(500).json({ message: "Failed to fetch payroll entry" });
+    }
+  });
+
+  app.post("/api/payroll", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const { deductions: deductionList, payPeriodStart, payPeriodEnd, ...rest } = req.body;
+      const data = insertPayrollEntrySchema.parse({
+        ...rest,
+        payPeriodStart: new Date(payPeriodStart),
+        payPeriodEnd: new Date(payPeriodEnd),
+        createdBy: userId,
+      });
+      const [entry] = await db.insert(payrollEntries).values(data).returning();
+      if (Array.isArray(deductionList) && deductionList.length > 0) {
+        const rows = deductionList.map((d: any) => insertPayrollDeductionSchema.parse({ ...d, payrollEntryId: entry.id }));
+        await db.insert(payrollDeductions).values(rows);
+      }
+      const deductions = await db.select().from(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, entry.id));
+      res.status(201).json({ ...entry, deductions });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error creating payroll entry:", error);
+      res.status(500).json({ message: "Failed to create payroll entry" });
+    }
+  });
+
+  app.patch("/api/payroll/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select().from(payrollEntries).where(eq(payrollEntries.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Payroll entry not found" });
+      const { status, deductions: deductionList, payPeriodStart, payPeriodEnd, ...rest } = req.body;
+      const userRole = req.user?.role;
+      // approve/pay requires admin or manager
+      if ((status === "approved" || status === "paid") && userRole !== "admin" && userRole !== "manager") {
+        return res.status(403).json({ message: "Only managers/admins can approve or mark paid" });
+      }
+      if (existing.status !== "draft" && !["approved", "paid"].includes(status ?? "")) {
+        return res.status(400).json({ message: "Only draft entries can be edited" });
+      }
+      const updates: any = { ...rest };
+      if (status) updates.status = status;
+      if (status === "paid" && !existing.paidAt) updates.paidAt = new Date();
+      if (payPeriodStart) updates.payPeriodStart = new Date(payPeriodStart);
+      if (payPeriodEnd) updates.payPeriodEnd = new Date(payPeriodEnd);
+      const [entry] = await db.update(payrollEntries).set(updates).where(eq(payrollEntries.id, id)).returning();
+      if (Array.isArray(deductionList)) {
+        await db.delete(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, id));
+        if (deductionList.length > 0) {
+          const rows = deductionList.map((d: any) => insertPayrollDeductionSchema.parse({ ...d, payrollEntryId: id }));
+          await db.insert(payrollDeductions).values(rows);
+        }
+      }
+      const deductions = await db.select().from(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, id));
+      res.json({ ...entry, deductions });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error updating payroll entry:", error);
+      res.status(500).json({ message: "Failed to update payroll entry" });
+    }
+  });
+
+  app.delete("/api/payroll/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select().from(payrollEntries).where(eq(payrollEntries.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Payroll entry not found" });
+      if (existing.status !== "draft") return res.status(400).json({ message: "Only draft entries can be deleted" });
+      await db.delete(payrollDeductions).where(eq(payrollDeductions.payrollEntryId, id));
+      await db.delete(payrollEntries).where(eq(payrollEntries.id, id));
+      res.json({ message: "Deleted" });
+    } catch (error) {
+      console.error("Error deleting payroll entry:", error);
+      res.status(500).json({ message: "Failed to delete payroll entry" });
     }
   });
 

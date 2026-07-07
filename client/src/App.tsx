@@ -46,6 +46,7 @@ import HeldQueue from "@/pages/held";
 import Dispatchers from "@/pages/dispatchers";
 import Trucks from "@/pages/trucks";
 import BankTransfers from "@/pages/bank-transfers";
+import Payroll from "@/pages/payroll";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -246,6 +247,11 @@ function Router() {
       <Route path="/bank-transfers">
         <ProtectedRoute>
           <BankTransfers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/payroll">
+        <ProtectedRoute>
+          <Payroll />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />

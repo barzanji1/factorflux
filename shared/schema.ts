@@ -1373,6 +1373,41 @@ export const insertBankTransferSchema = createInsertSchema(bankTransfers).omit({
 export type BankTransfer = typeof bankTransfers.$inferSelect;
 export type InsertBankTransfer = z.infer<typeof insertBankTransferSchema>;
 
+// ─── Payroll ──────────────────────────────────────────────────────────────────
+export const payrollEntries = pgTable("payroll_entries", {
+  id: serial("id").primaryKey(),
+  employeeId: varchar("employee_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  payPeriodStart: timestamp("pay_period_start").notNull(),
+  payPeriodEnd: timestamp("pay_period_end").notNull(),
+  regularHours: decimal("regular_hours", { precision: 8, scale: 2 }).default("0").notNull(),
+  overtimeHours: decimal("overtime_hours", { precision: 8, scale: 2 }).default("0").notNull(),
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).notNull(),
+  grossPay: decimal("gross_pay", { precision: 12, scale: 2 }).notNull(),
+  deductions: decimal("deductions", { precision: 12, scale: 2 }).default("0").notNull(),
+  netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull(),
+  status: varchar("status", { enum: ["draft", "approved", "paid"] }).default("draft").notNull(),
+  paidAt: timestamp("paid_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const payrollDeductions = pgTable("payroll_deductions", {
+  id: serial("id").primaryKey(),
+  payrollEntryId: integer("payroll_entry_id").references(() => payrollEntries.id, { onDelete: "cascade" }).notNull(),
+  deductionType: varchar("deduction_type", { enum: ["tax", "insurance", "other"] }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  description: text("description"),
+});
+
+export const insertPayrollEntrySchema = createInsertSchema(payrollEntries).omit({ id: true, createdAt: true });
+export const insertPayrollDeductionSchema = createInsertSchema(payrollDeductions).omit({ id: true });
+
+export type PayrollEntry = typeof payrollEntries.$inferSelect;
+export type InsertPayrollEntry = z.infer<typeof insertPayrollEntrySchema>;
+export type PayrollDeduction = typeof payrollDeductions.$inferSelect;
+export type InsertPayrollDeduction = z.infer<typeof insertPayrollDeductionSchema>;
+
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 
 export const workflowConfigs = pgTable("workflow_configs", {
