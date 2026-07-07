@@ -1348,6 +1348,31 @@ export const insertTruckSchema = createInsertSchema(trucks).omit({
 export type Truck = typeof trucks.$inferSelect;
 export type InsertTruck = z.infer<typeof insertTruckSchema>;
 
+// ─── Bank Transfers ───────────────────────────────────────────────────────────
+export const bankTransfers = pgTable("bank_transfers", {
+  id: serial("id").primaryKey(),
+  transferType: varchar("transfer_type", { enum: ["ACH", "wire"] }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "set null" }),
+  bankAccountName: varchar("bank_account_name"),
+  routingNumber: varchar("routing_number"),
+  accountNumberEncrypted: varchar("account_number_encrypted"),
+  memo: text("memo"),
+  status: varchar("status", { enum: ["pending", "processing", "completed", "failed"] }).default("pending").notNull(),
+  transferDate: timestamp("transfer_date"),
+  confirmedAt: timestamp("confirmed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const insertBankTransferSchema = createInsertSchema(bankTransfers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type BankTransfer = typeof bankTransfers.$inferSelect;
+export type InsertBankTransfer = z.infer<typeof insertBankTransferSchema>;
+
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 
 export const workflowConfigs = pgTable("workflow_configs", {

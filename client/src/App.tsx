@@ -45,6 +45,7 @@ import Lockbox from "@/pages/lockbox";
 import HeldQueue from "@/pages/held";
 import Dispatchers from "@/pages/dispatchers";
 import Trucks from "@/pages/trucks";
+import BankTransfers from "@/pages/bank-transfers";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -240,6 +241,11 @@ function Router() {
       <Route path="/trucks">
         <ProtectedRoute>
           <Trucks />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/bank-transfers">
+        <ProtectedRoute>
+          <BankTransfers />
         </ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />

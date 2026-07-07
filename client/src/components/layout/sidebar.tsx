@@ -8,7 +8,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -62,6 +62,7 @@ const navSections: NavSection[] = [
       { name: "Payments",       href: "/payouts",           icon: Wallet         },
       { name: "Lockbox",        href: "/lockbox",           icon: ArrowRightLeft },
       { name: "Fuel Advance",   href: "/fuel-advance",      icon: Fuel           },
+      { name: "Bank Transfers", href: "/bank-transfers",    icon: Landmark       },
     ],
   },
   {

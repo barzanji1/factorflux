@@ -59,6 +59,8 @@ import {
   insertDispatcherSchema,
   trucks,
   insertTruckSchema,
+  bankTransfers,
+  insertBankTransferSchema,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -4726,6 +4728,88 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deactivating dispatcher:", error);
       res.status(500).json({ message: "Failed to deactivate dispatcher" });
+    }
+  });
+
+  // ─── Bank Transfers ────────────────────────────────────────────────────────
+  app.get("/api/bank-transfers", requireAuth, async (req, res) => {
+    try {
+      const { carrierId, status, transferType, dateFrom, dateTo } = req.query;
+      const conditions: any[] = [];
+      if (carrierId) conditions.push(eq(bankTransfers.carrierId, parseInt(carrierId as string, 10)));
+      if (status && status !== "all") conditions.push(eq(bankTransfers.status, status as any));
+      if (transferType && transferType !== "all") conditions.push(eq(bankTransfers.transferType, transferType as any));
+      if (dateFrom) conditions.push(sql`${bankTransfers.transferDate} >= ${new Date(dateFrom as string)}`);
+      if (dateTo) conditions.push(sql`${bankTransfers.transferDate} <= ${new Date(dateTo as string)}`);
+      const rows = conditions.length
+        ? await db.select().from(bankTransfers).where(and(...conditions)).orderBy(desc(bankTransfers.createdAt))
+        : await db.select().from(bankTransfers).orderBy(desc(bankTransfers.createdAt));
+      // Mask account number — never send raw encrypted blob to client
+      const masked = rows.map((r) => ({ ...r, accountNumberEncrypted: r.accountNumberEncrypted ? "••••" : null }));
+      res.json(masked);
+    } catch (error) {
+      console.error("Error fetching bank transfers:", error);
+      res.status(500).json({ message: "Failed to fetch bank transfers" });
+    }
+  });
+
+  app.get("/api/bank-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [row] = await db.select().from(bankTransfers).where(eq(bankTransfers.id, id)).limit(1);
+      if (!row) return res.status(404).json({ message: "Transfer not found" });
+      // Decrypt account number for single-record view (authorized users only)
+      let accountNumberLast4: string | null = null;
+      if (row.accountNumberEncrypted) {
+        try {
+          const decrypted = decryptVault(row.accountNumberEncrypted);
+          accountNumberLast4 = "••••" + decrypted.slice(-4);
+        } catch { accountNumberLast4 = "••••"; }
+      }
+      res.json({ ...row, accountNumberEncrypted: undefined, accountNumberLast4 });
+    } catch (error) {
+      console.error("Error fetching bank transfer:", error);
+      res.status(500).json({ message: "Failed to fetch transfer" });
+    }
+  });
+
+  app.post("/api/bank-transfers", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const { accountNumber, transferDate, ...rest } = req.body;
+      const accountNumberEncrypted = accountNumber ? encryptVault(String(accountNumber)) : null;
+      const data = insertBankTransferSchema.parse({
+        ...rest,
+        accountNumberEncrypted,
+        transferDate: transferDate ? new Date(transferDate) : null,
+        createdBy: userId,
+      });
+      const [row] = await db.insert(bankTransfers).values(data).returning();
+      res.status(201).json({ ...row, accountNumberEncrypted: undefined });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error creating bank transfer:", error);
+      res.status(500).json({ message: "Failed to create transfer" });
+    }
+  });
+
+  app.patch("/api/bank-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { status, accountNumber, transferDate, confirmedAt, ...rest } = req.body;
+      const updates: Record<string, any> = { ...rest };
+      if (status) updates.status = status;
+      if (accountNumber) updates.accountNumberEncrypted = encryptVault(String(accountNumber));
+      if (transferDate) updates.transferDate = new Date(transferDate);
+      if (status === "completed" && !confirmedAt) updates.confirmedAt = new Date();
+      if (confirmedAt) updates.confirmedAt = new Date(confirmedAt);
+      const [row] = await db.update(bankTransfers).set(updates).where(eq(bankTransfers.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "Transfer not found" });
+      res.json({ ...row, accountNumberEncrypted: undefined });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      console.error("Error updating bank transfer:", error);
+      res.status(500).json({ message: "Failed to update transfer" });
     }
   });
 
