@@ -1459,6 +1459,66 @@ export const insertReleaseLetterSchema = createInsertSchema(releaseLetters).omit
 export type ReleaseLetter = typeof releaseLetters.$inferSelect;
 export type InsertReleaseLetter = z.infer<typeof insertReleaseLetterSchema>;
 
+// ─── Carrier Portal Users ──────────────────────────────────────────────────────
+export const carrierPortalUsers = pgTable("carrier_portal_users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email").notNull().unique(),
+  passwordHash: varchar("password_hash").notNull(),
+  carrierId: integer("carrier_id").references(() => clients.id),
+  mcNumber: varchar("mc_number"),
+  dotNumber: varchar("dot_number"),
+  companyName: varchar("company_name").notNull(),
+  status: varchar("status", { enum: ["pending", "active", "suspended"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastLoginAt: timestamp("last_login_at"),
+});
+
+export const insertCarrierPortalUserSchema = createInsertSchema(carrierPortalUsers).omit({
+  id: true, createdAt: true, lastLoginAt: true,
+});
+export type CarrierPortalUser = typeof carrierPortalUsers.$inferSelect;
+export type InsertCarrierPortalUser = z.infer<typeof insertCarrierPortalUserSchema>;
+
+// ─── Carrier Submissions ───────────────────────────────────────────────────────
+export const carrierSubmissions = pgTable("carrier_submissions", {
+  id: serial("id").primaryKey(),
+  carrierId: integer("carrier_id").references(() => clients.id),
+  portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id).notNull(),
+  invoiceNumber: varchar("invoice_number"),
+  loadNumber: varchar("load_number"),
+  brokerName: varchar("broker_name"),
+  amount: decimal("amount", { precision: 12, scale: 2 }),
+  paymentType: varchar("payment_type", { enum: ["ACH", "check"] }).default("ACH"),
+  status: varchar("status", { enum: ["submitted", "under_review", "approved", "funded", "rejected"] }).default("submitted").notNull(),
+  notes: text("notes"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCarrierSubmissionSchema = createInsertSchema(carrierSubmissions).omit({
+  id: true, submittedAt: true, createdAt: true,
+});
+export type CarrierSubmission = typeof carrierSubmissions.$inferSelect;
+export type InsertCarrierSubmission = z.infer<typeof insertCarrierSubmissionSchema>;
+
+// ─── Carrier Submission Documents ─────────────────────────────────────────────
+export const carrierSubmissionDocs = pgTable("carrier_submission_documents", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id").references(() => carrierSubmissions.id).notNull(),
+  documentType: varchar("document_type", { enum: ["rate_confirmation", "bol", "lumper_receipt", "other"] }).default("other").notNull(),
+  filename: varchar("filename").notNull(),
+  originalName: varchar("original_name").notNull(),
+  mimeType: varchar("mime_type"),
+  size: integer("size"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertCarrierSubmissionDocSchema = createInsertSchema(carrierSubmissionDocs).omit({
+  id: true, uploadedAt: true,
+});
+export type CarrierSubmissionDoc = typeof carrierSubmissionDocs.$inferSelect;
+export type InsertCarrierSubmissionDoc = z.infer<typeof insertCarrierSubmissionDocSchema>;
+
 // ─── Workflow Config (DB-persisted pipeline customization) ─────────────────────
 
 export const workflowConfigs = pgTable("workflow_configs", {

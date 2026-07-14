@@ -30,7 +30,7 @@ import {
   Users, Shield, UserPlus, Pencil, Trash2, Ban, CheckCircle,
   Loader2, Mail, Settings2, FileCheck, ClipboardList, Plus,
   AlertCircle, Bell, TrendingUp, Clock, Activity, Download,
-  ChevronRight, ChevronLeft,
+  ChevronRight, ChevronLeft, Globe, ExternalLink,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -154,11 +154,12 @@ const ACTIVITY_ICONS: Record<string, { icon: typeof Activity; color: string }> =
 };
 
 const TABS = [
-  { id: "users",       label: "Users",                icon: Users        },
-  { id: "timetracking",label: "Time Tracking",        icon: Clock        },
-  { id: "factoring",   label: "Factoring Settings",   icon: Settings2    },
-  { id: "documents",   label: "Document Requirements",icon: FileCheck    },
-  { id: "audit",       label: "Audit Log",             icon: ClipboardList},
+  { id: "users",        label: "Users",                icon: Users        },
+  { id: "timetracking", label: "Time Tracking",        icon: Clock        },
+  { id: "portal",       label: "Carrier Portal",       icon: Globe        },
+  { id: "factoring",    label: "Factoring Settings",   icon: Settings2    },
+  { id: "documents",    label: "Doc Requirements",     icon: FileCheck    },
+  { id: "audit",        label: "Audit Log",            icon: ClipboardList},
 ] as const;
 type Tab = typeof TABS[number]["id"];
 
@@ -245,6 +246,44 @@ export default function Admin() {
     queryKey: ["/api/time-tracking/agent", ttDrillAgent],
     enabled: !!ttDrillAgent,
   });
+
+  // ── Carrier Portal ───────────────────────────────────────────────────────
+  interface PortalUserRow {
+    id: number; email: string; companyName: string; mcNumber?: string; dotNumber?: string;
+    status: "pending" | "active" | "suspended"; createdAt?: string; lastLoginAt?: string; carrierId?: number;
+  }
+  const { data: portalUsers = [], isLoading: portalLoading } = useQuery<PortalUserRow[]>({
+    queryKey: ["/api/carrier-portal/users"],
+    enabled: activeTab === "portal",
+  });
+  const { data: portalSubmissionCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/carrier-portal/submissions"],
+    enabled: activeTab === "portal",
+    select: (data: any[]) => ({ count: data.length }),
+  });
+  const approvePortalMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await fetch(`/api/carrier-portal/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Update failed");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/carrier-portal/users"] });
+      toast({ title: "Portal user updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const PORTAL_STATUS_BADGE: Record<string, JSX.Element> = {
+    pending:   <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Pending</Badge>,
+    active:    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Active</Badge>,
+    suspended: <Badge className="bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300">Suspended</Badge>,
+  };
 
   function exportTtCsv(rows: TtSummaryRow[], filename = "time-tracking.csv") {
     const header = ["Agent", "Role", "Status", "Today (hrs)", "This Week (hrs)", "Pay Period (hrs)", "Last Activity"];
@@ -792,6 +831,129 @@ export default function Admin() {
             {/* ══════════════════════════════════════════════════════════════ */}
             {/* TAB: AUDIT LOG                                                 */}
             {/* ══════════════════════════════════════════════════════════════ */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* TAB: CARRIER PORTAL                                           */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {activeTab === "portal" && (
+              <div className="space-y-4">
+                {/* Quick stats + link to submissions */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { label: "Registered Carriers", value: portalUsers.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/30" },
+                    { label: "Pending Approval", value: portalUsers.filter(u => u.status === "pending").length, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
+                    { label: "Active Carriers", value: portalUsers.filter(u => u.status === "active").length, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
+                  ].map((s) => (
+                    <Card key={s.label} className="rounded-[20px] border border-[hsl(var(--border))]">
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${s.bg}`}>
+                          <Globe className={`h-5 w-5 ${s.color}`} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
+                          <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Registered Carrier Accounts</h3>
+                  <a href="/portal-submissions" className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View all submissions
+                  </a>
+                </div>
+
+                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                  <CardContent className="p-0">
+                    {portalLoading ? (
+                      <SkeletonRows rows={5} cols={5} />
+                    ) : portalUsers.length === 0 ? (
+                      <EmptyState icon={Globe} title="No registered carriers" description="Carriers will appear here once they register through the portal." />
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Company</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>MC / DOT</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Registered</TableHead>
+                              <TableHead>Last Login</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {portalUsers.map((u) => (
+                              <TableRow key={u.id}>
+                                <TableCell className="font-medium">{u.companyName}</TableCell>
+                                <TableCell className="text-sm text-slate-500">{u.email}</TableCell>
+                                <TableCell className="text-xs text-slate-500">
+                                  {u.mcNumber && <p>MC: {u.mcNumber}</p>}
+                                  {u.dotNumber && <p>DOT: {u.dotNumber}</p>}
+                                  {!u.mcNumber && !u.dotNumber && "—"}
+                                </TableCell>
+                                <TableCell>{PORTAL_STATUS_BADGE[u.status]}</TableCell>
+                                <TableCell className="text-xs text-slate-400">
+                                  {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
+                                </TableCell>
+                                <TableCell className="text-xs text-slate-400">
+                                  {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "Never"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    {u.status === "pending" && (
+                                      <Button
+                                        size="sm"
+                                        className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        onClick={() => approvePortalMutation.mutate({ id: u.id, status: "active" })}
+                                        disabled={approvePortalMutation.isPending}
+                                      >
+                                        Approve
+                                      </Button>
+                                    )}
+                                    {u.status === "active" && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 px-2 text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
+                                        onClick={() => approvePortalMutation.mutate({ id: u.id, status: "suspended" })}
+                                        disabled={approvePortalMutation.isPending}
+                                      >
+                                        Suspend
+                                      </Button>
+                                    )}
+                                    {u.status === "suspended" && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 px-2 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                        onClick={() => approvePortalMutation.mutate({ id: u.id, status: "active" })}
+                                        disabled={approvePortalMutation.isPending}
+                                      >
+                                        Reinstate
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 px-4 py-3 flex items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
+                  <Globe className="h-4 w-4 flex-shrink-0" />
+                  <span>The carrier portal is accessible at <span className="font-mono font-semibold">/portal</span> — share this link with carriers to let them self-register.</span>
+                </div>
+              </div>
+            )}
+
             {/* ══════════════════════════════════════════════════════════════ */}
             {/* TAB: TIME TRACKING                                            */}
             {/* ══════════════════════════════════════════════════════════════ */}

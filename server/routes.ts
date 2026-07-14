@@ -72,6 +72,9 @@ import {
   releaseLetters,
   insertReleaseLetterSchema,
   timeEntries,
+  carrierPortalUsers,
+  carrierSubmissions,
+  carrierSubmissionDocs,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -5391,6 +5394,260 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deactivating truck:", error);
       res.status(500).json({ message: "Failed to deactivate truck" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CARRIER PORTAL ROUTES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const portalUpload = multer({
+    dest: "uploads/portal/",
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = /jpeg|jpg|png|pdf|tiff|tif/;
+      if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+        return cb(null, true);
+      }
+      cb(new Error("Only PDF, JPEG, JPG, PNG, and TIFF files are allowed"));
+    },
+  });
+
+  const requirePortalAuth = (req: any, res: any, next: any) => {
+    const portalUser = (req.session as any)?.portalUser;
+    if (!portalUser) return res.status(401).json({ message: "Portal authentication required" });
+    req.portalUser = portalUser;
+    next();
+  };
+
+  // ── Portal Auth ────────────────────────────────────────────────────────────
+  app.post("/api/portal/register", async (req, res) => {
+    try {
+      const { email, password, companyName, mcNumber, dotNumber } = req.body;
+      if (!email || !password || !companyName) {
+        return res.status(400).json({ message: "Email, password, and company name are required" });
+      }
+      const [existing] = await db.select().from(carrierPortalUsers).where(eq(carrierPortalUsers.email, email.toLowerCase())).limit(1);
+      if (existing) return res.status(409).json({ message: "An account with this email already exists" });
+      const passwordHash = await bcrypt.hash(password, 10);
+      const [user] = await db.insert(carrierPortalUsers).values({
+        email: email.toLowerCase(),
+        passwordHash,
+        companyName,
+        mcNumber: mcNumber || null,
+        dotNumber: dotNumber || null,
+        status: "pending",
+      }).returning();
+      res.status(201).json({ message: "Registration successful. Pending approval.", id: user.id });
+    } catch (error) {
+      console.error("Portal register error:", error);
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post("/api/portal/login", async (req: any, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) return res.status(400).json({ message: "Email and password required" });
+      const [user] = await db.select().from(carrierPortalUsers).where(eq(carrierPortalUsers.email, email.toLowerCase())).limit(1);
+      if (!user) return res.status(401).json({ message: "Invalid email or password" });
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) return res.status(401).json({ message: "Invalid email or password" });
+      if (user.status === "suspended") return res.status(403).json({ message: "Your account has been suspended. Please contact TPF." });
+      await db.update(carrierPortalUsers).set({ lastLoginAt: new Date() }).where(eq(carrierPortalUsers.id, user.id));
+      (req.session as any).portalUser = { id: user.id, email: user.email, companyName: user.companyName, status: user.status };
+      res.json({ id: user.id, email: user.email, companyName: user.companyName, status: user.status });
+    } catch (error) {
+      console.error("Portal login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/portal/logout", (req: any, res) => {
+    delete (req.session as any).portalUser;
+    res.json({ message: "Logged out" });
+  });
+
+  app.get("/api/portal/me", requirePortalAuth, async (req: any, res) => {
+    try {
+      const [user] = await db.select().from(carrierPortalUsers).where(eq(carrierPortalUsers.id, req.portalUser.id)).limit(1);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json({ id: user.id, email: user.email, companyName: user.companyName, mcNumber: user.mcNumber, dotNumber: user.dotNumber, status: user.status });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  // ── Portal Submissions ─────────────────────────────────────────────────────
+  app.get("/api/portal/submissions", requirePortalAuth, async (req: any, res) => {
+    try {
+      const subs = await db.select().from(carrierSubmissions)
+        .where(eq(carrierSubmissions.portalUserId, req.portalUser.id))
+        .orderBy(desc(carrierSubmissions.submittedAt));
+      const subIds = subs.map((s) => s.id);
+      const docs = subIds.length
+        ? await db.select().from(carrierSubmissionDocs).where(inArray(carrierSubmissionDocs.submissionId, subIds))
+        : [];
+      const result = subs.map((s) => ({
+        ...s,
+        documents: docs.filter((d) => d.submissionId === s.id),
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Portal submissions error:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
+  app.post("/api/portal/submissions", requirePortalAuth, (req: any, res, next) => {
+    portalUpload.array("documents", 10)(req, res, (err: any) => {
+      if (err) return res.status(400).json({ message: err.message || "File upload error" });
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      const { loadNumber, invoiceNumber, brokerName, amount, paymentType } = req.body;
+      if (!loadNumber || !brokerName) return res.status(400).json({ message: "Load number and broker name are required" });
+      const [sub] = await db.insert(carrierSubmissions).values({
+        portalUserId: req.portalUser.id,
+        carrierId: null,
+        loadNumber,
+        invoiceNumber: invoiceNumber || null,
+        brokerName,
+        amount: amount ? String(amount) : null,
+        paymentType: paymentType || "ACH",
+        status: "submitted",
+      }).returning();
+
+      const files: Express.Multer.File[] = (req.files as Express.Multer.File[]) || [];
+      const docTypes: string[] = Array.isArray(req.body.documentTypes) ? req.body.documentTypes : (req.body.documentTypes ? [req.body.documentTypes] : []);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const dtype = (docTypes[i] || "other") as "rate_confirmation" | "bol" | "lumper_receipt" | "other";
+        await db.insert(carrierSubmissionDocs).values({
+          submissionId: sub.id,
+          documentType: dtype,
+          filename: file.filename,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+        });
+      }
+      res.status(201).json(sub);
+    } catch (error) {
+      console.error("Portal submit error:", error);
+      res.status(500).json({ message: "Submission failed" });
+    }
+  });
+
+  app.get("/api/portal/submissions/:id", requirePortalAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [sub] = await db.select().from(carrierSubmissions)
+        .where(and(eq(carrierSubmissions.id, id), eq(carrierSubmissions.portalUserId, req.portalUser.id))).limit(1);
+      if (!sub) return res.status(404).json({ message: "Submission not found" });
+      const docs = await db.select().from(carrierSubmissionDocs).where(eq(carrierSubmissionDocs.submissionId, id));
+      res.json({ ...sub, documents: docs });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch submission" });
+    }
+  });
+
+  app.get("/api/portal/submissions/:id/documents/:docId/view", async (req: any, res) => {
+    try {
+      const docId = parseInt(req.params.docId, 10);
+      const [doc] = await db.select().from(carrierSubmissionDocs).where(eq(carrierSubmissionDocs.id, docId)).limit(1);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      const filePath = path.join(process.cwd(), "uploads/portal", doc.filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found on disk" });
+      res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${doc.originalName}"`);
+      fs.createReadStream(filePath).pipe(res);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to serve document" });
+    }
+  });
+
+  app.get("/api/portal/submissions/:id/documents/:docId/download", async (req: any, res) => {
+    try {
+      const docId = parseInt(req.params.docId, 10);
+      const [doc] = await db.select().from(carrierSubmissionDocs).where(eq(carrierSubmissionDocs.id, docId)).limit(1);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      const filePath = path.join(process.cwd(), "uploads/portal", doc.filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found on disk" });
+      res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${doc.originalName}"`);
+      fs.createReadStream(filePath).pipe(res);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to download document" });
+    }
+  });
+
+  // ── Agent-facing Portal Routes ─────────────────────────────────────────────
+  app.get("/api/carrier-portal/submissions", requireAuth, async (_req, res) => {
+    try {
+      const subs = await db.select().from(carrierSubmissions).orderBy(desc(carrierSubmissions.submittedAt));
+      const subIds = subs.map((s) => s.id);
+      const docs = subIds.length
+        ? await db.select().from(carrierSubmissionDocs).where(inArray(carrierSubmissionDocs.submissionId, subIds))
+        : [];
+      const userIds = [...new Set(subs.map((s) => s.portalUserId))];
+      const portalUsers = userIds.length
+        ? await db.select().from(carrierPortalUsers).where(inArray(carrierPortalUsers.id, userIds))
+        : [];
+      const userMap = Object.fromEntries(portalUsers.map((u) => [u.id, u]));
+      const result = subs.map((s) => ({
+        ...s,
+        companyName: userMap[s.portalUserId]?.companyName ?? null,
+        documents: docs.filter((d) => d.submissionId === s.id),
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Agent portal submissions error:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
+  app.patch("/api/carrier-portal/submissions/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { status, notes } = req.body;
+      const validStatuses = ["submitted", "under_review", "approved", "funded", "rejected"];
+      if (status && !validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status" });
+      const [updated] = await db.update(carrierSubmissions)
+        .set({ ...(status && { status }), ...(notes !== undefined && { notes }) })
+        .where(eq(carrierSubmissions.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Submission not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update submission" });
+    }
+  });
+
+  app.get("/api/carrier-portal/users", requireAdmin, async (_req, res) => {
+    try {
+      const users = await db.select().from(carrierPortalUsers).orderBy(desc(carrierPortalUsers.createdAt));
+      res.json(users.map((u) => ({ ...u, passwordHash: undefined })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch portal users" });
+    }
+  });
+
+  app.patch("/api/carrier-portal/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { status, carrierId } = req.body;
+      const validStatuses = ["pending", "active", "suspended"];
+      if (status && !validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status" });
+      const [updated] = await db.update(carrierPortalUsers)
+        .set({ ...(status && { status }), ...(carrierId !== undefined && { carrierId }) })
+        .where(eq(carrierPortalUsers.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Portal user not found" });
+      res.json({ ...updated, passwordHash: undefined });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update portal user" });
     }
   });
 

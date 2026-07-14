@@ -8,7 +8,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,7 +53,8 @@ const navSections: NavSection[] = [
       { name: "Invoices",   href: "/invoices",  icon: FileText        },
       { name: "Documents",  href: "/documents", icon: Archive         },
       { name: "Tasks",         href: "/tasks",         icon: ListTodo },
-      { name: "Bulk Invoices", href: "/bulk-invoices",  icon: Layers   },
+      { name: "Bulk Invoices",      href: "/bulk-invoices",       icon: Layers  },
+      { name: "Portal Submissions", href: "/portal-submissions",   icon: Globe   },
     ],
   },
   {

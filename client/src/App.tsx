@@ -49,6 +49,13 @@ import BankTransfers from "@/pages/bank-transfers";
 import Payroll from "@/pages/payroll";
 import BulkInvoices from "@/pages/bulk-invoices";
 import ReleaseLetters from "@/pages/release-letters";
+import PortalLanding from "@/pages/portal/index";
+import PortalRegister from "@/pages/portal/register";
+import PortalLogin from "@/pages/portal/login";
+import PortalDashboard from "@/pages/portal/dashboard";
+import PortalSubmit from "@/pages/portal/submit";
+import PortalSubmissions from "@/pages/portal/submissions";
+import PortalSubmissionsPage from "@/pages/portal-submissions";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -265,6 +272,17 @@ function Router() {
         <ProtectedRoute>
           <ReleaseLetters />
         </ProtectedRoute>
+      </Route>
+      {/* Portal public routes */}
+      <Route path="/portal"><PortalLanding /></Route>
+      <Route path="/portal/register"><PortalRegister /></Route>
+      <Route path="/portal/login"><PortalLogin /></Route>
+      <Route path="/portal/dashboard"><PortalDashboard /></Route>
+      <Route path="/portal/submit"><PortalSubmit /></Route>
+      <Route path="/portal/submissions"><PortalSubmissions /></Route>
+      {/* Agent portal submissions */}
+      <Route path="/portal-submissions">
+        <ProtectedRoute><PortalSubmissionsPage /></ProtectedRoute>
       </Route>
       <Route path="*" component={NotFound} />
     </Switch>

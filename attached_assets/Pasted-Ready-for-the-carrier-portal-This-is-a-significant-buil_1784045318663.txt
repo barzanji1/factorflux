@@ -1,0 +1,75 @@
+Ready for the carrier portal. This is a significant build — read carefully before running:
+
+Build a Carrier Portal on the same domain as FactorFlux. Carriers register, log in, and submit invoices with documents. Everything saves to the backend where agents can see it in FactorFlux.
+Database
+
+ Create carrier_portal_users table: id, email, passwordHash, carrierId (FK to clients, nullable until approved), mcNumber, dotNumber, companyName, status (pending/active/suspended), createdAt, lastLoginAt
+ Create carrier_submissions table: id, carrierId, portalUserId, invoiceNumber, loadNumber, brokerName, amount, paymentType (ACH/check), status (submitted/under_review/approved/funded/rejected), notes, submittedAt, createdAt
+ Create carrier_submission_documents table: id, submissionId, documentType (rate_confirmation/bol/lumper_receipt/other), filename, originalName, mimeType, size, uploadedAt
+ Run db:push
+
+Backend — Portal Auth (separate from agent auth)
+
+ POST /api/portal/register — carrier self-registration, hashes password, status starts as pending
+ POST /api/portal/login — separate session key req.session.portalUser, returns carrier profile
+ POST /api/portal/logout — clears portal session
+ GET /api/portal/me — returns current portal user profile
+ Portal auth middleware requirePortalAuth — separate from requireAuth
+
+Backend — Submissions
+
+ GET /api/portal/submissions — returns submissions for logged-in carrier only
+ POST /api/portal/submissions — create new submission with documents, Multer handles file upload
+ GET /api/portal/submissions/:id — single submission with documents
+ GET /api/portal/submissions/:id/documents/:docId/view — stream file inline
+ GET /api/portal/submissions/:id/documents/:docId/download — download file
+
+Backend — Agent-facing
+
+ GET /api/carrier-portal/submissions — all submissions across all carriers, requires requireAuth
+ PATCH /api/carrier-portal/submissions/:id — update status, add notes, requires requireAuth
+ GET /api/carrier-portal/users — list all portal users, requires requireAdmin
+ PATCH /api/carrier-portal/users/:id — approve/suspend portal users, requires requireAdmin
+
+Frontend — Carrier Portal (public routes, no agent sidebar)
+
+ /portal — landing page with login and register buttons
+ /portal/register — registration form: company name, MC#, DOT#, email, password
+ /portal/login — login form
+ /portal/dashboard — carrier dashboard after login:
+
+Welcome message with company name
+Invoice Aging summary (0-30, 31-60, 61-90, 90+ days)
+Quick action buttons: Submit Invoice, Upload Only, Credit Check
+Recent submissions list
+
+
+ /portal/submit — invoice submission form:
+
+Load#, PO#, invoice amount, payment type, broker name
+Document upload sections: Rate Confirmation, BOL, Lumper Ticket, Other
+Camera capture supported (mobile)
+Submit button
+
+
+ /portal/submissions — list of carrier's own submissions with status badges
+ Portal has its own clean minimal layout — no agent sidebar, no agent nav
+ Mobile responsive — carriers use this on phones
+
+Frontend — Agent-facing (inside FactorFlux)
+
+ Add Carrier Portal section to Admin page:
+
+List of registered portal users with status badges (pending/active/suspended)
+Approve and suspend actions
+Link portal user to existing carrier record
+
+
+ Add Portal Submissions page at /portal-submissions:
+
+Table of all carrier submissions across all carriers
+Filter by status, carrier, date
+Click submission → see details + documents
+Update status and add notes
+View/download submitted documents
+Add to sidebar under WORKSPACE
