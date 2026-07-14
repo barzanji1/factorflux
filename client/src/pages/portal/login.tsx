@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Truck, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -46,13 +47,13 @@ export default function PortalLogin() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-sm w-full shadow-sm">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-            <Truck className="h-5 w-5 text-white" />
+        <div className="flex items-center gap-2.5 mb-6">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm">
+            <img src={factorFluxLogo} alt="FactorFlux" className="h-6 w-6 object-contain" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 text-sm leading-none">Carrier Portal</p>
-            <p className="text-slate-400 text-[10px]">Trucking Pros Financial</p>
+            <p className="font-bold text-slate-900 text-sm leading-tight tracking-tight">FactorFlux</p>
+            <p className="text-slate-400 text-[10px] leading-tight">Trucking Pros Financial</p>
           </div>
         </div>
 

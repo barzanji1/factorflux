@@ -49,7 +49,7 @@ export default function PortalLanding() {
               </Button>
             </Link>
             <Link href="/portal/login">
-              <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 px-8 w-full sm:w-auto">
+              <Button size="lg" className="bg-blue-500 hover:bg-blue-400 text-white px-8 w-full sm:w-auto">
                 Sign In
               </Button>
             </Link>
