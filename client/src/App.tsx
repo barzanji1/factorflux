@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { PermissionWatcher } from "@/components/PermissionWatcher";
 import { useTheme } from "@/hooks/useTheme";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
@@ -61,8 +62,9 @@ function Router() {
   useTheme(); // Initialize theme
 
   return (
-    <Switch>
-      {/* Public route */}
+    <>
+      <PermissionWatcher />
+      <Switch>
       <Route path="/login">
         <LoginPage />
       </Route>
@@ -286,6 +288,7 @@ function Router() {
       </Route>
       <Route path="*" component={NotFound} />
     </Switch>
+    </>
   );
 }
 

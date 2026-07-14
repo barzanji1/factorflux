@@ -141,6 +141,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  // Poll permissions every 60 seconds while authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(async () => {
+      const perms = await fetchPermissions();
+      setPermissions(perms);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   return (
     <AuthContext.Provider
       value={{
