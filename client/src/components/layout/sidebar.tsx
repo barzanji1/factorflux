@@ -95,10 +95,10 @@ const navSections: NavSection[] = [
   {
     title: "Admin",
     items: [
+      { name: "Admin",          href: "/admin",           icon: ShieldCheck,    role: "manager"    },
       { name: "Payroll",        href: "/payroll",         icon: BadgeDollarSign, role: "manager" },
       { name: "Vault",          href: "/vault",           icon: Lock                           },
       { name: "Help",             href: "/help",            icon: LifeBuoy                       },
-      { name: "Settings",         href: "/admin",           icon: Settings2,  role: "manager"    },
       { name: "Rules",            href: "/document-rules",  icon: FileCheck2, role: "manager"    },
       { name: "Workflow Builder", href: "/workflow-builder", icon: Workflow,   role: "manager"    },
     ],
