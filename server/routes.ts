@@ -461,7 +461,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No image file provided" });
       }
 
-      const profileImageUrl = `/uploads/${req.file.filename}`;
+      // Memory storage gives us a buffer — write it to disk with a unique name
+      const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
+      const filename = `profile-${crypto.randomUUID()}${ext}`;
+      const uploadsDir = path.resolve(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);
+
+      const profileImageUrl = `/uploads/${filename}`;
       await storage.updateUserProfile(userId, { profileImageUrl });
 
       // Update session immediately so auth context reflects the new image without re-login

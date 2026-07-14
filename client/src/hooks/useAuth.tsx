@@ -74,6 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setPermissions([]);
             } else {
               console.log("Server verification successful");
+              // Update user state from server — picks up profileImageUrl and any other fresh fields
+              const verifyData = await response.json();
+              if (verifyData.user) {
+                setUser(verifyData.user);
+                localStorage.setItem("user", JSON.stringify(verifyData.user));
+              }
               const perms = await fetchPermissions();
               setPermissions(perms);
             }
