@@ -313,16 +313,14 @@ export default function Invoices() {
                                   icon={<Eye className="h-4 w-4" />}
                                 />
 
-                                <ActionIconButton
+                                <a
+                                  href={`/api/invoices/${invoice.id}/download`}
+                                  download={`${invoice.invoiceNumber}.pdf`}
                                   title="Download Invoice"
-                                  onClick={() =>
-                                    toast({
-                                      title: "Download Started",
-                                      description: `Downloading invoice ${invoice.invoiceNumber}`,
-                                    })
-                                  }
-                                  icon={<Download className="h-4 w-4" />}
-                                />
+                                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-[hsl(var(--border))] bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </a>
 
                                 <ActionIconButton
                                   title="Edit Invoice"

@@ -12,6 +12,7 @@ import {
   deleteFromS3,
   downloadToTemp,
 } from "./services/s3Service";
+import PDFDocument from "pdfkit";
 import { z } from "zod";
 import { eq, and, desc, sql, inArray, notInArray } from "drizzle-orm";
 
@@ -1581,6 +1582,143 @@ ${message}
   });
 
   // ─── Invoice detail (all related data) ───────────────────────────────────
+  app.get("/api/invoices/:id/download", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid invoice ID" });
+
+      const [row] = await db
+        .select({
+          id: invoices.id,
+          invoiceNumber: invoices.invoiceNumber,
+          loadNumber: invoices.loadNumber,
+          amount: invoices.amount,
+          currency: invoices.currency,
+          status: invoices.status,
+          invoiceDate: invoices.invoiceDate,
+          submittedAt: invoices.submittedAt,
+          dueDate: invoices.dueDate,
+          pickupLocation: invoices.pickupLocation,
+          deliveryLocation: invoices.deliveryLocation,
+          bolNumber: invoices.bolNumber,
+          notes: invoices.notes,
+          clientName: clients.name,
+          debtorName: debtors.name,
+        })
+        .from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .where(eq(invoices.id, id))
+        .limit(1);
+
+      if (!row) return res.status(404).json({ message: "Invoice not found" });
+
+      const doc = new PDFDocument({ margin: 50, size: "LETTER" });
+      const chunks: Buffer[] = [];
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+      doc.on("end", () => {
+        const pdfBuffer = Buffer.concat(chunks);
+        const filename = `${row.invoiceNumber || `invoice-${id}`}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("Content-Length", pdfBuffer.length.toString());
+        res.end(pdfBuffer);
+      });
+
+      // ── Header ──────────────────────────────────────────────────────────
+      doc.fontSize(22).font("Helvetica-Bold").text("FactorFlux", 50, 50);
+      doc.fontSize(9).font("Helvetica").fillColor("#64748b").text("Trucking Pros Financial", 50, 76);
+      doc.fillColor("#1e293b");
+
+      // Invoice label + number (top-right)
+      doc.fontSize(20).font("Helvetica-Bold")
+        .text("INVOICE", 350, 50, { align: "right", width: 200 });
+      doc.fontSize(11).font("Helvetica")
+        .text(row.invoiceNumber || `#${id}`, 350, 76, { align: "right", width: 200 });
+
+      // Divider
+      doc.moveTo(50, 105).lineTo(562, 105).strokeColor("#e2e8f0").lineWidth(1).stroke();
+
+      // ── Billing info ─────────────────────────────────────────────────────
+      const col2 = 300;
+      let y = 120;
+
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#94a3b8").text("CARRIER", 50, y);
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#94a3b8").text("BROKER / DEBTOR", col2, y);
+      y += 14;
+      doc.fontSize(11).font("Helvetica-Bold").fillColor("#1e293b")
+        .text(row.clientName || "—", 50, y, { width: 220 });
+      doc.fontSize(11).font("Helvetica-Bold").fillColor("#1e293b")
+        .text(row.debtorName || "—", col2, y, { width: 220 });
+
+      y += 30;
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#94a3b8").text("INVOICE DATE", 50, y);
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#94a3b8").text("DUE DATE", col2, y);
+      y += 14;
+      const fmtDate = (d: Date | string | null | undefined) =>
+        d ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—";
+      doc.fontSize(10).font("Helvetica").fillColor("#1e293b")
+        .text(fmtDate(row.invoiceDate || row.submittedAt), 50, y);
+      doc.fontSize(10).font("Helvetica").fillColor("#1e293b")
+        .text(fmtDate(row.dueDate), col2, y);
+
+      y += 30;
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#94a3b8").text("STATUS", 50, y);
+      y += 14;
+      doc.fontSize(10).font("Helvetica-Bold").fillColor("#0f172a")
+        .text((row.status || "").toUpperCase().replace(/_/g, " "), 50, y);
+
+      // ── Load details table ────────────────────────────────────────────────
+      y += 40;
+      doc.moveTo(50, y).lineTo(562, y).strokeColor("#e2e8f0").lineWidth(1).stroke();
+      y += 10;
+
+      const col = [50, 200, 350, 450];
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#94a3b8");
+      doc.text("LOAD NUMBER", col[0], y);
+      doc.text("BOL NUMBER", col[1], y);
+      doc.text("PICKUP", col[2], y);
+      doc.text("DELIVERY", col[3], y);
+      y += 14;
+      doc.fontSize(10).font("Helvetica").fillColor("#1e293b");
+      doc.text(row.loadNumber || "—", col[0], y, { width: 140 });
+      doc.text(row.bolNumber || "—", col[1], y, { width: 140 });
+      doc.text(row.pickupLocation || "—", col[2], y, { width: 90, ellipsis: true });
+      doc.text(row.deliveryLocation || "—", col[3], y, { width: 110, ellipsis: true });
+
+      // ── Amount box ────────────────────────────────────────────────────────
+      y += 50;
+      doc.moveTo(50, y).lineTo(562, y).strokeColor("#e2e8f0").lineWidth(1).stroke();
+      y += 12;
+
+      const amountStr = parseFloat(row.amount || "0").toLocaleString("en-US", {
+        style: "currency", currency: row.currency || "USD",
+      });
+      doc.fontSize(10).font("Helvetica").fillColor("#64748b")
+        .text("Invoice Amount", 350, y, { align: "right", width: 200 });
+      y += 16;
+      doc.fontSize(18).font("Helvetica-Bold").fillColor("#1e293b")
+        .text(amountStr, 350, y, { align: "right", width: 200 });
+
+      // ── Notes ─────────────────────────────────────────────────────────────
+      if (row.notes) {
+        y += 50;
+        doc.fontSize(8).font("Helvetica-Bold").fillColor("#94a3b8").text("NOTES", 50, y);
+        y += 14;
+        doc.fontSize(10).font("Helvetica").fillColor("#475569").text(row.notes, 50, y, { width: 500 });
+      }
+
+      // ── Footer ────────────────────────────────────────────────────────────
+      doc.fontSize(8).font("Helvetica").fillColor("#94a3b8")
+        .text("Generated by FactorFlux · Trucking Pros Financial", 50, 720, { align: "center", width: 512 });
+
+      doc.end();
+    } catch (error) {
+      console.error("Error generating invoice PDF:", error);
+      res.status(500).json({ message: "Failed to generate invoice PDF" });
+    }
+  });
+
   app.get("/api/invoices/:id/detail", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
