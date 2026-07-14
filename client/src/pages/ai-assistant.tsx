@@ -16,6 +16,7 @@ interface Message {
 }
 
 const STARTERS = [
+  "Hi, I'm Earl. How can I help you with FactorFlux today?",
   "How do I factor an invoice?",
   "How do I put an invoice on hold?",
   "How do I approve a carrier in the portal?",
@@ -33,7 +34,7 @@ function MessageBubble({ msg }: { msg: Message }) {
       )}>
         {isUser
           ? <User className="h-4 w-4" />
-          : <img src={factorFluxLogo} alt="FactorFlux" className="w-6 h-6 object-contain" />
+          : <img src={factorFluxLogo} alt="Earl" className="w-6 h-6 object-contain" />
         }
       </div>
 
@@ -118,7 +119,7 @@ export default function AIAssistant() {
                 <Sparkles className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight">AI Assistant</h1>
+                <h1 className="text-xl font-bold tracking-tight">Earl</h1>
                 <p className="text-xs text-muted-foreground">Powered by Claude · FactorFlux knowledge base</p>
               </div>
             </div>
@@ -135,10 +136,10 @@ export default function AIAssistant() {
               <div className="flex flex-col items-center justify-center h-full gap-8 max-w-xl mx-auto text-center">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <img src={factorFluxLogo} alt="FactorFlux AI" className="w-10 h-10 object-contain" />
+                    <img src={factorFluxLogo} alt="Earl" className="w-10 h-10 object-contain" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold">How can I help you today?</h2>
+                    <h2 className="text-lg font-semibold">Hi, I'm Earl!</h2>
                     <p className="text-sm text-muted-foreground mt-1">
                       I know FactorFlux inside and out — ask me anything about workflows, features, or troubleshooting.
                     </p>
@@ -166,7 +167,7 @@ export default function AIAssistant() {
                 {chatMutation.isPending && (
                   <div className="flex items-end gap-2 mb-4">
                     <div className="flex-shrink-0 flex items-center justify-center rounded-full w-8 h-8 bg-background border border-border overflow-hidden">
-                      <img src={factorFluxLogo} alt="FactorFlux" className="w-6 h-6 object-contain" />
+                      <img src={factorFluxLogo} alt="Earl" className="w-6 h-6 object-contain" />
                     </div>
                     <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
                       <div className="flex gap-1 items-center h-4">
