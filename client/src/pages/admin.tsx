@@ -224,6 +224,12 @@ const PERMISSION_SECTIONS = [
       { key: "admin",            label: "Admin Panel"      },
     ],
   },
+  {
+    label: "Workspace",
+    items: [
+      { key: "earl", label: "Earl (AI Assistant)" },
+    ],
+  },
 ];
 
 const ROLE_DEFAULTS: Record<string, string[]> = {
@@ -234,6 +240,7 @@ const ROLE_DEFAULTS: Record<string, string[]> = {
     "brokers","cb_reviews","mc_check","held","logs",
     "followups","reports",
     "payroll","vault","help","settings","rules","workflow_builder","admin",
+    "earl",
   ],
   manager: [
     "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",

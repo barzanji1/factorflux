@@ -103,7 +103,7 @@ const navSections: NavSection[] = [
       { name: "Help",             href: "/help",             icon: LifeBuoy,        permission: "help"                              },
       { name: "Rules",            href: "/document-rules",   icon: FileCheck2,      permission: "rules",            role: "manager" },
       { name: "Workflow Builder", href: "/workflow-builder", icon: Workflow,        permission: "workflow_builder", role: "manager" },
-      { name: "Earl",              href: "/ai-assistant",     icon: Sparkles,        permission: "admin",            role: "manager" },
+      { name: "Earl",              href: "/ai-assistant",     icon: Sparkles,        permission: "earl" },
     ],
   },
 ];

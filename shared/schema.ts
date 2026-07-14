@@ -1569,6 +1569,7 @@ export const ALL_PERMISSIONS = [
   "brokers","cb_reviews","mc_check","held","logs",
   "followups","reports",
   "payroll","vault","help","settings","rules","workflow_builder","admin",
+  "earl",
 ] as const;
 export type PermissionKey = typeof ALL_PERMISSIONS[number];
 

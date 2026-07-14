@@ -241,6 +241,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn("[startup] Could not sync production users (non-fatal):", err?.message);
   }
 
+  // Auto-grant "earl" permission to all existing admin users who don't have it
+  try {
+    const adminUsers = await db.select().from(users).where(eq(users.role, "admin"));
+    for (const adminUser of adminUsers) {
+      const perms = await storage.getUserPermissions(adminUser.id);
+      if (!perms.includes("earl")) {
+        const newPerms = perms.length > 0 ? [...perms, "earl"] : [...(ROLE_DEFAULT_PERMISSIONS.admin as string[])];
+        await storage.setUserPermissions(adminUser.id, newPerms, "system");
+      }
+    }
+    console.log("[startup] Earl permission seeded for admin users");
+  } catch (err: any) {
+    console.warn("[startup] Could not seed earl permission (non-fatal):", err?.message);
+  }
+
   const requireAuth = (req: any, res: any, next: any) => {
     const user = (req.session as any)?.user;
     if (!user) {

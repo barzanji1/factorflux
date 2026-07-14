@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Send, Sparkles, Bot, User, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
 
 interface Message {
@@ -53,10 +55,20 @@ function MessageBubble({ msg }: { msg: Message }) {
 
 export default function AIAssistant() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { permissions } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Permission guard — redirect to dashboard if user lacks "earl" access
+  useEffect(() => {
+    if (permissions.length > 0 && !permissions.includes("earl")) {
+      toast({ title: "Access denied", description: "You don't have permission to use Earl.", variant: "destructive" });
+      setLocation("/");
+    }
+  }, [permissions]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
