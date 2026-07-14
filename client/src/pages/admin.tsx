@@ -29,7 +29,8 @@ import { Separator } from "@/components/ui/separator";
 import {
   Users, Shield, UserPlus, Pencil, Trash2, Ban, CheckCircle,
   Loader2, Mail, Settings2, FileCheck, ClipboardList, Plus,
-  AlertCircle, Bell, TrendingUp, Clock, Activity,
+  AlertCircle, Bell, TrendingUp, Clock, Activity, Download,
+  ChevronRight, ChevronLeft,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -153,10 +154,11 @@ const ACTIVITY_ICONS: Record<string, { icon: typeof Activity; color: string }> =
 };
 
 const TABS = [
-  { id: "users", label: "Users", icon: Users },
-  { id: "factoring", label: "Factoring Settings", icon: Settings2 },
-  { id: "documents", label: "Document Requirements", icon: FileCheck },
-  { id: "audit", label: "Audit Log", icon: ClipboardList },
+  { id: "users",       label: "Users",                icon: Users        },
+  { id: "timetracking",label: "Time Tracking",        icon: Clock        },
+  { id: "factoring",   label: "Factoring Settings",   icon: Settings2    },
+  { id: "documents",   label: "Document Requirements",icon: FileCheck    },
+  { id: "audit",       label: "Audit Log",             icon: ClipboardList},
 ] as const;
 type Tab = typeof TABS[number]["id"];
 
@@ -175,6 +177,7 @@ export default function Admin() {
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [docItems, setDocItems] = useState<DocRequirement[]>([]);
   const [docsDirty, setDocsDirty] = useState(false);
+  const [ttDrillAgent, setTtDrillAgent] = useState<string | null>(null);
 
   // Guard: only admin
   if (currentUser && currentUser.role !== "admin") {
@@ -215,6 +218,71 @@ export default function Admin() {
     queryKey: ["/api/admin/audit-log"],
     enabled: activeTab === "audit",
   });
+
+  // ── Time Tracking ────────────────────────────────────────────────────────
+  interface TtSummaryRow {
+    userId: string; firstName: string | null; lastName: string | null; role: string;
+    clockedIn: boolean; clockInTime: string | null; weekHours: number;
+    periodHours: number; todayHours: number; lastActivity: string | null;
+  }
+  interface TtDayEntry { id: number; clockIn: string; clockOut: string | null; hours: number | null; status: string; notes: string | null; }
+  interface TtDay { date: string; entries: TtDayEntry[]; totalHours: number; overtime: boolean; }
+  interface TtAgentDetail {
+    userId: string; firstName: string | null; lastName: string | null; role: string;
+    days: TtDay[]; weekTotal: number; weekOvertime: boolean;
+  }
+  const { data: ttSummary = [], isLoading: ttLoading } = useQuery<TtSummaryRow[]>({
+    queryKey: ["/api/time-tracking/summary"],
+    enabled: activeTab === "timetracking",
+    refetchInterval: activeTab === "timetracking" ? 30000 : false,
+  });
+  const { data: ttLive = [] } = useQuery<{ userId: string; firstName: string | null; lastName: string | null; clockInTime: string; durationHours: number }[]>({
+    queryKey: ["/api/time-tracking/live"],
+    enabled: activeTab === "timetracking",
+    refetchInterval: activeTab === "timetracking" ? 30000 : false,
+  });
+  const { data: ttAgentDetail, isLoading: ttAgentLoading } = useQuery<TtAgentDetail>({
+    queryKey: ["/api/time-tracking/agent", ttDrillAgent],
+    enabled: !!ttDrillAgent,
+  });
+
+  function exportTtCsv(rows: TtSummaryRow[], filename = "time-tracking.csv") {
+    const header = ["Agent", "Role", "Status", "Today (hrs)", "This Week (hrs)", "Pay Period (hrs)", "Last Activity"];
+    const body = rows.map((r) => [
+      `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim(),
+      r.role,
+      r.clockedIn ? "Clocked In" : "Clocked Out",
+      r.todayHours.toFixed(2),
+      r.weekHours.toFixed(2),
+      r.periodHours.toFixed(2),
+      r.lastActivity ? new Date(r.lastActivity).toLocaleString() : "—",
+    ]);
+    const csv = [header, ...body].map((row) => row.join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = filename;
+    a.click();
+  }
+  function exportAgentCsv(detail: TtAgentDetail) {
+    const header = ["Date", "Clock In", "Clock Out", "Hours", "Overtime"];
+    const rows: string[][] = [];
+    detail.days.forEach((d) => {
+      d.entries.forEach((e) => {
+        rows.push([
+          d.date,
+          new Date(e.clockIn).toLocaleTimeString(),
+          e.clockOut ? new Date(e.clockOut).toLocaleTimeString() : "—",
+          e.hours != null ? e.hours.toFixed(2) : "—",
+          d.overtime ? "Yes" : "",
+        ]);
+      });
+    });
+    const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `time-tracking-${detail.firstName}-${detail.lastName}.csv`;
+    a.click();
+  }
 
   // Init doc items from fetched data
   const effectiveDocItems = docsDirty ? docItems : (docReqs.length ? docReqs : DEFAULT_DOC_REQUIREMENTS);
@@ -724,6 +792,205 @@ export default function Admin() {
             {/* ══════════════════════════════════════════════════════════════ */}
             {/* TAB: AUDIT LOG                                                 */}
             {/* ══════════════════════════════════════════════════════════════ */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* TAB: TIME TRACKING                                            */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {activeTab === "timetracking" && !ttDrillAgent && (
+              <div className="space-y-4">
+                {/* Live Now Banner */}
+                {ttLive.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500">
+                      <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
+                    </div>
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                      {ttLive.length} agent{ttLive.length > 1 ? "s" : ""} currently clocked in:
+                    </p>
+                    {ttLive.map((a) => (
+                      <Badge key={a.userId} className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300">
+                        {a.firstName} {a.lastName} — {a.durationHours.toFixed(1)} h
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Clock className="h-5 w-5" />
+                          Agent Time Tracking
+                        </CardTitle>
+                        <CardDescription>Weekly and pay-period hours for all agents — auto-refreshes every 30 s</CardDescription>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => exportTtCsv(ttSummary)} className="gap-2">
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {ttLoading ? (
+                      <SkeletonRows rows={6} cols={6} />
+                    ) : ttSummary.length === 0 ? (
+                      <EmptyState icon={Clock} title="No time entries yet" description="Agents will appear here once they clock in." />
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Agent</TableHead>
+                              <TableHead>Role</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">Today</TableHead>
+                              <TableHead className="text-right">This Week</TableHead>
+                              <TableHead className="text-right">Pay Period</TableHead>
+                              <TableHead>Last Activity</TableHead>
+                              <TableHead />
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {ttSummary.map((row) => (
+                              <TableRow key={row.userId}>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <img
+                                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent((row.firstName ?? "?") + "+" + (row.lastName ?? ""))}&background=3B82F6&color=fff&size=28`}
+                                      alt="" className="h-7 w-7 rounded-full"
+                                    />
+                                    <span className="font-medium">{row.firstName} {row.lastName}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{ROLE_BADGE[row.role]}</TableCell>
+                                <TableCell>
+                                  {row.clockedIn ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                      <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                                        Live — since {row.clockInTime ? new Date(row.clockInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-slate-400">Clocked Out</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {row.todayHours > 0 ? (
+                                    <span className={row.todayHours > 8 ? "text-amber-600 font-semibold" : ""}>{row.todayHours.toFixed(2)} h</span>
+                                  ) : <span className="text-slate-400">—</span>}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {row.weekHours > 0 ? (
+                                    <span className={row.weekHours > 40 ? "text-red-600 font-semibold" : ""}>{row.weekHours.toFixed(2)} h</span>
+                                  ) : <span className="text-slate-400">—</span>}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {row.periodHours > 0 ? `${row.periodHours.toFixed(2)} h` : <span className="text-slate-400">—</span>}
+                                </TableCell>
+                                <TableCell className="text-xs text-slate-400">
+                                  {row.lastActivity ? new Date(row.lastActivity).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button variant="ghost" size="sm" onClick={() => setTtDrillAgent(row.userId)} className="gap-1.5 text-xs">
+                                    <ChevronRight className="h-4 w-4" />
+                                    Detail
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* ── Agent Drill-Down ──────────────────────────────────────────── */}
+            {activeTab === "timetracking" && !!ttDrillAgent && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={() => setTtDrillAgent(null)} className="gap-2">
+                    <ChevronLeft className="h-4 w-4" />
+                    Back
+                  </Button>
+                  {ttAgentDetail && (
+                    <>
+                      <h2 className="text-lg font-semibold">
+                        {ttAgentDetail.firstName} {ttAgentDetail.lastName}
+                      </h2>
+                      {ROLE_BADGE[ttAgentDetail.role]}
+                      {ttAgentDetail.weekOvertime && (
+                        <Badge className="bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300">OT this week</Badge>
+                      )}
+                      <div className="ml-auto flex items-center gap-2">
+                        <span className="text-sm text-slate-500">Week total: <span className="font-semibold text-slate-800 dark:text-white">{ttAgentDetail.weekTotal.toFixed(2)} h</span></span>
+                        <Button variant="outline" size="sm" onClick={() => exportAgentCsv(ttAgentDetail)} className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Export
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                  <CardContent className="p-0">
+                    {ttAgentLoading ? (
+                      <SkeletonRows rows={7} cols={5} />
+                    ) : !ttAgentDetail || ttAgentDetail.days.length === 0 ? (
+                      <EmptyState icon={Clock} title="No entries found" description="This agent has no recorded time entries." />
+                    ) : (
+                      <div className="custom-scrollbar max-h-[600px] overflow-y-auto">
+                        {ttAgentDetail.days.map((day) => (
+                          <div key={day.date} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
+                            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/60 px-5 py-2">
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                {new Date(day.date + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
+                              </span>
+                              <span className="ml-auto text-sm font-mono text-slate-600 dark:text-slate-400">
+                                {day.totalHours.toFixed(2)} h
+                              </span>
+                              {day.overtime && (
+                                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-[10px]">
+                                  OT &gt; 8h
+                                </Badge>
+                              )}
+                            </div>
+                            {day.entries.map((e) => (
+                              <div key={e.id} className="flex items-center gap-4 px-5 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                <div className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 min-w-[120px]">
+                                  <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                  {new Date(e.clockIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </div>
+                                <span className="text-slate-400 text-xs">→</span>
+                                <div className="text-sm text-slate-600 dark:text-slate-400 min-w-[100px]">
+                                  {e.clockOut ? new Date(e.clockOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : (
+                                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="font-mono text-sm text-slate-700 dark:text-slate-300">
+                                  {e.hours != null ? `${e.hours.toFixed(2)} h` : "—"}
+                                </div>
+                                {e.notes && (
+                                  <div className="text-xs text-slate-400 truncate max-w-[200px]">{e.notes}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             {activeTab === "audit" && (
               <Card className="rounded-[24px] border border-[hsl(var(--border))]">
                 <CardHeader className="border-b border-slate-100 dark:border-slate-800">

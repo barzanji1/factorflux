@@ -71,6 +71,7 @@ import {
   insertBulkInvoiceItemSchema,
   releaseLetters,
   insertReleaseLetterSchema,
+  timeEntries,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -1833,6 +1834,149 @@ ${message}
   });
 
   // Time tracking
+  // ─── Time Tracking Admin Routes ────────────────────────────────────────────
+  app.get("/api/time-tracking/summary", requireAdmin, async (_req, res) => {
+    try {
+      const now = new Date();
+      // Start of this week (Monday)
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      startOfWeek.setHours(0, 0, 0, 0);
+      // Start of pay period (14-day biweekly from a fixed epoch)
+      const epoch = new Date("2024-01-01");
+      const msSinceEpoch = now.getTime() - epoch.getTime();
+      const payPeriodMs = 14 * 24 * 60 * 60 * 1000;
+      const currentPeriodStart = new Date(epoch.getTime() + Math.floor(msSinceEpoch / payPeriodMs) * payPeriodMs);
+
+      const allUsers = await db.select().from(users).orderBy(users.firstName);
+      const weekEntries = await db.select().from(timeEntries)
+        .where(sql`${timeEntries.clockInTime} >= ${startOfWeek}`);
+      const periodEntries = await db.select().from(timeEntries)
+        .where(sql`${timeEntries.clockInTime} >= ${currentPeriodStart}`);
+      const liveEntries = await db.select().from(timeEntries)
+        .where(eq(timeEntries.status, "clocked_in"));
+
+      const summary = allUsers.map((u) => {
+        const weekHrs = weekEntries
+          .filter((e) => e.userId === u.id && e.status === "clocked_out")
+          .reduce((s, e) => s + parseFloat(e.totalHours ?? "0"), 0);
+        const periodHrs = periodEntries
+          .filter((e) => e.userId === u.id && e.status === "clocked_out")
+          .reduce((s, e) => s + parseFloat(e.totalHours ?? "0"), 0);
+        const live = liveEntries.find((e) => e.userId === u.id);
+        const lastEntry = [...weekEntries.filter((e) => e.userId === u.id)]
+          .sort((a, b) => new Date(b.clockInTime).getTime() - new Date(a.clockInTime).getTime())[0];
+        return {
+          userId: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          role: u.role,
+          clockedIn: !!live,
+          clockInTime: live?.clockInTime ?? null,
+          weekHours: Math.round(weekHrs * 100) / 100,
+          periodHours: Math.round(periodHrs * 100) / 100,
+          lastActivity: lastEntry?.clockInTime ?? null,
+          todayHours: weekEntries
+            .filter((e) => e.userId === u.id && e.status === "clocked_out" &&
+              new Date(e.clockInTime).toDateString() === now.toDateString())
+            .reduce((s, e) => s + parseFloat(e.totalHours ?? "0"), 0),
+        };
+      });
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching time tracking summary:", error);
+      res.status(500).json({ message: "Failed to fetch summary" });
+    }
+  });
+
+  app.get("/api/time-tracking/agent/:id", requireAdmin, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const [agent] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!agent) return res.status(404).json({ message: "Agent not found" });
+
+      const entries = await db.select().from(timeEntries)
+        .where(eq(timeEntries.userId, userId))
+        .orderBy(desc(timeEntries.clockInTime));
+
+      // Group by calendar day
+      const byDay: Record<string, typeof entries> = {};
+      for (const e of entries) {
+        const day = new Date(e.clockInTime).toLocaleDateString("en-CA"); // YYYY-MM-DD
+        if (!byDay[day]) byDay[day] = [];
+        byDay[day].push(e);
+      }
+
+      const startOfWeek = new Date();
+      startOfWeek.setDate(new Date().getDate() - ((new Date().getDay() + 6) % 7));
+      startOfWeek.setHours(0, 0, 0, 0);
+      let weekTotal = 0;
+
+      const days = Object.entries(byDay).map(([date, dayEntries]) => {
+        const dayHrs = dayEntries
+          .filter((e) => e.status === "clocked_out")
+          .reduce((s, e) => s + parseFloat(e.totalHours ?? "0"), 0);
+        const rounded = Math.round(dayHrs * 100) / 100;
+        if (new Date(date) >= startOfWeek) weekTotal += rounded;
+        return {
+          date,
+          entries: dayEntries.map((e) => ({
+            id: e.id,
+            clockIn: e.clockInTime,
+            clockOut: e.clockOutTime,
+            hours: e.totalHours ? parseFloat(e.totalHours) : null,
+            status: e.status,
+            notes: e.notes,
+          })),
+          totalHours: rounded,
+          overtime: rounded > 8,
+        };
+      });
+
+      res.json({
+        userId: agent.id,
+        firstName: agent.firstName,
+        lastName: agent.lastName,
+        role: agent.role,
+        days,
+        weekTotal: Math.round(weekTotal * 100) / 100,
+        weekOvertime: weekTotal > 40,
+      });
+    } catch (error) {
+      console.error("Error fetching agent time detail:", error);
+      res.status(500).json({ message: "Failed to fetch agent detail" });
+    }
+  });
+
+  app.get("/api/time-tracking/live", requireAdmin, async (_req, res) => {
+    try {
+      const live = await db.select().from(timeEntries)
+        .where(eq(timeEntries.status, "clocked_in"));
+      const userIds = [...new Set(live.map((e) => e.userId))];
+      const agentRows = userIds.length
+        ? await db.select().from(users).where(sql`${users.id} IN (${sql.join(userIds.map((id) => sql`${id}`), sql`, `)})`)
+        : [];
+      const agentMap = Object.fromEntries(agentRows.map((u) => [u.id, u]));
+      const result = live.map((e) => {
+        const agent = agentMap[e.userId];
+        const durationMs = Date.now() - new Date(e.clockInTime).getTime();
+        const hours = durationMs / (1000 * 60 * 60);
+        return {
+          userId: e.userId,
+          firstName: agent?.firstName ?? "Unknown",
+          lastName: agent?.lastName ?? "",
+          role: agent?.role ?? "",
+          clockInTime: e.clockInTime,
+          durationHours: Math.round(hours * 100) / 100,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching live agents:", error);
+      res.status(500).json({ message: "Failed to fetch live agents" });
+    }
+  });
+
   app.get("/api/time-tracking/status", requireAuth, async (req: any, res) => {
     try {
       const currentEntry = await storage.getCurrentTimeEntry(req.user.id);
