@@ -18,7 +18,7 @@ const schema = z.object({
   invoiceNumber: z.string().optional(),
   brokerName: z.string().min(1, "Broker name required"),
   amount: z.coerce.number().min(1, "Amount required"),
-  paymentType: z.enum(["ACH", "check"]),
+  paymentType: z.enum(["ACH", "wire"]),
 });
 type SubmitForm = z.infer<typeof schema>;
 
@@ -160,7 +160,7 @@ export default function PortalSubmit() {
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="ACH">ACH (Direct Deposit)</SelectItem>
-                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="wire">Wire Transfer</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
