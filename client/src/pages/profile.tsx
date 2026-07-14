@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import { updateUserProfileSchema, type UpdateUserProfile, type User } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -59,84 +59,71 @@ const jobTitles = [
 ];
 
 export default function Profile() {
-  // Mock user data since authentication is removed
-  const user = {
-    id: "1",
-    firstName: "Admin", 
-    lastName: "User",
-    email: "admin@tpf.com",
-    phone: null,
-    jobTitle: "System Administrator",
-    department: "IT",
-    role: "admin",
-    profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
-    bio: null,
-    location: null,
-    timezone: "America/New_York",
-    language: "en",
-    emailNotifications: true,
-    smsNotifications: false,
-    desktopNotifications: true,
-    startTime: "09:00",
-    endTime: "17:00", 
-    workDays: "monday,tuesday,wednesday,thursday,friday",
-    theme: "system",
-    dateFormat: "MM/dd/yyyy",
-    timeFormat: "12h",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-  const isAuthenticated = true;
-  const isLoading = false;
+  const { user: authUser, checkAuth } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // Authentication system removed - no redirect needed
+  // Fetch extended profile fields from DB
+  const { data: profileData } = useQuery<any>({
+    queryKey: ["/api/user/profile"],
+    enabled: !!authUser,
+  });
+
+  // Merge auth context (always fresh) with extended DB fields
+  const user = {
+    id: authUser?.id ?? "",
+    firstName: authUser?.firstName ?? profileData?.firstName ?? "",
+    lastName: authUser?.lastName ?? profileData?.lastName ?? "",
+    email: authUser?.email ?? authUser?.username ?? profileData?.email ?? "",
+    role: authUser?.role ?? profileData?.role ?? "employee",
+    profileImageUrl: authUser?.profileImageUrl ?? profileData?.profileImageUrl ?? "",
+    verified: authUser?.verified ?? profileData?.verified ?? false,
+    phone: profileData?.phone ?? null,
+    jobTitle: profileData?.jobTitle ?? null,
+    department: profileData?.department ?? null,
+    createdAt: profileData?.createdAt ? new Date(profileData.createdAt) : null,
+  };
 
   const form = useForm<UpdateUserProfile>({
     resolver: zodResolver(updateUserProfileSchema),
     defaultValues: {
-      firstName: user.firstName || "",
-      lastName: user.lastName || "",
-      phone: user.phone || "",
-      jobTitle: user.jobTitle || "",
-      department: user.department || "",
+      firstName: "",
+      lastName: "",
+      phone: "",
+      jobTitle: "",
+      department: "",
     },
   });
+
+  // Populate form once real data is available
+  useEffect(() => {
+    if (authUser || profileData) {
+      form.reset({
+        firstName: authUser?.firstName ?? profileData?.firstName ?? "",
+        lastName: authUser?.lastName ?? profileData?.lastName ?? "",
+        phone: profileData?.phone ?? "",
+        jobTitle: profileData?.jobTitle ?? "",
+        department: profileData?.department ?? "",
+      });
+    }
+  }, [authUser?.id, profileData?.id]);
 
   const updateProfile = useMutation({
     mutationFn: async (data: UpdateUserProfile) => {
       const response = await apiRequest("PATCH", "/api/user/profile", data);
-      
-      // Check if response has content before parsing JSON
       const text = await response.text();
-      if (text) {
-        return JSON.parse(text);
-      }
-      return { success: true };
+      return text ? JSON.parse(text) : { success: true };
     },
-    onSuccess: (data) => {
-      toast({
-        title: "Profile Updated", 
-        description: "Your profile has been updated successfully.",
-      });
-      // Save updated user data to localStorage for immediate UI updates
-      const updatedUser = { ...user, ...form.getValues() };
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      
-      // Refresh the page to show updated information
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+    onSuccess: () => {
+      toast({ title: "Profile Updated", description: "Your profile has been updated successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/verify"] });
+      checkAuth();
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update profile",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to update profile", variant: "destructive" });
     },
   });
 
@@ -145,72 +132,45 @@ export default function Profile() {
       setIsUploadingImage(true);
       const formData = new FormData();
       formData.append("profileImage", file);
-      
       const response = await fetch("/api/user/profile-image", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
-      
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
-      }
-      
+      if (!response.ok) throw new Error("Failed to upload image");
       return response.json();
     },
-    onSuccess: (data) => {
-      toast({
-        title: "Profile Image Updated",
-        description: "Your profile image has been updated successfully.",
-      });
+    onSuccess: () => {
+      toast({ title: "Profile Image Updated", description: "Your profile image has been updated successfully." });
       setIsUploadingImage(false);
-      // Refresh the page to show the new image
-      window.location.reload();
+      // Refresh auth context and profile data — no page reload needed
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/verify"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
+      checkAuth();
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to upload image",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to upload image", variant: "destructive" });
       setIsUploadingImage(false);
     },
   });
 
-  const onSubmit = (data: UpdateUserProfile) => {
-    updateProfile.mutate(data);
-  };
+  const onSubmit = (data: UpdateUserProfile) => { updateProfile.mutate(data); };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type and size
-      if (!file.type.startsWith("image/")) {
-        toast({
-          title: "Invalid File Type",
-          description: "Please select an image file (JPEG, PNG, GIF).",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({
-          title: "File Too Large",
-          description: "Please select an image smaller than 5MB.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      uploadProfileImage.mutate(file);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid File Type", description: "Please select an image file (JPEG, PNG, GIF).", variant: "destructive" });
+      return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "Please select an image smaller than 5MB.", variant: "destructive" });
+      return;
+    }
+    uploadProfileImage.mutate(file);
   };
 
-  const triggerImageUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Authentication system removed - always show profile
+  const triggerImageUpload = () => { fileInputRef.current?.click(); };
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">

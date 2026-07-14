@@ -338,12 +338,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/verify", (req, res) => {
-    const user = (req.session as any)?.user;
-    if (user) {
-      return res.json({ user });
+  app.get("/api/auth/verify", async (req, res) => {
+    const sessionUser = (req.session as any)?.user;
+    if (!sessionUser) {
+      return res.status(401).json({ message: "Not authenticated" });
     }
-    return res.status(401).json({ message: "Not authenticated" });
+    // Refresh profileImageUrl from DB so sidebar/header always show the latest image
+    try {
+      const dbUser = await storage.getUser(sessionUser.id);
+      if (dbUser) {
+        sessionUser.profileImageUrl = dbUser.profileImageUrl || "";
+        (req.session as any).user = sessionUser;
+      }
+    } catch {}
+    return res.json({ user: sessionUser });
   });
 
   app.post("/api/auth/logout", (req, res) => {
@@ -393,6 +401,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Profile
+  app.get("/api/user/profile", requireAuth, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
   app.patch("/api/user/profile", requireAuth, async (req: any, res) => {
     try {
       const validUpdates = [
@@ -435,23 +453,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/user/profile-image", handleUpload("profileImage"), async (req: any, res) => {
+  app.post("/api/user/profile-image", requireAuth, handleUpload("profileImage"), async (req: any, res) => {
     try {
-      const userId = "1";
+      const userId = req.user.id;
 
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });
       }
 
       const profileImageUrl = `/uploads/${req.file.filename}`;
-
       await storage.updateUserProfile(userId, { profileImageUrl });
-      const updatedUser = await storage.getUser(userId);
 
-      res.json({
-        message: "Profile image updated successfully",
-        user: updatedUser,
-      });
+      // Update session immediately so auth context reflects the new image without re-login
+      if ((req.session as any).user) {
+        (req.session as any).user.profileImageUrl = profileImageUrl;
+      }
+
+      res.json({ message: "Profile image updated successfully", profileImageUrl });
     } catch (error) {
       console.error("Error uploading profile image:", error);
       res.status(500).json({ message: "Failed to upload profile image" });
