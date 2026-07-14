@@ -138,10 +138,21 @@ function isRouteActive(current: string, href: string) {
 
 export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const user = getUserData();
   const { permissions, user: authUser } = useAuth();
 
-  const isAdmin = (authUser?.role ?? user.role) === "admin";
+  const userRole = authUser?.role ?? "employee";
+  const isAdmin = userRole === "admin";
+
+  // Build display user entirely from auth context — never fall back to hardcoded admin values
+  const user: CurrentUser = {
+    id: authUser?.id ?? "",
+    firstName: authUser?.firstName ?? "",
+    lastName: authUser?.lastName ?? "",
+    email: authUser?.email ?? authUser?.username ?? "",
+    role: userRole,
+    profileImageUrl: authUser?.profileImageUrl ?? "",
+    jobTitle: userRole.charAt(0).toUpperCase() + userRole.slice(1),
+  };
 
   const filteredSections = useMemo(() =>
     navSections
@@ -151,14 +162,14 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           // Admins always see everything
           if (isAdmin) return true;
           // Role gate for manager-only items
-          if (i.role === "manager" && user.role !== "manager" && user.role !== "admin") return false;
+          if (i.role === "manager" && userRole !== "manager" && userRole !== "admin") return false;
           // Permission gate
           if (i.permission && permissions.length > 0 && !permissions.includes(i.permission)) return false;
           return true;
         }),
       }))
       .filter(s => s.items.length > 0),
-    [user.role, isAdmin, permissions]
+    [userRole, isAdmin, permissions]
   );
 
   return (

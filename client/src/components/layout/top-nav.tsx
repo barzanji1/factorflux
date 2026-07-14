@@ -194,20 +194,12 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   ];
   const showHomeButton = pagesWithHomeButton.some((page) => location.startsWith(page));
 
-  const authUserAny = authUser as any;
-  const profileData = (() => {
-    try {
-      const raw = window.localStorage.getItem("currentUser");
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  })();
-  const displayFirstName = profileData?.firstName || authUserAny?.firstName || "Admin";
-  const displayLastName = profileData?.lastName || authUserAny?.lastName || "User";
-  const fullName = `${displayFirstName} ${displayLastName}`;
+  const displayFirstName = authUser?.firstName || "";
+  const displayLastName = authUser?.lastName || "";
+  const fullName = `${displayFirstName} ${displayLastName}`.trim() || "Agent";
   const userRole = authUser?.role || "Employee";
   const avatarSrc =
-    profileData?.profileImageUrl ||
-    authUserAny?.profileImageUrl ||
+    authUser?.profileImageUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=2563EB&color=fff`;
 
   const filteredNotifications = notifFilter === "unread"

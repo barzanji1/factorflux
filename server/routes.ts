@@ -290,6 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: prodUser.firstName,
           lastName: prodUser.lastName,
           verified: prodUser.verified,
+          profileImageUrl: (dbRecord as any)?.profileImageUrl || "",
         };
         (req.session as any).user = sessionUser;
         return res.json({ success: true, user: sessionUser });
@@ -327,6 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: dbUser.firstName || "",
         lastName: dbUser.lastName || "",
         verified: dbUser.verified ?? false,
+        profileImageUrl: dbUser.profileImageUrl || "",
       };
       (req.session as any).user = sessionUser;
       return res.json({ success: true, user: sessionUser });
