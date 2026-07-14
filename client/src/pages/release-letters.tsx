@@ -428,10 +428,10 @@ export default function ReleaseLetters() {
                 <FormField control={form.control} name="brokerId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Broker</FormLabel>
-                    <Select value={field.value} onValueChange={(v) => { field.onChange(v); autoPopulate(undefined, undefined, v, undefined); }}>
+                    <Select value={field.value || "none"} onValueChange={(v) => { const val = v === "none" ? "" : v; field.onChange(val); autoPopulate(undefined, undefined, val, undefined); }}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select broker…" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="">— None —</SelectItem>
+                        <SelectItem value="none">— None —</SelectItem>
                         {brokersData.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -444,10 +444,10 @@ export default function ReleaseLetters() {
                 <FormField control={form.control} name="invoiceId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Invoice</FormLabel>
-                    <Select value={field.value} onValueChange={(v) => { field.onChange(v); autoPopulate(undefined, undefined, undefined, v); }}>
+                    <Select value={field.value || "none"} onValueChange={(v) => { const val = v === "none" ? "" : v; field.onChange(val); autoPopulate(undefined, undefined, undefined, val); }}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select invoice…" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="">— None —</SelectItem>
+                        <SelectItem value="none">— None —</SelectItem>
                         {carrierInvoices.map((inv) => (
                           <SelectItem key={inv.id} value={String(inv.id)}>
                             {inv.invoiceNumber}{inv.loadNumber ? ` / ${inv.loadNumber}` : ""} — {fmt(inv.amount)}
