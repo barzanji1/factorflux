@@ -5180,25 +5180,28 @@ Trucking Pros Financial Team
 
   app.post("/api/release-letters", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub ?? req.user?.id;
       const { invoiceId, carrierId, brokerId, letterType, content } = req.body;
-      const data = insertReleaseLetterSchema.parse({
-        invoiceId: invoiceId ? parseInt(invoiceId, 10) : null,
+
+      if (!carrierId) return res.status(400).json({ message: "Carrier is required" });
+      if (!content || content.trim().length < 10) return res.status(400).json({ message: "Letter content must be at least 10 characters" });
+
+      const insertData: any = {
         carrierId: parseInt(carrierId, 10),
         brokerId: brokerId ? parseInt(brokerId, 10) : null,
+        invoiceId: invoiceId ? parseInt(invoiceId, 10) : null,
         letterType: letterType ?? "standard",
         status: "draft",
-        content,
-        createdBy: userId,
-      });
-      const [letter] = await db.insert(releaseLetters).values(data).returning();
+        content: content.trim(),
+      };
+
+      if (isNaN(insertData.carrierId)) return res.status(400).json({ message: "Invalid carrier ID" });
+
+      const [letter] = await db.insert(releaseLetters).values(insertData).returning();
       res.status(201).json(letter);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") });
-      }
+    } catch (error: any) {
       console.error("Error creating release letter:", error);
-      res.status(500).json({ message: "Failed to create release letter" });
+      const msg = error?.detail ?? error?.message ?? "Failed to create release letter";
+      res.status(500).json({ message: msg });
     }
   });
 

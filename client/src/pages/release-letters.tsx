@@ -195,16 +195,25 @@ export default function ReleaseLetters() {
   // ─── Mutations ─────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/release-letters", data),
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/release-letters", data);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/release-letters"] });
       setDialogOpen(false);
       form.reset();
       toast({ title: "Release letter created" });
     },
-    onError: async (e: any) => {
+    onError: (e: any) => {
+      // apiRequest throws Error with message like "400: {\"message\":\"...\"}"
       let msg = "Failed to create letter";
-      try { const j = await e?.response?.json?.(); if (j?.message) msg = j.message; } catch {}
+      try {
+        const raw = e?.message ?? "";
+        const jsonPart = raw.replace(/^\d+:\s*/, "");
+        const parsed = JSON.parse(jsonPart);
+        if (parsed?.message) msg = parsed.message;
+      } catch {}
       toast({ title: msg, variant: "destructive" });
     },
   });
