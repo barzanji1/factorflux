@@ -8,7 +8,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -103,6 +103,7 @@ const navSections: NavSection[] = [
       { name: "Help",             href: "/help",             icon: LifeBuoy,        permission: "help"                              },
       { name: "Rules",            href: "/document-rules",   icon: FileCheck2,      permission: "rules",            role: "manager" },
       { name: "Workflow Builder", href: "/workflow-builder", icon: Workflow,        permission: "workflow_builder", role: "manager" },
+      { name: "AI Assistant",     href: "/ai-assistant",     icon: Sparkles,        permission: "admin",            role: "manager" },
     ],
   },
 ];

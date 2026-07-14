@@ -79,6 +79,7 @@ import {
   insertBulkInvoiceItemSchema,
   releaseLetters,
   insertReleaseLetterSchema,
+  aiChatLogs,
   timeEntries,
   carrierPortalUsers,
   carrierSubmissions,
@@ -86,6 +87,7 @@ import {
   ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
+import Anthropic from "@anthropic-ai/sdk";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
 import { classifyDocumentAI } from "./services/aiClassifier";
@@ -5266,6 +5268,81 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error sending release letter:", error);
       res.status(500).json({ message: "Failed to send release letter" });
+    }
+  });
+
+  // ─── AI Assistant ──────────────────────────────────────────────────────────
+  app.post("/api/ai/chat", requireAuth, async (req: any, res) => {
+    try {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ message: "AI Assistant is not configured. Ask your administrator to set the ANTHROPIC_API_KEY." });
+      }
+
+      const { messages } = req.body;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ message: "messages array is required" });
+      }
+
+      const client = new Anthropic({ apiKey });
+
+      const systemPrompt = `You are an internal AI assistant for FactorFlux, a freight factoring operations system built for Trucking Pros Financial. You help agents navigate the system, troubleshoot issues, and understand workflows.
+
+System knowledge:
+- Carriers: trucking companies that submit invoices for factoring
+- Invoices: freight invoices submitted by carriers for payment advance
+- Factoring: 8-stage lifecycle — Document Intake → Verification → Advance → Approval → Collections → Payment Receipt → Final Settlement
+- Brokers: freight brokers who owe payment on invoices
+- Lockbox: cash application tool to match incoming payments to open invoices
+- Held Queue: invoices blocked from funding due to missing docs, disputes, or manual holds
+- Fuel Advance: short-term advances to carriers for fuel costs
+- Followups: automated broker communication and collections cadence
+- Vault: encrypted storage for sensitive carrier data (SSN, bank accounts)
+- Portal Submissions: invoices submitted by carriers through the carrier portal at /portal
+- Dispatchers: carrier dispatchers linked to carrier records
+- Trucks: carrier equipment tracked per carrier
+- Bank Transfers: ACH and wire transfer records
+- Payroll: agent payroll tracking
+- Release Letters: letters sent to brokers upon invoice settlement
+- C/B Reviews: credit and background reviews on carriers and brokers
+- MC Check: FMCSA authority verification for carriers
+- Bulk Invoices: batch invoice processing for high-volume carriers
+- Reports: Aging, Agent, Broker, Carrier, Daily AR, Monthly Summary
+- Audit Trail/Logs: full system activity log
+- Workflow Builder: configurable factoring pipeline stages with SLA targets
+- Rules: document classification rules
+- Admin: user management, permissions, carrier portal approvals
+
+Common workflows:
+- To factor an invoice: Carriers → Create Invoice → Upload BOL and Rate Con → Factoring tab → move through stages
+- To hold an invoice: Open invoice → Hold button → select reason
+- To match a payment: Lockbox → New Entry → Match to invoice
+- To approve a carrier portal user: Admin → Carrier Portal tab → Approve
+- To add an agent: Admin → Users tab → Add Agent → set permissions via toggles
+
+Always be helpful, concise, and specific to FactorFlux workflows. If an agent describes an error, ask for details and guide them through fixing it step by step.`;
+
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
+      });
+
+      const assistantMessage = response.content[0]?.type === "text" ? response.content[0].text : "";
+
+      // Log conversation
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      await db.insert(aiChatLogs).values({
+        userId,
+        messages: [...messages, { role: "assistant", content: assistantMessage }],
+      });
+
+      res.json({ message: assistantMessage });
+    } catch (error: any) {
+      console.error("AI chat error:", error);
+      const msg = error?.message ?? "Failed to get AI response";
+      res.status(500).json({ message: msg });
     }
   });
 

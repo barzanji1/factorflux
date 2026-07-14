@@ -50,6 +50,7 @@ import BankTransfers from "@/pages/bank-transfers";
 import Payroll from "@/pages/payroll";
 import BulkInvoices from "@/pages/bulk-invoices";
 import ReleaseLetters from "@/pages/release-letters";
+import AIAssistant from "@/pages/ai-assistant";
 import PortalLanding from "@/pages/portal/index";
 import PortalRegister from "@/pages/portal/register";
 import PortalLogin from "@/pages/portal/login";
@@ -273,6 +274,11 @@ function Router() {
       <Route path="/release-letters">
         <ProtectedRoute>
           <ReleaseLetters />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/ai-assistant">
+        <ProtectedRoute>
+          <AIAssistant />
         </ProtectedRoute>
       </Route>
       {/* Portal public routes */}

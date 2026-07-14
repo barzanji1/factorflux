@@ -1,0 +1,71 @@
+Good. Now paste this into Replit:
+
+Build an internal AI Assistant powered by Claude (Anthropic) inside FactorFlux. Agents can chat with it to get help, answers, and guidance about the system.
+Install dependencies
+
+ npm install @anthropic-ai/sdk
+
+Backend
+
+ Create POST /api/ai/chat — authenticated route, accepts { messages: [{role, content}] } conversation history
+ Initialize Anthropic client using ANTHROPIC_API_KEY env var
+ Use model claude-sonnet-4-6
+ System prompt must include full FactorFlux context:
+
+You are an internal AI assistant for FactorFlux, a freight factoring operations system built for Trucking Pros Financial. You help agents navigate the system, troubleshoot issues, and understand workflows.
+
+System knowledge:
+- Carriers: trucking companies that submit invoices for factoring
+- Invoices: freight invoices submitted by carriers for payment advance
+- Factoring: 8-stage lifecycle — Document Intake → Verification → Advance → Approval → Collections → Payment Receipt → Final Settlement
+- Brokers: freight brokers who owe payment on invoices
+- Lockbox: cash application tool to match incoming payments to open invoices
+- Held Queue: invoices blocked from funding due to missing docs, disputes, or manual holds
+- Fuel Advance: short-term advances to carriers for fuel costs
+- Followups: automated broker communication and collections cadence
+- Vault: encrypted storage for sensitive carrier data (SSN, bank accounts)
+- Portal Submissions: invoices submitted by carriers through the carrier portal at /portal
+- Dispatchers: carrier dispatchers linked to carrier records
+- Trucks: carrier equipment tracked per carrier
+- Bank Transfers: ACH and wire transfer records
+- Payroll: agent payroll tracking
+- Release Letters: letters sent to brokers upon invoice settlement
+- C/B Reviews: credit and background reviews on carriers and brokers
+- MC Check: FMCSA authority verification for carriers
+- Bulk Invoices: batch invoice processing for high-volume carriers
+- Reports: Aging, Agent, Broker, Carrier, Daily AR, Monthly Summary
+- Audit Trail/Logs: full system activity log
+- Workflow Builder: configurable factoring pipeline stages with SLA targets
+- Rules: document classification rules
+- Admin: user management, permissions, carrier portal approvals
+
+Common workflows:
+- To factor an invoice: Carriers → Create Invoice → Upload BOL and Rate Con → Factoring tab → move through stages
+- To hold an invoice: Open invoice → Hold button → select reason
+- To match a payment: Lockbox → New Entry → Match to invoice
+- To approve a carrier portal user: Admin → Carrier Portal tab → Approve
+- To add an agent: Admin → Users tab → Add Agent → set permissions via toggles
+
+Always be helpful, concise, and specific to FactorFlux workflows. If an agent describes an error, ask for details and guide them through fixing it step by step.
+
+ Stream responses back to frontend using Server-Sent Events or return full response
+ Log each conversation to ai_chat_logs table: id, userId, messages (JSON), createdAt
+ Run db:push
+
+Frontend — AI Chat page (/ai-assistant)
+
+ Clean chat UI: message bubbles, user on right, Claude on left with FactorFlux logo avatar
+ Input box at bottom with send button and Enter key support
+ Conversation history maintained during session
+ Loading indicator while Claude responds
+ Suggested starter questions:
+
+"How do I factor an invoice?"
+"How do I put an invoice on hold?"
+"How do I approve a carrier in the portal?"
+"How do I match a payment in Lockbox?"
+
+
+ Register /ai-assistant route in App.tsx
+ Add AI Assistant to sidebar under WORKSPACE section with a sparkle/bot icon
+ Only visible to users with admin or manager role initially

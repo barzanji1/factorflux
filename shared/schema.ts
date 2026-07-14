@@ -1551,6 +1551,17 @@ export const userPermissions = pgTable("user_permissions", {
 });
 export type UserPermission = typeof userPermissions.$inferSelect;
 
+// ─── AI Chat Logs ──────────────────────────────────────────────────────────────
+export const aiChatLogs = pgTable("ai_chat_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id"),
+  messages: jsonb("messages").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertAiChatLogSchema = createInsertSchema(aiChatLogs).omit({ id: true, createdAt: true });
+export type AiChatLog = typeof aiChatLogs.$inferSelect;
+export type InsertAiChatLog = z.infer<typeof insertAiChatLogSchema>;
+
 export const ALL_PERMISSIONS = [
   "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
   "factoring","payments","lockbox","fuel_advance","bank_transfers",
