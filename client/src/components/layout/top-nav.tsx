@@ -464,7 +464,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                   <div className="hidden text-left md:block">
                     <div className="flex items-center gap-1.5">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">{fullName}</p>
-                      {authUserAny?.verified && <BadgeCheck className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />}
+                      {authUser?.verified && <BadgeCheck className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />}
                     </div>
                     <p className="text-xs capitalize text-slate-500 dark:text-slate-400">{userRole}</p>
                   </div>
