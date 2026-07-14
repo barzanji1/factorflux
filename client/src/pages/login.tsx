@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth } from "@/hooks/useAuth";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  username: z.string().email("Enter a valid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -86,15 +86,16 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>Email Address</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                           <Input
                             {...field}
-                            type="text"
-                            placeholder="Enter your username"
+                            type="email"
+                            placeholder="you@company.com"
                             className="pl-10"
+                            autoComplete="email"
                             disabled={isLoading}
                           />
                         </div>

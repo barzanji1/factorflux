@@ -293,14 +293,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ success: true, user: sessionUser });
       }
 
-      // 2. Fall back to DB users (login with email as username)
+      // 2. Fall back to DB users (login with email address)
       const dbUser = await storage.getUserByEmail(username);
-      if (!dbUser || !dbUser.password) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      if (!dbUser) {
+        console.warn(`[login] No user found for email: ${username}`);
+        return res.status(401).json({ message: "No account found with that email address." });
+      }
+      if (!dbUser.password) {
+        console.warn(`[login] User ${username} has no password set`);
+        return res.status(401).json({ message: "This account has no password set. Contact your administrator." });
       }
 
       const isValid = await bcrypt.compare(password, dbUser.password);
-      if (!isValid) return res.status(401).json({ message: "Invalid credentials" });
+      if (!isValid) {
+        console.warn(`[login] Invalid password for user: ${username}`);
+        return res.status(401).json({ message: "Incorrect password. Please try again." });
+      }
 
       if ((dbUser as any).status === "suspended") {
         return res.status(403).json({ message: "Your account has been suspended. Contact your administrator." });
