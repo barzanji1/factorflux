@@ -5,6 +5,13 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import {
+  uploadToS3,
+  getSignedViewUrl,
+  getSignedDownloadUrl,
+  deleteFromS3,
+  downloadToTemp,
+} from "./services/s3Service";
 import { z } from "zod";
 import { eq, and, desc, sql, inArray, notInArray } from "drizzle-orm";
 
@@ -94,7 +101,7 @@ import {
 import { getDocumentCompleteness } from "./services/docValidation";
 
 const upload = multer({
-  dest: "uploads/",
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024,
   },
@@ -945,12 +952,18 @@ ${message}
 
       const { documentType, sourceChannel } = req.body;
       const processedOriginalName = sanitizeOriginalName(req.file.originalname);
+      const fileUuid = crypto.randomUUID();
+      const s3Key = await uploadToS3(req.file.buffer, `documents/${fileUuid}`, req.file.mimetype);
+      // Write to /tmp for OCR pipeline (ephemeral, not uploads/)
+      const tmpPath = path.join("/tmp", fileUuid);
+      fs.writeFileSync(tmpPath, req.file.buffer);
 
       const documentData = {
-        filename: req.file.filename,
+        filename: fileUuid,
         originalName: processedOriginalName,
         mimeType: req.file.mimetype,
         size: req.file.size,
+        s3Key,
         documentType: (documentType as any) || "other",
         loadId: null,
         invoiceId,
@@ -1005,19 +1018,20 @@ ${message}
 
       const { documentType, loadId, invoiceId, sourceChannel } = req.body;
 
-      const processedFilename = req.file.filename;
       const processedMimeType = req.file.mimetype;
       const processedOriginalName = sanitizeOriginalName(req.file.originalname);
-
-      if (req.file.mimetype.includes("jpeg") || req.file.mimetype.includes("jpg")) {
-        console.log("Image uploaded as-is (PDF conversion disabled for web deployment)");
-      }
+      const fileUuid = crypto.randomUUID();
+      const s3Key = await uploadToS3(req.file.buffer, `documents/${fileUuid}`, processedMimeType);
+      // Write to /tmp for OCR pipeline (ephemeral, not uploads/)
+      const tmpPath = path.join("/tmp", fileUuid);
+      fs.writeFileSync(tmpPath, req.file.buffer);
 
       const documentData = {
-        filename: processedFilename,
+        filename: fileUuid,
         originalName: processedOriginalName,
         mimeType: processedMimeType,
         size: req.file.size,
+        s3Key,
         documentType: documentType || "other",
         loadId: loadId && loadId !== "undefined" ? parseInt(loadId, 10) : null,
         invoiceId: invoiceId && invoiceId !== "undefined" ? parseInt(invoiceId, 10) : null,
@@ -1072,12 +1086,14 @@ ${message}
       await storage.deleteDocument(id);
 
       try {
-        const filePath = path.join("uploads", document.filename);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        if ((document as any).s3Key) {
+          await deleteFromS3((document as any).s3Key);
+        } else {
+          const filePath = path.join("uploads", document.filename);
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         }
       } catch (fileError) {
-        console.warn("Could not delete physical file:", fileError);
+        console.warn("Could not delete file:", fileError);
       }
 
       await storage.createActivity({
@@ -1104,6 +1120,12 @@ ${message}
         return res.status(404).json({ message: "Document not found" });
       }
 
+      if ((document as any).s3Key) {
+        const url = await getSignedDownloadUrl((document as any).s3Key, document.originalName);
+        return res.redirect(url);
+      }
+
+      // Local fallback for legacy files
       let filePath = path.resolve(process.cwd(), "uploads", document.filename);
       if (!fs.existsSync(filePath)) {
         filePath = path.resolve(process.cwd(), "uploads", `${document.filename}.pdf`);
@@ -1113,18 +1135,14 @@ ${message}
       }
 
       const stats = fs.statSync(filePath);
-
       res.setHeader("Content-Type", document.mimeType || "application/octet-stream");
       res.setHeader("Content-Disposition", `attachment; filename="${document.originalName}"`);
       res.setHeader("Content-Length", stats.size.toString());
       res.setHeader("Cache-Control", "no-cache");
-
       const fileStream = fs.createReadStream(filePath);
       fileStream.on("error", (error) => {
         console.error("Error streaming file:", error);
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Error streaming file" });
-        }
+        if (!res.headersSent) res.status(500).json({ message: "Error streaming file" });
       });
       fileStream.pipe(res);
     } catch (error) {
@@ -1142,6 +1160,12 @@ ${message}
         return res.status(404).json({ message: "Document not found" });
       }
 
+      if ((document as any).s3Key) {
+        const url = await getSignedViewUrl((document as any).s3Key);
+        return res.redirect(url);
+      }
+
+      // Local fallback for legacy files
       let filePath = path.resolve(process.cwd(), "uploads", document.filename);
       if (!fs.existsSync(filePath)) {
         filePath = path.resolve(process.cwd(), "uploads", `${document.filename}.pdf`);
@@ -1152,13 +1176,10 @@ ${message}
 
       res.setHeader("Content-Type", document.mimeType || "application/octet-stream");
       res.setHeader("Content-Disposition", `inline; filename="${document.originalName}"`);
-
       const fileStream = fs.createReadStream(filePath);
       fileStream.on("error", (error) => {
         console.error("Error streaming file:", error);
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Error streaming file" });
-        }
+        if (!res.headersSent) res.status(500).json({ message: "Error streaming file" });
       });
       fileStream.pipe(res);
     } catch (error) {
@@ -4406,7 +4427,16 @@ Trucking Pros Financial Team
         .values({ documentId: docId, jobType: "pdf_text", status: "queued" })
         .returning();
 
-      const filePath = path.join("uploads", doc.filename);
+      // For S3 docs: download to /tmp for OCR; for legacy docs: use uploads/ path
+      let filePath = path.join("/tmp", doc.filename);
+      if (!fs.existsSync(filePath)) {
+        const legacyPath = path.join("uploads", doc.filename);
+        if (fs.existsSync(legacyPath)) {
+          filePath = legacyPath;
+        } else if ((doc as any).s3Key) {
+          await downloadToTemp((doc as any).s3Key, filePath);
+        }
+      }
       jobQueue.enqueue({ jobId: job.id, documentId: docId, filePath, mimeType: doc.mimeType });
 
       res.json({ jobId: job.id, status: "queued" });
@@ -5402,7 +5432,7 @@ Trucking Pros Financial Team
   // ═══════════════════════════════════════════════════════════════════════════
 
   const portalUpload = multer({
-    dest: "uploads/portal/",
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
       const allowed = /jpeg|jpg|png|pdf|tiff|tif/;
@@ -5524,13 +5554,16 @@ Trucking Pros Financial Team
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const dtype = (docTypes[i] || "other") as "rate_confirmation" | "bol" | "lumper_receipt" | "other";
+        const portalFileUuid = crypto.randomUUID();
+        const portalS3Key = await uploadToS3(file.buffer, `portal/${portalFileUuid}`, file.mimetype);
         await db.insert(carrierSubmissionDocs).values({
           submissionId: sub.id,
           documentType: dtype,
-          filename: file.filename,
+          filename: portalFileUuid,
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,
+          s3Key: portalS3Key,
         });
       }
       res.status(201).json(sub);
@@ -5558,6 +5591,11 @@ Trucking Pros Financial Team
       const docId = parseInt(req.params.docId, 10);
       const [doc] = await db.select().from(carrierSubmissionDocs).where(eq(carrierSubmissionDocs.id, docId)).limit(1);
       if (!doc) return res.status(404).json({ message: "Document not found" });
+      if (doc.s3Key) {
+        const url = await getSignedViewUrl(doc.s3Key);
+        return res.redirect(url);
+      }
+      // Legacy local fallback
       const filePath = path.join(process.cwd(), "uploads/portal", doc.filename);
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found on disk" });
       res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");
@@ -5573,6 +5611,11 @@ Trucking Pros Financial Team
       const docId = parseInt(req.params.docId, 10);
       const [doc] = await db.select().from(carrierSubmissionDocs).where(eq(carrierSubmissionDocs.id, docId)).limit(1);
       if (!doc) return res.status(404).json({ message: "Document not found" });
+      if (doc.s3Key) {
+        const url = await getSignedDownloadUrl(doc.s3Key, doc.originalName);
+        return res.redirect(url);
+      }
+      // Legacy local fallback
       const filePath = path.join(process.cwd(), "uploads/portal", doc.filename);
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found on disk" });
       res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");

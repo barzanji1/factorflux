@@ -196,6 +196,7 @@ export const documents = pgTable("documents", {
   mimeType: varchar("mime_type").notNull(),
   size: integer("size").notNull(),
   storageKey: varchar("storage_key"),
+  s3Key: text("s3_key"),
   documentType: varchar("document_type", {
     enum: [
       "invoice",
@@ -1510,6 +1511,7 @@ export const carrierSubmissionDocs = pgTable("carrier_submission_documents", {
   originalName: varchar("original_name").notNull(),
   mimeType: varchar("mime_type"),
   size: integer("size"),
+  s3Key: text("s3_key"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
