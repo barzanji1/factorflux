@@ -30,7 +30,7 @@ import {
   Users, Shield, UserPlus, Pencil, Trash2, Ban, CheckCircle,
   Loader2, Mail, Settings2, FileCheck, ClipboardList, Plus,
   AlertCircle, Bell, TrendingUp, Clock, Activity, Download,
-  ChevronRight, ChevronLeft, Globe, ExternalLink,
+  ChevronRight, ChevronLeft, Globe, ExternalLink, KeyRound, RotateCcw,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -163,6 +163,89 @@ const TABS = [
 ] as const;
 type Tab = typeof TABS[number]["id"];
 
+// ─── Permission Sections ──────────────────────────────────────────────────────
+const PERMISSION_SECTIONS = [
+  {
+    label: "Workspace",
+    items: [
+      { key: "dashboard",          label: "Dashboard"          },
+      { key: "carriers",           label: "Carriers"           },
+      { key: "invoices",           label: "Invoices"           },
+      { key: "documents",          label: "Documents"          },
+      { key: "tasks",              label: "Tasks"              },
+      { key: "bulk_invoices",      label: "Bulk Invoices"      },
+      { key: "portal_submissions", label: "Portal Submissions" },
+    ],
+  },
+  {
+    label: "Funding",
+    items: [
+      { key: "factoring",      label: "Factoring"      },
+      { key: "payments",       label: "Payments"       },
+      { key: "lockbox",        label: "Lockbox"        },
+      { key: "fuel_advance",   label: "Fuel Advance"   },
+      { key: "bank_transfers", label: "Bank Transfers" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { key: "dispatchers",     label: "Dispatchers"     },
+      { key: "trucks",          label: "Trucks"          },
+      { key: "release_letters", label: "Release Letters" },
+    ],
+  },
+  {
+    label: "Risk",
+    items: [
+      { key: "brokers",    label: "Brokers"     },
+      { key: "cb_reviews", label: "C/B Reviews" },
+      { key: "mc_check",   label: "MC Check"    },
+      { key: "held",       label: "Held"        },
+      { key: "logs",       label: "Audit Logs"  },
+    ],
+  },
+  {
+    label: "Recovery",
+    items: [
+      { key: "followups", label: "Followups" },
+      { key: "reports",   label: "Reports"   },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { key: "payroll",          label: "Payroll"          },
+      { key: "vault",            label: "Vault"            },
+      { key: "help",             label: "Help"             },
+      { key: "settings",         label: "Settings"         },
+      { key: "rules",            label: "Doc Rules"        },
+      { key: "workflow_builder", label: "Workflow Builder" },
+      { key: "admin",            label: "Admin Panel"      },
+    ],
+  },
+];
+
+const ROLE_DEFAULTS: Record<string, string[]> = {
+  admin: [
+    "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
+    "factoring","payments","lockbox","fuel_advance","bank_transfers",
+    "dispatchers","trucks","release_letters",
+    "brokers","cb_reviews","mc_check","held","logs",
+    "followups","reports",
+    "payroll","vault","help","settings","rules","workflow_builder","admin",
+  ],
+  manager: [
+    "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
+    "factoring","payments","lockbox","fuel_advance","bank_transfers",
+    "dispatchers","trucks","release_letters",
+    "brokers","cb_reviews","mc_check","held","logs",
+    "followups","reports",
+    "payroll","vault","help","settings","rules","workflow_builder",
+  ],
+  employee: ["dashboard","carriers","invoices","documents","tasks","fuel_advance","vault","help","settings"],
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Admin() {
   const { toast } = useToast();
@@ -179,6 +262,8 @@ export default function Admin() {
   const [docItems, setDocItems] = useState<DocRequirement[]>([]);
   const [docsDirty, setDocsDirty] = useState(false);
   const [ttDrillAgent, setTtDrillAgent] = useState<string | null>(null);
+  const [permTarget, setPermTarget] = useState<UserRecord | null>(null);
+  const [permToggles, setPermToggles] = useState<Record<string, boolean>>({});
 
   // Guard: only admin
   if (currentUser && currentUser.role !== "admin") {
@@ -387,6 +472,56 @@ export default function Admin() {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
+
+  // ─── Permissions ──────────────────────────────────────────────────────────
+  const { data: permData, isLoading: permLoading } = useQuery<{ permissions: string[] }>({
+    queryKey: ["/api/admin/users", permTarget?.id, "permissions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/users/${permTarget!.id}/permissions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch permissions");
+      return res.json();
+    },
+    enabled: !!permTarget,
+  });
+
+  const permMutation = useMutation({
+    mutationFn: async ({ id, permissions }: { id: string; permissions: string[] }) => {
+      const res = await fetch(`/api/admin/users/${id}/permissions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ permissions }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to save permissions");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users", permTarget?.id, "permissions"] });
+      toast({ title: "Permissions saved", description: `Updated access for ${permTarget?.firstName} ${permTarget?.lastName}` });
+      setPermTarget(null);
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const openPermissions = (u: UserRecord) => {
+    setPermTarget(u);
+  };
+
+  // Sync permToggles when permData loads
+  const allKeys = PERMISSION_SECTIONS.flatMap(s => s.items.map(i => i.key));
+  const resolvedToggles: Record<string, boolean> = permData
+    ? Object.fromEntries(allKeys.map(k => [k, permData.permissions.includes(k)]))
+    : Object.fromEntries(allKeys.map(k => [k, false]));
+
+  const activeToggles = permLoading ? resolvedToggles : (Object.keys(permToggles).length > 0 ? permToggles : resolvedToggles);
+
+  const applyRoleDefaults = (role: string) => {
+    const defaults = ROLE_DEFAULTS[role] ?? ROLE_DEFAULTS.employee;
+    setPermToggles(Object.fromEntries(allKeys.map(k => [k, defaults.includes(k)])));
+  };
+
+  const grantedCount = Object.values(activeToggles).filter(Boolean).length;
 
   const ratesMutation = useMutation({
     mutationFn: async (data: RatesForm) => {
@@ -622,6 +757,9 @@ export default function Admin() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center justify-end gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => { setPermToggles({}); openPermissions(u); }} title="Manage Permissions">
+                                    <KeyRound className="h-4 w-4 text-blue-500" />
+                                  </Button>
                                   <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Edit">
                                     <Pencil className="h-4 w-4" />
                                   </Button>
@@ -1381,6 +1519,110 @@ export default function Admin() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Permissions Dialog ─────────────────────────────────────────────── */}
+      <Dialog open={!!permTarget} onOpenChange={(o) => { if (!o) { setPermTarget(null); setPermToggles({}); } }}>
+        <DialogContent className="sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-blue-500" />
+              Permissions — {permTarget?.firstName} {permTarget?.lastName}
+            </DialogTitle>
+            <DialogDescription>
+              Toggle exactly what this agent can access. Admin always sees everything regardless of these settings.
+            </DialogDescription>
+          </DialogHeader>
+
+          {permLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            </div>
+          ) : (
+            <div className="space-y-5 py-2">
+              {/* Header bar */}
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold text-slate-900 dark:text-white">{grantedCount}</span> of {allKeys.length} permissions granted
+                </p>
+                <div className="flex gap-2">
+                  {(["employee", "manager", "admin"] as const).map((r) => (
+                    <Button
+                      key={r}
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-7 gap-1 capitalize"
+                      onClick={() => applyRoleDefaults(r)}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      {r} defaults
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Permission sections */}
+              {PERMISSION_SECTIONS.map((section) => (
+                <div key={section.label}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{section.label}</p>
+                    <div className="flex-1 border-t border-slate-100 dark:border-slate-800" />
+                    <button
+                      type="button"
+                      className="text-[10px] text-blue-500 hover:underline"
+                      onClick={() => {
+                        const allOn = section.items.every(i => activeToggles[i.key]);
+                        setPermToggles(prev => ({
+                          ...resolvedToggles,
+                          ...prev,
+                          ...Object.fromEntries(section.items.map(i => [i.key, !allOn])),
+                        }));
+                      }}
+                    >
+                      {section.items.every(i => activeToggles[i.key]) ? "Disable all" : "Enable all"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+                    {section.items.map((item) => (
+                      <div key={item.key} className="flex items-center justify-between gap-3 rounded-lg border border-[hsl(var(--border))] bg-white dark:bg-slate-900 px-3 py-2.5">
+                        <Label htmlFor={`perm-${item.key}`} className="text-sm font-medium cursor-pointer">
+                          {item.label}
+                        </Label>
+                        <Switch
+                          id={`perm-${item.key}`}
+                          checked={!!activeToggles[item.key]}
+                          onCheckedChange={(val) =>
+                            setPermToggles(prev => ({
+                              ...resolvedToggles,
+                              ...prev,
+                              [item.key]: val,
+                            }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Footer actions */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <Button variant="outline" onClick={() => { setPermTarget(null); setPermToggles({}); }}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    const granted = allKeys.filter(k => activeToggles[k]);
+                    permMutation.mutate({ id: permTarget!.id, permissions: granted });
+                  }}
+                  disabled={permMutation.isPending}
+                >
+                  {permMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save Permissions"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

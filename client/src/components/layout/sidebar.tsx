@@ -10,6 +10,7 @@ import {
   ArrowRightLeft, AlertCircle, Activity, Radio,
   RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ type NavItem = {
   name: string;
   href: string;
   icon: LucideIcon;
+  permission: string;
   role?: "manager";
 };
 
@@ -48,59 +50,59 @@ const navSections: NavSection[] = [
   {
     title: "Workspace",
     items: [
-      { name: "Dashboard",  href: "/",          icon: LayoutDashboard },
-      { name: "Carriers",   href: "/clients",   icon: Users           },
-      { name: "Invoices",   href: "/invoices",  icon: FileText        },
-      { name: "Documents",  href: "/documents", icon: Archive         },
-      { name: "Tasks",         href: "/tasks",         icon: ListTodo },
-      { name: "Bulk Invoices",      href: "/bulk-invoices",       icon: Layers  },
-      { name: "Portal Submissions", href: "/portal-submissions",   icon: Globe   },
+      { name: "Dashboard",         href: "/",                   icon: LayoutDashboard, permission: "dashboard"          },
+      { name: "Carriers",          href: "/clients",            icon: Users,           permission: "carriers"           },
+      { name: "Invoices",          href: "/invoices",           icon: FileText,        permission: "invoices"           },
+      { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
+      { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
+      { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
+      { name: "Portal Submissions",href: "/portal-submissions", icon: Globe,           permission: "portal_submissions" },
     ],
   },
   {
     title: "Funding",
     items: [
-      { name: "Factoring",      href: "/factoring",        icon: TrendingUp     },
-      { name: "Payments",       href: "/payouts",           icon: Wallet         },
-      { name: "Lockbox",        href: "/lockbox",           icon: ArrowRightLeft },
-      { name: "Fuel Advance",   href: "/fuel-advance",      icon: Fuel           },
-      { name: "Bank Transfers", href: "/bank-transfers",    icon: Landmark       },
+      { name: "Factoring",      href: "/factoring",      icon: TrendingUp,     permission: "factoring"      },
+      { name: "Payments",       href: "/payouts",        icon: Wallet,         permission: "payments"       },
+      { name: "Lockbox",        href: "/lockbox",        icon: ArrowRightLeft, permission: "lockbox"        },
+      { name: "Fuel Advance",   href: "/fuel-advance",   icon: Fuel,           permission: "fuel_advance"   },
+      { name: "Bank Transfers", href: "/bank-transfers", icon: Landmark,       permission: "bank_transfers" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { name: "Dispatchers",     href: "/dispatchers",     icon: Headset  },
-      { name: "Trucks",          href: "/trucks",          icon: Truck    },
-      { name: "Release Letters", href: "/release-letters", icon: MailOpen },
+      { name: "Dispatchers",     href: "/dispatchers",     icon: Headset,  permission: "dispatchers"     },
+      { name: "Trucks",          href: "/trucks",          icon: Truck,    permission: "trucks"          },
+      { name: "Release Letters", href: "/release-letters", icon: MailOpen, permission: "release_letters" },
     ],
   },
   {
     title: "Risk",
     items: [
-      { name: "Brokers",     href: "/brokers",          icon: Building2   },
-      { name: "C/B Reviews", href: "/credit-checks",    icon: ShieldCheck },
-      { name: "MC Check",    href: "/fmcsa-authority",  icon: Radio       },
-      { name: "Held",        href: "/held",              icon: AlertCircle },
-      { name: "Logs",        href: "/audit-log",        icon: Activity    },
+      { name: "Brokers",     href: "/brokers",         icon: Building2,  permission: "brokers"    },
+      { name: "C/B Reviews", href: "/credit-checks",   icon: ShieldCheck,permission: "cb_reviews" },
+      { name: "MC Check",    href: "/fmcsa-authority", icon: Radio,      permission: "mc_check"   },
+      { name: "Held",        href: "/held",            icon: AlertCircle,permission: "held"       },
+      { name: "Logs",        href: "/audit-log",       icon: Activity,   permission: "logs"       },
     ],
   },
   {
     title: "Recovery",
     items: [
-      { name: "Followups",    href: "/collections",  icon: RotateCcw },
-      { name: "Reports",      href: "/reports",       icon: BarChart3 },
+      { name: "Followups", href: "/collections", icon: RotateCcw, permission: "followups" },
+      { name: "Reports",   href: "/reports",     icon: BarChart3, permission: "reports"   },
     ],
   },
   {
     title: "Admin",
     items: [
-      { name: "Admin",          href: "/admin",           icon: ShieldCheck,    role: "manager"    },
-      { name: "Payroll",        href: "/payroll",         icon: BadgeDollarSign, role: "manager" },
-      { name: "Vault",          href: "/vault",           icon: Lock                           },
-      { name: "Help",             href: "/help",            icon: LifeBuoy                       },
-      { name: "Rules",            href: "/document-rules",  icon: FileCheck2, role: "manager"    },
-      { name: "Workflow Builder", href: "/workflow-builder", icon: Workflow,   role: "manager"    },
+      { name: "Admin",            href: "/admin",            icon: ShieldCheck,     permission: "admin",            role: "manager" },
+      { name: "Payroll",          href: "/payroll",          icon: BadgeDollarSign, permission: "payroll",          role: "manager" },
+      { name: "Vault",            href: "/vault",            icon: Lock,            permission: "vault"                             },
+      { name: "Help",             href: "/help",             icon: LifeBuoy,        permission: "help"                              },
+      { name: "Rules",            href: "/document-rules",   icon: FileCheck2,      permission: "rules",            role: "manager" },
+      { name: "Workflow Builder", href: "/workflow-builder", icon: Workflow,        permission: "workflow_builder", role: "manager" },
     ],
   },
 ];
@@ -137,19 +139,26 @@ function isRouteActive(current: string, href: string) {
 export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const user = getUserData();
+  const { permissions, user: authUser } = useAuth();
+
+  const isAdmin = (authUser?.role ?? user.role) === "admin";
 
   const filteredSections = useMemo(() =>
     navSections
       .map(s => ({
         ...s,
-        items: s.items.filter(i =>
-          i.role === "manager"
-            ? user.role === "manager" || user.role === "admin"
-            : true
-        ),
+        items: s.items.filter(i => {
+          // Admins always see everything
+          if (isAdmin) return true;
+          // Role gate for manager-only items
+          if (i.role === "manager" && user.role !== "manager" && user.role !== "admin") return false;
+          // Permission gate
+          if (i.permission && permissions.length > 0 && !permissions.includes(i.permission)) return false;
+          return true;
+        }),
       }))
       .filter(s => s.items.length > 0),
-    [user.role]
+    [user.role, isAdmin, permissions]
   );
 
   return (

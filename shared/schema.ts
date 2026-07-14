@@ -1539,3 +1539,40 @@ export const insertWorkflowConfigSchema = createInsertSchema(workflowConfigs).om
 });
 export type WorkflowConfig = typeof workflowConfigs.$inferSelect;
 export type InsertWorkflowConfig = z.infer<typeof insertWorkflowConfigSchema>;
+
+// ─── User Permissions ──────────────────────────────────────────────────────────
+export const userPermissions = pgTable("user_permissions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permission: varchar("permission").notNull(),
+  granted: boolean("granted").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: varchar("updated_by"),
+});
+export type UserPermission = typeof userPermissions.$inferSelect;
+
+export const ALL_PERMISSIONS = [
+  "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
+  "factoring","payments","lockbox","fuel_advance","bank_transfers",
+  "dispatchers","trucks","release_letters",
+  "brokers","cb_reviews","mc_check","held","logs",
+  "followups","reports",
+  "payroll","vault","help","settings","rules","workflow_builder","admin",
+] as const;
+export type PermissionKey = typeof ALL_PERMISSIONS[number];
+
+export const ROLE_DEFAULT_PERMISSIONS: Record<string, PermissionKey[]> = {
+  admin: [...ALL_PERMISSIONS],
+  manager: [
+    "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
+    "factoring","payments","lockbox","fuel_advance","bank_transfers",
+    "dispatchers","trucks","release_letters",
+    "brokers","cb_reviews","mc_check","held","logs",
+    "followups","reports",
+    "payroll","vault","help","settings","rules","workflow_builder",
+  ],
+  employee: [
+    "dashboard","carriers","invoices","documents","tasks",
+    "fuel_advance","vault","help","settings",
+  ],
+};

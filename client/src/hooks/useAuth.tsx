@@ -16,6 +16,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  permissions: string[];
+  hasPermission: (key: string) => boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   checkAuth: () => Promise<void>;
@@ -23,40 +25,56 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+async function fetchPermissions(): Promise<string[]> {
+  try {
+    const res = await fetch("/api/auth/permissions", { credentials: "include" });
+    if (res.ok) {
+      const data = await res.json();
+      return data.permissions ?? [];
+    }
+  } catch {}
+  return [];
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [permissions, setPermissions] = useState<string[]>([]);
+
+  const hasPermission = (key: string): boolean => {
+    if (user?.role === "admin") return true;
+    return permissions.includes(key);
+  };
 
   const checkAuth = async () => {
     try {
       console.log("Checking authentication...");
-      // Check localStorage first
       const authFlag = localStorage.getItem("isAuthenticated");
       const userData = localStorage.getItem("user");
-      
+
       console.log("LocalStorage - isAuthenticated:", authFlag, "userData:", !!userData);
-      
+
       if (authFlag === "true" && userData) {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
         setIsAuthenticated(true);
         console.log("Setting authenticated state from localStorage");
-        
-        // Verify with server in background (don't block the UI)
+
         setTimeout(async () => {
           try {
-            const response = await fetch("/api/auth/verify", {
-              credentials: "include"
-            });
+            const response = await fetch("/api/auth/verify", { credentials: "include" });
             if (!response.ok) {
               console.log("Server verification failed, clearing auth state");
               localStorage.removeItem("isAuthenticated");
               localStorage.removeItem("user");
               setUser(null);
               setIsAuthenticated(false);
+              setPermissions([]);
             } else {
               console.log("Server verification successful");
+              const perms = await fetchPermissions();
+              setPermissions(perms);
             }
           } catch (error) {
             console.log("Network error during verification:", error);
@@ -66,11 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("No valid auth data in localStorage");
         setUser(null);
         setIsAuthenticated(false);
+        setPermissions([]);
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       setUser(null);
       setIsAuthenticated(false);
+      setPermissions([]);
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("user");
     } finally {
@@ -84,9 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
-        credentials: "include" // Important for session cookies
+        credentials: "include",
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         console.log("Login response:", result);
@@ -95,6 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("isAuthenticated", "true");
         localStorage.setItem("user", JSON.stringify(result.user));
         console.log("Auth state updated - authenticated:", true);
+
+        const perms = await fetchPermissions();
+        setPermissions(perms);
+
         return true;
       }
       return false;
@@ -107,10 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
+    setPermissions([]);
     localStorage.removeItem("isAuthenticated");
     localStorage.removeItem("user");
-    
-    // Call logout endpoint
     fetch("/api/auth/logout", { method: "POST" }).catch(console.error);
   };
 
@@ -124,6 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated,
+        permissions,
+        hasPermission,
         login,
         logout,
         checkAuth,

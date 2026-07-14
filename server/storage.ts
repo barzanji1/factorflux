@@ -90,6 +90,10 @@ import {
   type InsertDocumentRule,
   type InvoiceDocReview,
   type InsertInvoiceDocReview,
+  userPermissions,
+  ALL_PERMISSIONS,
+  ROLE_DEFAULT_PERMISSIONS,
+  type PermissionKey,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, or, and, count, sql, inArray, isNotNull } from "drizzle-orm";
@@ -105,6 +109,9 @@ export interface IStorage {
   getUserByEmailAndType(email: string, authType: string): Promise<User[]>;
   createAgent(data: { id: string; firstName: string; lastName: string; email: string; role: string; password: string; createdBy: string }): Promise<User>;
   deleteUser(id: string): Promise<void>;
+  getUserPermissions(userId: string): Promise<string[]>;
+  setUserPermissions(userId: string, granted: string[], updatedBy: string): Promise<void>;
+  seedDefaultPermissions(userId: string, role: string, updatedBy: string): Promise<void>;
 
   // Client operations
   getClients(): Promise<Client[]>;
@@ -1911,6 +1918,34 @@ export class DatabaseStorage implements IStorage {
   async createDocReview(data: InsertInvoiceDocReview): Promise<InvoiceDocReview> {
     const [row] = await db.insert(invoiceDocReviews).values(data).returning();
     return row;
+  }
+
+  // ─── User Permissions ──────────────────────────────────────────────────────
+  async getUserPermissions(userId: string): Promise<string[]> {
+    const rows = await db
+      .select({ permission: userPermissions.permission })
+      .from(userPermissions)
+      .where(and(eq(userPermissions.userId, userId), eq(userPermissions.granted, true)));
+    return rows.map((r) => r.permission);
+  }
+
+  async setUserPermissions(userId: string, granted: string[], updatedBy: string): Promise<void> {
+    await db.delete(userPermissions).where(eq(userPermissions.userId, userId));
+    if (granted.length === 0) return;
+    await db.insert(userPermissions).values(
+      granted.map((p) => ({ userId, permission: p, granted: true, updatedBy })),
+    );
+  }
+
+  async seedDefaultPermissions(userId: string, role: string, updatedBy: string): Promise<void> {
+    const existing = await db
+      .select({ id: userPermissions.id })
+      .from(userPermissions)
+      .where(eq(userPermissions.userId, userId))
+      .limit(1);
+    if (existing.length > 0) return; // already seeded
+    const defaults = ROLE_DEFAULT_PERMISSIONS[role] ?? ROLE_DEFAULT_PERMISSIONS.employee;
+    await this.setUserPermissions(userId, defaults as string[], updatedBy);
   }
 }
 

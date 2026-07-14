@@ -83,6 +83,8 @@ import {
   carrierPortalUsers,
   carrierSubmissions,
   carrierSubmissionDocs,
+  ALL_PERMISSIONS,
+  ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
@@ -772,6 +774,9 @@ ${message}
         html: welcomeHtml,
       });
 
+      // Seed default permissions for the new user
+      await storage.seedDefaultPermissions(id, role, adminUser.id);
+
       await storage.createActivity({
         userId: adminUser.id,
         type: "user_created",
@@ -847,6 +852,56 @@ ${message}
     } catch (error) {
       console.error("Error deleting user:", error);
       res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // ─── Permission routes ────────────────────────────────────────────────────
+
+  // Current user's own permissions (no admin required)
+  app.get("/api/auth/permissions", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      // Admin and manager roles get all permissions
+      if (req.user?.role === "admin") {
+        return res.json({ permissions: [...ALL_PERMISSIONS] });
+      }
+      const perms = await storage.getUserPermissions(userId);
+      // If no permissions seeded yet, fall back to role defaults
+      if (perms.length === 0 && req.user?.role) {
+        const defaults = ROLE_DEFAULT_PERMISSIONS[req.user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee;
+        return res.json({ permissions: defaults });
+      }
+      res.json({ permissions: perms });
+    } catch (err) {
+      console.error("Error fetching own permissions:", err);
+      res.status(500).json({ message: "Failed to fetch permissions" });
+    }
+  });
+
+  app.get("/api/admin/users/:id/permissions", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const perms = await storage.getUserPermissions(id);
+      res.json({ permissions: perms });
+    } catch (err) {
+      console.error("Error fetching user permissions:", err);
+      res.status(500).json({ message: "Failed to fetch user permissions" });
+    }
+  });
+
+  app.put("/api/admin/users/:id/permissions", requireAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { permissions } = req.body;
+      if (!Array.isArray(permissions)) {
+        return res.status(400).json({ message: "permissions must be an array" });
+      }
+      const valid = permissions.filter((p) => (ALL_PERMISSIONS as readonly string[]).includes(p));
+      await storage.setUserPermissions(id, valid, req.user.id);
+      res.json({ permissions: valid });
+    } catch (err) {
+      console.error("Error saving user permissions:", err);
+      res.status(500).json({ message: "Failed to save user permissions" });
     }
   });
 
