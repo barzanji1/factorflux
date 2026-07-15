@@ -4,6 +4,7 @@ import path from 'path';
 interface EmailParams {
   to: string;
   from: string;
+  replyTo?: string;
   subject: string;
   text?: string;
   html?: string;
@@ -41,6 +42,7 @@ async function deliver(params: EmailParams): Promise<{ success: boolean; message
       subject: params.subject,
       text:    params.text ?? (params.html ? "" : " "),
     };
+    if (params.replyTo) msg.replyTo = params.replyTo;
 
     if (params.html)        msg.html        = params.html;
     if (params.attachments?.length) msg.attachments = params.attachments;

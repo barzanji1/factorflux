@@ -553,7 +553,8 @@ export async function triggerBrokerFollowUp(
   if (cadence.sendImmediately && debtorEmail) {
     try {
       const { success, messageId } = await sendEmailTracked({
-        from:    "noreply@truckingprosfinancial.com",
+        from:    "Support@Truckingprosfinancial.com",
+        replyTo: "Support@Truckingprosfinancial.com",
         to:      debtorEmail,
         subject: immediateSubject,
         html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${immediateBody}</pre>`,
@@ -659,7 +660,8 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
 
         if (debtor?.email) {
           const result = await sendEmailTracked({
-            from:    "noreply@truckingprosfinancial.com",
+            from:    "Support@Truckingprosfinancial.com",
+            replyTo: "Support@Truckingprosfinancial.com",
             to:      debtor.email,
             subject: r.subject,
             html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${r.body}</pre>`,

@@ -513,7 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, email, subject, message } = contactSchema.parse(req.body);
 
       const supportEmail = "dosh@truckingprosfinancial.com";
-      const senderEmail = "doshbarzanji@gmail.com";
+      const FROM = "Support@Truckingprosfinancial.com";
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
@@ -543,8 +543,9 @@ ${message}
 
       const sent = await sendEmail({
         to: supportEmail,
-        from: senderEmail,
-        subject: `[FactorFlux Help] ${subject} - ${email}`,
+        from: FROM,
+        replyTo: email,
+        subject: `[FactorFlux Help] ${subject} — from ${name}`,
         text,
         html,
       });
@@ -591,8 +592,7 @@ ${message}
         message,
       });
 
-      const supportEmail = "doshbarzanji@gmail.com";
-      const senderEmail = "dosh@truckingprosfinancial.com";
+      const FROM = "Support@Truckingprosfinancial.com";
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
@@ -621,9 +621,10 @@ ${message}
       `.trim();
 
       await sendEmail({
-        to: supportEmail,
-        from: senderEmail,
-        subject: `[FactorFlux Help] ${subject} - ${email}`,
+        to: "dosh@truckingprosfinancial.com",
+        from: FROM,
+        replyTo: email,
+        subject: `[FactorFlux Help] ${subject} — from ${name}`,
         text,
         html,
       });
@@ -5261,7 +5262,7 @@ Trucking Pros Financial Team
       const toEmail = req.body?.email ?? brokerEmail;
       if (!toEmail) return res.status(400).json({ message: "No broker email available. Add email to broker profile or pass email in body." });
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL ?? "noreply@factorflux.com";
+      const FROM = "Support@Truckingprosfinancial.com";
       const subject = `Release Letter — ${letter.letterType.charAt(0).toUpperCase() + letter.letterType.slice(1)}`;
       const html = `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:24px;">
         <h2 style="color:#1a1a1a;">Release Letter</h2>
@@ -5272,7 +5273,7 @@ Trucking Pros Financial Team
         <p style="color:#6b7280;font-size:13px;">Sent via FactorFlux — Trucking Pros Financial</p>
       </div>`;
 
-      const sent = await sendEmail({ to: toEmail, from: fromEmail, subject, html, text: letter.content });
+      const sent = await sendEmail({ to: toEmail, from: FROM, replyTo: FROM, subject, html, text: letter.content });
       const [updated] = await db.update(releaseLetters)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(releaseLetters.id, id))
@@ -5791,6 +5792,32 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
         dotNumber: dotNumber || null,
         status: "pending",
       }).returning();
+
+      // Send registration confirmation to carrier
+      const regHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;">
+          <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
+            <h2 style="margin:0;">Carrier Portal — Registration Received</h2>
+            <p style="margin:4px 0 0;opacity:.8;font-size:13px;">Trucking Pros Financial</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+            <p style="color:#374151;">Hi ${companyName},</p>
+            <p style="color:#374151;">Thank you for registering on the Trucking Pros Financial carrier portal. Your account is <strong>pending approval</strong>.</p>
+            <p style="color:#374151;">Our team will review your information and notify you once your account has been approved. This typically takes 1–2 business days.</p>
+            <p style="color:#374151;">If you have questions, reply to this email or call us at <strong>385-495-4962</strong>.</p>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb;" />
+            <p style="color:#9ca3af;font-size:12px;margin:0;">Trucking Pros Financial · Support@Truckingprosfinancial.com · 385-495-4962</p>
+          </div>
+        </div>`;
+      sendEmail({
+        to: user.email,
+        from: "Support@Truckingprosfinancial.com",
+        replyTo: "Support@Truckingprosfinancial.com",
+        subject: "Carrier Portal — Registration Received (Pending Approval)",
+        html: regHtml,
+        text: `Hi ${companyName},\n\nThank you for registering. Your account is pending approval. We will notify you once approved.\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
+      }).catch(() => {});
+
       res.status(201).json({ message: "Registration successful. Pending approval.", id: user.id });
     } catch (error) {
       console.error("Portal register error:", error);
@@ -5980,11 +6007,66 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       const { status, notes } = req.body;
       const validStatuses = ["submitted", "under_review", "approved", "funded", "rejected"];
       if (status && !validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status" });
+
+      // Fetch existing submission + portal user email before update
+      const [existing] = await db.select().from(carrierSubmissions).where(eq(carrierSubmissions.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Submission not found" });
+
       const [updated] = await db.update(carrierSubmissions)
         .set({ ...(status && { status }), ...(notes !== undefined && { notes }) })
         .where(eq(carrierSubmissions.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Submission not found" });
+
+      // Notify carrier when status changes to a notable state
+      if (status && status !== existing.status && ["approved", "funded", "rejected", "under_review"].includes(status)) {
+        try {
+          const [portalUser] = await db.select().from(carrierPortalUsers).where(eq(carrierPortalUsers.id, existing.portalUserId)).limit(1);
+          if (portalUser?.email) {
+            const statusLabels: Record<string, string> = {
+              under_review: "Under Review",
+              approved: "Approved",
+              funded: "Funded",
+              rejected: "Action Required",
+            };
+            const statusMessages: Record<string, string> = {
+              under_review: "Your submission is currently being reviewed by our team. We will reach out if we need additional information.",
+              approved: "Great news — your submission has been <strong>approved</strong>! Our team will process your payment shortly.",
+              funded: "Your invoice has been <strong>funded</strong>. Please allow 1–2 business days for funds to arrive.",
+              rejected: "Unfortunately, your submission could not be processed at this time. Please contact us for details.",
+            };
+            const notifyHtml = `
+              <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;">
+                <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
+                  <h2 style="margin:0;">Submission Update — ${statusLabels[status] ?? status}</h2>
+                  <p style="margin:4px 0 0;opacity:.8;font-size:13px;">Trucking Pros Financial</p>
+                </div>
+                <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+                  <p style="color:#374151;">Hi ${portalUser.companyName},</p>
+                  <p style="color:#374151;">${statusMessages[status] ?? `Your submission status has been updated to <strong>${status}</strong>.`}</p>
+                  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin:16px 0;">
+                    <p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Load #:</strong> ${existing.loadNumber}</p>
+                    ${existing.invoiceNumber ? `<p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Invoice #:</strong> ${existing.invoiceNumber}</p>` : ""}
+                    ${existing.amount ? `<p style="margin:0;font-size:13px;color:#374151;"><strong>Amount:</strong> $${existing.amount}</p>` : ""}
+                  </div>
+                  ${notes ? `<p style="color:#374151;font-size:13px;"><strong>Notes:</strong> ${notes}</p>` : ""}
+                  <p style="color:#374151;">Questions? Reply to this email or call us at <strong>385-495-4962</strong>.</p>
+                  <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb;" />
+                  <p style="color:#9ca3af;font-size:12px;margin:0;">Trucking Pros Financial · Support@Truckingprosfinancial.com · 385-495-4962</p>
+                </div>
+              </div>`;
+            sendEmail({
+              to: portalUser.email,
+              from: "Support@Truckingprosfinancial.com",
+              replyTo: "Support@Truckingprosfinancial.com",
+              subject: `Carrier Portal — Submission ${statusLabels[status] ?? status}: Load #${existing.loadNumber}`,
+              html: notifyHtml,
+              text: `Hi ${portalUser.companyName},\n\n${statusMessages[status]?.replace(/<[^>]+>/g, "") ?? `Your submission (Load #${existing.loadNumber}) status updated to: ${status}`}\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
+            }).catch(() => {});
+          }
+        } catch (_) { /* email failure is non-fatal */ }
+      }
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update submission" });
