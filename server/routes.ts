@@ -543,7 +543,7 @@ ${message}
 
       const sent = await sendEmail({
         to: supportEmail,
-        from: FROM,
+        from: "dosh@truckingprosfinancial.com",
         replyTo: email,
         subject: `[FactorFlux Help] ${subject} — from ${name}`,
         text,
@@ -622,7 +622,7 @@ ${message}
 
       await sendEmail({
         to: "dosh@truckingprosfinancial.com",
-        from: FROM,
+        from: "dosh@truckingprosfinancial.com",
         replyTo: email,
         subject: `[FactorFlux Help] ${subject} — from ${name}`,
         text,
@@ -701,7 +701,8 @@ ${message}
 
         const sent = await sendEmail({
           to: client.email,
-          from: "Support@Truckingprosfinancial.com",
+          from: "dosh@truckingprosfinancial.com",
+          replyTo: "dosh@truckingprosfinancial.com",
           subject,
           text: body,
           html,
@@ -813,7 +814,8 @@ ${message}
       `;
       await sendEmail({
         to: email,
-        from: "Support@Truckingprosfinancial.com",
+        from: "dosh@truckingprosfinancial.com",
+        replyTo: "dosh@truckingprosfinancial.com",
         subject: "Your FactorFlux Account Has Been Created",
         text: `Welcome to FactorFlux!\n\nEmail: ${email}\nTemporary Password: ${password}\n\nPlease log in at ${req.protocol}://${req.get("host")}/login`,
         html: welcomeHtml,
@@ -5273,7 +5275,7 @@ Trucking Pros Financial Team
         <p style="color:#6b7280;font-size:13px;">Sent via FactorFlux — Trucking Pros Financial</p>
       </div>`;
 
-      const sent = await sendEmail({ to: toEmail, from: FROM, replyTo: FROM, subject, html, text: letter.content });
+      const sent = await sendEmail({ to: toEmail, from: "dosh@truckingprosfinancial.com", replyTo: "dosh@truckingprosfinancial.com", subject, html, text: letter.content });
       const [updated] = await db.update(releaseLetters)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(releaseLetters.id, id))
@@ -5811,8 +5813,8 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
         </div>`;
       sendEmail({
         to: user.email,
-        from: "Support@Truckingprosfinancial.com",
-        replyTo: "Support@Truckingprosfinancial.com",
+        from: "dosh@truckingprosfinancial.com",
+        replyTo: "dosh@truckingprosfinancial.com",
         subject: "Carrier Portal — Registration Received (Pending Approval)",
         html: regHtml,
         text: `Hi ${companyName},\n\nThank you for registering. Your account is pending approval. We will notify you once approved.\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
@@ -6057,8 +6059,8 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
               </div>`;
             sendEmail({
               to: portalUser.email,
-              from: "Support@Truckingprosfinancial.com",
-              replyTo: "Support@Truckingprosfinancial.com",
+              from: "dosh@truckingprosfinancial.com",
+              replyTo: "dosh@truckingprosfinancial.com",
               subject: `Carrier Portal — Submission ${statusLabels[status] ?? status}: Load #${existing.loadNumber}`,
               html: notifyHtml,
               text: `Hi ${portalUser.companyName},\n\n${statusMessages[status]?.replace(/<[^>]+>/g, "") ?? `Your submission (Load #${existing.loadNumber}) status updated to: ${status}`}\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
