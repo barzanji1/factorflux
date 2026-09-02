@@ -184,63 +184,7 @@ function buildDocumentMetadata(document: any) {
   };
 }
 
-const PRODUCTION_USERS = [
-  {
-    username: "agent1",
-    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla",
-    name: "Production Agent",
-    role: "employee",
-    id: "prod-1",
-    firstName: "TPF",
-    lastName: "Agent",
-    verified: false,
-  },
-  {
-    username: "manager1",
-    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla",
-    name: "Production Manager",
-    role: "manager",
-    id: "prod-2",
-    firstName: "TPF",
-    lastName: "Manager",
-    verified: false,
-  },
-  {
-    username: "admin1",
-    password: "$2b$10$6yrEqMAIrQ6dkKX/1N6NyeUPNiENkuVsNDCQIFQIwauFxepIEDVla",
-    name: "System Administrator",
-    role: "admin",
-    id: "prod-3",
-    firstName: "System",
-    lastName: "Admin",
-    verified: true,
-  },
-];
-
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Ensure production users exist in the DB so FK constraints (e.g. activities.user_id) never fail
-  try {
-    for (const u of PRODUCTION_USERS) {
-      await db
-        .insert(users)
-        .values({
-          id: u.id,
-          email: u.username === "agent1" ? "agent1@tpf.com" : u.username === "manager1" ? "manager1@tpf.com" : "admin1@tpf.com",
-          password: u.password,
-          firstName: u.firstName,
-          lastName: u.lastName,
-          role: u.role as "employee" | "manager" | "admin",
-          authType: "local",
-          verified: u.verified,
-          status: "active",
-        })
-        .onConflictDoNothing();
-    }
-    console.log("[startup] Production users synced to DB");
-  } catch (err: any) {
-    console.warn("[startup] Could not sync production users (non-fatal):", err?.message);
-  }
-
   // Auto-grant "earl" permission to all existing admin users who don't have it
   try {
     const adminUsers = await db.select().from(users).where(eq(users.role, "admin"));
