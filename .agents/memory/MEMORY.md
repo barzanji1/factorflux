@@ -1,2 +1,3 @@
 - [Safe schema pushes](safe-schema-pushes.md) — drizzle push may propose unrelated destructive ID conversions; never approve truncation and apply additive changes explicitly.
 - [Direct invoice seeds](direct-invoice-seeds.md) — explicitly set load_id NULL when seeding invoices without load rows; its legacy default can generate invalid foreign keys.
+- [Vault entry IDs](vault-entry-ids.md) — client_vault requires a real serial default; without it encrypted inserts fail after encryption with a null primary key.
