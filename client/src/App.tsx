@@ -236,6 +236,11 @@ function Router() {
           <ClientDetail />
         </ProtectedRoute>
       </Route>
+      <Route path="/carriers/:id">
+        <ProtectedRoute>
+          <ClientDetail />
+        </ProtectedRoute>
+      </Route>
       <Route path="/payouts/:id">
         <ProtectedRoute>
           <PayoutDetail />

@@ -13,12 +13,13 @@ import RecordDetail, {
 } from "@/components/layout/record-detail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import InvoiceModal from "@/components/modals/invoice-modal";
 
 import {
   Building2, ReceiptText, Phone, Mail, MapPin,
   FileText, Edit2, CheckCircle2, XCircle, User,
   Hash, Activity, MessageSquare, Send, DollarSign,
-  Banknote, ShieldCheck,
+  Banknote, ShieldCheck, Plus,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ export default function ClientDetail() {
   const qc = useQueryClient();
 
   const [noteText, setNoteText] = useState("");
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
   const { data: client, isLoading } = useQuery<any>({
     queryKey: ["/api/clients", clientId],
@@ -171,6 +173,13 @@ export default function ClientDetail() {
                     onClick={() => window.location.href = `/clients?edit=${clientId}`}>
                     <Edit2 className="h-3.5 w-3.5" />Edit Client
                   </Button>
+                  <Button
+                    size="sm"
+                    className="w-full justify-start gap-2 rounded-2xl bg-[#098b9f] text-xs text-white hover:bg-[#08798b]"
+                    onClick={() => setIsInvoiceModalOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />Create Invoice
+                  </Button>
                   {isAdmin && client?.status !== "active" && (
                     <Button size="sm"
                       disabled={statusMutation.isPending}
@@ -240,11 +249,23 @@ export default function ClientDetail() {
                   label: "Invoices",
                   icon: <ReceiptText className="h-3.5 w-3.5" />,
                   count: clientInvoices.length,
-                  content: !clientInvoices.length ? (
-                    <EmptyTab icon={<ReceiptText className="h-7 w-7" />} label="No invoices for this client yet" />
-                  ) : (
-                    <div className="space-y-2">
-                      {clientInvoices.map((inv: any) => (
+                  content: (
+                    <div className="space-y-4">
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          className="gap-2 rounded-xl bg-[#098b9f] text-white hover:bg-[#08798b]"
+                          onClick={() => setIsInvoiceModalOpen(true)}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Create Invoice
+                        </Button>
+                      </div>
+                      {!clientInvoices.length ? (
+                        <EmptyTab icon={<ReceiptText className="h-7 w-7" />} label="No invoices for this client yet" />
+                      ) : (
+                        <div className="space-y-2">
+                          {clientInvoices.map((inv: any) => (
                         <a key={inv.id} href={`/invoices/${inv.id}`}
                           className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition-colors hover:border-blue-200 hover:bg-blue-50/30 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-blue-900/40">
                           <div className="flex items-center gap-3">
@@ -258,8 +279,10 @@ export default function ClientDetail() {
                             <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(inv.amount)}</span>
                             <InvStatusBadge status={inv.status} />
                           </div>
-                        </a>
-                      ))}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ),
                 },
@@ -337,6 +360,15 @@ export default function ClientDetail() {
           </div>
         </main>
       </div>
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        initialClient={client ? { id: client.id, name: client.name } : null}
+        onCreated={() => {
+          qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+          qc.invalidateQueries({ queryKey: ["/api/clients", clientId] });
+        }}
+      />
     </div>
   );
 }

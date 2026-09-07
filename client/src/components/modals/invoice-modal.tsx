@@ -233,6 +233,8 @@ interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   invoice?: Invoice | null;
+  initialClient?: Pick<Client, "id" | "name"> | null;
+  onCreated?: () => void;
 }
 
 const invoiceFormSchema = insertInvoiceSchema.extend({
@@ -245,7 +247,7 @@ const invoiceFormSchema = insertInvoiceSchema.extend({
   bolNumber: z.string().optional(),
 });
 
-export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalProps) {
+export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, onCreated }: InvoiceModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -323,14 +325,14 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         loadType: "",
         pickupLocation: "",
         deliveryLocation: "",
-        clientId: "",
+        clientId: initialClient ? initialClient.id.toString() : "",
         amount: "",
         status: "draft",
         notes: "",
         bolNumber: "",
       });
-      setSelectedClient(null);
-      setClientSearch("");
+      setSelectedClient(initialClient ? initialClient as Client : null);
+      setClientSearch(initialClient?.name ?? "");
       setAttachedFiles({
         rate_confirmation: null,
         bill_of_lading: null,
@@ -338,7 +340,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         receipts: null,
       });
     }
-  }, [invoice, form, clients]);
+  }, [invoice, initialClient, form, clients]);
 
   const handleClientSelect = (client: Client) => {
     setSelectedClient(client);
@@ -399,9 +401,10 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
         description: "Invoice created successfully",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      onCreated?.();
       onClose();
     },
     onError: (error) => {
