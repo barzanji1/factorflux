@@ -363,7 +363,7 @@ export default function ClientDetail() {
       <InvoiceModal
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}
-        initialClient={client ? { id: client.id, name: client.name } : null}
+        initialClient={client ?? null}
         onCreated={() => {
           qc.invalidateQueries({ queryKey: ["/api/invoices"] });
           qc.invalidateQueries({ queryKey: ["/api/clients", clientId] });

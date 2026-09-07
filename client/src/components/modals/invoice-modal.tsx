@@ -233,7 +233,7 @@ interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   invoice?: Invoice | null;
-  initialClient?: Pick<Client, "id" | "name"> | null;
+  initialClient?: Client | null;
   onCreated?: () => void;
 }
 
@@ -317,7 +317,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
       const client = clients?.find((c) => c.id === invoice.clientId);
       if (client) {
         setSelectedClient(client);
-        setClientSearch(client.name);
+        setClientSearch("");
       }
     } else {
       form.reset({
@@ -331,8 +331,8 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
         notes: "",
         bolNumber: "",
       });
-      setSelectedClient(initialClient ? initialClient as Client : null);
-      setClientSearch(initialClient?.name ?? "");
+      setSelectedClient(initialClient ?? null);
+      setClientSearch("");
       setAttachedFiles({
         rate_confirmation: null,
         bill_of_lading: null,
@@ -344,9 +344,16 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
 
   const handleClientSelect = (client: Client) => {
     setSelectedClient(client);
-    setClientSearch(client.name);
-    form.setValue("clientId", client.id.toString());
+    setClientSearch("");
+    form.setValue("clientId", client.id.toString(), { shouldValidate: true });
     setShowClientDropdown(false);
+  };
+
+  const clearClientSelection = () => {
+    setSelectedClient(null);
+    setClientSearch("");
+    setShowClientDropdown(false);
+    form.setValue("clientId", "", { shouldValidate: true });
   };
 
   const createMutation = useMutation({
@@ -804,18 +811,15 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
-                      placeholder="Search client by name, email, or phone..."
+                      placeholder={selectedClient ? "Client selected below" : "Search client by name, email, or phone..."}
                       value={clientSearch}
+                      disabled={!!selectedClient}
                       onChange={(e) => {
                         setClientSearch(e.target.value);
                         setShowClientDropdown(true);
-                        if (!e.target.value) {
-                          setSelectedClient(null);
-                          form.setValue("clientId", "");
-                        }
                       }}
-                      onFocus={() => setShowClientDropdown(true)}
-                      className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                      onFocus={() => !selectedClient && setShowClientDropdown(true)}
+                      className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:disabled:bg-slate-900"
                       data-testid="input-client-search"
                     />
 
@@ -851,15 +855,18 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                 </div>
 
                 {selectedClient && (
-                  <Card className="mt-5 rounded-[22px] border border-slate-200/80 bg-slate-50/80 shadow-sm dark:border-slate-700 dark:bg-slate-800/50">
+                  <Card className="mt-5 rounded-[22px] border-2 border-[#27aab8] bg-[#eaf8fa] shadow-sm dark:border-[#098b9f] dark:bg-[#073b43]/30">
                     <CardContent className="p-5">
                       <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400">
-                          <Building className="h-5 w-5" />
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#098b9f] shadow-sm dark:bg-slate-900 dark:text-[#27aab8]">
+                          <CheckCircle2 className="h-5 w-5" />
                         </div>
 
                         <div className="flex-1 grid grid-cols-1 gap-4 lg:grid-cols-2">
                           <div>
+                            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#098b9f] dark:text-[#27aab8]">
+                              Selected client
+                            </p>
                             <p className="font-semibold text-slate-900 dark:text-white">
                               {selectedClient.name}
                             </p>
@@ -893,6 +900,16 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                             ) : null}
                           </div>
                         </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearClientSelection}
+                          className="shrink-0 gap-1.5 rounded-xl border-[#27aab8] bg-white text-xs text-[#08798b] hover:bg-[#dff4f6] dark:bg-slate-900"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Change
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
