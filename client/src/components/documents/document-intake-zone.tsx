@@ -266,13 +266,9 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
-            <SelectItem value="bill_of_lading">Bill of Lading (BOL)</SelectItem>
-            <SelectItem value="invoice">Commercial Invoice</SelectItem>
-            <SelectItem value="proof_of_delivery">Proof of Delivery (POD)</SelectItem>
-            <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
-            <SelectItem value="receipt">Receipt</SelectItem>
-            <SelectItem value="driver_id">Driver ID</SelectItem>
-            <SelectItem value="carrier_setup">Carrier Setup</SelectItem>
+            <SelectItem value="bol">Bill of Lading (BOL)</SelectItem>
+            <SelectItem value="commercial_invoice">Commercial Invoice</SelectItem>
+            <SelectItem value="pod">Proof of Delivery (POD)</SelectItem>
             <SelectItem value="other">Other</SelectItem>
           </SelectContent>
         </Select>

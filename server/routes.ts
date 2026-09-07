@@ -1059,8 +1059,7 @@ ${message}
     try {
       const id = parseInt(req.params.id, 10);
       const validTypes = [
-        "invoice", "rate_confirmation", "bill_of_lading", "proof_of_delivery",
-        "lumper_receipt", "receipt", "driver_id", "carrier_setup", "other",
+        "rate_confirmation", "bol", "commercial_invoice", "pod", "other",
       ];
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid document ID" });
       if (!validTypes.includes(req.body.documentType)) {
@@ -1718,6 +1717,49 @@ ${message}
     }
   });
 
+  app.post("/api/invoices/:id/override-approve", requireAuth, async (req: any, res) => {
+    try {
+      if (req.user?.role !== "manager" && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Manager or admin required" });
+      }
+      const id = parseInt(req.params.id, 10);
+      const reason = String(req.body.reason ?? "").trim();
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid invoice ID" });
+      if (!reason) return res.status(400).json({ message: "Override reason is required" });
+
+      const existing = await storage.getInvoice(id);
+      if (!existing) return res.status(404).json({ message: "Invoice not found" });
+      const appliedAt = new Date();
+      const agentName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || req.user.id;
+      const invoice = await storage.updateInvoice(id, {
+        status: "approved",
+        factoringStage: "approval",
+        approvedBy: req.user.id,
+        approvedAt: appliedAt,
+        updatedAt: appliedAt,
+      } as any);
+      await db.insert(eventLedger).values({
+        entityType: "invoice",
+        entityId: id,
+        eventType: "document_requirements_overridden",
+        actorType: "user",
+        actorId: req.user.id,
+        payloadJson: { reason, agentName, appliedAt: appliedAt.toISOString(), previousStatus: existing.status },
+      });
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "invoice_override_approved",
+        description: `${agentName} overrode document requirements and approved invoice ${invoice.invoiceNumber}: ${reason}`,
+        entityType: "invoice",
+        entityId: id,
+      } as any);
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error overriding invoice approval:", error);
+      res.status(500).json({ message: "Failed to override and approve invoice" });
+    }
+  });
+
   // ─── Invoice detail (all related data) ───────────────────────────────────
   app.get("/api/invoices/:id/download", requireAuth, async (req, res) => {
     try {
@@ -2022,7 +2064,19 @@ ${message}
           confirmed:        docReview?.reviewStatus === "confirmed",
         };
       });
-      res.json({ ...raw, rules: flatRules });
+      const [override] = await db.select().from(eventLedger)
+        .where(and(
+          eq(eventLedger.entityType, "invoice"),
+          eq(eventLedger.entityId, invoiceId),
+          eq(eventLedger.eventType, "document_requirements_overridden"),
+        ))
+        .orderBy(desc(eventLedger.createdAt))
+        .limit(1);
+      res.json({
+        ...raw,
+        rules: flatRules,
+        overrideApplied: override ? { ...(override.payloadJson as any), createdAt: override.createdAt } : null,
+      });
     } catch (err) { res.status(500).json({ message: "Failed to fetch document status" }); }
   });
 
@@ -4372,8 +4426,7 @@ Trucking Pros Financial Team
       const { entityType, entityId, documentType } = req.body;
       const validEntityTypes = ["invoice", "load", "client", "broker"];
       const validDocumentTypes = [
-        "invoice", "rate_confirmation", "bill_of_lading", "proof_of_delivery",
-        "lumper_receipt", "receipt", "driver_id", "carrier_setup", "other",
+        "rate_confirmation", "bol", "commercial_invoice", "pod", "other",
       ];
       if (!validEntityTypes.includes(entityType)) {
         return res.status(400).json({ message: "Invalid entityType" });

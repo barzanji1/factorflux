@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -20,7 +21,7 @@ import {
   CreditCard, Clock, TrendingUp, Package, User, Building2, Calendar,
   ExternalLink, FileCheck, ReceiptText, Banknote, ShieldAlert, Activity,
   ChevronRight, ArrowRight, Lock, TriangleAlert, Zap, XCircle, Info,
-  PlayCircle, ClipboardCheck, MessageSquare,
+  PlayCircle, ClipboardCheck, MessageSquare, Pencil, ShieldCheck,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -417,6 +418,10 @@ export default function InvoiceDetail() {
   const [reviewNotes,  setReviewNotes]  = useState("");
   const [reviewStatus, setReviewStatus] = useState<"approved"|"needs_revision"|"incomplete">("needs_revision");
   const [reviewDocId, setReviewDocId] = useState<number | null>(null);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH" });
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
     queryKey: ["/api/invoices", invoiceId, "detail"],
@@ -458,6 +463,35 @@ export default function InvoiceDetail() {
     },
     enabled: !isNaN(invoiceId),
     refetchOnMount: "always",
+  });
+
+  const { data: debtors = [] } = useQuery<any[]>({ queryKey: ["/api/debtors"], enabled: editOpen });
+
+  const overrideMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/invoices/${invoiceId}/override-approve`, { reason: overrideReason })).json(),
+    onSuccess: () => {
+      toast({ title: "Override applied", description: "Invoice approved and audit trail updated." });
+      setOverrideOpen(false); setOverrideReason("");
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "timeline"] });
+    },
+    onError: (e: any) => toast({ title: "Override failed", description: e.message, variant: "destructive" }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async () => (await apiRequest("PUT", `/api/invoices/${invoiceId}`, {
+      amount: editValues.amount,
+      loadNumber: editValues.loadNumber || null,
+      debtorId: editValues.debtorId ? Number(editValues.debtorId) : null,
+      paymentType: editValues.paymentType,
+    })).json(),
+    onSuccess: () => {
+      toast({ title: "Invoice updated" }); setEditOpen(false);
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+    },
+    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
   const reviewMutation = useMutation({
@@ -582,6 +616,17 @@ export default function InvoiceDetail() {
                           <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{fmtDate(detail.submittedAt ?? detail.createdAt)}</span>
                         </div>
                       </div>
+                      <Button variant="outline" className="gap-2" onClick={() => {
+                        setEditValues({
+                          amount: String(detail.amount ?? ""),
+                          loadNumber: detail.loadNumber ?? "",
+                          debtorId: detail.debtorId ? String(detail.debtorId) : "",
+                          paymentType: detail.paymentType ?? "ACH",
+                        });
+                        setEditOpen(true);
+                      }}>
+                        <Pencil className="h-4 w-4" />Edit Invoice
+                      </Button>
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Invoice Amount</p>
@@ -669,6 +714,18 @@ export default function InvoiceDetail() {
                       ) : (
                         <div className="space-y-5">
                           {/* Overall progress bar */}
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            {docStatus.overrideApplied ? (
+                              <Badge className="gap-1.5 border border-violet-200 bg-violet-50 text-violet-700">
+                                <ShieldCheck className="h-3.5 w-3.5" />Override Applied
+                              </Badge>
+                            ) : <span />}
+                            {isAdmin && !docStatus.overrideApplied && detail.status !== "approved" && (
+                              <Button variant="outline" className="gap-2 border-violet-300 text-violet-700" onClick={() => setOverrideOpen(true)}>
+                                <ShieldCheck className="h-4 w-4" />Override & Approve
+                              </Button>
+                            )}
+                          </div>
                           <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                             <div className="mb-3 flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -1033,13 +1090,9 @@ export default function InvoiceDetail() {
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
-                                        <SelectItem value="bill_of_lading">Bill of Lading (BOL)</SelectItem>
-                                        <SelectItem value="invoice">Commercial Invoice</SelectItem>
-                                        <SelectItem value="proof_of_delivery">Proof of Delivery (POD)</SelectItem>
-                                        <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
-                                        <SelectItem value="receipt">Receipt</SelectItem>
-                                        <SelectItem value="driver_id">Driver ID</SelectItem>
-                                        <SelectItem value="carrier_setup">Carrier Setup</SelectItem>
+                                        <SelectItem value="bol">Bill of Lading (BOL)</SelectItem>
+                                        <SelectItem value="commercial_invoice">Commercial Invoice</SelectItem>
+                                        <SelectItem value="pod">Proof of Delivery (POD)</SelectItem>
                                         <SelectItem value="other">Other</SelectItem>
                                       </SelectContent>
                                     </Select>
@@ -1286,6 +1339,33 @@ export default function InvoiceDetail() {
           </div>
         </main>
       </div>
+
+      <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Override & Approve</DialogTitle>
+            <DialogDescription>Override document requirements and approve this invoice? This will be logged.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={overrideReason} onChange={e => setOverrideReason(e.target.value)} placeholder="Required override reason" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOverrideOpen(false)}>Cancel</Button>
+            <Button onClick={() => overrideMutation.mutate()} disabled={!overrideReason.trim() || overrideMutation.isPending}>Confirm Override & Approve</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Invoice</DialogTitle><DialogDescription>Update invoice billing and load details.</DialogDescription></DialogHeader>
+          <div className="grid gap-4">
+            <div><label className="text-sm font-medium">Amount</label><Input type="number" value={editValues.amount} onChange={e => setEditValues(v => ({ ...v, amount: e.target.value }))} /></div>
+            <div><label className="text-sm font-medium">Load Number</label><Input value={editValues.loadNumber} onChange={e => setEditValues(v => ({ ...v, loadNumber: e.target.value }))} /></div>
+            <div><label className="text-sm font-medium">Broker</label><Select value={editValues.debtorId || "none"} onValueChange={v => setEditValues(s => ({ ...s, debtorId: v === "none" ? "" : v }))}><SelectTrigger><SelectValue placeholder="Select broker" /></SelectTrigger><SelectContent><SelectItem value="none">No broker</SelectItem>{debtors.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}</SelectContent></Select></div>
+            <div><label className="text-sm font-medium">Payment Type</label><Select value={editValues.paymentType} onValueChange={v => setEditValues(s => ({ ...s, paymentType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="check">Check</SelectItem></SelectContent></Select></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button onClick={() => editMutation.mutate()} disabled={!editValues.amount || editMutation.isPending}>Save Changes</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Transition dialog */}
       <TransitionDialog

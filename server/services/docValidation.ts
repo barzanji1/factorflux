@@ -41,6 +41,13 @@ export interface DocCompleteness {
   reviews: InvoiceDocReview[];
 }
 
+function checklistType(type: string): string {
+  if (type === "bill_of_lading") return "bol";
+  if (type === "invoice") return "commercial_invoice";
+  if (type === "proof_of_delivery") return "pod";
+  return type;
+}
+
 // ─── Core function ────────────────────────────────────────────────────────────
 
 export async function getDocumentCompleteness(invoiceId: number): Promise<DocCompleteness> {
@@ -60,12 +67,14 @@ export async function getDocumentCompleteness(invoiceId: number): Promise<DocCom
       .orderBy(desc(invoiceDocReviews.createdAt)),
   ]);
 
-  const docsByType = new Map<string, (typeof docs)[number]>(docs.map(d => [d.documentType as string, d]));
+  const docsByType = new Map<string, (typeof docs)[number]>(
+    docs.map(d => [checklistType(d.documentType as string), d]),
+  );
 
   const ruleStatuses: DocRuleStatus[] = rules.map(rule => ({
     rule,
-    uploaded: docsByType.has(rule.documentType),
-    document: docsByType.get(rule.documentType),
+    uploaded: docsByType.has(checklistType(rule.documentType)),
+    document: docsByType.get(checklistType(rule.documentType)),
   }));
 
   const required = ruleStatuses.filter(r => r.rule.required);
@@ -104,8 +113,8 @@ export async function guardDocsForReview(ctx: Ctx): Promise<{ code: string; mess
 
   const docs = await db.select({ documentType: documents.documentType }).from(documents)
     .where(eq(documents.invoiceId, ctx.invoiceId));
-  const types = new Set<string>(docs.map(d => d.documentType as string));
-  const missing = reviewRules.filter(r => !types.has(r.documentType)).map(r => r.label);
+  const types = new Set<string>(docs.map(d => checklistType(d.documentType as string)));
+  const missing = reviewRules.filter(r => !types.has(checklistType(r.documentType))).map(r => r.label);
 
   return missing.length === 0 ? null : {
     code: "missing_review_docs",
@@ -122,8 +131,8 @@ export async function guardDocsForApproval(ctx: Ctx): Promise<{ code: string; me
 
   const docs = await db.select({ documentType: documents.documentType }).from(documents)
     .where(eq(documents.invoiceId, ctx.invoiceId));
-  const types = new Set<string>(docs.map(d => d.documentType as string));
-  const missing = approveRules.filter(r => !types.has(r.documentType)).map(r => r.label);
+  const types = new Set<string>(docs.map(d => checklistType(d.documentType as string)));
+  const missing = approveRules.filter(r => !types.has(checklistType(r.documentType))).map(r => r.label);
 
   return missing.length === 0 ? null : {
     code: "missing_approval_docs",
