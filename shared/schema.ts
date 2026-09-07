@@ -805,6 +805,7 @@ export const payouts = pgTable("payouts", {
   reserveAmount: decimal("reserve_amount", { precision: 12, scale: 2 }).notNull(),
   netPayout: decimal("net_payout", { precision: 12, scale: 2 }).notNull(),
   paymentMethod: varchar("payment_method", { enum: ["ach", "wire"] }).default("ach").notNull(),
+  bankAccountVaultId: integer("bank_account_vault_id").references(() => clientVault.id),
   paymentStatus: varchar("payment_status", {
     enum: ["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"],
   }).default("pending_advance").notNull(),

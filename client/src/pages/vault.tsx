@@ -79,7 +79,11 @@ const DATA_TYPE_VARIANTS: Record<string, "default" | "secondary" | "destructive"
 };
 
 export default function VaultPage() {
-  const [selectedClient, setSelectedClient] = useState<number | null>(null);
+  const [selectedClient, setSelectedClient] = useState<number | null>(() => {
+    const value = new URLSearchParams(window.location.search).get("clientId");
+    const parsed = value ? Number(value) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<VaultEntry | null>(null);
   const [revealedValues, setRevealedValues] = useState<Record<number, string | null>>({});

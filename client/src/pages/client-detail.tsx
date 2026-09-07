@@ -13,6 +13,10 @@ import RecordDetail, {
 } from "@/components/layout/record-detail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import InvoiceModal from "@/components/modals/invoice-modal";
 
 import {
@@ -71,6 +75,10 @@ export default function ClientDetail() {
 
   const [noteText, setNoteText] = useState("");
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [bankDialogOpen, setBankDialogOpen] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    bankName: "", accountType: "checking", routingNumber: "", accountNumber: "", nickname: "",
+  });
 
   const { data: client, isLoading } = useQuery<any>({
     queryKey: ["/api/clients", clientId],
@@ -93,6 +101,34 @@ export default function ClientDetail() {
     enabled: !isNaN(clientId),
   });
   const clientDocs = allDocs.filter((doc: any) => doc.clientId === clientId);
+
+  const { data: bankAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/carriers", clientId, "bank-accounts"],
+    queryFn: async () => {
+      const r = await fetch(`/api/carriers/${clientId}/bank-accounts`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to load bank accounts");
+      return r.json();
+    },
+    enabled: !isNaN(clientId),
+  });
+
+  const addBankAccountMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/vault", {
+      clientId,
+      dataType: "bank_account",
+      label: bankForm.nickname || bankForm.bankName,
+      value: JSON.stringify(bankForm),
+      notes: null,
+    }),
+    onSuccess: () => {
+      toast({ title: "Bank account added to Vault" });
+      setBankDialogOpen(false);
+      setBankForm({ bankName: "", accountType: "checking", routingNumber: "", accountNumber: "", nickname: "" });
+      qc.invalidateQueries({ queryKey: ["/api/carriers", clientId, "bank-accounts"] });
+      qc.invalidateQueries({ queryKey: ["/api/vault", clientId] });
+    },
+    onError: () => toast({ title: "Failed to add bank account", variant: "destructive" }),
+  });
 
   const totalFunded = clientInvoices
     .filter((inv: any) => ["funded", "settled"].includes(inv.status))
@@ -179,6 +215,11 @@ export default function ClientDetail() {
                     onClick={() => setIsInvoiceModalOpen(true)}
                   >
                     <Plus className="h-3.5 w-3.5" />Create Invoice
+                  </Button>
+                  <Button variant="outline" size="sm"
+                    className="w-full justify-start gap-2 rounded-2xl border-slate-200 text-xs dark:border-slate-700"
+                    onClick={() => setBankDialogOpen(true)}>
+                    <Banknote className="h-3.5 w-3.5" />Add Bank Account
                   </Button>
                   {isAdmin && client?.status !== "active" && (
                     <Button size="sm"
@@ -360,6 +401,33 @@ export default function ClientDetail() {
           </div>
         </main>
       </div>
+      <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Bank Account to Vault</DialogTitle>
+            <DialogDescription>Account and routing numbers are encrypted before storage.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5"><Label>Bank Name</Label><Input value={bankForm.bankName} onChange={e => setBankForm(v => ({ ...v, bankName: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Account Nickname</Label><Input placeholder="Primary operating" value={bankForm.nickname} onChange={e => setBankForm(v => ({ ...v, nickname: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Account Type</Label>
+              <Select value={bankForm.accountType} onValueChange={accountType => setBankForm(v => ({ ...v, accountType }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="checking">Checking</SelectItem><SelectItem value="savings">Savings</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5"><Label>Routing Number</Label><Input inputMode="numeric" autoComplete="off" value={bankForm.routingNumber} onChange={e => setBankForm(v => ({ ...v, routingNumber: e.target.value.replace(/\D/g, "").slice(0, 9) }))} /></div>
+            <div className="space-y-1.5 sm:col-span-2"><Label>Account Number</Label><Input type="password" inputMode="numeric" autoComplete="new-password" value={bankForm.accountNumber} onChange={e => setBankForm(v => ({ ...v, accountNumber: e.target.value.replace(/\D/g, "") }))} /></div>
+          </div>
+          {bankAccounts.length > 0 && <p className="text-xs text-slate-500">{bankAccounts.length} account{bankAccounts.length === 1 ? "" : "s"} currently on file.</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBankDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => addBankAccountMutation.mutate()} disabled={addBankAccountMutation.isPending || !bankForm.bankName.trim() || bankForm.routingNumber.length !== 9 || !bankForm.accountNumber.trim()}>
+              Save to Vault
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <InvoiceModal
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}

@@ -1943,10 +1943,11 @@ ${message}
         reason: z.string().optional(),
         force: z.boolean().optional(),
         paymentMethod: z.enum(["ach", "wire"]).optional(),
+        bankAccountVaultId: z.number().int().positive().optional(),
       });
-      const { transitionId, reason, force, paymentMethod } = schema.parse(req.body);
+      const { transitionId, reason, force, paymentMethod, bankAccountVaultId } = schema.parse(req.body);
       const result = await performTransition(
-        id, transitionId, req.user.id, req.user.role ?? "employee", reason, force, paymentMethod,
+        id, transitionId, req.user.id, req.user.role ?? "employee", reason, force, paymentMethod, bankAccountVaultId,
       );
       res.json(result);
     } catch (err) {
@@ -2898,6 +2899,33 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error fetching vault entries:", error);
       res.status(500).json({ message: "Failed to fetch vault entries" });
+    }
+  });
+
+  app.get("/api/carriers/:id/bank-accounts", requireAuth, async (req: any, res) => {
+    try {
+      const carrierId = parseInt(req.params.id, 10);
+      if (Number.isNaN(carrierId)) return res.status(400).json({ message: "Invalid carrier ID" });
+      const entries = await storage.getAllVaultEntries(carrierId);
+      const accounts = entries
+        .filter((entry: any) => entry.dataType === "bank_account" && entry.isActive)
+        .map((entry: any) => {
+          const decrypted = decryptVault(entry.encryptedData);
+          let data: any = {};
+          try { data = JSON.parse(decrypted); } catch { data = { accountNumber: decrypted }; }
+          const digits = String(data.accountNumber ?? "").replace(/\D/g, "");
+          return {
+            id: entry.id,
+            bankName: data.bankName || "Bank",
+            accountType: data.accountType || null,
+            nickname: data.nickname || entry.label,
+            lastFour: digits.slice(-4).padStart(4, "•"),
+          };
+        });
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error fetching carrier bank accounts:", error);
+      res.status(500).json({ message: "Failed to fetch bank accounts" });
     }
   });
 

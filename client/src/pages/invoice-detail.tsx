@@ -423,6 +423,21 @@ export default function InvoiceDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [fundTransition, setFundTransition] = useState<AvailableTransition | null>(null);
   const [fundMethod, setFundMethod] = useState<"ach" | "wire">("ach");
+  const [fundBankAccountId, setFundBankAccountId] = useState("");
+  const carrierId = detail?.client?.id ?? detail?.clientId;
+  const { data: carrierBankAccounts = [], isLoading: bankAccountsLoading } = useQuery<any[]>({
+    queryKey: ["/api/carriers", carrierId, "bank-accounts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/carriers/${carrierId}/bank-accounts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load bank accounts");
+      return res.json();
+    },
+    enabled: !!fundTransition && !!carrierId,
+  });
+  useEffect(() => {
+    if (carrierBankAccounts.length === 1) setFundBankAccountId(String(carrierBankAccounts[0].id));
+    if (carrierBankAccounts.length === 0) setFundBankAccountId("");
+  }, [carrierBankAccounts]);
   const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH" });
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
@@ -524,8 +539,8 @@ export default function InvoiceDetail() {
   });
 
   const transitionMutation = useMutation({
-    mutationFn: async ({ transitionId, reason, force, paymentMethod }: { transitionId: string; reason?: string; force?: boolean; paymentMethod?: "ach" | "wire" }) => {
-      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/transition`, { transitionId, reason, force, paymentMethod });
+    mutationFn: async ({ transitionId, reason, force, paymentMethod, bankAccountVaultId }: { transitionId: string; reason?: string; force?: boolean; paymentMethod?: "ach" | "wire"; bankAccountVaultId?: number }) => {
+      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/transition`, { transitionId, reason, force, paymentMethod, bankAccountVaultId });
       return res.json();
     },
     onSuccess: (data) => {
@@ -553,6 +568,7 @@ export default function InvoiceDetail() {
 
   const openTransitionDialog = (t: AvailableTransition) => {
     if (t.id === "fund") {
+      setFundBankAccountId("");
       setFundTransition(t);
       return;
     }
@@ -1384,13 +1400,34 @@ export default function InvoiceDetail() {
               <SelectContent><SelectItem value="ach">ACH</SelectItem><SelectItem value="wire">Wire</SelectItem></SelectContent>
             </Select>
           </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Bank Account</label>
+            {bankAccountsLoading ? (
+              <p className="text-sm text-slate-500">Loading bank accounts…</p>
+            ) : carrierBankAccounts.length ? (
+              <Select value={fundBankAccountId} onValueChange={setFundBankAccountId}>
+                <SelectTrigger><SelectValue placeholder="Select destination account" /></SelectTrigger>
+                <SelectContent>
+                  {carrierBankAccounts.map((account: any) => (
+                    <SelectItem key={account.id} value={String(account.id)}>
+                      Account ending in {account.lastFour} — {account.bankName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                No bank accounts on file for this carrier — <a className="font-semibold underline" href={`/vault?clientId=${carrierId}`}>add one in Vault</a>
+              </p>
+            )}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFundTransition(null)}>Cancel</Button>
             <Button onClick={() => {
               if (!fundTransition) return;
-              transitionMutation.mutate({ transitionId: fundTransition.id, paymentMethod: fundMethod });
+              transitionMutation.mutate({ transitionId: fundTransition.id, paymentMethod: fundMethod, bankAccountVaultId: Number(fundBankAccountId) });
               setFundTransition(null);
-            }} disabled={transitionMutation.isPending}>Confirm Funding</Button>
+            }} disabled={transitionMutation.isPending || !fundBankAccountId || bankAccountsLoading}>Confirm Funding</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

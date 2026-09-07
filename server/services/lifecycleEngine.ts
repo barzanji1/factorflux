@@ -44,6 +44,7 @@ interface Ctx {
   reason?: string;
   force?: boolean;
   paymentMethod?: "ach" | "wire";
+  bankAccountVaultId?: number;
 }
 
 type Guard      = (ctx: Ctx) => Promise<BlockerInfo | null>;
@@ -201,7 +202,7 @@ const fxCheckDocsAutoDowngrade: SideEffect = async ({ invoiceId, actorId }) => {
 };
 
 /** Auto-create payout record on funding */
-const fxCreatePayout: SideEffect = async ({ invoiceId, actorId, paymentMethod }) => {
+const fxCreatePayout: SideEffect = async ({ invoiceId, actorId, paymentMethod, bankAccountVaultId }) => {
   const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!inv) return;
   const client = await storage.getClient(inv.clientId);
@@ -218,6 +219,7 @@ const fxCreatePayout: SideEffect = async ({ invoiceId, actorId, paymentMethod })
     advanceAmount: String(advanceAmount), feeAmount: String(feeAmount),
     reserveAmount: String(reserveAmount), netPayout: String(netPayout),
     paymentMethod: paymentMethod ?? "ach",
+    bankAccountVaultId,
     paymentStatus: "advance_paid",
     advancePaidAt: new Date(),
     notes: "Auto-created by lifecycle engine on invoice funding",
@@ -498,6 +500,7 @@ export async function performTransition(
   reason?: string,
   force?: boolean,
   paymentMethod?: "ach" | "wire",
+  bankAccountVaultId?: number,
 ): Promise<TransitionResult> {
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!invoice) return { success: false, error: "Invoice not found" };
@@ -511,7 +514,14 @@ export async function performTransition(
   if (def.requiredRole === "admin" && actorRole !== "admin")
     return { success: false, error: "Only admins can perform this action" };
 
-  const ctx: Ctx = { invoiceId, invoice, actorId, actorRole, reason, force, paymentMethod };
+  if (transitionId === "fund") {
+    if (!bankAccountVaultId) return { success: false, error: "A carrier bank account is required" };
+    const account = await storage.getVaultEntry(bankAccountVaultId);
+    if (!account || account.clientId !== invoice.clientId || account.dataType !== "bank_account" || !account.isActive) {
+      return { success: false, error: "The selected bank account is not available for this carrier" };
+    }
+  }
+  const ctx: Ctx = { invoiceId, invoice, actorId, actorRole, reason, force, paymentMethod, bankAccountVaultId };
 
   // Run guards
   const blockers: BlockerInfo[] = [];
