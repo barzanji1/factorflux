@@ -424,7 +424,7 @@ export default function InvoiceDetail() {
   const [fundTransition, setFundTransition] = useState<AvailableTransition | null>(null);
   const [fundMethod, setFundMethod] = useState<"ach" | "wire">("ach");
   const [fundBankAccountId, setFundBankAccountId] = useState("");
-  const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH" });
+  const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH", bankAccountId: "" });
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
     queryKey: ["/api/invoices", invoiceId, "detail"],
@@ -443,12 +443,17 @@ export default function InvoiceDetail() {
       if (!res.ok) throw new Error("Failed to load bank accounts");
       return res.json();
     },
-    enabled: !!fundTransition && !!carrierId,
+    enabled: !!carrierId,
   });
   useEffect(() => {
     if (carrierBankAccounts.length === 1) setFundBankAccountId(String(carrierBankAccounts[0].id));
     if (carrierBankAccounts.length === 0) setFundBankAccountId("");
   }, [carrierBankAccounts]);
+  useEffect(() => {
+    if (editOpen && carrierBankAccounts.length === 1 && !editValues.bankAccountId) {
+      setEditValues(v => ({ ...v, bankAccountId: String(carrierBankAccounts[0].id) }));
+    }
+  }, [editOpen, carrierBankAccounts, editValues.bankAccountId]);
 
   const { data: timeline, isLoading: timelineLoading } = useQuery<any[]>({
     queryKey: ["/api/invoices", invoiceId, "timeline"],
@@ -502,6 +507,7 @@ export default function InvoiceDetail() {
       loadNumber: editValues.loadNumber || null,
       debtorId: editValues.debtorId ? Number(editValues.debtorId) : null,
       paymentType: editValues.paymentType,
+      bankAccountId: editValues.bankAccountId ? Number(editValues.bankAccountId) : null,
     })).json(),
     onSuccess: () => {
       toast({ title: "Invoice updated" }); setEditOpen(false);
@@ -644,6 +650,7 @@ export default function InvoiceDetail() {
                           loadNumber: detail.loadNumber ?? "",
                           debtorId: detail.debtorId ? String(detail.debtorId) : "",
                           paymentType: detail.paymentType ?? "ACH",
+                          bankAccountId: detail.bankAccountId ? String(detail.bankAccountId) : "",
                         });
                         setEditOpen(true);
                       }}>
@@ -1007,6 +1014,10 @@ export default function InvoiceDetail() {
                             { label: "Invoice Date", value: fmtDate(detail.invoiceDate) },
                             { label: "Due Date",     value: fmtDate(detail.dueDate) },
                             { label: "BOL Number",   value: detail.bolNumber || "—" },
+                            { label: "Payment Type", value: detail.paymentType || "—" },
+                            { label: "Bank Account", value: carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId)
+                              ? `${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).bankName} — ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).accountType || "account"} ending in ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).lastFour}`
+                              : "—" },
                             { label: "Load Type",    value: detail.loadType?.replace(/_/g, " ") || "—" },
                             { label: "Pickup",       value: detail.pickupLocation || "—" },
                             { label: "Delivery",     value: detail.deliveryLocation || "—" },
@@ -1439,9 +1450,18 @@ export default function InvoiceDetail() {
             <div><label className="text-sm font-medium">Amount</label><Input type="number" value={editValues.amount} onChange={e => setEditValues(v => ({ ...v, amount: e.target.value }))} /></div>
             <div><label className="text-sm font-medium">Load Number</label><Input value={editValues.loadNumber} onChange={e => setEditValues(v => ({ ...v, loadNumber: e.target.value }))} /></div>
             <div><label className="text-sm font-medium">Broker</label><Select value={editValues.debtorId || "none"} onValueChange={v => setEditValues(s => ({ ...s, debtorId: v === "none" ? "" : v }))}><SelectTrigger><SelectValue placeholder="Select broker" /></SelectTrigger><SelectContent><SelectItem value="none">No broker</SelectItem>{debtors.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}</SelectContent></Select></div>
-            <div><label className="text-sm font-medium">Payment Type</label><Select value={editValues.paymentType} onValueChange={v => setEditValues(s => ({ ...s, paymentType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="check">Check</SelectItem></SelectContent></Select></div>
+            <div><label className="text-sm font-medium">Payment Type</label><Select value={editValues.paymentType} onValueChange={v => setEditValues(s => ({ ...s, paymentType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent></Select></div>
+            {["ACH", "Wire"].includes(editValues.paymentType) && <div>
+              <label className="text-sm font-medium">Bank Account</label>
+              {carrierBankAccounts.length ? (
+                <Select value={editValues.bankAccountId} onValueChange={bankAccountId => setEditValues(s => ({ ...s, bankAccountId }))}>
+                  <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
+                  <SelectContent>{carrierBankAccounts.map((account: any) => <SelectItem key={account.id} value={String(account.id)}>{account.bankName} — {account.accountType ? account.accountType.charAt(0).toUpperCase() + account.accountType.slice(1) : "Account"} ending in {account.lastFour}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : <p className="mt-1 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No bank accounts on file — <a className="font-semibold underline" href={`/vault?clientId=${carrierId}`}>add in carrier Vault</a></p>}
+            </div>}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button onClick={() => editMutation.mutate()} disabled={!editValues.amount || editMutation.isPending}>Save Changes</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button onClick={() => editMutation.mutate()} disabled={!editValues.amount || editMutation.isPending || (["ACH", "Wire"].includes(editValues.paymentType) && !editValues.bankAccountId)}>Save Changes</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -76,6 +76,7 @@ export default function ClientDetail() {
   const [noteText, setNoteText] = useState("");
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
+  const [editingBankAccount, setEditingBankAccount] = useState<any | null>(null);
   const [bankForm, setBankForm] = useState({
     bankName: "", accountType: "checking", routingNumber: "", accountNumber: "", nickname: "",
   });
@@ -112,23 +113,45 @@ export default function ClientDetail() {
     enabled: !isNaN(clientId),
   });
 
-  const addBankAccountMutation = useMutation({
-    mutationFn: async () => apiRequest("POST", "/api/vault", {
-      clientId,
-      dataType: "bank_account",
+  const saveBankAccountMutation = useMutation({
+    mutationFn: async () => apiRequest(editingBankAccount ? "PATCH" : "POST", editingBankAccount ? `/api/vault/${editingBankAccount.id}` : "/api/vault", {
+      ...(editingBankAccount ? {} : { clientId, dataType: "bank_account" }),
       label: bankForm.nickname || bankForm.bankName,
       value: JSON.stringify(bankForm),
       notes: null,
     }),
     onSuccess: () => {
-      toast({ title: "Bank account added to Vault" });
+      toast({ title: editingBankAccount ? "Bank account updated" : "Bank account added to Vault" });
       setBankDialogOpen(false);
+      setEditingBankAccount(null);
       setBankForm({ bankName: "", accountType: "checking", routingNumber: "", accountNumber: "", nickname: "" });
       qc.invalidateQueries({ queryKey: ["/api/carriers", clientId, "bank-accounts"] });
       qc.invalidateQueries({ queryKey: ["/api/vault", clientId] });
     },
     onError: () => toast({ title: "Failed to add bank account", variant: "destructive" }),
   });
+
+  const deleteBankAccountMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/vault/${id}`),
+    onSuccess: () => {
+      toast({ title: "Bank account removed" });
+      qc.invalidateQueries({ queryKey: ["/api/carriers", clientId, "bank-accounts"] });
+      qc.invalidateQueries({ queryKey: ["/api/vault", clientId] });
+    },
+    onError: () => toast({ title: "Failed to remove bank account", variant: "destructive" }),
+  });
+
+  const openAddBankAccount = () => {
+    setEditingBankAccount(null);
+    setBankForm({ bankName: "", accountType: "checking", routingNumber: "", accountNumber: "", nickname: "" });
+    setBankDialogOpen(true);
+  };
+
+  const openEditBankAccount = (account: any) => {
+    setEditingBankAccount(account);
+    setBankForm({ bankName: account.bankName, accountType: account.accountType || "checking", routingNumber: "", accountNumber: "", nickname: account.nickname || "" });
+    setBankDialogOpen(true);
+  };
 
   const totalFunded = clientInvoices
     .filter((inv: any) => ["funded", "settled"].includes(inv.status))
@@ -218,9 +241,22 @@ export default function ClientDetail() {
                   </Button>
                   <Button variant="outline" size="sm"
                     className="w-full justify-start gap-2 rounded-2xl border-slate-200 text-xs dark:border-slate-700"
-                    onClick={() => setBankDialogOpen(true)}>
+                    onClick={openAddBankAccount}>
                     <Banknote className="h-3.5 w-3.5" />Add Bank Account
                   </Button>
+                  {bankAccounts.length > 0 && <div className="space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Bank Accounts</p>
+                    {bankAccounts.map((account: any) => <div key={account.id} className="rounded-xl border border-slate-200 p-2.5 dark:border-slate-700">
+                      <p className="truncate text-xs font-semibold">{account.nickname || account.bankName}</p>
+                      <p className="text-[10px] text-slate-500">{account.bankName} · {account.accountType || "account"} · •••• {account.lastFour}</p>
+                      <div className="mt-2 flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => openEditBankAccount(account)}>Edit</Button>
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-red-600" onClick={() => {
+                          if (window.confirm(`Remove ${account.nickname || account.bankName}? This bank account will no longer be available for funding.`)) deleteBankAccountMutation.mutate(account.id);
+                        }}>Delete</Button>
+                      </div>
+                    </div>)}
+                  </div>}
                   {isAdmin && client?.status !== "active" && (
                     <Button size="sm"
                       disabled={statusMutation.isPending}
@@ -404,8 +440,8 @@ export default function ClientDetail() {
       <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Bank Account to Vault</DialogTitle>
-            <DialogDescription>Account and routing numbers are encrypted before storage.</DialogDescription>
+            <DialogTitle>{editingBankAccount ? "Edit Bank Account" : "Add Bank Account to Vault"}</DialogTitle>
+            <DialogDescription>{editingBankAccount ? "Re-enter routing and account numbers to securely replace this account." : "Account and routing numbers are encrypted before storage."}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5"><Label>Bank Name</Label><Input value={bankForm.bankName} onChange={e => setBankForm(v => ({ ...v, bankName: e.target.value }))} /></div>
@@ -422,8 +458,8 @@ export default function ClientDetail() {
           {bankAccounts.length > 0 && <p className="text-xs text-slate-500">{bankAccounts.length} account{bankAccounts.length === 1 ? "" : "s"} currently on file.</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setBankDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => addBankAccountMutation.mutate()} disabled={addBankAccountMutation.isPending || !bankForm.bankName.trim() || bankForm.routingNumber.length !== 9 || !bankForm.accountNumber.trim()}>
-              Save to Vault
+            <Button onClick={() => saveBankAccountMutation.mutate()} disabled={saveBankAccountMutation.isPending || !bankForm.bankName.trim() || bankForm.routingNumber.length !== 9 || !bankForm.accountNumber.trim()}>
+              {editingBankAccount ? "Save Changes" : "Save to Vault"}
             </Button>
           </DialogFooter>
         </DialogContent>

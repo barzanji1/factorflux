@@ -1646,6 +1646,13 @@ ${message}
       const id = parseInt(req.params.id, 10);
       const invoiceData = insertInvoiceSchema.partial().parse(req.body);
       const user = req.user;
+      if (invoiceData.bankAccountId) {
+        const currentInvoice = await storage.getInvoice(id);
+        const account = await storage.getVaultEntry(invoiceData.bankAccountId);
+        if (!currentInvoice || !account || account.clientId !== currentInvoice.clientId || account.dataType !== "bank_account" || !account.isActive) {
+          return res.status(400).json({ message: "The selected bank account is not available for this carrier" });
+        }
+      }
 
       const updatePayload: any = {
         ...invoiceData,
