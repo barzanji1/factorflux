@@ -188,6 +188,9 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           <p className="truncate pl-11 text-[10px] text-[#444] mt-0.5">
             Freight Factoring OS
           </p>
+          <p className="truncate pl-11 text-[8px] font-semibold uppercase tracking-[0.08em] text-[#5a5a5a]">
+            Trucking Pros Financial
+          </p>
         </div>
       </div>
 
