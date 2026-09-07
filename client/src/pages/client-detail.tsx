@@ -23,7 +23,7 @@ import {
   Building2, ReceiptText, Phone, Mail, MapPin,
   FileText, Edit2, CheckCircle2, XCircle, User,
   Hash, Activity, MessageSquare, Send, DollarSign,
-  Banknote, ShieldCheck, Plus,
+  Banknote, ShieldCheck, Plus, Eye, EyeOff,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -77,6 +77,9 @@ export default function ClientDetail() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const [editingBankAccount, setEditingBankAccount] = useState<any | null>(null);
+  const [showRoutingNumber, setShowRoutingNumber] = useState(false);
+  const [showAccountNumber, setShowAccountNumber] = useState(false);
+  const [revealedAccountNumbers, setRevealedAccountNumbers] = useState<Record<number, string>>({});
   const [bankForm, setBankForm] = useState({
     bankName: "", accountType: "checking", routingNumber: "", accountNumber: "", nickname: "",
   });
@@ -144,13 +147,43 @@ export default function ClientDetail() {
   const openAddBankAccount = () => {
     setEditingBankAccount(null);
     setBankForm({ bankName: "", accountType: "checking", routingNumber: "", accountNumber: "", nickname: "" });
+    setShowRoutingNumber(false);
+    setShowAccountNumber(false);
     setBankDialogOpen(true);
   };
 
   const openEditBankAccount = (account: any) => {
     setEditingBankAccount(account);
     setBankForm({ bankName: account.bankName, accountType: account.accountType || "checking", routingNumber: "", accountNumber: "", nickname: account.nickname || "" });
+    setShowRoutingNumber(false);
+    setShowAccountNumber(false);
     setBankDialogOpen(true);
+  };
+
+  const toggleSavedAccountNumber = async (accountId: number) => {
+    if (revealedAccountNumbers[accountId]) {
+      setRevealedAccountNumbers(values => {
+        const next = { ...values };
+        delete next[accountId];
+        return next;
+      });
+      return;
+    }
+    try {
+      const response = await fetch(`/api/vault/entry/${accountId}`, { credentials: "include" });
+      if (!response.ok) throw new Error();
+      const entry = await response.json();
+      const data = JSON.parse(entry.decryptedValue);
+      const accountNumber = String(data.accountNumber || "");
+      setRevealedAccountNumbers(values => ({ ...values, [accountId]: accountNumber }));
+      window.setTimeout(() => setRevealedAccountNumbers(values => {
+        const next = { ...values };
+        delete next[accountId];
+        return next;
+      }), 30000);
+    } catch {
+      toast({ title: "Could not reveal account number", variant: "destructive" });
+    }
   };
 
   const totalFunded = clientInvoices
@@ -248,7 +281,12 @@ export default function ClientDetail() {
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Bank Accounts</p>
                     {bankAccounts.map((account: any) => <div key={account.id} className="rounded-xl border border-slate-200 p-2.5 dark:border-slate-700">
                       <p className="truncate text-xs font-semibold">{account.nickname || account.bankName}</p>
-                      <p className="text-[10px] text-slate-500">{account.bankName} · {account.accountType || "account"} · •••• {account.lastFour}</p>
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="min-w-0 truncate text-[10px] text-slate-500">{account.bankName} · {account.accountType || "account"} · {revealedAccountNumbers[account.id] || `•••• ${account.lastFour}`}</p>
+                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleSavedAccountNumber(account.id)} aria-label={revealedAccountNumbers[account.id] ? "Hide account number" : "Show account number"}>
+                          {revealedAccountNumbers[account.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </Button>
+                      </div>
                       <div className="mt-2 flex gap-1">
                         <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => openEditBankAccount(account)}>Edit</Button>
                         <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-red-600" onClick={() => {
@@ -452,8 +490,8 @@ export default function ClientDetail() {
                 <SelectContent><SelectItem value="checking">Checking</SelectItem><SelectItem value="savings">Savings</SelectItem></SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Routing Number</Label><Input inputMode="numeric" autoComplete="off" value={bankForm.routingNumber} onChange={e => setBankForm(v => ({ ...v, routingNumber: e.target.value.replace(/\D/g, "").slice(0, 9) }))} /></div>
-            <div className="space-y-1.5 sm:col-span-2"><Label>Account Number</Label><Input type="password" inputMode="numeric" autoComplete="new-password" value={bankForm.accountNumber} onChange={e => setBankForm(v => ({ ...v, accountNumber: e.target.value.replace(/\D/g, "") }))} /></div>
+            <div className="space-y-1.5"><Label>Routing Number</Label><div className="relative"><Input className="pr-10" type={showRoutingNumber ? "text" : "password"} inputMode="numeric" autoComplete="off" value={bankForm.routingNumber} onChange={e => setBankForm(v => ({ ...v, routingNumber: e.target.value.replace(/\D/g, "").slice(0, 9) }))} /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowRoutingNumber(v => !v)} aria-label={showRoutingNumber ? "Hide routing number" : "Show routing number"}>{showRoutingNumber ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div>
+            <div className="space-y-1.5 sm:col-span-2"><Label>Account Number</Label><div className="relative"><Input className="pr-10" type={showAccountNumber ? "text" : "password"} inputMode="numeric" autoComplete="new-password" value={bankForm.accountNumber} onChange={e => setBankForm(v => ({ ...v, accountNumber: e.target.value.replace(/\D/g, "") }))} /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowAccountNumber(v => !v)} aria-label={showAccountNumber ? "Hide account number" : "Show account number"}>{showAccountNumber ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div>
           </div>
           {bankAccounts.length > 0 && <p className="text-xs text-slate-500">{bankAccounts.length} account{bankAccounts.length === 1 ? "" : "s"} currently on file.</p>}
           <DialogFooter>
