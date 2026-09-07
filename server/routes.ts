@@ -5,6 +5,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { encryptVault, decryptVault } from "./services/vaultCrypto";
 import {
   uploadToS3,
   getSignedViewUrl,
@@ -134,37 +135,6 @@ function handleUpload(field: string) {
       return res.status(400).json({ message: err.message || "File upload rejected." });
     });
   };
-}
-
-function vaultKey(): Buffer {
-  const secret = process.env.VAULT_SECRET || process.env.SESSION_SECRET || "vault-default-secret-key";
-  return crypto.scryptSync(secret, "vault-salt-v1", 32);
-}
-
-function encryptVault(plaintext: string): string {
-  const key = vaultKey();
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
-}
-
-function decryptVault(encryptedText: string): string {
-  try {
-    const key = vaultKey();
-    const parts = encryptedText.split(":");
-    if (parts.length !== 3) return "***LEGACY***";
-    const [ivHex, authTagHex, encryptedHex] = parts;
-    const iv = Buffer.from(ivHex, "hex");
-    const authTag = Buffer.from(authTagHex, "hex");
-    const encrypted = Buffer.from(encryptedHex, "hex");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(authTag);
-    return decipher.update(encrypted) + decipher.final("utf8");
-  } catch {
-    return "***DECRYPTION ERROR***";
-  }
 }
 
 function sanitizeOriginalName(name: string) {

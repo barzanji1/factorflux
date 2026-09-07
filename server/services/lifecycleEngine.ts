@@ -23,6 +23,8 @@ import { eq, and, inArray } from "drizzle-orm";
 import { advanceInvoiceStage, type FactoringStage } from "./invoiceStage";
 import { guardDocsForReview, guardDocsForApproval } from "./docValidation";
 import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
+import { sendEmailTracked } from "../emailService";
+import { decryptVault } from "./vaultCrypto";
 
 // ─── Blocker types ────────────────────────────────────────────────────────────
 
@@ -227,6 +229,107 @@ const fxCreatePayout: SideEffect = async ({ invoiceId, actorId, paymentMethod, b
   });
 };
 
+const money = (value: string | number) =>
+  Number(value).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+/** Send carrier confirmation after the payout snapshot has been created. */
+const fxSendFundingConfirmation: SideEffect = async ({ invoiceId, actorId }) => {
+  try {
+    const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+    const [payout] = await db.select().from(payouts).where(eq(payouts.invoiceId, invoiceId));
+    if (!inv || !payout) return;
+    const carrier = await storage.getClient(inv.clientId);
+    if (!carrier?.email) {
+      await storage.createActivity({
+        userId: actorId, type: "funding_email_skipped",
+        description: `Funding confirmation not sent for ${inv.invoiceNumber} — carrier has no email on file`,
+        entityType: "invoice", entityId: invoiceId,
+      });
+      return;
+    }
+
+    let bankName = "Selected bank";
+    let lastFour = "••••";
+    if (payout.bankAccountVaultId) {
+      const account = await storage.getVaultEntry(payout.bankAccountVaultId);
+      if (account) {
+        try {
+          const data = JSON.parse(decryptVault(account.encryptedData));
+          bankName = data.bankName || account.label || bankName;
+          const digits = String(data.accountNumber || "").replace(/\D/g, "");
+          if (digits) lastFour = digits.slice(-4);
+        } catch { bankName = account.label || bankName; }
+      }
+    }
+
+    const method = payout.paymentMethod === "wire" ? "Wire" : "ACH";
+    const availability = method === "Wire"
+      ? "Same day if processed before 1:15 PM MST"
+      : "Next business day";
+    const subject = `Invoice ${inv.invoiceNumber} Funded — Your Advance is on the Way`;
+    const text = `Hi ${carrier.name},
+
+Great news! Your invoice has been processed and your advance payment is on its way.
+
+Invoice Details:
+- Invoice #: ${inv.invoiceNumber}
+- Load #: ${inv.loadNumber || "N/A"}
+- Gross Invoice Amount: ${money(payout.invoiceAmount)}
+- Advance Rate: ${Number(payout.advanceRate).toFixed(2)}%
+- Advance Amount: ${money(payout.advanceAmount)}
+- Factoring Fee: ${money(payout.feeAmount)}
+- Reserve Held: ${money(payout.reserveAmount)}
+- Net to You: ${money(payout.netPayout)}
+- Payment Method: ${method}
+- Bank Account: ${bankName} ending in ${lastFour}
+
+Estimated Availability:
+- ${method}: ${availability}
+
+If you have any questions, contact us at:
+Email: dosh@truckingprosfinancial.com
+Phone: 385-495-4962
+
+Thank you for choosing Trucking Pros Financial.
+
+Trucking Pros Financial Team`;
+
+    const result = await sendEmailTracked({
+      from: "dosh@truckingprosfinancial.com",
+      replyTo: "dosh@truckingprosfinancial.com",
+      to: carrier.email,
+      subject,
+      text,
+    });
+    await storage.createActivity({
+      userId: actorId,
+      type: result.success ? "funding_email_sent" : "funding_email_failed",
+      description: result.success
+        ? `Funding confirmation emailed to ${carrier.name} for ${inv.invoiceNumber}`
+        : `Funding confirmation email failed for ${inv.invoiceNumber}`,
+      entityType: "invoice", entityId: invoiceId,
+      metadata: result.messageId ? { messageId: result.messageId } : undefined,
+    } as any);
+    await db.insert(eventLedger).values({
+      entityType: "invoice", entityId: invoiceId,
+      eventType: result.success ? "funding_email_sent" : "funding_email_failed",
+      actorType: "system", actorId,
+      payloadJson: { recipient: carrier.email, messageId: result.messageId ?? null, paymentMethod: method },
+    });
+    if (result.success) {
+      await storage.createNotification({
+        userId: actorId,
+        title: "Funding email sent",
+        message: `Confirmation sent to ${carrier.name} for invoice ${inv.invoiceNumber}.`,
+        type: "success", entityType: "invoice", entityId: invoiceId,
+        actionUrl: `/invoices/${invoiceId}`,
+      } as any);
+    }
+  } catch (error: any) {
+    console.error("[funding-email] unexpected error:", error?.message ?? error);
+  }
+};
+
 /** Mark payout complete + release reserve on final payment */
 const fxReleaseReserve: SideEffect = async ({ invoiceId }) => {
   const [p] = await db.select().from(payouts).where(eq(payouts.invoiceId, invoiceId));
@@ -362,6 +465,7 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     sideEffects: [
       fxSetStatus("funded"),
       fxCreatePayout,
+      fxSendFundingConfirmation,
       // Funding completes Advance; Approval is the next active lifecycle stage.
       fxStage("approval"),
       fxActivity("invoice_funded", ctx => `Invoice ${ctx.invoice.invoiceNumber} funded — payout record auto-created`),
