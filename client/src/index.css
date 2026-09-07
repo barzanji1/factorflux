@@ -8,8 +8,8 @@
 
 :root {
   /* ── Shadcn component variables ─────────────────────────────────────── */
-  --background:           215 20% 97%;
-  --foreground:           222 47% 11%;
+  --background:           36 12% 80%;
+  --foreground:           0 0% 10%;
 
   --muted:                214 20% 94%;
   --muted-foreground:     215 18% 48%;
@@ -23,7 +23,7 @@
   --border:               214 22% 89%;
   --input:                214 22% 89%;
 
-  --primary:              217 91% 48%;
+  --primary:              184 65% 44%;
   --primary-foreground:   0 0% 100%;
   --primary-dark:         221 83% 42%;
 
@@ -45,7 +45,7 @@
   --warning:              36 94% 44%;
   --warning-foreground:   0 0% 98%;
 
-  --ring:                 217 91% 48%;
+  --ring:                 184 65% 44%;
   --surface:              0 0% 100%;
 
   --radius:               0.75rem;
@@ -560,3 +560,86 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+/* ─── FactorFlux Win95 cockpit skin ─────────────────────────────────────── */
+:root {
+  --ff-bg: #d4d0c8;
+  --ff-surface: #ffffff;
+  --ff-surface-subtle: #f0f0f0;
+  --ff-surface-tint: #c0c0c0;
+  --ff-border: #808080;
+  --ff-border-strong: #404040;
+  --ff-border-focus: #098b9f;
+  --ff-text-0: #1a1a1a;
+  --ff-text-1: #444444;
+  --ff-text-2: #666666;
+  --ff-text-3: #808080;
+  --ff-r-xs: 0px;
+  --ff-r-sm: 2px;
+  --ff-r-md: 3px;
+  --ff-r-lg: 4px;
+  --ff-r-xl: 5px;
+  --ff-shadow-xs: 1px 1px 0 #808080, -1px -1px 0 #ffffff;
+  --ff-shadow-sm: 2px 2px 0 #808080, -2px -2px 0 #ffffff;
+  --ff-shadow-md: 3px 3px 0 #808080, -3px -3px 0 #ffffff;
+}
+
+body {
+  background: var(--ff-bg);
+  color: var(--ff-text-0);
+  font-family: "Segoe UI", Tahoma, Geneva, sans-serif;
+}
+
+.ff-card, .qc-card {
+  border: 2px solid;
+  border-color: #fff #808080 #808080 #fff;
+  border-radius: 0;
+  background: var(--ff-surface);
+  box-shadow: none;
+}
+.ff-card-interactive:hover, .qc-card-hover:hover {
+  border-color: #27aab8 #098b9f #098b9f #27aab8;
+  box-shadow: var(--ff-shadow-sm);
+}
+.ff-btn-primary, .qc-button-primary {
+  border: 2px solid;
+  border-color: #fff #4a4a4a #4a4a4a #fff;
+  border-radius: 2px;
+  background: #27aab8;
+  color: #fff;
+  text-shadow: 1px 1px rgba(0,0,0,.25);
+}
+.ff-btn-primary:hover, .qc-button-primary:hover { background: #098b9f; }
+.ff-btn-primary:active, .qc-button-primary:active,
+.ff-btn-secondary:active, .qc-button-secondary:active,
+.ff-btn-danger:active { border-color: #4a4a4a #fff #fff #4a4a4a; }
+.ff-btn-secondary, .qc-button-secondary {
+  border: 2px solid;
+  border-color: #fff #808080 #808080 #fff;
+  border-radius: 2px;
+  background: #d4d0c8;
+  color: #1a1a1a;
+  text-shadow: 1px 1px #fff;
+}
+.ff-btn-danger {
+  border: 2px solid;
+  border-color: #fff #660000 #660000 #fff;
+  border-radius: 2px;
+  background: #cc0000;
+  color: #fff;
+  text-shadow: 1px 1px rgba(0,0,0,.3);
+}
+.ff-btn-danger:hover { background: #a80000; }
+.ff-input, .qc-topbar-search {
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+.ff-input:focus, .qc-topbar-search:focus {
+  border-color: #098b9f;
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,.15), 0 0 0 1px #27aab8;
+}
+.ff-data-table tbody tr:nth-child(odd) { background: #f0f0f0; }
+.ff-data-table tbody tr:hover { background: #dff5f6; box-shadow: inset 3px 0 #27aab8; }

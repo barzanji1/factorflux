@@ -21,13 +21,13 @@ const SelectTrigger = React.forwardRef<
     className={cn(
       [
         "flex h-11 w-full items-center justify-between",
-        "rounded-xl border border-input bg-background px-3.5 py-2.5",
-        "text-sm text-slate-900 shadow-sm",
-        "ring-offset-background transition-all duration-200",
+        "ff-input px-3.5 py-2.5",
+        "text-sm text-[#1a1a1a]",
+        "ring-offset-background transition-colors duration-150",
         "data-[placeholder]:text-muted-foreground",
-        "focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary",
+        "focus:outline-none",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        "[&>span]:line-clamp-1 dark:text-white",
+        "[&>span]:line-clamp-1",
       ].join(" "),
       className
     )}
@@ -81,8 +81,8 @@ const SelectContent = React.forwardRef<
       className={cn(
         [
           "z-[9999] max-h-[var(--radix-select-content-available-height)] min-w-[10rem]",
-          "overflow-y-auto overflow-x-hidden rounded-2xl border border-[hsl(var(--border))]",
-          "bg-popover text-popover-foreground shadow-[0_18px_40px_rgba(15,23,42,0.14)]",
+          "ff-card overflow-y-auto overflow-x-hidden",
+          "bg-[#d4d0c8] text-[#1a1a1a]",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

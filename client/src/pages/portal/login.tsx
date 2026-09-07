@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -49,7 +49,7 @@ export default function PortalLogin() {
       <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-sm w-full shadow-sm">
         <div className="flex items-center gap-2.5 mb-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm">
-            <img src={factorFluxLogo} alt="FactorFlux" className="h-6 w-6 object-contain" />
+            <FactorFluxLogo showWordmark={false} markClassName="h-6 w-6" />
           </div>
           <div>
             <p className="font-bold text-slate-900 text-sm leading-tight tracking-tight">FactorFlux</p>

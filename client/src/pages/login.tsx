@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, User, Eye, EyeOff } from "lucide-react";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -61,17 +61,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#d4d0c8] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="mx-auto w-20 h-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-md overflow-hidden">
-            <img src={factorFluxLogo} alt="FactorFlux" className="w-16 h-16 object-contain" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">FactorFlux</h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">Trucking Pros Financial</p>
+          <div className="mx-auto mb-4 flex justify-center"><FactorFluxLogo /></div>
+          <p className="text-[#444] mt-2">Freight Factoring OS</p>
         </div>
 
-        <Card className="shadow-xl border-0">
+         <Card className="shadow-none">
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
             <CardDescription>

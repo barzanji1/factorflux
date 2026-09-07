@@ -214,7 +214,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
         </SheetContent>
       </Sheet>
 
-      <header className="sticky top-0 z-30 border-b border-[hsl(var(--border))] bg-white/90 px-6 py-4 backdrop-blur dark:bg-[hsl(var(--card))]/90">
+      <header className="sticky top-0 z-30 border-b-2 border-[#808080] bg-[#c0c0c0] px-4 py-3">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center">
             <div className="flex min-w-0 items-start gap-3">
@@ -234,7 +234,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                     <span className="text-slate-500 dark:text-slate-400">{title}</span>
                   </div>
                 )}
-                <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+                <h1 className="truncate text-xl font-bold tracking-tight text-[#1a1a1a]">{title}</h1>
                 {subtitle && <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
               </div>
             </div>

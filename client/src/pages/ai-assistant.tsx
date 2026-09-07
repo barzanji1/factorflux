@@ -10,7 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Send, Sparkles, Bot, User, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 
 interface Message {
   role: "user" | "assistant";
@@ -36,7 +36,7 @@ function MessageBubble({ msg }: { msg: Message }) {
       )}>
         {isUser
           ? <User className="h-4 w-4" />
-          : <img src={factorFluxLogo} alt="Earl" className="w-6 h-6 object-contain" />
+          : <FactorFluxLogo showWordmark={false} markClassName="h-6 w-6" />
         }
       </div>
 
@@ -148,7 +148,7 @@ export default function AIAssistant() {
               <div className="flex flex-col items-center justify-center h-full gap-8 max-w-xl mx-auto text-center">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <img src={factorFluxLogo} alt="Earl" className="w-10 h-10 object-contain" />
+                    <FactorFluxLogo showWordmark={false} markClassName="h-10 w-10" />
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold">Hi, I'm Earl!</h2>
@@ -179,7 +179,7 @@ export default function AIAssistant() {
                 {chatMutation.isPending && (
                   <div className="flex items-end gap-2 mb-4">
                     <div className="flex-shrink-0 flex items-center justify-center rounded-full w-8 h-8 bg-background border border-border overflow-hidden">
-                      <img src={factorFluxLogo} alt="Earl" className="w-6 h-6 object-contain" />
+                      <FactorFluxLogo showWordmark={false} markClassName="h-6 w-6" />
                     </div>
                     <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
                       <div className="flex gap-1 items-center h-4">

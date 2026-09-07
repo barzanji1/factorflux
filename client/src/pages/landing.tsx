@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Truck, FileText, Users, DollarSign } from "lucide-react";
-import factorFluxLogo from "@assets/FactorFlux_icon_1774282476113.png";
+import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 
 export default function Landing() {
   return (
@@ -11,7 +11,7 @@ export default function Landing() {
         <div className="text-center mb-16">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-md overflow-hidden">
-              <img src={factorFluxLogo} alt="FactorFlux" className="w-10 h-10 object-contain" />
+              <FactorFluxLogo showWordmark={false} markClassName="h-10 w-10" />
             </div>
             <h1 className="text-4xl font-bold text-secondary">FactorFlux</h1>
           </div>

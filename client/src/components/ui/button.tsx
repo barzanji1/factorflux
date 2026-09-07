@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-2 whitespace-nowrap",
-    "rounded-xl text-sm font-semibold",
-    "ring-offset-background transition-all duration-200",
+    "rounded-[2px] text-sm font-semibold",
+    "ring-offset-background transition-colors duration-150",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     "disabled:pointer-events-none disabled:opacity-50",
     "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
@@ -17,23 +17,23 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_10px_24px_rgba(37,99,235,0.18)] hover:bg-primary/90 hover:-translate-y-0.5",
+          "ff-btn-primary",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:-translate-y-0.5",
+          "ff-btn-danger",
         outline:
-          "border border-input bg-background text-slate-700 hover:bg-accent hover:text-accent-foreground hover:border-slate-300 dark:text-slate-200",
+          "ff-btn-secondary hover:bg-[#e4e0d8]",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "ff-btn-secondary hover:bg-[#e4e0d8]",
         ghost:
-          "text-slate-700 hover:bg-accent hover:text-accent-foreground dark:text-slate-200",
+          "border border-transparent text-[#1a1a1a] hover:border-[#fff_#808080_#808080_#fff] hover:bg-[#d4d0c8]",
         link:
           "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-4 py-2.5",
-        sm: "h-9 rounded-lg px-3",
-        lg: "h-12 px-8 rounded-xl",
-        icon: "h-10 w-10 rounded-xl",
+        sm: "h-9 px-3",
+        lg: "h-12 px-8",
+        icon: "h-10 w-10",
       },
     },
     defaultVariants: {
