@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, type ReactNode } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +21,11 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
+  FileText,
+  ShieldCheck,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,8 +56,10 @@ function exportCsv(filename: string, rows: Record<string, unknown>[]) {
 const TABS = [
   { id: "aging",    label: "Aging",    icon: Clock       },
   { id: "agent",    label: "Agent",    icon: Users       },
+  { id: "agent-performance", label: "Agent Performance", icon: TrendingUp },
   { id: "broker",   label: "Broker",   icon: Building2   },
   { id: "carrier",  label: "Carrier",  icon: Truck       },
+  { id: "carrier-ar", label: "Carrier AR", icon: DollarSign },
   { id: "daily-ar", label: "Daily AR", icon: DollarSign  },
   { id: "monthly",  label: "Monthly",  icon: CalendarDays},
 ] as const;
@@ -569,6 +577,104 @@ function MonthlyTab() {
   );
 }
 
+// ─── Agent performance / Carrier AR ──────────────────────────────────────────
+
+type PerformanceRow = {
+  userId?: string; id?: string; firstName?: string; lastName?: string; email?: string; role?: string;
+  invoicesProcessed?: number; invoiceCount?: number; fundedVolume?: number; totalVolumeFunded?: number; totalFunded?: number;
+  averageDaysToFund?: number | null; avgDaysToFund?: number | null; carrierReviewsCompleted?: number;
+  brokerReviewsCompleted?: number; hoursWorked?: number; clockHoursWorked?: number; invoicesByStage?: Record<string, number>;
+  invoices?: Array<Record<string, unknown>>;
+};
+type Warning = { id: number; userId: string; agentName?: string; firstName?: string; lastName?: string; reason: string; severity: string; createdAt: string; acknowledgedAt?: string | null };
+type ArRow = {
+  carrierId?: number; brokerId?: number; id?: number; carrierName?: string; brokerName?: string;
+  totalInvoices?: number; invoiceCount?: number; totalFundedAmount?: number; totalFunded?: number;
+  totalOutstanding?: number; outstanding?: number; reserveHeld?: number; totalReserve?: number;
+  totalCollected?: number; collected?: number; chargebackExposure?: number;
+  aging?: Record<string, number>; invoices?: Array<Record<string, unknown>>;
+};
+type ArResponse = { totals: { totalOutstanding: number; reserveHeld: number; totalCollected: number; chargebackExposure: number }; results: ArRow[] };
+const money = (row: ArRow, ...keys: string[]) => Number(keys.map(k => (row as Record<string, unknown>)[k]).find(v => v != null) ?? 0);
+const arValue = (row: ArRow, bucket: string) => Number(row.aging?.[bucket] ?? (row as Record<string, unknown>)[bucket] ?? 0);
+
+function ReportToolbar({ start, end, onDates, children }: { start: string; end: string; onDates: (s: string, e: string) => void; children?: ReactNode }) {
+  return <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+    <div className="flex flex-wrap items-end gap-2">
+      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">From</label><Input type="date" value={start} onChange={e => onDates(e.target.value, end)} className="h-8 w-36 text-xs" /></div>
+      <span className="mb-2 text-xs text-slate-400">to</span>
+      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Through</label><Input type="date" value={end} onChange={e => onDates(start, e.target.value)} className="h-8 w-36 text-xs" /></div>
+      {children}
+    </div>
+  </div>;
+}
+
+function InvoiceDrilldown({ open, onOpenChange, title, invoices }: { open: boolean; onOpenChange: (v: boolean) => void; title: string; invoices?: Array<Record<string, unknown>> }) {
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-4xl overflow-hidden p-0">
+    <DialogHeader className="border-b border-slate-200 px-6 py-5 dark:border-slate-700"><DialogTitle>{title}</DialogTitle><DialogDescription>Invoice activity for the selected reporting period.</DialogDescription></DialogHeader>
+    <div className="max-h-[60vh] overflow-auto p-6">
+      {!invoices?.length ? <div className="py-12 text-center text-sm text-slate-500">No invoice detail was returned for this selection.</div> :
+        <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="border-b text-left text-[10px] uppercase tracking-wider text-slate-500">{["Invoice","Status","Amount","Funded","Date"].map(h => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>
+          <tbody className="divide-y">{invoices.map((inv, i) => <tr key={String(inv.id ?? i)}><td className="px-3 py-2 font-semibold">{String(inv.invoiceNumber ?? inv.number ?? inv.id ?? "—")}</td><td className="px-3 py-2">{String(inv.status ?? "—")}</td><td className="px-3 py-2 tabular-nums">{inv.amount != null ? fmt(Number(inv.amount)) : "—"}</td><td className="px-3 py-2 tabular-nums">{inv.fundedAmount != null ? fmt(Number(inv.fundedAmount)) : "—"}</td><td className="px-3 py-2">{String(inv.createdAt ?? inv.date ?? "—")}</td></tr>)}</tbody>
+        </table></div>}
+    </div>
+  </DialogContent></Dialog>;
+}
+
+function AgentPerformanceTab() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
+  const [end, setEnd] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [agentId, setAgentId] = useState("all");
+  const [selected, setSelected] = useState<PerformanceRow | null>(null);
+  const [warningOpen, setWarningOpen] = useState(false);
+  const [warningForm, setWarningForm] = useState({ userId: "", severity: "verbal", reason: "" });
+  const manager = user?.role === "manager" || user?.role === "admin";
+  const params = `startDate=${start}&endDate=${end}${agentId !== "all" ? `&userId=${agentId}` : ""}`;
+  const query = useQuery<PerformanceRow[] | PerformanceRow>({ queryKey: ["/api/reports/agent-performance", start, end, agentId], queryFn: () => fetch(`/api/reports/agent-performance?${params}`, { credentials: "include" }).then(r => r.json()) });
+  const agentOptionsQuery = useQuery<PerformanceRow[]>({ queryKey: ["/api/reports/agent-performance", start, end, "options"], queryFn: () => fetch(`/api/reports/agent-performance?startDate=${start}&endDate=${end}`, { credentials: "include" }).then(r => r.json()) });
+  const warningQuery = useQuery<Warning[]>({ queryKey: ["/api/warnings"], queryFn: () => fetch("/api/warnings", { credentials: "include" }).then(r => r.json()) });
+  const rows = Array.isArray(query.data) ? query.data : query.data ? [query.data] : [];
+  const warnings = warningQuery.data ?? [];
+  const createWarning = useMutation({ mutationFn: () => apiRequest("POST", "/api/warnings", warningForm), onSuccess: () => { setWarningOpen(false); setWarningForm({ userId: "", severity: "verbal", reason: "" }); queryClient.invalidateQueries({ queryKey: ["/api/warnings"] }); } });
+  const acknowledge = useMutation({ mutationFn: (id: number) => apiRequest("PATCH", `/api/warnings/${id}/acknowledge`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/warnings"] }) });
+  const csv = rows.map(r => ({ agent: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "—", role: r.role ?? "", invoices: r.invoicesProcessed ?? r.invoiceCount ?? 0, volume_funded: r.fundedVolume ?? r.totalVolumeFunded ?? r.totalFunded ?? 0, avg_days_to_fund: r.averageDaysToFund ?? r.avgDaysToFund ?? "", reviews: Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0), hours: r.hoursWorked ?? r.clockHoursWorked ?? 0 }));
+  return <div className="space-y-4">
+    <ReportToolbar start={start} end={end} onDates={(s, e) => { setStart(s); setEnd(e); }}>
+      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Employee</label><Select value={agentId} onValueChange={setAgentId}><SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Agents</SelectItem>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div>
+      <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("agent_performance.csv", csv)}><Download className="h-3.5 w-3.5" /> CSV</Button>
+      {manager && <Button size="sm" className="h-8 gap-1.5" onClick={() => setWarningOpen(true)}><AlertTriangle className="h-3.5 w-3.5" /> Issue warning</Button>}
+    </ReportToolbar>
+    <Card className="overflow-hidden border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-sm"><thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Agent","Role","Invoices","Volume funded","Avg days","Reviews","Hours"].map(h => <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>)}</tr></thead><tbody className="divide-y">{query.isLoading ? <SkeletonRows cols={7} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelected(r)} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20"><td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td><td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td><td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td><td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td><td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td><td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td><td className="px-4 py-3 tabular-nums">{r.clockHoursWorked ?? "—"}</td></tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">No agents found for this period.</td></tr>}</tbody></table></div></Card>
+    <Card className="border border-slate-200 dark:border-slate-700"><CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings</CardTitle><span className="text-xs text-slate-500">{warnings.length} recorded</span></CardHeader><CardContent className="p-0"><div className="divide-y">{warnings.length ? warnings.map(w => <div key={w.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800">{w.severity}</span></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div><div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</span> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" onClick={() => acknowledge.mutate(w.id)}>Acknowledge</Button> : <span>Pending</span>}</div></div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">No written warnings in scope.</div>}</div></CardContent></Card>
+    <InvoiceDrilldown open={!!selected} onOpenChange={v => !v && setSelected(null)} title={selected ? `${selected.firstName ?? ""} ${selected.lastName ?? ""} · invoice detail` : "Invoice detail"} invoices={selected?.invoices} />
+    <Dialog open={warningOpen} onOpenChange={setWarningOpen}><DialogContent><DialogHeader><DialogTitle>Issue written warning</DialogTitle><DialogDescription>Record a performance issue for an agent. The agent will be able to acknowledge it.</DialogDescription></DialogHeader><div className="space-y-4"><div><label className="text-xs font-semibold">Agent</label><Select value={warningForm.userId} onValueChange={v => setWarningForm(f => ({ ...f, userId: v }))}><SelectTrigger className="mt-1"><SelectValue placeholder="Select agent" /></SelectTrigger><SelectContent>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div><div><label className="text-xs font-semibold">Severity</label><Select value={warningForm.severity} onValueChange={v => setWarningForm(f => ({ ...f, severity: v }))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verbal">Verbal</SelectItem><SelectItem value="written">Written</SelectItem><SelectItem value="final">Final</SelectItem></SelectContent></Select></div><div><label className="text-xs font-semibold">Reason</label><textarea value={warningForm.reason} onChange={e => setWarningForm(f => ({ ...f, reason: e.target.value }))} className="mt-1 min-h-24 w-full rounded-md border border-slate-300 bg-transparent p-2 text-sm" placeholder="Describe the issue and expected correction." /></div></div><DialogFooter><Button variant="outline" onClick={() => setWarningOpen(false)}>Cancel</Button><Button disabled={!warningForm.userId || !warningForm.reason || createWarning.isPending} onClick={() => createWarning.mutate()}>Save warning</Button></DialogFooter></DialogContent></Dialog>
+  </div>;
+}
+
+function CarrierArTab() {
+  const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
+  const [end, setEnd] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [carrierId, setCarrierId] = useState("all");
+  const [selected, setSelected] = useState<ArRow | null>(null);
+  const queryString = `startDate=${start}&endDate=${end}${carrierId !== "all" ? `&carrierId=${carrierId}` : ""}`;
+  const carrierQuery = useQuery<ArResponse>({ queryKey: ["/api/reports/carrier-ar", start, end, carrierId], queryFn: () => fetch(`/api/reports/carrier-ar?${queryString}`, { credentials: "include" }).then(r => r.json()) });
+  const brokerQuery = useQuery<ArResponse>({ queryKey: ["/api/reports/broker-ar", start, end], queryFn: () => fetch(`/api/reports/broker-ar?startDate=${start}&endDate=${end}`, { credentials: "include" }).then(r => r.json()) });
+  const { data: carrierOptions = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients"] });
+  const carriers = carrierQuery.data?.results ?? []; const brokers = brokerQuery.data?.results ?? [];
+  const sum = (key: string) => carriers.reduce((n, r) => n + money(r, key, key === "totalOutstanding" ? "outstanding" : "", key === "reserveHeld" ? "totalReserve" : "", key === "totalCollected" ? "collected" : ""), 0);
+   const exportRows = (list: ArRow[], kind: string) => list.map(r => ({ [kind]: r.carrierName ?? r.brokerName ?? "", invoices: r.totalInvoices ?? r.invoiceCount ?? 0, funded: money(r, "totalFundedAmount", "totalFunded"), outstanding: money(r, "totalOutstanding", "outstanding"), reserve: money(r, "reserveHeld", "totalReserve"), collected: money(r, "totalCollected", "collected"), chargeback_exposure: r.chargebackExposure ?? 0, aging_0_30: arValue(r, "0-30"), aging_31_60: arValue(r, "31-60"), aging_61_90: arValue(r, "61-90"), aging_90_plus: arValue(r, "90+") }));
+  const downloadPdf = () => { const a = document.createElement("a"); a.href = `/api/reports/carrier-ar.pdf?${queryString}`; a.target = "_blank"; a.rel = "noreferrer"; a.click(); };
+  const table = (list: ArRow[], kind: "carrier" | "broker") => <Card className="overflow-hidden border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-sm"><thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{[kind === "carrier" ? "Carrier" : "Broker","Invoices","Funded","Outstanding","Reserve","Collected","0–30","31–60","61–90","90+"].map(h => <th key={h} className="whitespace-nowrap px-3 py-3">{h}</th>)}</tr></thead><tbody className="divide-y">{list.map((r, i) => <tr key={String(r.carrierId ?? r.brokerId ?? r.id ?? i)} onClick={() => kind === "carrier" && setSelected(r)} className={cn("hover:bg-blue-50/60 dark:hover:bg-blue-950/20", kind === "carrier" && "cursor-pointer")}><td className="px-3 py-3 font-semibold">{r.carrierName ?? r.brokerName ?? "Unknown"}</td><td className="px-3 py-3 tabular-nums">{r.totalInvoices ?? r.invoiceCount ?? 0}</td><td className="px-3 py-3 tabular-nums">{fmt(money(r, "totalFundedAmount", "totalFunded"))}</td><td className="px-3 py-3 tabular-nums font-semibold text-amber-700">{fmt(money(r, "totalOutstanding", "outstanding"))}</td><td className="px-3 py-3 tabular-nums">{fmt(money(r, "reserveHeld", "totalReserve"))}</td><td className="px-3 py-3 tabular-nums text-emerald-700">{fmt(money(r, "totalCollected", "collected"))}</td>{["0-30","31-60","61-90","90+"].map(b => <td key={b} className="px-3 py-3 tabular-nums text-slate-600">{fmt(arValue(r, b))}</td>)}</tr>)}</tbody></table></div></Card>;
+  return <div className="space-y-4"><ReportToolbar start={start} end={end} onDates={(s, e) => { setStart(s); setEnd(e); }}><div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Carrier</label><Select value={carrierId} onValueChange={setCarrierId}><SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Carriers</SelectItem>{carriers.map(r => <SelectItem key={String(r.carrierId ?? r.id)} value={String(r.carrierId ?? r.id)}>{r.carrierName}</SelectItem>)}</SelectContent></Select></div><Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("carrier_ar.csv", exportRows(carriers, "carrier"))}><Download className="h-3.5 w-3.5" /> CSV</Button><Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={downloadPdf}><FileText className="h-3.5 w-3.5" /> PDF</Button></ReportToolbar>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><StatTile label="Total outstanding" value={fmtShort(sum("totalOutstanding"))} color="amber" /><StatTile label="Reserve held" value={fmtShort(sum("reserveHeld"))} color="blue" /><StatTile label="Total collected" value={fmtShort(sum("totalCollected"))} color="green" /><StatTile label="Chargeback exposure" value={fmtShort(carriers.reduce((n, r) => n + Number(r.chargebackExposure ?? 0), 0))} color="red" /></div>
+    <div className="space-y-2"><div className="flex items-center justify-between"><div><h2 className="text-sm font-bold">Carrier accounts receivable</h2><p className="text-xs text-slate-500">Select a row to inspect invoice-level activity.</p></div></div>{carrierQuery.isLoading ? <Card className="h-48 animate-pulse bg-slate-100 dark:bg-slate-800" /> : table(carriers, "carrier")}</div>
+    <div className="space-y-2"><div className="flex items-center justify-between"><h2 className="text-sm font-bold">Broker accounts receivable</h2><Button size="sm" variant="outline" className="h-8" onClick={() => exportCsv("broker_ar.csv", exportRows(brokers, "broker"))}>Export broker CSV</Button></div>{brokerQuery.isLoading ? <Card className="h-40 animate-pulse bg-slate-100 dark:bg-slate-800" /> : table(brokers, "broker")}</div>
+    <InvoiceDrilldown open={!!selected} onOpenChange={v => !v && setSelected(null)} title={selected ? `${selected.carrierName ?? "Carrier"} · invoice detail` : "Invoice detail"} invoices={selected?.invoices} />
+   </div>;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Reports() {
@@ -616,8 +722,10 @@ export default function Reports() {
             <div>
               {activeTab === "aging"    && <AgingTab />}
               {activeTab === "agent"    && <AgentTab />}
+              {activeTab === "agent-performance" && <AgentPerformanceTab />}
               {activeTab === "broker"   && <BrokerTab />}
               {activeTab === "carrier"  && <CarrierTab />}
+              {activeTab === "carrier-ar" && <CarrierArTab />}
               {activeTab === "daily-ar" && <DailyARTab />}
               {activeTab === "monthly"  && <MonthlyTab />}
             </div>

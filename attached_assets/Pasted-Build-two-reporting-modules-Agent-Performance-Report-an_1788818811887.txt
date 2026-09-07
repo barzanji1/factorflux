@@ -1,0 +1,52 @@
+Build two reporting modules: Agent Performance Report and Carrier AR Report.
+
+Database
+
+ Create written_warnings table: id, userId (agent receiving warning), issuedBy (admin/manager userId), reason, severity (verbal/written/final), createdAt, acknowledgedAt
+ Run db:push
+
+Backend — Agent Performance Report
+
+ GET /api/reports/agent-performance — accepts ?startDate=&endDate=&userId=
+ Returns per agent: firstName, lastName, email, role, invoices processed count, total volume funded ($), average days to fund, invoices per stage breakdown, carrier reviews completed, broker reviews completed, clock hours worked in period
+ If userId param provided — return single agent detail
+ Requires requireAuth — managers see their team, admin sees all
+
+Backend — Written Warnings
+
+ GET /api/warnings — list all warnings, filterable by userId
+ POST /api/warnings — create warning, requires manager or admin
+ PATCH /api/warnings/:id/acknowledge — agent acknowledges warning
+ All routes require requireAuth
+
+Backend — Carrier AR Report
+
+ GET /api/reports/carrier-ar — accepts ?carrierId=&startDate=&endDate=
+ Returns per carrier: total invoices, total funded amount, total outstanding, reserve held, total collected, chargeback exposure, aging buckets (0-30/31-60/61-90/90+)
+ GET /api/reports/broker-ar — same structure per broker
+ Both require requireAuth
+
+Frontend — Reports Page Updates
+Add two new tabs to the existing Reports page:
+
+Agent Performance Tab
+
+ Date range picker (start/end date)
+ Employee dropdown — "All Agents" or select specific agent
+ Results table: Agent Name, Role, Invoices Processed, Total Volume, Avg Days to Fund, Reviews Completed, Hours Worked
+ Click agent row → drill down to individual invoice list for that agent in that period
+ Written Warnings section below table:
+List of all warnings with agent name, severity badge, reason, date, acknowledged status
+Issue Warning button (manager/admin only) → modal: select agent, severity, reason
+Agent sees their own warnings with acknowledge button
+ Export to CSV button
+
+Carrier AR Tab
+
+ Carrier dropdown filter — select specific carrier or all
+ Date range picker
+ Summary cards: Total Outstanding, Total Reserve Held, Total Collected, Chargeback Exposure
+ Per carrier table: Carrier Name, Total Invoices, Funded Amount, Outstanding, Reserve, Collected, 0-30, 31-60, 61-90, 90+ aging columns
+ Click carrier row → drill down to their individual invoices
+ Per broker section below: same structure showing what each broker owes
+ Export to CSV and PDF

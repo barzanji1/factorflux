@@ -87,6 +87,7 @@ import {
   carrierPortalUsers,
   carrierSubmissions,
   carrierSubmissionDocs,
+  writtenWarnings,
   ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
@@ -5148,6 +5149,262 @@ Trucking Pros Financial Team
   });
 
   // ─── Reports API ──────────────────────────────────────────────────────────────
+
+  const reportDateRange = (query: Record<string, unknown>) => {
+    const parse = (value: unknown, label: string, endOfDay = false) => {
+      if (!value) return undefined;
+      const date = new Date(String(value));
+      if (Number.isNaN(date.getTime())) throw new Error(`Invalid ${label}`);
+      if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(String(value))) date.setHours(23, 59, 59, 999);
+      return date;
+    };
+    const start = parse(query.startDate, "startDate");
+    const end = parse(query.endDate, "endDate", true);
+    if (start && end && start > end) throw new Error("startDate must be before endDate");
+    return { start, end };
+  };
+
+  const inReportRange = (date: Date | null, range: { start?: Date; end?: Date }) =>
+    !!date && (!range.start || date >= range.start) && (!range.end || date <= range.end);
+
+  // Detailed operational productivity report. Agent visibility is deliberately
+  // enforced here rather than trusting a userId supplied by the browser.
+  app.get("/api/reports/agent-performance", requireAuth, async (req: any, res) => {
+    try {
+      const range = reportDateRange(req.query);
+      const requestedUserId = typeof req.query.userId === "string" ? req.query.userId : undefined;
+      const actor = req.user;
+      const activeUsers = await db.select().from(users).where(eq(users.status, "active"));
+      let visibleUsers = activeUsers;
+      if (actor.role === "employee") {
+        visibleUsers = activeUsers.filter((user) => user.id === actor.id);
+      } else if (actor.role === "manager") {
+        visibleUsers = activeUsers.filter((user) => user.id === actor.id || user.createdBy === actor.id);
+      }
+      if (requestedUserId) {
+        visibleUsers = visibleUsers.filter((user) => user.id === requestedUserId);
+        if (!visibleUsers.length) return res.status(403).json({ message: "You do not have access to this employee" });
+      }
+
+      const visibleIds = new Set(visibleUsers.map((user) => user.id));
+      const invoiceRows = await db.select({
+        id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount,
+        status: invoices.status, factoringStage: invoices.factoringStage, createdAt: invoices.createdAt,
+        fundedAt: invoices.fundedAt, assignedTo: invoices.assignedTo, submittedBy: invoices.submittedBy,
+        clientId: invoices.clientId, clientName: clients.name, debtorId: invoices.debtorId, debtorName: debtors.name,
+      }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+      const relevantInvoices = invoiceRows.filter((invoice) => {
+        const ownerId = invoice.assignedTo ?? invoice.submittedBy;
+        return !!ownerId && visibleIds.has(ownerId) && inReportRange(invoice.createdAt, range);
+      });
+      const invoiceIds = new Set(relevantInvoices.map((invoice) => invoice.id));
+
+      const reviewRows = invoiceIds.size ? await db.select({
+        invoiceId: documentsTable.invoiceId, type: documentsTable.documentType,
+        reviewedBy: docReviews.reviewedByUserId, reviewStatus: docReviews.reviewStatus,
+      }).from(docReviews).innerJoin(documentsTable, eq(docReviews.documentId, documentsTable.id)) : [];
+      const entryRows = await db.select().from(timeEntries);
+      const performance = visibleUsers.map((user) => {
+        const agentInvoices = relevantInvoices.filter((invoice) => (invoice.assignedTo ?? invoice.submittedBy) === user.id);
+        const stageBreakdown: Record<string, number> = {};
+        let fundedVolume = 0;
+        const fundedDays: number[] = [];
+        for (const invoice of agentInvoices) {
+          stageBreakdown[invoice.factoringStage] = (stageBreakdown[invoice.factoringStage] || 0) + 1;
+          if (["funded", "paid", "settled"].includes(invoice.status)) {
+            fundedVolume += Number(invoice.amount);
+            if (invoice.createdAt && invoice.fundedAt) fundedDays.push(Math.max(0, (invoice.fundedAt.getTime() - invoice.createdAt.getTime()) / 86400000));
+          }
+        }
+        const completedReviews = reviewRows.filter((review) => review.reviewStatus === "confirmed" && review.reviewedBy === user.id);
+        const hoursWorked = entryRows.filter((entry) => entry.userId === user.id && inReportRange(entry.clockInTime, range))
+          .reduce((sum, entry) => sum + Number(entry.totalHours || 0), 0);
+        return {
+          userId: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role,
+          invoicesProcessed: agentInvoices.length, fundedVolume: +fundedVolume.toFixed(2),
+          totalVolumeFunded: +fundedVolume.toFixed(2),
+          avgDaysToFund: fundedDays.length ? +(fundedDays.reduce((sum, days) => sum + days, 0) / fundedDays.length).toFixed(2) : null,
+          averageDaysToFund: fundedDays.length ? +(fundedDays.reduce((sum, days) => sum + days, 0) / fundedDays.length).toFixed(2) : null,
+          stageBreakdown,
+          invoicesByStage: stageBreakdown,
+          carrierReviewsCompleted: completedReviews.filter((review) => review.type === "carrier_setup").length,
+          brokerReviewsCompleted: completedReviews.filter((review) => review.type === "rate_confirmation").length,
+          hoursWorked: +hoursWorked.toFixed(2),
+          clockHoursWorked: +hoursWorked.toFixed(2),
+          invoices: agentInvoices.map((invoice) => ({
+            id: invoice.id, invoiceNumber: invoice.invoiceNumber, amount: invoice.amount, status: invoice.status,
+            factoringStage: invoice.factoringStage, createdAt: invoice.createdAt, fundedAt: invoice.fundedAt,
+            carrierId: invoice.clientId, carrierName: invoice.clientName, brokerId: invoice.debtorId, brokerName: invoice.debtorName,
+          })),
+        };
+      });
+      res.json(requestedUserId ? performance[0] : performance);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to generate agent performance report" });
+    }
+  });
+
+  const warningScope = async (actor: any) => {
+    if (actor.role === "admin") return undefined as Set<string> | undefined;
+    if (actor.role === "employee") return new Set([actor.id]);
+    const team = await db.select({ id: users.id }).from(users)
+      .where(and(eq(users.status, "active"), eq(users.createdBy, actor.id)));
+    return new Set([actor.id, ...team.map((user) => user.id)]);
+  };
+
+  app.get("/api/warnings", requireAuth, async (req: any, res) => {
+    try {
+      const scope = await warningScope(req.user);
+      const requestedUserId = typeof req.query.userId === "string" ? req.query.userId : undefined;
+      if (requestedUserId && scope && !scope.has(requestedUserId)) return res.status(403).json({ message: "You do not have access to these warnings" });
+      const rows = await db.select({
+        id: writtenWarnings.id, userId: writtenWarnings.userId, issuedBy: writtenWarnings.issuedBy,
+        reason: writtenWarnings.reason, severity: writtenWarnings.severity, createdAt: writtenWarnings.createdAt,
+        acknowledgedAt: writtenWarnings.acknowledgedAt, firstName: users.firstName, lastName: users.lastName, email: users.email,
+      }).from(writtenWarnings).leftJoin(users, eq(writtenWarnings.userId, users.id)).orderBy(desc(writtenWarnings.createdAt));
+      res.json(rows.filter((warning) => (!scope || scope.has(warning.userId)) && (!requestedUserId || warning.userId === requestedUserId))
+        .map(warning => ({ ...warning, agentName: `${warning.firstName ?? ""} ${warning.lastName ?? ""}`.trim() || warning.email || warning.userId })));
+    } catch { res.status(500).json({ message: "Failed to fetch warnings" }); }
+  });
+
+  app.post("/api/warnings", requireAuth, async (req: any, res) => {
+    try {
+      if (!["manager", "admin"].includes(req.user.role)) return res.status(403).json({ message: "Manager or Admin role required" });
+      const body = z.object({ userId: z.string().min(1), reason: z.string().trim().min(1), severity: z.enum(["verbal", "written", "final"]) }).parse(req.body);
+      const scope = await warningScope(req.user);
+      if (scope && !scope.has(body.userId)) return res.status(403).json({ message: "You may only issue warnings to your active team" });
+      const [target] = await db.select({ id: users.id }).from(users).where(and(eq(users.id, body.userId), eq(users.status, "active")));
+      if (!target) return res.status(404).json({ message: "Active employee not found" });
+      const [warning] = await db.insert(writtenWarnings).values({ ...body, issuedBy: req.user.id }).returning();
+      await db.insert(eventLedger).values({ entityType: "user", entityId: 0, eventType: "written_warning_issued", actorType: "user", actorId: req.user.id, payloadJson: { warningId: warning.id, userId: body.userId, severity: body.severity } });
+      res.status(201).json(warning);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid warning" });
+      res.status(500).json({ message: "Failed to issue warning" });
+    }
+  });
+
+  app.patch("/api/warnings/:id/acknowledge", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid warning id" });
+      const [warning] = await db.select().from(writtenWarnings).where(eq(writtenWarnings.id, id));
+      if (!warning) return res.status(404).json({ message: "Warning not found" });
+      if (warning.userId !== req.user.id) return res.status(403).json({ message: "Only the receiving employee may acknowledge this warning" });
+      const [updated] = await db.update(writtenWarnings).set({ acknowledgedAt: warning.acknowledgedAt || new Date() }).where(eq(writtenWarnings.id, id)).returning();
+      await db.insert(eventLedger).values({ entityType: "user", entityId: 0, eventType: "written_warning_acknowledged", actorType: "user", actorId: req.user.id, payloadJson: { warningId: id } });
+      res.json(updated);
+    } catch { res.status(500).json({ message: "Failed to acknowledge warning" }); }
+  });
+
+  type ArRow = {
+    id: number; invoiceNumber: string; amount: number; appliedAmount: number; outstanding: number;
+    status: string; invoiceDate: Date | null; dueDate: Date | null; createdAt: Date | null;
+    carrierId: number; carrierName: string; brokerId: number | null; brokerName: string;
+    reserveHeld: number; chargebackExposure: number;
+  };
+  const buildArReport = async (kind: "carrier" | "broker", query: Record<string, unknown>) => {
+    const range = reportDateRange(query);
+    const filterId = kind === "carrier" ? query.carrierId : query.brokerId;
+    if (filterId !== undefined && (!/^\d+$/.test(String(filterId)) || Number(filterId) < 1)) throw new Error(`Invalid ${kind}Id`);
+    const allInvoices = await db.select({
+      id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount, status: invoices.status,
+      invoiceDate: invoices.invoiceDate, dueDate: invoices.dueDate, createdAt: invoices.createdAt,
+      chargebackStatus: invoices.chargebackStatus, clientId: invoices.clientId, clientName: clients.name,
+      debtorId: invoices.debtorId, debtorName: debtors.name,
+    }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+    const applications = await db.select({ invoiceId: paymentApplicationLines.invoiceId, appliedAmount: paymentApplicationLines.appliedAmount }).from(paymentApplicationLines);
+    const payoutsForInvoices = await db.select({
+      invoiceId: payouts.invoiceId, reserveAmount: payouts.reserveAmount, reserveReleasedAt: payouts.reserveReleasedAt, paymentStatus: payouts.paymentStatus,
+    }).from(payouts);
+    const appliedByInvoice = new Map<number, number>();
+    applications.forEach((line) => appliedByInvoice.set(line.invoiceId, (appliedByInvoice.get(line.invoiceId) || 0) + Number(line.appliedAmount)));
+    const payoutByInvoice = new Map(payoutsForInvoices.map((payout) => [payout.invoiceId, payout]));
+    const rows: ArRow[] = allInvoices.filter((invoice) => {
+      const entityId = kind === "carrier" ? invoice.clientId : invoice.debtorId;
+      return inReportRange(invoice.createdAt, range) && (!filterId || entityId === Number(filterId));
+    }).map((invoice) => {
+      const appliedAmount = appliedByInvoice.get(invoice.id) || 0;
+      const payout = payoutByInvoice.get(invoice.id);
+      const reserveHeld = payout && !payout.reserveReleasedAt && !["reserve_released", "complete"].includes(payout.paymentStatus) ? Number(payout.reserveAmount) : 0;
+      return {
+        id: invoice.id, invoiceNumber: invoice.invoiceNumber, amount: Number(invoice.amount), appliedAmount,
+        outstanding: Math.max(0, Number(invoice.amount) - appliedAmount), status: invoice.status,
+        invoiceDate: invoice.invoiceDate, dueDate: invoice.dueDate, createdAt: invoice.createdAt,
+        carrierId: invoice.clientId, carrierName: invoice.clientName || `Carrier #${invoice.clientId}`,
+        brokerId: invoice.debtorId, brokerName: invoice.debtorName || (invoice.debtorId ? `Broker #${invoice.debtorId}` : "Unassigned"),
+        reserveHeld, chargebackExposure: ["scheduled", "extended", "charged"].includes(invoice.chargebackStatus) ? Math.max(0, Number(invoice.amount) - appliedAmount) : 0,
+      };
+    });
+    const grouped = new Map<string, any>();
+    const now = Date.now();
+    for (const row of rows) {
+      const id = kind === "carrier" ? row.carrierId : row.brokerId;
+      const name = kind === "carrier" ? row.carrierName : row.brokerName;
+      const key = String(id ?? "unassigned");
+      if (!grouped.has(key)) grouped.set(key, {
+        [`${kind}Id`]: id, [`${kind}Name`]: name, totalInvoices: 0, totalFundedAmount: 0, totalOutstanding: 0,
+        reserveHeld: 0, totalCollected: 0, chargebackExposure: 0, aging: { "0-30": 0, "31-60": 0, "61-90": 0, "90+": 0 }, invoices: [],
+      });
+      const group = grouped.get(key);
+      group.totalInvoices++;
+      if (["funded", "paid", "settled"].includes(row.status)) group.totalFundedAmount += row.amount;
+      group.totalOutstanding += row.outstanding;
+      group.reserveHeld += row.reserveHeld;
+      group.totalCollected += row.appliedAmount;
+      group.chargebackExposure += row.chargebackExposure;
+      if (row.outstanding) {
+        const basis = row.dueDate || row.invoiceDate || row.createdAt || new Date();
+        const days = Math.max(0, Math.floor((now - basis.getTime()) / 86400000));
+        group.aging[days <= 30 ? "0-30" : days <= 60 ? "31-60" : days <= 90 ? "61-90" : "90+"] += row.outstanding;
+      }
+      group.invoices.push(row);
+    }
+    const results = Array.from(grouped.values()).map((group) => ({
+      ...group,
+      totalFundedAmount: +group.totalFundedAmount.toFixed(2), totalOutstanding: +group.totalOutstanding.toFixed(2),
+      reserveHeld: +group.reserveHeld.toFixed(2), totalCollected: +group.totalCollected.toFixed(2),
+      chargebackExposure: +group.chargebackExposure.toFixed(2),
+    })).sort((a, b) => b.totalOutstanding - a.totalOutstanding);
+    return {
+      totals: results.reduce((total, row) => ({
+        totalOutstanding: total.totalOutstanding + row.totalOutstanding, reserveHeld: total.reserveHeld + row.reserveHeld,
+        totalCollected: total.totalCollected + row.totalCollected, chargebackExposure: total.chargebackExposure + row.chargebackExposure,
+      }), { totalOutstanding: 0, reserveHeld: 0, totalCollected: 0, chargebackExposure: 0 }),
+      results,
+    };
+  };
+
+  app.get("/api/reports/carrier-ar", requireAuth, async (req, res) => {
+    try { res.json(await buildArReport("carrier", req.query)); }
+    catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate carrier AR report" }); }
+  });
+  app.get("/api/reports/broker-ar", requireAuth, async (req, res) => {
+    try { res.json(await buildArReport("broker", req.query)); }
+    catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate broker AR report" }); }
+  });
+  app.get("/api/reports/carrier-ar/pdf", requireAuth, async (req, res) => {
+    try {
+      const report = await buildArReport("carrier", req.query);
+      const doc = new PDFDocument({ size: "LETTER", margin: 36, info: { Title: "Carrier AR Report" } });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "attachment; filename=carrier-ar-report.pdf");
+      doc.pipe(res);
+      doc.font("Helvetica-Bold").fontSize(18).text("Carrier Accounts Receivable Report");
+      doc.font("Helvetica").fontSize(9).fillColor("#555").text(`Generated ${new Date().toLocaleDateString()}`);
+      doc.moveDown().fillColor("#111").fontSize(10).text(`Outstanding: $${report.totals.totalOutstanding.toFixed(2)}    Reserve held: $${report.totals.reserveHeld.toFixed(2)}    Collected: $${report.totals.totalCollected.toFixed(2)}    Chargebacks: $${report.totals.chargebackExposure.toFixed(2)}`);
+      doc.moveDown();
+      for (const row of report.results) {
+        if (doc.y > 700) doc.addPage();
+        doc.font("Helvetica-Bold").fontSize(11).text(row.carrierName);
+        doc.font("Helvetica").fontSize(9).text(`Invoices ${row.totalInvoices} | Funded $${row.totalFundedAmount.toFixed(2)} | Outstanding $${row.totalOutstanding.toFixed(2)} | Reserve $${row.reserveHeld.toFixed(2)} | Collected $${row.totalCollected.toFixed(2)}`);
+        doc.text(`Aging: 0–30 $${row.aging["0-30"].toFixed(2)}  31–60 $${row.aging["31-60"].toFixed(2)}  61–90 $${row.aging["61-90"].toFixed(2)}  90+ $${row.aging["90+"].toFixed(2)}`);
+        doc.moveDown(0.6);
+      }
+      doc.end();
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate carrier AR PDF" }); }
+  });
 
   // Aging Report
   app.get("/api/reports/aging", requireAuth, async (_req, res) => {

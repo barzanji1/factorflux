@@ -391,6 +391,29 @@ export const timeEntries = pgTable("time_entries", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Written corrective-action notices issued to employees. This is intentionally
+// additive so historical personnel records are never overwritten.
+export const writtenWarnings = pgTable("written_warnings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  issuedBy: varchar("issued_by").references(() => users.id).notNull(),
+  reason: text("reason").notNull(),
+  severity: varchar("severity", { enum: ["verbal", "written", "final"] }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+}, (table) => [
+  index("written_warnings_user_idx").on(table.userId),
+  index("written_warnings_issued_by_idx").on(table.issuedBy),
+]);
+
+export const insertWrittenWarningSchema = createInsertSchema(writtenWarnings).omit({
+  id: true,
+  createdAt: true,
+  acknowledgedAt: true,
+});
+export type WrittenWarning = typeof writtenWarnings.$inferSelect;
+export type InsertWrittenWarning = z.infer<typeof insertWrittenWarningSchema>;
+
 // Notifications table
 export const notifications = pgTable("notifications", {
   id: integer("id").primaryKey(),

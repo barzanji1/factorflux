@@ -3,3 +3,4 @@
 - [Vault entry IDs](vault-entry-ids.md) — client_vault requires a real serial default; without it encrypted inserts fail after encryption with a null primary key.
 - [Chargeback extensions](chargeback-extensions.md) — a future extension date must defer the automatic 90-day chargeback until that date arrives.
 - [Carrier onboarding secrets](carrier-onboarding-secrets.md) — SSNs and bank credentials are encrypted server-side, omitted from API responses, and preserved when blank on edit.
+- [Manager report scope](manager-report-scope.md) — until explicit teams exist, manager reporting scope is self plus active users created by that manager.
