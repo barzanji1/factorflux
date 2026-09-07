@@ -125,6 +125,10 @@ const upload = multer({
     cb(new Error("Only PDF, JPEG, JPG, PNG, and TIFF files are allowed"));
   },
 });
+const carrierUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: Math.ceil(134.22 * 1024 * 1024) },
+});
 
 function handleUpload(field: string) {
   return (req: any, res: any, next: any) => {
@@ -144,6 +148,17 @@ function sanitizeOriginalName(name: string) {
     .replace(/[^\w.\- ()]/g, "_")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function sanitizeClientResponse(client: any) {
+  return {
+    ...client,
+    owners: (client.owners as any[] ?? []).map(owner => ({ ...owner, ssn: owner.ssn ? "" : null })),
+    bankAccountEncrypted: undefined,
+    abaRoutingEncrypted: undefined,
+    hasBankAccount: !!client.bankAccountEncrypted,
+    hasAbaRouting: !!client.abaRoutingEncrypted,
+  };
 }
 
 function buildDocumentMetadata(document: any) {
@@ -1300,7 +1315,7 @@ ${message}
   app.get("/api/clients", requireAuth, async (_req: any, res) => {
     try {
       const allClients = await storage.getClients();
-      res.json(allClients);
+      res.json(allClients.map(sanitizeClientResponse));
     } catch (error) {
       console.error("Error fetching clients:", error);
       res.status(500).json({ message: "Failed to fetch clients" });
@@ -1313,10 +1328,56 @@ ${message}
       if (isNaN(id)) return res.status(400).json({ message: "Invalid client id" });
       const client = await storage.getClient(id);
       if (!client) return res.status(404).json({ message: "Client not found" });
-      res.json(client);
+      res.json(sanitizeClientResponse(client));
     } catch (error) {
       console.error("Error fetching client:", error);
       res.status(500).json({ message: "Failed to fetch client" });
+    }
+  });
+
+  app.get("/api/clients/:id/documents", requireAuth, async (req: any, res) => {
+    try {
+      const clientId = Number(req.params.id);
+      if (!Number.isInteger(clientId)) return res.status(400).json({ message: "Invalid carrier id" });
+      const rows = await db.select().from(documentsTable).where(eq(documentsTable.clientId, clientId)).orderBy(desc(documentsTable.createdAt));
+      res.json(rows.map(document => ({ ...document, ...buildDocumentMetadata(document) })));
+    } catch (error) {
+      console.error("Error fetching carrier documents:", error);
+      res.status(500).json({ message: "Failed to fetch carrier documents" });
+    }
+  });
+
+  app.post("/api/clients/:id/documents", requireAuth, carrierUpload.single("file"), async (req: any, res) => {
+    try {
+      const clientId = Number(req.params.id);
+      if (!Number.isInteger(clientId)) return res.status(400).json({ message: "Invalid carrier id" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const [exists] = await db.select({ id: clients.id }).from(clients).where(eq(clients.id, clientId)).limit(1);
+      if (!exists) return res.status(404).json({ message: "Carrier not found" });
+      const documentCategory = String(req.body.documentCategory || "").trim();
+      if (!documentCategory) return res.status(400).json({ message: "Document category is required" });
+      const lower = documentCategory.toLowerCase();
+      const limit = lower.includes("logo") || lower.includes("envelope") ? 2 * 1024 * 1024
+        : lower.includes("driver license") || lower.includes("void check") ? 5 * 1024 * 1024
+        : Math.ceil(134.22 * 1024 * 1024);
+      if (req.file.size > limit) return res.status(400).json({ message: `File exceeds the ${Math.round(limit / 1024 / 1024)}MB limit for this category` });
+      const fileUuid = crypto.randomUUID();
+      const s3Key = await uploadToS3(req.file.buffer, `clients/${clientId}/${fileUuid}`, req.file.mimetype);
+      const document = await storage.createDocument({
+        filename: fileUuid, originalName: sanitizeOriginalName(req.file.originalname),
+        mimeType: req.file.mimetype, size: req.file.size, s3Key,
+        documentType: "carrier_setup", clientId, loadId: null, invoiceId: null,
+        documentCategory, uploadedBy: req.user.id, sourceChannel: "manual", status: "processed",
+      } as any);
+      await storage.createActivity({
+        userId: req.user.id, type: "carrier_document_uploaded",
+        description: `Uploaded ${documentCategory} for carrier ${clientId}`,
+        entityType: "client", entityId: clientId, metadata: buildDocumentMetadata(document),
+      } as any);
+      res.status(201).json({ ...document, ...buildDocumentMetadata(document) });
+    } catch (error) {
+      console.error("Error uploading carrier document:", error);
+      res.status(500).json({ message: "Failed to upload carrier document" });
     }
   });
 
@@ -1329,7 +1390,7 @@ ${message}
       }
 
       const results = await storage.searchClients(q);
-      res.json(results);
+      res.json(results.map(sanitizeClientResponse));
     } catch (error) {
       console.error("Error searching clients:", error);
       res.status(500).json({ message: "Failed to search clients" });
@@ -1338,7 +1399,15 @@ ${message}
 
   app.post("/api/clients", requireAuth, async (req: any, res) => {
     try {
-      const clientData = insertClientSchema.parse(req.body);
+      const { bankAccountNumber, abaRouting, owners = [], ...raw } = req.body;
+      const secureOwners = Array.isArray(owners) ? owners.slice(0, 3).map((owner: any) => ({
+        ...owner, ssn: owner.ssn ? encryptVault(String(owner.ssn)) : null,
+      })) : [];
+      const clientData = insertClientSchema.parse({
+        ...raw, owners: secureOwners,
+        bankAccountEncrypted: bankAccountNumber ? encryptVault(String(bankAccountNumber)) : null,
+        abaRoutingEncrypted: abaRouting ? encryptVault(String(abaRouting)) : null,
+      });
       const client = await storage.createClient(clientData);
 
       try {
@@ -1359,7 +1428,7 @@ ${message}
         entityId: client.id,
       });
 
-      res.status(201).json(client);
+      res.status(201).json(sanitizeClientResponse(client));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -1395,7 +1464,18 @@ ${message}
         return res.status(400).json({ message: "Invalid client id" });
       }
 
-      const clientData = insertClientSchema.partial().parse(req.body);
+      const { bankAccountNumber, abaRouting, owners, ...raw } = req.body;
+      const existingClient = await storage.getClient(id);
+      const existingOwners = (existingClient?.owners as any[] | null) ?? [];
+      const secureOwners = Array.isArray(owners) ? owners.slice(0, 3).map((owner: any, index: number) => ({
+        ...owner, ssn: owner.ssn ? encryptVault(String(owner.ssn)) : existingOwners[index]?.ssn ?? null,
+      })) : undefined;
+      const clientData = insertClientSchema.partial().parse({
+        ...raw,
+        ...(secureOwners ? { owners: secureOwners } : {}),
+        ...(bankAccountNumber ? { bankAccountEncrypted: encryptVault(String(bankAccountNumber)) } : {}),
+        ...(abaRouting ? { abaRoutingEncrypted: encryptVault(String(abaRouting)) } : {}),
+      });
       const client = await storage.updateClient(id, clientData);
 
       try {
@@ -1416,7 +1496,7 @@ ${message}
         entityId: client.id,
       });
 
-      res.json(client);
+      res.json(sanitizeClientResponse(client));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({

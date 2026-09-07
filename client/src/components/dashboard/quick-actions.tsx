@@ -28,7 +28,7 @@ const actions: Action[] = [
     icon: Truck,
     tint: "text-emerald-600 dark:text-emerald-400",
     bg: "bg-emerald-50 dark:bg-emerald-950/30",
-    href: "/clients",
+    href: "/carriers/new",
   },
   {
     title: "Open Insights",

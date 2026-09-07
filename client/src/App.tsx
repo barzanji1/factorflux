@@ -40,6 +40,7 @@ import DocumentRules from "@/pages/document-rules";
 import WorkflowBuilder from "@/pages/workflow-builder";
 import BrokerDetail from "@/pages/broker-detail";
 import ClientDetail from "@/pages/client-detail";
+import CarrierOnboarding from "@/pages/carrier-onboarding";
 import PayoutDetail from "@/pages/payout-detail";
 import LoadDetail from "@/pages/load-detail";
 import Lockbox from "@/pages/lockbox";
@@ -234,6 +235,16 @@ function Router() {
       <Route path="/clients/:id">
         <ProtectedRoute>
           <ClientDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/carriers/new">
+        <ProtectedRoute>
+          <CarrierOnboarding />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/carriers/:id/edit">
+        <ProtectedRoute>
+          <CarrierOnboarding />
         </ProtectedRoute>
       </Route>
       <Route path="/carriers/:id">

@@ -85,7 +85,11 @@ export const clients = pgTable("clients", {
   nextReview: timestamp("next_review"),
   reserves: decimal("reserves", { precision: 12, scale: 2 }).default("0"),
   shorts: decimal("shorts", { precision: 12, scale: 2 }).default("0"),
-  status: varchar("status", { enum: ["active", "inactive"] }).default("active").notNull(),
+  owners: jsonb("owners").$type<Array<Record<string, unknown>>>().default([]),
+  onboardingData: jsonb("onboarding_data").$type<Record<string, unknown>>().default({}),
+  bankAccountEncrypted: text("bank_account_encrypted"),
+  abaRoutingEncrypted: text("aba_routing_encrypted"),
+  status: varchar("status", { enum: ["new_client", "active", "inactive"] }).default("new_client").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -262,6 +266,8 @@ export const documents = pgTable("documents", {
   aiClassificationModel: varchar("ai_classification_model"),
   loadId: integer("load_id").references(() => loads.id, { onDelete: "cascade" }),
   invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }),
+  documentCategory: varchar("document_category"),
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
   sourceChannel: varchar("source_channel", {
     enum: ["portal", "manual", "email", "api", "drag_drop"],

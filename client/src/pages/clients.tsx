@@ -24,7 +24,6 @@ import {
   CircleCheck,
   ExternalLink,
 } from "lucide-react";
-import ClientModal from "@/components/modals/client-modal";
 import type { Client } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -33,8 +32,6 @@ export default function Clients() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const {
@@ -81,13 +78,11 @@ export default function Clients() {
   };
 
   const handleCreateClient = () => {
-    setSelectedClient(null);
-    setIsClientModalOpen(true);
+    window.location.href = "/carriers/new";
   };
 
   const handleEditClient = (client: Client) => {
-    setSelectedClient(client);
-    setIsClientModalOpen(true);
+    window.location.href = `/carriers/${client.id}/edit`;
   };
 
   const totalClients = clients.length;
@@ -377,14 +372,6 @@ export default function Clients() {
         </main>
       </div>
 
-      <ClientModal
-        isOpen={isClientModalOpen}
-        onClose={() => {
-          setIsClientModalOpen(false);
-          refetchClients();
-        }}
-        client={selectedClient}
-      />
     </div>
   );
 }

@@ -262,7 +262,7 @@ export default function ClientDetail() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Actions</p>
                   <Button variant="outline" size="sm"
                     className="w-full justify-start gap-2 rounded-2xl border-slate-200 text-xs dark:border-slate-700"
-                    onClick={() => window.location.href = `/clients?edit=${clientId}`}>
+                    onClick={() => window.location.href = `/carriers/${clientId}/edit`}>
                     <Edit2 className="h-3.5 w-3.5" />Edit Client
                   </Button>
                   <Button

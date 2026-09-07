@@ -182,7 +182,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
 
   const quickActions = [
     { label: "New Load Entry",   icon: FileText,  action: () => setLocation("/invoices")  },
-    { label: "Add Carrier",      icon: Users,     action: () => setLocation("/clients")   },
+    { label: "Add Carrier",      icon: Users,     action: () => setLocation("/carriers/new") },
     { label: "Upload Evidence",  icon: FolderOpen, action: () => setLocation("/documents") },
   ];
 

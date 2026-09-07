@@ -2,3 +2,4 @@
 - [Direct invoice seeds](direct-invoice-seeds.md) — explicitly set load_id NULL when seeding invoices without load rows; its legacy default can generate invalid foreign keys.
 - [Vault entry IDs](vault-entry-ids.md) — client_vault requires a real serial default; without it encrypted inserts fail after encryption with a null primary key.
 - [Chargeback extensions](chargeback-extensions.md) — a future extension date must defer the automatic 90-day chargeback until that date arrives.
+- [Carrier onboarding secrets](carrier-onboarding-secrets.md) — SSNs and bank credentials are encrypted server-side, omitted from API responses, and preserved when blank on edit.

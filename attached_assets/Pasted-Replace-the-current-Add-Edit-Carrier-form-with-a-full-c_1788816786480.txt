@@ -1,0 +1,114 @@
+Replace the current Add/Edit Carrier form with a full carrier onboarding form matching our internal requirements. This is an agent-only internal form.
+
+Database — extend the clients table with all new fields:
+
+Owner Information (up to 3 owners):
+
+ Add owners JSONB column — stores array of up to 3 owners, each with: firstName, middleName, lastName, prefix, title, dob, ssn (encrypted), pin, fein, mobileNumber, email, idType, idNumber, idState, home
+
+Carrier Information:
+
+ status (New Client/Active/Inactive), established, structure, state, faxNumber, since, businessDescription, legalName, businessName, extraLegalName, dba, preferredName, initials, language
+
+Business Bank Information:
+
+ bankName, bankAccountNumber (encrypted), abaRouting (encrypted), bankOfficer, bankDateOpened, bankPhone, bankFax, bankAddress, bankCity, bankState, bankZip
+
+Addresses:
+
+ physicalAddress, physicalCity, physicalState, physicalZip
+ mailingAddress, mailingCity, mailingState, mailingZip, mailingSameAsPhysical
+
+UCC:
+
+ ucc1IniFileNumber, ucc1IniExpiration, ucc1IniReviewBy, ucc1IniReviewDate
+ ucc1ConFileNumber, ucc1ConExpiration, ucc1ConReviewBy, ucc1ConReviewDate
+ uccUrl
+
+COI:
+
+ coiInsExp, coiEffectiveDate, coiCancellationDate, coiReviewBy, coiReviewDate
+
+Workers Comp:
+
+ wcExpiration, wcEffective, wcCancellation, wcReviewBy, wcReviewDate
+
+Corporation:
+
+ corpStatus, corpReviewBy, corpReviewDate, corpUrl
+
+Referral:
+
+ referralAdmin, referral
+
+Miscellaneous:
+
+ ownershipChangeInPastTwoYears, ownsOrLeasesLocation, leaseInfo, howFoundUs
+
+Financial Information:
+
+ filedBankruptcy, taxesPastDue, taxLienFiled, hasFactoredBefore, avs, mfv, cor, aia, invoiceTerms, hasCommercialLoans
+
+Trucking Authority:
+
+ entityType, usdotStatus, dotNumber, mcs150, authorityStatus, mcNumber, businessPhone, dunNumber, powerUnits, drivers, authorityType, vehiclePercent, driverPercent, crashes, authorityReviewBy, authorityReviewDate, operationClassification, carrierOperation, cargoCarried, fmcsaUrl, hasBrokerAuthority, otherBusinessNames, otherMcNumbers
+
+Factoring Settings:
+
+ factoringEnabled, emailAlert, smsAlert, former, faPercent, ratePercent, prePay, priorityForFunds, factoringCompany, noa, commission
+ currentLimit, maxLimit, ar, arOver90Days, debt, loanType, collectionBalance
+ vendor, podSubmission, ldm, lwf, fdm, fwf, selectUnit, holdAllFunding
+
+Amendment:
+
+ amendmentFor, amendmentToReserves
+
+Contract:
+
+ oneYearContract, monthsContract
+
+Invoicing Type:
+
+ invoicingType, driverSupport, invoicingType2, preDiem, invoiceOnly, chargeback, customReferenceNumber, vendorInvoiceOnly, doubleApproval
+
+Linked:
+
+ linkedDriver1, linkedDriver2, linkedBrokerId, linkedSubBrokerId
+ Run db:push after all schema changes
+
+Document Upload Categories (all stored in S3):
+
+Factoring Documents:
+
+Factoring Application, Security Agreement, Security Agreement 2.0, Letter Of Intent, Aging Report, Buyout Agreement, Percentage Amendment, Release Letter, NOA, Deposit & Withdrawals Agreement
+
+UCC Documents:
+
+UCC-1-UT Initial Financing Statement, UCC-3-UT Continuation, UCC-3-UT Termination, UCC-11 Search and Copy Request
+
+Carrier Documents:
+
+Bonding, EIN Letter, W9, Articles Of Organization, Authority MC#, Void Check, Driver License, Insurance Certificate, WC COI, Logo, Envelope
+ Each document category stored with type tag in documents table linked to carrierId
+ Max file sizes as specified: most 134.22MB, some 5MB, Logo/Envelope 2MB
+
+Frontend — Full Carrier Onboarding Form
+
+ Multi-section form matching the exact layout from the old system
+ Organized into collapsible sections with section headers
+ Each section header styled bold with dark background matching old system feel
+ Form uses React Hook Form + Zod validation
+ Required fields marked with asterisk
+ SSN, Account Number, Routing Number fields: masked by default with eye toggle to reveal
+ mailingSameAsPhysical checkbox auto-fills mailing from physical
+ Support Information Checklist: checkboxes for each document type
+ Factoring Documents, UCC, Carrier Documents: drag and drop upload zones per document type, 4 per row
+ Submit, Reset, Cancel buttons at bottom
+
+Replace existing carrier form:
+
+ Remove current simple Add Carrier modal
+ Replace with full page form at /carriers/new and /carriers/:id/edit
+ "Add Carrier" button in Carriers page navigates to /carriers/new full page
+ "Edit Client" button on carrier profile navigates to /carriers/:id/edit
+ On submit: save all fields, upload documents to S3, redirect to carrier profile
