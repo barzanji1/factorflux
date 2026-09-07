@@ -55,6 +55,8 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
       contactPerson: "",
       taxId: "",
       status: "active",
+      advanceRate: "80.00",
+      factoringFeeRate: "3.00",
     },
   });
 
@@ -68,6 +70,8 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
         contactPerson: client.contactPerson || "",
         taxId: client.taxId || "",
         status: client.status,
+        advanceRate: client.advanceRate || "80.00",
+        factoringFeeRate: client.factoringFeeRate || "3.00",
       });
     } else {
       form.reset({
@@ -78,6 +82,8 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
         contactPerson: "",
         taxId: "",
         status: "active",
+        advanceRate: "80.00",
+        factoringFeeRate: "3.00",
       });
     }
   }, [client, form]);
@@ -168,6 +174,28 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="advanceRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Advance Rate %</FormLabel>
+                    <FormControl><Input type="number" min="0" max="100" step="0.01" {...field} value={field.value ?? "80.00"} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="factoringFeeRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Factoring Fee %</FormLabel>
+                    <FormControl><Input type="number" min="0" max="100" step="0.01" {...field} value={field.value ?? "3.00"} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="name"

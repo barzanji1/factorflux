@@ -43,6 +43,7 @@ interface Ctx {
   actorRole: string;
   reason?: string;
   force?: boolean;
+  paymentMethod?: "ach" | "wire";
 }
 
 type Guard      = (ctx: Ctx) => Promise<BlockerInfo | null>;
@@ -200,14 +201,13 @@ const fxCheckDocsAutoDowngrade: SideEffect = async ({ invoiceId, actorId }) => {
 };
 
 /** Auto-create payout record on funding */
-const fxCreatePayout: SideEffect = async ({ invoiceId, actorId }) => {
+const fxCreatePayout: SideEffect = async ({ invoiceId, actorId, paymentMethod }) => {
   const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!inv) return;
-  let settings = await storage.getPayoutSettings();
-  if (!settings) settings = await storage.upsertPayoutSettings({ advanceRate: "90.00", feeRate: "3.00" });
+  const client = await storage.getClient(inv.clientId);
   const invoiceAmount = parseFloat(inv.amount);
-  const advanceRate   = parseFloat(settings.advanceRate);
-  const feeRate       = parseFloat(settings.feeRate);
+  const advanceRate   = parseFloat(client?.advanceRate ?? "80.00");
+  const feeRate       = parseFloat(client?.factoringFeeRate ?? "3.00");
   const advanceAmount = +(invoiceAmount * advanceRate / 100).toFixed(2);
   const feeAmount     = +(invoiceAmount * feeRate  / 100).toFixed(2);
   const reserveAmount = +(invoiceAmount - advanceAmount).toFixed(2);
@@ -217,7 +217,9 @@ const fxCreatePayout: SideEffect = async ({ invoiceId, actorId }) => {
     invoiceAmount: String(invoiceAmount), advanceRate: String(advanceRate), feeRate: String(feeRate),
     advanceAmount: String(advanceAmount), feeAmount: String(feeAmount),
     reserveAmount: String(reserveAmount), netPayout: String(netPayout),
-    paymentStatus: "pending_advance",
+    paymentMethod: paymentMethod ?? "ach",
+    paymentStatus: "advance_paid",
+    advancePaidAt: new Date(),
     notes: "Auto-created by lifecycle engine on invoice funding",
     createdBy: actorId,
   });
@@ -315,7 +317,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     guards: [guardHasApprovalDocs, guardNoOpenCriticalExceptions, guardNoDeclinedCreditCheck],
     sideEffects: [
       fxSetStatus("approved"),
-      fxStage("approval"),
       fxActivity("invoice_approved", ctx => `Invoice ${ctx.invoice.invoiceNumber} approved`),
       fxNotify(
         ctx => `Invoice Approved — ${ctx.invoice.invoiceNumber}`,
@@ -359,7 +360,8 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     sideEffects: [
       fxSetStatus("funded"),
       fxCreatePayout,
-      fxStage("advance"),
+      // Funding completes Advance; Approval is the next active lifecycle stage.
+      fxStage("approval"),
       fxActivity("invoice_funded", ctx => `Invoice ${ctx.invoice.invoiceNumber} funded — payout record auto-created`),
       fxNotify(
         ctx => `Invoice Funded — ${ctx.invoice.invoiceNumber}`,
@@ -495,6 +497,7 @@ export async function performTransition(
   actorRole: string,
   reason?: string,
   force?: boolean,
+  paymentMethod?: "ach" | "wire",
 ): Promise<TransitionResult> {
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!invoice) return { success: false, error: "Invoice not found" };
@@ -508,7 +511,7 @@ export async function performTransition(
   if (def.requiredRole === "admin" && actorRole !== "admin")
     return { success: false, error: "Only admins can perform this action" };
 
-  const ctx: Ctx = { invoiceId, invoice, actorId, actorRole, reason, force };
+  const ctx: Ctx = { invoiceId, invoice, actorId, actorRole, reason, force, paymentMethod };
 
   // Run guards
   const blockers: BlockerInfo[] = [];

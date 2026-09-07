@@ -19,8 +19,8 @@ import { eq, and, desc } from "drizzle-orm";
 export const FACTORING_STAGES = [
   "document_intake",
   "verification",
-  "approval",
   "advance",
+  "approval",
   "collections",
   "payment_receipt",
   "reconciliation",
@@ -35,8 +35,8 @@ export const STAGE_META: Record<
 > = {
   document_intake:  { label: "Document Intake",    description: "Receiving and organizing carrier documents",        color: "slate",   step: 1 },
   verification:     { label: "Verification",        description: "Verifying docs, credit, and broker authority",     color: "amber",   step: 2 },
-  approval:         { label: "Approval",            description: "Factor review and funding decision",               color: "blue",    step: 3 },
-  advance:          { label: "Advance",             description: "Advance payment sent to carrier",                  color: "violet",  step: 4 },
+    advance:          { label: "Advance",             description: "Advance payment sent to carrier",                  color: "violet",  step: 3 },
+    approval:         { label: "Approval",            description: "Internal factor review and funding decision",      color: "blue",    step: 4 },
   collections:      { label: "Collections",         description: "Collecting payment from broker/debtor",            color: "orange",  step: 5 },
   payment_receipt:  { label: "Payment Receipt",     description: "Payment received from broker/debtor",              color: "teal",    step: 6 },
   reconciliation:   { label: "Reconciliation",      description: "Matching payment to outstanding balance",          color: "indigo",  step: 7 },

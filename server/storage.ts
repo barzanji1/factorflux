@@ -1252,7 +1252,7 @@ export class DatabaseStorage implements IStorage {
       return updated;
     }
     const [created] = await db.insert(payoutSettings).values({
-      advanceRate: data.advanceRate ?? "90.00",
+      advanceRate: data.advanceRate ?? "80.00",
       feeRate: data.feeRate ?? "3.00",
       updatedBy: data.updatedBy,
     }).returning();

@@ -206,7 +206,7 @@ export default function Payouts() {
   // ── Forms ──
   const settingsForm = useForm<SettingsForm>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: { advanceRate: 90, feeRate: 3 },
+    defaultValues: { advanceRate: 80, feeRate: 3 },
     values: settings ? { advanceRate: Number(settings.advanceRate), feeRate: Number(settings.feeRate) } : undefined,
   });
 
@@ -233,7 +233,7 @@ export default function Payouts() {
     : null;
 
   // Live preview in settings modal
-  const watchAdvance = settingsForm.watch("advanceRate") ?? 90;
+  const watchAdvance = settingsForm.watch("advanceRate") ?? 80;
   const watchFee = settingsForm.watch("feeRate") ?? 3;
   const sampleAmt = 10000;
   const settingsPreview = {

@@ -78,6 +78,8 @@ export const clients = pgTable("clients", {
   // Carrier / factoring fields
   mcNumber: varchar("mc_number"),
   ratePercent: decimal("rate_percent", { precision: 6, scale: 2 }),
+  advanceRate: decimal("advance_rate", { precision: 5, scale: 2 }).default("80.00"),
+  factoringFeeRate: decimal("factoring_fee_rate", { precision: 5, scale: 2 }).default("3.00"),
   language: varchar("language"),
   reviewed: timestamp("reviewed"),
   nextReview: timestamp("next_review"),
@@ -775,7 +777,7 @@ export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 // One active row stores the current configurable factoring percentages
 export const payoutSettings = pgTable("payout_settings", {
   id: serial("id").primaryKey(),
-  advanceRate: decimal("advance_rate", { precision: 5, scale: 2 }).notNull().default("90.00"),
+  advanceRate: decimal("advance_rate", { precision: 5, scale: 2 }).notNull().default("80.00"),
   feeRate: decimal("fee_rate", { precision: 5, scale: 2 }).notNull().default("3.00"),
   updatedBy: varchar("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -802,6 +804,7 @@ export const payouts = pgTable("payouts", {
   feeAmount: decimal("fee_amount", { precision: 12, scale: 2 }).notNull(),
   reserveAmount: decimal("reserve_amount", { precision: 12, scale: 2 }).notNull(),
   netPayout: decimal("net_payout", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method", { enum: ["ach", "wire"] }).default("ach").notNull(),
   paymentStatus: varchar("payment_status", {
     enum: ["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"],
   }).default("pending_advance").notNull(),

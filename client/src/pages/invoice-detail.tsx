@@ -32,15 +32,15 @@ import DocumentReviewDialog from "@/components/documents/document-review-dialog"
 // ─── Stage constants ───────────────────────────────────────────────────────────
 
 const FACTORING_STAGES = [
-  "document_intake","verification","approval","advance",
+  "document_intake","verification","advance","approval",
   "collections","payment_receipt","reconciliation","final_settlement",
 ] as const;
 type FactoringStage = (typeof FACTORING_STAGES)[number];
 const STAGE_META: Record<FactoringStage, { label: string; description: string }> = {
   document_intake:  { label: "Document Intake",  description: "Receiving carrier documents"       },
   verification:     { label: "Verification",      description: "Docs, credit & broker checks"      },
-  approval:         { label: "Approval",          description: "Factor review & funding decision"  },
   advance:          { label: "Advance",           description: "Advance sent to carrier"           },
+  approval:         { label: "Approval",          description: "Internal factor funding review"    },
   collections:      { label: "Collections",       description: "Collecting from broker/debtor"     },
   payment_receipt:  { label: "Payment Receipt",   description: "Payment received"                  },
   reconciliation:   { label: "Reconciliation",    description: "Matching payment to balance"       },
@@ -421,6 +421,8 @@ export default function InvoiceDetail() {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+  const [fundTransition, setFundTransition] = useState<AvailableTransition | null>(null);
+  const [fundMethod, setFundMethod] = useState<"ach" | "wire">("ach");
   const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH" });
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
@@ -522,8 +524,8 @@ export default function InvoiceDetail() {
   });
 
   const transitionMutation = useMutation({
-    mutationFn: async ({ transitionId, reason, force }: { transitionId: string; reason?: string; force?: boolean }) => {
-      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/transition`, { transitionId, reason, force });
+    mutationFn: async ({ transitionId, reason, force, paymentMethod }: { transitionId: string; reason?: string; force?: boolean; paymentMethod?: "ach" | "wire" }) => {
+      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/transition`, { transitionId, reason, force, paymentMethod });
       return res.json();
     },
     onSuccess: (data) => {
@@ -550,6 +552,10 @@ export default function InvoiceDetail() {
   });
 
   const openTransitionDialog = (t: AvailableTransition) => {
+    if (t.id === "fund") {
+      setFundTransition(t);
+      return;
+    }
     setSelectedTransition(t);
     // If no reason required and no warnings, fire directly
     if (!t.requiresReason && !t.warnOnly) {
@@ -1134,6 +1140,7 @@ export default function InvoiceDetail() {
                               { label: "Fee Amount",     value: fmtCurrency(detail.payout.feeAmount),     tint: "amber"  },
                               { label: "Net Payout",     value: fmtCurrency(detail.payout.netPayout),     tint: "emerald"},
                               { label: "Reserve",        value: fmtCurrency(detail.payout.reserveAmount), tint: "teal"   },
+                              { label: "Payment Method", value: String(detail.payout.paymentMethod ?? "ach").toUpperCase(), tint: "slate" },
                             ].map(({ label, value, tint }) => (
                               <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                                 <p className="mb-1 text-xs text-slate-400">{label}</p>
@@ -1350,6 +1357,40 @@ export default function InvoiceDetail() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOverrideOpen(false)}>Cancel</Button>
             <Button onClick={() => overrideMutation.mutate()} disabled={!overrideReason.trim() || overrideMutation.isPending}>Confirm Override & Approve</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!fundTransition} onOpenChange={(open) => { if (!open) setFundTransition(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fund Invoice</DialogTitle>
+            <DialogDescription>
+              Confirm the carrier advance using their configured rates.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 rounded-xl border p-4 text-sm">
+            <div><span className="text-slate-500">Gross invoice</span><p className="font-semibold">{fmtCurrency(detail?.amount)}</p></div>
+            <div><span className="text-slate-500">Advance rate</span><p className="font-semibold">{detail?.client?.advanceRate ?? "80.00"}%</p></div>
+            <div><span className="text-slate-500">Advance amount</span><p className="font-semibold">{fmtCurrency(Number(detail?.amount ?? 0) * Number(detail?.client?.advanceRate ?? 80) / 100)}</p></div>
+            <div><span className="text-slate-500">Factoring fee</span><p className="font-semibold">{detail?.client?.factoringFeeRate ?? "3.00"}%</p></div>
+            <div><span className="text-slate-500">Reserve held</span><p className="font-semibold">{fmtCurrency(Number(detail?.amount ?? 0) * (100 - Number(detail?.client?.advanceRate ?? 80)) / 100)}</p></div>
+            <div><span className="text-slate-500">Net to carrier</span><p className="font-semibold">{fmtCurrency(Number(detail?.amount ?? 0) * (Number(detail?.client?.advanceRate ?? 80) - Number(detail?.client?.factoringFeeRate ?? 3)) / 100)}</p></div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Payment Method</label>
+            <Select value={fundMethod} onValueChange={(v: "ach" | "wire") => setFundMethod(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="ach">ACH</SelectItem><SelectItem value="wire">Wire</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFundTransition(null)}>Cancel</Button>
+            <Button onClick={() => {
+              if (!fundTransition) return;
+              transitionMutation.mutate({ transitionId: fundTransition.id, paymentMethod: fundMethod });
+              setFundTransition(null);
+            }} disabled={transitionMutation.isPending}>Confirm Funding</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

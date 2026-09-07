@@ -605,7 +605,7 @@ export default function Admin() {
   });
   const ratesForm = useForm<RatesForm>({
     resolver: zodResolver(ratesSchema),
-    defaultValues: { advanceRate: 90, feeRate: 3 },
+    defaultValues: { advanceRate: 80, feeRate: 3 },
     values: settings ? { advanceRate: Number(settings.advanceRate), feeRate: Number(settings.feeRate) } : undefined,
   });
 
@@ -670,7 +670,7 @@ export default function Admin() {
   };
 
   const stageGroups = ["submission", "approval", "factoring", "payout"];
-  const watchAdvance = ratesForm.watch("advanceRate") ?? 90;
+  const watchAdvance = ratesForm.watch("advanceRate") ?? 80;
   const watchFee = ratesForm.watch("feeRate") ?? 3;
 
   return (

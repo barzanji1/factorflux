@@ -1942,10 +1942,11 @@ ${message}
         transitionId: z.string().min(1),
         reason: z.string().optional(),
         force: z.boolean().optional(),
+        paymentMethod: z.enum(["ach", "wire"]).optional(),
       });
-      const { transitionId, reason, force } = schema.parse(req.body);
+      const { transitionId, reason, force, paymentMethod } = schema.parse(req.body);
       const result = await performTransition(
-        id, transitionId, req.user.id, req.user.role ?? "employee", reason, force,
+        id, transitionId, req.user.id, req.user.role ?? "employee", reason, force, paymentMethod,
       );
       res.json(result);
     } catch (err) {
