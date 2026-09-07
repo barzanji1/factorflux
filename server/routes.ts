@@ -230,34 +230,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-
-      // 1. Check hardcoded production users first (by username)
-      const prodUser = PRODUCTION_USERS.find((u) => u.username === username);
-      if (prodUser) {
-        const isValid = await bcrypt.compare(password, prodUser.password);
-        if (!isValid) return res.status(401).json({ message: "Invalid credentials" });
-
-        // Check live DB status for prod users (allows admin to suspend them)
-        const dbRecord = await storage.getUser(prodUser.id);
-        if (dbRecord && (dbRecord as any).status === "suspended") {
-          return res.status(403).json({ message: "Your account has been suspended. Contact your administrator." });
-        }
-
-        const sessionUser = {
-          id: prodUser.id,
-          username: prodUser.username,
-          name: prodUser.name,
-          role: prodUser.role,
-          firstName: prodUser.firstName,
-          lastName: prodUser.lastName,
-          verified: prodUser.verified,
-          profileImageUrl: (dbRecord as any)?.profileImageUrl || "",
-        };
-        (req.session as any).user = sessionUser;
-        return res.json({ success: true, user: sessionUser });
-      }
-
-      // 2. Fall back to DB users (login with email address)
       const dbUser = await storage.getUserByEmail(username);
       if (!dbUser) {
         console.warn(`[login] No user found for email: ${username}`);
