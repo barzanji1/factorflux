@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Upload,
   X,
@@ -809,21 +808,44 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                   </FormLabel>
 
                   <div className="relative">
-                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      placeholder={selectedClient ? "Client selected below" : "Search client by name, email, or phone..."}
-                      value={clientSearch}
-                      disabled={!!selectedClient}
-                      onChange={(e) => {
-                        setClientSearch(e.target.value);
-                        setShowClientDropdown(true);
-                      }}
-                      onFocus={() => !selectedClient && setShowClientDropdown(true)}
-                      className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:disabled:bg-slate-900"
-                      data-testid="input-client-search"
-                    />
+                    {selectedClient ? (
+                      <div
+                        className="flex h-12 items-center rounded-2xl border-2 border-[#27aab8] bg-white px-3 shadow-sm dark:border-[#098b9f] dark:bg-slate-950"
+                        data-testid="selected-client-field"
+                        aria-label={`Selected client: ${selectedClient.name}`}
+                      >
+                        <div className="flex min-w-0 max-w-full items-center gap-2 rounded-xl bg-[#e5f7f8] px-3 py-1.5 text-[#075f6c] dark:bg-[#073b43] dark:text-[#74d4dc]">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-[#098b9f] dark:text-[#27aab8]" />
+                          <span className="truncate text-sm font-bold">{selectedClient.name}</span>
+                          <button
+                            type="button"
+                            onClick={clearClientSelection}
+                            className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#098b9f] transition hover:bg-[#c8ecef] hover:text-[#064e59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#098b9f] dark:text-[#65cbd4] dark:hover:bg-[#0a5660]"
+                            aria-label={`Remove ${selectedClient.name}`}
+                            title="Change client"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          placeholder="Search client by name, email, or phone..."
+                          value={clientSearch}
+                          onChange={(e) => {
+                            setClientSearch(e.target.value);
+                            setShowClientDropdown(true);
+                          }}
+                          onFocus={() => setShowClientDropdown(true)}
+                          className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                          data-testid="input-client-search"
+                        />
+                      </>
+                    )}
 
-                    {showClientDropdown && clientSearch && filteredClients.length > 0 && (
+                    {!selectedClient && showClientDropdown && clientSearch && filteredClients.length > 0 && (
                       <div className="absolute z-[9999] mt-2 w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_20px_40px_rgba(15,23,42,0.12)] dark:border-slate-700 dark:bg-slate-900">
                         <div className="max-h-72 overflow-auto py-2">
                           {filteredClients.map((client) => (
@@ -847,73 +869,35 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                     )}
                   </div>
 
+                  {selectedClient && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-slate-500 dark:text-slate-400">
+                      {selectedClient.email && (
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{selectedClient.email}</span>
+                        </span>
+                      )}
+                      {selectedClient.phone && (
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 shrink-0" />
+                          {selectedClient.phone}
+                        </span>
+                      )}
+                      {selectedClient.address && (
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{selectedClient.address}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {form.formState.errors.clientId && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.clientId.message}
                     </p>
                   )}
                 </div>
-
-                {selectedClient && (
-                  <Card className="mt-5 rounded-[22px] border-2 border-[#27aab8] bg-[#eaf8fa] shadow-sm dark:border-[#098b9f] dark:bg-[#073b43]/30">
-                    <CardContent className="p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#098b9f] shadow-sm dark:bg-slate-900 dark:text-[#27aab8]">
-                          <CheckCircle2 className="h-5 w-5" />
-                        </div>
-
-                        <div className="flex-1 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                          <div>
-                            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#098b9f] dark:text-[#27aab8]">
-                              Selected client
-                            </p>
-                            <p className="font-semibold text-slate-900 dark:text-white">
-                              {selectedClient.name}
-                            </p>
-                            {selectedClient.contactPerson ? (
-                              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                Contact: {selectedClient.contactPerson}
-                              </p>
-                            ) : null}
-                          </div>
-
-                          <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                            {selectedClient.email ? (
-                              <div className="flex items-center gap-2">
-                                <Mail className="h-3.5 w-3.5" />
-                                <span>{selectedClient.email}</span>
-                              </div>
-                            ) : null}
-
-                            {selectedClient.phone ? (
-                              <div className="flex items-center gap-2">
-                                <Phone className="h-3.5 w-3.5" />
-                                <span>{selectedClient.phone}</span>
-                              </div>
-                            ) : null}
-
-                            {selectedClient.address ? (
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-3.5 w-3.5" />
-                                <span>{selectedClient.address}</span>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={clearClientSelection}
-                          className="shrink-0 gap-1.5 rounded-xl border-[#27aab8] bg-white text-xs text-[#08798b] hover:bg-[#dff4f6] dark:bg-slate-900"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Change
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
 
                 <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
                   <FormField
