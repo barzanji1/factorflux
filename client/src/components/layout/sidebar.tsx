@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
@@ -27,6 +27,11 @@ type NavItem = {
 type NavSection = {
   title: string;
   items: NavItem[];
+};
+
+const sidebarScrollPositions = {
+  desktop: 0,
+  mobile: 0,
 };
 
 type CurrentUser = {
@@ -140,6 +145,8 @@ function isRouteActive(current: string, href: string) {
 export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { permissions, user: authUser } = useAuth();
+  const navRef = useRef<HTMLElement>(null);
+  const scrollPositionKey = mobile ? "mobile" : "desktop";
 
   const userRole = authUser?.role ?? "employee";
   const isAdmin = userRole === "admin";
@@ -172,6 +179,19 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
       .filter(s => s.items.length > 0),
     [userRole, isAdmin, permissions]
   );
+
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (nav) nav.scrollTop = sidebarScrollPositions[scrollPositionKey];
+  }, [filteredSections, scrollPositionKey]);
+
+  const navigateTo = (href: string) => {
+    if (navRef.current) {
+      sidebarScrollPositions[scrollPositionKey] = navRef.current.scrollTop;
+    }
+    setLocation(href);
+    onNavigate?.();
+  };
 
   return (
     <aside
@@ -221,7 +241,13 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3 ff-sidebar-scroll">
+      <nav
+        ref={navRef}
+        onScroll={(event) => {
+          sidebarScrollPositions[scrollPositionKey] = event.currentTarget.scrollTop;
+        }}
+        className="flex-1 overflow-y-auto px-2.5 py-3 ff-sidebar-scroll"
+      >
         <div className="space-y-4">
           {filteredSections.map(section => (
             <div key={section.title}>
@@ -236,7 +262,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                     <button
                       key={item.name}
                       type="button"
-                      onClick={() => { setLocation(item.href); onNavigate?.(); }}
+                      onClick={() => navigateTo(item.href)}
                       aria-current={active ? "page" : undefined}
                       className={cn(
                          "group flex w-full items-center gap-2 border-l-2 border-transparent px-2.5 py-2 text-left transition-colors duration-100",
