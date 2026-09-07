@@ -337,7 +337,7 @@ export default function Dashboard() {
                   <Icon className={cn("h-[15px] w-[15px]", s.icon)} />
                   <ArrowRight className="h-3 w-3 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-600" />
                 </div>
-                <div className={cn("text-[26px] font-bold leading-none tracking-tight", s.num)}>
+                <div className="text-4xl font-black leading-none tracking-tight text-[#27aab8]">
                   {tile.value}
                 </div>
                 <div className="mt-1.5 text-[11.5px] font-semibold text-slate-600 dark:text-slate-300">

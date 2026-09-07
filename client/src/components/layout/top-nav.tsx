@@ -214,7 +214,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
         </SheetContent>
       </Sheet>
 
-      <header className="sticky top-0 z-30 border-b-2 border-[#808080] bg-[#c0c0c0] px-4 py-3">
+      <header className="sticky top-0 z-30 border-b-2 border-[#808080] !bg-[#c0c0c0] px-4 py-3">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center">
             <div className="flex min-w-0 items-start gap-3">

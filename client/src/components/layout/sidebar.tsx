@@ -194,9 +194,17 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
       {/* User */}
       <div className="border-b-2 border-[#808080] px-3 py-2.5">
         <div className="flex items-center gap-2.5 border-2 border-[#fff] border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] px-2.5 py-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-[#098b9f] text-[11px] font-bold text-white">
-            {(user.firstName[0] || "A")}{(user.lastName[0] || "U")}
-          </div>
+          {user.profileImageUrl ? (
+            <img
+              src={user.profileImageUrl}
+              alt={`${user.firstName} ${user.lastName}`}
+              className="h-7 w-7 shrink-0 rounded-full border border-[#808080] object-cover"
+            />
+          ) : (
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#098b9f] text-[11px] font-bold text-white">
+              {(user.firstName[0] || "A")}{(user.lastName[0] || "U")}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
              <p className="truncate text-[12px] font-semibold text-[#1a1a1a] leading-none">
               {user.firstName} {user.lastName}
