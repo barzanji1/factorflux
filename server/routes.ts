@@ -222,9 +222,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  const requireDevelopment = (_req: any, res: any, next: any) => {
+    if (process.env.NODE_ENV === "production") {
+      return res.status(404).json({ message: "Not found" });
+    }
+    next();
+  };
+
+  const testDocumentDate = () => new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Denver",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
+
+  const streamTestPdf = (
+    res: any,
+    filename: string,
+    title: string,
+    subtitle: string,
+    fields: Array<[string, string]>,
+  ) => {
+    const doc = new PDFDocument({ size: "LETTER", margin: 54, info: { Title: title, Author: "Trucking Pros Financial" } });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "no-store");
+    doc.pipe(res);
+
+    doc.rect(0, 0, 612, 112).fill("#098b9f");
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(24).text("TRUCKING PROS FINANCIAL", 54, 34);
+    doc.font("Helvetica").fontSize(10).text("FactorFlux Test Document", 54, 68);
+
+    doc.fillColor("#1a1a1a").font("Helvetica-Bold").fontSize(22).text(title, 54, 145, { align: "center" });
+    doc.fillColor("#5a5a5a").font("Helvetica").fontSize(10).text(subtitle, 54, 176, { align: "center" });
+
+    let y = 220;
+    fields.forEach(([label, value], index) => {
+      const fill = index % 2 === 0 ? "#f1f5f5" : "#ffffff";
+      doc.rect(54, y, 504, 38).fill(fill).strokeColor("#b5b5b5").stroke();
+      doc.fillColor("#444444").font("Helvetica-Bold").fontSize(10).text(label.toUpperCase(), 68, y + 13, { width: 150 });
+      doc.fillColor("#111111").font("Helvetica").fontSize(11).text(value, 220, y + 12, { width: 320 });
+      y += 38;
+    });
+
+    doc.moveDown(3);
+    doc.fillColor("#666666").font("Helvetica-Oblique").fontSize(9)
+      .text("SAMPLE DOCUMENT — FOR TESTING PURPOSES ONLY", 54, 704, { align: "center", width: 504 });
+    doc.end();
+  };
+
   // ─── Health check — must be first, no auth, always 200 ───────────────────
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok", ts: Date.now() });
+  });
+
+  app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {
+    streamTestPdf(
+      res,
+      "TEST-001-rate-confirmation.pdf",
+      "RATE CONFIRMATION",
+      "Load tender and carrier rate agreement",
+      [
+        ["Broker", "TPF Test Broker"],
+        ["Carrier", "TPF Test Carrier"],
+        ["Load Number", "TEST-001"],
+        ["Origin", "Chicago, IL"],
+        ["Destination", "Dallas, TX"],
+        ["Rate", "$85,000.00"],
+        ["Payment Terms", "Net 30"],
+        ["Date", testDocumentDate()],
+      ],
+    );
+  });
+
+  app.get("/api/test/generate-bol", requireAdmin, requireDevelopment, (_req, res) => {
+    streamTestPdf(
+      res,
+      "TEST-001-bill-of-lading.pdf",
+      "BILL OF LADING",
+      "Non-negotiable freight shipping document",
+      [
+        ["Carrier", "TPF Test Carrier"],
+        ["Load Number", "TEST-001"],
+        ["Shipper", "ABC Warehouse, Chicago, IL"],
+        ["Consignee", "XYZ Distribution, Dallas, TX"],
+        ["Commodity", "General Freight"],
+        ["Weight", "42,000 lbs"],
+        ["Date", testDocumentDate()],
+      ],
+    );
   });
 
   // Auth

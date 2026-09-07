@@ -271,6 +271,7 @@ export default function Admin() {
   const [ttDrillAgent, setTtDrillAgent] = useState<string | null>(null);
   const [permTarget, setPermTarget] = useState<UserRecord | null>(null);
   const [permToggles, setPermToggles] = useState<Record<string, boolean>>({});
+  const [generatingTestDocs, setGeneratingTestDocs] = useState(false);
 
   // Guard: only admin
   if (currentUser && currentUser.role !== "admin") {
@@ -621,6 +622,39 @@ export default function Admin() {
   };
   const isSelf = (id: string) => id === currentUser?.id;
 
+  const downloadTestDocument = async (url: string, filename: string) => {
+    const response = await fetch(url, { credentials: "include" });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.message || `Failed to generate ${filename}`);
+    }
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  };
+
+  const handleGenerateTestDocs = async () => {
+    setGeneratingTestDocs(true);
+    try {
+      await downloadTestDocument("/api/test/generate-rate-con", "TEST-001-rate-confirmation.pdf");
+      await downloadTestDocument("/api/test/generate-bol", "TEST-001-bill-of-lading.pdf");
+      toast({ title: "Test documents generated", description: "Rate confirmation and bill of lading downloaded." });
+    } catch (error) {
+      toast({
+        title: "Generation failed",
+        description: error instanceof Error ? error.message : "Could not generate test documents.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingTestDocs(false);
+    }
+  };
+
   // Doc requirement helpers
   const updateDoc = (idx: number, patch: Partial<DocRequirement>) => {
     setDocItems((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
@@ -703,6 +737,18 @@ export default function Admin() {
                       <CardDescription>Manage roles, status, and access for all accounts</CardDescription>
                     </div>
                     <div className="flex gap-2">
+                      {import.meta.env.DEV && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleGenerateTestDocs}
+                          disabled={generatingTestDocs}
+                          className="gap-2"
+                        >
+                          {generatingTestDocs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                          Generate Test Docs
+                        </Button>
+                      )}
                       <Button variant="outline" size="sm" onClick={() => setNotifyOpen(true)} className="gap-2">
                         <Bell className="h-4 w-4" />
                         Notify User
