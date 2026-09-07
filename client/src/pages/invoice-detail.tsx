@@ -473,6 +473,20 @@ export default function InvoiceDetail() {
     onError: () => toast({ title: "Error saving note", variant: "destructive" }),
   });
 
+  const documentTypeMutation = useMutation({
+    mutationFn: async ({ documentId, documentType }: { documentId: number; documentType: string }) => {
+      const res = await apiRequest("PATCH", `/api/documents/${documentId}/document-type`, { documentType });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Document type updated" });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "available-transitions"] });
+    },
+    onError: () => toast({ title: "Could not update document type", variant: "destructive" }),
+  });
+
   const transitionMutation = useMutation({
     mutationFn: async ({ transitionId, reason, force }: { transitionId: string; reason?: string; force?: boolean }) => {
       const res = await apiRequest("POST", `/api/invoices/${invoiceId}/transition`, { transitionId, reason, force });
@@ -984,6 +998,8 @@ export default function InvoiceDetail() {
                             entityId={invoiceId}
                             onUploadComplete={() => {
                               qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+                              qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
+                              qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "available-transitions"] });
                             }}
                           />
                         </div>
@@ -1004,10 +1020,34 @@ export default function InvoiceDetail() {
                                       <p className="text-xs text-slate-400">{doc.documentType.replace(/_/g, " ")} · {(doc.size / 1024).toFixed(1)} KB</p>
                                     </div>
                                   </div>
-                                  <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[11px]",
-                                    doc.status === "processed" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>
-                                    {doc.status}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={doc.documentType || "other"}
+                                      onValueChange={(documentType) =>
+                                        documentTypeMutation.mutate({ documentId: doc.id, documentType })
+                                      }
+                                      disabled={documentTypeMutation.isPending}
+                                    >
+                                      <SelectTrigger className="h-8 w-[190px] rounded-lg bg-white text-xs dark:bg-slate-950">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
+                                        <SelectItem value="bill_of_lading">Bill of Lading (BOL)</SelectItem>
+                                        <SelectItem value="invoice">Commercial Invoice</SelectItem>
+                                        <SelectItem value="proof_of_delivery">Proof of Delivery (POD)</SelectItem>
+                                        <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
+                                        <SelectItem value="receipt">Receipt</SelectItem>
+                                        <SelectItem value="driver_id">Driver ID</SelectItem>
+                                        <SelectItem value="carrier_setup">Carrier Setup</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[11px]",
+                                      doc.status === "processed" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>
+                                      {doc.status}
+                                    </Badge>
+                                  </div>
                                 </div>
                               ))}
                               <div className="pt-1">

@@ -137,7 +137,7 @@ const STAGE_COLORS: Record<string, string> = {
 const DEFAULT_DOC_REQUIREMENTS: DocRequirement[] = [
   { stage: "submission", documentName: "Rate Confirmation", required: true, description: "Signed rate confirmation from broker" },
   { stage: "submission", documentName: "Bill of Lading", required: true, description: "Proof of freight delivery" },
-  { stage: "submission", documentName: "Proof of Delivery", required: true, description: "Signed POD from consignee" },
+  { stage: "submission", documentName: "Proof of Delivery", required: false, description: "Signed POD from consignee" },
   { stage: "approval", documentName: "Driver ID", required: true, description: "Valid government-issued photo ID" },
   { stage: "approval", documentName: "Carrier Authority", required: true, description: "FMCSA carrier authority documentation" },
   { stage: "factoring", documentName: "W-9 Form", required: true, description: "Tax information form" },

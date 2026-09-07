@@ -1055,6 +1055,30 @@ ${message}
     }
   });
 
+  app.patch("/api/documents/:id/document-type", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const validTypes = [
+        "invoice", "rate_confirmation", "bill_of_lading", "proof_of_delivery",
+        "lumper_receipt", "receipt", "driver_id", "carrier_setup", "other",
+      ];
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid document ID" });
+      if (!validTypes.includes(req.body.documentType)) {
+        return res.status(400).json({ message: "Invalid document type" });
+      }
+
+      const document = await storage.updateDocument(id, {
+        documentType: req.body.documentType,
+        finalDocumentType: req.body.documentType,
+      } as any);
+      if (!document) return res.status(404).json({ message: "Document not found" });
+      res.json(document);
+    } catch (error) {
+      console.error("Error updating document type:", error);
+      res.status(500).json({ message: "Failed to update document type" });
+    }
+  });
+
   app.post("/api/invoices/:id/documents", requireAuth, handleUpload("file"), async (req: any, res) => {
     try {
       const invoiceId = parseInt(req.params.id, 10);
@@ -4345,20 +4369,28 @@ Trucking Pros Financial Team
     try {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-      const { entityType, entityId } = req.body;
+      const { entityType, entityId, documentType } = req.body;
       const validEntityTypes = ["invoice", "load", "client", "broker"];
+      const validDocumentTypes = [
+        "invoice", "rate_confirmation", "bill_of_lading", "proof_of_delivery",
+        "lumper_receipt", "receipt", "driver_id", "carrier_setup", "other",
+      ];
       if (!validEntityTypes.includes(entityType)) {
         return res.status(400).json({ message: "Invalid entityType" });
       }
       const eid = parseInt(entityId, 10);
       if (isNaN(eid)) return res.status(400).json({ message: "Invalid entityId" });
+      if (!validDocumentTypes.includes(documentType)) {
+        return res.status(400).json({ message: "Select a valid document type" });
+      }
 
       const docData: any = {
         filename:     req.file.filename,
         originalName: sanitizeOriginalName(req.file.originalname),
         mimeType:     req.file.mimetype,
         size:         req.file.size,
-        documentType: "other" as const,
+        documentType,
+        finalDocumentType: documentType,
         uploadedBy:   req.user.id,
         sourceChannel: "drag_drop" as const,
         status:       "processing" as const,

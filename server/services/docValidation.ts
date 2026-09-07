@@ -136,7 +136,17 @@ export async function guardDocsForApproval(ctx: Ctx): Promise<{ code: string; me
 
 export async function seedDocumentRules(): Promise<void> {
   const [existing] = await db.select({ id: documentRules.id }).from(documentRules).limit(1);
-  if (existing) return;
+  if (existing) {
+    // Commercial invoices and PODs remain visible checklist items, but they
+    // must not block review, approval, or required-document completeness.
+    await db.update(documentRules)
+      .set({ required: false })
+      .where(eq(documentRules.documentType, "invoice"));
+    await db.update(documentRules)
+      .set({ required: false })
+      .where(eq(documentRules.documentType, "proof_of_delivery"));
+    return;
+  }
 
   await db.insert(documentRules).values([
     {
@@ -161,7 +171,7 @@ export async function seedDocumentRules(): Promise<void> {
       documentType: "invoice",
       label: "Commercial Invoice",
       description: "Carrier invoice issued to the broker or debtor for the completed load",
-      required: true,
+      required: false,
       requiredForStage: "approve",
       sortOrder: 3,
       active: true,
@@ -170,7 +180,7 @@ export async function seedDocumentRules(): Promise<void> {
       documentType: "proof_of_delivery",
       label: "Proof of Delivery (POD)",
       description: "Signed delivery receipt confirming successful delivery to the consignee",
-      required: true,
+      required: false,
       requiredForStage: "approve",
       sortOrder: 4,
       active: true,

@@ -5,6 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Upload,
   FileText,
   CheckCircle2,
@@ -136,6 +143,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
   const [files,       setFiles]       = useState<UploadedFile[]>([]);
   const [reviewDocId, setReviewDocId] = useState<number | null>(null);
   const [rejectBanner, setRejectBanner] = useState<string | null>(null);
+  const [documentType, setDocumentType] = useState("");
 
   const updateFile = useCallback((localId: string, patch: Partial<UploadedFile>) => {
     setFiles((prev) => prev.map((f) => (f.localId === localId ? { ...f, ...patch } : f)));
@@ -143,7 +151,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
 
   // ── Core upload function ─────────────────────────────────────────────────
   const uploadFile = useCallback(
-    async (file: File) => {
+    async (file: File, selectedDocumentType: string) => {
       const localId = `${Date.now()}-${Math.random()}`;
       setFiles((prev) => [
         {
@@ -165,6 +173,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
       formData.append("file",       file);
       formData.append("entityType", entityType);
       formData.append("entityId",   String(entityId));
+      formData.append("documentType", selectedDocumentType);
 
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/load-documents/intake");
@@ -186,6 +195,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           });
           qc.invalidateQueries({ queryKey: ["/api/invoices", entityId, "detail"] });
           qc.invalidateQueries({ queryKey: ["/api/invoices", entityId, "documents"] });
+          qc.invalidateQueries({ queryKey: ["/api/invoices", entityId, "document-status"] });
           onUploadComplete?.(doc);
         } else {
           let errMsg = "Upload failed";
@@ -204,6 +214,10 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
   const handleFiles = useCallback(
     (incoming: File[]) => {
       setRejectBanner(null);
+      if (!documentType) {
+        setRejectBanner("Select a document type before uploading.");
+        return;
+      }
       const rejected: string[] = [];
 
       incoming.forEach((file) => {
@@ -215,7 +229,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           rejected.push(`${file.name} — exceeds 10 MB limit`);
           return;
         }
-        uploadFile(file);
+        uploadFile(file, documentType);
       });
 
       if (rejected.length > 0) {
@@ -223,7 +237,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
         setTimeout(() => setRejectBanner(null), 6000);
       }
     },
-    [uploadFile],
+    [uploadFile, documentType],
   );
 
   // ── Safe drop hook (fixes browser takeover + child-element flickering) ───
@@ -242,6 +256,28 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
 
   return (
     <div className="space-y-3">
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+          Document type
+        </label>
+        <Select value={documentType} onValueChange={setDocumentType}>
+          <SelectTrigger className="h-10 rounded-xl bg-white dark:bg-slate-950">
+            <SelectValue placeholder="Select the type before uploading" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
+            <SelectItem value="bill_of_lading">Bill of Lading (BOL)</SelectItem>
+            <SelectItem value="invoice">Commercial Invoice</SelectItem>
+            <SelectItem value="proof_of_delivery">Proof of Delivery (POD)</SelectItem>
+            <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
+            <SelectItem value="receipt">Receipt</SelectItem>
+            <SelectItem value="driver_id">Driver ID</SelectItem>
+            <SelectItem value="carrier_setup">Carrier Setup</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Rejection banner */}
       {rejectBanner && (
         <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
@@ -298,7 +334,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
               ? "File type not supported"
               : "Drag & drop documents here"}
         </p>
-        <p className="mt-1 text-xs text-slate-400">PDF, JPG, PNG · max 10 MB · auto-classified on upload</p>
+        <p className="mt-1 text-xs text-slate-400">PDF, JPG, PNG · max 10 MB · tagged with the selected type</p>
 
         <Button
           variant="outline"
@@ -420,7 +456,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           onOpenChange={(open) => { if (!open) setReviewDocId(null); }}
           onReviewComplete={(status, invoiceId) => {
             if (invoiceId) {
-              qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "completeness"] });
+              qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
               qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
             }
           }}
