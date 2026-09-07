@@ -132,8 +132,11 @@ const guardHasReason: Guard = async ({ reason }) =>
 /** Write status change + audit trail */
 function fxSetStatus(newStatus: string): SideEffect {
   return async ({ invoiceId, actorId, invoice, reason }) => {
+    const statusUpdate: any = { status: newStatus as any, updatedAt: new Date() };
+    // Do not overwrite the original funding date on any later transition.
+    if (newStatus === "funded" && !invoice.fundedAt) statusUpdate.fundedAt = new Date();
     await db.update(invoices)
-      .set({ status: newStatus as any, updatedAt: new Date() })
+      .set(statusUpdate)
       .where(eq(invoices.id, invoiceId));
     await db.insert(invoiceStatusHistory).values({
       invoiceId, oldStatus: invoice.status, newStatus, changedBy: actorId,

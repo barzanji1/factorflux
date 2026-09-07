@@ -1,0 +1,108 @@
+import { and, asc, eq, inArray, isNotNull, isNull, notInArray } from "drizzle-orm";
+import { db } from "../db";
+import { storage } from "../storage";
+import { clients, debtors, eventLedger, invoiceAgingAlerts, invoices, invoiceStatusHistory, notifications, users } from "@shared/schema";
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Creates aging alerts and their internal notifications. The database unique
+ * key makes repeated scheduler runs safe, including concurrent application
+ * instances.
+ */
+export async function processInvoiceAgingAlerts(): Promise<{ created: number }> {
+  const now = new Date();
+  let created = 0;
+
+  // Existing funded invoices predate the dedicated fundedAt column. Recover
+  // their original funding date from lifecycle history so they can age normally.
+  const missingFundingDates = await db.select({
+    id: invoices.id,
+    fallbackDate: invoices.updatedAt,
+  }).from(invoices).where(and(
+    isNull(invoices.fundedAt),
+    inArray(invoices.status, ["funded", "settled", "paid"] as any[]),
+  ));
+  for (const invoice of missingFundingDates) {
+    const [fundingEvent] = await db.select({ createdAt: invoiceStatusHistory.createdAt })
+      .from(invoiceStatusHistory)
+      .where(and(
+        eq(invoiceStatusHistory.invoiceId, invoice.id),
+        eq(invoiceStatusHistory.newStatus, "funded"),
+      ))
+      .orderBy(asc(invoiceStatusHistory.createdAt))
+      .limit(1);
+    const fundedAt = fundingEvent?.createdAt ?? invoice.fallbackDate;
+    if (fundedAt) {
+      await db.update(invoices).set({ fundedAt }).where(and(
+        eq(invoices.id, invoice.id),
+        isNull(invoices.fundedAt),
+      ));
+    }
+  }
+
+  const funded = await db.select({
+    id: invoices.id, invoiceNumber: invoices.invoiceNumber, fundedAt: invoices.fundedAt,
+    clientName: clients.name, brokerName: debtors.name,
+  }).from(invoices)
+    .leftJoin(clients, eq(invoices.clientId, clients.id))
+    .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+    .where(and(isNotNull(invoices.fundedAt), notInArray(invoices.status, ["paid", "settled"] as any[])));
+  const recipients = await db.select({ id: users.id }).from(users)
+    .where(and(eq(users.status, "active"), inArray(users.role, ["employee", "manager", "admin"])));
+
+  for (const invoice of funded) {
+    const days = Math.floor((now.getTime() - invoice.fundedAt!.getTime()) / DAY_MS);
+    const types = days >= 90 ? ["day_60", "day_90"] as const : days >= 60 ? ["day_60"] as const : [];
+    for (const alertType of types) {
+      const inserted = await db.insert(invoiceAgingAlerts).values({
+        invoiceId: invoice.id, alertType, status: "pending",
+      }).onConflictDoNothing().returning({ id: invoiceAgingAlerts.id });
+      const [alert] = inserted[0]
+        ? inserted
+        : await db.select({ id: invoiceAgingAlerts.id }).from(invoiceAgingAlerts)
+          .where(and(eq(invoiceAgingAlerts.invoiceId, invoice.id), eq(invoiceAgingAlerts.alertType, alertType)))
+          .limit(1);
+      if (!alert) continue;
+      if (inserted[0]) created++;
+      const urgent = alertType === "day_90";
+      const carrier = invoice.clientName ?? "Carrier";
+      const broker = invoice.brokerName ?? "Broker";
+      const title = urgent ? "90 Day Past Due Invoice" : "60 Day Invoice Alert";
+      const message = urgent
+        ? `Invoice ${invoice.invoiceNumber} for ${carrier} is 90 days old — PAST DUE. Broker ${broker} must remit payment immediately`
+        : `Invoice ${invoice.invoiceNumber} for ${carrier} is 60 days old — follow up with ${broker} immediately`;
+      for (const user of recipients) {
+        const [existing] = await db.select({ id: notifications.id }).from(notifications).where(and(
+          eq(notifications.userId, user.id),
+          eq(notifications.entityType, "invoice"),
+          eq(notifications.entityId, invoice.id),
+          eq(notifications.title, title),
+        )).limit(1);
+        if (!existing) {
+          await storage.createNotification({
+            userId: user.id, title,
+            message, type: urgent ? "error" : "warning", entityType: "invoice", entityId: invoice.id,
+            actionUrl: `/invoices/${invoice.id}`,
+            metadata: JSON.stringify({ category: "invoice_aging", severity: urgent ? "red" : "amber", alertType, days, agingAlertId: alert.id }),
+          } as any);
+        }
+      }
+      if (inserted[0]) {
+        await db.insert(eventLedger).values({
+          entityType: "invoice", entityId: invoice.id, eventType: "invoice_aging_alert_triggered",
+          actorType: "system", actorId: "system", payloadJson: { alertType, days, alertId: alert.id },
+        });
+      }
+    }
+  }
+  return { created };
+}
+
+let scheduler: NodeJS.Timeout | null = null;
+export function startInvoiceAgingScheduler(intervalMs = DAY_MS): void {
+  if (scheduler) return;
+  processInvoiceAgingAlerts().catch(e => console.warn("[agingScheduler] initial run error:", e?.message));
+  scheduler = setInterval(() => processInvoiceAgingAlerts().catch(e =>
+    console.warn("[agingScheduler] run error:", e?.message)), intervalMs);
+}

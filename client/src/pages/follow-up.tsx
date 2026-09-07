@@ -105,6 +105,8 @@ interface BrokerFollowUpReminder {
   body: string;
   sendgridMessageId: string | null;
   deliveryStatus: string | null;
+  editedAt: string | null;
+  editedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -428,6 +430,8 @@ function ReminderTimeline({
   const [overdueInput, setOverdueInput] = useState(
     (cadenceConfig?.overdueIntervals ?? [3, 7]).join(", "),
   );
+  const [editingReminder, setEditingReminder] = useState<BrokerFollowUpReminder | null>(null);
+  const [reminderDraft, setReminderDraft] = useState({ scheduledSendAt: "", subject: "", body: "" });
 
   const { data: reminders = [], isLoading } = useQuery<BrokerFollowUpReminder[]>({
     queryKey: ["/api/broker-follow-ups", bfuId, "reminders"],
@@ -454,6 +458,24 @@ function ReminderTimeline({
     },
     onError: () => toast({ title: "Error", description: "Failed to save cadence", variant: "destructive" }),
   });
+  const editReminderMut = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/broker-follow-ups/${bfuId}/reminders/${editingReminder!.id}`, {
+      scheduledSendAt: new Date(reminderDraft.scheduledSendAt).toISOString(),
+      emailSubject: reminderDraft.subject, emailBody: reminderDraft.body,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups", bfuId, "reminders"] });
+      setEditingReminder(null); toast({ title: "Reminder updated" });
+    },
+    onError: () => toast({ title: "Unable to edit reminder", description: "Only scheduled reminders may be edited.", variant: "destructive" }),
+  });
+  function openReminderEditor(reminder: BrokerFollowUpReminder) {
+    setReminderDraft({
+      scheduledSendAt: format(new Date(reminder.scheduledSendAt), "yyyy-MM-dd'T'HH:mm"),
+      subject: reminder.subject, body: reminder.body,
+    });
+    setEditingReminder(reminder);
+  }
 
   function handleReminderAction(reminder: BrokerFollowUpReminder, action: "skip" | "cancel" | "restore") {
     const statusMap = { skip: "skipped", cancel: "canceled", restore: "scheduled" } as const;
@@ -636,6 +658,7 @@ function ReminderTimeline({
                       {r.status === "paused" && <Pause className="mr-0.5 h-2.5 w-2.5" />}
                       {r.status}
                     </span>
+                    {r.editedAt && <span className="rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-300">Edited</span>}
                     {/* Delivery status badge */}
                     {r.status === "sent" && (() => {
                       const ds = r.deliveryStatus;
@@ -696,6 +719,12 @@ function ReminderTimeline({
 
                 {/* Actions */}
                 <div className="flex items-start gap-1 pt-0.5 shrink-0">
+                  {r.status === "scheduled" && (
+                    <button type="button" onClick={() => openReminderEditor(r)}
+                      className="flex items-center gap-0.5 rounded-md bg-blue-50 px-2 py-1 text-[10.5px] font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400">
+                      <Pencil className="h-3 w-3" /> Edit
+                    </button>
+                  )}
                   {canRestore && (
                     <button
                       type="button"
@@ -735,6 +764,18 @@ function ReminderTimeline({
           })}
         </div>
       )}
+      <Dialog open={!!editingReminder} onOpenChange={open => !open && setEditingReminder(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Edit Scheduled Reminder</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Send date & time</Label><Input className="mt-1" type="datetime-local" value={reminderDraft.scheduledSendAt} onChange={e => setReminderDraft(d => ({ ...d, scheduledSendAt: e.target.value }))} /></div>
+            <div><Label>Subject</Label><Input className="mt-1" value={reminderDraft.subject} onChange={e => setReminderDraft(d => ({ ...d, subject: e.target.value }))} /></div>
+            <div><Label>Message</Label><Textarea className="mt-1 min-h-36" value={reminderDraft.body} onChange={e => setReminderDraft(d => ({ ...d, body: e.target.value }))} /></div>
+            <div className="flex flex-wrap gap-1"><span className="mr-1 text-[11px] text-slate-500">Insert:</span>{["{{brokerName}}", "{{invoiceNumber}}", "{{loadNumber}}", "{{amountDue}}", "{{dueDate}}"].map(token => <button type="button" key={token} onClick={() => setReminderDraft(d => ({ ...d, body: `${d.body}${d.body ? " " : ""}${token}` }))} className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50">{token}</button>)}</div>
+          </div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEditingReminder(null)}>Cancel</Button><Button disabled={!reminderDraft.scheduledSendAt || !reminderDraft.subject.trim() || !reminderDraft.body.trim() || editReminderMut.isPending} onClick={() => editReminderMut.mutate()}>{editReminderMut.isPending ? "Saving…" : "Save reminder"}</Button></div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

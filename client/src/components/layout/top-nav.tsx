@@ -405,6 +405,11 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                       const notifType = (notification.type || "info") as keyof typeof NOTIF_ICON;
                       const iconData = NOTIF_ICON[notifType] ?? NOTIF_ICON.info;
                       const IconComp = iconData.icon;
+                      let agingSeverity: "red" | "amber" | null = null;
+                      try {
+                        const metadata = notification.metadata ? JSON.parse(notification.metadata) : null;
+                        if (metadata?.category === "invoice_aging" && (metadata.severity === "red" || metadata.severity === "amber")) agingSeverity = metadata.severity;
+                      } catch { /* legacy notification metadata may not be JSON */ }
                       return (
                         <button
                           key={notification.id}
@@ -430,7 +435,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                             </p>
                           </div>
                           {!notification.read && (
-                            <div className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
+                            <div className={cn("mt-2 h-2 w-2 flex-shrink-0 rounded-full", agingSeverity === "red" ? "bg-red-500" : agingSeverity === "amber" ? "bg-amber-500" : "bg-blue-500")} />
                           )}
                         </button>
                       );

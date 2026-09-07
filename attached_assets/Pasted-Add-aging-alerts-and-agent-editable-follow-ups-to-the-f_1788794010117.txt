@@ -1,0 +1,49 @@
+Add aging alerts and agent-editable follow-ups to the factoring workflow.
+
+Database
+
+ Add fundedAt (timestamp) to invoices table if not already present — records when invoice was funded
+ Create invoice_aging_alerts table: id, invoiceId, alertType (day_60/day_90), triggeredAt, acknowledgedAt, acknowledgedBy, status (pending/acknowledged)
+ Run db:push
+
+Backend — Aging Alert Engine
+
+ Add a scheduled job that runs daily (alongside the existing reminder scheduler)
+ Scans all funded invoices where status is not paid/settled
+ Calculates days since fundedAt
+ At 60 days: creates a day_60 alert if one doesn't exist, sends internal notification to all agents and managers: "Invoice [#] for [Carrier] is 60 days old — follow up with [Broker] immediately"
+ At 90 days: creates a day_90 alert, sends urgent internal notification: "Invoice [#] for [Carrier] is 90 days old — PAST DUE. Broker [Name] must remit payment immediately"
+ Alerts also appear in the notifications bell in the top nav
+ GET /api/invoices/aging-alerts — returns all pending alerts, requires auth
+ POST /api/invoices/aging-alerts/:id/acknowledge — marks alert acknowledged, logs who did it
+
+Backend — Editable Follow-ups
+
+ PATCH /api/broker-follow-ups/:id/reminders/:reminderId — allow agent to update scheduledSendAt and emailBody and emailSubject on any pending reminder
+ Validate: can only edit reminders with status scheduled — not already sent ones
+ Log edits to audit trail
+
+Frontend — Factoring Page
+
+ Add an Aging Alerts section/tab showing all invoices with pending 60-day or 90-day alerts
+ Each row: invoice#, carrier, broker, days since funded, alert type badge (60 DAY / 90 DAY PAST DUE), acknowledge button
+ 90-day alerts styled in red, 60-day in amber
+ Acknowledged alerts move to a separate "Resolved" view
+
+Frontend — Follow-up Editor
+
+ In the expanded broker follow-up row, add Edit button on each pending reminder step
+ Edit modal: change scheduled date (date picker) and edit email subject and body (textarea with placeholder chips)
+ Save updates the reminder via PATCH endpoint
+ Show "Edited" badge on modified reminder steps
+
+Frontend — Dashboard
+
+ Add an Aging Invoices card to the dashboard showing count of invoices at 60+ days and 90+ days
+ Click through to the Aging Alerts page
+
+Notifications Bell
+
+ 60-day and 90-day alerts appear in the notification bell dropdown
+ 90-day alerts show with red dot, 60-day with amber dot
+ Clicking notification takes agent directly to that invoice

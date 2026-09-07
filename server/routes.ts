@@ -60,6 +60,7 @@ import {
   eventLedger,
   loads,
   brokerFollowUps,
+  invoiceAgingAlerts,
   debtors,
   paymentApplicationLines,
   cashApplications,
@@ -1802,6 +1803,35 @@ ${message}
     }
   });
 
+  app.get("/api/invoices/aging-alerts", requireAuth, async (req: any, res) => {
+    try {
+      const view = req.query.view === "resolved" ? "acknowledged" : "pending";
+      const alerts = await db.select({
+        id: invoiceAgingAlerts.id, invoiceId: invoiceAgingAlerts.invoiceId, alertType: invoiceAgingAlerts.alertType,
+        triggeredAt: invoiceAgingAlerts.triggeredAt, acknowledgedAt: invoiceAgingAlerts.acknowledgedAt,
+        acknowledgedBy: invoiceAgingAlerts.acknowledgedBy, status: invoiceAgingAlerts.status,
+        invoiceNumber: invoices.invoiceNumber, fundedAt: invoices.fundedAt, carrier: clients.name, broker: debtors.name,
+      }).from(invoiceAgingAlerts).innerJoin(invoices, eq(invoiceAgingAlerts.invoiceId, invoices.id))
+        .leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .where(eq(invoiceAgingAlerts.status, view as any)).orderBy(desc(invoiceAgingAlerts.triggeredAt));
+      res.json(alerts);
+    } catch (error) { console.error("Error fetching aging alerts:", error); res.status(500).json({ message: "Failed to fetch aging alerts" }); }
+  });
+
+  app.post("/api/invoices/aging-alerts/:id/acknowledge", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid alert id" });
+      const [alert] = await db.update(invoiceAgingAlerts).set({
+        status: "acknowledged", acknowledgedAt: new Date(), acknowledgedBy: req.user.id,
+      }).where(and(eq(invoiceAgingAlerts.id, id), eq(invoiceAgingAlerts.status, "pending"))).returning();
+      if (!alert) return res.status(404).json({ message: "Pending aging alert not found" });
+      await db.insert(eventLedger).values({ entityType: "invoice", entityId: alert.invoiceId, eventType: "invoice_aging_alert_acknowledged", actorType: "user", actorId: req.user.id, payloadJson: { alertId: id, alertType: alert.alertType } });
+      await storage.createActivity({ userId: req.user.id, type: "invoice_aging_alert_acknowledged", description: `Acknowledged ${alert.alertType} aging alert`, entityType: "invoice", entityId: alert.invoiceId } as any);
+      res.json(alert);
+    } catch (error) { console.error("Error acknowledging aging alert:", error); res.status(500).json({ message: "Failed to acknowledge aging alert" }); }
+  });
+
   // ─── Document Rules (admin-configurable checklist) ───────────────────────
   app.get("/api/document-rules", requireAuth, async (_req, res) => {
     try { res.json(await storage.getDocumentRules()); }
@@ -3011,21 +3041,69 @@ Trucking Pros Financial Team
     }
   });
 
-  // Update a reminder (skip, cancel, restore, reschedule)
+  // Update a reminder lifecycle state through an allowlisted transition.
   app.patch("/api/broker-follow-up-reminders/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const updates: Record<string, unknown> = { ...req.body, updatedAt: new Date() };
+      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid reminder id" });
+      const { status } = z.object({
+        status: z.enum(["scheduled", "skipped", "canceled"]),
+      }).strict().parse(req.body);
+      const [current] = await db.select().from(brokerFollowUpReminders).where(eq(brokerFollowUpReminders.id, id)).limit(1);
+      if (!current) return res.status(404).json({ message: "Reminder not found" });
+      const allowed: Record<string, string[]> = {
+        scheduled: ["skipped", "canceled"],
+        paused: ["skipped", "canceled"],
+        skipped: ["scheduled", "canceled"],
+        canceled: ["scheduled"],
+      };
+      if (!allowed[current.status]?.includes(status)) {
+        return res.status(409).json({ message: `Cannot change reminder from ${current.status} to ${status}` });
+      }
       const [updated] = await db
         .update(brokerFollowUpReminders)
-        .set(updates as any)
-        .where(eq(brokerFollowUpReminders.id, id))
+        .set({ status, updatedAt: new Date() })
+        .where(and(eq(brokerFollowUpReminders.id, id), eq(brokerFollowUpReminders.status, current.status)))
         .returning();
-      if (!updated) return res.status(404).json({ message: "Reminder not found" });
+      if (!updated) return res.status(409).json({ message: "Reminder changed while this action was processing" });
       res.json(updated);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message ?? "Invalid reminder update" });
       console.error("Error updating reminder:", error);
       res.status(500).json({ message: "Failed to update reminder" });
+    }
+  });
+
+  app.patch("/api/broker-follow-ups/:id/reminders/:reminderId", requireAuth, async (req: any, res) => {
+    try {
+      const followUpId = Number(req.params.id), reminderId = Number(req.params.reminderId);
+      if (!Number.isInteger(followUpId) || !Number.isInteger(reminderId) || followUpId < 1 || reminderId < 1)
+        return res.status(400).json({ message: "Invalid follow-up or reminder id" });
+      const payload = z.object({
+        scheduledSendAt: z.string().datetime(),
+        emailSubject: z.string().trim().min(1).max(500),
+        emailBody: z.string().trim().min(1).max(20000),
+      }).parse(req.body);
+      const scheduledAt = new Date(payload.scheduledSendAt);
+      if (Number.isNaN(scheduledAt.getTime())) return res.status(400).json({ message: "Invalid scheduled date" });
+      const [reminder] = await db.select().from(brokerFollowUpReminders).where(and(eq(brokerFollowUpReminders.id, reminderId), eq(brokerFollowUpReminders.followUpId, followUpId))).limit(1);
+      if (!reminder) return res.status(404).json({ message: "Reminder not found for this follow-up" });
+      if (reminder.status !== "scheduled") return res.status(409).json({ message: "Only scheduled reminders can be edited" });
+      const [updated] = await db.update(brokerFollowUpReminders).set({ scheduledSendAt: scheduledAt, subject: payload.emailSubject, body: payload.emailBody, editedAt: new Date(), editedBy: req.user.id, updatedAt: new Date() }).where(and(
+        eq(brokerFollowUpReminders.id, reminderId),
+        eq(brokerFollowUpReminders.followUpId, followUpId),
+        eq(brokerFollowUpReminders.status, "scheduled"),
+      )).returning();
+      if (!updated) return res.status(409).json({ message: "Reminder is no longer scheduled" });
+      const [followUp] = await db.select({ invoiceId: brokerFollowUps.invoiceId }).from(brokerFollowUps).where(eq(brokerFollowUps.id, followUpId));
+      if (followUp) {
+        await db.insert(eventLedger).values({ entityType: "invoice", entityId: followUp.invoiceId, eventType: "broker_followup_reminder_edited", actorType: "user", actorId: req.user.id, payloadJson: { followUpId, reminderId } });
+        await storage.createActivity({ userId: req.user.id, type: "broker_followup_reminder_edited", description: `Edited scheduled broker follow-up reminder #${reminderId}`, entityType: "invoice", entityId: followUp.invoiceId } as any);
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message ?? "Invalid reminder update" });
+      console.error("Error editing reminder:", error); res.status(500).json({ message: "Failed to edit reminder" });
     }
   });
 

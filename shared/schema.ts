@@ -10,6 +10,7 @@ import {
   boolean,
   integer,
   primaryKey,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -181,6 +182,7 @@ export const invoices = pgTable("invoices", {
   submittedAt: timestamp("submitted_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
   approvedAt: timestamp("approved_at"),
+  fundedAt: timestamp("funded_at"),
   assignedTo: varchar("assigned_to").references(() => users.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -383,6 +385,30 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// One durable alert per aging threshold. Acknowledgement is intentionally
+// retained so collections history remains visible after resolution.
+export const invoiceAgingAlerts = pgTable("invoice_aging_alerts", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  alertType: varchar("alert_type", { enum: ["day_60", "day_90"] }).notNull(),
+  triggeredAt: timestamp("triggered_at").defaultNow().notNull(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  acknowledgedBy: varchar("acknowledged_by").references(() => users.id),
+  status: varchar("status", { enum: ["pending", "acknowledged"] }).default("pending").notNull(),
+}, (table) => [
+  uniqueIndex("invoice_aging_alert_invoice_type_unique").on(table.invoiceId, table.alertType),
+  index("invoice_aging_alert_status_idx").on(table.status),
+  index("invoice_aging_alert_invoice_idx").on(table.invoiceId),
+]);
+
+export const insertInvoiceAgingAlertSchema = createInsertSchema(invoiceAgingAlerts).omit({
+  id: true,
+  triggeredAt: true,
+  acknowledgedAt: true,
+});
+export type InvoiceAgingAlert = typeof invoiceAgingAlerts.$inferSelect;
+export type InsertInvoiceAgingAlert = z.infer<typeof insertInvoiceAgingAlertSchema>;
+
 // Document Requirements table (configurable checklist per workflow stage)
 export const docRequirements = pgTable("doc_requirements", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -503,6 +529,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   activities: many(activities),
   timeEntries: many(timeEntries),
   notifications: many(notifications),
+  acknowledgedAgingAlerts: many(invoiceAgingAlerts),
 }));
 
 export const debtorsRelations = relations(debtors, ({ many }) => ({
@@ -521,6 +548,11 @@ export const loadsRelations = relations(loads, ({ one, many }) => ({
   invoices: many(invoices),
   documents: many(documents),
 }));
+
+export const invoiceAgingAlertsRelations = relations(invoiceAgingAlerts, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoiceAgingAlerts.invoiceId], references: [invoices.id] }),
+  acknowledgedByUser: one(users, { fields: [invoiceAgingAlerts.acknowledgedBy], references: [users.id] }),
+}));
 // Added new invoice relations 3/29/26
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   load: one(loads, { fields: [invoices.loadId], references: [loads.id] }),
@@ -530,6 +562,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   approvedByUser: one(users, { fields: [invoices.approvedBy], references: [users.id] }),
   assignedToUser: one(users, { fields: [invoices.assignedTo], references: [users.id] }),
   documents: many(documents),
+  agingAlerts: many(invoiceAgingAlerts),
 }));
 
 export const invoiceStatusHistoryRelations = relations(invoiceStatusHistory, ({ one }) => ({
@@ -1256,7 +1289,7 @@ export const brokerFollowUpReminders = pgTable("broker_follow_up_reminders", {
   scheduledSendAt: timestamp("scheduled_send_at").notNull(),
   actualSendAt: timestamp("actual_send_at"),
   status: varchar("status", {
-    enum: ["scheduled", "sent", "skipped", "paused", "canceled"],
+    enum: ["scheduled", "sending", "sent", "skipped", "paused", "canceled"],
   }).default("scheduled").notNull(),
   skipReason: varchar("skip_reason"),
   stopReason: varchar("stop_reason"),
@@ -1265,6 +1298,8 @@ export const brokerFollowUpReminders = pgTable("broker_follow_up_reminders", {
   body: text("body").notNull(),
   sendgridMessageId: text("sendgrid_message_id"),
   deliveryStatus: varchar("delivery_status").default("pending"),
+  editedAt: timestamp("edited_at"),
+  editedBy: varchar("edited_by").references(() => users.id),
   // deliveryStatus values: pending | delivered | bounced | failed | spam | unsubscribed
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

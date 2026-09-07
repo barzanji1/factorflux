@@ -142,6 +142,9 @@ export async function startServer(
   import("./services/brokerFollowUpEngine")
     .then(m => m.startReminderScheduler())
     .catch(e => console.warn("[reminderScheduler] startup error:", e?.message));
+  import("./services/invoiceAgingEngine")
+    .then(m => m.startInvoiceAgingScheduler())
+    .catch(e => console.warn("[agingScheduler] startup error:", e?.message));
 
   import("./services/seedTemplates").then(m => m.seedDefaultTemplates()).catch(e =>
     console.warn("[templateSeed] error:", e?.message)

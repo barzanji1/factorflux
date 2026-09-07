@@ -126,6 +126,10 @@ export default function Dashboard() {
   // ── Queries ──────────────────────────────────────────────────────────────
 
   const { data: invoices    = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: agingAlerts = [] } = useQuery<Array<{ alertType: "day_60" | "day_90" }>>({
+    queryKey: ["/api/invoices/aging-alerts", "pending"],
+    queryFn: () => fetch("/api/invoices/aging-alerts?view=pending", { credentials: "include" }).then(r => r.json()),
+  });
   const { data: activities  = [] } = useQuery<Activity[]>({ queryKey: ["/api/dashboard/recent-activities"] });
   const { data: exceptions  = [] } = useQuery<Exception[]>({ queryKey: ["/api/exceptions"] });
   const { data: stats } = useQuery<{
@@ -219,6 +223,15 @@ export default function Dashboard() {
       level: openExceptions.length > 0 ? "critical" : "neutral",
       icon: AlertCircle,
       pulse: openExceptions.length > 0,
+    },
+    {
+      label: "Aging Invoices",
+      value: new Set(agingAlerts.map(a => a.invoiceId)).size,
+      sub: `${new Set(agingAlerts.map(a => a.invoiceId)).size} at 60+ · ${new Set(agingAlerts.filter(a => a.alertType === "day_90").map(a => a.invoiceId)).size} at 90+`,
+      href: "/factoring#aging-alerts",
+      level: agingAlerts.some(a => a.alertType === "day_90") ? "critical" : agingAlerts.length ? "warn" : "neutral",
+      icon: Clock3,
+      pulse: agingAlerts.length > 0,
     },
     {
       label: "Funded Today",

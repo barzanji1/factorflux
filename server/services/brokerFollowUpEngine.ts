@@ -605,6 +605,14 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
   let skipped = 0;
   let stopped = 0;
 
+  // Recover reminders left in-flight if a worker stopped after claiming one.
+  await db.update(brokerFollowUpReminders)
+    .set({ status: "scheduled", updatedAt: now })
+    .where(and(
+      eq(brokerFollowUpReminders.status, "sending"),
+      lte(brokerFollowUpReminders.updatedAt, new Date(now.getTime() - 30 * 60 * 1000)),
+    ));
+
   // Fetch due reminders with their parent follow-up data
   const dueReminders = await db
     .select({
@@ -648,6 +656,16 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
       continue;
     }
 
+    // Claim atomically so overlapping scheduler/admin runs cannot send twice.
+    const [claimed] = await db.update(brokerFollowUpReminders)
+      .set({ status: "sending", updatedAt: new Date() })
+      .where(and(
+        eq(brokerFollowUpReminders.id, r.reminderId),
+        eq(brokerFollowUpReminders.status, "scheduled"),
+      ))
+      .returning({ id: brokerFollowUpReminders.id });
+    if (!claimed) continue;
+
     // ── Try to send email ──────────────────────────────────────────────────────
     let emailSent  = false;
     let messageId: string | undefined;
@@ -680,7 +698,10 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
         deliveryStatus:    messageId ? "pending" : "sent",
         updatedAt:         new Date(),
       })
-      .where(eq(brokerFollowUpReminders.id, r.reminderId));
+      .where(and(
+        eq(brokerFollowUpReminders.id, r.reminderId),
+        eq(brokerFollowUpReminders.status, "sending"),
+      ));
 
     // Write audit event
     try {

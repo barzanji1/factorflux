@@ -1,0 +1,1 @@
+- [Safe schema pushes](safe-schema-pushes.md) — drizzle push may propose unrelated destructive ID conversions; never approve truncation and apply additive changes explicitly.
