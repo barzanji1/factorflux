@@ -1,6 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Badge } from "@/components/ui/badge";
@@ -424,6 +424,17 @@ export default function InvoiceDetail() {
   const [fundTransition, setFundTransition] = useState<AvailableTransition | null>(null);
   const [fundMethod, setFundMethod] = useState<"ach" | "wire">("ach");
   const [fundBankAccountId, setFundBankAccountId] = useState("");
+  const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH" });
+
+  const { data: detail, isLoading: detailLoading } = useQuery<any>({
+    queryKey: ["/api/invoices", invoiceId, "detail"],
+    queryFn: async () => {
+      const r = await fetch(`/api/invoices/${invoiceId}/detail`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to fetch detail");
+      return r.json();
+    },
+    enabled: !isNaN(invoiceId),
+  });
   const carrierId = detail?.client?.id ?? detail?.clientId;
   const { data: carrierBankAccounts = [], isLoading: bankAccountsLoading } = useQuery<any[]>({
     queryKey: ["/api/carriers", carrierId, "bank-accounts"],
@@ -438,17 +449,6 @@ export default function InvoiceDetail() {
     if (carrierBankAccounts.length === 1) setFundBankAccountId(String(carrierBankAccounts[0].id));
     if (carrierBankAccounts.length === 0) setFundBankAccountId("");
   }, [carrierBankAccounts]);
-  const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH" });
-
-  const { data: detail, isLoading: detailLoading } = useQuery<any>({
-    queryKey: ["/api/invoices", invoiceId, "detail"],
-    queryFn: async () => {
-      const r = await fetch(`/api/invoices/${invoiceId}/detail`, { credentials: "include" });
-      if (!r.ok) throw new Error("Failed to fetch detail");
-      return r.json();
-    },
-    enabled: !isNaN(invoiceId),
-  });
 
   const { data: timeline, isLoading: timelineLoading } = useQuery<any[]>({
     queryKey: ["/api/invoices", invoiceId, "timeline"],
