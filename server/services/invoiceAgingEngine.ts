@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull, notInArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lte, notInArray, or } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { clients, debtors, eventLedger, invoiceAgingAlerts, invoices, invoiceStatusHistory, notifications, users } from "@shared/schema";
@@ -44,10 +44,11 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
   const funded = await db.select({
     id: invoices.id, invoiceNumber: invoices.invoiceNumber, fundedAt: invoices.fundedAt,
     clientName: clients.name, brokerName: debtors.name,
+    chargebackStatus: invoices.chargebackStatus, chargebackDate: invoices.chargebackDate,
   }).from(invoices)
     .leftJoin(clients, eq(invoices.clientId, clients.id))
     .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
-    .where(and(isNotNull(invoices.fundedAt), notInArray(invoices.status, ["paid", "settled"] as any[])));
+    .where(and(isNotNull(invoices.fundedAt), notInArray(invoices.status, ["paid", "settled", "collected"] as any[])));
   const recipients = await db.select({ id: users.id }).from(users)
     .where(and(eq(users.status, "active"), inArray(users.role, ["employee", "manager", "admin"])));
 
@@ -93,6 +94,42 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
           entityType: "invoice", entityId: invoice.id, eventType: "invoice_aging_alert_triggered",
           actorType: "system", actorId: "system", payloadJson: { alertType, days, alertId: alert.id },
         });
+      }
+    }
+
+    const carrier = invoice.clientName ?? "Carrier";
+    const broker = invoice.brokerName ?? "Broker";
+    const extensionStillActive = invoice.chargebackStatus === "extended" && invoice.chargebackDate && invoice.chargebackDate > now;
+    if (days >= 90 && !extensionStillActive) {
+      const [changed] = await db.update(invoices).set({
+        chargebackStatus: "charged", chargebackDate: invoice.fundedAt
+          ? new Date(invoice.fundedAt.getTime() + 90 * DAY_MS) : now, updatedAt: now,
+      }).where(and(eq(invoices.id, invoice.id), notInArray(invoices.chargebackStatus, ["charged"] as any[]), or(
+        notInArray(invoices.chargebackStatus, ["extended"] as any[]),
+        lte(invoices.chargebackDate, now),
+      ))).returning({ id: invoices.id });
+      if (changed) {
+        for (const user of recipients) await storage.createNotification({
+          userId: user.id, title: "Chargeback Applied",
+          message: `Invoice ${invoice.invoiceNumber} for ${carrier} has been charged back — 90 days with no payment from ${broker}`,
+          type: "error", entityType: "invoice", entityId: invoice.id, actionUrl: `/invoices/${invoice.id}`,
+          metadata: JSON.stringify({ category: "chargeback", severity: "red", status: "charged" }),
+        } as any);
+        await db.insert(eventLedger).values({ entityType: "invoice", entityId: invoice.id, eventType: "chargeback_applied", actorType: "system", actorId: "system", payloadJson: { days, broker } });
+      }
+    } else if (days >= 60) {
+      const chargebackDate = new Date(invoice.fundedAt!.getTime() + 60 * DAY_MS);
+      const [changed] = await db.update(invoices).set({
+        chargebackStatus: "scheduled", chargebackDate, updatedAt: now,
+      }).where(and(eq(invoices.id, invoice.id), eq(invoices.chargebackStatus, "none"))).returning({ id: invoices.id });
+      if (changed) {
+        for (const user of recipients) await storage.createNotification({
+          userId: user.id, title: "Scheduled for Chargeback",
+          message: `Invoice ${invoice.invoiceNumber} for ${carrier} has been scheduled for chargeback — 60 days with no payment from ${broker}`,
+          type: "warning", entityType: "invoice", entityId: invoice.id, actionUrl: `/invoices/${invoice.id}`,
+          metadata: JSON.stringify({ category: "chargeback", severity: "amber", status: "scheduled" }),
+        } as any);
+        await db.insert(eventLedger).values({ entityType: "invoice", entityId: invoice.id, eventType: "chargeback_scheduled", actorType: "system", actorId: "system", payloadJson: { days, chargebackDate, broker } });
       }
     }
   }

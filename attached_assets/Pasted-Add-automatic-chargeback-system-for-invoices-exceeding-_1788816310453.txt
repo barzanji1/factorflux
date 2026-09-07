@@ -1,0 +1,39 @@
+Add automatic chargeback system for invoices exceeding 60 days with agent override capability.
+
+Database
+
+ Add to invoices table: chargebackDate (timestamp), chargebackStatus (none/scheduled/extended/charged), chargebackExtendedBy (userId), chargebackExtendedAt (timestamp), chargebackExtensionReason (text), chargebackExtensionDate (timestamp)
+ Run db:push
+
+Backend — Chargeback Engine
+
+ Add to the existing daily aging scheduler — when an invoice hits 60 days since fundedAt:
+Set chargebackStatus to scheduled
+Set chargebackDate to 60 days from fundedAt
+Create internal notification to all agents and managers: "Invoice [#] for [Carrier] has been scheduled for chargeback — 60 days with no payment from [Broker]"
+Log to audit trail
+ At 90 days: set chargebackStatus to charged, notify agents urgently
+ POST /api/invoices/:id/extend-chargeback — agent extends chargeback date
+Requires: extensionDate (new date), reason (text)
+Role: employee, manager, admin all allowed
+Logs extension to audit trail with who extended and why
+Updates chargebackStatus to extended
+ GET /api/invoices/chargebacks — returns all invoices with chargeback status scheduled/extended/charged
+
+Frontend — Chargeback Management
+
+ On invoice detail page — show a Chargeback section when invoice is 60+ days old:
+Status badge: Scheduled / Extended / Charged
+Chargeback date
+Extend Chargeback button — opens modal with new date picker and reason field
+Extension history: who extended, when, new date, reason
+ Add Chargebacks tab to the invoice detail page alongside Overview, Doc Checklist, etc.
+ On the Dashboard add a Chargebacks widget showing: scheduled count, extended count, charged count
+ On the Factoring page add a Chargebacks filter tab showing all invoices with active chargebacks
+
+Notifications
+
+ At 60 days: amber internal notification — "Scheduled for chargeback"
+ At 90 days: red urgent notification — "Chargeback applied"
+ When extended: green notification — "Chargeback extended by [Agent] to [New Date]"
+ All appear in the notification bell

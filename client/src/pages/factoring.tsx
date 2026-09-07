@@ -60,6 +60,7 @@ const QUEUE_TABS = [
   { id: "under_review", label: "Under Review",   statuses: ["under_review"],                dot: "bg-violet-500" },
   { id: "approved",     label: "Approved",       statuses: ["approved"],                    dot: "bg-emerald-500" },
   { id: "funded",       label: "Funded",         statuses: ["funded", "settled", "paid"],   dot: "bg-emerald-600" },
+  { id: "chargebacks",   label: "Chargebacks",    statuses: null,                             dot: "bg-orange-600" },
   { id: "held",         label: "Held",           statuses: ["rejected"],                    dot: "bg-red-500" },
 ] as const;
 
@@ -81,6 +82,7 @@ const ROW_ACTIONS: Record<QTabId, RowAction[]> = {
   ],
   approved: [{ label: "Fund", tid: "fund" }],
   funded:   [],
+  chargebacks: [],
   held:     [],
 };
 
@@ -94,6 +96,7 @@ const BULK_ACTIONS: Record<QTabId, Array<{ label: string; tid: TransId; needsRea
   ],
   approved: [{ label: "Fund All", tid: "fund" }],
   funded:   [],
+  chargebacks: [],
   held:     [],
 };
 
@@ -122,7 +125,8 @@ export default function Factoring() {
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: invoices.length };
     for (const t of QUEUE_TABS) {
-      if (t.statuses) c[t.id] = invoices.filter(i => (t.statuses as readonly string[]).includes(i.status)).length;
+      if (t.id === "chargebacks") c[t.id] = invoices.filter(i => ["scheduled", "extended", "charged"].includes((i as any).chargebackStatus)).length;
+      else if (t.statuses) c[t.id] = invoices.filter(i => (t.statuses as readonly string[]).includes(i.status)).length;
     }
     return c;
   }, [invoices]);
@@ -133,7 +137,9 @@ export default function Factoring() {
   // ── Visible rows ─────────────────────────────────────────────────
   const rows = useMemo(() => {
     const tab = QUEUE_TABS.find(t => t.id === activeTab)!;
-    let items = tab.statuses
+    let items = activeTab === "chargebacks"
+      ? invoices.filter(i => ["scheduled", "extended", "charged"].includes((i as any).chargebackStatus))
+      : tab.statuses
       ? invoices.filter(i => (tab.statuses as readonly string[]).includes(i.status))
       : invoices;
     if (search.trim()) {

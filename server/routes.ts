@@ -62,6 +62,7 @@ import {
   loads,
   brokerFollowUps,
   invoiceAgingAlerts,
+  notifications,
   debtors,
   paymentApplicationLines,
   cashApplications,
@@ -1963,6 +1964,56 @@ ${message}
     } catch (error) { console.error("Error acknowledging aging alert:", error); res.status(500).json({ message: "Failed to acknowledge aging alert" }); }
   });
 
+  app.get("/api/invoices/chargebacks", requireAuth, async (_req, res) => {
+    try {
+      const rows = await db.select({
+        invoice: invoices, carrierName: clients.name, brokerName: debtors.name,
+      }).from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .where(inArray(invoices.chargebackStatus, ["scheduled", "extended", "charged"] as any[]))
+        .orderBy(desc(invoices.chargebackDate));
+      res.json(rows.map(r => ({ ...r.invoice, carrierName: r.carrierName, brokerName: r.brokerName })));
+    } catch (error) {
+      console.error("Error fetching chargebacks:", error);
+      res.status(500).json({ message: "Failed to fetch chargebacks" });
+    }
+  });
+
+  app.post("/api/invoices/:id/extend-chargeback", requireAuth, async (req: any, res) => {
+    try {
+      if (!["employee", "manager", "admin"].includes(req.user?.role)) return res.status(403).json({ message: "Agent access required" });
+      const id = Number(req.params.id);
+      const body = z.object({ extensionDate: z.string().min(1), reason: z.string().trim().min(3) }).parse(req.body);
+      const extensionDate = new Date(body.extensionDate);
+      if (Number.isNaN(extensionDate.getTime()) || extensionDate <= new Date()) return res.status(400).json({ message: "Extension date must be in the future" });
+      const [invoice] = await db.update(invoices).set({
+        chargebackStatus: "extended", chargebackDate: extensionDate,
+        chargebackExtensionDate: extensionDate, chargebackExtensionReason: body.reason,
+        chargebackExtendedBy: req.user.id, chargebackExtendedAt: new Date(), updatedAt: new Date(),
+      }).where(and(eq(invoices.id, id), inArray(invoices.chargebackStatus, ["scheduled", "extended"] as any[]))).returning();
+      if (!invoice) return res.status(404).json({ message: "Active scheduled chargeback not found" });
+      const recipients = await db.select({ id: users.id }).from(users).where(and(eq(users.status, "active"), inArray(users.role, ["employee", "manager", "admin"])));
+      const agentName = req.user.name || req.user.username || "Agent";
+      for (const user of recipients) await storage.createNotification({
+        userId: user.id, title: "Chargeback Extended",
+        message: `Chargeback for invoice ${invoice.invoiceNumber} extended by ${agentName} to ${extensionDate.toLocaleDateString()}`,
+        type: "success", entityType: "invoice", entityId: id, actionUrl: `/invoices/${id}`,
+        metadata: JSON.stringify({ category: "chargeback", severity: "green", status: "extended" }),
+      } as any);
+      await db.insert(eventLedger).values({
+        entityType: "invoice", entityId: id, eventType: "chargeback_extended", actorType: "user", actorId: req.user.id,
+        payloadJson: { extensionDate, reason: body.reason, agentName },
+      });
+      await storage.createActivity({ userId: req.user.id, type: "chargeback_extended", description: `Extended chargeback for ${invoice.invoiceNumber} to ${extensionDate.toLocaleDateString()}: ${body.reason}`, entityType: "invoice", entityId: id } as any);
+      res.json(invoice);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
+      console.error("Error extending chargeback:", error);
+      res.status(500).json({ message: "Failed to extend chargeback" });
+    }
+  });
+
   // ─── Document Rules (admin-configurable checklist) ───────────────────────
   app.get("/api/document-rules", requireAuth, async (_req, res) => {
     try { res.json(await storage.getDocumentRules()); }
@@ -2400,7 +2451,7 @@ ${message}
   // Notifications
   app.get("/api/notifications", requireAuth, async (req: any, res) => {
     try {
-      const userId = "1";
+      const userId = req.user.id;
       const limit = parseInt(req.query.limit as string, 10) || 20;
       const notifications = await storage.getNotifications(userId, limit);
       res.json(notifications);
@@ -2410,9 +2461,9 @@ ${message}
     }
   });
 
-  app.get("/api/notifications/unread-count", requireAuth, async (_req: any, res) => {
+  app.get("/api/notifications/unread-count", requireAuth, async (req: any, res) => {
     try {
-      const count = await storage.getUnreadNotificationCount("1");
+      const count = await storage.getUnreadNotificationCount(req.user.id);
       res.json({ count });
     } catch (error) {
       console.error("Error fetching unread notification count:", error);
@@ -2423,6 +2474,9 @@ ${message}
   app.patch("/api/notifications/:id/read", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const [owned] = await db.select({ id: notifications.id }).from(notifications)
+        .where(and(eq(notifications.id, id), eq(notifications.userId, req.user.id))).limit(1);
+      if (!owned) return res.status(404).json({ message: "Notification not found" });
       await storage.markNotificationAsRead(id);
       res.json({ message: "Notification marked as read" });
     } catch (error) {
@@ -2431,9 +2485,9 @@ ${message}
     }
   });
 
-  app.patch("/api/notifications/mark-all-read", requireAuth, async (_req: any, res) => {
+  app.patch("/api/notifications/mark-all-read", requireAuth, async (req: any, res) => {
     try {
-      await storage.markAllNotificationsAsRead("1");
+      await storage.markAllNotificationsAsRead(req.user.id);
       res.json({ message: "All notifications marked as read" });
     } catch (error) {
       console.error("Error marking all notifications as read:", error);

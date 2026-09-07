@@ -424,6 +424,9 @@ export default function InvoiceDetail() {
   const [fundTransition, setFundTransition] = useState<AvailableTransition | null>(null);
   const [fundMethod, setFundMethod] = useState<"ach" | "wire">("ach");
   const [fundBankAccountId, setFundBankAccountId] = useState("");
+  const [chargebackDialogOpen, setChargebackDialogOpen] = useState(false);
+  const [chargebackExtensionDate, setChargebackExtensionDate] = useState("");
+  const [chargebackReason, setChargebackReason] = useState("");
   const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH", bankAccountId: "" });
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
@@ -515,6 +518,20 @@ export default function InvoiceDetail() {
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
     },
     onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
+  const extendChargebackMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/invoices/${invoiceId}/extend-chargeback`, {
+      extensionDate: chargebackExtensionDate, reason: chargebackReason,
+    })).json(),
+    onSuccess: () => {
+      toast({ title: "Chargeback extended" });
+      setChargebackDialogOpen(false); setChargebackExtensionDate(""); setChargebackReason("");
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "timeline"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices/chargebacks"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+    },
+    onError: (e: any) => toast({ title: "Unable to extend chargeback", description: e.message, variant: "destructive" }),
   });
 
   const reviewMutation = useMutation({
@@ -714,6 +731,7 @@ export default function InvoiceDetail() {
                           { value: "documents",   label: "Documents",     icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length },
                           { value: "payout",      label: "Payout",        icon: <Banknote className="h-3.5 w-3.5" /> },
                           { value: "collections", label: "Collections",   icon: <CreditCard className="h-3.5 w-3.5" />,  count: detail.collections?.length },
+                          { value: "chargeback",  label: "Chargeback",    icon: <AlertTriangle className="h-3.5 w-3.5" />, alert: ["scheduled", "extended", "charged"].includes(detail.chargebackStatus) },
                           { value: "cashapp",     label: "Cash Applied",  icon: <DollarSign className="h-3.5 w-3.5" />,  count: detail.cashAppLines?.length },
                           { value: "exceptions",  label: "Exceptions",    icon: <ShieldAlert className="h-3.5 w-3.5" />, count: detail.exceptions?.length },
                           { value: "timeline",    label: "Timeline",      icon: <Activity className="h-3.5 w-3.5" /> },
@@ -998,6 +1016,34 @@ export default function InvoiceDetail() {
                               </div>
                             </div>
                           )}
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="chargeback" className="p-6">
+                      {!["scheduled", "extended", "charged"].includes(detail.chargebackStatus) ? (
+                        <EmptyTabState icon={<AlertTriangle className="h-7 w-7" />} label="No active chargeback for this invoice" />
+                      ) : (
+                        <div className="space-y-5">
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-900/50 dark:bg-orange-950/20">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Chargeback Status</p>
+                              <Badge className={cn("mt-2 capitalize", detail.chargebackStatus === "charged" ? "bg-red-600" : detail.chargebackStatus === "extended" ? "bg-emerald-600" : "bg-amber-600")}>{detail.chargebackStatus}</Badge>
+                              <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">Chargeback date: <strong>{fmtDate(detail.chargebackDate)}</strong></p>
+                            </div>
+                            <Button onClick={() => setChargebackDialogOpen(true)} disabled={detail.chargebackStatus === "charged"}>Extend Chargeback</Button>
+                          </div>
+                          {detail.chargebackExtensionReason && <div className="rounded-xl border p-4 text-sm">
+                            <p className="font-semibold">Latest Extension</p>
+                            <p className="mt-1 text-slate-500">Extended {fmtDate(detail.chargebackExtendedAt)} to {fmtDate(detail.chargebackExtensionDate)}</p>
+                            <p className="mt-2">{detail.chargebackExtensionReason}</p>
+                          </div>}
+                          <div>
+                            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Extension History</h3>
+                            {(timeline ?? []).filter((event: any) => event.title === "chargeback extended").length ? (
+                              <div className="space-y-2">{(timeline ?? []).filter((event: any) => event.title === "chargeback extended").map((event: any, index: number) => <div key={event.id ?? index} className="rounded-xl border p-3 text-sm"><p>Extended by {event.meta?.agentName || "Agent"} to {fmtDate(event.meta?.extensionDate)}</p><p className="mt-1">{event.meta?.reason}</p><p className="text-xs text-slate-400">{fmtDate(event.timestamp)}</p></div>)}</div>
+                            ) : <p className="text-sm text-slate-400">No extension history.</p>}
+                          </div>
                         </div>
                       )}
                     </TabsContent>
@@ -1462,6 +1508,16 @@ export default function InvoiceDetail() {
             </div>}
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button onClick={() => editMutation.mutate()} disabled={!editValues.amount || editMutation.isPending || (["ACH", "Wire"].includes(editValues.paymentType) && !editValues.bankAccountId)}>Save Changes</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={chargebackDialogOpen} onOpenChange={setChargebackDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Extend Chargeback</DialogTitle><DialogDescription>Choose a new future chargeback date and provide the reason for the extension.</DialogDescription></DialogHeader>
+          <div className="space-y-4">
+            <div><label className="text-sm font-medium">New Chargeback Date</label><Input type="date" min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)} value={chargebackExtensionDate} onChange={e => setChargebackExtensionDate(e.target.value)} /></div>
+            <div><label className="text-sm font-medium">Reason</label><Textarea value={chargebackReason} onChange={e => setChargebackReason(e.target.value)} placeholder="Explain why the chargeback should be extended" /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setChargebackDialogOpen(false)}>Cancel</Button><Button onClick={() => extendChargebackMutation.mutate()} disabled={!chargebackExtensionDate || chargebackReason.trim().length < 3 || extendChargebackMutation.isPending}>Confirm Extension</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

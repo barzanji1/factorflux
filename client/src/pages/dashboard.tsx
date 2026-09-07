@@ -8,7 +8,7 @@ import TimeClock from "@/components/time-tracking/time-clock";
 import type { Invoice, Activity, Exception } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import {
-  AlertCircle, ArrowRight, CheckCircle2, Clock3,
+  AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, Clock3,
   FileText, DollarSign, ShieldAlert, FileX,
   Upload, UserPlus, Activity as ActivityIcon,
   TrendingUp, RotateCcw, ChevronRight,
@@ -126,9 +126,12 @@ export default function Dashboard() {
   // ── Queries ──────────────────────────────────────────────────────────────
 
   const { data: invoices    = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
-  const { data: agingAlerts = [] } = useQuery<Array<{ alertType: "day_60" | "day_90" }>>({
+  const { data: agingAlerts = [] } = useQuery<Array<{ invoiceId: number; alertType: "day_60" | "day_90" }>>({
     queryKey: ["/api/invoices/aging-alerts", "pending"],
     queryFn: () => fetch("/api/invoices/aging-alerts?view=pending", { credentials: "include" }).then(r => r.json()),
+  });
+  const { data: chargebacks = [] } = useQuery<Array<{ chargebackStatus: "scheduled" | "extended" | "charged" }>>({
+    queryKey: ["/api/invoices/chargebacks"],
   });
   const { data: activities  = [] } = useQuery<Activity[]>({ queryKey: ["/api/dashboard/recent-activities"] });
   const { data: exceptions  = [] } = useQuery<Exception[]>({ queryKey: ["/api/exceptions"] });
@@ -232,6 +235,15 @@ export default function Dashboard() {
       level: agingAlerts.some(a => a.alertType === "day_90") ? "critical" : agingAlerts.length ? "warn" : "neutral",
       icon: Clock3,
       pulse: agingAlerts.length > 0,
+    },
+    {
+      label: "Chargebacks",
+      value: chargebacks.length,
+      sub: `${chargebacks.filter(c => c.chargebackStatus === "scheduled").length} scheduled · ${chargebacks.filter(c => c.chargebackStatus === "extended").length} extended · ${chargebacks.filter(c => c.chargebackStatus === "charged").length} charged`,
+      href: "/factoring",
+      level: chargebacks.some(c => c.chargebackStatus === "charged") ? "critical" : chargebacks.length ? "warn" : "neutral",
+      icon: AlertTriangle,
+      pulse: chargebacks.some(c => c.chargebackStatus === "charged"),
     },
     {
       label: "Funded Today",
