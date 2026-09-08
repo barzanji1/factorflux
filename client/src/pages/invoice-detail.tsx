@@ -22,6 +22,7 @@ import {
   ExternalLink, FileCheck, ReceiptText, Banknote, ShieldAlert, Activity,
   ChevronRight, ArrowRight, Lock, TriangleAlert, Zap, XCircle, Info,
   PlayCircle, ClipboardCheck, MessageSquare, Pencil, ShieldCheck,
+  Eye, Download, Loader2, Upload,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -437,6 +438,7 @@ export default function InvoiceDetail() {
   const [chargebackDialogOpen, setChargebackDialogOpen] = useState(false);
   const [chargebackExtensionDate, setChargebackExtensionDate] = useState("");
   const [chargebackReason, setChargebackReason] = useState("");
+  const [uploadingDocumentType, setUploadingDocumentType] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH", bankAccountId: "" });
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
@@ -571,6 +573,42 @@ export default function InvoiceDetail() {
     },
     onError: () => toast({ title: "Could not update document type", variant: "destructive" }),
   });
+
+  const refreshPaperwork = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] }),
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] }),
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "available-transitions"] }),
+    ]);
+  };
+
+  const choosePaperworkFile = (type: string, label: string, existingDocument?: any) => {
+    if (existingDocument && !window.confirm(`Replace existing ${label}?`)) return;
+    document.getElementById(`paperwork-upload-${type}`)?.click();
+  };
+
+  const uploadPaperworkFile = async (type: string, label: string, file: File, existingDocument?: any) => {
+    setUploadingDocumentType(type);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("documentType", type);
+      await apiRequest("POST", `/api/invoices/${invoiceId}/documents`, formData);
+      if (existingDocument) {
+        await apiRequest("DELETE", `/api/documents/${existingDocument.id}`);
+      }
+      await refreshPaperwork();
+      toast({ title: existingDocument ? `${label} replaced` : `${label} uploaded` });
+    } catch (error: any) {
+      toast({
+        title: `Unable to upload ${label}`,
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDocumentType(null);
+    }
+  };
 
   const transitionMutation = useMutation({
     mutationFn: async ({ transitionId, reason, force, paymentMethod, bankAccountVaultId }: { transitionId: string; reason?: string; force?: boolean; paymentMethod?: "ach" | "wire"; bankAccountVaultId?: number }) => {
@@ -1199,19 +1237,86 @@ export default function InvoiceDetail() {
                     {/* Documents */}
                     <TabsContent value="paperwork" className="p-6">
                       <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                           {[
-                            ["bill_of_lading", "BOL"], ["rate_confirmation", "Rate Con"],
+                            ["bol", "BOL"], ["rate_confirmation", "Rate Con"],
                             ["lumper_receipt", "Lumper"], ["invoice", "Invoice"],
                             ["noa", "NOA"], ["release_letter", "Release Letter"], ["other", "Other"],
                           ].map(([type, label]) => {
                             const rule = docStatus?.rules?.find((r: any) => r.documentType === type);
                             const doc = detail.documents?.find((d: any) => d.documentType === type || d.finalDocumentType === type);
                             const present = !!rule?.present || !!doc;
-                            return <div key={type} className={cn("flex items-center gap-2 rounded-[3px] border-2 px-2.5 py-2", present ? "border-[#6aa36a] bg-[#e8f5e8]" : "border-[#c66] bg-[#fff0f0]")}>
-                              <FileText className={cn("h-5 w-5", present ? "text-[#168044]" : "text-[#b3261e]")} />
-                              <div className="min-w-0"><p className="truncate text-xs font-bold">{label}</p><p className={cn("text-[10px] font-semibold", present ? "text-[#168044]" : "text-[#b3261e]")}>{present ? "Uploaded" : "Missing"}</p></div>
-                            </div>;
+                            const uploading = uploadingDocumentType === type;
+                            return (
+                              <div key={type}>
+                                <input
+                                  id={`paperwork-upload-${type}`}
+                                  type="file"
+                                  className="hidden"
+                                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    event.target.value = "";
+                                    if (file) uploadPaperworkFile(type, label, file, doc);
+                                  }}
+                                />
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => doc
+                                    ? window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer")
+                                    : choosePaperworkFile(type, label)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.preventDefault();
+                                      doc
+                                        ? window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer")
+                                        : choosePaperworkFile(type, label);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "group min-h-[132px] cursor-pointer rounded-xl border-2 p-3 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                                    present
+                                      ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500 hover:shadow-sm"
+                                      : "border-red-300 bg-red-50 hover:border-red-500 hover:shadow-sm",
+                                  )}
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", present ? "bg-emerald-100" : "bg-red-100")}>
+                                      {uploading
+                                        ? <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                                        : <FileText className={cn("h-5 w-5", present ? "text-emerald-700" : "text-red-700")} />}
+                                    </div>
+                                    {present && doc && !uploading && (
+                                      <div className="flex items-center gap-1">
+                                        <button type="button" title={`View ${label}`}
+                                          onClick={(event) => { event.stopPropagation(); window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer"); }}
+                                          className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-100">
+                                          <Eye className="h-4 w-4" />
+                                        </button>
+                                        <a title={`Download ${label}`} href={`/api/documents/${doc.id}/download`}
+                                          onClick={(event) => event.stopPropagation()}
+                                          className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-100">
+                                          <Download className="h-4 w-4" />
+                                        </a>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="mt-2 truncate text-xs font-bold text-slate-900">{label}</p>
+                                  <p className={cn("text-[11px] font-semibold", present ? "text-emerald-700" : "text-red-700")}>
+                                    {uploading ? "Uploading..." : present ? "Uploaded" : "Missing"}
+                                  </p>
+                                  {doc && <p className="mt-1 truncate text-[10px] text-slate-500" title={doc.originalName}>{doc.originalName}</p>}
+                                  {present && doc && !uploading && (
+                                    <button type="button"
+                                      onClick={(event) => { event.stopPropagation(); choosePaperworkFile(type, label, doc); }}
+                                      className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:underline">
+                                      <Upload className="h-3 w-3" />Replace
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
                           })}
                         </div>
                         {docStatus && <div className={cn("flex flex-wrap items-center justify-between gap-3 rounded-[3px] border-2 px-3 py-2 text-xs", docStatus.canApprove ? "border-[#6aa36a] bg-[#e8f5e8] text-[#166534]" : "border-[#c99a42] bg-[#fff8df] text-[#7a5100]")}>
