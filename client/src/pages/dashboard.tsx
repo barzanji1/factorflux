@@ -125,22 +125,35 @@ export default function Dashboard() {
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
-  const { data: invoices    = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
-  const { data: agingAlerts = [] } = useQuery<Array<{ invoiceId: number; alertType: "day_60" | "day_90" }>>({
+  const { data: invoicesData } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: agingAlertsData } = useQuery<Array<{ invoiceId: number; alertType: "day_60" | "day_90" }>>({
     queryKey: ["/api/invoices/aging-alerts", "pending"],
-    queryFn: () => fetch("/api/invoices/aging-alerts?view=pending", { credentials: "include" }).then(r => r.json()),
+    queryFn: async () => {
+      const response = await fetch("/api/invoices/aging-alerts?view=pending", { credentials: "include" });
+      if (!response.ok) throw new Error(`Failed to load aging alerts (${response.status})`);
+      return response.json();
+    },
   });
-  const { data: chargebacks = [] } = useQuery<Array<{ chargebackStatus: "scheduled" | "extended" | "charged" }>>({
+  const { data: chargebacksData } = useQuery<Array<{ chargebackStatus: "scheduled" | "extended" | "charged" }>>({
     queryKey: ["/api/invoices/chargebacks"],
   });
-  const { data: activities  = [] } = useQuery<Activity[]>({ queryKey: ["/api/dashboard/recent-activities"] });
-  const { data: exceptions  = [] } = useQuery<Exception[]>({ queryKey: ["/api/exceptions"] });
+  const { data: activitiesData } = useQuery<Activity[]>({ queryKey: ["/api/dashboard/recent-activities"] });
+  const { data: exceptionsData } = useQuery<Exception[]>({ queryKey: ["/api/exceptions"] });
   const { data: stats } = useQuery<{
     pendingInvoices: number;
     processedToday: number;
     totalRevenue: string;
     activeClients: number;
   }>({ queryKey: ["/api/dashboard/stats"] });
+
+  // A stale locally cached session can briefly render this page while the API
+  // returns a 401 response object. Keep collection rendering safe until auth
+  // verification redirects the user to sign in.
+  const invoices = Array.isArray(invoicesData) ? invoicesData : [];
+  const agingAlerts = Array.isArray(agingAlertsData) ? agingAlertsData : [];
+  const chargebacks = Array.isArray(chargebacksData) ? chargebacksData : [];
+  const activities = Array.isArray(activitiesData) ? activitiesData : [];
+  const exceptions = Array.isArray(exceptionsData) ? exceptionsData : [];
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
