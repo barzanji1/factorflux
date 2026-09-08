@@ -1735,9 +1735,9 @@ ${message}
 
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
-      const invoiceData = insertInvoiceSchema.parse(req.body);
       // Always generate a unique invoice number server-side to prevent collisions
       const invoiceNumber = await storage.getNextInvoiceNumber();
+      const invoiceData = insertInvoiceSchema.parse({ ...req.body, invoiceNumber });
       const {
         status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,
         fundedAt, heldReason, heldAt, heldBy, heldNotes, previousStatus,
