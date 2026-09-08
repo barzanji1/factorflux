@@ -66,6 +66,7 @@ import {
   debtors,
   paymentApplicationLines,
   cashApplications,
+  exceptions,
   dispatchers,
   insertDispatcherSchema,
   trucks,
@@ -217,6 +218,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     req.user = user;
     next();
+  };
+
+  const requireReportsPermission = async (req: any, res: any, next: any) => {
+    const user = (req.session as any)?.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+    if (user.role === "admin") { req.user = user; return next(); }
+    try {
+      const stored = await storage.getUserPermissions(user.id);
+      const permissions = stored.length ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee);
+      if (!(permissions as readonly string[]).includes("reports")) return res.status(403).json({ message: "Reports permission required" });
+      req.user = user;
+      next();
+    } catch {
+      res.status(500).json({ message: "Unable to verify reports permission" });
+    }
   };
 
   const employeeCanAccessInvoice = async (req: any, invoiceId: number) => {
@@ -5342,6 +5358,330 @@ Trucking Pros Financial Team
 
   const inReportRange = (date: Date | null, range: { start?: Date; end?: Date }) =>
     !!date && (!range.start || date >= range.start) && (!range.end || date <= range.end);
+
+  // Global reports deliberately use a small, presentation-neutral contract so the
+  // web table and exported PDF cannot diverge.  Keep the directory projections
+  // explicit: client banking, tax, owner, and onboarding fields must never leak.
+  const globalReportIds = new Set([
+    "aging-1", "aging-45", "aging-60", "aging-90", "aging-100", "todays-deposits",
+    "all-short-pay", "uncollected-2025", "dso", "monthly-sales-journal",
+    "aging-90-chargebacks", "brokers-all", "brokers-active", "brokers-inactive",
+    "brokers-active-dump", "brokers-active-otr", "carriers-all", "carriers-active-all",
+    "carriers-active-basic", "carriers-active-dump-all", "carriers-active-dump-basic",
+    "carriers-active-otr-all", "carriers-active-otr-basic", "carriers-top-20", "carriers-noa",
+  ]);
+  const globalReportTitles: Record<string, string> = {
+    "aging-1": "1+ Day Aging Report", "aging-45": "45+ Days Aging Report",
+    "aging-60": "60+ Days Aging Report", "aging-90": "90+ Days Aging Report",
+    "aging-100": "100+ Days Aging Report", "todays-deposits": "Today's Deposits",
+    "all-short-pay": "All Short Pay Report", "uncollected-2025": "2025 Uncollected AR",
+    dso: "DSO (Days Sales Outstanding)", "monthly-sales-journal": "Monthly Sales Journal Reports",
+    "aging-90-chargebacks": "90 Plus Days Reports", "brokers-all": "All Broker List",
+    "brokers-active": "All Active Broker List", "brokers-inactive": "All Inactive Broker List",
+    "brokers-active-dump": "Active Broker (Dump)", "brokers-active-otr": "Active Broker (OTR)",
+    "carriers-all": "All Carrier List", "carriers-active-all": "Active Carrier all info (All)",
+    "carriers-active-basic": "Active Carrier less info (All)",
+    "carriers-active-dump-all": "Active Carrier all info (Dump)",
+    "carriers-active-dump-basic": "Active Carrier less info (Dump)",
+    "carriers-active-otr-all": "Active Carrier all info (OTR)",
+    "carriers-active-otr-basic": "Active Carrier less info (OTR)",
+    "carriers-top-20": "Active Carrier Top 20", "carriers-noa": "Carrier's NOA",
+  };
+  type GlobalReport = {
+    title: string;
+    columns: Array<{ key: string; label: string; type?: "money" | "date" | "number" | "text" }>;
+    rows: Array<Record<string, string | number | null>>;
+    summary: { count: number; totalAmount: number };
+  };
+  const globalColumns = {
+    invoice: [
+      { key: "invoiceNumber", label: "Invoice" }, { key: "carrier", label: "Carrier" },
+      { key: "broker", label: "Broker / Debtor" }, { key: "amount", label: "Amount", type: "money" as const },
+      { key: "fundedDate", label: "Funded Date", type: "date" as const },
+      { key: "ageDays", label: "Age (Days)", type: "number" as const }, { key: "status", label: "Status" },
+      { key: "outstanding", label: "Outstanding", type: "money" as const },
+    ],
+    broker: [
+      { key: "name", label: "Name" }, { key: "mcNumber", label: "MC #" }, { key: "contactPerson", label: "Contact" },
+      { key: "email", label: "Email" }, { key: "phone", label: "Phone" }, { key: "status", label: "Status" },
+      { key: "address", label: "Address" }, { key: "city", label: "City" }, { key: "state", label: "State" },
+      { key: "zipCode", label: "ZIP" }, { key: "dotNumber", label: "DOT #" },
+      { key: "creditLimit", label: "Credit Limit", type: "money" as const },
+      { key: "paymentTerms", label: "Payment Terms" }, { key: "createdAt", label: "Created", type: "date" as const },
+    ],
+    carrierBasic: [
+      { key: "name", label: "Name" }, { key: "mcNumber", label: "MC #" },
+      { key: "email", label: "Email" }, { key: "phone", label: "Phone" },
+    ],
+    carrierFull: [
+      { key: "name", label: "Name" }, { key: "mcNumber", label: "MC #" }, { key: "contactPerson", label: "Contact" },
+      { key: "email", label: "Email" }, { key: "phone", label: "Phone" }, { key: "address", label: "Address" },
+      { key: "ratePercent", label: "Rate %", type: "number" as const },
+      { key: "advanceRate", label: "Advance Rate", type: "number" as const },
+      { key: "factoringFeeRate", label: "Factoring Fee", type: "number" as const },
+      { key: "language", label: "Language" }, { key: "reviewed", label: "Reviewed", type: "date" as const },
+      { key: "nextReview", label: "Next Review", type: "date" as const },
+      { key: "reserves", label: "Reserves", type: "money" as const },
+      { key: "shorts", label: "Shorts", type: "money" as const },
+      { key: "status", label: "Status" }, { key: "createdAt", label: "Created", type: "date" as const },
+    ],
+  };
+  const reportDate = (value: Date | null | undefined) => value ? value.toISOString().slice(0, 10) : null;
+  const businessDate = (value: Date) => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Denver", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(value);
+    const part = (type: string) => parts.find(item => item.type === type)?.value || "";
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  };
+  const normalized = (value: string | null | undefined) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const buildGlobalReport = async (reportId: string): Promise<GlobalReport> => {
+    if (!globalReportIds.has(reportId)) throw Object.assign(new Error("Report not found"), { status: 404 });
+    const title = globalReportTitles[reportId];
+    const allInvoices = await db.select({
+      id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount, status: invoices.status,
+      fundedAt: invoices.fundedAt, invoiceDate: invoices.invoiceDate, createdAt: invoices.createdAt,
+      clientId: invoices.clientId, carrier: clients.name, debtorId: invoices.debtorId, broker: debtors.name, debtorMcNumber: debtors.mcNumber,
+      loadType: invoices.loadType, chargebackStatus: invoices.chargebackStatus,
+    }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+    const lines = await db.select({
+      invoiceId: paymentApplicationLines.invoiceId, appliedAmount: paymentApplicationLines.appliedAmount,
+      variance: paymentApplicationLines.variance, varianceType: paymentApplicationLines.varianceType,
+      createdAt: paymentApplicationLines.createdAt,
+      paymentDate: cashApplications.paymentDate,
+    }).from(paymentApplicationLines).leftJoin(cashApplications, eq(paymentApplicationLines.cashApplicationId, cashApplications.id));
+    const applied = new Map<number, number>();
+    const settled = new Map<number, number>();
+    const shortPay = new Set<number>();
+    const paymentEvents = new Map<number, Array<{ date: Date; amount: number }>>();
+    for (const line of lines) {
+      const amount = Number(line.appliedAmount);
+      applied.set(line.invoiceId, (applied.get(line.invoiceId) || 0) + amount);
+      const adjustment = line.varianceType === "write_off" ? Math.abs(Number(line.variance || 0)) : 0;
+      settled.set(line.invoiceId, (settled.get(line.invoiceId) || 0) + amount + adjustment);
+      if (line.varianceType === "short_pay") shortPay.add(line.invoiceId);
+      const date = line.paymentDate || line.createdAt;
+      if (date) {
+        const events = paymentEvents.get(line.invoiceId) || [];
+        events.push({ date, amount });
+        paymentEvents.set(line.invoiceId, events);
+      }
+    }
+    const shortPayExceptions = await db.select({
+      invoiceId: exceptions.entityId, status: exceptions.status,
+    }).from(exceptions).where(and(eq(exceptions.type, "short_pay"), eq(exceptions.entityType, "invoice")));
+    const shortPayExceptionStates = new Map<number, Set<string>>();
+    shortPayExceptions.forEach(item => {
+      if (!item.invoiceId) return;
+      const states = shortPayExceptionStates.get(item.invoiceId) || new Set<string>();
+      states.add(item.status);
+      shortPayExceptionStates.set(item.invoiceId, states);
+    });
+    const invoiceReport = (predicate: (invoice: typeof allInvoices[number], outstanding: number, age: number) => boolean, chargebacks = false): GlobalReport => {
+      const now = Date.now();
+      const rows = allInvoices.map(invoice => {
+        const outstanding = Math.max(0, Number(invoice.amount) - (settled.get(invoice.id) || 0));
+        const ageDays = invoice.fundedAt ? Math.max(0, Math.floor((now - invoice.fundedAt.getTime()) / 86400000)) : 0;
+        return { invoice, outstanding, ageDays };
+      }).filter(({ invoice, outstanding, ageDays }) => predicate(invoice, outstanding, ageDays))
+        .map(({ invoice, outstanding, ageDays }) => ({
+          invoiceNumber: invoice.invoiceNumber, carrier: invoice.carrier || `Carrier #${invoice.clientId}`,
+          broker: invoice.broker || "Unassigned", amount: Number(invoice.amount), fundedDate: reportDate(invoice.fundedAt),
+          ageDays, status: invoice.status, outstanding: +outstanding.toFixed(2),
+          ...(chargebacks ? { chargebackStatus: invoice.chargebackStatus } : {}),
+        })).sort((a, b) => Number(b.ageDays) - Number(a.ageDays));
+      const columns = chargebacks ? [...globalColumns.invoice, { key: "chargebackStatus", label: "Chargeback Status" }] : globalColumns.invoice;
+      return { title, columns, rows, summary: { count: rows.length, totalAmount: +rows.reduce((sum, row) => sum + Number(row.outstanding), 0).toFixed(2) } };
+    };
+    const agingThreshold = /^aging-(1|45|60|90|100)$/.exec(reportId);
+    if (agingThreshold) return invoiceReport((invoice, outstanding, age) => !!invoice.fundedAt && outstanding > 0 && age >= Number(agingThreshold[1]));
+    if (reportId === "aging-90-chargebacks") return invoiceReport((invoice, outstanding, age) => !!invoice.fundedAt && outstanding > 0 && age >= 90, true);
+    if (reportId === "all-short-pay") {
+      const report = invoiceReport((invoice, outstanding) => {
+        const states = shortPayExceptionStates.get(invoice.id);
+        const unresolved = !states || states.has("open") || states.has("under_review");
+        return shortPay.has(invoice.id) && unresolved && outstanding > 0;
+      });
+      report.columns = [
+        ...globalColumns.invoice.slice(0, -1),
+        { key: "collected", label: "Collected", type: "money" },
+        { key: "shortPayAmount", label: "Short Pay Amount", type: "money" },
+      ];
+      const invoiceByNumber = new Map(allInvoices.map(invoice => [invoice.invoiceNumber, invoice]));
+      report.rows = report.rows.map(row => {
+        const invoice = invoiceByNumber.get(String(row.invoiceNumber))!;
+        return {
+          ...Object.fromEntries(globalColumns.invoice.slice(0, -1).map(column => [column.key, row[column.key]])),
+          collected: +(applied.get(invoice.id) || 0).toFixed(2),
+          shortPayAmount: row.outstanding,
+        };
+      });
+      return report;
+    }
+    if (reportId === "uncollected-2025") return invoiceReport((invoice, outstanding) =>
+      !!invoice.invoiceDate && businessDate(invoice.invoiceDate).startsWith("2025-") && outstanding > 0,
+    );
+
+    if (reportId === "todays-deposits") {
+      const payoutRows = await db.select({
+        id: payouts.id, invoiceId: payouts.invoiceId, netPayout: payouts.netPayout, advanceAmount: payouts.advanceAmount,
+        advancePaidAt: payouts.advancePaidAt, paymentStatus: payouts.paymentStatus, invoiceNumber: invoices.invoiceNumber,
+        invoiceAmount: invoices.amount, carrier: clients.name, broker: debtors.name, fundedAt: invoices.fundedAt,
+      }).from(payouts).innerJoin(invoices, eq(payouts.invoiceId, invoices.id)).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+      const today = businessDate(new Date());
+      const rows = payoutRows.filter(row =>
+        row.paymentStatus !== "pending_advance" && !!row.advancePaidAt && businessDate(row.advancePaidAt) === today,
+      ).map(row => ({
+        payoutId: row.id, invoiceNumber: row.invoiceNumber, carrier: row.carrier || "Unknown", broker: row.broker || "Unassigned",
+        amount: Number(row.netPayout || row.advanceAmount), processedDate: row.advancePaidAt ? businessDate(row.advancePaidAt) : null,
+      }));
+      return { title: "Today's Deposits", columns: [{ key: "payoutId", label: "Payout #" }, { key: "invoiceNumber", label: "Invoice" }, { key: "carrier", label: "Carrier" }, { key: "broker", label: "Broker" }, { key: "amount", label: "Amount", type: "money" }, { key: "processedDate", label: "Processed", type: "date" }], rows, summary: { count: rows.length, totalAmount: +rows.reduce((s, r) => s + Number(r.amount), 0).toFixed(2) } };
+    }
+    if (reportId === "dso") {
+      const groups = new Map<string, { broker: string; count: number; days: number; amount: number }>();
+      for (const invoice of allInvoices) {
+        if (!invoice.fundedAt) continue;
+        const events = (paymentEvents.get(invoice.id) || []).sort((a, b) => a.date.getTime() - b.date.getTime());
+        let cumulative = 0;
+        let end: Date | undefined;
+        for (const event of events) {
+          cumulative += event.amount;
+          if (cumulative >= Number(invoice.amount)) { end = event.date; break; }
+        }
+        if (!end) continue;
+        const key = String(invoice.debtorId || "unassigned");
+        const days = Math.max(0, Math.floor((end.getTime() - invoice.fundedAt.getTime()) / 86400000));
+        const group = groups.get(key) || { broker: invoice.broker || "Unassigned", count: 0, days: 0, amount: 0 };
+        group.count++; group.days += days; group.amount += Number(invoice.amount); groups.set(key, group);
+      }
+      const grouped = Array.from(groups.values());
+      const overall = grouped.reduce((total, group) => ({ count: total.count + group.count, days: total.days + group.days, amount: total.amount + group.amount }), { count: 0, days: 0, amount: 0 });
+      const rows = [
+        ...grouped.map(g => ({ broker: g.broker, invoiceCount: g.count, averageDays: +(g.days / g.count).toFixed(2) })),
+        ...(overall.count ? [{ broker: "Overall", invoiceCount: overall.count, averageDays: +(overall.days / overall.count).toFixed(2) }] : []),
+      ];
+      return { title: "Days Sales Outstanding", columns: [{ key: "broker", label: "Broker / Debtor" }, { key: "invoiceCount", label: "Invoices", type: "number" }, { key: "averageDays", label: "Average Days", type: "number" }], rows, summary: { count: overall.count, totalAmount: +overall.amount.toFixed(2) } };
+    }
+    if (reportId === "monthly-sales-journal") {
+      const payoutRows = await db.select().from(payouts);
+      const byInvoice = new Map(allInvoices.map(i => [i.id, i]));
+      const months = new Map<string, { funded: number; fees: number; reserves: number; count: number }>();
+      for (const payout of payoutRows) {
+        if (payout.paymentStatus === "pending_advance" || !payout.advancePaidAt) continue;
+        const invoice = byInvoice.get(payout.invoiceId), date = payout.advancePaidAt;
+        const key = businessDate(date).slice(0, 7), row = months.get(key) || { funded: 0, fees: 0, reserves: 0, count: 0 };
+        row.funded += Number(payout.advanceAmount); row.fees += Number(payout.feeAmount); row.reserves += Number(payout.reserveAmount); row.count++; months.set(key, row);
+      }
+      const rows = Array.from(months.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([month, r]) => ({ month, totalFunded: +r.funded.toFixed(2), fees: +r.fees.toFixed(2), reserves: +r.reserves.toFixed(2), count: r.count }));
+      return { title: "Monthly Sales Journal", columns: [{ key: "month", label: "Month" }, { key: "totalFunded", label: "Funded", type: "money" }, { key: "fees", label: "Fees", type: "money" }, { key: "reserves", label: "Reserves", type: "money" }, { key: "count", label: "Count", type: "number" }], rows, summary: { count: rows.reduce((s, r) => s + Number(r.count), 0), totalAmount: +rows.reduce((s, r) => s + Number(r.totalFunded), 0).toFixed(2) } };
+    }
+    const clientRows = await db.select().from(clients);
+    const carrierRow = (client: typeof clientRows[number], basic: boolean): Record<string, string | number | null> => basic
+      ? { name: client.name, mcNumber: client.mcNumber, email: client.email, phone: client.phone }
+      : {
+          name: client.name, mcNumber: client.mcNumber, contactPerson: client.contactPerson,
+          email: client.email, phone: client.phone, address: client.address,
+          ratePercent: Number(client.ratePercent || 0), advanceRate: Number(client.advanceRate || 0),
+          factoringFeeRate: Number(client.factoringFeeRate || 0), language: client.language,
+          reviewed: reportDate(client.reviewed), nextReview: reportDate(client.nextReview),
+          reserves: Number(client.reserves || 0), shorts: Number(client.shorts || 0),
+          status: client.status, createdAt: reportDate(client.createdAt),
+        };
+    if (reportId.startsWith("brokers-")) {
+      const directory = await db.select().from(brokers);
+      let rows = directory;
+      if (reportId === "brokers-active" || reportId === "brokers-active-dump" || reportId === "brokers-active-otr") rows = rows.filter(b => b.status === "active");
+      if (reportId === "brokers-inactive") rows = rows.filter(b => b.status === "inactive");
+      if (reportId === "brokers-active-otr") {
+        const otrDebtorNames = new Set(allInvoices.filter(i => i.loadType === "otr_load").map(i => normalized(i.broker)).filter(Boolean));
+        const otrDebtorMcNumbers = new Set(allInvoices.filter(i => i.loadType === "otr_load").map(i => normalized(i.debtorMcNumber)).filter(Boolean));
+        rows = rows.filter(b => {
+          const name = normalized(b.name), mcNumber = normalized(b.mcNumber);
+          return (!!name && otrDebtorNames.has(name)) || (!!mcNumber && otrDebtorMcNumbers.has(mcNumber));
+        });
+      }
+      const safe = rows.map(b => ({
+        name: b.name, mcNumber: b.mcNumber, contactPerson: b.contactPerson, email: b.email,
+        phone: b.phone, status: b.status, address: b.address, city: b.city, state: b.state,
+        zipCode: b.zipCode, dotNumber: b.dotNumber, creditLimit: Number(b.creditLimit || 0),
+        paymentTerms: b.paymentTerms, createdAt: reportDate(b.createdAt),
+      }));
+      return { title, columns: globalColumns.broker, rows: safe, summary: { count: safe.length, totalAmount: 0 } };
+    }
+    const basic = reportId.endsWith("basic") || reportId.endsWith("basic");
+    let selected = clientRows;
+    if (reportId.includes("active")) selected = selected.filter(c => c.status === "active");
+    if (reportId.includes("-otr-")) {
+      const otrClients = new Set(allInvoices.filter(i => i.loadType === "otr_load").map(i => i.clientId));
+      selected = selected.filter(c => otrClients.has(c.id));
+    }
+    if (reportId === "carriers-top-20") {
+      const totals = new Map<number, { count: number; amount: number }>();
+      allInvoices.filter(i => !!i.fundedAt).forEach(i => { const x = totals.get(i.clientId) || { count: 0, amount: 0 }; x.count++; x.amount += Number(i.amount); totals.set(i.clientId, x); });
+      const rows = clientRows.filter(c => c.status === "active" && totals.has(c.id)).map(c => ({ ...carrierRow(c, false), invoiceCount: totals.get(c.id)!.count, invoiceVolume: +totals.get(c.id)!.amount.toFixed(2) })).sort((a, b) => Number(b.invoiceVolume) - Number(a.invoiceVolume)).slice(0, 20);
+      return { title: "Top 20 Carriers", columns: [...globalColumns.carrierFull, { key: "invoiceCount", label: "Invoices", type: "number" }, { key: "invoiceVolume", label: "Invoice Volume", type: "money" }], rows, summary: { count: rows.length, totalAmount: +rows.reduce((s, r) => s + Number(r.invoiceVolume), 0).toFixed(2) } };
+    }
+    if (reportId === "carriers-noa") {
+      const docs = await db.select({
+        clientId: documentsTable.clientId, invoiceId: documentsTable.invoiceId,
+        documentType: documentsTable.documentType, finalDocumentType: documentsTable.finalDocumentType,
+        aiDocumentType: documentsTable.aiDocumentType, documentCategory: documentsTable.documentCategory,
+        filename: documentsTable.filename, originalName: documentsTable.originalName,
+        storageKey: documentsTable.storageKey, s3Key: documentsTable.s3Key,
+      }).from(documentsTable);
+      const invoiceClients = new Map(allInvoices.map(invoice => [invoice.id, invoice.clientId]));
+      const counts = new Map<number, number>();
+      docs.forEach(d => {
+        const metadata = [d.documentType, d.finalDocumentType, d.aiDocumentType, d.documentCategory, d.filename, d.originalName, d.storageKey, d.s3Key].filter(Boolean).join(" ");
+        const clientId = d.clientId || (d.invoiceId ? invoiceClients.get(d.invoiceId) : undefined);
+        if (/(?:^|[^a-z0-9])noa(?:[^a-z0-9]|$)|notice[\s_-]*of[\s_-]*assignment/i.test(metadata) && clientId) counts.set(clientId, (counts.get(clientId) || 0) + 1);
+      });
+      const rows = clientRows.filter(c => counts.has(c.id)).map(c => ({ ...carrierRow(c, false), documentCount: counts.get(c.id)! }));
+      return { title: "Carrier NOA", columns: [...globalColumns.carrierFull, { key: "documentCount", label: "NOA Documents", type: "number" }], rows, summary: { count: rows.length, totalAmount: 0 } };
+    }
+    const rows = selected.map(c => carrierRow(c, basic));
+    return { title, columns: basic ? globalColumns.carrierBasic : globalColumns.carrierFull, rows, summary: { count: rows.length, totalAmount: 0 } };
+  };
+  const streamGlobalReportPdf = (res: any, report: GlobalReport, reportId: string) => {
+    const margin = 28;
+    const doc = new PDFDocument({ size: "LEGAL", layout: "landscape", margin, info: { Title: report.title } });
+    const money = (value: unknown) => `$${Number(value || 0).toFixed(2)}`;
+    const display = (value: unknown, type?: string) => value === null || value === undefined ? "—" : type === "money" ? money(value) : String(value).replace(/_/g, " ");
+    const width = (doc.page.width - margin * 2) / Math.max(report.columns.length, 1);
+    const drawRow = (values: string[], bold = false) => {
+      doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(report.columns.length > 12 ? 6 : 7).fillColor(bold ? "#333" : "#111");
+      const rowY = doc.y;
+      const rowHeight = Math.max(9, ...values.map(value => doc.heightOfString(value, { width: width - 4 }))) + 4;
+      if (!bold && rowY + rowHeight > doc.page.height - margin) {
+        doc.addPage();
+        header();
+        return drawRow(values);
+      }
+      values.forEach((value, index) => {
+        doc.text(value, margin + index * width, rowY, { width: width - 4, height: rowHeight - 2, ellipsis: true });
+      });
+      doc.y = rowY + rowHeight;
+    };
+    const header = () => {
+      drawRow(report.columns.map(column => column.label.toUpperCase()), true);
+      doc.moveTo(margin, doc.y).lineTo(doc.page.width - margin, doc.y).strokeColor("#999").stroke();
+      doc.y += 4;
+    };
+    res.setHeader("Content-Type", "application/pdf"); res.setHeader("Content-Disposition", `attachment; filename="${reportId}.pdf"`); res.setHeader("Cache-Control", "no-store"); doc.pipe(res);
+    doc.font("Helvetica-Bold").fontSize(17).fillColor("#111").text(report.title);
+    doc.font("Helvetica").fontSize(9).fillColor("#555").text(`Generated ${new Date().toLocaleDateString()}  •  Count: ${report.summary.count}  •  Total: ${money(report.summary.totalAmount)}`);
+    doc.moveDown(); header();
+    for (const row of report.rows) drawRow(report.columns.map(column => display(row[column.key], column.type)));
+    doc.end();
+  };
+  app.get("/api/reports/global/:reportId/pdf", requireReportsPermission, async (req, res) => {
+    try { streamGlobalReportPdf(res, await buildGlobalReport(req.params.reportId), req.params.reportId); }
+    catch (error: any) { res.status(error.status || 400).json({ message: error.message || "Failed to generate report PDF" }); }
+  });
+  app.get("/api/reports/global/:reportId", requireReportsPermission, async (req, res) => {
+    try { res.json(await buildGlobalReport(req.params.reportId)); }
+    catch (error: any) { res.status(error.status || 400).json({ message: error.message || "Failed to generate report" }); }
+  });
 
   // Detailed operational productivity report. Agent visibility is deliberately
   // enforced here rather than trusting a userId supplied by the browser.

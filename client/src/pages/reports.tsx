@@ -43,9 +43,14 @@ function fmtShort(n: number) {
 function exportCsv(filename: string, rows: Record<string, unknown>[]) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);
+  const safeCell = (value: unknown) => {
+    const text = String(value ?? "");
+    return /^[=+\-@]/.test(text) ? `'${text}` : text;
+  };
+  const csvCell = (value: unknown) => `"${safeCell(value).replace(/"/g, '""')}"`;
   const lines = [
-    headers.join(","),
-    ...rows.map(r => headers.map(h => JSON.stringify(r[h] ?? "")).join(",")),
+    headers.map(csvCell).join(","),
+    ...rows.map(r => headers.map(h => csvCell(r[h])).join(",")),
   ];
   const blob = new Blob([lines.join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -57,6 +62,7 @@ function exportCsv(filename: string, rows: Record<string, unknown>[]) {
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
 const TABS = [
+  { id: "global",   label: "Global Reports", icon: BarChart3 },
   { id: "aging",    label: "Aging",    icon: Clock       },
   { id: "agent",    label: "Agent",    icon: Users       },
   { id: "agent-performance", label: "Agent Performance", icon: TrendingUp },
@@ -808,10 +814,142 @@ function CarrierArTab() {
   </div>;
 }
 
+// ─── Global Reports ───────────────────────────────────────────────────────────
+
+type GlobalReportColumn = { key: string; label: string; type?: "money" | "date" | "number" | "text" };
+type GlobalReportResponse = {
+  title: string;
+  columns: GlobalReportColumn[];
+  rows: Array<Record<string, string | number | null>>;
+  summary: { count: number; totalAmount: number };
+};
+type GlobalReportLink = { id: string; label: string };
+
+const GLOBAL_REPORT_GROUPS: Array<{ title: string; accent: string; reports: GlobalReportLink[] }> = [
+  {
+    title: "Aging Report", accent: "border-t-red-500", reports: [
+      { id: "aging-1", label: "1+ Day" },
+      { id: "aging-45", label: "45+ Days" },
+      { id: "aging-60", label: "60+ Days" },
+      { id: "aging-90", label: "90+ Days" },
+      { id: "aging-100", label: "100+ Days" },
+    ],
+  },
+  {
+    title: "Other", accent: "border-t-amber-500", reports: [
+      { id: "todays-deposits", label: "Today's Deposits" },
+      { id: "all-short-pay", label: "All Short Pay Report" },
+      { id: "uncollected-2025", label: "2025 Uncollected AR" },
+      { id: "dso", label: "DSO (Days Sales Outstanding)" },
+      { id: "monthly-sales-journal", label: "Monthly Sales Journal Reports" },
+      { id: "aging-90-chargebacks", label: "90 Plus Days Reports" },
+    ],
+  },
+  {
+    title: "Brokers", accent: "border-t-blue-500", reports: [
+      { id: "brokers-all", label: "All Broker List" },
+      { id: "brokers-active", label: "All Active Broker List" },
+      { id: "brokers-inactive", label: "All Inactive Broker List" },
+      { id: "brokers-active-dump", label: "Active Broker (Dump)" },
+      { id: "brokers-active-otr", label: "Active Broker (OTR)" },
+    ],
+  },
+  {
+    title: "Carriers", accent: "border-t-emerald-500", reports: [
+      { id: "carriers-all", label: "All Carrier List" },
+      { id: "carriers-active-all", label: "Active Carrier all info (All)" },
+      { id: "carriers-active-basic", label: "Active Carrier less info (All)" },
+      { id: "carriers-active-dump-all", label: "Active Carrier all info (Dump)" },
+      { id: "carriers-active-dump-basic", label: "Active Carrier less info (Dump)" },
+      { id: "carriers-active-otr-all", label: "Active Carrier all info (OTR)" },
+      { id: "carriers-active-otr-basic", label: "Active Carrier less info (OTR)" },
+      { id: "carriers-top-20", label: "Active Carrier Top 20" },
+      { id: "carriers-noa", label: "Carrier's NOA" },
+    ],
+  },
+];
+
+function GlobalReportsTab() {
+  const [reportId, setReportId] = useState<string | null>(null);
+  const reportQuery = useQuery<GlobalReportResponse>({
+    queryKey: ["/api/reports/global", reportId],
+    queryFn: async () => {
+      const response = await fetch(`/api/reports/global/${reportId}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Unable to generate report");
+      return response.json();
+    },
+    enabled: !!reportId,
+  });
+  const report = reportQuery.data;
+  const formatCell = (value: string | number | null, column: GlobalReportColumn) => {
+    if (value == null || value === "") return "—";
+    if (column.type === "money") return fmt(Number(value));
+    if (column.type === "date") {
+      const dateValue = String(value);
+      const parsed = new Date(/^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? `${dateValue}T00:00:00` : dateValue);
+      return Number.isNaN(parsed.getTime()) ? String(value) : format(parsed, "MMM d, yyyy");
+    }
+    if (column.type === "number") return Number(value).toLocaleString();
+    return String(value).replace(/_/g, " ");
+  };
+  const csvRows = report?.rows.map(row => Object.fromEntries(
+    report.columns.map(column => [column.label, row[column.key] ?? ""]),
+  )) ?? [];
+
+  return <div className="space-y-5">
+    <div>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-white">Global Reports</h2>
+      <p className="mt-0.5 text-sm text-slate-500">Select any report to view current results and export them.</p>
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {GLOBAL_REPORT_GROUPS.map(group => <Card key={group.title} className={cn("overflow-hidden border-t-4 shadow-sm", group.accent)}>
+        <CardHeader className="border-b bg-slate-50/70 px-4 py-3 dark:bg-slate-800/40">
+          <CardTitle className="text-sm uppercase tracking-wider">{group.title}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-2">
+          <div className="divide-y dark:divide-slate-800">
+            {group.reports.map(item => <button key={item.id} type="button" onClick={() => setReportId(item.id)}
+              className={cn("flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30 dark:hover:text-blue-300", reportId === item.id && "bg-blue-50 font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300")}>
+              <span>{item.label}</span><ChevronRight className="h-4 w-4 shrink-0 opacity-60" />
+            </button>)}
+          </div>
+        </CardContent>
+      </Card>)}
+    </div>
+
+    {reportId && <Card className="overflow-hidden border-slate-200 shadow-sm dark:border-slate-700">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 border-b">
+        <div>
+          <CardTitle className="text-base">{report?.title ?? "Generating report…"}</CardTitle>
+          {report && <p className="mt-1 text-xs text-slate-500">{report.summary.count.toLocaleString()} records · {fmt(report.summary.totalAmount)}</p>}
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button size="sm" variant="outline" disabled={!report?.rows.length} onClick={() => exportCsv(`${reportId}.csv`, csvRows)}><Download className="mr-1 h-3.5 w-3.5" />CSV</Button>
+          <Button size="sm" variant="outline" disabled={!report?.rows.length} asChild>
+            <a href={`/api/reports/global/${reportId}/pdf`} target="_blank" rel="noreferrer"><FileText className="mr-1 h-3.5 w-3.5" />PDF</a>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {reportQuery.isLoading ? <div className="h-56 animate-pulse bg-slate-100 dark:bg-slate-800" />
+          : reportQuery.isError ? <div className="p-12 text-center text-sm text-red-600">Unable to generate this report.</div>
+          : report ? <div className="overflow-x-auto"><table className="w-full min-w-max text-sm">
+            <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">
+              {report.columns.map(column => <th key={column.key} className="whitespace-nowrap px-4 py-3">{column.label}</th>)}
+            </tr></thead>
+            <tbody className="divide-y dark:divide-slate-800">{report.rows.length ? report.rows.map((row, index) => <tr key={String(row.id ?? row.invoiceNumber ?? index)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              {report.columns.map(column => <td key={column.key} className={cn("max-w-xs whitespace-nowrap px-4 py-3 capitalize", ["money", "number"].includes(column.type ?? "") && "text-right tabular-nums", column.key === "invoiceNumber" && "font-semibold")}>{formatCell(row[column.key], column)}</td>)}
+            </tr>) : <tr><td colSpan={report.columns.length} className="px-4 py-14 text-center text-slate-500">No records match this report.</td></tr>}</tbody>
+          </table></div> : null}
+      </CardContent>
+    </Card>}
+  </div>;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const [activeTab, setActiveTab] = useState<TabId>("aging");
+  const [activeTab, setActiveTab] = useState<TabId>("global");
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -853,6 +991,7 @@ export default function Reports() {
             </div>
 
             <div>
+              {activeTab === "global"   && <GlobalReportsTab />}
               {activeTab === "aging"    && <AgingTab />}
               {activeTab === "agent"    && <AgentTab />}
               {activeTab === "agent-performance" && <AgentPerformanceTab />}
