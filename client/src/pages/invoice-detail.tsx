@@ -164,6 +164,15 @@ function EmptyTabState({ icon, label }: { icon: React.ReactNode; label: string }
   );
 }
 
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-[#d4d0c8] py-1.5 last:border-0">
+      <span className="text-xs text-[#666]">{label}</span>
+      <span className="text-right text-xs font-semibold text-[#222]">{value}</span>
+    </div>
+  );
+}
+
 // ─── Lifecycle Actions Card ───────────────────────────────────────────────────
 
 function LifecycleActionsCard({
@@ -646,21 +655,21 @@ export default function InvoiceDetail() {
               <div className="space-y-5">
 
                 {/* ── Header card ────────────────────────────────────────── */}
-                <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                 <div className="overflow-hidden rounded-[6px] border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f7f7f7] shadow-[2px_2px_0_#808080]">
                   <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-4">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.28)]">
+                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[3px] bg-[#098b9f] text-white">
                         <ReceiptText className="h-7 w-7" />
                       </div>
                       <div>
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">{detail.invoiceNumber}</h1>
+                           <h1 className="text-2xl font-bold tracking-tight text-[#1a1a1a]">Load #{detail.loadNumber || detail.loadId || detail.invoiceNumber}</h1>
                           <InvoiceStatusBadge status={detail.status} />
                         </div>
-                        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
-                          {detail.client && <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />{detail.client.name}</span>}
-                          {detail.loadId && <span className="flex items-center gap-1.5"><Package className="h-3.5 w-3.5" />Load #{detail.loadId}</span>}
-                          <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{fmtDate(detail.submittedAt ?? detail.createdAt)}</span>
+                         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[#444]">
+                           {detail.client && <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-[#098b9f]" />Carrier: <strong>{detail.client.name}</strong></span>}
+                           {detail.debtor && <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-[#098b9f]" />Broker: <strong>{detail.debtor.name}</strong></span>}
+                           <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{fmtDate(detail.submittedAt ?? detail.createdAt)}</span>
                         </div>
                       </div>
                       {(isManager || canAgentCorrect) && <Button variant="outline" className="gap-2" onClick={() => {
@@ -676,10 +685,17 @@ export default function InvoiceDetail() {
                         <Pencil className="h-4 w-4" />Edit Invoice
                       </Button>}
                     </div>
-                    <div className="text-right">
+                     <div className="text-right">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Invoice Amount</p>
                       <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{fmtCurrency(detail.amount)}</p>
                     </div>
+                   <div className="flex items-center gap-2 border-t-2 border-[#808080] bg-[#dff5f6] px-6 py-2.5 text-xs font-semibold text-[#155e63]">
+                     <Activity className="h-3.5 w-3.5" />
+                     <span>Current workflow</span>
+                     <ChevronRight className="h-3.5 w-3.5" />
+                     <span className="capitalize">{(detail.displayStatus || detail.status || "in progress").replace(/_/g, " ")}</span>
+                     <span className="ml-auto font-normal text-[#5a5a5a]">{STAGE_META[currentStage]?.description}</span>
+                   </div>
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 sm:grid-cols-4 dark:divide-slate-800 dark:border-slate-800">
                     {[
@@ -701,19 +717,7 @@ export default function InvoiceDetail() {
                   </div>
                 </div>
 
-                {isManager && <>{/* ── Stage pipeline ─────────────────────────────────────── */}
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/90 px-6 py-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <div className="mb-4 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-blue-600" />
-                    <h2 className="text-sm font-semibold text-slate-700 dark:text-white">Factoring Lifecycle</h2>
-                    <span className="ml-auto rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
-                      Stage {FACTORING_STAGES.indexOf(currentStage) + 1} of 8 · {STAGE_META[currentStage]?.label}
-                    </span>
-                  </div>
-                  <StagePipeline current={currentStage} />
-                </div>
-
-                {/* ── Lifecycle actions ──────────────────────────────────── */}
+                 {isManager && <>
                 <LifecycleActionsCard
                   invoiceId={invoiceId}
                   transitions={transitions}
@@ -724,24 +728,30 @@ export default function InvoiceDetail() {
 
                 {/* ── Tabs ──────────────────────────────────────────────── */}
                 <div className="rounded-[28px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <Tabs defaultValue="overview">
+                     <Tabs defaultValue="invoice">
                     <div className="border-b border-slate-100 px-6 pt-5 dark:border-slate-800">
-                      <TabsList className="h-auto gap-1 rounded-none bg-transparent p-0">
-                        {(isManager ? [
-                          { value: "overview",    label: "Overview",      icon: <ReceiptText className="h-3.5 w-3.5" /> },
-                          { value: "doccheck",    label: "Doc Checklist", icon: <ClipboardCheck className="h-3.5 w-3.5" />, alert: docStatus && !docStatus.canApprove },
-                          { value: "documents",   label: "Documents",     icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length },
-                          { value: "payout",      label: "Payout",        icon: <Banknote className="h-3.5 w-3.5" /> },
+                       <TabsList className="custom-scrollbar flex h-auto w-full gap-1 overflow-x-auto rounded-none bg-transparent p-0">
+                         {(isManager ? [
+                           { value: "invoice",    label: "Invoice",      icon: <ReceiptText className="h-3.5 w-3.5" /> },
+                           { value: "paperwork",  label: "Paperwork",    icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length, alert: docStatus && !docStatus.canApprove },
+                           { value: "broker",     label: "Broker",       icon: <Building2 className="h-3.5 w-3.5" /> },
+                           { value: "carrier",    label: "Carrier",      icon: <User className="h-3.5 w-3.5" /> },
+                           { value: "notes",      label: "Notes",        icon: <MessageSquare className="h-3.5 w-3.5" /> },
+                           { value: "followup",   label: "Followup",     icon: <Clock className="h-3.5 w-3.5" /> },
+                           { value: "sheet",      label: "Sheet",        icon: <Banknote className="h-3.5 w-3.5" /> },
                           { value: "collections", label: "Collections",   icon: <CreditCard className="h-3.5 w-3.5" />,  count: detail.collections?.length },
                           { value: "chargeback",  label: "Chargeback",    icon: <AlertTriangle className="h-3.5 w-3.5" />, alert: ["scheduled", "extended", "charged"].includes(detail.chargebackStatus) },
                           { value: "cashapp",     label: "Cash Applied",  icon: <DollarSign className="h-3.5 w-3.5" />,  count: detail.cashAppLines?.length },
                           { value: "exceptions",  label: "Exceptions",    icon: <ShieldAlert className="h-3.5 w-3.5" />, count: detail.exceptions?.length },
-                          { value: "timeline",    label: "Timeline",      icon: <Activity className="h-3.5 w-3.5" /> },
+                           { value: "timeline",    label: "Timeline",      icon: <Activity className="h-3.5 w-3.5" /> },
                         ] : [
-                          { value: "overview", label: "Overview", icon: <ReceiptText className="h-3.5 w-3.5" /> },
-                          { value: "documents", label: "Documents", icon: <FileText className="h-3.5 w-3.5" />, count: detail.documents?.length },
-                          { value: "timeline", label: "Status", icon: <Activity className="h-3.5 w-3.5" /> },
+                           { value: "invoice", label: "Invoice", icon: <ReceiptText className="h-3.5 w-3.5" /> },
+                           { value: "paperwork", label: "Paperwork", icon: <FileText className="h-3.5 w-3.5" />, count: detail.documents?.length, alert: docStatus && !docStatus.canApprove },
+                           { value: "broker", label: "Broker", icon: <Building2 className="h-3.5 w-3.5" /> },
+                           { value: "carrier", label: "Carrier", icon: <User className="h-3.5 w-3.5" /> },
                           { value: "notes", label: "Notes", icon: <MessageSquare className="h-3.5 w-3.5" /> },
+                           { value: "followup", label: "Followup", icon: <Clock className="h-3.5 w-3.5" /> },
+                           { value: "sheet", label: "Sheet", icon: <Banknote className="h-3.5 w-3.5" /> },
                         ]).map(({ value, label, icon, count, alert }: any) => (
                           <TabsTrigger key={value} value={value}
                             className="flex items-center gap-1.5 rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-xs font-semibold text-slate-500 transition-colors data-[state=active]:border-blue-600 data-[state=active]:text-blue-700 dark:text-slate-400 dark:data-[state=active]:text-blue-300">
@@ -762,6 +772,54 @@ export default function InvoiceDetail() {
                       <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-900/40">
                         <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white"><MessageSquare className="h-4 w-4 text-blue-600" />Invoice notes</div>
                         <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{detail.notes || "No notes have been added to this invoice."}</p>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="broker" className="p-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker profile</p>
+                          {detail.debtor ? <div className="space-y-2 text-sm">
+                            <p className="text-lg font-bold text-[#1a1a1a]">{detail.debtor.name}</p>
+                            <InfoRow label="Contact" value={detail.debtor.contactPerson || detail.debtor.contactName || "Not available"} />
+                            <InfoRow label="Email" value={detail.debtor.email || "Not available"} />
+                            <InfoRow label="Phone" value={detail.debtor.phone || "Not available"} />
+                            <InfoRow label="MC #" value={detail.debtor.mcNumber || "Not available"} />
+                            <InfoRow label="Credit limit" value={detail.debtor.creditLimit ? fmtCurrency(detail.debtor.creditLimit) : "Not available"} />
+                          </div> : <EmptyTabState icon={<Building2 className="h-7 w-7" />} label="No broker details available" />}
+                        </div>
+                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Payment history</p>
+                          {detail.debtor?.paymentHistory?.length ? <div className="space-y-2">{detail.debtor.paymentHistory.map((p: any, i: number) => <InfoRow key={p.id ?? i} label={fmtDate(p.date)} value={`${fmtCurrency(p.amount)} · ${p.status || "recorded"}`} />)}</div> : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No payment history available" />}
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="carrier" className="p-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Carrier profile</p>
+                          {detail.client ? <div className="space-y-2 text-sm">
+                            <p className="text-lg font-bold text-[#1a1a1a]">{detail.client.name}</p>
+                            <InfoRow label="Contact" value={detail.client.contactPerson || detail.client.contactName || "Not available"} />
+                            <InfoRow label="Email" value={detail.client.email || "Not available"} />
+                            <InfoRow label="Phone" value={detail.client.phone || "Not available"} />
+                            <InfoRow label="MC #" value={detail.client.mcNumber || "Not available"} />
+                            <InfoRow label="DOT #" value={detail.client.dotNumber || "Not available"} />
+                          </div> : <EmptyTabState icon={<User className="h-7 w-7" />} label="No carrier details available" />}
+                        </div>
+                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Bank account</p>
+                          {carrierBankAccounts.length ? carrierBankAccounts.map((a: any) => <div key={a.id} className="mb-2 rounded-[3px] border border-[#b5b5b5] bg-white px-3 py-2 text-sm"><p className="font-semibold">{a.bankName || "Bank account"}</p><p className="text-xs text-[#666]">{a.accountType || "Account"} ending in {a.lastFour || "••••"}</p></div>) : <p className="text-sm text-[#666]">No bank account on file.</p>}
+                          <p className="mt-3 text-[11px] text-[#666]">Full bank credentials are restricted to authorized funding workflows.</p>
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="followup" className="p-6">
+                      <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                        <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker follow-up history</p><p className="mt-1 text-xs text-[#666]">Scheduled reminders and contact records linked to this load.</p></div></div>
+                        {(detail.brokerFollowUps || detail.followUps || detail.followupHistory)?.length ? <div className="divide-y divide-[#c8c8c8]">{(detail.brokerFollowUps || detail.followUps || detail.followupHistory).map((f: any, i: number) => <div key={f.id ?? i} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-semibold">{f.subject || f.note || f.description || "Follow-up"}</p><p className="text-xs text-[#666]">{fmtDate(f.followUpDate || f.scheduledAt || f.createdAt)}{f.status ? ` · ${f.status}` : ""}</p></div><Badge className="border border-[#b5b5b5] bg-white text-[#444]">{f.outcome || f.type || "Recorded"}</Badge></div>)}</div> : <EmptyTabState icon={<Clock className="h-7 w-7" />} label="No follow-up history or reminders available" />}
                       </div>
                     </TabsContent>
 
@@ -1064,7 +1122,7 @@ export default function InvoiceDetail() {
                     </TabsContent>
 
                     {/* Overview */}
-                    <TabsContent value="overview" className="p-6">
+                    <TabsContent value="invoice" className="p-6">
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <div className="space-y-3">
                           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Invoice Details</h3>
@@ -1137,8 +1195,28 @@ export default function InvoiceDetail() {
                     </TabsContent>
 
                     {/* Documents */}
-                    <TabsContent value="documents" className="p-6">
+                    <TabsContent value="paperwork" className="p-6">
                       <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                          {[
+                            ["bill_of_lading", "BOL"], ["rate_confirmation", "Rate Con"],
+                            ["lumper_receipt", "Lumper"], ["invoice", "Invoice"],
+                            ["noa", "NOA"], ["release_letter", "Release Letter"], ["other", "Other"],
+                          ].map(([type, label]) => {
+                            const rule = docStatus?.rules?.find((r: any) => r.documentType === type);
+                            const doc = detail.documents?.find((d: any) => d.documentType === type || d.finalDocumentType === type);
+                            const present = !!rule?.present || !!doc;
+                            return <div key={type} className={cn("flex items-center gap-2 rounded-[3px] border-2 px-2.5 py-2", present ? "border-[#6aa36a] bg-[#e8f5e8]" : "border-[#c66] bg-[#fff0f0]")}>
+                              <FileText className={cn("h-5 w-5", present ? "text-[#168044]" : "text-[#b3261e]")} />
+                              <div className="min-w-0"><p className="truncate text-xs font-bold">{label}</p><p className={cn("text-[10px] font-semibold", present ? "text-[#168044]" : "text-[#b3261e]")}>{present ? "Uploaded" : "Missing"}</p></div>
+                            </div>;
+                          })}
+                        </div>
+                        {docStatus && <div className={cn("flex flex-wrap items-center justify-between gap-3 rounded-[3px] border-2 px-3 py-2 text-xs", docStatus.canApprove ? "border-[#6aa36a] bg-[#e8f5e8] text-[#166534]" : "border-[#c99a42] bg-[#fff8df] text-[#7a5100]")}>
+                          <span className="font-bold">Document readiness: {docStatus.completenessPercent ?? 0}%</span>
+                          {!docStatus.canApprove && <span>Missing: {(docStatus.missingForApproval || docStatus.missingForReview || []).join(", ") || "Review required"}</span>}
+                          {isAdmin && !docStatus.overrideApplied && detail.status !== "approved" && <Button size="sm" variant="outline" className="h-7 rounded-[2px] text-[11px]" onClick={() => setOverrideOpen(true)}><ShieldCheck className="mr-1 h-3 w-3" />Override & Approve</Button>}
+                        </div>}
                         {/* Drag-and-drop intake zone */}
                         <div>
                           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -1165,13 +1243,16 @@ export default function InvoiceDetail() {
                               {detail.documents.map((doc: any) => (
                                 <div key={doc.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
                                   <div className="flex items-center gap-3">
-                                    <FileCheck className="h-5 w-5 shrink-0 text-blue-500" />
+                                     <FileText className="h-5 w-5 shrink-0 text-red-500" />
                                     <div>
                                       <p className="text-sm font-medium text-slate-800 dark:text-white">{doc.originalName}</p>
                                       <p className="text-xs text-slate-400">{doc.documentType.replace(/_/g, " ")} · {(doc.size / 1024).toFixed(1)} KB</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
+                                     <Button asChild variant="outline" size="sm" className="h-8 rounded-lg px-2 text-[11px]">
+                                       <a href={`/api/documents/${doc.id}/view`} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1 h-3 w-3" />Open</a>
+                                     </Button>
                                     <Select
                                       value={doc.documentType || "other"}
                                       onValueChange={(documentType) =>
@@ -1209,7 +1290,7 @@ export default function InvoiceDetail() {
                     </TabsContent>
 
                     {/* Payout */}
-                    <TabsContent value="payout" className="p-6">
+                    <TabsContent value="sheet" className="p-6">
                       {!detail.payout ? (
                         <div className="flex flex-col items-center justify-center py-16">
                           <EmptyTabState icon={<Banknote className="h-7 w-7" />} label="No payout record yet — fund the invoice to auto-create one" />
