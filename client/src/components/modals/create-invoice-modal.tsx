@@ -25,7 +25,7 @@ type Broker = {
 
 const EMPTY = {
   loadNumber: "", clientId: "", debtorId: "", branchName: "",
-  buyout: "", amount: "", paymentType: "ACH",
+  buyout: "", amount: "", paymentType: "ACH", bankAccountId: "",
 };
 
 function SearchSelect<T extends { id: number; name: string }>({
@@ -132,8 +132,20 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
   const [values, setValues] = useState(EMPTY);
   const { data: carriersData = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients"], enabled: open });
   const { data: brokersData = [] } = useQuery<Broker[]>({ queryKey: ["/api/debtors"], enabled: open });
+  const { data: bankAccountsData = [] } = useQuery<Array<{
+    id: number; bankName?: string | null; accountType?: string | null; lastFour?: string | null;
+  }>>({
+    queryKey: ["/api/carriers", values.clientId, "bank-accounts"],
+    queryFn: async () => {
+      const response = await fetch(`/api/carriers/${values.clientId}/bank-accounts`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load bank accounts");
+      return response.json();
+    },
+    enabled: open && !!values.clientId && values.paymentType === "ACH",
+  });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
   const brokers = Array.isArray(brokersData) ? brokersData : [];
+  const bankAccounts = Array.isArray(bankAccountsData) ? bankAccountsData : [];
   const carrier = carriers.find(item => String(item.id) === values.clientId);
   const broker = brokers.find(item => String(item.id) === values.debtorId);
 
@@ -149,6 +161,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
         buyout: values.buyout === "" ? null : values.buyout === "yes",
         amount: values.amount,
         paymentType: values.paymentType,
+        bankAccountId: values.bankAccountId ? Number(values.bankAccountId) : null,
       });
       return response.json();
     },
@@ -196,11 +209,26 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Payment Type</Label>
-                <Select value={values.paymentType} onValueChange={paymentType => setValues(v => ({ ...v, paymentType }))}>
+                <Select value={values.paymentType} onValueChange={paymentType => setValues(v => ({ ...v, paymentType, bankAccountId: paymentType === "ACH" ? v.bankAccountId : "" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent>
                 </Select>
               </div>
+              {values.paymentType === "ACH" && (
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Bank Account Credentials</Label>
+                  <Select value={values.bankAccountId} onValueChange={bankAccountId => setValues(v => ({ ...v, bankAccountId }))}>
+                    <SelectTrigger><SelectValue placeholder={values.clientId ? "Select carrier bank account" : "Select a carrier first"} /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(account => (
+                        <SelectItem key={account.id} value={String(account.id)}>
+                          {account.bankName || "Bank account"} · {account.accountType || "Account"} ending in {account.lastFour || "••••"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
