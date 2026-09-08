@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -721,6 +722,7 @@ function CarrierArTab() {
   const [brokerId, setBrokerId] = useState("");
   const [selection, setSelection] = useState<{ carrierId: string; brokerId: string } | null>(null);
   const [report, setReport] = useState<CarrierBrokerReportDef | null>(null);
+  const [agingPdfDays, setAgingPdfDays] = useState("1");
   const { data: carriersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients"] });
   const { data: brokersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/debtors"] });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
@@ -769,6 +771,7 @@ function CarrierArTab() {
           <div><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-blue-600">Step 2</p><SearchableEntitySelect label="Select Broker" items={brokers} value={brokerId} onChange={setBrokerId} placeholder="Search brokers..." /></div>
         </div>
         <div className="mt-5 flex justify-end gap-2 border-t pt-4">
+          <AgingPdfDownload carrierId={carrierId} minDays={agingPdfDays} onMinDaysChange={setAgingPdfDays} compact />
           <Button variant="ghost" onClick={() => { setSelection(null); setReport(null); }}>Cancel</Button>
           <Button variant="outline" onClick={reset}>Reset</Button>
           <Button disabled={!carrierId || !brokerId} onClick={() => { setSelection({ carrierId, brokerId }); setReport(null); }} className="bg-blue-600 text-white hover:bg-blue-700">Submit</Button>

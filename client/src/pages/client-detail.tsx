@@ -18,12 +18,13 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import InvoiceModal from "@/components/modals/invoice-modal";
+import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
 
 import {
   Building2, ReceiptText, Phone, Mail, MapPin,
   FileText, Edit2, CheckCircle2, XCircle, User,
   Hash, Activity, MessageSquare, Send, DollarSign,
-  Banknote, ShieldCheck, Plus, Eye, EyeOff,
+  Banknote, ShieldCheck, Plus, Eye, EyeOff, BarChart3,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -78,6 +79,7 @@ export default function ClientDetail() {
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const [editingBankAccount, setEditingBankAccount] = useState<any | null>(null);
   const [showRoutingNumber, setShowRoutingNumber] = useState(false);
+  const [agingPdfDays, setAgingPdfDays] = useState("1");
   const [showAccountNumber, setShowAccountNumber] = useState(false);
   const [revealedAccountNumbers, setRevealedAccountNumbers] = useState<Record<number, string>>({});
   const [bankForm, setBankForm] = useState({
@@ -428,6 +430,25 @@ export default function ClientDetail() {
                           </Badge>
                         </div>
                       ))}
+                    </div>
+                  ),
+                },
+                {
+                  value: "reports",
+                  label: "Reports",
+                  icon: <BarChart3 className="h-3.5 w-3.5" />,
+                  content: (
+                    <div className="max-w-xl rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-900/40">
+                      <div className="mb-4 flex items-start gap-3">
+                        <div className="rounded-xl bg-teal-100 p-2 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white">TPF Carrier Aging Statement</h3>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">Download the carrier’s open funded invoices, grouped by broker, in the standard TPF aging format.</p>
+                        </div>
+                      </div>
+                      <AgingPdfDownload carrierId={clientId} minDays={agingPdfDays} onMinDaysChange={setAgingPdfDays} />
                     </div>
                   ),
                 },

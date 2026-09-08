@@ -6099,6 +6099,203 @@ Trucking Pros Financial Team
     } catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate carrier AR PDF" }); }
   });
 
+  // Printable carrier statement used by the Aging Report download action.  This
+  // intentionally derives its balance from cash application lines rather than
+  // invoice status, since a funded invoice may be only partially collected.
+  app.get("/api/reports/aging-pdf", requireAuth, async (req, res) => {
+    try {
+      const parsePositiveInteger = (value: unknown, label: string) => {
+        if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+          throw new Error(`${label} must be a positive integer`);
+        }
+        return Number(value);
+      };
+      const carrierId = parsePositiveInteger(req.query.carrierId, "carrierId");
+      const minDays = req.query.minDays === undefined ? 1 : Number(req.query.minDays);
+      if (!Number.isInteger(minDays) || ![1, 45, 60, 90, 100].includes(minDays)) {
+        throw new Error("minDays must be one of 1, 45, 60, 90, or 100");
+      }
+
+      const [carrier] = await db.select().from(clients).where(eq(clients.id, carrierId));
+      if (!carrier) return res.status(404).json({ message: "Carrier not found" });
+
+      const invoiceRows = await db.select({
+        id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount,
+        invoiceDate: invoices.invoiceDate, dueDate: invoices.dueDate, fundedAt: invoices.fundedAt,
+        loadNumber: invoices.loadNumber, bolNumber: invoices.bolNumber, loadId: invoices.loadId,
+        debtorName: debtors.name, loadLoadNumber: loads.loadNumber,
+      }).from(invoices)
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .leftJoin(loads, eq(invoices.loadId, loads.id))
+        .where(eq(invoices.clientId, carrierId));
+      const invoiceIds = invoiceRows.map(invoice => invoice.id);
+      const applicationRows = invoiceIds.length ? await db.select({
+        invoiceId: paymentApplicationLines.invoiceId, appliedAmount: paymentApplicationLines.appliedAmount,
+        variance: paymentApplicationLines.variance, varianceType: paymentApplicationLines.varianceType,
+      }).from(paymentApplicationLines).where(inArray(paymentApplicationLines.invoiceId, invoiceIds)) : [];
+      const collectedByInvoice = new Map<number, number>();
+      for (const line of applicationRows) {
+        const writeOff = line.varianceType === "write_off" ? Math.abs(Number(line.variance || 0)) : 0;
+        collectedByInvoice.set(line.invoiceId, (collectedByInvoice.get(line.invoiceId) || 0) + Number(line.appliedAmount || 0) + writeOff);
+      }
+      const denverCalendarDay = (value: Date) => {
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Denver", year: "numeric", month: "2-digit", day: "2-digit",
+        }).formatToParts(value);
+        const part = (type: string) => Number(parts.find(item => item.type === type)?.value || 0);
+        return Math.floor(Date.UTC(part("year"), part("month") - 1, part("day")) / 86400000);
+      };
+      const today = denverCalendarDay(new Date());
+      const rows = invoiceRows.map(invoice => {
+        const ageDays = invoice.fundedAt ? Math.max(0, today - denverCalendarDay(invoice.fundedAt)) : 0;
+        return {
+          ...invoice,
+          ageDays,
+          balance: Math.max(0, Number(invoice.amount) - (collectedByInvoice.get(invoice.id) || 0)),
+          broker: invoice.debtorName || "Unassigned",
+        };
+      }).filter(invoice => !!invoice.fundedAt && invoice.ageDays >= minDays && invoice.balance > 0)
+        .sort((a, b) => a.broker.localeCompare(b.broker) || b.ageDays - a.ageDays || a.invoiceNumber.localeCompare(b.invoiceNumber));
+
+      const allLoads = await db.select({ id: loads.id, clientId: loads.clientId }).from(loads);
+      const carrierLoadIds = new Set(allLoads.filter(load => load.clientId === carrierId).map(load => load.id));
+      const normalizeName = (value: string | null | undefined) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const normalizedCarrierName = normalizeName(carrier.name);
+      const allCarrierNames = await db.select({ name: clients.name }).from(clients);
+      const carrierNameIsUnique = allCarrierNames.filter(item => normalizeName(item.name) === normalizedCarrierName).length === 1;
+      const advances = await db.select().from(fuelAdvances);
+      const fuelAdvance = advances.filter(advance => {
+        if (!["approved", "paid"].includes(advance.status)) return false;
+        // A load association is authoritative; only unassociated advances use
+        // the carrier-name fallback to avoid matching another carrier's load.
+        return advance.loadId
+          ? carrierLoadIds.has(advance.loadId)
+          : carrierNameIsUnique && normalizeName(advance.carrierName) === normalizedCarrierName;
+      }).reduce((sum, advance) => sum + Number(advance.advanceAmount || 0), 0);
+
+      const buckets = { "1-30": 0, "31-60": 0, "61-90": 0, "90-120": 0, "120+": 0 };
+      rows.forEach(row => {
+        const bucket = row.ageDays <= 30 ? "1-30" : row.ageDays <= 60 ? "31-60" : row.ageDays <= 90 ? "61-90" : row.ageDays <= 120 ? "90-120" : "120+";
+        buckets[bucket] += row.balance;
+      });
+      const balance = rows.reduce((sum, row) => sum + row.balance, 0);
+      const reserves = Number(carrier.reserves || 0);
+      const shorts = Number(carrier.shorts || 0);
+      const claims = 0, others = 0, totalAmountDue = balance + reserves - fuelAdvance - claims - shorts - others;
+      const onboarding = (carrier.onboardingData && typeof carrier.onboardingData === "object" ? carrier.onboardingData : {}) as Record<string, unknown>;
+      const field = (...names: string[]) => {
+        for (const name of names) {
+          const value = onboarding[name];
+          if (typeof value === "string" && value.trim()) return value.trim();
+        }
+        return "";
+      };
+      const contact = carrier.contactPerson || field("contactPerson", "contactName", "primaryContact") || "—";
+      const dot = field("dotNumber", "dot", "DOT") || "—";
+      const streetAddress = carrier.address || field("physicalAddress", "mailingAddress", "businessAddress") || "—";
+      const city = field("physicalCity", "mailingCity", "city", "businessCity");
+      const state = field("physicalState", "mailingState", "state", "businessState");
+      const zip = field("physicalZip", "mailingZip", "zip", "zipCode", "businessZip");
+      const location = [city, state, zip].filter(Boolean).join(", ") || "—";
+      const statementDate = new Intl.DateTimeFormat("en-US", { timeZone: "America/Denver", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 28, info: { Title: `${carrier.name} Aging Statement`, Author: "Trucking Pros Financial" } });
+      const left = 28, right = 764, bottom = 556;
+      const money = (value: number) => {
+        const normalized = Math.abs(value) < 0.005 ? 0 : value;
+        return `$${normalized.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+      const date = (value: Date | null) => value ? new Intl.DateTimeFormat("en-US", { timeZone: "America/Denver", month: "2-digit", day: "2-digit", year: "2-digit" }).format(value) : "—";
+      const columns = [
+        ["Broker Name", 136], ["Invoice#", 76], ["Invoice Date", 82], ["Date Factored", 88],
+        ["Broker PO#/Ref", 128], ["Days Out", 58], ["Due Date", 80], ["Balance Due", 88],
+      ] as const;
+      const footer = () => {
+        doc.strokeColor("#000").lineWidth(0.4).moveTo(left, bottom).lineTo(right, bottom).stroke();
+        doc.font("Helvetica").fontSize(6.5).fillColor("#111").text(
+          "Trucking Pros Financial LLC  |  (801) 755-9755  |  legalteam@truckingprosfinancial.com  |  www.truckingprosfinancial.com",
+          left, bottom + 5, { width: right - left, align: "center" },
+        );
+      };
+      const pageHeader = () => {
+        let logoDrawn = false;
+        const logoPaths = [
+          path.resolve(process.cwd(), "server/assets/tpf-logo.png"),
+          path.resolve(process.cwd(), "dist/tpf-logo.png"),
+        ];
+        try {
+          const logoPath = logoPaths.find(candidate => fs.existsSync(candidate));
+          if (logoPath) { doc.image(logoPath, left, 23, { fit: [190, 54] }); logoDrawn = true; }
+        } catch { /* Bold wordmark below is the deliberate rendering fallback. */ }
+        if (!logoDrawn) doc.font("Helvetica-Bold").fontSize(17).fillColor("#111").text("TRUCKING PROS FINANCIAL", left, 39);
+        doc.font("Helvetica").fontSize(7.5).fillColor("#111").text("PO BOX 2073, Salt Lake City, Utah", left, 80);
+        doc.font("Helvetica-Bold").fontSize(16).text("AGING STATEMENT", 500, 29, { width: 264, align: "right" });
+        doc.font("Helvetica").fontSize(8).text(`Statement Date: ${statementDate}`, 500, 49, { width: 264, align: "right" });
+        doc.text(`Account #: TPF-${String(carrier.id).padStart(6, "0")}`, 500, 61, { width: 264, align: "right" });
+        doc.text(`Phone: ${carrier.phone || "—"}  |  Fax: —`, 500, 73, { width: 264, align: "right" });
+        doc.strokeColor("#000").lineWidth(0.6).moveTo(left, 93).lineTo(right, 93).stroke();
+        doc.font("Helvetica-Bold").fontSize(8).text(carrier.name, left, 99);
+        doc.font("Helvetica").fontSize(7).text(`Contact: ${contact}`, left, 110);
+        doc.text(`Address: ${streetAddress}`, left, 120, { width: 300, ellipsis: true });
+        doc.text(`City / State / ZIP: ${location}`, 338, 110, { width: 210, ellipsis: true });
+        doc.text(`MC#: ${carrier.mcNumber || "—"}   DOT#: ${dot}`, 338, 120, { width: 210, ellipsis: true });
+      };
+      const tableHeader = (y: number) => {
+        doc.rect(left, y, right - left, 15).fill("#f1f1f1");
+        doc.fillColor("#111").font("Helvetica-Bold").fontSize(6.7);
+        let x = left;
+        columns.forEach(([label, width]) => { doc.text(label, x + 2, y + 4, { width: width - 4, ellipsis: true }); x += width; });
+        doc.strokeColor("#000").lineWidth(0.4).rect(left, y, right - left, 15).stroke();
+      };
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="aging-statement-TPF-${String(carrier.id).padStart(6, "0")}-${minDays}days.pdf"`);
+      res.setHeader("Cache-Control", "no-store");
+      doc.pipe(res);
+      pageHeader();
+      let y = 139, currentBroker = "";
+      tableHeader(y); y += 15;
+      for (const row of rows) {
+        if (y + 16 > 480) {
+          footer(); doc.addPage(); pageHeader(); y = 139; tableHeader(y); y += 15; currentBroker = "";
+        }
+        const brokerLabel = row.broker !== currentBroker ? `^${row.broker}` : "";
+        currentBroker = row.broker;
+        const values = [brokerLabel, row.invoiceNumber, date(row.invoiceDate), date(row.fundedAt), row.loadLoadNumber || row.loadNumber || row.bolNumber || "—", String(row.ageDays), date(row.dueDate), money(row.balance)];
+        doc.font("Helvetica").fontSize(6.7).fillColor("#111");
+        let x = left;
+        values.forEach((value, index) => {
+          const width = columns[index][1];
+          doc.text(value, x + 2, y + 4, { width: width - 4, height: 9, ellipsis: true, align: index === 7 ? "right" : "left" });
+          x += width;
+        });
+        doc.strokeColor("#000").lineWidth(0.25).rect(left, y, right - left, 16).stroke();
+        y += 16;
+      }
+      // Keep statement totals together at the bottom, starting a fresh page when
+      // a long detail section would crowd the aging buckets.
+      if (y > 385) { footer(); doc.addPage(); pageHeader(); y = 139; }
+      const boxY = Math.max(y + 13, 390), boxWidth = (right - left) / 5;
+      doc.font("Helvetica-Bold").fontSize(7).fillColor("#111").text("AGING SUMMARY", left, boxY - 12);
+      Object.entries(buckets).forEach(([label, value], index) => {
+        const x = left + index * boxWidth;
+        doc.rect(x, boxY, boxWidth, 34).strokeColor("#000").lineWidth(0.4).stroke();
+        doc.font("Helvetica-Bold").fontSize(6.5).text(label, x + 4, boxY + 5, { width: boxWidth - 8 });
+        doc.font("Helvetica").fontSize(7.5).text(money(value), x + 4, boxY + 18, { width: boxWidth - 8, align: "right" });
+      });
+      const summaryY = boxY + 51, summaryX = 522;
+      const summary = [["Carrier Reserves", reserves], ["Fuel Advance", -fuelAdvance], ["Claims", -claims], ["Shorts", -shorts], ["Others", -others], ["Balance", balance], ["Total Amount Due", totalAmountDue]];
+      summary.forEach(([label, value], index) => {
+        const total = index === summary.length - 1;
+        if (total) doc.moveTo(summaryX, summaryY + index * 12 - 2).lineTo(right, summaryY + index * 12 - 2).strokeColor("#000").stroke();
+        doc.font(total ? "Helvetica-Bold" : "Helvetica").fontSize(total ? 8 : 7).fillColor("#111").text(String(label), summaryX, summaryY + index * 12, { width: 135 });
+        doc.text(money(Number(value)), summaryX + 135, summaryY + index * 12, { width: 107, align: "right" });
+      });
+      footer();
+      doc.end();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to generate aging statement" });
+    }
+  });
+
   // Aging Report
   app.get("/api/reports/aging", requireAuth, async (_req, res) => {
     try {
