@@ -143,6 +143,8 @@ export const invoices = pgTable("invoices", {
   paymentType: varchar("payment_type", { enum: ["ACH", "Wire"] }).default("ACH"),
   bankAccountId: integer("bank_account_id").references(() => clientVault.id),
   loadNumber: varchar("load_number"),
+  branchName: varchar("branch_name"),
+  buyout: boolean("buyout"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency").default("USD").notNull(),
   invoiceDate: timestamp("invoice_date"),

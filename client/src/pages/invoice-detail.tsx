@@ -1129,6 +1129,8 @@ export default function InvoiceDetail() {
                           {[
                             { label: "Invoice #",    value: detail.invoiceNumber },
                             { label: "Load #",       value: detail.loadNumber || (detail.loadId ? `#${detail.loadId}` : "—") },
+                            { label: "Branch",       value: detail.branchName || "—" },
+                            { label: "Buyout",       value: detail.buyout == null ? "—" : detail.buyout ? "Yes" : "No" },
                             { label: "Amount",       value: fmtCurrency(detail.amount) },
                             { label: "Invoice Date", value: fmtDate(detail.invoiceDate) },
                             { label: "Due Date",     value: fmtDate(detail.dueDate) },

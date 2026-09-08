@@ -234,7 +234,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const employeeCanModifyInvoice = async (req: any, invoiceId: number) => {
     if (req.user?.role !== "employee") return true;
     const invoice = await storage.getInvoice(invoiceId);
-    return !!invoice && invoice.submittedBy === req.user.id && ["draft", "rejected"].includes(invoice.status);
+    return !!invoice && invoice.submittedBy === req.user.id
+      && ["draft", "rejected", "submitted", "docs_pending"].includes(invoice.status);
   };
 
   const employeeCanModifyDocument = async (req: any, documentId: number) => {
@@ -1734,9 +1735,6 @@ ${message}
 
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
-      if (req.user.role !== "employee") {
-        return res.status(403).json({ message: "Only agents can create factoring invoice drafts" });
-      }
       const invoiceData = insertInvoiceSchema.parse(req.body);
       // Always generate a unique invoice number server-side to prevent collisions
       const invoiceNumber = await storage.getNextInvoiceNumber();
@@ -1750,15 +1748,15 @@ ${message}
         invoiceNumber,
         loadId: null,
         submittedBy: req.user.id,
-        submittedAt: null,
-        status: "draft",
-        factoringStage: "document_intake",
+        submittedAt: new Date(),
+        status: "submitted",
+        factoringStage: "verification",
       });
 
       await storage.createActivity({
         userId: req.user.id,
         type: "invoice_created",
-        description: `Created invoice: ${invoice.invoiceNumber}`,
+        description: `Created and submitted invoice ${invoice.invoiceNumber} for funding review`,
         entityType: "invoice",
         entityId: invoice.id,
       });

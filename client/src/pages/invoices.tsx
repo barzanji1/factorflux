@@ -25,6 +25,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import InvoiceModal from "@/components/modals/invoice-modal";
+import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
 import type { Invoice } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,7 +48,8 @@ export default function Invoices() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
+  const [isEditInvoiceOpen, setIsEditInvoiceOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const submitMutation = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/invoices/${id}/transition`, { transitionId: "submit", force: false }),
@@ -79,12 +81,12 @@ export default function Invoices() {
 
   const handleCreateInvoice = () => {
     setSelectedInvoice(null);
-    setIsInvoiceModalOpen(true);
+    setIsCreateInvoiceOpen(true);
   };
 
   const handleEditInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
-    setIsInvoiceModalOpen(true);
+    setIsEditInvoiceOpen(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -170,13 +172,13 @@ export default function Invoices() {
                     />
                   </div>
 
-                  {!isManager && <Button
+                  <Button
                     onClick={handleCreateInvoice}
                     className="h-12 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] hover:bg-blue-700"
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    New Invoice
-                  </Button>}
+                    Create Invoice
+                  </Button>
                 </div>
               </div>
 
@@ -396,10 +398,11 @@ export default function Invoices() {
       </div>
 
       <InvoiceModal
-        isOpen={isInvoiceModalOpen}
-        onClose={() => setIsInvoiceModalOpen(false)}
+        isOpen={isEditInvoiceOpen}
+        onClose={() => setIsEditInvoiceOpen(false)}
         invoice={selectedInvoice}
       />
+      <CreateInvoiceModal open={isCreateInvoiceOpen} onOpenChange={setIsCreateInvoiceOpen} />
     </div>
   );
 }
