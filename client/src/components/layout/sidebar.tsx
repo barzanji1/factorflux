@@ -68,6 +68,7 @@ const navSections: NavSection[] = [
     title: "Funding",
     items: [
       { name: "Factoring",      href: "/factoring",      icon: TrendingUp,     permission: "factoring"      },
+      { name: "Funding Queue",  href: "/funding-queue",  icon: FileCheck2,     permission: "factoring", role: "manager" },
       { name: "Payments",       href: "/payouts",        icon: Wallet,         permission: "payments"       },
       { name: "Lockbox",        href: "/lockbox",        icon: ArrowRightLeft, permission: "lockbox"        },
       { name: "Fuel Advance",   href: "/fuel-advance",   icon: Fuel,           permission: "fuel_advance"   },

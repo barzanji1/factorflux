@@ -99,13 +99,13 @@ import { classifyDocumentAI } from "./services/aiClassifier";
 import { sendEmail } from "./emailService";
 import {
   advanceInvoiceStage,
-  stageFromInvoiceStatus,
   getInvoiceDetail,
   getInvoiceTimeline,
 } from "./services/invoiceStage";
 import {
   getAvailableTransitions,
   performTransition,
+  getInvoiceDisplayStatus,
 } from "./services/lifecycleEngine";
 import { getDocumentCompleteness } from "./services/docValidation";
 
@@ -208,6 +208,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.user = user;
     next();
   };
+
+  const requireManagerOrAdmin = (req: any, res: any, next: any) => {
+    const user = (req.session as any)?.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+    if (user.role !== "manager" && user.role !== "admin") {
+      return res.status(403).json({ message: "Manager or admin access required" });
+    }
+    req.user = user;
+    next();
+  };
+
+  const employeeCanAccessInvoice = async (req: any, invoiceId: number) => {
+    if (req.user?.role !== "employee") return true;
+    const invoice = await storage.getInvoice(invoiceId);
+    return !!invoice && invoice.submittedBy === req.user.id;
+  };
+
+  const employeeCanAccessDocument = async (req: any, documentId: number) => {
+    if (req.user?.role !== "employee") return true;
+    const document = await storage.getDocument(documentId);
+    return !!document?.invoiceId && employeeCanAccessInvoice(req, document.invoiceId);
+  };
+
+  const employeeCanModifyInvoice = async (req: any, invoiceId: number) => {
+    if (req.user?.role !== "employee") return true;
+    const invoice = await storage.getInvoice(invoiceId);
+    return !!invoice && invoice.submittedBy === req.user.id && ["draft", "rejected"].includes(invoice.status);
+  };
+
+  const employeeCanModifyDocument = async (req: any, documentId: number) => {
+    if (req.user?.role !== "employee") return true;
+    const document = await storage.getDocument(documentId);
+    return !!document?.invoiceId && employeeCanModifyInvoice(req, document.invoiceId);
+  };
+
+  const withInvoiceDisplayStatus = (invoice: any) => ({
+    ...invoice,
+    displayStatus: getInvoiceDisplayStatus(invoice?.status),
+  });
 
   const requireDevelopment = (_req: any, res: any, next: any) => {
     if (process.env.NODE_ENV === "production") {
@@ -1023,6 +1062,12 @@ ${message}
         documents = await storage.getDocuments();
       }
 
+      if (req.user.role === "employee") {
+        const ownedInvoices = new Set(
+          (await storage.getInvoices()).filter(invoice => invoice.submittedBy === req.user.id).map(invoice => invoice.id),
+        );
+        documents = documents.filter(document => !!document.invoiceId && ownedInvoices.has(document.invoiceId));
+      }
       res.json(documents);
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -1034,6 +1079,7 @@ ${message}
     try {
       const invoiceId = parseInt(req.params.id, 10);
       if (Number.isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only access documents for your own invoices" });
       const docs = await storage.getDocumentsByInvoice(invoiceId);
       res.json(docs);
     } catch (error) {
@@ -1044,6 +1090,7 @@ ${message}
 
   app.patch("/api/documents/:id/document-type", requireAuth, async (req: any, res) => {
     try {
+      if (req.user.role !== "manager" && req.user.role !== "admin") return res.status(403).json({ message: "Manager or admin access required" });
       const id = parseInt(req.params.id, 10);
       const validTypes = [
         "rate_confirmation", "bol", "commercial_invoice", "pod", "other",
@@ -1069,6 +1116,7 @@ ${message}
     try {
       const invoiceId = parseInt(req.params.id, 10);
       if (Number.isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
+      if (!await employeeCanModifyInvoice(req, invoiceId)) return res.status(403).json({ message: "Documents can only be changed on your own draft or correction-required invoices" });
 
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -1121,6 +1169,7 @@ ${message}
   app.get("/api/documents/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (!await employeeCanAccessDocument(req, id)) return res.status(403).json({ message: "You may only access documents for your own invoices" });
       const document = await storage.getDocument(id);
 
       if (!document) {
@@ -1141,6 +1190,9 @@ ${message}
       }
 
       const { documentType, loadId, invoiceId, sourceChannel } = req.body;
+      if (invoiceId && !await employeeCanModifyInvoice(req, Number(invoiceId))) {
+        return res.status(403).json({ message: "Documents can only be changed on your own draft or correction-required invoices" });
+      }
 
       const processedMimeType = req.file.mimetype;
       const processedOriginalName = sanitizeOriginalName(req.file.originalname);
@@ -1200,6 +1252,7 @@ ${message}
       if (Number.isNaN(id)) {
         return res.status(400).json({ message: "Invalid document ID" });
       }
+      if (!await employeeCanModifyDocument(req, id)) return res.status(403).json({ message: "Documents can only be changed on your own draft or correction-required invoices" });
 
       const document = await storage.getDocument(id);
 
@@ -1238,6 +1291,7 @@ ${message}
   app.get("/api/documents/:id/download", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (!await employeeCanAccessDocument(req, id)) return res.status(403).json({ message: "You may only download documents for your own invoices" });
       const document = await storage.getDocument(id);
 
       if (!document) {
@@ -1278,6 +1332,7 @@ ${message}
   app.get("/api/documents/:id/view", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (!await employeeCanAccessDocument(req, id)) return res.status(403).json({ message: "You may only view documents for your own invoices" });
       const document = await storage.getDocument(id);
 
       if (!document) {
@@ -1635,6 +1690,9 @@ ${message}
 
   app.post("/api/invoices/:id/hold", requireAuth, async (req: any, res) => {
     try {
+      if (req.user.role !== "manager" && req.user.role !== "admin") {
+        return res.status(403).json({ message: "Manager or admin access required" });
+      }
       const { reason, notes } = req.body as { reason: string; notes?: string };
       if (!reason?.trim()) return res.status(400).json({ message: "Hold reason is required" });
       const inv = await storage.holdInvoice(Number(req.params.id), reason, req.user.id, notes);
@@ -1645,6 +1703,9 @@ ${message}
 
   app.post("/api/invoices/:id/release", requireAuth, async (req: any, res) => {
     try {
+      if (req.user.role !== "manager" && req.user.role !== "admin") {
+        return res.status(403).json({ message: "Manager or admin access required" });
+      }
       const { releaseNote } = req.body as { releaseNote?: string };
       const inv = await storage.releaseInvoice(Number(req.params.id), req.user.id, releaseNote);
       await storage.createActivity({ userId: req.user.id, type: "invoice_released", description: `Invoice #${inv.invoiceNumber} released from hold`, entityType: "invoice", entityId: inv.id });
@@ -1652,10 +1713,19 @@ ${message}
     } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to release invoice" }); }
   });
 
-  app.get("/api/invoices", requireAuth, async (_req: any, res) => {
+  app.get("/api/invoices", requireAuth, async (req: any, res) => {
     try {
-      const invoices = await storage.getInvoices();
-      res.json(invoices);
+      const rows = await db.select({
+        invoice: invoices,
+        carrierName: clients.name,
+      }).from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .where(req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)
+        .orderBy(desc(invoices.createdAt));
+      res.json(rows.map(({ invoice, carrierName }) => ({
+        ...withInvoiceDisplayStatus(invoice),
+        carrierName,
+      })));
     } catch (error) {
       console.error("Error fetching invoices:", error);
       res.status(500).json({ message: "Failed to fetch invoices" });
@@ -1664,15 +1734,25 @@ ${message}
 
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
+      if (req.user.role !== "employee") {
+        return res.status(403).json({ message: "Only agents can create factoring invoice drafts" });
+      }
       const invoiceData = insertInvoiceSchema.parse(req.body);
       // Always generate a unique invoice number server-side to prevent collisions
       const invoiceNumber = await storage.getNextInvoiceNumber();
+      const {
+        status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,
+        fundedAt, heldReason, heldAt, heldBy, heldNotes, previousStatus,
+        ...draftData
+      } = invoiceData as any;
       const invoice = await storage.createInvoice({
-        ...invoiceData,
+        ...draftData,
         invoiceNumber,
         loadId: null,
         submittedBy: req.user.id,
-        submittedAt: new Date(),
+        submittedAt: null,
+        status: "draft",
+        factoringStage: "document_intake",
       });
 
       await storage.createActivity({
@@ -1683,7 +1763,7 @@ ${message}
         entityId: invoice.id,
       });
 
-      res.status(201).json(invoice);
+      res.status(201).json(withInvoiceDisplayStatus(invoice));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
@@ -1693,13 +1773,152 @@ ${message}
     }
   });
 
+  // ─── Funding queue: pending-review invoices with required-document state ──
+  app.get("/api/invoices/funding/queue", requireManagerOrAdmin, async (_req: any, res) => {
+    try {
+      const queue = await db.select({
+        invoice: invoices,
+        carrierName: clients.name,
+        advanceRate: clients.advanceRate,
+        factoringFeeRate: clients.factoringFeeRate,
+        brokerName: debtors.name,
+      }).from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .where(inArray(invoices.status, ["submitted", "docs_pending", "under_review"]))
+        .orderBy(invoices.submittedAt, invoices.createdAt);
+      const ids = queue.map((row) => row.invoice.id);
+      const docs = ids.length
+        ? await db.select({
+          invoiceId: documentsTable.invoiceId,
+          documentType: documentsTable.documentType,
+          finalDocumentType: documentsTable.finalDocumentType,
+        }).from(documentsTable).where(inArray(documentsTable.invoiceId, ids))
+        : [];
+      const byInvoice = new Map<number, typeof docs>();
+      for (const document of docs) {
+        if (!document.invoiceId) continue;
+        byInvoice.set(document.invoiceId, [...(byInvoice.get(document.invoiceId) ?? []), document]);
+      }
+      res.json(queue.map(({ invoice, carrierName, advanceRate, factoringFeeRate, brokerName }) => {
+        const invoiceDocs = byInvoice.get(invoice.id) ?? [];
+        const types = new Set(invoiceDocs.flatMap((document) =>
+          [document.documentType, document.finalDocumentType].filter(Boolean),
+        ));
+        const rateConfirmationPresent = types.has("rate_confirmation");
+        const billOfLadingPresent = types.has("bill_of_lading") || types.has("bol");
+        return {
+          ...withInvoiceDisplayStatus(invoice),
+          carrierName,
+          advanceRate,
+          factoringFeeRate,
+          brokerName,
+          documentPresence: {
+            rateConfirmation: rateConfirmationPresent,
+            billOfLading: billOfLadingPresent,
+            readyToFund: rateConfirmationPresent && billOfLadingPresent,
+          },
+        };
+      }));
+    } catch (error) {
+      console.error("Error fetching funding queue:", error);
+      res.status(500).json({ message: "Failed to fetch funding queue" });
+    }
+  });
+
+  // Uses the same guarded lifecycle operation as individual funding, ensuring
+  // every funded invoice gets its payout, history, ledger, and notifications.
+  app.post("/api/invoices/funding/batch", requireManagerOrAdmin, async (req: any, res) => {
+    try {
+      const body = z.object({
+        items: z.array(z.object({
+          invoiceId: z.number().int().positive(),
+          bankAccountVaultId: z.number().int().positive(),
+          paymentMethod: z.enum(["ach", "wire"]).optional(),
+        })).min(1).max(100),
+        force: z.boolean().optional(),
+      }).parse(req.body);
+      const uniqueIds = new Set(body.items.map((item) => item.invoiceId));
+      if (uniqueIds.size !== body.items.length) {
+        return res.status(400).json({ message: "Each invoice may appear only once in a funding batch" });
+      }
+
+      const results = [];
+      for (const item of body.items) {
+        const current = await storage.getInvoice(item.invoiceId);
+        if (!current) {
+          results.push({ invoiceId: item.invoiceId, success: false, error: "Invoice not found" });
+          continue;
+        }
+
+        let result: any = { success: true, invoice: current };
+        if (["submitted", "docs_pending"].includes(current.status)) {
+          result = await performTransition(
+            item.invoiceId, "start_review", req.user.id, req.user.role,
+          );
+        }
+        if (result.success && ["submitted", "docs_pending", "under_review"].includes(current.status)) {
+          result = await performTransition(
+            item.invoiceId, "approve", req.user.id, req.user.role,
+          );
+        }
+        if (result.success) {
+          result = await performTransition(
+          item.invoiceId,
+          "fund",
+          req.user.id,
+          req.user.role,
+          undefined,
+          body.force,
+          item.paymentMethod,
+          item.bankAccountVaultId,
+          );
+        }
+        results.push({
+          invoiceId: item.invoiceId,
+          ...result,
+          invoice: result.invoice ? withInvoiceDisplayStatus(result.invoice) : undefined,
+        });
+      }
+      const funded = results.filter((result) => result.success).length;
+      res.status(200).json({
+        success: funded === results.length,
+        funded,
+        failed: results.length - funded,
+        results,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
+      console.error("Error funding invoice batch:", error);
+      res.status(500).json({ message: "Failed to fund invoice batch" });
+    }
+  });
+
   app.put("/api/invoices/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid invoice ID" });
+      const lifecycleFields = [
+        "status", "factoringStage", "submittedBy", "submittedAt", "approvedBy",
+        "approvedAt", "fundedAt", "heldReason", "heldAt", "heldBy", "heldNotes",
+        "previousStatus",
+      ];
+      const attemptedLifecycleField = lifecycleFields.find((field) =>
+        Object.prototype.hasOwnProperty.call(req.body, field),
+      );
+      if (attemptedLifecycleField) {
+        return res.status(400).json({
+          message: `Lifecycle field "${attemptedLifecycleField}" cannot be changed through invoice updates; use the transition API`,
+        });
+      }
       const invoiceData = insertInvoiceSchema.partial().parse(req.body);
       const user = req.user;
+      const currentInvoice = await storage.getInvoice(id);
+      if (!currentInvoice) return res.status(404).json({ message: "Invoice not found" });
+      if (user.role === "employee" && (currentInvoice.submittedBy !== user.id || !["draft", "rejected"].includes(currentInvoice.status))) {
+        return res.status(403).json({ message: "Agents may edit only their own draft or correction-required invoices" });
+      }
       if (invoiceData.bankAccountId) {
-        const currentInvoice = await storage.getInvoice(id);
         const account = await storage.getVaultEntry(invoiceData.bankAccountId);
         if (!currentInvoice || !account || account.clientId !== currentInvoice.clientId || account.dataType !== "bank_account" || !account.isActive) {
           return res.status(400).json({ message: "The selected bank account is not available for this carrier" });
@@ -1711,15 +1930,6 @@ ${message}
         updatedAt: new Date(),
       };
 
-      if (invoiceData.status === "approved" && (user?.role === "manager" || user?.role === "admin")) {
-        updatePayload.approvedBy = req.user.id;
-        updatePayload.approvedAt = new Date();
-      }
-
-      if (invoiceData.status === "submitted") {
-        updatePayload.submittedAt = new Date();
-      }
-
       const invoice = await storage.updateInvoice(id, updatePayload);
 
       await storage.createActivity({
@@ -1730,12 +1940,7 @@ ${message}
         entityId: invoice.id,
       });
 
-      if (invoiceData.status) {
-        const derivedStage = stageFromInvoiceStatus(invoiceData.status);
-        advanceInvoiceStage(id, derivedStage, req.user.id, `Status changed to ${invoiceData.status}`).catch(() => {});
-      }
-
-      res.json(invoice);
+      res.json(withInvoiceDisplayStatus(invoice));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
@@ -1747,29 +1952,11 @@ ${message}
 
   app.put("/api/invoices/:id/approve", requireAuth, async (req: any, res) => {
     try {
-      const user = req.user;
-      if (user?.role !== "manager" && user?.role !== "admin") {
-        return res.status(403).json({ message: "Only managers and admins can approve invoices" });
-      }
-
       const id = parseInt(req.params.id, 10);
-      const invoice = await storage.updateInvoice(id, {
-        status: "approved",
-        approvedBy: req.user.id,
-        approvedAt: new Date(),
-      });
-
-      await storage.createActivity({
-        userId: req.user.id,
-        type: "invoice_approved",
-        description: `Approved invoice: ${invoice.invoiceNumber}`,
-        entityType: "invoice",
-        entityId: invoice.id,
-      });
-
-      advanceInvoiceStage(id, "approval", req.user.id, "Invoice approved").catch(() => {});
-
-      res.json(invoice);
+      const result = await performTransition(id, "approve", req.user.id, req.user.role ?? "employee");
+      res.status(result.success ? 200 : 400).json(
+        result.success ? { ...result, invoice: withInvoiceDisplayStatus(result.invoice) } : result,
+      );
     } catch (error) {
       console.error("Error approving invoice:", error);
       res.status(500).json({ message: "Failed to approve invoice" });
@@ -1778,41 +1965,16 @@ ${message}
 
   app.post("/api/invoices/:id/override-approve", requireAuth, async (req: any, res) => {
     try {
-      if (req.user?.role !== "manager" && req.user?.role !== "admin") {
-        return res.status(403).json({ message: "Manager or admin required" });
-      }
       const id = parseInt(req.params.id, 10);
       const reason = String(req.body.reason ?? "").trim();
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid invoice ID" });
       if (!reason) return res.status(400).json({ message: "Override reason is required" });
-
-      const existing = await storage.getInvoice(id);
-      if (!existing) return res.status(404).json({ message: "Invoice not found" });
-      const appliedAt = new Date();
-      const agentName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || req.user.id;
-      const invoice = await storage.updateInvoice(id, {
-        status: "approved",
-        factoringStage: "approval",
-        approvedBy: req.user.id,
-        approvedAt: appliedAt,
-        updatedAt: appliedAt,
-      } as any);
-      await db.insert(eventLedger).values({
-        entityType: "invoice",
-        entityId: id,
-        eventType: "document_requirements_overridden",
-        actorType: "user",
-        actorId: req.user.id,
-        payloadJson: { reason, agentName, appliedAt: appliedAt.toISOString(), previousStatus: existing.status },
-      });
-      await storage.createActivity({
-        userId: req.user.id,
-        type: "invoice_override_approved",
-        description: `${agentName} overrode document requirements and approved invoice ${invoice.invoiceNumber}: ${reason}`,
-        entityType: "invoice",
-        entityId: id,
-      } as any);
-      res.json(invoice);
+      const result = await performTransition(
+        id, "approve", req.user.id, req.user.role ?? "employee", reason, true,
+      );
+      res.status(result.success ? 200 : 400).json(
+        result.success ? { ...result, invoice: withInvoiceDisplayStatus(result.invoice) } : result,
+      );
     } catch (error) {
       console.error("Error overriding invoice approval:", error);
       res.status(500).json({ message: "Failed to override and approve invoice" });
@@ -1824,6 +1986,7 @@ ${message}
     try {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid invoice ID" });
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only download your own invoices" });
 
       const [row] = await db
         .select({
@@ -1960,8 +2123,12 @@ ${message}
   app.get("/api/invoices/:id/detail", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const invoice = await storage.getInvoice(id);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if ((req as any).user.role === "employee" && invoice.submittedBy !== (req as any).user.id) {
+        return res.status(403).json({ message: "You may only view your own submitted invoices" });
+      }
       const detail = await getInvoiceDetail(id);
-      if (!detail) return res.status(404).json({ message: "Invoice not found" });
       res.json(detail);
     } catch (err) {
       console.error("Error fetching invoice detail:", err);
@@ -1973,6 +2140,7 @@ ${message}
   app.get("/api/invoices/:id/timeline", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only view your own invoice status" });
       const timeline = await getInvoiceTimeline(id);
       res.json(timeline);
     } catch (err) {
@@ -1985,8 +2153,11 @@ ${message}
   app.get("/api/invoices/:id/available-transitions", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const transitions = await getAvailableTransitions(id, req.user?.role ?? "employee");
-      res.json(transitions);
+      const transitions = await getAvailableTransitions(id, req.user?.role ?? "employee", req.user?.id);
+      res.json(transitions.map((transition) => ({
+        ...transition,
+        toDisplayStatus: getInvoiceDisplayStatus(transition.to),
+      })));
     } catch (err) {
       console.error("Error fetching transitions:", err);
       res.status(500).json({ message: "Failed to fetch available transitions" });
@@ -2008,7 +2179,9 @@ ${message}
       const result = await performTransition(
         id, transitionId, req.user.id, req.user.role ?? "employee", reason, force, paymentMethod, bankAccountVaultId,
       );
-      res.json(result);
+      res.status(result.success ? 200 : 400).json(
+        result.success ? { ...result, invoice: withInvoiceDisplayStatus(result.invoice) } : result,
+      );
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message });
       console.error("Error performing transition:", err);
@@ -2132,6 +2305,7 @@ ${message}
   app.get("/api/invoices/:id/document-status", requireAuth, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only view document status for your own invoices" });
       const raw = await getDocumentCompleteness(invoiceId);
 
       // Fetch latest review per document to surface confirmation status
@@ -2194,7 +2368,9 @@ ${message}
   // ─── Invoice document reviews (reviewer notes) ────────────────────────────
   app.get("/api/invoices/:id/doc-reviews", requireAuth, async (req, res) => {
     try {
-      res.json(await storage.getDocReviews(parseInt(req.params.id)));
+      const invoiceId = parseInt(req.params.id);
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only view reviews for your own invoices" });
+      res.json(await storage.getDocReviews(invoiceId));
     } catch (err) { res.status(500).json({ message: "Failed to fetch document reviews" }); }
   });
 
@@ -2226,7 +2402,9 @@ ${message}
         return res.status(400).json({ message: "Search query is required" });
       }
       const invoices = await storage.searchInvoices(q);
-      res.json(invoices);
+      res.json(req.user.role === "employee"
+        ? invoices.filter(invoice => invoice.submittedBy === req.user.id)
+        : invoices);
     } catch (error) {
       console.error("Error searching invoices:", error);
       res.status(500).json({ message: "Failed to search invoices" });

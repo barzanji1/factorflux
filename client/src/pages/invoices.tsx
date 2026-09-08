@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -27,13 +27,36 @@ import {
 import InvoiceModal from "@/components/modals/invoice-modal";
 import type { Invoice } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Invoices() {
+  const { user } = useAuth();
+  const isManager = user?.role === "manager" || user?.role === "admin";
+  const agentStatus = (status: string) => ({
+    draft: "Draft",
+    submitted: "Pending Review",
+    docs_pending: "Pending Review",
+    under_review: "Pending Review",
+    approved: "Approved",
+    funded: "Funded",
+    paid: "Collected",
+    settled: "Settled",
+    rejected: "Correction Required",
+  }[status] ?? status);
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const submitMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/invoices/${id}/transition`, { transitionId: "submit", force: false }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({ title: "Invoice submitted for funding" });
+    },
+    onError: (error: Error) => toast({ title: "Unable to submit invoice", description: error.message, variant: "destructive" }),
+  });
 
   const { data: invoices, isLoading: invoicesLoading, isError: invoicesError } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
@@ -111,8 +134,8 @@ export default function Invoices() {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
-          title="Loads"
-          subtitle="Invoice creation, review, status, and processing workflow"
+          title={isManager ? "Invoices" : "My invoices"}
+          subtitle={isManager ? "Review invoice activity and funding status" : "Create, upload, and submit invoices for funding"}
           group="Workspace"
         />
 
@@ -147,13 +170,13 @@ export default function Invoices() {
                     />
                   </div>
 
-                  <Button
+                  {!isManager && <Button
                     onClick={handleCreateInvoice}
                     className="h-12 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] hover:bg-blue-700"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     New Invoice
-                  </Button>
+                  </Button>}
                 </div>
               </div>
 
@@ -252,7 +275,7 @@ export default function Invoices() {
                             Invoice #
                           </th>
                           <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            Load #
+                             Carrier
                           </th>
                           <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                             Amount
@@ -282,7 +305,7 @@ export default function Invoices() {
                             </td>
 
                             <td className="px-6 py-5 text-sm text-slate-600 dark:text-slate-300">
-                              {invoice.loadId ? `#${invoice.loadId}` : <span className="text-slate-400">—</span>}
+                              {(invoice as Invoice & { carrierName?: string }).carrierName ?? <span className="text-slate-400">—</span>}
                             </td>
 
                             <td className="px-6 py-5 text-sm font-semibold text-slate-900 dark:text-white">
@@ -290,7 +313,7 @@ export default function Invoices() {
                             </td>
 
                             <td className="px-6 py-5">
-                              <FFBadge status={invoice.status} />
+                              {isManager ? <FFBadge status={invoice.status} /> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{agentStatus(invoice.status)}</span>}
                             </td>
 
                             <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">
@@ -307,11 +330,7 @@ export default function Invoices() {
                                   icon={<ChevronRight className="h-4 w-4" />}
                                 />
 
-                                <ActionIconButton
-                                  title="View Invoice"
-                                  onClick={() => handleEditInvoice(invoice)}
-                                  icon={<Eye className="h-4 w-4" />}
-                                />
+                                 {isManager && <ActionIconButton title="View Invoice" onClick={() => handleEditInvoice(invoice)} icon={<Eye className="h-4 w-4" />} />}
 
                                 <a
                                   href={`/api/invoices/${invoice.id}/download`}
@@ -322,11 +341,20 @@ export default function Invoices() {
                                   <Download className="h-4 w-4" />
                                 </a>
 
-                                <ActionIconButton
-                                  title="Edit Invoice"
-                                  onClick={() => handleEditInvoice(invoice)}
-                                  icon={<Edit className="h-4 w-4" />}
-                                />
+                                {!isManager && ["draft", "rejected"].includes(String(invoice.status)) && (
+                                  <ActionIconButton title="Edit Invoice" onClick={() => handleEditInvoice(invoice)} icon={<Edit className="h-4 w-4" />} />
+                                )}
+                                {!isManager && ["draft", "rejected"].includes(String(invoice.status)) && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => submitMutation.mutate(invoice.id)}
+                                    disabled={submitMutation.isPending}
+                                    className="h-8 bg-[#098b9f] px-2.5 text-[11px] text-white hover:bg-[#087b8d]"
+                                  >
+                                    Submit for Funding
+                                  </Button>
+                                )}
+                                {isManager && <ActionIconButton title="Edit Invoice" onClick={() => handleEditInvoice(invoice)} icon={<Edit className="h-4 w-4" />} />}
                               </div>
                             </td>
                           </tr>

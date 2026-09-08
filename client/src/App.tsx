@@ -25,6 +25,7 @@ import FollowUp from "@/pages/follow-up";
 import Collections from "@/pages/collections";
 import Vault from "@/pages/vault";
 import Factoring from "@/pages/factoring";
+import FundingQueue from "@/pages/funding-queue";
 import Tasks from "@/pages/tasks";
 import Brokers from "@/pages/brokers";
 import FormDemo from "@/pages/form-demo";
@@ -115,6 +116,11 @@ function Router() {
       <Route path="/factoring">
         <ProtectedRoute>
           <Factoring />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/funding-queue">
+        <ProtectedRoute>
+          <FundingQueue />
         </ProtectedRoute>
       </Route>
       <Route path="/payouts">

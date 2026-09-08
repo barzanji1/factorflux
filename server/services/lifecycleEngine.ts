@@ -60,11 +60,35 @@ interface TransitionDef {
   to: string;
   label: string;
   description: string;
-  requiredRole: "any" | "manager_or_admin" | "admin";
+  requiredRole: "any" | "agent" | "manager_or_admin" | "admin";
+  /** Agent-only actions must be performed by the invoice's submitting agent. */
+  submitterOnly?: boolean;
   variant: "primary" | "secondary" | "danger";
   requiresReason?: boolean;
   guards: Guard[];
   sideEffects: SideEffect[];
+}
+
+/**
+ * Database statuses remain deliberately stable for downstream collections,
+ * payout, and chargeback integrations.  API consumers should use this label
+ * when presenting the simplified factoring workflow.
+ */
+export const INVOICE_DISPLAY_STATUS: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Pending Review",
+  docs_pending: "Documents Required",
+  under_review: "Under Review",
+  approved: "Approved for Funding",
+  rejected: "Rejected",
+  funded: "Funded",
+  settled: "Settled",
+  paid: "Collected",
+  held: "On Hold",
+};
+
+export function getInvoiceDisplayStatus(status: string | null | undefined) {
+  return INVOICE_DISPLAY_STATUS[status ?? ""] ?? "Unknown";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +113,20 @@ const guardHasAnyDocument: Guard = async ({ invoiceId }) => {
 // from docValidation.ts so admins can configure the checklist without code changes.
 const guardHasRequiredDocs: Guard = (ctx) => guardDocsForReview(ctx);
 const guardHasApprovalDocs: Guard = (ctx) => guardDocsForApproval(ctx);
+
+/** Funding is never permitted without the two core freight documents. */
+const guardHasFundingDocs: Guard = async ({ invoiceId }) => {
+  const docs = await db.select({ documentType: documents.documentType }).from(documents)
+    .where(eq(documents.invoiceId, invoiceId));
+  const types = new Set(docs.map((document) => document.documentType));
+  const missing = [
+    !types.has("rate_confirmation") ? "rate confirmation" : null,
+    !(types.has("bill_of_lading") || types.has("bol")) ? "bill of lading" : null,
+  ].filter(Boolean);
+  return missing.length
+    ? { code: "missing_funding_docs", message: `Cannot fund without: ${missing.join(", ")}`, severity: "error" }
+    : null;
+};
 
 const guardNoOpenCriticalExceptions: Guard = async ({ invoiceId }) => {
   const [exc] = await db.select({ id: exceptions.id }).from(exceptions)
@@ -137,7 +175,12 @@ const guardHasReason: Guard = async ({ reason }) =>
 function fxSetStatus(newStatus: string): SideEffect {
   return async ({ invoiceId, actorId, invoice, reason }) => {
     const statusUpdate: any = { status: newStatus as any, updatedAt: new Date() };
+    if (newStatus === "submitted" && !invoice.submittedAt) statusUpdate.submittedAt = new Date();
     // Do not overwrite the original funding date on any later transition.
+    if (newStatus === "approved") {
+      statusUpdate.approvedBy = actorId;
+      statusUpdate.approvedAt = new Date();
+    }
     if (newStatus === "funded" && !invoice.fundedAt) statusUpdate.fundedAt = new Date();
     await db.update(invoices)
       .set(statusUpdate)
@@ -357,13 +400,14 @@ export const TRANSITION_DEFS: TransitionDef[] = [
   // ── 1. Submit draft ───────────────────────────────────────────────────────
   {
     id: "submit",
-    from: ["draft"],
+    from: ["draft", "rejected"],
     to: "submitted",
-    label: "Submit for Review",
-    description: "Submit this invoice to begin the factoring review process",
-    requiredRole: "any",
+    label: "Submit for Funding",
+    description: "Submit this invoice to the manager funding queue",
+    requiredRole: "agent",
+    submitterOnly: true,
     variant: "primary",
-    guards: [guardHasClient, guardHasAmount, guardHasAnyDocument],
+    guards: [guardHasClient, guardHasAmount, guardHasRequiredDocs],
     sideEffects: [
       fxSetStatus("submitted"),
       fxCheckDocsAutoDowngrade,
@@ -433,7 +477,7 @@ export const TRANSITION_DEFS: TransitionDef[] = [
   // ── 5. Reject ─────────────────────────────────────────────────────────────
   {
     id: "reject",
-    from: ["under_review"],
+    from: ["submitted", "docs_pending", "under_review"],
     to: "rejected",
     label: "Reject Invoice",
     description: "Reject this invoice and notify the submitter — creates an exception record",
@@ -443,7 +487,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     guards: [guardHasReason],
     sideEffects: [
       fxSetStatus("rejected"),
-      fxCreateRejectionException,
       fxActivity("invoice_rejected", ctx => `Invoice ${ctx.invoice.invoiceNumber} rejected: ${ctx.reason}`),
       fxNotify(
         ctx => `Invoice Rejected — ${ctx.invoice.invoiceNumber}`,
@@ -461,10 +504,10 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     description: "Create payout record and fund this invoice — auto-calculates advance, fee, and reserve",
     requiredRole: "manager_or_admin",
     variant: "primary",
-    guards: [guardNoExistingPayout],
+    guards: [guardNoExistingPayout, guardHasFundingDocs],
     sideEffects: [
-      fxSetStatus("funded"),
       fxCreatePayout,
+      fxSetStatus("funded"),
       fxSendFundingConfirmation,
       // Funding completes Advance; Approval is the next active lifecycle stage.
       fxStage("approval"),
@@ -480,41 +523,41 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     ],
   },
 
-  // ── 7. Settle ─────────────────────────────────────────────────────────────
+  // ── 7. Record collection ──────────────────────────────────────────────────
   {
     id: "settle",
     from: ["funded"],
-    to: "settled",
-    label: "Mark as Settled",
-    description: "Mark invoice settled after debtor/broker payment received",
+    to: "paid",
+    label: "Mark Collected",
+    description: "Record receipt of the debtor or broker payment",
     requiredRole: "manager_or_admin",
     variant: "primary",
     guards: [guardHasPaymentApplied],
     sideEffects: [
-      fxSetStatus("settled"),
-      fxStage("final_settlement"),
-      fxActivity("invoice_settled", ctx => `Invoice ${ctx.invoice.invoiceNumber} settled`),
+      fxSetStatus("paid"),
+      fxStage("collections"),
+      fxActivity("invoice_collected", ctx => `Payment collected for invoice ${ctx.invoice.invoiceNumber}`),
     ],
   },
 
-  // ── 8. Mark paid + release reserve ───────────────────────────────────────
+  // ── 8. Final settlement + reserve release ────────────────────────────────
   {
     id: "mark_paid",
-    from: ["settled"],
-    to: "paid",
-    label: "Mark Paid & Release Reserve",
-    description: "Mark fully paid and release carrier reserve — this is the final lifecycle action",
+    from: ["paid"],
+    to: "settled",
+    label: "Settle Invoice",
+    description: "Complete settlement and release the carrier reserve",
     requiredRole: "manager_or_admin",
     variant: "primary",
     guards: [],
     sideEffects: [
-      fxSetStatus("paid"),
+      fxSetStatus("settled"),
       fxReleaseReserve,
       fxStage("final_settlement"),
-      fxActivity("invoice_paid", ctx => `Invoice ${ctx.invoice.invoiceNumber} fully paid — reserve released`),
+      fxActivity("invoice_settled", ctx => `Invoice ${ctx.invoice.invoiceNumber} settled — reserve released`),
       fxNotify(
-        ctx => `Invoice Paid — ${ctx.invoice.invoiceNumber}`,
-        ctx => `Invoice ${ctx.invoice.invoiceNumber} is fully paid and your reserve has been released.`,
+        ctx => `Invoice Settled — ${ctx.invoice.invoiceNumber}`,
+        ctx => `Invoice ${ctx.invoice.invoiceNumber} is settled and your reserve has been released.`,
       ),
     ],
   },
@@ -526,7 +569,8 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     to: "draft",
     label: "Reopen for Editing",
     description: "Reopen a rejected invoice so it can be corrected and resubmitted",
-    requiredRole: "any",
+    requiredRole: "agent",
+    submitterOnly: true,
     variant: "secondary",
     guards: [],
     sideEffects: [
@@ -563,15 +607,18 @@ export interface TransitionResult {
 export async function getAvailableTransitions(
   invoiceId: number,
   actorRole: string,
+  actorId?: string,
 ): Promise<AvailableTransition[]> {
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!invoice) return [];
 
-  const ctx: Ctx = { invoiceId, invoice, actorId: "", actorRole };
+  const ctx: Ctx = { invoiceId, invoice, actorId: actorId ?? "", actorRole };
   const result: AvailableTransition[] = [];
 
   for (const def of TRANSITION_DEFS) {
     if (!def.from.includes(invoice.status)) continue;
+    if (def.requiredRole === "agent" && actorRole !== "employee") continue;
+    if (def.submitterOnly && invoice.submittedBy !== ctx.actorId) continue;
     if (def.requiredRole === "manager_or_admin" && actorRole !== "manager" && actorRole !== "admin") continue;
     if (def.requiredRole === "admin" && actorRole !== "admin") continue;
 
@@ -613,6 +660,10 @@ export async function performTransition(
   if (!def) return { success: false, error: `Unknown transition: ${transitionId}` };
   if (!def.from.includes(invoice.status))
     return { success: false, error: `Cannot perform "${def.label}" when invoice status is "${invoice.status}"` };
+  if (def.requiredRole === "agent" && actorRole !== "employee")
+    return { success: false, error: "Only agents can perform this action" };
+  if (def.submitterOnly && invoice.submittedBy !== actorId)
+    return { success: false, error: "Only the submitting agent can perform this action" };
   if (def.requiredRole === "manager_or_admin" && actorRole !== "manager" && actorRole !== "admin")
     return { success: false, error: "Insufficient permissions for this action" };
   if (def.requiredRole === "admin" && actorRole !== "admin")
@@ -641,11 +692,18 @@ export async function performTransition(
   const softBlockers = blockers.filter(b => b.severity === "warning");
   if (softBlockers.length > 0 && !force)
     return { success: false, blockers: softBlockers, error: "Transition has warnings — use admin override to proceed" };
+  if (softBlockers.length > 0 && force && actorRole !== "admin")
+    return { success: false, blockers: softBlockers, error: "Only admins can override transition warnings" };
 
   // Execute side effects
   for (const fx of def.sideEffects) {
     try { await fx(ctx); }
-    catch (err) { console.error(`[lifecycle] side-effect error in ${transitionId}:`, err); }
+    catch (err) {
+      console.error(`[lifecycle] side-effect error in ${transitionId}:`, err);
+      if (transitionId === "fund" && fx === fxCreatePayout) {
+        return { success: false, error: "Funding failed before the invoice status changed" };
+      }
+    }
   }
 
   const [updated] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));

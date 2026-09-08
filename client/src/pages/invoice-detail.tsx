@@ -412,6 +412,7 @@ export default function InvoiceDetail() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const invoiceId = Number(id);
+  const isManager = user?.role === "manager" || user?.role === "admin";
 
   const [selectedTransition, setSelectedTransition] = useState<AvailableTransition | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -438,6 +439,7 @@ export default function InvoiceDetail() {
     },
     enabled: !isNaN(invoiceId),
   });
+  const canAgentCorrect = !isManager && ["draft", "rejected"].includes(String(detail?.status ?? ""));
   const carrierId = detail?.client?.id ?? detail?.clientId;
   const { data: carrierBankAccounts = [], isLoading: bankAccountsLoading } = useQuery<any[]>({
     queryKey: ["/api/carriers", carrierId, "bank-accounts"],
@@ -661,7 +663,7 @@ export default function InvoiceDetail() {
                           <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{fmtDate(detail.submittedAt ?? detail.createdAt)}</span>
                         </div>
                       </div>
-                      <Button variant="outline" className="gap-2" onClick={() => {
+                      {(isManager || canAgentCorrect) && <Button variant="outline" className="gap-2" onClick={() => {
                         setEditValues({
                           amount: String(detail.amount ?? ""),
                           loadNumber: detail.loadNumber ?? "",
@@ -672,7 +674,7 @@ export default function InvoiceDetail() {
                         setEditOpen(true);
                       }}>
                         <Pencil className="h-4 w-4" />Edit Invoice
-                      </Button>
+                      </Button>}
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Invoice Amount</p>
@@ -699,7 +701,7 @@ export default function InvoiceDetail() {
                   </div>
                 </div>
 
-                {/* ── Stage pipeline ─────────────────────────────────────── */}
+                {isManager && <>{/* ── Stage pipeline ─────────────────────────────────────── */}
                 <div className="rounded-[24px] border border-slate-200/80 bg-white/90 px-6 py-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                   <div className="mb-4 flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-blue-600" />
@@ -718,14 +720,14 @@ export default function InvoiceDetail() {
                   isLoading={transitionsLoading}
                   userRole={user?.role ?? "employee"}
                   onTransition={openTransitionDialog}
-                />
+                /></>}
 
                 {/* ── Tabs ──────────────────────────────────────────────── */}
                 <div className="rounded-[28px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                   <Tabs defaultValue="overview">
                     <div className="border-b border-slate-100 px-6 pt-5 dark:border-slate-800">
                       <TabsList className="h-auto gap-1 rounded-none bg-transparent p-0">
-                        {[
+                        {(isManager ? [
                           { value: "overview",    label: "Overview",      icon: <ReceiptText className="h-3.5 w-3.5" /> },
                           { value: "doccheck",    label: "Doc Checklist", icon: <ClipboardCheck className="h-3.5 w-3.5" />, alert: docStatus && !docStatus.canApprove },
                           { value: "documents",   label: "Documents",     icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length },
@@ -735,7 +737,12 @@ export default function InvoiceDetail() {
                           { value: "cashapp",     label: "Cash Applied",  icon: <DollarSign className="h-3.5 w-3.5" />,  count: detail.cashAppLines?.length },
                           { value: "exceptions",  label: "Exceptions",    icon: <ShieldAlert className="h-3.5 w-3.5" />, count: detail.exceptions?.length },
                           { value: "timeline",    label: "Timeline",      icon: <Activity className="h-3.5 w-3.5" /> },
-                        ].map(({ value, label, icon, count, alert }: any) => (
+                        ] : [
+                          { value: "overview", label: "Overview", icon: <ReceiptText className="h-3.5 w-3.5" /> },
+                          { value: "documents", label: "Documents", icon: <FileText className="h-3.5 w-3.5" />, count: detail.documents?.length },
+                          { value: "timeline", label: "Status", icon: <Activity className="h-3.5 w-3.5" /> },
+                          { value: "notes", label: "Notes", icon: <MessageSquare className="h-3.5 w-3.5" /> },
+                        ]).map(({ value, label, icon, count, alert }: any) => (
                           <TabsTrigger key={value} value={value}
                             className="flex items-center gap-1.5 rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-xs font-semibold text-slate-500 transition-colors data-[state=active]:border-blue-600 data-[state=active]:text-blue-700 dark:text-slate-400 dark:data-[state=active]:text-blue-300">
                             {icon}{label}
@@ -749,6 +756,14 @@ export default function InvoiceDetail() {
                         ))}
                       </TabsList>
                     </div>
+
+                    {/* Employee notes */}
+                    <TabsContent value="notes" className="p-6">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-900/40">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white"><MessageSquare className="h-4 w-4 text-blue-600" />Invoice notes</div>
+                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{detail.notes || "No notes have been added to this invoice."}</p>
+                      </div>
+                    </TabsContent>
 
                     {/* Doc Checklist */}
                     <TabsContent value="doccheck" className="p-6">

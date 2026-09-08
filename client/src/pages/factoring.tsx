@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import type { Invoice } from "@shared/schema";
 import { Search, Eye, AlertTriangle, SquareCheck, Square, ChevronRight } from "lucide-react";
@@ -103,6 +104,7 @@ const BULK_ACTIONS: Record<QTabId, Array<{ label: string; tid: TransId; needsRea
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Factoring() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, go] = useLocation();
 
   const [activeTab, setActiveTab] = useStickyState<QTabId>("ff:factoring:tab", "all");
@@ -207,6 +209,11 @@ export default function Factoring() {
 
   const rowActions = ROW_ACTIONS[activeTab];
   const bulkActions = BULK_ACTIONS[activeTab];
+
+  if (user?.role !== "manager" && user?.role !== "admin") {
+    go("/invoices");
+    return null;
+  }
 
   const actionBtn = (action: RowAction) => cn(
     "rounded-[7px] px-2.5 py-1.5 text-[11px] font-semibold transition-colors whitespace-nowrap",
