@@ -5560,6 +5560,183 @@ Trucking Pros Financial Team
     try { res.json(await buildArReport("broker", req.query)); }
     catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate broker AR report" }); }
   });
+
+  // Carrier/broker reports always scope by both sides of the receivable. This
+  // prevents a carrier-only (or broker-only) query from inadvertently exposing
+  // unrelated invoice activity.
+  type CarrierBrokerReportRow = {
+    id: number; invoiceNumber: string; loadNumber: string | null; amount: number;
+    fundedDate: Date | null; ageDays: number; status: string; chargebackStatus: string;
+    appliedAmount: number; collected: number; outstanding: number; shortPayAmount: number;
+    accountStatus: "pending" | "overdue" | "charged_back" | "payment_plan";
+  };
+  const carrierBrokerReportQuery = (query: Record<string, unknown>, options: {
+    aging?: boolean; invoices?: boolean; shortPay?: boolean;
+  } = {}) => {
+    const parsePositiveInteger = (value: unknown, label: string) => {
+      if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) throw new Error(`${label} must be a positive integer`);
+      return Number(value);
+    };
+    const carrierId = parsePositiveInteger(query.carrierId, "carrierId");
+    const brokerId = parsePositiveInteger(query.brokerId, "brokerId");
+    let minDays = 0;
+    if (options.aging && query.minDays !== undefined) {
+      if (typeof query.minDays !== "string" || !/^\d+$/.test(query.minDays)) throw new Error("minDays must be a non-negative integer");
+      minDays = Number(query.minDays);
+    }
+    let includeChargebacks = false;
+    if (options.aging && query.includeChargebacks !== undefined) {
+      if (query.includeChargebacks !== "true" && query.includeChargebacks !== "false") throw new Error("includeChargebacks must be true or false");
+      includeChargebacks = query.includeChargebacks === "true";
+    }
+    let year: number | undefined;
+    let type: "all" | "otr" = "all";
+    if (options.invoices) {
+      if (query.year !== undefined) {
+        if (typeof query.year !== "string" || !/^\d{4}$/.test(query.year)) throw new Error("year must be a four-digit year");
+        year = Number(query.year);
+      }
+      if (query.type !== undefined) {
+        if (query.type !== "all" && query.type !== "otr") throw new Error("type must be all or otr");
+        type = query.type;
+      }
+    }
+    return { carrierId, brokerId, minDays, includeChargebacks, year, type };
+  };
+  const buildCarrierBrokerReport = async (
+    query: Record<string, unknown>,
+    options: { aging?: boolean; invoices?: boolean; shortPay?: boolean } = {},
+  ) => {
+    const filters = carrierBrokerReportQuery(query, options);
+    const invoiceRows = await db.select({
+      id: invoices.id, invoiceNumber: invoices.invoiceNumber, loadNumber: invoices.loadNumber,
+      amount: invoices.amount, fundedDate: invoices.fundedAt, status: invoices.status,
+      chargebackStatus: invoices.chargebackStatus, invoiceDate: invoices.invoiceDate,
+      dueDate: invoices.dueDate, createdAt: invoices.createdAt, loadType: invoices.loadType,
+      notes: invoices.notes,
+    }).from(invoices).where(and(eq(invoices.clientId, filters.carrierId), eq(invoices.debtorId, filters.brokerId)));
+    const invoiceIds = invoiceRows.map((invoice) => invoice.id);
+    const applicationRows = invoiceIds.length
+      ? await db.select({
+          invoiceId: paymentApplicationLines.invoiceId,
+          appliedAmount: paymentApplicationLines.appliedAmount,
+          varianceType: paymentApplicationLines.varianceType,
+        }).from(paymentApplicationLines).where(inArray(paymentApplicationLines.invoiceId, invoiceIds))
+      : [];
+    const appliedByInvoice = new Map<number, number>();
+    applicationRows.forEach((line) =>
+      appliedByInvoice.set(line.invoiceId, (appliedByInvoice.get(line.invoiceId) || 0) + Number(line.appliedAmount)),
+    );
+    const shortPayInvoiceIds = new Set(
+      applicationRows.filter((line) => line.varianceType === "short_pay").map((line) => line.invoiceId),
+    );
+    const now = Date.now();
+    const rows: CarrierBrokerReportRow[] = invoiceRows
+      .filter((invoice) => {
+        const appliedAmount = appliedByInvoice.get(invoice.id) || 0;
+        const outstanding = Math.max(0, Number(invoice.amount) - appliedAmount);
+        const ageDays = invoice.fundedDate ? Math.max(0, Math.floor((now - invoice.fundedDate.getTime()) / 86400000)) : 0;
+        if (options.aging && (!invoice.fundedDate || outstanding <= 0 || (!filters.includeChargebacks && ["scheduled", "extended", "charged"].includes(invoice.chargebackStatus)) || ageDays < filters.minDays)) return false;
+        if (options.invoices && ((filters.year !== undefined && (invoice.invoiceDate ?? invoice.createdAt)?.getFullYear() !== filters.year) || (filters.type === "otr" && invoice.loadType !== "otr_load"))) return false;
+        if (options.shortPay && (!shortPayInvoiceIds.has(invoice.id) || outstanding <= 0)) return false;
+        return true;
+      })
+      .map((invoice) => {
+        const appliedAmount = appliedByInvoice.get(invoice.id) || 0;
+        const outstanding = Math.max(0, Number(invoice.amount) - appliedAmount);
+        const chargedBack = ["scheduled", "extended", "charged"].includes(invoice.chargebackStatus);
+        const paymentPlan = /\bpayment\s*plan\b/i.test(invoice.notes || "");
+        const overdue = !!invoice.dueDate && invoice.dueDate.getTime() < now;
+        const accountStatus: CarrierBrokerReportRow["accountStatus"] =
+          paymentPlan ? "payment_plan" : chargedBack ? "charged_back" : overdue ? "overdue" : "pending";
+        return {
+          id: invoice.id, invoiceNumber: invoice.invoiceNumber, loadNumber: invoice.loadNumber,
+          amount: Number(invoice.amount), fundedDate: invoice.fundedDate,
+          ageDays: invoice.fundedDate ? Math.max(0, Math.floor((now - invoice.fundedDate.getTime()) / 86400000)) : 0,
+          status: invoice.status, chargebackStatus: invoice.chargebackStatus,
+          appliedAmount: +appliedAmount.toFixed(2), collected: +appliedAmount.toFixed(2),
+          outstanding: +outstanding.toFixed(2), shortPayAmount: options.shortPay ? +outstanding.toFixed(2) : 0,
+          accountStatus,
+        };
+      })
+      .sort((a, b) => b.ageDays - a.ageDays || a.invoiceNumber.localeCompare(b.invoiceNumber));
+    const summary = rows.reduce((total, row) => ({
+      count: total.count + 1,
+      totalAmount: total.totalAmount + row.amount,
+      totalOutstanding: total.totalOutstanding + row.outstanding,
+      totalShortPay: total.totalShortPay + row.shortPayAmount,
+    }), { count: 0, totalAmount: 0, totalOutstanding: 0, totalShortPay: 0 });
+    return {
+      rows,
+      summary: {
+        count: summary.count,
+        totalAmount: +summary.totalAmount.toFixed(2),
+        totalOutstanding: +summary.totalOutstanding.toFixed(2),
+        totalShortPay: +summary.totalShortPay.toFixed(2),
+      },
+    };
+  };
+
+  app.get("/api/reports/carrier-broker-aging", requireAuth, async (req, res) => {
+    try { res.json(await buildCarrierBrokerReport(req.query, { aging: true })); }
+    catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate carrier/broker aging report" }); }
+  });
+  app.get("/api/reports/carrier-broker-invoices", requireAuth, async (req, res) => {
+    try { res.json(await buildCarrierBrokerReport(req.query, { invoices: true })); }
+    catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate carrier/broker invoice report" }); }
+  });
+  app.get("/api/reports/short-pay", requireAuth, async (req, res) => {
+    try { res.json(await buildCarrierBrokerReport(req.query, { shortPay: true })); }
+    catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate short-pay report" }); }
+  });
+  app.get("/api/reports/carrier-broker-pdf", requireAuth, async (req, res) => {
+    try {
+      const reportType = String(req.query.reportType || "aging");
+      if (!["aging", "invoices", "short-pay"].includes(reportType)) throw new Error("Invalid reportType");
+      const options = reportType === "aging" ? { aging: true }
+        : reportType === "invoices" ? { invoices: true } : { shortPay: true };
+      const report = await buildCarrierBrokerReport(req.query, options);
+      const showAccountStatus = req.query.statusView === "true";
+      const showShortPay = reportType === "short-pay";
+      const title = typeof req.query.title === "string" && req.query.title.trim()
+        ? req.query.title.trim().slice(0, 120) : "Carrier / Broker AR Report";
+      const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 30, info: { Title: title } });
+      const money = (value: number) => `$${value.toFixed(2)}`;
+      const tableHeader = () => {
+        doc.font("Helvetica-Bold").fontSize(8).fillColor("#333");
+        doc.text("INVOICE", 30, doc.y, { width: 90, continued: true })
+          .text("LOAD", { width: 72, continued: true }).text("AMOUNT", { width: 72, continued: true })
+          .text("FUNDED", { width: 82, continued: true }).text("AGE", { width: 42, continued: true })
+          .text("STATUS", { width: 86, continued: true }).text("CHARGEBACK", { width: 82, continued: true })
+          .text(showShortPay ? "SHORT PAY" : "OUTSTANDING", { width: 90 });
+        doc.moveTo(30, doc.y + 3).lineTo(762, doc.y + 3).strokeColor("#999").stroke();
+        doc.moveDown(0.5);
+      };
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "attachment; filename=carrier-broker-report.pdf");
+      res.setHeader("Cache-Control", "no-store");
+      doc.pipe(res);
+      doc.font("Helvetica-Bold").fontSize(18).fillColor("#111").text(title);
+      doc.font("Helvetica").fontSize(9).fillColor("#555").text(`Generated ${new Date().toLocaleDateString()}`);
+      doc.moveDown(0.5).fillColor("#111").text(
+        `Invoices: ${report.summary.count}    Total: ${money(report.summary.totalAmount)}    Outstanding: ${money(report.summary.totalOutstanding)}${showShortPay ? `    Short Pay: ${money(report.summary.totalShortPay)}` : ""}`,
+      );
+      doc.moveDown();
+      tableHeader();
+      for (const row of report.rows) {
+        if (doc.y > 540) { doc.addPage(); tableHeader(); }
+        doc.font("Helvetica").fontSize(8).fillColor("#111");
+        doc.text(row.invoiceNumber, 30, doc.y, { width: 90, continued: true })
+          .text(row.loadNumber || "—", { width: 72, continued: true }).text(money(row.amount), { width: 72, continued: true })
+          .text(row.fundedDate ? row.fundedDate.toLocaleDateString() : "—", { width: 82, continued: true })
+          .text(`${row.ageDays}d`, { width: 42, continued: true }).text((showAccountStatus ? row.accountStatus : row.status).replace(/_/g, " "), { width: 86, continued: true })
+          .text(row.chargebackStatus.replace(/_/g, " "), { width: 82, continued: true })
+          .text(money(showShortPay ? row.shortPayAmount : row.outstanding), { width: 90 });
+        doc.moveDown(0.35);
+      }
+      doc.end();
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to generate carrier/broker PDF" }); }
+  });
   app.get("/api/reports/carrier-ar/pdf", requireAuth, async (req, res) => {
     try {
       const report = await buildArReport("carrier", req.query);

@@ -23,6 +23,9 @@ import {
   AlertTriangle,
   FileText,
   ShieldCheck,
+  Search,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -653,26 +656,156 @@ function AgentPerformanceTab() {
   </div>;
 }
 
+type CarrierBrokerReportRow = {
+  id: number; invoiceNumber: string; loadNumber?: string | null; amount: number;
+  fundedDate?: string | null; ageDays: number; status: string; chargebackStatus: string;
+  appliedAmount?: number; collected?: number; outstanding: number; shortPayAmount?: number;
+  accountStatus?: "pending" | "overdue" | "charged_back" | "payment_plan";
+};
+type CarrierBrokerReportResponse = {
+  rows: CarrierBrokerReportRow[];
+  summary: { count: number; totalAmount: number; totalOutstanding: number; totalShortPay?: number };
+};
+type CarrierBrokerReportDef = {
+  id: string; title: string; category: string; endpoint: "aging" | "invoices" | "short-pay";
+  minDays?: number; includeChargebacks?: boolean; year?: number; type?: "all" | "otr";
+};
+
+const CARRIER_BROKER_REPORTS: CarrierBrokerReportDef[] = [
+  ...[1, 45, 60, 90, 100].flatMap(minDays => [
+    { id: `aging-${minDays}-without`, title: `${minDays}+ Days — Without Chargebacks`, category: "Aging Report · Invoice Summary", endpoint: "aging" as const, minDays, includeChargebacks: false },
+    { id: `aging-${minDays}-with`, title: `${minDays}+ Days — With Chargebacks`, category: "Aging Report · Invoice Summary", endpoint: "aging" as const, minDays, includeChargebacks: true },
+  ]),
+  { id: "aging-status-1", title: "1+ Day — Pending, Overdue, Charged-Back & Payment Plan", category: "Aging Report · Account Status", endpoint: "aging", minDays: 1, includeChargebacks: true },
+  { id: "all-invoices", title: "All Invoices", category: "Invoice Reports", endpoint: "invoices", type: "all" },
+  { id: "invoices-2025", title: "2025 Invoices", category: "Invoice Reports", endpoint: "invoices", type: "all", year: 2025 },
+  { id: "invoices-2026", title: "2026 Invoices", category: "Invoice Reports", endpoint: "invoices", type: "all", year: 2026 },
+  { id: "otr-all", title: "All OTR Invoices", category: "Invoice Reports", endpoint: "invoices", type: "otr" },
+  { id: "otr-2025", title: "2025 OTR Invoices", category: "Invoice Reports", endpoint: "invoices", type: "otr", year: 2025 },
+  { id: "otr-2026", title: "2026 OTR Invoices", category: "Invoice Reports", endpoint: "invoices", type: "otr", year: 2026 },
+  { id: "short-pay", title: "Short Pay Report", category: "Other Reports", endpoint: "short-pay" },
+];
+
+function SearchableEntitySelect({ label, items, value, onChange, placeholder }: {
+  label: string; items: Array<{ id: number; name: string }>; value: string;
+  onChange: (value: string) => void; placeholder: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const selected = items.find(item => String(item.id) === value);
+  const filtered = items.filter(item => item.name.toLowerCase().includes(search.toLowerCase())).slice(0, 10);
+  return <div className="relative">
+    <label className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{label}</label>
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <Input value={open ? search : selected?.name ?? ""} onFocus={() => { setSearch(""); setOpen(true); }}
+        onChange={e => { setSearch(e.target.value); setOpen(true); }} placeholder={placeholder} className="h-10 pl-9 pr-9" />
+      {selected && <button type="button" onClick={() => { onChange(""); setSearch(""); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>}
+    </div>
+    {open && <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-900">
+      {filtered.length ? filtered.map(item => <button key={item.id} type="button" onClick={() => { onChange(String(item.id)); setOpen(false); setSearch(""); }}
+        className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">{item.name}</button>)
+        : <p className="px-3 py-5 text-center text-xs text-slate-500">No matches found</p>}
+    </div>}
+  </div>;
+}
+
 function CarrierArTab() {
-  const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
-  const [end, setEnd] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [carrierId, setCarrierId] = useState("all");
-  const [selected, setSelected] = useState<ArRow | null>(null);
-  const queryString = `startDate=${start}&endDate=${end}${carrierId !== "all" ? `&carrierId=${carrierId}` : ""}`;
-  const carrierQuery = useQuery<ArResponse>({ queryKey: ["/api/reports/carrier-ar", start, end, carrierId], queryFn: () => fetch(`/api/reports/carrier-ar?${queryString}`, { credentials: "include" }).then(r => r.json()) });
-  const brokerQuery = useQuery<ArResponse>({ queryKey: ["/api/reports/broker-ar", start, end], queryFn: () => fetch(`/api/reports/broker-ar?startDate=${start}&endDate=${end}`, { credentials: "include" }).then(r => r.json()) });
-  const { data: carrierOptions = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients"] });
-  const carriers = carrierQuery.data?.results ?? []; const brokers = brokerQuery.data?.results ?? [];
-  const sum = (key: string) => carriers.reduce((n, r) => n + money(r, key, key === "totalOutstanding" ? "outstanding" : "", key === "reserveHeld" ? "totalReserve" : "", key === "totalCollected" ? "collected" : ""), 0);
-   const exportRows = (list: ArRow[], kind: string) => list.map(r => ({ [kind]: r.carrierName ?? r.brokerName ?? "", invoices: r.totalInvoices ?? r.invoiceCount ?? 0, funded: money(r, "totalFundedAmount", "totalFunded"), outstanding: money(r, "totalOutstanding", "outstanding"), reserve: money(r, "reserveHeld", "totalReserve"), collected: money(r, "totalCollected", "collected"), chargeback_exposure: r.chargebackExposure ?? 0, aging_0_30: arValue(r, "0-30"), aging_31_60: arValue(r, "31-60"), aging_61_90: arValue(r, "61-90"), aging_90_plus: arValue(r, "90+") }));
-  const downloadPdf = () => { const a = document.createElement("a"); a.href = `/api/reports/carrier-ar.pdf?${queryString}`; a.target = "_blank"; a.rel = "noreferrer"; a.click(); };
-  const table = (list: ArRow[], kind: "carrier" | "broker") => <Card className="overflow-hidden border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-sm"><thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{[kind === "carrier" ? "Carrier" : "Broker","Invoices","Funded","Outstanding","Reserve","Collected","0–30","31–60","61–90","90+"].map(h => <th key={h} className="whitespace-nowrap px-3 py-3">{h}</th>)}</tr></thead><tbody className="divide-y">{list.map((r, i) => <tr key={String(r.carrierId ?? r.brokerId ?? r.id ?? i)} onClick={() => kind === "carrier" && setSelected(r)} className={cn("hover:bg-blue-50/60 dark:hover:bg-blue-950/20", kind === "carrier" && "cursor-pointer")}><td className="px-3 py-3 font-semibold">{r.carrierName ?? r.brokerName ?? "Unknown"}</td><td className="px-3 py-3 tabular-nums">{r.totalInvoices ?? r.invoiceCount ?? 0}</td><td className="px-3 py-3 tabular-nums">{fmt(money(r, "totalFundedAmount", "totalFunded"))}</td><td className="px-3 py-3 tabular-nums font-semibold text-amber-700">{fmt(money(r, "totalOutstanding", "outstanding"))}</td><td className="px-3 py-3 tabular-nums">{fmt(money(r, "reserveHeld", "totalReserve"))}</td><td className="px-3 py-3 tabular-nums text-emerald-700">{fmt(money(r, "totalCollected", "collected"))}</td>{["0-30","31-60","61-90","90+"].map(b => <td key={b} className="px-3 py-3 tabular-nums text-slate-600">{fmt(arValue(r, b))}</td>)}</tr>)}</tbody></table></div></Card>;
-  return <div className="space-y-4"><ReportToolbar start={start} end={end} onDates={(s, e) => { setStart(s); setEnd(e); }}><div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Carrier</label><Select value={carrierId} onValueChange={setCarrierId}><SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Carriers</SelectItem>{carriers.map(r => <SelectItem key={String(r.carrierId ?? r.id)} value={String(r.carrierId ?? r.id)}>{r.carrierName}</SelectItem>)}</SelectContent></Select></div><Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("carrier_ar.csv", exportRows(carriers, "carrier"))}><Download className="h-3.5 w-3.5" /> CSV</Button><Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={downloadPdf}><FileText className="h-3.5 w-3.5" /> PDF</Button></ReportToolbar>
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><StatTile label="Total outstanding" value={fmtShort(sum("totalOutstanding"))} color="amber" /><StatTile label="Reserve held" value={fmtShort(sum("reserveHeld"))} color="blue" /><StatTile label="Total collected" value={fmtShort(sum("totalCollected"))} color="green" /><StatTile label="Chargeback exposure" value={fmtShort(carriers.reduce((n, r) => n + Number(r.chargebackExposure ?? 0), 0))} color="red" /></div>
-    <div className="space-y-2"><div className="flex items-center justify-between"><div><h2 className="text-sm font-bold">Carrier accounts receivable</h2><p className="text-xs text-slate-500">Select a row to inspect invoice-level activity.</p></div></div>{carrierQuery.isLoading ? <Card className="h-48 animate-pulse bg-slate-100 dark:bg-slate-800" /> : table(carriers, "carrier")}</div>
-    <div className="space-y-2"><div className="flex items-center justify-between"><h2 className="text-sm font-bold">Broker accounts receivable</h2><Button size="sm" variant="outline" className="h-8" onClick={() => exportCsv("broker_ar.csv", exportRows(brokers, "broker"))}>Export broker CSV</Button></div>{brokerQuery.isLoading ? <Card className="h-40 animate-pulse bg-slate-100 dark:bg-slate-800" /> : table(brokers, "broker")}</div>
-    <InvoiceDrilldown open={!!selected} onOpenChange={v => !v && setSelected(null)} title={selected ? `${selected.carrierName ?? "Carrier"} · invoice detail` : "Invoice detail"} invoices={selected?.invoices} />
-   </div>;
+  const [carrierId, setCarrierId] = useState("");
+  const [brokerId, setBrokerId] = useState("");
+  const [selection, setSelection] = useState<{ carrierId: string; brokerId: string } | null>(null);
+  const [report, setReport] = useState<CarrierBrokerReportDef | null>(null);
+  const { data: carriersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients"] });
+  const { data: brokersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/debtors"] });
+  const carriers = Array.isArray(carriersData) ? carriersData : [];
+  const brokers = Array.isArray(brokersData) ? brokersData : [];
+
+  const params = useMemo(() => {
+    if (!selection || !report) return "";
+    const p = new URLSearchParams({ carrierId: selection.carrierId, brokerId: selection.brokerId });
+    if (report.minDays != null) p.set("minDays", String(report.minDays));
+    if (report.includeChargebacks != null) p.set("includeChargebacks", String(report.includeChargebacks));
+    if (report.year) p.set("year", String(report.year));
+    if (report.type) p.set("type", report.type);
+    if (report.id === "aging-status-1") p.set("statusView", "true");
+    return p.toString();
+  }, [selection, report]);
+  const endpoint = report?.endpoint === "aging" ? "carrier-broker-aging"
+    : report?.endpoint === "invoices" ? "carrier-broker-invoices" : "short-pay";
+  const reportQuery = useQuery<CarrierBrokerReportResponse>({
+    queryKey: ["/api/reports/carrier-broker", report?.id, params],
+    queryFn: async () => {
+      const response = await fetch(`/api/reports/${endpoint}?${params}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Unable to generate report");
+      return response.json();
+    },
+    enabled: !!selection && !!report,
+  });
+  const rows = Array.isArray(reportQuery.data?.rows) ? reportQuery.data!.rows : [];
+  const selectedCarrier = carriers.find(item => String(item.id) === selection?.carrierId);
+  const selectedBroker = brokers.find(item => String(item.id) === selection?.brokerId);
+  const reset = () => { setCarrierId(""); setBrokerId(""); setSelection(null); setReport(null); };
+  const csvRows = rows.map(row => ({
+    invoice_number: row.invoiceNumber, load_number: row.loadNumber ?? "", amount: row.amount,
+    funded_date: row.fundedDate ?? "", age_days: row.ageDays, status: row.status,
+    account_status: row.accountStatus ?? "", chargeback_status: row.chargebackStatus,
+    collected: row.collected ?? row.appliedAmount ?? 0, total_outstanding: row.outstanding,
+    short_pay_amount: row.shortPayAmount ?? 0,
+  }));
+  const pdfParams = report ? new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(params)), reportType: report.endpoint, title: report.title }).toString() : "";
+
+  return <div className="space-y-5">
+    <Card className="border-slate-200 shadow-sm dark:border-slate-700">
+      <CardHeader className="border-b pb-4"><CardTitle className="text-base">Carrier / Broker AR Report</CardTitle></CardHeader>
+      <CardContent className="p-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-blue-600">Step 1</p><SearchableEntitySelect label="Select Carrier" items={carriers} value={carrierId} onChange={setCarrierId} placeholder="Search carriers..." /></div>
+          <div><p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-blue-600">Step 2</p><SearchableEntitySelect label="Select Broker" items={brokers} value={brokerId} onChange={setBrokerId} placeholder="Search brokers..." /></div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2 border-t pt-4">
+          <Button variant="ghost" onClick={() => { setSelection(null); setReport(null); }}>Cancel</Button>
+          <Button variant="outline" onClick={reset}>Reset</Button>
+          <Button disabled={!carrierId || !brokerId} onClick={() => { setSelection({ carrierId, brokerId }); setReport(null); }} className="bg-blue-600 text-white hover:bg-blue-700">Submit</Button>
+        </div>
+      </CardContent>
+    </Card>
+
+    {selection && <Card className="border-slate-200 dark:border-slate-700">
+      <CardHeader className="border-b pb-4"><CardTitle className="text-base">Available Reports</CardTitle><p className="text-xs text-slate-500">{selectedCarrier?.name} · {selectedBroker?.name}</p></CardHeader>
+      <CardContent className="grid gap-5 p-5 lg:grid-cols-2">
+        {Array.from(new Set(CARRIER_BROKER_REPORTS.map(item => item.category))).map(category => <section key={category}>
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{category}</h3>
+          <div className="divide-y overflow-hidden rounded-xl border">{CARRIER_BROKER_REPORTS.filter(item => item.category === category).map(item => <button key={item.id} type="button" onClick={() => setReport(item)}
+            className={cn("flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950/20", report?.id === item.id && "bg-blue-50 font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300")}>
+            <span>{item.title}</span><ChevronRight className="h-4 w-4" />
+          </button>)}</div>
+        </section>)}
+      </CardContent>
+    </Card>}
+
+    {selection && report && <Card className="overflow-hidden border-slate-200 dark:border-slate-700">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 border-b">
+        <div><CardTitle className="text-base">{report.title}</CardTitle><p className="mt-1 text-xs text-slate-500">{selectedCarrier?.name} · {selectedBroker?.name}</p></div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" disabled={!rows.length} onClick={() => exportCsv(`${report.id}.csv`, csvRows)}><Download className="mr-1 h-3.5 w-3.5" />CSV</Button>
+          <Button size="sm" variant="outline" disabled={!rows.length} asChild><a href={`/api/reports/carrier-broker-pdf?${pdfParams}`} target="_blank" rel="noreferrer"><FileText className="mr-1 h-3.5 w-3.5" />PDF</a></Button>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {reportQuery.isLoading ? <div className="h-48 animate-pulse bg-slate-100 dark:bg-slate-800" /> : reportQuery.isError ? <div className="p-10 text-center text-sm text-red-600">Unable to generate this report.</div> :
+          <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm">
+            <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Invoice #","Load #","Amount","Funded Date","Age","Status","Chargeback", report.endpoint === "short-pay" ? "Short Pay Amount" : "Outstanding"].map(head => <th key={head} className="px-4 py-3">{head}</th>)}</tr></thead>
+            <tbody className="divide-y">{rows.length ? rows.map(row => <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <td className="px-4 py-3 font-semibold">{row.invoiceNumber}</td><td className="px-4 py-3">{row.loadNumber || "—"}</td>
+              <td className="px-4 py-3 tabular-nums">{fmt(Number(row.amount))}</td><td className="px-4 py-3">{row.fundedDate ? format(new Date(row.fundedDate), "MMM d, yyyy") : "—"}</td>
+              <td className="px-4 py-3 tabular-nums">{row.ageDays}d</td><td className="px-4 py-3 capitalize">{(report.id === "aging-status-1" && row.accountStatus ? row.accountStatus : row.status).replace(/_/g, " ")}</td>
+              <td className="px-4 py-3 capitalize">{(row.chargebackStatus || "none").replace(/_/g, " ")}</td><td className="px-4 py-3 font-semibold tabular-nums">{fmt(Number(report.endpoint === "short-pay" ? row.shortPayAmount ?? row.outstanding : row.outstanding))}</td>
+            </tr>) : <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-500">No invoices match this report.</td></tr>}</tbody>
+            {reportQuery.data?.summary && <tfoot><tr className="border-t-2 bg-slate-50 font-semibold dark:bg-slate-800/60"><td colSpan={2} className="px-4 py-3">Totals · {reportQuery.data.summary.count} invoices</td><td className="px-4 py-3 tabular-nums">{fmt(reportQuery.data.summary.totalAmount)}</td><td colSpan={4} /><td className="px-4 py-3 tabular-nums">{fmt(report.endpoint === "short-pay" ? reportQuery.data.summary.totalShortPay ?? reportQuery.data.summary.totalOutstanding : reportQuery.data.summary.totalOutstanding)}</td></tr></tfoot>}
+          </table></div>}
+      </CardContent>
+    </Card>}
+  </div>;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

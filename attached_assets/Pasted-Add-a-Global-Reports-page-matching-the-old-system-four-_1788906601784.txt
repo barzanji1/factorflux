@@ -1,0 +1,52 @@
+Add a Global Reports page matching the old system — four column layout with all report types.
+
+Layout:
+
+ Four column layout: Aging Report, Other, Brokers, Carriers
+ Each column has a header and list of clickable report links
+ Clicking a report generates and displays it inline or exports as PDF/CSV
+
+Aging Report column:
+
+ 1+ Day — all invoices funded 1+ days ago, not yet collected
+ 45+ Days — funded 45+ days, not collected
+ 60+ Days — funded 60+ days
+ 90+ Days — funded 90+ days
+ 100+ Days — funded 100+ days
+ Each shows: Invoice#, Carrier, Broker, Amount, Funded Date, Age, Status
+
+Other column:
+
+ Today's Deposits — all payouts/funding processed today
+ All Short Pay Report — invoices where amount collected < amount invoiced
+ 2025 Uncollected AR — all invoices from 2025 not yet collected
+ DSO (Days Sales Outstanding) — average days to collect per broker and overall
+ Monthly Sales Journal Reports — total funded per month, fees collected, reserves
+ 90 Plus Days Reports — same as aging 90+ with chargeback status
+
+Brokers column:
+
+ All Broker List — full broker directory export
+ All Active Broker List — active brokers only
+ All Inactive Broker List — inactive brokers
+ Active Broker (Dump) — full data export of active brokers
+ Active Broker (OTR) — OTR brokers only
+
+Carriers column:
+
+ All Carrier List — full carrier directory
+ Active Carrier all info (All) — all fields for active carriers
+ Active Carrier less info (All) — basic fields only (name, MC#, email, phone)
+ Active Carrier all info (Dump) — full data dump
+ Active Carrier less info (Dump) — basic dump
+ Active Carrier all info (OTR) — OTR carriers full info
+ Active Carrier less info (OTR) — OTR carriers basic
+ Active Carrier Top 20 — top 20 carriers by invoice volume
+ Carrier's NOA — carriers with Notice of Assignment on file
+
+All reports:
+
+ Export to CSV and PDF buttons on each generated report
+ Show record count and total dollar amount in report header
+ All routes require requireAuth
+ Add this as a new Global Reports tab on the Reports page
