@@ -181,9 +181,10 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   };
 
   const quickActions = [
-    { label: "New Load Entry",   icon: FileText,  action: () => setLocation("/invoices")  },
-    { label: "Add Carrier",      icon: Users,     action: () => setLocation("/carriers/new") },
-    { label: "Upload Evidence",  icon: FolderOpen, action: () => setLocation("/documents") },
+    { label: "Carriers",   icon: Users,     action: () => setLocation("/clients") },
+    { label: "Invoices",   icon: FileText,  action: () => setLocation("/invoices") },
+    { label: "Brokers",    icon: BadgeCheck, action: () => setLocation("/brokers") },
+    { label: "Follow Ups", icon: Clock,     action: () => setLocation("/follow-up") },
   ];
 
   const pagesWithHomeButton = [
