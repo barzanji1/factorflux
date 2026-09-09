@@ -147,7 +147,7 @@ export default function CollectionsPage() {
 
   // ── Queries ──────────────────────────────────────────────────────
   const { data: collections = [], isLoading } = useQuery<Collection[]>({ queryKey: ["/api/collections"] });
-  const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients"] });
+  const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/clients", { all: true }] });
   const { data: brokerFollowUps = [] } = useQuery<{ invoiceId: number; status: string }[]>({
     queryKey: ["/api/broker-follow-ups"],
     select: (data: any[]) => data.map((d: any) => ({ invoiceId: d.invoiceId, status: d.status })),

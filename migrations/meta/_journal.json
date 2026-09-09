@@ -15,6 +15,20 @@
       "when": 1774303503490,
       "tag": "0001_mysterious_loners",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788975000000,
+      "tag": "0002_carrier_drivers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788975900000,
+      "tag": "0003_list_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

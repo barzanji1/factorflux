@@ -125,7 +125,7 @@ export default function Dashboard() {
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
-  const { data: invoicesData } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: invoicesData } = useQuery<Invoice[]>({ queryKey: ["/api/invoices", { all: true }] });
   const { data: agingAlertsData } = useQuery<Array<{ invoiceId: number; alertType: "day_60" | "day_90" }>>({
     queryKey: ["/api/invoices/aging-alerts", "pending"],
     queryFn: async () => {

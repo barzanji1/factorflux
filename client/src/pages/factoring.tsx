@@ -113,7 +113,7 @@ export default function Factoring() {
   const [reasonDlg, setReasonDlg] = useState<{ tid: TransId; invoice?: Invoice; bulk?: boolean } | null>(null);
   const [reason, setReason] = useState("");
 
-  const { data: invoices = [], isLoading } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: invoices = [], isLoading } = useQuery<Invoice[]>({ queryKey: ["/api/invoices", { all: true }] });
   type AgingAlert = { id: number; invoiceId: number; invoiceNumber: string; carrier: string | null; broker: string | null; fundedAt: string; alertType: "day_60" | "day_90"; status: string };
   const [agingView, setAgingView] = useState<"pending" | "resolved">("pending");
   const { data: agingAlerts = [] } = useQuery<AgingAlert[]>({ queryKey: ["/api/invoices/aging-alerts", agingView], queryFn: () => fetch(`/api/invoices/aging-alerts?view=${agingView}`, { credentials: "include" }).then(r => r.json()) });

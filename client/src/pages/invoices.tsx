@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -23,6 +23,7 @@ import {
   CircleDollarSign,
   Sparkles,
   ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 import InvoiceModal from "@/components/modals/invoice-modal";
 import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
@@ -30,6 +31,13 @@ import type { Invoice } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+type InvoicesResponse = {
+  data: Invoice[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
 
 export default function Invoices() {
   const { user } = useAuth();
@@ -48,6 +56,8 @@ export default function Invoices() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [isEditInvoiceOpen, setIsEditInvoiceOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -60,24 +70,36 @@ export default function Invoices() {
     onError: (error: Error) => toast({ title: "Unable to submit invoice", description: error.message, variant: "destructive" }),
   });
 
-  const { data: invoices, isLoading: invoicesLoading, isError: invoicesError } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
-  });
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
 
-  const { data: searchResults } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices/search", searchQuery],
-    enabled: searchQuery.trim().length > 0,
+  const { data: invoicesResponse, isLoading: invoicesLoading, isError: invoicesError } = useQuery<InvoicesResponse>({
+    queryKey: ["/api/invoices", page, debouncedSearchQuery],
     queryFn: async () => {
-      const res = await fetch(`/api/invoices/search?q=${encodeURIComponent(searchQuery)}`, {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "50",
+        q: debouncedSearchQuery,
+      });
+      const res = await fetch(`/api/invoices?${params.toString()}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Search failed");
+      if (!res.ok) throw new Error("Failed to load invoices");
       return res.json();
     },
   });
 
-  const displayInvoices = searchQuery.trim() ? searchResults : invoices;
-  const invoiceList = displayInvoices || [];
+  const invoices = invoicesResponse?.data || [];
+  const totalInvoices = invoicesResponse?.total || 0;
+  const totalPages = invoicesResponse?.totalPages || 1;
+  const invoiceList = invoices;
+  const firstInvoice = totalInvoices === 0 ? 0 : (page - 1) * 50 + 1;
+  const lastInvoice = totalInvoices === 0 ? 0 : Math.min(page * 50, totalInvoices);
 
   const handleCreateInvoice = () => {
     setSelectedInvoice(null);
@@ -106,9 +128,8 @@ export default function Invoices() {
   };
 
   const stats = useMemo(() => {
-    const allInvoices = invoices || [];
+    const allInvoices = invoices;
 
-    const totalInvoices = allInvoices.length;
     const pendingInvoices = allInvoices.filter(
       (invoice) => (invoice.status as string) === "pending" || invoice.status === "draft"
     ).length;
@@ -123,12 +144,12 @@ export default function Invoices() {
     );
 
     return {
-      totalInvoices,
+      totalInvoices: totalInvoices,
       pendingInvoices,
       approvedInvoices,
       totalAmount,
     };
-  }, [invoices]);
+  }, [invoices, totalInvoices]);
 
   return (
     <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
@@ -167,7 +188,10 @@ export default function Invoices() {
                     <Input
                       placeholder="Search by invoice number or load number..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                       onChange={(e) => {
+                         setSearchQuery(e.target.value);
+                         setPage(1);
+                       }}
                       className="h-12 rounded-2xl border-slate-200 bg-white pl-11 pr-4 text-[15px] shadow-sm transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:bg-slate-950"
                     />
                   </div>
@@ -191,21 +215,21 @@ export default function Invoices() {
                 />
 
                 <PremiumStatCard
-                  title="Draft / Pending"
+                  title="Current page draft / pending"
                   value={stats.pendingInvoices.toLocaleString()}
                   icon={<Clock3 className="h-5 w-5" />}
                   tint="amber"
                 />
 
                 <PremiumStatCard
-                  title="Approved / Paid"
+                  title="Current page approved / paid"
                   value={stats.approvedInvoices.toLocaleString()}
                   icon={<FileText className="h-5 w-5" />}
                   tint="emerald"
                 />
 
                 <PremiumStatCard
-                  title="Total Amount"
+                  title="Current page total amount"
                   value={`$${stats.totalAmount.toLocaleString("en-US", {
                     maximumFractionDigits: 2,
                   })}`}
@@ -237,24 +261,26 @@ export default function Invoices() {
                     </p>
                   </div>
 
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                   <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     <ChevronRight className="h-4 w-4 text-slate-400" />
-                    {searchQuery ? (
-                      <span>Showing results for “{searchQuery}”</span>
-                    ) : (
-                      <span>
-                        Showing {invoiceList.length} invoice
-                        {invoiceList.length === 1 ? "" : "s"}
-                      </span>
-                    )}
+                     <span>Showing {firstInvoice}-{lastInvoice} of {totalInvoices} invoices</span>
                   </div>
                 </div>
               </CardHeader>
 
               <CardContent className="p-0">
                 {invoicesLoading ? (
-                  <div className="flex items-center justify-center py-20">
-                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                      <div key={index} className="flex items-center gap-6 px-6 py-6">
+                        <div className="h-5 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-5 w-28 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-5 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-6 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+                        <div className="h-5 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                        <div className="ml-auto h-8 w-28 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+                      </div>
+                    ))}
                   </div>
                 ) : invoicesError ? (
                   <div className="px-6 py-20 text-center">
@@ -389,6 +415,36 @@ export default function Invoices() {
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     )}
+                  </div>
+                )}
+
+                {!invoicesLoading && !invoicesError && (
+                  <div className="flex items-center justify-between border-t border-slate-200/70 px-6 py-4 dark:border-slate-800">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Showing {firstInvoice}-{lastInvoice} of {totalInvoices} invoices
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+                        disabled={page <= 1}
+                        className="gap-1"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
+                        disabled={page >= totalPages}
+                        className="gap-1"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

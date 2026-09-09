@@ -98,7 +98,7 @@ function ContactTab() {
   const [body, setBody] = useState("");
 
   const { data: clients = [] } = useQuery<Array<{ id: number; name: string; email?: string }>>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients", { all: true }],
   });
 
   const { data: sentMessages = [], isLoading: messagesLoading } = useQuery<any[]>({

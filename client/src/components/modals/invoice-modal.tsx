@@ -287,7 +287,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
   });
 
   const { data: clients } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients", { all: true }],
     enabled: isOpen,
   });
 

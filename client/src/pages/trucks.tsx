@@ -98,11 +98,11 @@ export default function Trucks() {
   // ─── Queries ───────────────────────────────────────────────────────────────
 
   const { data: truckList = [], isLoading } = useQuery<TruckRow[]>({
-    queryKey: ["/api/trucks"],
+    queryKey: ["/api/trucks", { all: true }],
   });
 
-  const { data: carriers = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
-  const { data: dispatchers = [] } = useQuery<Dispatcher[]>({ queryKey: ["/api/dispatchers"] });
+  const { data: carriers = [] } = useQuery<Client[]>({ queryKey: ["/api/clients", { all: true }] });
+  const { data: dispatchers = [] } = useQuery<Dispatcher[]>({ queryKey: ["/api/dispatchers", { all: true }] });
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
 

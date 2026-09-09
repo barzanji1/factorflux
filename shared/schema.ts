@@ -14,7 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -101,7 +101,20 @@ export const clients = pgTable("clients", {
   status: varchar("status", { enum: ["new_client", "active", "inactive"] }).default("new_client").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("clients_name_idx").on(table.name),
+  index("clients_search_trgm_idx").using("gin", sql`(
+    coalesce(${table.name}, '') || ' ' ||
+    coalesce(${table.preferredName}, '') || ' ' ||
+    coalesce(${table.email}, '') || ' ' ||
+    coalesce(${table.phone}, '') || ' ' ||
+    coalesce(${table.contactPerson}, '') || ' ' ||
+    coalesce(${table.city}, '') || ' ' ||
+    coalesce(${table.state}, '') || ' ' ||
+    coalesce(${table.mcNumber}, '') || ' ' ||
+    coalesce(${table.dotNumber}, '')
+  ) gin_trgm_ops`),
+]);
 
 // New addition for debtors table
 export const debtors = pgTable("debtors", {
@@ -214,7 +227,19 @@ export const invoices = pgTable("invoices", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("invoices_invoice_number_idx").on(table.invoiceNumber),
+  index("invoices_client_id_idx").on(table.clientId),
+  index("invoices_created_at_idx").on(table.createdAt),
+  index("invoices_submitted_by_created_at_idx").on(table.submittedBy, table.createdAt),
+  index("invoices_search_trgm_idx").using("gin", sql`(
+    coalesce(${table.invoiceNumber}, '') || ' ' ||
+    coalesce(${table.loadNumber}, '') || ' ' ||
+    coalesce(${table.branchName}, '') || ' ' ||
+    coalesce(${table.bolNumber}, '') || ' ' ||
+    coalesce(${table.status}, '')
+  ) gin_trgm_ops`),
+]);
 
 // Documents table
 export const documents = pgTable("documents", {
@@ -550,7 +575,21 @@ export const brokers = pgTable("brokers", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("brokers_name_idx").on(table.name),
+  index("brokers_search_trgm_idx").using("gin", sql`(
+    coalesce(${table.name}, '') || ' ' ||
+    coalesce(${table.contactPerson}, '') || ' ' ||
+    coalesce(${table.email}, '') || ' ' ||
+    coalesce(${table.phone}, '') || ' ' ||
+    coalesce(${table.address}, '') || ' ' ||
+    coalesce(${table.city}, '') || ' ' ||
+    coalesce(${table.state}, '') || ' ' ||
+    coalesce(${table.mcNumber}, '') || ' ' ||
+    coalesce(${table.dotNumber}, '') || ' ' ||
+    coalesce(${table.notes}, '')
+  ) gin_trgm_ops`),
+]);
 
 // Fuel Advances table
 export const fuelAdvances = pgTable("fuel_advances", {
@@ -1418,6 +1457,35 @@ export const insertDispatcherSchema = createInsertSchema(dispatchers).omit({
 
 export type Dispatcher = typeof dispatchers.$inferSelect;
 export type InsertDispatcher = z.infer<typeof insertDispatcherSchema>;
+
+// ─── Drivers ──────────────────────────────────────────────────────────────────
+export const drivers = pgTable("drivers", {
+  id: serial("id").primaryKey(),
+  carrierId: integer("carrier_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  phone: varchar("phone"),
+  email: varchar("email"),
+  licenseNumber: varchar("license_number"),
+  licenseState: varchar("license_state"),
+  licenseExpiration: timestamp("license_expiration"),
+  status: varchar("status", { enum: ["active", "inactive"] }).default("active").notNull(),
+  photoS3Key: varchar("photo_s3_key"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+}, (table) => [
+  index("drivers_carrier_id_idx").on(table.carrierId),
+]);
+
+export const insertDriverSchema = createInsertSchema(drivers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Driver = typeof drivers.$inferSelect;
+export type InsertDriver = z.infer<typeof insertDriverSchema>;
 
 // ─── Trucks ───────────────────────────────────────────────────────────────────
 export const trucks = pgTable("trucks", {

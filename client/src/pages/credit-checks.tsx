@@ -116,7 +116,7 @@ export default function CreditChecks() {
 
   const { data: checks = [], isLoading } = useQuery<CreditCheck[]>({ queryKey: ["/api/credit-checks"] });
   const { data: debtors = [] } = useQuery<Debtor[]>({ queryKey: ["/api/debtors"] });
-  const { data: brokers = [] } = useQuery<Broker[]>({ queryKey: ["/api/brokers"] });
+  const { data: brokers = [] } = useQuery<Broker[]>({ queryKey: ["/api/brokers", { all: true }] });
 
   const createMutation = useMutation({
     mutationFn: (data: object) => apiRequest("POST", "/api/credit-checks", data),

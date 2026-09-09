@@ -723,7 +723,7 @@ function CarrierArTab() {
   const [selection, setSelection] = useState<{ carrierId: string; brokerId: string } | null>(null);
   const [report, setReport] = useState<CarrierBrokerReportDef | null>(null);
   const [agingPdfDays, setAgingPdfDays] = useState("1");
-  const { data: carriersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients"] });
+  const { data: carriersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients", { all: true }] });
   const { data: brokersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/debtors"] });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
   const brokers = Array.isArray(brokersData) ? brokersData : [];

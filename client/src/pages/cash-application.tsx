@@ -148,7 +148,7 @@ export default function CashApplication() {
   }[]>([{ invoiceId: "", invoiceNumber: "", invoiceAmount: "", appliedAmount: "", varianceType: "full_match", varianceReason: "" }]);
 
   const { data: payments = [], isLoading } = useQuery<CashApplication[]>({ queryKey: ["/api/cash-applications"] });
-  const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices", { all: true }] });
   const { data: debtors = [] } = useQuery<Debtor[]>({ queryKey: ["/api/debtors"] });
 
   const createPaymentMutation = useMutation({

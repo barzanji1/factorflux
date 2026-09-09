@@ -834,7 +834,7 @@ export default function FollowUpPage() {
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const { data: followUps = [], isLoading }  = useQuery<FollowUp[]>({ queryKey: ["/api/follow-ups"] });
-  const { data: clients = [] }               = useQuery({ queryKey: ["/api/clients"] });
+  const { data: clients = [] }               = useQuery({ queryKey: ["/api/clients", { all: true }] });
   const { data: brokerFollowUps = [], isLoading: bfuLoading } = useQuery<BrokerFollowUp[]>({
     queryKey: ["/api/broker-follow-ups"],
   });

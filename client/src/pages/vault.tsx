@@ -92,7 +92,7 @@ export default function VaultPage() {
   const queryClient = useQueryClient();
 
   const { data: clients = [] } = useQuery<Array<{ id: number; name: string }>>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients", { all: true }],
   });
 
   const { data: vaultEntries = [], isLoading: vaultLoading } = useQuery<VaultEntry[]>({

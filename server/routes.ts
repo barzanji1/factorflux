@@ -15,7 +15,7 @@ import {
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
-import { eq, and, desc, sql, inArray, notInArray } from "drizzle-orm";
+import { eq, and, desc, sql, count, ilike, or, inArray, notInArray } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -70,6 +70,7 @@ import {
   exceptions,
   dispatchers,
   insertDispatcherSchema,
+  drivers,
   trucks,
   insertTruckSchema,
   bankTransfers,
@@ -198,6 +199,14 @@ function sanitizeClientResponse(client: any, userRole?: string) {
     hasBankAccount: !!client.bankAccountEncrypted,
     hasAbaRouting: !!client.abaRoutingEncrypted,
   };
+}
+
+function parseListPagination(req: any) {
+  const pageValue = Number.parseInt(String(req.query.page ?? "1"), 10);
+  const limitValue = Number.parseInt(String(req.query.limit ?? "50"), 10);
+  const page = Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1;
+  const limit = Number.isFinite(limitValue) ? Math.min(200, Math.max(1, limitValue)) : 50;
+  return { page, limit, offset: (page - 1) * limit };
 }
 
 function buildDocumentMetadata(document: any) {
@@ -1441,8 +1450,28 @@ ${message}
   // Clients
   app.get("/api/clients", requireAuth, async (_req: any, res) => {
     try {
-      const allClients = await storage.getClients();
-      res.json(allClients.map(client => sanitizeClientResponse(client, _req.user.role)));
+      const q = typeof _req.query.q === "string" ? _req.query.q.trim() : "";
+      const all = _req.query.all === "true";
+      const clientSearchDocument = sql`(
+        coalesce(${clients.name}, '') || ' ' ||
+        coalesce(${clients.preferredName}, '') || ' ' ||
+        coalesce(${clients.email}, '') || ' ' ||
+        coalesce(${clients.phone}, '') || ' ' ||
+        coalesce(${clients.contactPerson}, '') || ' ' ||
+        coalesce(${clients.city}, '') || ' ' ||
+        coalesce(${clients.state}, '') || ' ' ||
+        coalesce(${clients.mcNumber}, '') || ' ' ||
+        coalesce(${clients.dotNumber}, '')
+      )`;
+      const where = q ? ilike(clientSearchDocument, `%${q}%`) : undefined;
+      if (all) {
+        const rows = await db.select().from(clients).where(where).orderBy(clients.name);
+        return res.json(rows.map(client => sanitizeClientResponse(client, _req.user.role)));
+      }
+      const { page, limit, offset } = parseListPagination(_req);
+      const [{ total }] = await db.select({ total: count() }).from(clients).where(where);
+      const rows = await db.select().from(clients).where(where).orderBy(clients.name).limit(limit).offset(offset);
+      res.json({ data: rows.map(client => sanitizeClientResponse(client, _req.user.role)), total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching clients:", error);
       res.status(500).json({ message: "Failed to fetch clients" });
@@ -1586,7 +1615,9 @@ ${message}
     }
   });
 
-  app.put("/api/clients/:id", requireAuth, async (req: any, res) => {
+  // Keep client updates in one handler so PUT and PATCH have identical
+  // validation, redaction, encryption, authorization, and audit behavior.
+  const updateClientHandler = async (req: any, res: any) => {
     try {
       const id = parseInt(req.params.id, 10);
 
@@ -1596,12 +1627,39 @@ ${message}
 
       const { bankAccountNumber, abaRouting, owners, ...raw } = req.body;
       const existingClient = await storage.getClient(id);
+      if (!existingClient) {
+        return res.status(404).json({ message: "Client not found" });
+      }
       const existingOwners = (existingClient?.owners as any[] | null) ?? [];
+      const updatePayload = { ...raw };
+      if (raw.onboardingProfile && Array.isArray(raw.onboardingProfile.messages)) {
+        const existingProfile = {
+          ...((existingClient.onboardingData as Record<string, any> | null) ?? {}),
+          ...((existingClient.onboardingProfile as Record<string, any> | null) ?? {}),
+        };
+        const existingMessages = Array.isArray(existingProfile.messages) ? existingProfile.messages : [];
+        const author = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.name || req.user.email || "Staff";
+        const messages = raw.onboardingProfile.messages
+          .filter((message: any) => typeof message?.message === "string" && message.message.trim())
+          .map((message: any) => {
+            const unchanged = existingMessages.find((existing: any) =>
+              existing?.message === message.message &&
+              existing?.author === message.author &&
+              existing?.timestamp === message.timestamp
+            );
+            return unchanged ?? {
+              message: message.message.trim(),
+              author,
+              timestamp: new Date().toISOString(),
+            };
+          });
+        updatePayload.onboardingProfile = { ...raw.onboardingProfile, messages };
+      }
       const secureOwners = Array.isArray(owners) ? owners.slice(0, 3).map((owner: any, index: number) => ({
         ...owner, ssn: owner.ssn ? encryptVault(String(owner.ssn)) : existingOwners[index]?.ssn ?? null,
       })) : undefined;
       const clientData = insertClientSchema.partial().parse({
-        ...raw,
+        ...updatePayload,
         ...(secureOwners ? { owners: secureOwners } : {}),
         ...(bankAccountNumber ? { bankAccountEncrypted: encryptVault(String(bankAccountNumber)) } : {}),
         ...(abaRouting ? { abaRoutingEncrypted: encryptVault(String(abaRouting)) } : {}),
@@ -1638,7 +1696,10 @@ ${message}
       console.error("Error updating client:", error);
       res.status(500).json({ message: "Failed to update client" });
     }
-  });
+  };
+
+  app.put("/api/clients/:id", requireAuth, updateClientHandler);
+  app.patch("/api/clients/:id", requireAuth, updateClientHandler);
 
   app.delete("/api/clients/:id", requireAuth, async (req: any, res) => {
     const id = Number(req.params.id);
@@ -1650,6 +1711,8 @@ ${message}
     try {
       console.log(`[DELETE CLIENT] route hit for id=${id}`);
 
+      const driverPhotos = await db.select({ photoS3Key: drivers.photoS3Key }).from(drivers).where(eq(drivers.carrierId, id));
+      await Promise.all(driverPhotos.filter((driver) => driver.photoS3Key).map((driver) => deleteFromS3(driver.photoS3Key!)));
       await storage.deleteClient(id);
       console.log(`[DELETE CLIENT] Postgres delete complete for id=${id}`);
 
@@ -1789,17 +1852,54 @@ ${message}
 
   app.get("/api/invoices", requireAuth, async (req: any, res) => {
     try {
-      const rows = await db.select({
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      const all = req.query.all === "true";
+      const scope = req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined;
+      const invoiceSearchDocument = sql`(
+        coalesce(${invoices.invoiceNumber}, '') || ' ' ||
+        coalesce(${invoices.loadNumber}, '') || ' ' ||
+        coalesce(${invoices.branchName}, '') || ' ' ||
+        coalesce(${invoices.bolNumber}, '') || ' ' ||
+        coalesce(${invoices.status}, '')
+      )`;
+      const invoiceCarrierSearchDocument = sql`(
+        coalesce(${clients.name}, '') || ' ' ||
+        coalesce(${clients.preferredName}, '') || ' ' ||
+        coalesce(${clients.email}, '') || ' ' ||
+        coalesce(${clients.phone}, '') || ' ' ||
+        coalesce(${clients.contactPerson}, '') || ' ' ||
+        coalesce(${clients.city}, '') || ' ' ||
+        coalesce(${clients.state}, '') || ' ' ||
+        coalesce(${clients.mcNumber}, '') || ' ' ||
+        coalesce(${clients.dotNumber}, '')
+      )`;
+      const search = q ? or(
+        ilike(invoiceSearchDocument, `%${q}%`), ilike(invoiceCarrierSearchDocument, `%${q}%`),
+      ) : undefined;
+      const where = scope && search ? and(scope, search) : scope || search;
+      const query = db.select({
         invoice: invoices,
         carrierName: clients.name,
       }).from(invoices)
         .leftJoin(clients, eq(invoices.clientId, clients.id))
-        .where(req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)
+        .where(where)
         .orderBy(desc(invoices.createdAt));
-      res.json(rows.map(({ invoice, carrierName }) => ({
+      if (all) {
+        const rows = await query;
+        return res.json(rows.map(({ invoice, carrierName }) => ({
+          ...withInvoiceDisplayStatus(invoice),
+          carrierName,
+        })));
+      }
+      const { page, limit, offset } = parseListPagination(req);
+      const [{ total }] = await db.select({ total: count() }).from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id)).where(where);
+      const rows = await query.limit(limit).offset(offset);
+      const data = rows.map(({ invoice, carrierName }) => ({
         ...withInvoiceDisplayStatus(invoice),
         carrierName,
-      })));
+      }));
+      res.json({ data, total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching invoices:", error);
       res.status(500).json({ message: "Failed to fetch invoices" });
@@ -3943,8 +4043,10 @@ Trucking Pros Financial Team
 
   app.post("/api/tasks", requireAuth, async (req: any, res) => {
     try {
+      const hasDueDate = Object.prototype.hasOwnProperty.call(req.body, "dueDate");
       const taskData = insertTaskSchema.parse({
         ...req.body,
+        ...(hasDueDate ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null } : {}),
         assignedTo: req.user.id,
       });
 
@@ -3962,7 +4064,11 @@ Trucking Pros Financial Team
   app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const updateData = insertTaskSchema.partial().parse(req.body);
+      const hasDueDate = Object.prototype.hasOwnProperty.call(req.body, "dueDate");
+      const updateData = insertTaskSchema.partial().parse({
+        ...req.body,
+        ...(hasDueDate ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null } : {}),
+      });
 
       const [updatedTask] = await db
         .update(tasks)
@@ -4001,10 +4107,35 @@ Trucking Pros Financial Team
   });
 
   // Brokers
-  app.get("/api/brokers", requireAuth, async (_req, res) => {
+  app.get("/api/brokers", requireAuth, async (req, res) => {
     try {
-      const brokersData = await db.select().from(brokers).orderBy(brokers.name);
-      res.json(brokersData);
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      const conditions: any[] = [];
+      const brokerSearchDocument = sql`(
+        coalesce(${brokers.name}, '') || ' ' ||
+        coalesce(${brokers.contactPerson}, '') || ' ' ||
+        coalesce(${brokers.email}, '') || ' ' ||
+        coalesce(${brokers.phone}, '') || ' ' ||
+        coalesce(${brokers.address}, '') || ' ' ||
+        coalesce(${brokers.city}, '') || ' ' ||
+        coalesce(${brokers.state}, '') || ' ' ||
+        coalesce(${brokers.mcNumber}, '') || ' ' ||
+        coalesce(${brokers.dotNumber}, '') || ' ' ||
+        coalesce(${brokers.notes}, '')
+      )`;
+      if (q) conditions.push(ilike(brokerSearchDocument, `%${q}%`));
+      if (typeof req.query.status === "string" && req.query.status !== "all") {
+        conditions.push(eq(brokers.status, req.query.status as any));
+      }
+      if (typeof req.query.paymentTerms === "string" && req.query.paymentTerms) {
+        conditions.push(eq(brokers.paymentTerms, req.query.paymentTerms as any));
+      }
+      const where = conditions.length ? and(...conditions) : undefined;
+      if (req.query.all === "true") return res.json(await db.select().from(brokers).where(where).orderBy(brokers.name));
+      const { page, limit, offset } = parseListPagination(req);
+      const [{ total }] = await db.select({ total: count() }).from(brokers).where(where);
+      const data = await db.select().from(brokers).where(where).orderBy(brokers.name).limit(limit).offset(offset);
+      res.json({ data, total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching brokers:", error);
       res.status(500).json({ message: "Failed to fetch brokers" });
@@ -6632,14 +6763,21 @@ Trucking Pros Financial Team
   app.get("/api/dispatchers", requireAuth, async (req, res) => {
     try {
       const { carrierId, status } = req.query;
-      let query = db.select().from(dispatchers);
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const conditions: any[] = [];
       if (carrierId) conditions.push(eq(dispatchers.carrierId, parseInt(carrierId as string, 10)));
       if (status && status !== "all") conditions.push(eq(dispatchers.status, status as any));
-      const rows = conditions.length
-        ? await db.select().from(dispatchers).where(and(...conditions)).orderBy(dispatchers.lastName)
-        : await db.select().from(dispatchers).orderBy(dispatchers.lastName);
-      res.json(rows);
+      if (q) conditions.push(or(
+        ilike(dispatchers.firstName, `%${q}%`), ilike(dispatchers.lastName, `%${q}%`),
+        ilike(dispatchers.email, `%${q}%`), ilike(dispatchers.phone, `%${q}%`),
+        ilike(dispatchers.notes, `%${q}%`),
+      ));
+      const where = conditions.length ? and(...conditions) : undefined;
+      if (req.query.all === "true") return res.json(await db.select().from(dispatchers).where(where).orderBy(dispatchers.lastName));
+      const { page, limit, offset } = parseListPagination(req);
+      const [{ total }] = await db.select({ total: count() }).from(dispatchers).where(where);
+      const rows = await db.select().from(dispatchers).where(where).orderBy(dispatchers.lastName).limit(limit).offset(offset);
+      res.json({ data: rows, total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching dispatchers:", error);
       res.status(500).json({ message: "Failed to fetch dispatchers" });
@@ -7540,14 +7678,23 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   app.get("/api/trucks", requireAuth, async (req, res) => {
     try {
       const { carrierId, dispatcherId, status } = req.query;
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const conditions: any[] = [];
       if (carrierId) conditions.push(eq(trucks.carrierId, parseInt(carrierId as string, 10)));
       if (dispatcherId) conditions.push(eq(trucks.dispatcherId, parseInt(dispatcherId as string, 10)));
       if (status && status !== "all") conditions.push(eq(trucks.status, status as any));
-      const rows = conditions.length
-        ? await db.select().from(trucks).where(and(...conditions)).orderBy(trucks.truckNumber)
-        : await db.select().from(trucks).orderBy(trucks.truckNumber);
-      res.json(rows);
+      if (q) conditions.push(or(
+        ilike(trucks.truckNumber, `%${q}%`), ilike(trucks.vin, `%${q}%`),
+        ilike(trucks.make, `%${q}%`), ilike(trucks.model, `%${q}%`),
+        ilike(trucks.licensePlate, `%${q}%`), ilike(trucks.state, `%${q}%`),
+        ilike(trucks.notes, `%${q}%`),
+      ));
+      const where = conditions.length ? and(...conditions) : undefined;
+      if (req.query.all === "true") return res.json(await db.select().from(trucks).where(where).orderBy(trucks.truckNumber));
+      const { page, limit, offset } = parseListPagination(req);
+      const [{ total }] = await db.select({ total: count() }).from(trucks).where(where);
+      const rows = await db.select().from(trucks).where(where).orderBy(trucks.truckNumber).limit(limit).offset(offset);
+      res.json({ data: rows, total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching trucks:", error);
       res.status(500).json({ message: "Failed to fetch trucks" });
@@ -7596,12 +7743,148 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   app.delete("/api/trucks/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const [row] = await db.update(trucks).set({ status: "inactive" }).where(eq(trucks.id, id)).returning();
+      const [row] = await db.delete(trucks).where(eq(trucks.id, id)).returning();
       if (!row) return res.status(404).json({ message: "Truck not found" });
       res.json(row);
     } catch (error) {
-      console.error("Error deactivating truck:", error);
-      res.status(500).json({ message: "Failed to deactivate truck" });
+      console.error("Error deleting truck:", error);
+      res.status(500).json({ message: "Failed to delete truck" });
+    }
+  });
+
+  // ─── Carrier Drivers ───────────────────────────────────────────────────────
+  const driverPayloadSchema = z.object({
+    carrierId: z.coerce.number().int().positive(),
+    firstName: z.string().trim().min(1, "First name is required"),
+    lastName: z.string().trim().min(1, "Last name is required"),
+    phone: z.string().trim().max(50).optional().nullable(),
+    email: z.union([z.string().trim().email(), z.literal("")]).optional().nullable(),
+    licenseNumber: z.string().trim().max(100).optional().nullable(),
+    licenseState: z.string().trim().max(2).optional().nullable(),
+    licenseExpiration: z.union([z.string().trim(), z.literal("")]).optional().nullable(),
+    status: z.enum(["active", "inactive"]).default("active"),
+  });
+
+  const serializeDriver = async (driver: typeof drivers.$inferSelect, canViewLicense: boolean) => ({
+    ...driver,
+    licenseNumber: canViewLicense ? driver.licenseNumber : null,
+    licenseState: canViewLicense ? driver.licenseState : null,
+    licenseExpiration: canViewLicense ? driver.licenseExpiration : null,
+    photoUrl: driver.photoS3Key ? await getSignedViewUrl(driver.photoS3Key) : null,
+    photoS3Key: undefined,
+  });
+
+  app.get("/api/drivers", requireAuth, async (req: any, res) => {
+    try {
+      const carrierId = Number(req.query.carrierId);
+      if (!Number.isInteger(carrierId) || carrierId <= 0) {
+        return res.status(400).json({ message: "A valid carrierId is required" });
+      }
+      const rows = await db.select().from(drivers)
+        .where(eq(drivers.carrierId, carrierId))
+        .orderBy(desc(drivers.status), drivers.lastName, drivers.firstName);
+      const canViewLicense = req.user.role === "manager" || req.user.role === "admin";
+      res.json(await Promise.all(rows.map((row) => serializeDriver(row, canViewLicense))));
+    } catch (error) {
+      console.error("Error fetching carrier drivers:", error);
+      res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  app.post("/api/drivers", requireManagerOrAdmin, async (req: any, res) => {
+    try {
+      const parsed = driverPayloadSchema.parse(req.body);
+      const [carrier] = await db.select({ id: clients.id }).from(clients)
+        .where(eq(clients.id, parsed.carrierId)).limit(1);
+      if (!carrier) return res.status(404).json({ message: "Carrier not found" });
+      const [row] = await db.insert(drivers).values({
+        ...parsed,
+        phone: parsed.phone || null,
+        email: parsed.email || null,
+        licenseNumber: parsed.licenseNumber || null,
+        licenseState: parsed.licenseState?.toUpperCase() || null,
+        licenseExpiration: parsed.licenseExpiration ? new Date(`${parsed.licenseExpiration}T12:00:00Z`) : null,
+        createdBy: req.user.id,
+      }).returning();
+      res.status(201).json(await serializeDriver(row, true));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid driver data", errors: error.errors });
+      console.error("Error creating driver:", error);
+      res.status(500).json({ message: "Failed to create driver" });
+    }
+  });
+
+  app.patch("/api/drivers/:id", requireManagerOrAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid driver id" });
+      const parsed = driverPayloadSchema.partial().omit({ carrierId: true }).parse(req.body);
+      const [row] = await db.update(drivers).set({
+        ...parsed,
+        phone: parsed.phone === undefined ? undefined : parsed.phone || null,
+        email: parsed.email === undefined ? undefined : parsed.email || null,
+        licenseNumber: parsed.licenseNumber === undefined ? undefined : parsed.licenseNumber || null,
+        licenseState: parsed.licenseState === undefined ? undefined : parsed.licenseState?.toUpperCase() || null,
+        licenseExpiration: parsed.licenseExpiration === undefined
+          ? undefined
+          : parsed.licenseExpiration ? new Date(`${parsed.licenseExpiration}T12:00:00Z`) : null,
+        updatedAt: new Date(),
+      }).where(eq(drivers.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "Driver not found" });
+      res.json(await serializeDriver(row, true));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid driver data", errors: error.errors });
+      console.error("Error updating driver:", error);
+      res.status(500).json({ message: "Failed to update driver" });
+    }
+  });
+
+  app.post("/api/drivers/:id/photo", requireManagerOrAdmin, handleUpload("photo"), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid driver id" });
+      if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
+      if (!["image/jpeg", "image/png"].includes(req.file.mimetype) || req.file.size > 5 * 1024 * 1024) {
+        return res.status(400).json({ message: "Driver photo must be a JPEG or PNG no larger than 5MB" });
+      }
+      const bytes = req.file.buffer;
+      const validJpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+      const validPng = bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+      if (!validJpeg && !validPng) return res.status(400).json({ message: "Photo contents are not a valid JPEG or PNG" });
+      const [existing] = await db.select().from(drivers).where(eq(drivers.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Driver not found" });
+      const s3Key = await uploadToS3(req.file.buffer, `drivers/${id}/${crypto.randomUUID()}`, req.file.mimetype);
+      let updated: typeof drivers.$inferSelect;
+      try {
+        [updated] = await db.update(drivers).set({ photoS3Key: s3Key, updatedAt: new Date() })
+          .where(eq(drivers.id, id)).returning();
+      } catch (error) {
+        await deleteFromS3(s3Key);
+        throw error;
+      }
+      if (existing.photoS3Key) await deleteFromS3(existing.photoS3Key).catch((error) => console.warn("Could not remove previous driver photo:", error));
+      res.json(await serializeDriver(updated, true));
+    } catch (error) {
+      console.error("Error uploading driver photo:", error);
+      res.status(500).json({ message: "Failed to upload driver photo" });
+    }
+  });
+
+  app.delete("/api/drivers/:id", requireManagerOrAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid driver id" });
+      const [existing] = await db.select().from(drivers).where(eq(drivers.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Driver not found" });
+      const [row] = await db.delete(drivers).where(eq(drivers.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "Driver not found" });
+      if (existing.photoS3Key) {
+        await deleteFromS3(existing.photoS3Key).catch((error) => console.warn("Could not remove deleted driver photo:", error));
+      }
+      res.json({ message: "Driver removed" });
+    } catch (error) {
+      console.error("Error removing driver:", error);
+      res.status(500).json({ message: "Failed to remove driver" });
     }
   });
 

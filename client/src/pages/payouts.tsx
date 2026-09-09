@@ -123,7 +123,7 @@ export default function Payouts() {
   });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
+    queryKey: ["/api/invoices", { all: true }],
   });
 
   // Invoices without a payout record yet

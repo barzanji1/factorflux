@@ -97,7 +97,7 @@ export default function BrokerDetail() {
   });
 
   const { data: allInvoices = [] } = useQuery<any[]>({
-    queryKey: ["/api/invoices"],
+    queryKey: ["/api/invoices", { all: true }],
     enabled: !isNaN(brokerId),
   });
 

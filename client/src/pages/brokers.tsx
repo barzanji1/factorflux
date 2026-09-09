@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,10 +73,19 @@ interface Broker {
   updatedAt: string;
 }
 
+interface BrokersResponse {
+  data: Broker[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export default function Brokers() {
   const [isBrokerDialogOpen, setIsBrokerDialogOpen] = useState(false);
   const [editingBroker, setEditingBroker] = useState<Broker | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -89,13 +98,48 @@ export default function Brokers() {
   function applyView(view: SavedView) {
     if (view.filters.status) setStatusFilter(view.filters.status);
     if (view.filters.terms) setStatusFilter("quickpay_" + view.filters.terms);
+    setPage(1);
     setActiveViewId(view.id);
   }
 
-  // Fetch brokers
-  const { data: brokers = [], isLoading } = useQuery<Broker[]>({
-    queryKey: ["/api/brokers"],
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchTerm]);
+
+  // Fetch brokers server-side. Keep the payment terms filter separate from
+  // status so saved views can continue to express either kind of filter.
+  const statusQuery = ["active", "inactive", "suspended"].includes(statusFilter)
+    ? statusFilter
+    : undefined;
+  const paymentTermsQuery = statusFilter === "quickpay"
+    ? "quickpay"
+    : statusFilter.startsWith("quickpay_")
+      ? statusFilter.slice("quickpay_".length)
+      : undefined;
+  const { data: brokersResponse, isLoading } = useQuery<BrokersResponse>({
+    queryKey: ["/api/brokers", page, debouncedSearch, statusQuery, paymentTermsQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "50",
+        q: debouncedSearch,
+      });
+      if (statusQuery) params.set("status", statusQuery);
+      if (paymentTermsQuery) params.set("paymentTerms", paymentTermsQuery);
+      const response = await fetch(`/api/brokers?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch brokers");
+      return response.json();
+    },
   });
+  const brokers = brokersResponse?.data ?? [];
+  const totalBrokers = brokersResponse?.total ?? 0;
+  const totalPages = brokersResponse?.totalPages ?? 1;
 
   // Broker form
   const form = useForm<BrokerFormData>({
@@ -105,19 +149,6 @@ export default function Brokers() {
       status: "active",
       creditLimit: 0,
     },
-  });
-
-  // Filter brokers
-  const filteredBrokers = brokers.filter(broker => {
-    const matchesSearch =
-      broker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      broker.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      broker.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" ? true
-      : statusFilter === "quickpay" ? broker.paymentTerms === "quickpay"
-      : broker.status === statusFilter;
-    return matchesSearch && matchesStatus;
   });
 
   // Create broker mutation
@@ -259,11 +290,11 @@ export default function Brokers() {
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
         {/* ── Stats strip ──────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
-          {[
-            { label: "Total Brokers",      value: brokers.length,                                         icon: Building    },
-            { label: "Active",             value: brokers.filter(b => b.status === "active").length,       icon: TrendingUp  },
-            { label: "Total Credit Limit", value: `$${brokers.reduce((s,b) => s+(b.creditLimit||0), 0).toLocaleString()}`, icon: DollarSign },
-            { label: "Quick Pay",          value: brokers.filter(b => b.paymentTerms === "quickpay").length, icon: Calendar  },
+            {[
+             { label: "Total Brokers",      value: totalBrokers,                                           icon: Building    },
+            { label: "Current page active",             value: brokers.filter(b => b.status === "active").length,       icon: TrendingUp  },
+            { label: "Current page credit limit", value: `$${brokers.reduce((s,b) => s+(b.creditLimit||0), 0).toLocaleString()}`, icon: DollarSign },
+            { label: "Current page quick pay",          value: brokers.filter(b => b.paymentTerms === "quickpay").length, icon: Calendar  },
           ].map(s => {
             const Icon = s.icon;
             return (
@@ -311,7 +342,7 @@ export default function Brokers() {
                 <button
                   key={s}
                   type="button"
-                  onClick={() => { setStatusFilter(s); setActiveViewId(null); }}
+                   onClick={() => { setStatusFilter(s); setPage(1); setActiveViewId(null); }}
                   className={`rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors capitalize ${
                     statusFilter === s
                       ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
@@ -336,12 +367,19 @@ export default function Brokers() {
         {/* ── Broker table ─────────────────────────────────────────────── */}
         <div className="overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+             <div className="space-y-3 p-5">
+               {[1, 2, 3, 4, 5].map((row) => (
+                 <div key={row} className="flex animate-pulse items-center gap-4">
+                   <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                   <div className="h-4 flex-1 rounded bg-slate-200 dark:bg-slate-800" />
+                   <div className="h-4 w-1/4 rounded bg-slate-200 dark:bg-slate-800" />
+                   <div className="h-4 w-1/6 rounded bg-slate-200 dark:bg-slate-800" />
+                 </div>
+               ))}
             </div>
-          ) : filteredBrokers.length === 0 ? (
+           ) : brokers.length === 0 ? (
             <div className="px-8 py-10">
-              {brokers.length === 0 ? (
+               {totalBrokers === 0 && !debouncedSearch && statusFilter === "all" ? (
                 <FFOnboarding
                   title="No brokers yet"
                   description="Add freight broker contacts to track relationships, credit limits, and payment terms in one place."
@@ -356,18 +394,25 @@ export default function Brokers() {
                   hint="Tip: Quick Pay brokers are flagged separately so your team can prioritize them."
                 />
               ) : (
-                <div className="py-8 text-center">
+                 <div className="py-8 text-center">
                   <Building className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
                   <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No brokers match your search</p>
                   <button
                     type="button"
-                    onClick={() => { setSearchTerm(""); setStatusFilter("all"); setActiveViewId(null); }}
+                     onClick={() => { setSearchTerm(""); setStatusFilter("all"); setPage(1); setActiveViewId(null); }}
                     className="mt-2 text-[12px] font-semibold text-blue-600 hover:text-blue-700"
                   >
                     Clear filters
                   </button>
                 </div>
               )}
+               {(totalBrokers === 0 || brokers.length === 0) && (
+                 <div className="mt-5 flex items-center justify-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                   <span className="mr-2 text-[11.5px] text-slate-400">Showing 0-0 of {totalBrokers} brokers</span>
+                   <Button type="button" variant="outline" size="sm" disabled>Previous</Button>
+                   <Button type="button" variant="outline" size="sm" disabled>Next</Button>
+                 </div>
+               )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -385,7 +430,7 @@ export default function Brokers() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredBrokers.map((broker) => (
+                   {brokers.map((broker) => (
                     <tr
                       key={broker.id}
                       className={broker.status === "suspended" ? "ff-row-urgent" : broker.status === "inactive" ? "ff-row-stale" : ""}
@@ -474,11 +519,33 @@ export default function Brokers() {
                 </tbody>
               </table>
               <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
-                <span className="text-[11.5px] text-slate-400">{filteredBrokers.length} broker{filteredBrokers.length !== 1 ? "s" : ""}</span>
+                 <span className="text-[11.5px] text-slate-400">
+                   Showing {totalBrokers === 0 ? 0 : (page - 1) * 50 + 1}-{Math.min(page * 50, totalBrokers)} of {totalBrokers} brokers
+                 </span>
                 <span className="text-[11.5px] text-slate-400">
-                  ${filteredBrokers.reduce((s, b) => s + (b.creditLimit || 0), 0).toLocaleString()} total credit
+                   ${brokers.reduce((s, b) => s + (b.creditLimit || 0), 0).toLocaleString()} total credit
                 </span>
               </div>
+               <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
+                 <Button
+                   type="button"
+                   variant="outline"
+                   size="sm"
+                   disabled={page <= 1 || isLoading}
+                   onClick={() => setPage(currentPage => Math.max(1, currentPage - 1))}
+                 >
+                   Previous
+                 </Button>
+                 <Button
+                   type="button"
+                   variant="outline"
+                   size="sm"
+                   disabled={page >= totalPages || isLoading}
+                   onClick={() => setPage(currentPage => Math.min(totalPages, currentPage + 1))}
+                 >
+                   Next
+                 </Button>
+               </div>
             </div>
           )}
         </div>

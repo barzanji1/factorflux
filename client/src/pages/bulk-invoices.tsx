@@ -63,8 +63,8 @@ export default function BulkInvoices() {
   const watchedItems = form.watch("items");
   const runningTotal = watchedItems.reduce((sum, row) => sum + Number(row.rate || 0), 0);
 
-  const { data: brokers = [], isLoading: brokersLoading } = useQuery<Broker[]>({ queryKey: ["/api/brokers"] });
-  const { data: carriers = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients"] });
+  const { data: brokers = [], isLoading: brokersLoading } = useQuery<Broker[]>({ queryKey: ["/api/brokers", { all: true }] });
+  const { data: carriers = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients", { all: true }] });
   const { data: batches = [], isLoading, isError, refetch } = useQuery<Batch[]>({ queryKey: ["/api/bulk-invoices"] });
   const detailQuery = useQuery<Batch>({ queryKey: ["/api/bulk-invoices", detail?.id], enabled: Boolean(detail?.id) });
   const activeDetail = detailQuery.data || detail;

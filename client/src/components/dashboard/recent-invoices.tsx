@@ -52,7 +52,7 @@ export default function RecentInvoices() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
+    queryKey: ["/api/invoices", { all: true }],
   });
 
   const handleViewInvoice = (invoice: Invoice) => {

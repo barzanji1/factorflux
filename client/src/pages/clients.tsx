@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,35 +27,49 @@ import {
 import type { Client } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
+type ClientsResponse = {
+  data: Client[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
 export default function Clients() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
   const {
-    data: clients = [],
+    data: clientsResponse,
     isLoading: clientsLoading,
     isError: clientsError,
     refetch: refetchClients,
-  } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-  });
-
-  const { data: searchResults = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients/search", searchQuery],
-    enabled: searchQuery.trim().length > 0,
+  } = useQuery<ClientsResponse>({
+    queryKey: ["/api/clients", page, debouncedSearch],
     queryFn: async () => {
-      const res = await fetch(`/api/clients/search?q=${encodeURIComponent(searchQuery)}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+      const params = new URLSearchParams({ page: String(page), limit: "50", q: debouncedSearch });
+      const res = await fetch(`/api/clients?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`Failed to load clients: ${res.status}`);
       return res.json();
     },
   });
 
-  const displayClients = searchQuery.trim() ? searchResults : clients;
+  const clients = clientsResponse?.data ?? [];
+  const totalClients = clientsResponse?.total ?? 0;
+  const totalPages = clientsResponse?.totalPages ?? 1;
+  const displayClients = clients;
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
@@ -85,7 +99,6 @@ export default function Clients() {
     window.location.href = `/carriers/${client.id}/edit`;
   };
 
-  const totalClients = clients.length;
   const activeClients = clients.filter((client) => client.status === "active").length;
   const inactiveClients = clients.filter((client) => client.status !== "active").length;
   const clientsWithEmail = clients.filter((client) => !!client.email).length;
@@ -138,7 +151,7 @@ export default function Clients() {
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
                   <CircleCheck className="h-5 w-5" />
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Active Clients</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Current page active clients</p>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                   {activeClients}
                 </p>
@@ -148,7 +161,7 @@ export default function Clients() {
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
                   <Users className="h-5 w-5" />
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Inactive / Other</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Current page inactive / other</p>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                   {inactiveClients}
                 </p>
@@ -158,7 +171,7 @@ export default function Clients() {
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400">
                   <Mail className="h-5 w-5" />
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">With Email</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Current page with email</p>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                   {clientsWithEmail}
                 </p>
@@ -188,22 +201,22 @@ export default function Clients() {
                     </div>
 
                     <div className="text-sm text-slate-500 dark:text-slate-400">
-                      {searchQuery ? (
-                        <>Showing results for “{searchQuery}”</>
-                      ) : (
-                        <>
-                          Showing {displayClients.length} client
-                          {displayClients.length === 1 ? "" : "s"}
-                        </>
-                      )}
+                      Showing{" "}
+                      {totalClients === 0 ? 0 : (page - 1) * 50 + 1}-
+                      {Math.min(page * 50, totalClients)} of {totalClients} carriers
                     </div>
                   </div>
                 </CardHeader>
 
                 <CardContent className="p-6">
                   {clientsLoading ? (
-                    <div className="flex items-center justify-center py-16">
-                      <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 2xl:grid-cols-3" aria-label="Loading clients">
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="h-64 animate-pulse rounded-[22px] border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900"
+                        />
+                      ))}
                     </div>
                   ) : clientsError ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -349,12 +362,12 @@ export default function Clients() {
                         No clients found
                       </p>
                       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        {searchQuery
+                        {debouncedSearch
                           ? "Try a different name, email, or contact person."
                           : "Add your first client to begin building your directory."}
                       </p>
 
-                      {!searchQuery && (
+                      {!debouncedSearch && (
                         <Button
                           className="mt-5 h-11 rounded-xl bg-blue-600 px-4 text-white hover:bg-blue-700"
                           onClick={handleCreateClient}
@@ -363,6 +376,29 @@ export default function Clients() {
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                       )}
+                    </div>
+                  )}
+                  {!clientsLoading && !clientsError && (
+                    <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5 dark:border-slate-800">
+                      <Button
+                        variant="outline"
+                        className="rounded-xl"
+                        disabled={page <= 1}
+                        onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        Page {page} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        className="rounded-xl"
+                        disabled={page >= totalPages}
+                        onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                      >
+                        Next
+                      </Button>
                     </div>
                   )}
                 </CardContent>

@@ -130,7 +130,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [values, setValues] = useState(EMPTY);
-  const { data: carriersData = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients"], enabled: open });
+  const { data: carriersData = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients", { all: true }], enabled: open });
   const { data: brokersData = [] } = useQuery<Broker[]>({ queryKey: ["/api/debtors"], enabled: open });
   const { data: bankAccountsData = [] } = useQuery<Array<{
     id: number; bankName?: string | null; accountType?: string | null; lastFour?: string | null;

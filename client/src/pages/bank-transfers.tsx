@@ -132,7 +132,7 @@ export default function BankTransfers() {
     queryKey: ["/api/bank-transfers"],
   });
 
-  const { data: carriers = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
+  const { data: carriers = [] } = useQuery<Client[]>({ queryKey: ["/api/clients", { all: true }] });
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
 

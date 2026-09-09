@@ -171,9 +171,9 @@ export default function ReleaseLetters() {
   // ─── Queries ───────────────────────────────────────────────────────────────
 
   const { data: letters = [], isLoading } = useQuery<ReleaseLetter[]>({ queryKey: ["/api/release-letters"] });
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
-  const { data: brokersData = [] } = useQuery<Broker[]>({ queryKey: ["/api/brokers"] });
-  const { data: invoicesData = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients", { all: true }] });
+  const { data: brokersData = [] } = useQuery<Broker[]>({ queryKey: ["/api/brokers", { all: true }] });
+  const { data: invoicesData = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices", { all: true }] });
 
   const clientMap = Object.fromEntries(clients.map((c) => [c.id, c.name]));
   const brokerMap = Object.fromEntries(brokersData.map((b) => [b.id, b.name]));

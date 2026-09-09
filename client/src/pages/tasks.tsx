@@ -78,7 +78,7 @@ export default function Tasks() {
   });
 
   const { data: clients = [] } = useQuery<Array<{ id: number; name: string }>>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients", { all: true }],
   });
 
   const form = useForm<TaskFormData>({

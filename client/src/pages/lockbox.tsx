@@ -145,7 +145,7 @@ function MatchModal({
   const [applyAmounts, setApplyAmounts] = useState<Record<number, string>>({});
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
+    queryKey: ["/api/invoices", { all: true }],
   });
 
   const openInvoices = useMemo(() =>

@@ -528,7 +528,7 @@ export default function WorkflowBuilder() {
 
   // ── Invoice counts per stage ────────────────────────────────────────────────
   const { data: invoices = [] } = useQuery<{ factoringStage: string | null }[]>({
-    queryKey: ["/api/invoices"],
+    queryKey: ["/api/invoices", { all: true }],
     select: (data: any[]) => data.map((d: any) => ({ factoringStage: d.factoringStage })),
   });
   const stageCounts: Record<string, number> = {};

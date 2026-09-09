@@ -82,11 +82,11 @@ export default function Dispatchers() {
   // ─── Queries ───────────────────────────────────────────────────────────────
 
   const { data: dispatchers = [], isLoading } = useQuery<Dispatcher[]>({
-    queryKey: ["/api/dispatchers"],
+    queryKey: ["/api/dispatchers", { all: true }],
   });
 
   const { data: carriers = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients", { all: true }],
   });
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
