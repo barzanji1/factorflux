@@ -226,7 +226,7 @@ export function DriverSection({ carrierId, canEdit, legacyDriver }: { carrierId:
             setPreview(null);
             setOpen(true);
           }}>Convert</Button>}
-        </div> : <EmptyState label="No drivers linked to this carrier" actionLabel={canEdit ? "Add driver" : undefined} onAction={canEdit ? () => openDriver() : undefined} />}
+        </div> : <EmptyState label="No drivers linked to this carrier" />}
       </ProfileSection>
 
       <Dialog open={open} onOpenChange={setOpen}>
