@@ -1,0 +1,71 @@
+Build a Communications system — internal real-time agent chat and external email from carrier profiles.
+
+Part 1 — Internal Agent Chat
+
+Database
+
+ Create chat_channels table: id, name, type (public/direct), createdAt
+ Create chat_messages table: id, channelId, userId, message, createdAt, readBy (array of userIds)
+ Create chat_members table: id, channelId, userId, joinedAt
+ Seed default channels: #general, #funding, #collections, #operations
+ Run db:push
+
+Backend
+
+ GET /api/chat/channels — list all channels current user belongs to
+ GET /api/chat/channels/:id/messages — paginated message history, last 50
+ POST /api/chat/channels/:id/messages — send message
+ POST /api/chat/direct — create or get direct message channel between two users
+ GET /api/chat/unread — count of unread messages across all channels
+ PATCH /api/chat/channels/:id/read — mark channel as read
+ All routes require requireAuth
+ Poll endpoint every 3 seconds for new messages
+
+Frontend — Chat Page (/chat)
+
+ Three column layout:
+Left: channel list (public channels + direct messages) with unread badges
+Center: message thread for selected channel
+Right: channel members list
+ Channel list shows: channel name, last message preview, unread count badge
+ Message thread: avatar + name + timestamp + message bubble
+ Own messages right-aligned, others left-aligned
+ Message input at bottom with Send button and Enter key support
+ Auto-scroll to latest message
+ Polls every 3 seconds for new messages — updates without full page refresh
+ New message notification badge on sidebar Chat icon
+ Direct Message button — opens user picker to start DM with any agent
+ Online status indicator (green dot) on user avatars
+ Add Chat to sidebar under WORKSPACE section with chat bubble icon
+
+Part 2 — External Email from Carrier Profile
+
+Database
+
+ Create carrier_emails table: id, carrierId, sentBy, toEmail, subject, body, templateType, sentAt, deliveryStatus
+ Run db:push
+
+Backend
+
+ POST /api/carriers/:id/email — send email to carrier via SendGrid, log to carrier_emails
+ GET /api/carriers/:id/emails — return email history for this carrier
+ Pre-built templates:
+Request Documents: "Please send your Rate Con and BOL for Load #[X]"
+Funding Update: "Your invoice has been funded. Advance of $[X] sent via [method]"
+Payment Reminder: "Please submit your documents for pending payment"
+General: blank template
+ All routes require requireAuth
+
+Frontend — Carrier Profile Email Section
+
+ Add Email tab to carrier profile page tabs
+ Tab shows: compose form + email history below
+ Compose form:
+To: auto-filled with carrier's email (editable)
+Template selector dropdown — selecting template auto-fills subject and body
+Subject field
+Body textarea with placeholder variables: [Load#], [Amount], [CarrierName]
+Send button
+ Email history: list of sent emails with date, subject, status badge (Sent/Delivered/Failed)
+ Click email row → expand to see full body
+ Failed emails show retry button
