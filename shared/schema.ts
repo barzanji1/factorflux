@@ -496,7 +496,7 @@ export const collections = pgTable("collections", {
 
 // Client Vault - Secure storage for confidential information
 export const clientVault = pgTable("client_vault", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity({ name: "client_vault_id_seq", startWith: 3 }),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   dataType: varchar("data_type", {
     enum: ["ssn", "bank_account", "password", "driver_license", "passport", "tax_documents", "insurance", "other"]
