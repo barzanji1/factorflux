@@ -2,8 +2,8 @@
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const sql = neon(DATABASE_URL);
+const NEON_DATABASE_URL = process.env.NEON_DATABASE_URL;
+const sql = neon(NEON_DATABASE_URL);
 
 async function emergencyProductionFix() {
   console.log('=== EMERGENCY PRODUCTION AUTHENTICATION FIX ===');

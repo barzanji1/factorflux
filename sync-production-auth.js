@@ -2,14 +2,14 @@
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const NEON_DATABASE_URL = process.env.NEON_DATABASE_URL;
 
-if (!DATABASE_URL) {
-  console.error('DATABASE_URL not found');
+if (!NEON_DATABASE_URL) {
+  console.error('NEON_DATABASE_URL not found');
   process.exit(1);
 }
 
-const sql = neon(DATABASE_URL);
+const sql = neon(NEON_DATABASE_URL);
 
 async function resetAdminPassword() {
   try {

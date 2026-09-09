@@ -26,12 +26,12 @@ if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET must be set in environment variables");
 }
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL must be set in environment variables");
+if (!process.env.NEON_DATABASE_URL) {
+  throw new Error("NEON_DATABASE_URL must be set in environment variables");
 }
 
 const PgSession = connectPgSimple(session);
-const pgPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pgPool = new pg.Pool({ connectionString: process.env.NEON_DATABASE_URL });
 
 const isProduction = process.env.NODE_ENV === "production";
 

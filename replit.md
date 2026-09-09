@@ -9,7 +9,7 @@ FactorFlux is a freight factoring workflow application that streamlines invoice 
 *   **Typecheck**: `npm run typecheck`
 *   **DB Push**: `npm run db:push`
 *   **Seed Demo Data**: `POST /api/admin/seed-demo` (admin auth required, idempotent)
-*   **Env Vars**: `DATABASE_URL`, `PORT`, `SESSION_SECRET`, `FMCSA_WEBKEY`, `FMCSA_CRON`, `SENDGRID_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
+*   **Env Vars**: `NEON_DATABASE_URL`, `PORT`, `SESSION_SECRET`, `FMCSA_WEBKEY`, `FMCSA_CRON`, `SENDGRID_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
 *   **OCR Provider**: `EXTRACTION_PROVIDER=hybrid` (default) | `native_pdf` | `tesseract_ocr`
 *   **File Storage**: S3 bucket `factorflux-documents-tpf` (region `us-east-2`). New uploads go to S3 only; legacy local files in `uploads/` still served as fallback. S3 service: `server/services/s3Service.ts`.
 
