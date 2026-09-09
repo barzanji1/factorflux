@@ -130,7 +130,37 @@ const upload = multer({
 const carrierUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: Math.ceil(134.22 * 1024 * 1024) },
+  fileFilter: (_req, file, cb) => {
+    const allowedExtensions = new Set([".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff"]);
+    const allowedMimeTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/tiff"]);
+    if (allowedExtensions.has(path.extname(file.originalname).toLowerCase()) && allowedMimeTypes.has(file.mimetype.toLowerCase())) {
+      return cb(null, true);
+    }
+    cb(new Error("Only PDF, JPEG, PNG, and TIFF files are allowed"));
+  },
 });
+
+const hasAllowedCarrierDocumentSignature = (file: Express.Multer.File) => {
+  const bytes = file.buffer;
+  const isPdf = bytes.length >= 5 && bytes.subarray(0, 5).toString("ascii") === "%PDF-";
+  const isJpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const isPng = bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const isTiff = bytes.length >= 4 && (
+    bytes.subarray(0, 4).equals(Buffer.from([0x49, 0x49, 0x2a, 0x00]))
+    || bytes.subarray(0, 4).equals(Buffer.from([0x4d, 0x4d, 0x00, 0x2a]))
+  );
+  return isPdf || isJpeg || isPng || isTiff;
+};
+
+function handleCarrierUpload(req: any, res: any, next: any) {
+  carrierUpload.single("file")(req, res, (err: any) => {
+    if (!err) return next();
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "File too large. Maximum size is 135MB." });
+    }
+    return res.status(400).json({ message: err.message || "File upload rejected." });
+  });
+}
 
 function handleUpload(field: string) {
   return (req: any, res: any, next: any) => {
@@ -152,10 +182,16 @@ function sanitizeOriginalName(name: string) {
     .trim();
 }
 
-function sanitizeClientResponse(client: any) {
+function sanitizeClientResponse(client: any, userRole?: string) {
+  const canViewOwnerIdentity = userRole === "manager" || userRole === "admin";
   return {
     ...client,
-    owners: (client.owners as any[] ?? []).map(owner => ({ ...owner, ssn: owner.ssn ? "" : null })),
+    owners: (client.owners as any[] ?? []).map(owner => {
+      const { ssn: _ssn, ...withoutSsn } = owner;
+      if (canViewOwnerIdentity) return { ...withoutSsn, ssn: owner.ssn ? "" : null };
+      const { idNumber: _idNumber, idState: _idState, ...safeOwner } = withoutSsn;
+      return safeOwner;
+    }),
     bankAccountEncrypted: undefined,
     abaRoutingEncrypted: undefined,
     hasBankAccount: !!client.bankAccountEncrypted,
@@ -1388,7 +1424,7 @@ ${message}
   app.get("/api/clients", requireAuth, async (_req: any, res) => {
     try {
       const allClients = await storage.getClients();
-      res.json(allClients.map(sanitizeClientResponse));
+      res.json(allClients.map(client => sanitizeClientResponse(client, _req.user.role)));
     } catch (error) {
       console.error("Error fetching clients:", error);
       res.status(500).json({ message: "Failed to fetch clients" });
@@ -1401,14 +1437,14 @@ ${message}
       if (isNaN(id)) return res.status(400).json({ message: "Invalid client id" });
       const client = await storage.getClient(id);
       if (!client) return res.status(404).json({ message: "Client not found" });
-      res.json(sanitizeClientResponse(client));
+      res.json(sanitizeClientResponse(client, req.user.role));
     } catch (error) {
       console.error("Error fetching client:", error);
       res.status(500).json({ message: "Failed to fetch client" });
     }
   });
 
-  app.get("/api/clients/:id/documents", requireAuth, async (req: any, res) => {
+  app.get("/api/clients/:id/documents", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const clientId = Number(req.params.id);
       if (!Number.isInteger(clientId)) return res.status(400).json({ message: "Invalid carrier id" });
@@ -1420,11 +1456,14 @@ ${message}
     }
   });
 
-  app.post("/api/clients/:id/documents", requireAuth, carrierUpload.single("file"), async (req: any, res) => {
+  app.post("/api/clients/:id/documents", requireManagerOrAdmin, handleCarrierUpload, async (req: any, res) => {
     try {
       const clientId = Number(req.params.id);
       if (!Number.isInteger(clientId)) return res.status(400).json({ message: "Invalid carrier id" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      if (!hasAllowedCarrierDocumentSignature(req.file)) {
+        return res.status(400).json({ message: "File contents do not match an allowed PDF or image format" });
+      }
       const [exists] = await db.select({ id: clients.id }).from(clients).where(eq(clients.id, clientId)).limit(1);
       if (!exists) return res.status(404).json({ message: "Carrier not found" });
       const documentCategory = String(req.body.documentCategory || "").trim();
@@ -1463,7 +1502,7 @@ ${message}
       }
 
       const results = await storage.searchClients(q);
-      res.json(results.map(sanitizeClientResponse));
+      res.json(results.map(client => sanitizeClientResponse(client, req.user.role)));
     } catch (error) {
       console.error("Error searching clients:", error);
       res.status(500).json({ message: "Failed to search clients" });
@@ -1501,7 +1540,7 @@ ${message}
         entityId: client.id,
       });
 
-      res.status(201).json(sanitizeClientResponse(client));
+      res.status(201).json(sanitizeClientResponse(client, req.user.role));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -1569,7 +1608,7 @@ ${message}
         entityId: client.id,
       });
 
-      res.json(sanitizeClientResponse(client));
+      res.json(sanitizeClientResponse(client, req.user.role));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -3168,7 +3207,7 @@ Trucking Pros Financial Team
   });
 
   // Vault — NOTE: specific sub-routes must be registered BEFORE the :clientId wildcard
-  app.get("/api/vault/entry/:id", requireAuth, async (req: any, res) => {
+  app.get("/api/vault/entry/:id", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
@@ -3186,27 +3225,28 @@ Trucking Pros Financial Team
       });
 
       const decryptedValue = decryptVault((entry as any).encryptedData);
-      res.json({ ...entry, decryptedValue });
+      const { encryptedData: _encryptedData, ...safeEntry } = entry as any;
+      res.json({ ...safeEntry, decryptedValue });
     } catch (error) {
       console.error("Error fetching vault entry:", error);
       res.status(500).json({ message: "Failed to fetch vault entry" });
     }
   });
 
-  app.get("/api/vault/:clientId", requireAuth, async (req: any, res) => {
+  app.get("/api/vault/:clientId", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const clientId = parseInt(req.params.clientId, 10);
       if (Number.isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
 
       const vaultEntries = await storage.getAllVaultEntries(clientId);
-      res.json(vaultEntries);
+      res.json(vaultEntries.map(({ encryptedData: _encryptedData, ...entry }: any) => entry));
     } catch (error) {
       console.error("Error fetching vault entries:", error);
       res.status(500).json({ message: "Failed to fetch vault entries" });
     }
   });
 
-  app.get("/api/carriers/:id/bank-accounts", requireAuth, async (req: any, res) => {
+  app.get("/api/carriers/:id/bank-accounts", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const carrierId = parseInt(req.params.id, 10);
       if (Number.isNaN(carrierId)) return res.status(400).json({ message: "Invalid carrier ID" });
@@ -3222,6 +3262,7 @@ Trucking Pros Financial Team
             id: entry.id,
             bankName: data.bankName || "Bank",
             accountType: data.accountType || null,
+            paymentType: data.paymentType === "ACH" || data.paymentType === "Wire" ? data.paymentType : null,
             nickname: data.nickname || entry.label,
             lastFour: digits.slice(-4).padStart(4, "•"),
           };
@@ -3233,16 +3274,20 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post("/api/vault", requireAuth, async (req: any, res) => {
+  app.post("/api/vault", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const { value, clientId, dataType, label, notes } = req.body;
       if (!value) return res.status(400).json({ message: "Value is required" });
       if (!clientId) return res.status(400).json({ message: "Client is required" });
+      const parsedClientId = parseInt(String(clientId), 10);
+      if (!Number.isInteger(parsedClientId)) return res.status(400).json({ message: "Invalid client ID" });
+      const client = await storage.getClient(parsedClientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
 
       const encryptedData = encryptVault(String(value));
 
       const data = insertClientVaultSchema.parse({
-        clientId: parseInt(String(clientId), 10),
+        clientId: parsedClientId,
         dataType: dataType || "other",
         label,
         encryptedData,
@@ -3260,7 +3305,8 @@ Trucking Pros Financial Team
         entityId: entry.id,
       });
 
-      res.status(201).json(entry);
+      const { encryptedData: _encryptedData, ...safeEntry } = entry as any;
+      res.status(201).json(safeEntry);
     } catch (error: any) {
       console.error("Error creating vault entry:", error);
       if (error instanceof z.ZodError) {
@@ -3270,10 +3316,15 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch("/api/vault/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/vault/:id", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
+      const existing = await storage.getVaultEntry(id);
+      if (!existing || !(existing as any).isActive) return res.status(404).json({ message: "Vault entry not found" });
+      if (req.body.clientId !== undefined && Number(req.body.clientId) !== Number((existing as any).clientId)) {
+        return res.status(403).json({ message: "Vault entry does not belong to this carrier" });
+      }
 
       const updates: any = {};
       if (req.body.label) updates.label = req.body.label;
@@ -3291,17 +3342,23 @@ Trucking Pros Financial Team
         entityId: id,
       });
 
-      res.json(entry);
+      const { encryptedData: _encryptedData, ...safeEntry } = entry as any;
+      res.json(safeEntry);
     } catch (error) {
       console.error("Error updating vault entry:", error);
       res.status(500).json({ message: "Failed to update vault entry" });
     }
   });
 
-  app.put("/api/vault/:id", requireAuth, async (req: any, res) => {
+  app.put("/api/vault/:id", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
+      const existing = await storage.getVaultEntry(id);
+      if (!existing || !(existing as any).isActive) return res.status(404).json({ message: "Vault entry not found" });
+      if (req.body.clientId !== undefined && Number(req.body.clientId) !== Number((existing as any).clientId)) {
+        return res.status(403).json({ message: "Vault entry does not belong to this carrier" });
+      }
 
       const updates: any = {};
       if (req.body.label) updates.label = req.body.label;
@@ -3310,17 +3367,23 @@ Trucking Pros Financial Team
       if (req.body.value) updates.encryptedData = encryptVault(String(req.body.value));
 
       const entry = await storage.updateVaultEntry(id, updates);
-      res.json(entry);
+      const { encryptedData: _encryptedData, ...safeEntry } = entry as any;
+      res.json(safeEntry);
     } catch (error) {
       console.error("Error updating vault entry (PUT):", error);
       res.status(500).json({ message: "Failed to update vault entry" });
     }
   });
 
-  app.delete("/api/vault/:id", requireAuth, async (req: any, res) => {
+  app.delete("/api/vault/:id", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid vault entry ID" });
+      const existing = await storage.getVaultEntry(id);
+      if (!existing || !(existing as any).isActive) return res.status(404).json({ message: "Vault entry not found" });
+      if (req.query.clientId !== undefined && Number(req.query.clientId) !== Number((existing as any).clientId)) {
+        return res.status(403).json({ message: "Vault entry does not belong to this carrier" });
+      }
 
       await storage.deleteVaultEntry(id);
 
