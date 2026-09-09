@@ -1,0 +1,61 @@
+Rebuild the carrier profile page to match the old system — display all onboarding data in a comprehensive two-column layout.
+
+Layout: Two column, full page — left column and right column side by side
+
+Left Column:
+
+ Owner — name, DOB, phone, email (from owners JSON)
+ Shipping Address — address, city, state, zip
+ Billing Address — address, city, state, zip
+ Outstanding — debt amount, type, details
+ Administrative — UCC reviewed by/date, COI reviewed by/date, Corporation reviewed by/date, Rating reviewed by/date
+ Miscellaneous — language, dispatch, text notifications, email notifications, admin, reserves
+ Notification Email Addresses — list with + add button
+ Notification Phone Numbers — list with + add button
+ Trucks — linked trucks with + add button
+ Rules — carrier-specific rules with + add button
+ Tasks — carrier tasks with + add button
+ Factoring Documents — NOA, Agreement, Application (PDF icons, uploadable)
+ Carrier Documents — W9, Void Check, CDL, Insurance, MC, Business Proof, EIN Letter (PDF icons, uploadable)
+ Other Sign-up Documents — uploadable section
+ UCC Reports — uploadable section
+ Sign-up Documents — uploadable section
+
+Right Column:
+
+ AR — Paid, AR balance, Max Limit $, Current Limit $, AR Over Eligible Days, Availability
+ Shorts & Chargebacks — Carrier's Shorts, Carrier's Advanced Shorts, Carrier's Pending Chargebacks (red text for amounts)
+ Cargo Type — Dump (yes/no), Driver Support (yes/no), OTR (yes/no)
+ Other Info — Since date, Referral, Last Invoice date, Date Created
+ To Do List — tasks with + add button
+ Dispatcher — linked dispatcher with photo, name, phone, email, status
+ Bank Accounts — table showing: For (ACH/Wire), Account Name, Financial Institution, Routing#, Account#, Type, Actions (edit/delete). Multiple accounts supported. + add button
+ Monitors — name, phone, email, status table with + add button
+ Driver — linked driver with photo, name, phone, email, status
+ Messages — internal messages with + add button
+ RAP Sheet — document upload section
+ Preferred Brokers — list of brokers this carrier prefers
+ UCC — UCC-1-UT Initial, UCC-3-UT Continuation (PDF icons, uploadable)
+ Other Documents — uploadable section
+
+Top Action Bar (matching old system):
+
+ Edit Carrier button
+ Review UCC button
+ Review Corp button
+ Downloads dropdown
+ Send Carrier SMS button
+ Send Carrier Email button
+ Carrier on FMCSA link button
+ Close/Back button
+
+Pull all data from:
+
+ clients table for basic info
+ onboardingProfile JSON for all extended fields
+ documents table filtered by carrierId for all document sections
+ trucks table for trucks section
+ dispatchers table for dispatcher section
+ Bank accounts from Vault
+
+Remove the current simplified carrier profile layout and replace with this comprehensive view.
