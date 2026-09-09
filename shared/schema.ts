@@ -1496,25 +1496,39 @@ export type InsertPayrollDeduction = z.infer<typeof insertPayrollDeductionSchema
 export const bulkInvoiceBatches = pgTable("bulk_invoice_batches", {
   id: serial("id").primaryKey(),
   batchName: varchar("batch_name").notNull(),
-  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "set null" }),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "restrict" }),
+  requestHash: varchar("request_hash").unique(),
+  reportDateStart: timestamp("report_date_start"),
+  reportDateEnd: timestamp("report_date_end"),
   totalAmount: decimal("total_amount", { precision: 14, scale: 2 }).default("0").notNull(),
+  totalRate: decimal("total_rate", { precision: 14, scale: 2 }).default("0").notNull(),
   invoiceCount: integer("invoice_count").default(0).notNull(),
   status: varchar("status", { enum: ["draft", "submitted", "processing", "completed", "failed"] }).default("draft").notNull(),
   submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   createdBy: varchar("created_by").references(() => users.id),
-});
+}, (table) => [
+  uniqueIndex("bulk_invoice_batches_request_hash_unique").on(table.requestHash),
+]);
 
 export const bulkInvoiceItems = pgTable("bulk_invoice_items", {
   id: serial("id").primaryKey(),
   batchId: integer("batch_id").references(() => bulkInvoiceBatches.id, { onDelete: "cascade" }).notNull(),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "restrict" }),
+  ticketNumber: varchar("ticket_number"),
   invoiceNumber: varchar("invoice_number").notNull(),
   loadNumber: varchar("load_number"),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  rate: decimal("rate", { precision: 12, scale: 2 }),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  businessKey: varchar("business_key"),
   brokerName: varchar("broker_name"),
   status: varchar("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   notes: text("notes"),
-});
+}, (table) => [
+  uniqueIndex("bulk_invoice_items_business_key_unique").on(table.businessKey),
+]);
 
 export const insertBulkInvoiceBatchSchema = createInsertSchema(bulkInvoiceBatches).omit({ id: true, createdAt: true });
 export const insertBulkInvoiceItemSchema = createInsertSchema(bulkInvoiceItems).omit({ id: true });

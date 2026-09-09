@@ -50,6 +50,7 @@ import {
   brokers,
   fuelAdvances,
   invoices,
+  invoiceStatusHistory,
   payouts,
   docRequirements,
   activities,
@@ -268,6 +269,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next();
     } catch {
       res.status(500).json({ message: "Unable to verify reports permission" });
+    }
+  };
+
+  const requireModulePermission = (permission: string) => async (req: any, res: any, next: any) => {
+    const user = (req.session as any)?.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+    if (user.role === "admin") { req.user = user; return next(); }
+    try {
+      const stored = await storage.getUserPermissions(user.id);
+      const permissions = stored.length ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee);
+      if (!(permissions as readonly string[]).includes(permission)) {
+        return res.status(403).json({ message: `${permission.replace(/_/g, " ")} permission required` });
+      }
+      req.user = user;
+      next();
+    } catch {
+      res.status(500).json({ message: `Unable to verify ${permission.replace(/_/g, " ")} permission` });
     }
   };
 
@@ -6882,107 +6900,424 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   });
 
   // ─── Bulk Invoices ─────────────────────────────────────────────────────────
-  app.get("/api/bulk-invoices", requireAuth, async (req, res) => {
+  const bulkRateSchema = z.union([
+    z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Rate must use no more than two decimal places"),
+    z.number().multipleOf(0.01, "Rate must use no more than two decimal places"),
+  ]).transform(value => Number(value)).refine(value => value > 0 && value <= 99_999_999.99, "Rate must be greater than zero");
+
+  const bulkInvoiceCreateSchema = z.object({
+    brokerId: z.coerce.number().int().positive(),
+    reportDateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    reportDateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    items: z.array(z.object({
+      carrierId: z.coerce.number().int().positive(),
+      ticketNumber: z.string().trim().min(1).max(120),
+      loadNumber: z.string().trim().min(1).max(120),
+      rate: bulkRateSchema,
+    })).min(1).max(200),
+  }).superRefine((value, ctx) => {
+    if (value.reportDateStart > value.reportDateEnd) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["reportDateEnd"], message: "End date must be on or after start date" });
+    }
+    const seen = new Set<string>();
+    value.items.forEach((item, index) => {
+      const key = `${item.carrierId}|${item.ticketNumber.toLowerCase()}|${item.loadNumber.toLowerCase()}`;
+      if (seen.has(key)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["items", index], message: "Duplicate carrier, ticket, and load combination" });
+      }
+      seen.add(key);
+    });
+  });
+
+  const bulkBatchAccessCondition = (req: any, id?: number) => {
+    const conditions = id ? [eq(bulkInvoiceBatches.id, id)] : [];
+    if (req.user.role === "employee") conditions.push(eq(bulkInvoiceBatches.createdBy, req.user.id));
+    return conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined;
+  };
+
+  const formatBulkPdfDate = (value: Date | string | null | undefined) => value
+    ? new Date(value).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric", timeZone: "America/Denver" })
+    : "Not recorded";
+
+  app.get("/api/bulk-invoices", requireModulePermission("bulk_invoices"), async (req: any, res) => {
     try {
-      const { carrierId, status } = req.query;
-      const conditions: any[] = [];
-      if (carrierId) conditions.push(eq(bulkInvoiceBatches.carrierId, parseInt(carrierId as string, 10)));
-      if (status && status !== "all") conditions.push(eq(bulkInvoiceBatches.status, status as any));
-      const rows = conditions.length
-        ? await db.select().from(bulkInvoiceBatches).where(and(...conditions)).orderBy(desc(bulkInvoiceBatches.createdAt))
-        : await db.select().from(bulkInvoiceBatches).orderBy(desc(bulkInvoiceBatches.createdAt));
-      res.json(rows);
+      const rows = await db.select({
+        batch: bulkInvoiceBatches,
+        brokerName: brokers.name,
+        createdByFirstName: users.firstName,
+        createdByLastName: users.lastName,
+      }).from(bulkInvoiceBatches)
+        .leftJoin(brokers, eq(bulkInvoiceBatches.brokerId, brokers.id))
+        .leftJoin(users, eq(bulkInvoiceBatches.createdBy, users.id))
+        .where(bulkBatchAccessCondition(req))
+        .orderBy(desc(bulkInvoiceBatches.createdAt));
+
+      const batchIds = rows.map(({ batch }) => batch.id);
+      const ticketRows = batchIds.length
+        ? await db.select({
+            batchId: bulkInvoiceItems.batchId,
+            ticketNumber: bulkInvoiceItems.ticketNumber,
+            legacyLoadNumber: bulkInvoiceItems.loadNumber,
+          }).from(bulkInvoiceItems).where(inArray(bulkInvoiceItems.batchId, batchIds))
+        : [];
+      const ticketsByBatch = new Map<number, string[]>();
+      for (const item of ticketRows) {
+        const ticket = item.ticketNumber || item.legacyLoadNumber;
+        if (!ticket) continue;
+        ticketsByBatch.set(item.batchId, [...(ticketsByBatch.get(item.batchId) || []), ticket]);
+      }
+
+      res.json(rows.map(({ batch, brokerName, createdByFirstName, createdByLastName }) => ({
+        ...batch,
+        brokerName: brokerName || "Legacy batch",
+        totalRate: batch.totalRate || batch.totalAmount,
+        ticketNumbers: ticketsByBatch.get(batch.id) || [],
+        createdByName: [createdByFirstName, createdByLastName].filter(Boolean).join(" ") || "Unknown",
+      })));
     } catch (error) {
       console.error("Error fetching bulk invoices:", error);
       res.status(500).json({ message: "Failed to fetch bulk invoices" });
     }
   });
 
-  app.get("/api/bulk-invoices/:id", requireAuth, async (req, res) => {
+  app.get("/api/bulk-invoices/:id", requireModulePermission("bulk_invoices"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const [batch] = await db.select().from(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id)).limit(1);
-      if (!batch) return res.status(404).json({ message: "Batch not found" });
-      const items = await db.select().from(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, id));
-      res.json({ ...batch, items });
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid batch ID" });
+      const [row] = await db.select({
+        batch: bulkInvoiceBatches,
+        brokerName: brokers.name,
+        createdByFirstName: users.firstName,
+        createdByLastName: users.lastName,
+      }).from(bulkInvoiceBatches)
+        .leftJoin(brokers, eq(bulkInvoiceBatches.brokerId, brokers.id))
+        .leftJoin(users, eq(bulkInvoiceBatches.createdBy, users.id))
+        .where(bulkBatchAccessCondition(req, id))
+        .limit(1);
+      if (!row) return res.status(404).json({ message: "Batch not found" });
+      const items = await db.select({
+        id: bulkInvoiceItems.id,
+        batchId: bulkInvoiceItems.batchId,
+        carrierId: bulkInvoiceItems.carrierId,
+        carrierName: clients.name,
+        ticketNumber: bulkInvoiceItems.ticketNumber,
+        loadNumber: bulkInvoiceItems.loadNumber,
+        rate: bulkInvoiceItems.rate,
+        invoiceId: bulkInvoiceItems.invoiceId,
+        invoiceNumber: bulkInvoiceItems.invoiceNumber,
+        createdAt: invoices.createdAt,
+      }).from(bulkInvoiceItems)
+        .leftJoin(clients, eq(bulkInvoiceItems.carrierId, clients.id))
+        .leftJoin(invoices, eq(bulkInvoiceItems.invoiceId, invoices.id))
+        .where(eq(bulkInvoiceItems.batchId, id));
+      res.json({
+        ...row.batch,
+        brokerName: row.brokerName || "Legacy batch",
+        totalRate: row.batch.totalRate || row.batch.totalAmount,
+        ticketNumbers: items.map(item => item.ticketNumber || item.loadNumber).filter(Boolean),
+        createdByName: [row.createdByFirstName, row.createdByLastName].filter(Boolean).join(" ") || "Unknown",
+        items,
+      });
     } catch (error) {
       console.error("Error fetching bulk invoice batch:", error);
       res.status(500).json({ message: "Failed to fetch batch" });
     }
   });
 
-  app.post("/api/bulk-invoices", requireAuth, async (req: any, res) => {
+  app.post("/api/bulk-invoices", requireModulePermission("bulk_invoices"), async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub ?? req.user?.id;
-      const { items: itemList, ...batchBody } = req.body;
-      const parsedItems = Array.isArray(itemList) ? itemList : [];
-      const totalAmount = parsedItems.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
-      const batch = insertBulkInvoiceBatchSchema.parse({
-        batchName: batchBody.batchName,
-        carrierId: parseInt(batchBody.carrierId, 10),
-        totalAmount: totalAmount.toFixed(2),
-        invoiceCount: parsedItems.length,
-        status: "draft",
-        createdBy: userId,
+      const input = bulkInvoiceCreateSchema.parse(req.body);
+      const userId = req.user.id;
+      const reportDateStart = new Date(`${input.reportDateStart}T12:00:00`);
+      const reportDateEnd = new Date(`${input.reportDateEnd}T12:00:00`);
+      const totalRateCents = input.items.reduce((sum, item) => sum + Math.round(item.rate * 100), 0);
+      const totalRate = totalRateCents / 100;
+      const uniqueCarrierIds = Array.from(new Set(input.items.map(item => item.carrierId)));
+      const normalizeBulkIdentity = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+      const requestHash = crypto.createHash("sha256").update(JSON.stringify({
+        userId,
+        brokerId: input.brokerId,
+        reportDateStart: input.reportDateStart,
+        reportDateEnd: input.reportDateEnd,
+        items: input.items.map(item => ({
+          carrierId: item.carrierId,
+          ticketNumber: item.ticketNumber.toLowerCase(),
+          loadNumber: item.loadNumber.toLowerCase(),
+          rateCents: Math.round(item.rate * 100),
+        })),
+      })).digest("hex");
+
+      const [broker] = await db.select().from(brokers).where(eq(brokers.id, input.brokerId)).limit(1);
+      if (!broker) return res.status(400).json({ message: "Selected broker was not found" });
+      const carrierRows = await db.select({ id: clients.id }).from(clients).where(inArray(clients.id, uniqueCarrierIds));
+      if (carrierRows.length !== uniqueCarrierIds.length) return res.status(400).json({ message: "One or more selected carriers were not found" });
+
+      const createdResult = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(92734011)`);
+
+        let [debtor] = await tx.select().from(debtors)
+          .where(sql`lower(${debtors.name}) = lower(${broker.name})`)
+          .limit(1);
+        if (!debtor) {
+          [debtor] = await tx.insert(debtors).values({
+            name: broker.name,
+            email: broker.email,
+            phone: broker.phone,
+            address: [broker.address, broker.city, broker.state, broker.zipCode].filter(Boolean).join(", ") || null,
+            contactPerson: broker.contactPerson,
+            mcNumber: broker.mcNumber,
+            dotNumber: broker.dotNumber,
+            status: broker.status === "inactive" ? "inactive" : "active",
+            notes: `Created automatically from broker record #${broker.id} for bulk invoicing`,
+          }).returning();
+        }
+
+        const existingNumbers = await tx.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices);
+        const maxSequence = existingNumbers.reduce((max, row) => {
+          const numeric = parseInt((row.invoiceNumber || "").replace(/\D/g, ""), 10);
+          return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
+        }, 0);
+        const now = new Date();
+        const batchName = `${broker.name} ${input.reportDateStart} to ${input.reportDateEnd}`;
+        const [createdBatch] = await tx.insert(bulkInvoiceBatches).values({
+          batchName,
+          carrierId: input.items[0].carrierId,
+          brokerId: broker.id,
+          requestHash,
+          reportDateStart,
+          reportDateEnd,
+          totalAmount: totalRate.toFixed(2),
+          totalRate: totalRate.toFixed(2),
+          invoiceCount: input.items.length,
+          status: "submitted",
+          submittedAt: now,
+          createdBy: userId,
+        }).returning();
+
+        const createdInvoices: any[] = [];
+        const createdItems: any[] = [];
+        for (let index = 0; index < input.items.length; index += 1) {
+          const item = input.items[index];
+          const businessKey = crypto.createHash("sha256").update([
+            broker.id,
+            item.carrierId,
+            normalizeBulkIdentity(item.ticketNumber),
+            normalizeBulkIdentity(item.loadNumber),
+          ].join("|")).digest("hex");
+          const invoiceNumber = `INV${String(maxSequence + index + 1).padStart(3, "0")}`;
+          const [createdInvoice] = await tx.insert(invoices).values({
+            invoiceNumber,
+            loadId: null,
+            clientId: item.carrierId,
+            debtorId: debtor.id,
+            loadNumber: item.loadNumber,
+            amount: (Math.round(item.rate * 100) / 100).toFixed(2),
+            currency: "USD",
+            invoiceDate: now,
+            loadType: "dump_truck_ticket",
+            bolNumber: item.ticketNumber,
+            status: "submitted",
+            factoringStage: "verification",
+            submittedBy: userId,
+            submittedAt: now,
+            notes: `Bulk invoice batch #${createdBatch.id}; ticket ${item.ticketNumber}`,
+          }).returning();
+          await tx.insert(invoiceStatusHistory).values({
+            invoiceId: createdInvoice.id,
+            oldStatus: null,
+            newStatus: "submitted",
+            changedBy: userId,
+            reason: `Created from bulk invoice batch #${createdBatch.id}`,
+          });
+          const [createdItem] = await tx.insert(bulkInvoiceItems).values({
+            batchId: createdBatch.id,
+            carrierId: item.carrierId,
+            ticketNumber: item.ticketNumber,
+            loadNumber: item.loadNumber,
+            rate: (Math.round(item.rate * 100) / 100).toFixed(2),
+            invoiceId: createdInvoice.id,
+            businessKey,
+            invoiceNumber,
+            amount: (Math.round(item.rate * 100) / 100).toFixed(2),
+            brokerName: broker.name,
+            status: "pending",
+            notes: null,
+          }).returning();
+          createdInvoices.push(createdInvoice);
+          createdItems.push(createdItem);
+        }
+        return { batch: createdBatch, createdInvoices, items: createdItems };
       });
-      const [created] = await db.insert(bulkInvoiceBatches).values(batch).returning();
-      if (parsedItems.length > 0) {
-        const rows = parsedItems.map((i: any) => insertBulkInvoiceItemSchema.parse({
-          batchId: created.id,
-          invoiceNumber: i.invoiceNumber,
-          loadNumber: i.loadNumber ?? null,
-          amount: String(Number(i.amount).toFixed(2)),
-          brokerName: i.brokerName ?? null,
-          status: "pending",
-          notes: i.notes ?? null,
-        }));
-        await db.insert(bulkInvoiceItems).values(rows);
-      }
-      const items = await db.select().from(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, created.id));
-      res.status(201).json({ ...created, items });
+
+      await Promise.all(createdResult.createdInvoices.map(invoice => storage.createEvent({
+        entityType: "invoice",
+        entityId: invoice.id,
+        eventType: "invoice.created",
+        actorType: "user",
+        actorId: userId,
+        payloadJson: {
+          invoiceNumber: invoice.invoiceNumber,
+          status: invoice.status,
+          clientId: invoice.clientId,
+          debtorId: invoice.debtorId,
+          amount: invoice.amount,
+          source: "bulk_invoice",
+          batchId: createdResult.batch.id,
+        },
+      }).catch((error: any) => console.warn("Bulk invoice event logging failed:", error?.message))));
+      await storage.createActivity({
+        userId,
+        type: "invoice_created",
+        description: `Created bulk invoice batch #${createdResult.batch.id} with ${createdResult.createdInvoices.length} invoices for ${broker.name}`,
+        entityType: "bulk_invoice_batch",
+        entityId: createdResult.batch.id,
+      });
+
+      res.status(201).json({
+        ...createdResult.batch,
+        brokerName: broker.name,
+        totalRate: createdResult.batch.totalRate,
+        ticketNumbers: input.items.map(item => item.ticketNumber),
+        createdByName: req.user.name || [req.user.firstName, req.user.lastName].filter(Boolean).join(" "),
+        items: createdResult.items,
+        createdInvoices: createdResult.createdInvoices.map(withInvoiceDisplayStatus),
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        console.error("[POST /api/bulk-invoices] Zod error:", error.errors);
         return res.status(400).json({ message: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), errors: error.errors });
       }
-      console.error("Error creating bulk invoice batch:", error);
-      res.status(500).json({ message: "Failed to create batch" });
-    }
-  });
-
-  app.patch("/api/bulk-invoices/:id", requireAuth, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      const [existing] = await db.select().from(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Batch not found" });
-      const { status, batchName } = req.body;
-      const updates: any = {};
-      if (batchName) updates.batchName = batchName;
-      if (status) {
-        updates.status = status;
-        if (status === "submitted" && !existing.submittedAt) updates.submittedAt = new Date();
+      const duplicateConstraint = String((error as any)?.constraint || "");
+      const isRequestDuplicate = (error as any)?.code === "23505" && duplicateConstraint.includes("request_hash");
+      const isBusinessDuplicate = (error as any)?.code === "23505" && duplicateConstraint.includes("business_key");
+      if (isRequestDuplicate || isBusinessDuplicate) {
+        return res.status(409).json({
+          message: isBusinessDuplicate
+            ? "One or more carrier ticket/load combinations have already been invoiced."
+            : "This exact bulk invoice batch was already submitted.",
+        });
       }
-      const [updated] = await db.update(bulkInvoiceBatches).set(updates).where(eq(bulkInvoiceBatches.id, id)).returning();
-      const items = await db.select().from(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, id));
-      res.json({ ...updated, items });
-    } catch (error) {
-      console.error("Error updating bulk invoice batch:", error);
-      res.status(500).json({ message: "Failed to update batch" });
+      console.error("Error creating bulk invoice batch:", error);
+      const message = isBusinessDuplicate
+        ? "One or more carrier ticket/load combinations have already been invoiced."
+        : isRequestDuplicate
+          ? "This exact bulk invoice batch was already submitted."
+          : (error as any)?.code === "23505"
+            ? "An invoice number collision occurred. Please retry."
+            : "Failed to create batch";
+      res.status(500).json({ message });
     }
   });
 
-  app.delete("/api/bulk-invoices/:id", requireAuth, async (req, res) => {
+  app.get("/api/bulk-invoices/:id/pdf", requireModulePermission("bulk_invoices"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const [existing] = await db.select().from(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Batch not found" });
-      if (existing.status !== "draft") return res.status(400).json({ message: "Only draft batches can be deleted" });
-      await db.delete(bulkInvoiceItems).where(eq(bulkInvoiceItems.batchId, id));
-      await db.delete(bulkInvoiceBatches).where(eq(bulkInvoiceBatches.id, id));
-      res.json({ message: "Deleted" });
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid batch ID" });
+      const [row] = await db.select({
+        batch: bulkInvoiceBatches,
+        brokerName: brokers.name,
+      }).from(bulkInvoiceBatches)
+        .leftJoin(brokers, eq(bulkInvoiceBatches.brokerId, brokers.id))
+        .where(bulkBatchAccessCondition(req, id))
+        .limit(1);
+      if (!row) return res.status(404).json({ message: "Batch not found" });
+      const items = await db.select({
+        carrierName: clients.name,
+        ticketNumber: bulkInvoiceItems.ticketNumber,
+        loadNumber: bulkInvoiceItems.loadNumber,
+        invoiceNumber: bulkInvoiceItems.invoiceNumber,
+        rate: bulkInvoiceItems.rate,
+        legacyAmount: bulkInvoiceItems.amount,
+        createdAt: invoices.createdAt,
+      }).from(bulkInvoiceItems)
+        .leftJoin(clients, eq(bulkInvoiceItems.carrierId, clients.id))
+        .leftJoin(invoices, eq(bulkInvoiceItems.invoiceId, invoices.id))
+        .where(eq(bulkInvoiceItems.batchId, id));
+
+      const doc = new PDFDocument({ size: "LETTER", margin: 42, bufferPages: true });
+      const chunks: Buffer[] = [];
+      doc.on("data", chunk => chunks.push(chunk));
+      doc.on("end", () => {
+        const pdf = Buffer.concat(chunks);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="bulk-invoice-batch-${id}.pdf"`);
+        res.setHeader("Content-Length", String(pdf.length));
+        res.send(pdf);
+      });
+
+      const logoCandidates = [
+        path.resolve(process.cwd(), "server/assets/tpf-logo.png"),
+        path.resolve(process.cwd(), "dist/tpf-logo.png"),
+      ];
+      const logoPath = logoCandidates.find(candidate => fs.existsSync(candidate));
+      if (logoPath) doc.image(logoPath, 370, 42, { fit: [180, 58], align: "right" });
+      else doc.font("Helvetica-Bold").fontSize(16).fillColor("#087d8d").text("TPF", 440, 50, { width: 110, align: "right" });
+
+      doc.fillColor("#203a46").font("Helvetica-Bold").fontSize(12).text(`For: ${row.brokerName || "Not recorded"}`, 42, 45, { width: 315 });
+      doc.font("Helvetica").fontSize(9)
+        .text(`Report Dates: ${formatBulkPdfDate(row.batch.reportDateStart)} to ${formatBulkPdfDate(row.batch.reportDateEnd)}`)
+        .text(`Today's Date: ${formatBulkPdfDate(new Date())}`)
+        .text(`Invoice Count: ${row.batch.invoiceCount}`)
+        .text(`Total Rate: $${Number(row.batch.totalRate || row.batch.totalAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      doc.moveTo(42, 118).lineTo(570, 118).strokeColor("#087d8d").lineWidth(1.5).stroke();
+
+      const columns = [
+        { label: "Carrier", x: 42, width: 128 },
+        { label: "Load/Ticket#", x: 170, width: 120 },
+        { label: "Invoice#", x: 290, width: 92 },
+        { label: "Total Rate$", x: 382, width: 90 },
+        { label: "Created on", x: 472, width: 98 },
+      ];
+      let y = 132;
+      const drawTableHeader = () => {
+        doc.rect(42, y, 528, 22).fill("#087d8d");
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
+        columns.forEach(column => doc.text(column.label, column.x + 5, y + 7, { width: column.width - 10 }));
+        y += 22;
+      };
+      const ensureRoom = (height: number) => {
+        if (y + height <= 660) return;
+        doc.addPage();
+        y = 46;
+        drawTableHeader();
+      };
+      drawTableHeader();
+      const sortedItems = [...items].sort((a, b) => (a.carrierName || "").localeCompare(b.carrierName || ""));
+      let currentCarrier = "";
+      for (const item of sortedItems) {
+        const carrierName = item.carrierName || "Carrier not recorded";
+        if (carrierName !== currentCarrier) {
+          ensureRoom(43);
+          doc.rect(42, y, 528, 19).fill("#e3eff0");
+          doc.fillColor("#203a46").font("Helvetica-Bold").fontSize(8).text(carrierName, 47, y + 6, { width: 518, lineBreak: false, ellipsis: true });
+          y += 19;
+          currentCarrier = carrierName;
+        }
+        ensureRoom(24);
+        doc.rect(42, y, 528, 24).fill(y % 2 === 0 ? "#f7f9f8" : "#ffffff");
+        doc.fillColor("#334b54").font("Helvetica").fontSize(8);
+        const values = [
+          carrierName,
+          [item.loadNumber, item.ticketNumber].filter(Boolean).join(" / "),
+          item.invoiceNumber,
+          `$${Number(item.rate || item.legacyAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          formatBulkPdfDate(item.createdAt || row.batch.createdAt),
+        ];
+        columns.forEach((column, index) => doc.text(values[index] || "—", column.x + 5, y + 8, { width: column.width - 10, lineBreak: false, ellipsis: true }));
+        doc.moveTo(42, y + 24).lineTo(570, y + 24).strokeColor("#d6dfe1").lineWidth(0.4).stroke();
+        y += 24;
+      }
+
+      const pageRange = doc.bufferedPageRange();
+      for (let pageIndex = 0; pageIndex < pageRange.count; pageIndex += 1) {
+        doc.switchToPage(pageIndex);
+        doc.moveTo(42, 680).lineTo(570, 680).strokeColor("#a9b6ba").lineWidth(0.5).stroke();
+        doc.fillColor("#52666d").font("Helvetica-Bold").fontSize(8).text("Trucking Pros Financial LLC", 42, 689, { width: 260 });
+        doc.font("Helvetica").fontSize(7).text("204 E. 900 S. · Salt Lake City, UT 84111 · 801-755-9755", 302, 689, { width: 268, align: "right" });
+      }
+      doc.end();
     } catch (error) {
-      console.error("Error deleting bulk invoice batch:", error);
-      res.status(500).json({ message: "Failed to delete batch" });
+      console.error("Error generating bulk invoice PDF:", error);
+      if (!res.headersSent) res.status(500).json({ message: "Failed to generate batch PDF" });
     }
   });
 
