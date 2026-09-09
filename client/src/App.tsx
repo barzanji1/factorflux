@@ -18,6 +18,7 @@ import Admin from "@/pages/admin";
 import Activities from "@/pages/activities";
 import Reports from "@/pages/reports";
 import FuelAdvanceTracking from "@/pages/fuel-advance-tracking";
+import FuelAdvanceDetail from "@/pages/fuel-advance-detail";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import DownloadPage from "@/pages/download";
@@ -191,6 +192,11 @@ function Router() {
       <Route path="/help">
         <ProtectedRoute>
           <Help />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/fuel-advance/:id">
+        <ProtectedRoute>
+          <FuelAdvanceDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/fuel-advance">

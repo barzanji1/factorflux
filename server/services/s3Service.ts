@@ -6,10 +6,11 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const BUCKET = "factorflux-documents-tpf";
+const BUCKET = process.env.AWS_S3_BUCKET;
 const REGION = process.env.AWS_REGION || "us-east-2";
 
 function getClient(): S3Client {
+  if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   return new S3Client({
     region: REGION,
     credentials: {
@@ -24,6 +25,7 @@ export async function uploadToS3(
   key: string,
   mimeType: string
 ): Promise<string> {
+  if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const client = getClient();
   await client.send(
     new PutObjectCommand({
@@ -37,6 +39,7 @@ export async function uploadToS3(
 }
 
 export async function getSignedViewUrl(key: string): Promise<string> {
+  if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const client = getClient();
   return getSignedUrl(
     client,
@@ -53,6 +56,7 @@ export async function getSignedDownloadUrl(
   key: string,
   filename: string
 ): Promise<string> {
+  if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const client = getClient();
   return getSignedUrl(
     client,
@@ -67,6 +71,7 @@ export async function getSignedDownloadUrl(
 
 export async function deleteFromS3(key: string): Promise<void> {
   try {
+    if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
     const client = getClient();
     await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
   } catch (err) {
@@ -75,6 +80,7 @@ export async function deleteFromS3(key: string): Promise<void> {
 }
 
 export async function downloadToTemp(key: string, destPath: string): Promise<void> {
+  if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const { createWriteStream } = await import("fs");
   const { Readable } = await import("stream");
   const client = getClient();

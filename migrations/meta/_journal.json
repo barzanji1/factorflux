@@ -29,6 +29,13 @@
       "when": 1788975900000,
       "tag": "0003_list_performance_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788976800000,
+      "tag": "0004_fuel_advance_rebuild",
+      "breakpoints": true
     }
   ]
 }

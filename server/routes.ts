@@ -35,7 +35,6 @@ import {
   insertClientVaultSchema,
   insertTaskSchema,
   insertBrokerSchema,
-  insertFuelAdvanceSchema,
   insertBrokerFollowUpSchema,
   insertBrokerFollowUpReminderSchema,
   insertLockboxEntrySchema,
@@ -139,6 +138,16 @@ const carrierUpload = multer({
       return cb(null, true);
     }
     cb(new Error("Only PDF, JPEG, PNG, and TIFF files are allowed"));
+  },
+});
+const rateConUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() === ".pdf" && file.mimetype.toLowerCase() === "application/pdf") {
+      return cb(null, true);
+    }
+    cb(new Error("Rate confirmation must be a PDF"));
   },
 });
 
@@ -4214,56 +4223,48 @@ Trucking Pros Financial Team
   });
 
   // Fuel advances
-  app.get("/api/fuel-advances", requireAuth, async (_req, res) => {
+  app.get("/api/fuel-advances", requireModulePermission("fuel_advance"), async (_req, res) => {
     try {
       const fuelAdvancesData = await db
         .select({
-          id: fuelAdvances.id,
-          carrierName: fuelAdvances.carrierName,
-          advanceAmount: fuelAdvances.advanceAmount,
-          advanceDate: fuelAdvances.advanceDate,
-          pickupState: fuelAdvances.pickupState,
-          deliveryState: fuelAdvances.deliveryState,
-          processedBy: fuelAdvances.processedBy,
-          loadId: fuelAdvances.loadId,
-          notes: fuelAdvances.notes,
-          status: fuelAdvances.status,
-          createdAt: fuelAdvances.createdAt,
-          updatedAt: fuelAdvances.updatedAt,
-          processedByName: users.firstName,
+          fuelAdvance: fuelAdvances,
+          processedByName: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
+          carrierJoinedName: clients.name,
+          brokerName: brokers.name,
+          authorizedAgentName: sql<string>`concat_ws(' ', ${userTable.firstName}, ${userTable.lastName})`,
         })
         .from(fuelAdvances)
         .leftJoin(users, eq(fuelAdvances.processedBy, users.id))
-        .orderBy(fuelAdvances.advanceDate);
+        .leftJoin(clients, eq(fuelAdvances.carrierId, clients.id))
+        .leftJoin(brokers, eq(fuelAdvances.brokerId, brokers.id))
+        .leftJoin(userTable, eq(fuelAdvances.authorizedAgent, userTable.id))
+        .orderBy(desc(fuelAdvances.advanceDate));
 
-      res.json(fuelAdvancesData);
+      res.json(fuelAdvancesData.map(({ fuelAdvance, ...joined }) => ({
+        ...fuelAdvance, ...joined, carrierName: joined.carrierJoinedName || fuelAdvance.carrierName,
+      })));
     } catch (error) {
       console.error("Error fetching fuel advances:", error);
       res.status(500).json({ message: "Failed to fetch fuel advances" });
     }
   });
 
-  app.get("/api/fuel-advances/:id", requireAuth, async (req, res) => {
+  app.get("/api/fuel-advances/:id", requireModulePermission("fuel_advance"), async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const [fuelAdvance] = await db
         .select({
-          id: fuelAdvances.id,
-          carrierName: fuelAdvances.carrierName,
-          advanceAmount: fuelAdvances.advanceAmount,
-          advanceDate: fuelAdvances.advanceDate,
-          pickupState: fuelAdvances.pickupState,
-          deliveryState: fuelAdvances.deliveryState,
-          processedBy: fuelAdvances.processedBy,
-          loadId: fuelAdvances.loadId,
-          notes: fuelAdvances.notes,
-          status: fuelAdvances.status,
-          createdAt: fuelAdvances.createdAt,
-          updatedAt: fuelAdvances.updatedAt,
-          processedByName: users.firstName,
+          fuelAdvance: fuelAdvances,
+          processedByName: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
+          carrierJoinedName: clients.name,
+          brokerName: brokers.name,
+          authorizedAgentName: sql<string>`concat_ws(' ', ${userTable.firstName}, ${userTable.lastName})`,
         })
         .from(fuelAdvances)
         .leftJoin(users, eq(fuelAdvances.processedBy, users.id))
+        .leftJoin(clients, eq(fuelAdvances.carrierId, clients.id))
+        .leftJoin(brokers, eq(fuelAdvances.brokerId, brokers.id))
+        .leftJoin(userTable, eq(fuelAdvances.authorizedAgent, userTable.id))
         .where(eq(fuelAdvances.id, id))
         .limit(1);
 
@@ -4271,31 +4272,146 @@ Trucking Pros Financial Team
         return res.status(404).json({ message: "Fuel advance not found" });
       }
 
-      res.json(fuelAdvance);
+      const { fuelAdvance: advance, ...joined } = fuelAdvance;
+      res.json({ ...advance, ...joined, carrierName: joined.carrierJoinedName || advance.carrierName });
     } catch (error) {
       console.error("Error fetching fuel advance:", error);
       res.status(500).json({ message: "Failed to fetch fuel advance" });
     }
   });
 
-  app.post("/api/fuel-advances", requireAuth, async (req, res) => {
+  app.post("/api/fuel-advances", requireModulePermission("fuel_advance"), (req: any, res: any, next: any) => {
+    // The tracking form submits multipart data so the optional rate confirmation
+    // can be created atomically with the advance.
+    rateConUpload.single("rateCon")(req, res, (err: any) => {
+      if (err) return res.status(400).json({ message: err.message || "Invalid rate confirmation" });
+      next();
+    });
+  }, async (req: any, res) => {
+    let uploadedKey: string | undefined;
+    let inserted = false;
     try {
-      const fuelAdvanceData = insertFuelAdvanceSchema.parse(req.body);
+      const body = req.body || {};
+      const isLegacyCreate = !body.carrierId && !body.brokerId && !body.rate && !body.loadNumber
+        && body.carrierName && body.advanceAmount && body.advanceDate;
+      if (isLegacyCreate) {
+        const legacyData = insertFuelAdvanceSchema.parse({
+          ...body,
+          processedBy: req.user.id,
+          authorizedAgent: req.user.id,
+          paid: body.status === "paid",
+        });
+        const [legacyAdvance] = await db.insert(fuelAdvances).values(legacyData).returning();
+        return res.status(201).json(legacyAdvance);
+      }
+      const number = (name: string, required = false) => {
+        const value = Number(body[name]);
+        if (!Number.isFinite(value) || (required && value <= 0)) throw new Error(`${name} is required and must be numeric`);
+        return value;
+      };
+      const carrierId = number("carrierId", true);
+      const brokerId = number("brokerId", true);
+      const rate = number("rate", true);
+      const advanceAmount = number("advanceAmount", true);
+      const faPercent = body.faPercent === "" || body.faPercent == null ? 0 : number("faPercent");
+      if (faPercent < 0) return res.status(400).json({ message: "FA percentage cannot be negative" });
+      const rateCents = Math.round(rate * 100);
+      const advanceCents = Math.round(advanceAmount * 100);
+      if (advanceCents > Math.floor(rateCents * 0.5)) return res.status(400).json({ message: "Advance cannot exceed 50% of the rate" });
+      const [carrier] = await db.select({ id: clients.id, name: clients.name }).from(clients).where(eq(clients.id, carrierId));
+      const [broker] = await db.select({ id: brokers.id, name: brokers.name }).from(brokers).where(eq(brokers.id, brokerId));
+      if (!carrier) return res.status(400).json({ message: "Carrier not found" });
+      if (!broker) return res.status(400).json({ message: "Broker not found" });
+      const loadNumber = String(body.loadNumber || "").trim();
+      if (!loadNumber) return res.status(400).json({ message: "Load number is required" });
+      const feeCents = Math.round(advanceCents * faPercent / 100);
+      const owedCents = advanceCents + feeCents;
+      const fees = feeCents / 100;
+      const owed = owedCents / 100;
+      const deliveryDate = body.deliveryDate ? new Date(body.deliveryDate) : null;
+      if (deliveryDate && Number.isNaN(deliveryDate.getTime())) return res.status(400).json({ message: "Invalid delivery date" });
+      const referenceNumber = String(body.referenceNumber || body.reference || "").trim() || null;
+      const fuelAdvanceData: any = {
+        type: String(body.type || "Fuel Advance"), loadNumber, carrierId, brokerId, rate: rate.toFixed(2),
+        faPercent: faPercent.toFixed(4), fees: fees.toFixed(2), owed: owed.toFixed(2),
+        paymentMethod: body.paymentMethod ? String(body.paymentMethod) : null,
+        deliveryDate, code: body.code ? String(body.code) : null, referenceNumber,
+        authorizedAgent: req.user.id, processedBy: req.user.id, carrierName: carrier.name,
+        advanceAmount: advanceAmount.toFixed(2), advanceDate: new Date(),
+        pickupState: String(body.pickupState || ""), deliveryState: String(body.deliveryState || ""),
+        loadId: body.loadId ? Number(body.loadId) : null, notes: body.notes ? String(body.notes) : null,
+      };
+      if (req.file) {
+        if (req.file.buffer.subarray(0, 5).toString("ascii") !== "%PDF-") return res.status(400).json({ message: "Uploaded rate confirmation is not a valid PDF" });
+        uploadedKey = await uploadToS3(req.file.buffer, `fuel-advances/pending/${crypto.randomUUID()}.pdf`, "application/pdf");
+        fuelAdvanceData.rateConS3Key = uploadedKey;
+        fuelAdvanceData.rateConName = sanitizeOriginalName(req.file.originalname);
+        fuelAdvanceData.rateConType = "application/pdf";
+      }
       const [newFuelAdvance] = await db.insert(fuelAdvances).values(fuelAdvanceData).returning();
-      res.status(201).json(newFuelAdvance);
+      inserted = true;
+      const [joined] = await db.select({
+        fuelAdvance: fuelAdvances, carrierJoinedName: clients.name, brokerName: brokers.name,
+        authorizedAgentName: sql<string>`concat_ws(' ', ${userTable.firstName}, ${userTable.lastName})`,
+      }).from(fuelAdvances).leftJoin(clients, eq(fuelAdvances.carrierId, clients.id))
+        .leftJoin(brokers, eq(fuelAdvances.brokerId, brokers.id))
+        .leftJoin(userTable, eq(fuelAdvances.authorizedAgent, userTable.id))
+        .where(eq(fuelAdvances.id, newFuelAdvance.id)).limit(1);
+      const { fuelAdvance: created, ...names } = joined;
+      res.status(201).json({ ...created, carrierName: names.carrierJoinedName || created.carrierName, ...names });
     } catch (error) {
+      if (uploadedKey && !inserted) await deleteFromS3(uploadedKey);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid fuel advance data", errors: error.errors });
       }
       console.error("Error creating fuel advance:", error);
-      res.status(500).json({ message: "Failed to create fuel advance" });
+      res.status(error instanceof Error && /required|numeric|not found/i.test(error.message) ? 400 : 500)
+        .json({ message: error instanceof Error ? error.message : "Failed to create fuel advance" });
     }
   });
 
-  app.patch("/api/fuel-advances/:id", requireAuth, async (req, res) => {
+  app.patch("/api/fuel-advances/:id", requireModulePermission("fuel_advance"), async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const updateData = insertFuelAdvanceSchema.partial().parse(req.body);
+      const body: any = req.body || {};
+      const allowed = ["type", "loadNumber", "carrierId", "brokerId", "rate", "faPercent", "paymentMethod",
+        "deliveryDate", "code", "referenceNumber", "account", "notes", "status", "pickupState", "deliveryState",
+        "advanceAmount",
+        "loadId", "deliveryVerified", "paid"];
+      const updateData: any = {};
+      for (const key of allowed) if (Object.prototype.hasOwnProperty.call(body, key)) updateData[key] = body[key];
+      if (Object.prototype.hasOwnProperty.call(body, "reference")) updateData.referenceNumber = body.reference;
+      for (const key of ["carrierId", "brokerId", "loadId"]) if (updateData[key] !== undefined && updateData[key] !== null && updateData[key] !== "") updateData[key] = Number(updateData[key]);
+      for (const key of ["deliveryVerified", "paid"]) if (updateData[key] !== undefined) updateData[key] = updateData[key] === true || updateData[key] === "true" || updateData[key] === "1";
+      if (updateData.paid !== undefined) {
+        updateData.status = updateData.paid ? "paid" : "approved";
+      } else if (updateData.status !== undefined) {
+        updateData.paid = updateData.status === "paid";
+      }
+      if (updateData.deliveryDate !== undefined) {
+        updateData.deliveryDate = updateData.deliveryDate ? new Date(updateData.deliveryDate) : null;
+        if (updateData.deliveryDate && Number.isNaN(updateData.deliveryDate.getTime())) return res.status(400).json({ message: "Invalid delivery date" });
+      }
+      const moneyChanged = ["rate", "faPercent", "advanceAmount"].some((key) => updateData[key] !== undefined);
+      if (moneyChanged) {
+        const [current] = await db.select({ rate: fuelAdvances.rate, faPercent: fuelAdvances.faPercent, advanceAmount: fuelAdvances.advanceAmount })
+          .from(fuelAdvances).where(eq(fuelAdvances.id, id));
+        if (!current) return res.status(404).json({ message: "Fuel advance not found" });
+        const rate = Number(updateData.rate ?? current.rate);
+        const faPercent = Number(updateData.faPercent ?? current.faPercent ?? 0);
+        const advance = Number(updateData.advanceAmount ?? current.advanceAmount);
+        if (![rate, faPercent, advance].every(Number.isFinite)) return res.status(400).json({ message: "Invalid monetary values" });
+        if (rate <= 0 || advance <= 0 || faPercent < 0) return res.status(400).json({ message: "Rate and advance must be positive, and FA percentage cannot be negative" });
+        const rateCents = Math.round(rate * 100);
+        const advanceCents = Math.round(advance * 100);
+        if (advanceCents > Math.floor(rateCents * 0.5)) return res.status(400).json({ message: "Advance cannot exceed 50% of the rate" });
+        const feeCents = Math.round(advanceCents * faPercent / 100);
+        updateData.rate = (rateCents / 100).toFixed(2);
+        updateData.faPercent = faPercent.toFixed(4);
+        updateData.advanceAmount = (advanceCents / 100).toFixed(2);
+        updateData.fees = (feeCents / 100).toFixed(2);
+        updateData.owed = ((advanceCents + feeCents) / 100).toFixed(2);
+      }
 
       const [updatedFuelAdvance] = await db
         .update(fuelAdvances)
@@ -4317,7 +4433,107 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete("/api/fuel-advances/:id", requireAuth, async (req, res) => {
+  // Rate confirmations are intentionally PDF-only and stored using the shared S3 service.
+  app.post("/api/fuel-advances/:id/rate-con", requireModulePermission("fuel_advance"), (req: any, res: any, next: any) => {
+    rateConUpload.single("file")(req, res, (err: any) => {
+      if (err) return res.status(400).json({ message: err.message || "PDF upload rejected" });
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "PDF file is required" });
+      if (req.file.buffer.subarray(0, 5).toString("ascii") !== "%PDF-") return res.status(400).json({ message: "Uploaded file is not a valid PDF" });
+      const id = Number(req.params.id);
+      const [existing] = await db.select({ key: fuelAdvances.rateConS3Key }).from(fuelAdvances)
+        .where(eq(fuelAdvances.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Fuel advance not found" });
+      const key = await uploadToS3(req.file.buffer, `fuel-advances/${id}/rate-con-${crypto.randomUUID()}.pdf`, "application/pdf");
+      let row;
+      try {
+        [row] = await db.update(fuelAdvances).set({
+          rateConS3Key: key, rateConName: sanitizeOriginalName(req.file.originalname), rateConType: "application/pdf", updatedAt: new Date(),
+        }).where(eq(fuelAdvances.id, id)).returning();
+      } catch (error) {
+        await deleteFromS3(key);
+        throw error;
+      }
+      if (!row) {
+        await deleteFromS3(key);
+        return res.status(404).json({ message: "Fuel advance not found" });
+      }
+      if (existing.key && existing.key !== key) await deleteFromS3(existing.key);
+      res.json(row);
+    } catch (error) {
+      console.error("Error uploading fuel rate confirmation:", error);
+      res.status(500).json({ message: "Failed to upload rate confirmation" });
+    }
+  });
+
+  for (const [suffix, disposition] of [["view", "view"], ["download", "download"]] as const) {
+    app.get(`/api/fuel-advances/:id/rate-con/${suffix}`, requireModulePermission("fuel_advance"), async (req, res) => {
+      try {
+        const [row] = await db.select({ key: fuelAdvances.rateConS3Key, name: fuelAdvances.rateConName })
+          .from(fuelAdvances).where(eq(fuelAdvances.id, Number(req.params.id))).limit(1);
+        if (!row) return res.status(404).json({ message: "Fuel advance not found" });
+        if (!row.key) return res.status(404).json({ message: "Rate confirmation not uploaded" });
+        const url = disposition === "view" ? await getSignedViewUrl(row.key) : await getSignedDownloadUrl(row.key, row.name || "rate-confirmation.pdf");
+        res.redirect(url);
+      } catch { res.status(500).json({ message: "Failed to access rate confirmation" }); }
+    });
+  }
+  app.get("/api/fuel-advances/:id/rate-con", requireModulePermission("fuel_advance"), (req, res) => {
+    res.redirect(`/api/fuel-advances/${encodeURIComponent(req.params.id)}/rate-con/view`);
+  });
+
+  app.get("/api/fuel-advances/:id/deposit-slip", requireModulePermission("fuel_advance"), async (req, res) => {
+    try {
+      const [row] = await db.select({
+        fuelAdvance: fuelAdvances, carrierJoinedName: clients.name, carrierAddress: clients.address,
+        carrierCity: clients.city, carrierState: clients.state, carrierPhone: clients.phone,
+        brokerName: brokers.name,
+        authorizedAgentName: sql<string>`concat_ws(' ', ${userTable.firstName}, ${userTable.lastName})`,
+      }).from(fuelAdvances).leftJoin(clients, eq(fuelAdvances.carrierId, clients.id))
+        .leftJoin(brokers, eq(fuelAdvances.brokerId, brokers.id))
+        .leftJoin(userTable, eq(fuelAdvances.authorizedAgent, userTable.id))
+        .where(eq(fuelAdvances.id, Number(req.params.id))).limit(1);
+      if (!row) return res.status(404).json({ message: "Fuel advance not found" });
+      const advance = row.fuelAdvance;
+      const doc = new PDFDocument({ size: "LETTER", margin: 48, info: { Title: "Fuel Advance Deposit Slip", Author: "Trucking Pros Financial" } });
+      res.setHeader("Content-Type", "application/pdf");
+      const disposition = req.query.download === "1" ? "attachment" : "inline";
+      res.setHeader("Content-Disposition", `${disposition}; filename="fuel-advance-${advance.id}-deposit-slip.pdf"`);
+      doc.pipe(res);
+      doc.rect(0, 0, 612, 92).fill("#098b9f");
+      const logoPath = path.resolve(process.cwd(), "server/assets/tpf-logo.png");
+      if (fs.existsSync(logoPath)) doc.image(logoPath, 48, 15, { fit: [95, 60] });
+      doc.fillColor("#fff").font("Helvetica-Bold").fontSize(18).text("TRUCKING PROS FINANCIAL", 155, 28);
+      doc.font("Helvetica").fontSize(10).text("Fuel Advance Deposit Slip", 48, 58);
+      doc.fillColor("#1a1a1a").font("Helvetica-Bold").fontSize(20).text("DEPOSIT SLIP", 48, 125);
+      let y = 175;
+      const carrierDetails = [row.carrierAddress, [row.carrierCity, row.carrierState].filter(Boolean).join(", "), row.carrierPhone].filter(Boolean).join(" • ");
+      const pdfMoney = (value: string | null | undefined) => value == null || value === ""
+        ? "N/A"
+        : `$${Number(value).toFixed(2)}`;
+      const fields: Array<[string, string]> = [
+        ["PRO / Load #", `${advance.code || "—"} / ${advance.loadNumber || "—"}`],
+        ["Carrier", `${row.carrierJoinedName || advance.carrierName}${carrierDetails ? ` — ${carrierDetails}` : ""}`],
+        ["Broker", row.brokerName || "—"],
+        ["Advance", pdfMoney(advance.advanceAmount)],
+        ["Fees", pdfMoney(advance.fees)],
+        ["Owed", pdfMoney(advance.owed)],
+        ["Payment method", advance.paymentMethod || "—"],
+        ["Reference", advance.referenceNumber || `FA-${advance.id}`],
+        ["Date", new Date(advance.advanceDate).toLocaleDateString("en-US")],
+        ["Authorized agent", row.authorizedAgentName || "—"],
+      ];
+      fields.forEach(([label, value], i) => { doc.rect(48, y, 516, 34).fill(i % 2 ? "#fff" : "#f1f5f5").strokeColor("#cbd5e1").stroke(); doc.fillColor("#475569").font("Helvetica-Bold").fontSize(9).text(label.toUpperCase(), 60, y + 11); doc.fillColor("#111827").font("Helvetica").fontSize(11).text(value, 220, y + 10); y += 34; });
+      doc.fillColor("#64748b").fontSize(8).text("Generated electronically by FactorFlux. Retain for accounting records.", 48, 700);
+      doc.font("Helvetica-Bold").fontSize(9).text("Trucking Pros Financial LLC", 48, 718, { align: "center", width: 516 });
+      doc.end();
+    } catch { res.status(500).json({ message: "Failed to generate deposit slip" }); }
+  });
+
+  app.delete("/api/fuel-advances/:id", requireModulePermission("fuel_advance"), async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const [deletedFuelAdvance] = await db.delete(fuelAdvances).where(eq(fuelAdvances.id, id)).returning();
@@ -4325,6 +4541,7 @@ Trucking Pros Financial Team
       if (!deletedFuelAdvance) {
         return res.status(404).json({ message: "Fuel advance not found" });
       }
+      if (deletedFuelAdvance.rateConS3Key) await deleteFromS3(deletedFuelAdvance.rateConS3Key);
 
       res.json({ message: "Fuel advance deleted successfully" });
     } catch (error) {
