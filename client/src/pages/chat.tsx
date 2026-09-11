@@ -26,7 +26,52 @@ type Message = {
   body: string;
   createdAt: string;
 };
-type EmojiSelection = { native: string };
+type EmojiSelection = { id?: string; native?: string };
+
+const tpfEmojiDefinitions = [
+  { id: "tpf-logo", name: "TPF Logo", keywords: ["tpf", "logo"], skins: [{ src: "/emojis/tpf-logo.png" }] },
+  { id: "ff-logo", name: "FactorFlux Logo", keywords: ["factorflux", "ff", "logo"], skins: [{ src: "/emojis/ff-logo.png" }] },
+  { id: "tpf4life", name: "TPF 4Life", keywords: ["tpf", "4life"], skins: [{ src: "/emojis/tpf4life.png" }] },
+  { id: "gm-tpf", name: "GM TPF", keywords: ["good morning", "tpf", "wave"], skins: [{ src: "/emojis/gm-tpf.png" }] },
+  { id: "tpf-truck", name: "TPF Truck", keywords: ["tpf", "truck"], skins: [{ src: "/emojis/tpf-truck.png" }] },
+  { id: "funded", name: "Funded", keywords: ["funded", "money", "dollar"], skins: [{ src: "/emojis/funded.png" }] },
+  { id: "invoice", name: "Invoice", keywords: ["invoice", "document"], skins: [{ src: "/emojis/invoice.png" }] },
+  { id: "approved", name: "Approved", keywords: ["approved", "check"], skins: [{ src: "/emojis/approved.png" }] },
+];
+
+const emojiPickerData = {
+  ...emojiData,
+  categories: [
+    { id: "tpf", name: "TPF", emojis: tpfEmojiDefinitions.map((emoji) => emoji.id) },
+    ...emojiData.categories,
+  ],
+  emojis: {
+    ...Object.fromEntries(tpfEmojiDefinitions.map((emoji) => [emoji.id, emoji])),
+    ...emojiData.emojis,
+  },
+};
+
+const customEmojiSources: Record<string, { src: string; label: string }> = {
+  "tpf-logo": { src: "/emojis/tpf-logo.png", label: "TPF Logo" },
+  "ff-logo": { src: "/emojis/ff-logo.png", label: "FactorFlux Logo" },
+  tpf4life: { src: "/emojis/tpf4life.png", label: "TPF 4Life" },
+  "gm-tpf": { src: "/emojis/gm-tpf.png", label: "GM TPF" },
+  "tpf-truck": { src: "/emojis/tpf-truck.png", label: "TPF Truck" },
+  funded: { src: "/emojis/funded.png", label: "Funded" },
+  invoice: { src: "/emojis/invoice.png", label: "Invoice" },
+  approved: { src: "/emojis/approved.png", label: "Approved" },
+};
+
+const customEmojiPattern = /:(tpf-logo|ff-logo|tpf4life|gm-tpf|tpf-truck|funded|invoice|approved):/g;
+
+function renderMessageBody(body: string) {
+  return body.split(customEmojiPattern).map((part, index) => {
+    const emoji = customEmojiSources[part];
+    return emoji
+      ? <img key={`${part}-${index}`} src={emoji.src} alt={`:${part}:`} title={emoji.label} className="mx-0.5 inline-block h-6 w-6 align-middle object-contain" />
+      : part;
+  });
+}
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
@@ -159,8 +204,10 @@ export default function Chat() {
     const textarea = textareaRef.current;
     const start = textarea?.selectionStart ?? draft.length;
     const end = textarea?.selectionEnd ?? start;
-    const nextDraft = `${draft.slice(0, start)}${emoji.native}${draft.slice(end)}`;
-    const nextCursor = start + emoji.native.length;
+    const insertedEmoji = emoji.native || (emoji.id ? `:${emoji.id}:` : "");
+    if (!insertedEmoji) return;
+    const nextDraft = `${draft.slice(0, start)}${insertedEmoji}${draft.slice(end)}`;
+    const nextCursor = start + insertedEmoji.length;
     setDraft(nextDraft);
     setEmojiPickerOpen(false);
     window.requestAnimationFrame(() => {
@@ -234,11 +281,11 @@ export default function Chat() {
             {loadingMessages && !messages.length ? <div className="space-y-4">{[1, 2, 3].map((item) => <div key={item} className={cn("h-14 animate-pulse bg-[#d9d8d2]", item % 2 === 0 ? "ml-auto max-w-[60%]" : "max-w-[55%]")} />)}</div>
               : messages.length ? messages.map((message) => <div key={message.id} className={cn("mb-5 flex gap-2.5", String(message.senderId) === String(user?.id) ? "justify-end" : "justify-start")}>
                 <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold", String(message.senderId) === String(user?.id) ? "order-2 bg-[#098b9f] text-white" : "bg-[#b7c9c7] text-[#31585a]")}>{initials(message.senderName)}</div>
-                <div className={cn("max-w-[78%] md:max-w-[65%]", String(message.senderId) === String(user?.id) && "text-right")}><div className="mb-1 flex items-baseline gap-2 text-[10px] text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span></div><div className={cn("inline-block border-2 px-3 py-2 text-sm leading-relaxed shadow-[1px_1px_0_#aaa]", String(message.senderId) === String(user?.id) ? "border-[#087888] bg-[#098b9f] text-white" : "border-[#b8b7b0] bg-[#fffdf5] text-[#252525]")}>{message.body}</div></div>
+                 <div className={cn("max-w-[78%] md:max-w-[65%]", String(message.senderId) === String(user?.id) && "text-right")}><div className="mb-1 flex items-baseline gap-2 text-[10px] text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span></div><div className={cn("inline-block whitespace-pre-wrap break-words border-2 px-3 py-2 text-sm leading-relaxed shadow-[1px_1px_0_#aaa]", String(message.senderId) === String(user?.id) ? "border-[#087888] bg-[#098b9f] text-white" : "border-[#b8b7b0] bg-[#fffdf5] text-[#252525]")}>{renderMessageBody(message.body)}</div></div>
               </div>) : <div className="flex h-full flex-col items-center justify-center text-center text-[#707371]"><MessageCircle className="mb-3 h-10 w-10 text-[#8bbfc1]" /><p className="font-semibold">No messages here yet</p><p className="mt-1 text-xs">Send the first note to this conversation.</p></div>}
             <div ref={bottomRef} />
           </div>
-          <div className="border-t-2 border-[#808080] bg-[#d4d0c8] p-3 md:p-4"><div className="relative flex items-end gap-2 border-2 border-[#808080] border-r-white border-b-white bg-[#f9f8f2] p-1.5"><textarea ref={textareaRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitMessage(); } }} placeholder={`Message ${selected.directName || selected.name}...`} rows={1} className="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" /><div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="ghost" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="h-9 w-9 rounded-sm p-0 text-[#666] hover:bg-[#dff5f6] hover:text-[#098b9f]"><Smile className="h-5 w-5" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-md border border-[#808080] bg-white shadow-lg"><Picker data={emojiData} onEmojiSelect={insertEmoji} categories={["frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} className="h-9 rounded-sm bg-[#098b9f] px-3 text-white hover:bg-[#087c8d]"><Send className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">Send</span></Button></div><p className="mt-1.5 px-1 text-[10px] text-[#777]">Enter to send · Shift + Enter for a new line</p></div>
+          <div className="border-t-2 border-[#808080] bg-[#d4d0c8] p-3 md:p-4"><div className="relative flex items-end gap-2 border-2 border-[#808080] border-r-white border-b-white bg-[#f9f8f2] p-1.5"><textarea ref={textareaRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitMessage(); } }} placeholder={`Message ${selected.directName || selected.name}...`} rows={1} className="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" /><div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="ghost" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="h-9 w-9 rounded-sm p-0 text-[#666] hover:bg-[#dff5f6] hover:text-[#098b9f]"><Smile className="h-5 w-5" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-md border border-[#808080] bg-white shadow-lg"><Picker data={emojiPickerData} onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} className="h-9 rounded-sm bg-[#098b9f] px-3 text-white hover:bg-[#087c8d]"><Send className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">Send</span></Button></div><p className="mt-1.5 px-1 text-[10px] text-[#777]">Enter to send · Shift + Enter for a new line</p></div>
         </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
         </section>
       </div>
