@@ -79,6 +79,12 @@ export async function deleteFromS3(key: string): Promise<void> {
   }
 }
 
+export async function deleteFromS3Strict(key: string): Promise<void> {
+  if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
+  const client = getClient();
+  await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
 export async function downloadToTemp(key: string, destPath: string): Promise<void> {
   if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const { createWriteStream } = await import("fs");

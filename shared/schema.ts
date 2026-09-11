@@ -427,6 +427,48 @@ export const timeEntries = pgTable("time_entries", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Employee expense reimbursements. Amounts are stored as integer cents to avoid
+// floating point rounding; the API exposes both amountCents and a fixed amount.
+export const expenses = pgTable("expenses", {
+  id: serial("id").primaryKey(),
+  submittedBy: varchar("submitted_by").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  title: varchar("title").notNull(),
+  category: varchar("category", { enum: ["fuel", "office", "travel", "meals", "equipment", "software", "other"] }).notNull(),
+  description: text("description"),
+  merchant: varchar("merchant"),
+  paymentMethod: varchar("payment_method"),
+  notes: text("notes"),
+  expenseDate: timestamp("expense_date").notNull(),
+  status: varchar("status", { enum: ["draft", "submitted", "approved", "rejected", "reimbursed"] }).default("draft").notNull(),
+  rejectionReason: text("rejection_reason"),
+  receiptKey: text("receipt_key"),
+  receiptName: varchar("receipt_name"),
+  receiptMimeType: varchar("receipt_mime_type"),
+  receiptSize: integer("receipt_size"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectedBy: varchar("rejected_by").references(() => users.id),
+  rejectedAt: timestamp("rejected_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("expenses_submitted_by_idx").on(table.submittedBy),
+  index("expenses_status_idx").on(table.status),
+  index("expenses_date_idx").on(table.expenseDate),
+]);
+
+export const insertExpenseSchema = createInsertSchema(expenses).omit({
+  id: true, createdAt: true, updatedAt: true, approvedBy: true, approvedAt: true,
+  rejectedBy: true, rejectedAt: true, rejectionReason: true, receiptKey: true,
+  receiptName: true, receiptMimeType: true, receiptSize: true,
+}).extend({
+  amountCents: z.coerce.number().int().positive(),
+  expenseDate: z.coerce.date(),
+});
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+
 // Written corrective-action notices issued to employees. This is intentionally
 // additive so historical personnel records are never overwritten.
 export const writtenWarnings = pgTable("written_warnings", {
@@ -1803,14 +1845,54 @@ export const insertAiChatLogSchema = createInsertSchema(aiChatLogs).omit({ id: t
 export type AiChatLog = typeof aiChatLogs.$inferSelect;
 export type InsertAiChatLog = z.infer<typeof insertAiChatLogSchema>;
 
+// Internal agent chat
+export const chatChannels = pgTable("chat_channels", {
+  id: serial("id").primaryKey(),
+  name: varchar("name"),
+  type: varchar("type", { enum: ["channel", "direct"] }).notNull(),
+  directKey: varchar("direct_key").unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("chat_channels_type_idx").on(table.type),
+]);
+
+export const chatMembers = pgTable("chat_members", {
+  channelId: integer("channel_id").references(() => chatChannels.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  lastReadAt: timestamp("last_read_at"),
+}, (table) => [
+  primaryKey({ columns: [table.channelId, table.userId] }),
+  index("chat_members_user_idx").on(table.userId),
+]);
+
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  channelId: integer("channel_id").references(() => chatChannels.id, { onDelete: "cascade" }).notNull(),
+  senderId: varchar("sender_id").references(() => users.id).notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  editedAt: timestamp("edited_at"),
+}, (table) => [
+  index("chat_messages_channel_created_idx").on(table.channelId, table.createdAt),
+]);
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true, createdAt: true, editedAt: true,
+}).extend({ body: z.string().trim().min(1).max(10000) });
+export type ChatChannel = typeof chatChannels.$inferSelect;
+export type ChatMember = typeof chatMembers.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
 export const ALL_PERMISSIONS = [
   "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
   "factoring","payments","lockbox","fuel_advance","bank_transfers",
   "dispatchers","trucks","release_letters",
   "brokers","cb_reviews","mc_check","held","logs",
   "followups","reports",
-  "payroll","vault","help","settings","rules","workflow_builder","admin",
-  "earl",
+  "payroll","expenses","vault","help","settings","rules","workflow_builder","admin",
+  "earl","chat",
 ] as const;
 export type PermissionKey = typeof ALL_PERMISSIONS[number];
 
@@ -1822,10 +1904,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, PermissionKey[]> = {
     "dispatchers","trucks","release_letters",
     "brokers","cb_reviews","mc_check","held","logs",
     "followups","reports",
-    "payroll","vault","help","settings","rules","workflow_builder",
+    "payroll","expenses","vault","help","settings","rules","workflow_builder",
+    "chat",
   ],
   employee: [
     "dashboard","carriers","invoices","documents","tasks",
-    "fuel_advance","vault","help","settings",
+    "fuel_advance","expenses","vault","help","settings",
+    "chat",
   ],
 };

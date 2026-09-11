@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
@@ -8,7 +9,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, MessageCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -60,6 +61,7 @@ const navSections: NavSection[] = [
       { name: "Invoices",          href: "/invoices",           icon: FileText,        permission: "invoices"           },
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
+      { name: "Chat",              href: "/chat",               icon: MessageCircle,   permission: "chat"               },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
       { name: "Portal Submissions",href: "/portal-submissions", icon: Globe,           permission: "portal_submissions" },
@@ -106,6 +108,7 @@ const navSections: NavSection[] = [
     items: [
       { name: "Admin",            href: "/admin",            icon: ShieldCheck,     permission: "admin",            role: "manager" },
       { name: "Payroll",          href: "/payroll",          icon: BadgeDollarSign, permission: "payroll",          role: "manager" },
+      { name: "Expenses",         href: "/expenses",         icon: Receipt,         permission: "expenses" },
       { name: "Vault",            href: "/vault",            icon: Lock,            permission: "vault"                             },
       { name: "Help",             href: "/help",             icon: LifeBuoy,        permission: "help"                              },
       { name: "Rules",            href: "/document-rules",   icon: FileCheck2,      permission: "rules",            role: "manager" },
@@ -146,12 +149,18 @@ function isRouteActive(current: string, href: string) {
 
 export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const { permissions, user: authUser } = useAuth();
-  const navRef = useRef<HTMLElement>(null);
-  const scrollPositionKey = mobile ? "mobile" : "desktop";
-
+  const { permissions, user: authUser, isLoading: authLoading } = useAuth();
   const userRole = authUser?.role ?? "employee";
   const isAdmin = userRole === "admin";
+  const canUseChat = !!authUser && (isAdmin || (!authLoading && permissions.includes("chat")));
+  const { data: chatUnread } = useQuery<{ count: number }>({
+    queryKey: ["/api/chat/unread-count"],
+    refetchInterval: 3000,
+    retry: false,
+    enabled: canUseChat,
+  });
+  const navRef = useRef<HTMLElement>(null);
+  const scrollPositionKey = mobile ? "mobile" : "desktop";
 
   // Build display user entirely from auth context — never fall back to hardcoded admin values
   const user: CurrentUser = {
@@ -171,6 +180,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         items: s.items.filter(i => {
           // Admins always see everything
           if (isAdmin) return true;
+          if (i.permission === "chat" && !permissions.includes("chat")) return false;
           // Role gate for manager-only items
           if (i.role === "manager" && userRole !== "manager" && userRole !== "admin") return false;
           // Permission gate
@@ -205,7 +215,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     >
       {/* Brand */}
       <div className="border-b-2 border-[#808080] px-3 py-4">
-        <FactorFluxLogo />
+        <FactorFluxLogo shine />
         <div className="min-w-0">
           <p className="truncate pl-11 text-[10px] text-[#444] mt-0.5">
             Freight Factoring OS
@@ -278,9 +288,10 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                         "h-[14px] w-[14px] shrink-0 transition-colors",
                          active ? "text-[#098b9f]" : "text-[#666] group-hover:text-[#098b9f]"
                       )} />
-                      <span className="truncate text-[12.5px] font-medium leading-none">
+                       <span className="truncate text-[12.5px] font-medium leading-none">
                         {item.name}
                       </span>
+                       {item.name === "Chat" && !!chatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{chatUnread.count > 99 ? "99+" : chatUnread.count}</span>}
                     </button>
                   );
                 })}

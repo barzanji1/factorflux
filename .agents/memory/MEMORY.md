@@ -9,3 +9,5 @@
 - [Bulk invoice uniqueness](bulk-invoice-uniqueness.md) — one broker/carrier/ticket/load identity may produce only one bulk receivable across all batches.
 - [Fuel advance compatibility](fuel-advance-compatibility.md) — preserve legacy fuel-advance reads/API fields while normalized workflow fields are adopted.
 - [External Neon verification](external-neon-verification.md) — database callbacks may target a different managed DB; verify app data through the configured Neon connection.
+- [Permission override semantics](permission-override-semantics.md) — one explicit permission row replaces all role defaults; never seed a single module permission for default-only users.
+- [Direct-message identity](direct-message-identity.md) — canonical DM keys must encode participant IDs unambiguously; delimiter joins can collide and expose private threads.

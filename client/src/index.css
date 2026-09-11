@@ -2,6 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
+.logo-shine-wrapper {
+  contain: paint;
+}
+
+.logo-shine-wrapper::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%
+  );
+  opacity: 0;
+  transform: translateX(-160%);
+  will-change: transform, opacity;
+  animation: logo-shine-sweep 8s ease-in-out 4s infinite;
+}
+
+@keyframes logo-shine-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-160%);
+  }
+  8% {
+    opacity: 1;
+  }
+  42% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+    transform: translateX(160%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(160%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-shine-wrapper::after {
+    animation: none;
+    opacity: 0;
+    transform: translateX(-160%);
+  }
+}
+
 /* ─── FactorFlux Design System v2 ─────────────────────────────────────────────
    Calm operational UI. Premium but restrained. Minimal color used semantically.
    ──────────────────────────────────────────────────────────────────────────── */

@@ -11,11 +11,12 @@ import {
   getSignedViewUrl,
   getSignedDownloadUrl,
   deleteFromS3,
+  deleteFromS3Strict,
   downloadToTemp,
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
-import { eq, and, desc, sql, count, ilike, or, inArray, notInArray } from "drizzle-orm";
+import { eq, and, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -88,10 +89,15 @@ import {
   insertReleaseLetterSchema,
   aiChatLogs,
   timeEntries,
+  expenses,
+  insertExpenseSchema,
   carrierPortalUsers,
   carrierSubmissions,
   carrierSubmissionDocs,
   writtenWarnings,
+  chatChannels,
+  chatMembers,
+  chatMessages,
   ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
@@ -2890,6 +2896,186 @@ ${message}
     }
   });
 
+  // Expenses
+  const expenseOutput = async (expense: any) => {
+    const [submitter] = await db.select({
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+    }).from(users).where(eq(users.id, expense.submittedBy)).limit(1);
+    const submittedByName = [submitter?.firstName, submitter?.lastName].filter(Boolean).join(" ") || submitter?.email || "Unknown agent";
+    return {
+      ...expense,
+      amount: (Number(expense.amountCents) / 100).toFixed(2),
+      submittedByName,
+      receiptUrl: expense.receiptKey ? await getSignedViewUrl(expense.receiptKey) : null,
+      receiptKey: undefined,
+    };
+  };
+  const expenseId = (req: any) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) throw new Error("Invalid expense id");
+    return id;
+  };
+  const canManageExpense = (req: any, expense: any) =>
+    req.user.role !== "employee" || expense.submittedBy === req.user.id;
+  const expenseDateFilter = (value: unknown, end = false) => {
+    if (!value) return undefined;
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) throw new Error("Invalid date filter");
+    if (end && /^\d{4}-\d{2}-\d{2}$/.test(String(value))) date.setUTCHours(23, 59, 59, 999);
+    return date;
+  };
+  const parseExpenseAmount = (value: unknown) => {
+    const amount = String(value ?? "");
+    if (!/^\d+(?:\.\d{1,2})?$/.test(amount)) throw new Error("Amount must be positive with at most two decimal places");
+    const cents = Math.round(Number(amount) * 100);
+    if (!Number.isSafeInteger(cents) || cents <= 0) throw new Error("Amount must be greater than zero");
+    return cents;
+  };
+  const expenseCategories = z.enum(["fuel", "office", "travel", "meals", "equipment", "software", "other"]);
+  const expenseStatuses = z.enum(["draft", "submitted", "approved", "rejected", "reimbursed"]);
+
+  app.get("/api/expenses", requireModulePermission("expenses"), async (req: any, res) => {
+    try {
+      const conditions: any[] = [];
+      if (req.user.role === "employee") conditions.push(eq(expenses.submittedBy, req.user.id));
+      else if (req.query.submittedBy || req.query.userId) conditions.push(eq(expenses.submittedBy, String(req.query.submittedBy ?? req.query.userId)));
+      if (req.query.status) conditions.push(eq(expenses.status, expenseStatuses.parse(String(req.query.status))));
+      if (req.query.category) conditions.push(eq(expenses.category, expenseCategories.parse(String(req.query.category))));
+      const from = expenseDateFilter(req.query.from ?? req.query.startDate ?? req.query.dateFrom);
+      const to = expenseDateFilter(req.query.to ?? req.query.endDate ?? req.query.dateTo, true);
+      if (from) conditions.push(gte(expenses.expenseDate, from));
+      if (to) conditions.push(lte(expenses.expenseDate, to));
+      const rows = await db.select().from(expenses)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(expenses.expenseDate), desc(expenses.createdAt));
+      res.json(await Promise.all(rows.map(expenseOutput)));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to fetch expenses" });
+    }
+  });
+
+  app.get("/api/expenses/:id", requireModulePermission("expenses"), async (req: any, res) => {
+    try {
+      const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId(req)));
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      if (!canManageExpense(req, expense)) return res.status(403).json({ message: "You can only access your own expenses" });
+      res.json(await expenseOutput(expense));
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to fetch expense" }); }
+  });
+
+  app.post("/api/expenses", requireModulePermission("expenses"), handleUpload("receipt"), async (req: any, res) => {
+    let createdId: number | undefined;
+    let uploadedKey: string | undefined;
+    try {
+      if (req.file && !hasAllowedCarrierDocumentSignature(req.file)) return res.status(400).json({ message: "Invalid receipt file" });
+      const body = { ...req.body, submittedBy: req.user.role === "employee" ? req.user.id : (req.body.submittedBy || req.user.id) };
+      if (body.amountCents === undefined && body.amount !== undefined) {
+        body.amountCents = parseExpenseAmount(body.amount);
+      }
+      const input = insertExpenseSchema.parse(body);
+      let [expense] = await db.insert(expenses).values(input as any).returning();
+      createdId = expense.id;
+      if (req.file) {
+        const key = `expenses/${req.user.id}/${expense.id}/${crypto.randomUUID()}-${sanitizeOriginalName(req.file.originalname)}`;
+        await uploadToS3(req.file.buffer, key, req.file.mimetype);
+        uploadedKey = key;
+        [expense] = await db.update(expenses).set({ receiptKey: key, receiptName: sanitizeOriginalName(req.file.originalname), receiptMimeType: req.file.mimetype, receiptSize: req.file.size }).where(eq(expenses.id, expense.id)).returning();
+      }
+      res.status(201).json(await expenseOutput(expense));
+    } catch (error: any) {
+      if (uploadedKey) await deleteFromS3(uploadedKey);
+      if (createdId) await db.delete(expenses).where(eq(expenses.id, createdId)).catch(() => undefined);
+      res.status(400).json({ message: error?.issues?.[0]?.message || error.message || "Invalid expense" });
+    }
+  });
+
+  app.patch("/api/expenses/:id", requireModulePermission("expenses"), async (req: any, res) => {
+    try {
+      const id = expenseId(req);
+      const [existing] = await db.select().from(expenses).where(eq(expenses.id, id));
+      if (!existing) return res.status(404).json({ message: "Expense not found" });
+      if (!canManageExpense(req, existing)) return res.status(403).json({ message: "You can only modify your own expenses" });
+      if (req.body.status === "reimbursed" && req.user.role !== "employee" && existing.status === "approved") {
+        const [updated] = await db.update(expenses).set({ status: "reimbursed", updatedAt: new Date() }).where(eq(expenses.id, id)).returning();
+        return res.json(await expenseOutput(updated));
+      }
+      if (!["draft", "rejected"].includes(existing.status)) return res.status(409).json({ message: "Only draft or rejected expenses can be modified" });
+      const allowed: any = {};
+      for (const key of ["title", "category", "description", "expenseDate", "notes"]) if (req.body[key] !== undefined) allowed[key] = req.body[key];
+      if (req.body.amount !== undefined) allowed.amountCents = parseExpenseAmount(req.body.amount);
+      if (allowed.expenseDate !== undefined) allowed.expenseDate = new Date(allowed.expenseDate);
+      if (allowed.amountCents !== undefined) allowed.amountCents = Number(allowed.amountCents);
+      if (req.body.status !== undefined && !["draft", "submitted"].includes(req.body.status)) {
+        return res.status(400).json({ message: "Approval and rejection must use their dedicated endpoints" });
+      }
+      if (req.body.status !== undefined) allowed.status = req.body.status;
+      const [updated] = await db.update(expenses).set({ ...allowed, updatedAt: new Date() }).where(eq(expenses.id, id)).returning();
+      res.json(await expenseOutput(updated));
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to update expense" }); }
+  });
+
+  app.patch("/api/expenses/:id/approve", requireModulePermission("expenses"), requireManagerOrAdmin, async (req: any, res) => {
+    try {
+      const id = expenseId(req);
+      const [updated] = await db.update(expenses).set({ status: "approved", approvedBy: req.user.id, approvedAt: new Date(), rejectionReason: null, updatedAt: new Date() })
+        .where(and(eq(expenses.id, id), eq(expenses.status, "submitted"))).returning();
+      if (!updated) return res.status(404).json({ message: "Expense not found or not awaiting approval" });
+      res.json(await expenseOutput(updated));
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to approve expense" }); }
+  });
+
+  app.patch("/api/expenses/:id/reject", requireModulePermission("expenses"), requireManagerOrAdmin, async (req: any, res) => {
+    try {
+      const reason = z.string().trim().min(1, "Rejection reason is required").parse(req.body?.reason);
+      const id = expenseId(req);
+      const [updated] = await db.update(expenses).set({ status: "rejected", rejectionReason: reason, rejectedBy: req.user.id, rejectedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(expenses.id, id), eq(expenses.status, "submitted"))).returning();
+      if (!updated) return res.status(404).json({ message: "Expense not found or not awaiting approval" });
+      res.json(await expenseOutput(updated));
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to reject expense" }); }
+  });
+
+  app.delete("/api/expenses/:id", requireModulePermission("expenses"), async (req: any, res) => {
+    try {
+      const id = expenseId(req);
+      const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      if (!canManageExpense(req, expense)) return res.status(403).json({ message: "You can only delete your own expenses" });
+      if (expense.status !== "draft") return res.status(409).json({ message: "Only draft expenses can be deleted" });
+      if (expense.receiptKey) await deleteFromS3Strict(expense.receiptKey);
+      await db.delete(expenses).where(eq(expenses.id, id));
+      res.status(204).send();
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to delete expense" }); }
+  });
+
+  app.post("/api/expenses/:id/receipt", requireModulePermission("expenses"), handleUpload("receipt"), async (req: any, res) => {
+    let uploadedKey: string | undefined;
+    try {
+      const id = expenseId(req);
+      const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      if (!canManageExpense(req, expense)) return res.status(403).json({ message: "You can only upload receipts for your own expenses" });
+      if (!["draft", "rejected"].includes(expense.status)) return res.status(409).json({ message: "Receipts can only be uploaded to draft or rejected expenses" });
+      if (!req.file || !hasAllowedCarrierDocumentSignature(req.file)) return res.status(400).json({ message: "Invalid receipt file" });
+      const key = `expenses/${req.user.id}/${id}/${crypto.randomUUID()}-${sanitizeOriginalName(req.file.originalname)}`;
+      await uploadToS3(req.file.buffer, key, req.file.mimetype);
+      uploadedKey = key;
+      const [updated] = await db.update(expenses).set({ receiptKey: key, receiptName: sanitizeOriginalName(req.file.originalname), receiptMimeType: req.file.mimetype, receiptSize: req.file.size, updatedAt: new Date() }).where(eq(expenses.id, id)).returning();
+      uploadedKey = undefined;
+      if (expense.receiptKey) {
+        await deleteFromS3Strict(expense.receiptKey).catch((error) => {
+          console.error("[Expenses] Could not remove replaced receipt:", expense.receiptKey, error);
+        });
+      }
+      res.json(await expenseOutput(updated));
+    } catch (error: any) {
+      if (uploadedKey) await deleteFromS3Strict(uploadedKey).catch(() => undefined);
+      res.status(400).json({ message: error.message || "Failed to upload receipt" });
+    }
+  });
+
   // Calendar
   const calendarRange = (req: any) => {
     const fromValue = req.query.from ?? req.query.startDate;
@@ -3004,6 +3190,178 @@ ${message}
     } catch (error) {
       console.error("Error fetching unread notification count:", error);
       res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
+
+  // ─── Internal agent chat ───────────────────────────────────────────────────
+  const chatPermission = requireModulePermission("chat");
+  const chatChannelIdSchema = z.coerce.number().int().positive();
+  const chatBodySchema = z.object({
+    body: z.string().trim().min(1, "Message body is required").max(10000),
+  }).strict();
+
+  const ensurePublicChatMembership = async (userId: string) => {
+    const publicChannels = await db.select({ id: chatChannels.id })
+      .from(chatChannels).where(eq(chatChannels.type, "channel"));
+    if (publicChannels.length) {
+      await db.insert(chatMembers).values(publicChannels.map(channel => ({
+        channelId: channel.id, userId,
+      }))).onConflictDoNothing();
+    }
+  };
+
+  app.get("/api/chat/channels", chatPermission, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      await ensurePublicChatMembership(userId);
+      const channels = await db.select().from(chatChannels)
+        .leftJoin(chatMembers, and(eq(chatMembers.channelId, chatChannels.id), eq(chatMembers.userId, userId)))
+        .where(or(eq(chatChannels.type, "channel"), sql`${chatMembers.userId} IS NOT NULL`));
+      const result = await Promise.all(channels.map(async ({ chat_channels: channel, chat_members: membership }) => {
+        const members = await db.select({
+          id: users.id, name: sql<string>`trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, '')))`,
+        }).from(chatMembers).innerJoin(users, eq(users.id, chatMembers.userId))
+          .where(eq(chatMembers.channelId, channel.id));
+        const unread = await db.select({ count: count() }).from(chatMessages)
+          .where(and(eq(chatMessages.channelId, channel.id),
+            membership?.lastReadAt ? sql`${chatMessages.createdAt} > ${membership.lastReadAt}` : sql`true`));
+        const directOther = channel.type === "direct" ? members.find(member => member.id !== userId) : undefined;
+        return {
+          id: channel.id, name: channel.name, type: channel.type,
+          unreadCount: Number(unread[0]?.count ?? 0), members,
+          directName: directOther?.name || null,
+        };
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching chat channels:", error);
+      res.status(500).json({ message: "Failed to fetch chat channels" });
+    }
+  });
+
+  app.post("/api/chat/channels/direct", chatPermission, async (req: any, res) => {
+    try {
+      const { userId } = z.object({ userId: z.string().trim().min(1).max(255) }).strict().parse(req.body);
+      const me = req.user.id as string;
+      if (userId === me) return res.status(400).json({ message: "Cannot create a direct channel with yourself" });
+      const [other] = await db.select({ id: users.id }).from(users)
+        .where(and(eq(users.id, userId), eq(users.status, "active")));
+      if (!other) return res.status(404).json({ message: "Active user not found" });
+      const directKey = JSON.stringify([me, userId].sort());
+      const existing = await db.select().from(chatChannels).where(eq(chatChannels.directKey, directKey));
+      let channel = existing[0];
+      if (!channel) {
+        try {
+          const inserted = await db.insert(chatChannels).values({ type: "direct", directKey }).returning();
+          channel = inserted[0];
+          if (channel) await db.insert(chatMembers).values([
+            { channelId: channel.id, userId: me }, { channelId: channel.id, userId },
+          ]).onConflictDoNothing();
+        } catch (error: any) {
+          if (error?.code !== "23505") throw error;
+          channel = (await db.select().from(chatChannels).where(eq(chatChannels.directKey, directKey)))[0];
+        }
+      }
+      if (!channel) return res.status(500).json({ message: "Unable to create direct channel" });
+      await db.insert(chatMembers).values([
+        { channelId: channel.id, userId: me }, { channelId: channel.id, userId },
+      ]).onConflictDoNothing();
+      res.status(201).json(channel);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid request" });
+      console.error("Error creating direct chat channel:", error);
+      res.status(500).json({ message: "Failed to create direct channel" });
+    }
+  });
+
+  app.get("/api/chat/users", chatPermission, async (req: any, res) => {
+    try {
+      const people = await db.select({
+        id: users.id, name: sql<string>`trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, '')))`,
+        email: users.email, role: users.role,
+      }).from(users).where(and(eq(users.status, "active"), sql`${users.id} <> ${req.user.id}`));
+      res.json(people);
+    } catch (error) {
+      console.error("Error fetching chat users:", error);
+      res.status(500).json({ message: "Failed to fetch chat users" });
+    }
+  });
+
+  app.get("/api/chat/channels/:id/messages", chatPermission, async (req: any, res) => {
+    try {
+      const channelId = chatChannelIdSchema.parse(req.params.id);
+      const afterRaw = req.query.after;
+      let after: Date | undefined;
+      if (afterRaw !== undefined) {
+        if (typeof afterRaw !== "string" || !afterRaw || Number.isNaN(Date.parse(afterRaw))) {
+          return res.status(400).json({ message: "after must be a valid ISO timestamp" });
+        }
+        after = new Date(afterRaw);
+      }
+      const [membership] = await db.select().from(chatMembers)
+        .where(and(eq(chatMembers.channelId, channelId), eq(chatMembers.userId, req.user.id)));
+      if (!membership) return res.status(403).json({ message: "Chat channel access required" });
+      const messages = await db.select({
+        id: chatMessages.id, channelId: chatMessages.channelId, senderId: chatMessages.senderId,
+        body: chatMessages.body, createdAt: chatMessages.createdAt, editedAt: chatMessages.editedAt,
+        senderName: sql<string>`trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, '')))`,
+      }).from(chatMessages).innerJoin(users, eq(users.id, chatMessages.senderId))
+        .where(after ? and(eq(chatMessages.channelId, channelId), gt(chatMessages.createdAt, after)) : eq(chatMessages.channelId, channelId))
+        .orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
+        .limit(50);
+      res.json(messages.reverse());
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid channel ID" });
+      console.error("Error fetching chat messages:", error);
+      res.status(500).json({ message: "Failed to fetch chat messages" });
+    }
+  });
+
+  app.post("/api/chat/channels/:id/messages", chatPermission, async (req: any, res) => {
+    try {
+      const channelId = chatChannelIdSchema.parse(req.params.id);
+      const { body } = chatBodySchema.parse(req.body);
+      const [membership] = await db.select().from(chatMembers)
+        .where(and(eq(chatMembers.channelId, channelId), eq(chatMembers.userId, req.user.id)));
+      if (!membership) return res.status(403).json({ message: "Chat channel access required" });
+      const [message] = await db.insert(chatMessages).values({ channelId, senderId: req.user.id, body }).returning();
+      await db.update(chatMembers).set({ lastReadAt: new Date() })
+        .where(and(eq(chatMembers.channelId, channelId), eq(chatMembers.userId, req.user.id)));
+      res.status(201).json(message);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid message" });
+      console.error("Error sending chat message:", error);
+      res.status(500).json({ message: "Failed to send chat message" });
+    }
+  });
+
+  app.patch("/api/chat/channels/:id/read", chatPermission, async (req: any, res) => {
+    try {
+      const channelId = chatChannelIdSchema.parse(req.params.id);
+      z.object({}).strict().parse(req.body ?? {});
+      const [membership] = await db.update(chatMembers)
+        .set({ lastReadAt: new Date() })
+        .where(and(eq(chatMembers.channelId, channelId), eq(chatMembers.userId, req.user.id))).returning();
+      if (!membership) return res.status(403).json({ message: "Chat channel access required" });
+      res.json({ success: true, lastReadAt: membership.lastReadAt });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid read timestamp" });
+      console.error("Error marking chat read:", error);
+      res.status(500).json({ message: "Failed to mark chat channel read" });
+    }
+  });
+
+  app.get("/api/chat/unread-count", chatPermission, async (req: any, res) => {
+    try {
+      await ensurePublicChatMembership(req.user.id);
+      const rows = await db.select({ count: count() }).from(chatMessages)
+        .innerJoin(chatMembers, and(eq(chatMembers.channelId, chatMessages.channelId), eq(chatMembers.userId, req.user.id)))
+        .where(sql`${chatMembers.lastReadAt} IS NULL OR ${chatMessages.createdAt} > ${chatMembers.lastReadAt}`);
+      const unreadCount = Number(rows[0]?.count ?? 0);
+      res.json({ count: unreadCount, unreadCount });
+    } catch (error) {
+      console.error("Error fetching chat unread count:", error);
+      res.status(500).json({ message: "Failed to fetch chat unread count" });
     }
   });
 

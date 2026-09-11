@@ -62,6 +62,8 @@ import PortalSubmit from "@/pages/portal/submit";
 import PortalSubmissions from "@/pages/portal/submissions";
 import PortalSubmissionsPage from "@/pages/portal-submissions";
 import CalendarPage from "@/pages/calendar";
+import Expenses from "@/pages/expenses";
+import Chat from "@/pages/chat";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -298,6 +300,16 @@ function Router() {
       <Route path="/payroll">
         <ProtectedRoute>
           <Payroll />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/expenses">
+        <ProtectedRoute>
+          <Expenses />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chat">
+        <ProtectedRoute>
+          <Chat />
         </ProtectedRoute>
       </Route>
       <Route path="/bulk-invoices">
