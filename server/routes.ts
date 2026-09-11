@@ -16,7 +16,7 @@ import {
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
-import { eq, and, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -98,6 +98,8 @@ import {
   chatChannels,
   chatMembers,
   chatMessages,
+  tickets,
+  ticketComments,
   ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
@@ -784,6 +786,252 @@ ${message}
     }
   });
 
+  // ─── Tickets ───────────────────────────────────────────────────────────────
+  const ticketCategories = ["billing", "technical", "carrier", "broker", "document", "payroll", "other"] as const;
+  const ticketPriorities = ["low", "medium", "high", "urgent"] as const;
+  const ticketStatuses = ["open", "in-progress", "pending", "resolved", "closed"] as const;
+  const ticketIdSchema = z.coerce.number().int().positive();
+  const ticketCreateSchema = z.object({
+    title: z.string().trim().min(1).max(200),
+    description: z.string().trim().min(1).max(10000),
+    category: z.enum(ticketCategories),
+    priority: z.enum(ticketPriorities).default("medium"),
+    assignedTo: z.string().trim().min(1).nullable().optional(),
+    carrierId: z.coerce.number().int().positive().nullable().optional(),
+    brokerId: z.coerce.number().int().positive().nullable().optional(),
+    invoiceId: z.coerce.number().int().positive().nullable().optional(),
+  });
+  const ticketPatchSchema = z.object({
+    status: z.enum(ticketStatuses).optional(),
+    priority: z.enum(ticketPriorities).optional(),
+    assignedTo: z.string().trim().min(1).nullable().optional(),
+    resolution: z.string().trim().max(10000).nullable().optional(),
+  }).strict();
+  const ticketCommentSchema = z.object({ comment: z.string().trim().min(1).max(10000) });
+  const canSeeTicket = (user: any, ticket: any) =>
+    user.role !== "employee" || ticket.submittedBy === user.id || ticket.assignedTo === user.id;
+  const getTicket = async (id: number) => {
+    const rows = await db.select().from(tickets).where(eq(tickets.id, id));
+    return rows[0];
+  };
+  const ensureAssignableUser = async (userId: string | null | undefined) => {
+    if (!userId) return true;
+    const [candidate] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId));
+    return Boolean(candidate);
+  };
+  const ensureLinkedRecordsExist = async (input: { carrierId?: number | null; brokerId?: number | null; invoiceId?: number | null }) => {
+    const [carrier, broker, invoice] = await Promise.all([
+      input.carrierId ? db.select({ id: clients.id }).from(clients).where(eq(clients.id, input.carrierId)) : Promise.resolve([{ id: null }]),
+      input.brokerId ? db.select({ id: brokers.id }).from(brokers).where(eq(brokers.id, input.brokerId)) : Promise.resolve([{ id: null }]),
+      input.invoiceId ? db.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, input.invoiceId)) : Promise.resolve([{ id: null }]),
+    ]);
+    if (input.carrierId && !carrier[0]) return "Carrier was not found";
+    if (input.brokerId && !broker[0]) return "Broker was not found";
+    if (input.invoiceId && !invoice[0]) return "Invoice was not found";
+    return null;
+  };
+
+  app.get("/api/tickets", requireAuth, requireModulePermission("tickets"), async (req: any, res) => {
+    try {
+      const filters: any[] = [];
+      const user = req.user;
+      if (user.role === "employee") filters.push(or(eq(tickets.submittedBy, user.id), eq(tickets.assignedTo, user.id)));
+      if (req.query.status) {
+        if (!ticketStatuses.includes(String(req.query.status) as any)) return res.status(400).json({ message: "Invalid status filter" });
+        filters.push(eq(tickets.status, String(req.query.status) as any));
+      }
+      if (req.query.priority) {
+        if (!ticketPriorities.includes(String(req.query.priority) as any)) return res.status(400).json({ message: "Invalid priority filter" });
+        filters.push(eq(tickets.priority, String(req.query.priority) as any));
+      }
+      if (req.query.category) {
+        if (!ticketCategories.includes(String(req.query.category) as any)) return res.status(400).json({ message: "Invalid category filter" });
+        filters.push(eq(tickets.category, String(req.query.category) as any));
+      }
+      if (req.query.assignedTo) filters.push(eq(tickets.assignedTo, String(req.query.assignedTo)));
+      if (req.query.from) {
+        const date = new Date(String(req.query.from));
+        if (Number.isNaN(date.getTime())) return res.status(400).json({ message: "Invalid from date" });
+        filters.push(gte(tickets.createdAt, date));
+      }
+      if (req.query.to) {
+        const date = new Date(String(req.query.to));
+        if (Number.isNaN(date.getTime())) return res.status(400).json({ message: "Invalid to date" });
+        date.setUTCDate(date.getUTCDate() + 1);
+        filters.push(lt(tickets.createdAt, date));
+      }
+      const rows = await db.select().from(tickets).where(filters.length ? and(...filters) : undefined).orderBy(desc(tickets.createdAt));
+      const enriched = await Promise.all(rows.map(async (ticket) => {
+        const [submitted, assigned, carrier, broker, invoice] = await Promise.all([
+          db.select({ firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).where(eq(users.id, ticket.submittedBy)),
+          ticket.assignedTo ? db.select({ firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).where(eq(users.id, ticket.assignedTo)) : [],
+          ticket.carrierId ? db.select({ name: clients.name }).from(clients).where(eq(clients.id, ticket.carrierId)) : [],
+          ticket.brokerId ? db.select({ name: brokers.name }).from(brokers).where(eq(brokers.id, ticket.brokerId)) : [],
+          ticket.invoiceId ? db.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices).where(eq(invoices.id, ticket.invoiceId)) : [],
+        ]);
+        const name = (person: any) => person ? `${person.firstName || ""} ${person.lastName || ""}`.trim() || person.email : null;
+        return {
+          ...ticket,
+          submittedByName: name(submitted[0]),
+          assignedToName: name(assigned[0]),
+          carrierName: carrier[0]?.name ?? null,
+          brokerName: broker[0]?.name ?? null,
+          invoiceNumber: invoice[0]?.invoiceNumber ?? null,
+        };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Ticket list error:", error);
+      res.status(500).json({ message: "Failed to fetch tickets" });
+    }
+  });
+
+  app.get("/api/tickets/summary", requireAuth, requireModulePermission("tickets"), async (req: any, res) => {
+    try {
+      const scope = req.user.role === "employee"
+        ? or(eq(tickets.submittedBy, req.user.id), eq(tickets.assignedTo, req.user.id))
+        : undefined;
+      const rows = await db.select({
+        status: tickets.status,
+        resolvedAt: tickets.resolvedAt,
+      }).from(tickets).where(scope);
+      const today = new Date();
+      const sameDay = (value: Date | null) => value && value.getFullYear() === today.getFullYear()
+        && value.getMonth() === today.getMonth() && value.getDate() === today.getDate();
+      res.json({
+        open: rows.filter(row => row.status === "open").length,
+        inProgress: rows.filter(row => row.status === "in-progress").length,
+        pending: rows.filter(row => row.status === "pending").length,
+        resolvedToday: rows.filter(row => sameDay(row.resolvedAt)).length,
+      });
+    } catch {
+      res.status(500).json({ message: "Failed to fetch ticket summary" });
+    }
+  });
+
+  app.get("/api/tickets/:id", requireAuth, requireModulePermission("tickets"), async (req: any, res) => {
+    try {
+      const id = ticketIdSchema.parse(req.params.id);
+      const ticket = await getTicket(id);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!canSeeTicket(req.user, ticket)) return res.status(403).json({ message: "You do not have access to this ticket" });
+      const comments = await db.select().from(ticketComments).where(eq(ticketComments.ticketId, id)).orderBy(ticketComments.createdAt);
+      const [submitted, assigned, carrier, broker, invoice] = await Promise.all([
+        db.select({ firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).where(eq(users.id, ticket.submittedBy)),
+        ticket.assignedTo ? db.select({ firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).where(eq(users.id, ticket.assignedTo)) : [],
+        ticket.carrierId ? db.select({ id: clients.id, name: clients.name }).from(clients).where(eq(clients.id, ticket.carrierId)) : [],
+        ticket.brokerId ? db.select({ id: brokers.id, name: brokers.name }).from(brokers).where(eq(brokers.id, ticket.brokerId)) : [],
+        ticket.invoiceId ? db.select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber }).from(invoices).where(eq(invoices.id, ticket.invoiceId)) : [],
+      ]);
+      const name = (person: any) => person ? `${person.firstName || ""} ${person.lastName || ""}`.trim() || person.email : null;
+      const commentsWithNames = await Promise.all(comments.map(async comment => {
+        const [author] = await db.select({ firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).where(eq(users.id, comment.userId));
+        return { ...comment, authorName: name(author) };
+      }));
+      res.json({
+        ...ticket,
+        submittedByName: name(submitted[0]),
+        assignedToName: name(assigned[0]),
+        carrier: carrier[0] ?? null,
+        broker: broker[0] ?? null,
+        invoice: invoice[0] ?? null,
+        comments: commentsWithNames,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid ticket id" });
+      res.status(500).json({ message: "Failed to fetch ticket" });
+    }
+  });
+
+  app.post("/api/tickets", requireAuth, requireModulePermission("tickets"), async (req: any, res) => {
+    try {
+      const input = ticketCreateSchema.parse(req.body);
+      if (input.assignedTo && req.user.role === "employee") return res.status(403).json({ message: "Only managers and admins can assign tickets" });
+      if (!(await ensureAssignableUser(input.assignedTo))) return res.status(400).json({ message: "Assigned agent was not found" });
+      const linkedRecordError = await ensureLinkedRecordsExist(input);
+      if (linkedRecordError) return res.status(400).json({ message: linkedRecordError });
+      if (input.invoiceId && !(await employeeCanAccessInvoice(req, input.invoiceId))) {
+        return res.status(403).json({ message: "You do not have access to the linked invoice" });
+      }
+      const created = await db.transaction(async (tx) => {
+        // Transaction-scoped advisory lock makes number allocation safe across workers.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(481923)`);
+        const [last] = await tx.select({ max: sql<number>`coalesce(max(substring(${tickets.ticketNumber} from 5)::integer), 0)` }).from(tickets);
+        const number = Number(last?.max ?? 0) + 1;
+        const [row] = await tx.insert(tickets).values({
+          ...input,
+          ticketNumber: `TKT-${String(number).padStart(4, "0")}`,
+          submittedBy: req.user.id,
+          assignedTo: input.assignedTo ?? null,
+          carrierId: input.carrierId ?? null,
+          brokerId: input.brokerId ?? null,
+          invoiceId: input.invoiceId ?? null,
+        }).returning();
+        return row;
+      });
+      res.status(201).json(created);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid ticket data" });
+      console.error("Ticket create error:", error);
+      res.status(500).json({ message: "Failed to create ticket" });
+    }
+  });
+
+  app.patch("/api/tickets/:id", requireAuth, requireModulePermission("tickets"), async (req: any, res) => {
+    try {
+      const id = ticketIdSchema.parse(req.params.id);
+      const input = ticketPatchSchema.parse(req.body);
+      const ticket = await getTicket(id);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!canSeeTicket(req.user, ticket)) return res.status(403).json({ message: "You do not have access to this ticket" });
+      if (input.assignedTo !== undefined && req.user.role === "employee") return res.status(403).json({ message: "Only managers and admins can assign tickets" });
+      if (!(await ensureAssignableUser(input.assignedTo))) return res.status(400).json({ message: "Assigned agent was not found" });
+      const nextStatus = input.status ?? ticket.status;
+      const nextResolution = input.resolution !== undefined ? input.resolution : ticket.resolution;
+      if ((nextStatus === "resolved" || nextStatus === "closed") && !nextResolution?.trim()) {
+        return res.status(400).json({ message: "Resolution is required when resolving or closing a ticket" });
+      }
+      const updates: any = { ...input, updatedAt: new Date() };
+      if (input.status !== undefined) updates.resolvedAt = (nextStatus === "resolved" || nextStatus === "closed") ? (ticket.resolvedAt ?? new Date()) : null;
+      const updateScope = req.user.role === "employee"
+        ? and(eq(tickets.id, id), or(eq(tickets.submittedBy, req.user.id), eq(tickets.assignedTo, req.user.id)))
+        : eq(tickets.id, id);
+      const [updated] = await db.update(tickets).set(updates).where(updateScope).returning();
+      if (!updated) return res.status(403).json({ message: "You no longer have access to this ticket" });
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid ticket update" });
+      res.status(500).json({ message: "Failed to update ticket" });
+    }
+  });
+
+  app.post("/api/tickets/:id/comments", requireAuth, requireModulePermission("tickets"), async (req: any, res) => {
+    try {
+      const id = ticketIdSchema.parse(req.params.id);
+      const ticket = await getTicket(id);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!canSeeTicket(req.user, ticket)) return res.status(403).json({ message: "You do not have access to this ticket" });
+      const { comment: commentText } = ticketCommentSchema.parse(req.body);
+      const [comment] = await db.insert(ticketComments).values({ ticketId: id, userId: req.user.id, comment: commentText }).returning();
+      res.status(201).json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid comment" });
+      res.status(500).json({ message: "Failed to add comment" });
+    }
+  });
+
+  app.delete("/api/tickets/:id", requireAdmin, requireModulePermission("tickets"), async (req: any, res) => {
+    try {
+      const id = ticketIdSchema.parse(req.params.id);
+      const deleted = await db.delete(tickets).where(eq(tickets.id, id)).returning({ id: tickets.id });
+      if (!deleted.length) return res.status(404).json({ message: "Ticket not found" });
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid ticket id" });
+      res.status(500).json({ message: "Failed to delete ticket" });
+    }
+  });
+
   // Client/Carrier messaging
   app.post("/api/messages/send", requireAuth, async (req: any, res) => {
     try {
@@ -1045,7 +1293,7 @@ ${message}
         const defaults = ROLE_DEFAULT_PERMISSIONS[req.user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee;
         return res.json({ permissions: defaults });
       }
-      res.json({ permissions: perms });
+      res.json({ permissions: perms.filter((permission) => permission !== "__none__") });
     } catch (err) {
       console.error("Error fetching own permissions:", err);
       res.status(500).json({ message: "Failed to fetch permissions" });
@@ -1056,7 +1304,7 @@ ${message}
     try {
       const { id } = req.params;
       const perms = await storage.getUserPermissions(id);
-      res.json({ permissions: perms });
+      res.json({ permissions: perms.filter((permission) => permission !== "__none__") });
     } catch (err) {
       console.error("Error fetching user permissions:", err);
       res.status(500).json({ message: "Failed to fetch user permissions" });
@@ -4458,8 +4706,14 @@ Trucking Pros Financial Team
 
 
   // Tasks
-  app.get("/api/tasks", requireAuth, async (_req: any, res) => {
+  app.get("/api/tasks", requireAuth, requireModulePermission("tasks"), async (req: any, res) => {
     try {
+      const isManager = req.user.role === "manager" || req.user.role === "admin";
+      const scope = typeof req.query.scope === "string" ? req.query.scope : "all";
+      const visibility = isManager
+        ? scope === "assigned-to-me" ? eq(tasks.assignedTo, req.user.id)
+          : scope === "created-by-me" ? eq(tasks.createdBy, req.user.id) : undefined
+        : eq(tasks.assignedTo, req.user.id);
       const tasksData = await db
         .select({
           id: tasks.id,
@@ -4471,6 +4725,11 @@ Trucking Pros Financial Team
           dueDate: tasks.dueDate,
           clientId: tasks.clientId,
           assignedTo: tasks.assignedTo,
+          createdBy: tasks.createdBy,
+          progress: tasks.progress,
+          progressUpdatedAt: tasks.progressUpdatedAt,
+          progressUpdatedBy: tasks.progressUpdatedBy,
+          assignedAgent: { id: userTable.id, firstName: userTable.firstName, lastName: userTable.lastName, profileImageUrl: userTable.profileImageUrl },
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
           client: {
@@ -4480,41 +4739,81 @@ Trucking Pros Financial Team
         })
         .from(tasks)
         .leftJoin(clients, eq(tasks.clientId, clients.id))
+        .leftJoin(userTable, eq(tasks.assignedTo, userTable.id))
+        .where(visibility)
         .orderBy(tasks.createdAt);
-
-      res.json(tasksData);
+      // Fetch attribution names separately to avoid duplicate aliases in Drizzle's
+      // select object while retaining the compact list query.
+      const enriched = await Promise.all(tasksData.map(async (task) => {
+        const [updater] = task.progressUpdatedAt && task.progressUpdatedBy
+          ? await db.select({ firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+            .from(users).where(eq(users.id, task.progressUpdatedBy)).limit(1)
+          : [];
+        const [creator] = task.createdBy
+          ? await db.select({ firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+            .from(users).where(eq(users.id, task.createdBy)).limit(1)
+          : [];
+        return { ...task, progressUpdater: updater ?? null, creator: creator ?? null };
+      }));
+      res.json(enriched);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       res.status(500).json({ message: "Failed to fetch tasks" });
     }
   });
 
-  app.get("/api/tasks/:id", requireAuth, async (req, res) => {
+  app.get("/api/tasks/:id", requireAuth, requireModulePermission("tasks"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const [task] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+      const isManager = req.user.role === "manager" || req.user.role === "admin";
+      const [task] = await db.select().from(tasks).where(and(eq(tasks.id, id), isManager ? sql`true` : eq(tasks.assignedTo, req.user.id))).limit(1);
 
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
-
-      res.json(task);
+      const [assignedAgent] = task.assignedTo
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl }).from(users).where(eq(users.id, task.assignedTo)).limit(1)
+        : [];
+      const [progressUpdater] = task.progressUpdatedBy
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl }).from(users).where(eq(users.id, task.progressUpdatedBy)).limit(1)
+        : [];
+      const [creator] = task.createdBy
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl }).from(users).where(eq(users.id, task.createdBy)).limit(1)
+        : [];
+      res.json({ ...task, assignedAgent: assignedAgent ?? null, progressUpdater: progressUpdater ?? null, creator: creator ?? null });
     } catch (error) {
       console.error("Error fetching task:", error);
       res.status(500).json({ message: "Failed to fetch task" });
     }
   });
 
-  app.post("/api/tasks", requireAuth, async (req: any, res) => {
+  app.post("/api/tasks", requireAuth, requireModulePermission("tasks"), async (req: any, res) => {
     try {
+      const isManager = req.user.role === "manager" || req.user.role === "admin";
       const hasDueDate = Object.prototype.hasOwnProperty.call(req.body, "dueDate");
+      const requestedAssignee = req.body.assignedTo === "" ? null : req.body.assignedTo;
+      if (!isManager && requestedAssignee && requestedAssignee !== req.user.id) {
+        return res.status(403).json({ message: "Employees may only assign tasks to themselves" });
+      }
+      const assignedTo = isManager ? (requestedAssignee ?? null) : req.user.id;
+      if (assignedTo) {
+        const [assignee] = await db.select({ id: users.id }).from(users)
+          .where(and(eq(users.id, assignedTo), eq(users.status, "active"))).limit(1);
+        if (!assignee) return res.status(400).json({ message: "Assignee must be an active user" });
+      }
+      const progress = req.body.progress === undefined ? 0 : Number(req.body.progress);
+      if (!Number.isInteger(progress) || progress < 0 || progress > 100) return res.status(400).json({ message: "Progress must be an integer from 0 to 100" });
       const taskData = insertTaskSchema.parse({
         ...req.body,
         ...(hasDueDate ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null } : {}),
-        assignedTo: req.user.id,
+        assignedTo,
+        progress,
+        createdBy: undefined,
       });
-
-      const [newTask] = await db.insert(tasks).values(taskData).returning();
+      const [newTask] = await db.insert(tasks).values({ ...taskData, createdBy: req.user.id, progressUpdatedAt: progress ? new Date() : null, progressUpdatedBy: progress ? req.user.id : null }).returning();
+      if (assignedTo && assignedTo !== req.user.id) {
+        await storage.createNotification({ userId: assignedTo, title: "New task assigned", message: `You were assigned: ${newTask.title}`, type: "info", entityType: "task", entityId: newTask.id, actionUrl: `/tasks/${newTask.id}` });
+      }
       res.status(201).json(newTask);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4525,25 +4824,41 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
+  app.patch("/api/tasks/:id", requireAuth, requireModulePermission("tasks"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid task id" });
+      const isManager = req.user.role === "manager" || req.user.role === "admin";
+      const [existing] = await db.select().from(tasks).where(and(eq(tasks.id, id), isManager ? sql`true` : eq(tasks.assignedTo, req.user.id))).limit(1);
+      if (!existing) return res.status(404).json({ message: "Task not found" });
       const hasDueDate = Object.prototype.hasOwnProperty.call(req.body, "dueDate");
+      if (!isManager && Object.prototype.hasOwnProperty.call(req.body, "assignedTo")) return res.status(403).json({ message: "Employees cannot reassign tasks" });
+      const requestedAssignee = Object.prototype.hasOwnProperty.call(req.body, "assignedTo") ? (req.body.assignedTo === "" ? null : req.body.assignedTo) : undefined;
+      if (requestedAssignee) {
+        const [assignee] = await db.select({ id: users.id }).from(users).where(and(eq(users.id, requestedAssignee), eq(users.status, "active"))).limit(1);
+        if (!assignee) return res.status(400).json({ message: "Assignee must be an active user" });
+      }
       const updateData = insertTaskSchema.partial().parse({
         ...req.body,
         ...(hasDueDate ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null } : {}),
       });
-
+      if (updateData.progress !== undefined && (updateData.progress < 0 || updateData.progress > 100)) return res.status(400).json({ message: "Progress must be from 0 to 100" });
+      const progressChanged = updateData.progress !== undefined && updateData.progress !== existing.progress;
+      const setData: any = { ...updateData, ...(requestedAssignee !== undefined ? { assignedTo: requestedAssignee } : {}), updatedAt: new Date() };
+      if (progressChanged) Object.assign(setData, { progressUpdatedAt: new Date(), progressUpdatedBy: req.user.id });
       const [updatedTask] = await db
         .update(tasks)
-        .set({ ...updateData, updatedAt: new Date() })
-        .where(eq(tasks.id, id))
+        .set(setData)
+        .where(and(eq(tasks.id, id), isManager ? sql`true` : eq(tasks.assignedTo, req.user.id)))
         .returning();
 
       if (!updatedTask) {
         return res.status(404).json({ message: "Task not found" });
       }
 
+      if (updatedTask.assignedTo && updatedTask.assignedTo !== existing.assignedTo && updatedTask.assignedTo !== req.user.id) {
+        await storage.createNotification({ userId: updatedTask.assignedTo, title: "Task assigned to you", message: `You were assigned: ${updatedTask.title}`, type: "info", entityType: "task", entityId: updatedTask.id, actionUrl: `/tasks/${updatedTask.id}` });
+      }
       res.json(updatedTask);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4554,8 +4869,22 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete("/api/tasks/:id", requireAuth, async (req, res) => {
+  app.patch("/api/tasks/:id/progress", requireAuth, requireModulePermission("tasks"), async (req: any, res) => {
+    const id = Number(req.params.id);
+    const progress = Number(req.body?.progress);
+    if (!Number.isInteger(id) || !Number.isInteger(progress) || progress < 0 || progress > 100) return res.status(400).json({ message: "Progress must be an integer from 0 to 100" });
+    const isManager = req.user.role === "manager" || req.user.role === "admin";
+    const [updated] = await db.update(tasks).set({ progress, progressUpdatedAt: new Date(), progressUpdatedBy: req.user.id, updatedAt: new Date() })
+      .where(and(eq(tasks.id, id), isManager ? sql`true` : eq(tasks.assignedTo, req.user.id))).returning();
+    if (!updated) return res.status(404).json({ message: "Task not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/tasks/:id", requireAuth, requireModulePermission("tasks"), async (req: any, res) => {
     try {
+      if (req.user.role !== "manager" && req.user.role !== "admin") {
+        return res.status(403).json({ message: "Only managers and admins can delete tasks" });
+      }
       const id = parseInt(req.params.id, 10);
       const [deletedTask] = await db.delete(tasks).where(eq(tasks.id, id)).returning();
 
@@ -5014,8 +5343,10 @@ Trucking Pros Financial Team
           lastName: users.lastName,
           email: users.email,
           role: users.role,
+           profileImageUrl: users.profileImageUrl,
         })
-        .from(users);
+        .from(users)
+        .where(eq(users.status, "active"));
       res.json(allUsers);
     } catch (error) {
       console.error("Error fetching users:", error);

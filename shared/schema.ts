@@ -589,7 +589,11 @@ export const tasks = pgTable("tasks", {
   status: varchar("status", { enum: ["todo", "in_progress", "held", "completed"] }).default("todo").notNull(),
   dueDate: timestamp("due_date"),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
-  assignedTo: varchar("assigned_to").references(() => users.id).notNull(),
+  assignedTo: varchar("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  progress: integer("progress").default(0).notNull(),
+  progressUpdatedAt: timestamp("progress_updated_at"),
+  progressUpdatedBy: varchar("progress_updated_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -725,6 +729,56 @@ export const followUps = pgTable("follow_ups", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Internal support tickets and their chronological discussion.
+export const tickets = pgTable("tickets", {
+  id: serial("id").primaryKey(),
+  ticketNumber: varchar("ticket_number").notNull().unique(),
+  title: varchar("title").notNull(),
+  description: text("description").notNull(),
+  category: varchar("category", { enum: ["billing", "technical", "carrier", "broker", "document", "payroll", "other"] }).notNull(),
+  priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium").notNull(),
+  status: varchar("status", { enum: ["open", "in-progress", "pending", "resolved", "closed"] }).default("open").notNull(),
+  submittedBy: varchar("submitted_by").references(() => users.id).notNull(),
+  assignedTo: varchar("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "set null" }),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  resolution: text("resolution"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("tickets_status_idx").on(table.status),
+  index("tickets_assigned_to_idx").on(table.assignedTo),
+  index("tickets_submitted_by_idx").on(table.submittedBy),
+  index("tickets_created_at_idx").on(table.createdAt),
+]);
+
+export const ticketComments = pgTable("ticket_comments", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").references(() => tickets.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  comment: text("comment").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ticket_comments_ticket_created_idx").on(table.ticketId, table.createdAt),
+]);
+
+export const insertTicketSchema = createInsertSchema(tickets).omit({
+  id: true, ticketNumber: true, createdAt: true, updatedAt: true, resolvedAt: true,
+  submittedBy: true,
+}).extend({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(10000),
+});
+export const insertTicketCommentSchema = createInsertSchema(ticketComments).omit({
+  id: true, createdAt: true, userId: true,
+}).extend({ comment: z.string().trim().min(1).max(10000) });
+export type Ticket = typeof tickets.$inferSelect;
+export type InsertTicket = z.infer<typeof insertTicketSchema>;
+export type TicketComment = typeof ticketComments.$inferSelect;
+export type InsertTicketComment = z.infer<typeof insertTicketCommentSchema>;
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   invoices: many(invoices),
@@ -800,6 +854,19 @@ export const followUpsRelations = relations(followUps, ({ one }) => ({
   client: one(clients, { fields: [followUps.clientId], references: [clients.id] }),
 }));
 
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
+  submittedByUser: one(users, { fields: [tickets.submittedBy], references: [users.id] }),
+  assignedToUser: one(users, { fields: [tickets.assignedTo], references: [users.id] }),
+  carrier: one(clients, { fields: [tickets.carrierId], references: [clients.id] }),
+  broker: one(brokers, { fields: [tickets.brokerId], references: [brokers.id] }),
+  invoice: one(invoices, { fields: [tickets.invoiceId], references: [invoices.id] }),
+  comments: many(ticketComments),
+}));
+export const ticketCommentsRelations = relations(ticketComments, ({ one }) => ({
+  ticket: one(tickets, { fields: [ticketComments.ticketId], references: [tickets.id] }),
+  author: one(users, { fields: [ticketComments.userId], references: [users.id] }),
+}));
+
 export const collectionsRelations = relations(collections, ({ one }) => ({
   client: one(clients, { fields: [collections.clientId], references: [clients.id] }),
   assignedToUser: one(users, { fields: [collections.assignedTo], references: [users.id] }),
@@ -814,6 +881,8 @@ export const clientVaultRelations = relations(clientVault, ({ one }) => ({
 export const tasksRelations = relations(tasks, ({ one }) => ({
   client: one(clients, { fields: [tasks.clientId], references: [clients.id] }),
   assignedToUser: one(users, { fields: [tasks.assignedTo], references: [users.id] }),
+  createdByUser: one(users, { fields: [tasks.createdBy], references: [users.id] }),
+  progressUpdatedByUser: one(users, { fields: [tasks.progressUpdatedBy], references: [users.id] }),
 }));
 
 export const brokersRelations = relations(brokers, ({ many }) => ({
@@ -894,7 +963,12 @@ export const insertClientVaultSchema = createInsertSchema(clientVault).omit({
 export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
-  updatedAt: true
+  updatedAt: true,
+  progressUpdatedAt: true,
+  progressUpdatedBy: true,
+  createdBy: true,
+}).extend({
+  progress: z.coerce.number().int().min(0).max(100).optional(),
 });
 
 export const insertBrokerSchema = createInsertSchema(brokers).omit({
@@ -1892,7 +1966,7 @@ export const ALL_PERMISSIONS = [
   "brokers","cb_reviews","mc_check","held","logs",
   "followups","reports",
   "payroll","expenses","vault","help","settings","rules","workflow_builder","admin",
-  "earl","chat",
+  "earl","chat","tickets",
 ] as const;
 export type PermissionKey = typeof ALL_PERMISSIONS[number];
 
@@ -1905,11 +1979,11 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, PermissionKey[]> = {
     "brokers","cb_reviews","mc_check","held","logs",
     "followups","reports",
     "payroll","expenses","vault","help","settings","rules","workflow_builder",
-    "chat",
+    "chat","tickets",
   ],
   employee: [
     "dashboard","carriers","invoices","documents","tasks",
     "fuel_advance","expenses","vault","help","settings",
-    "chat",
+    "chat","tickets",
   ],
 };

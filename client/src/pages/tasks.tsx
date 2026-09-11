@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,6 +36,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { Slider } from "@/components/ui/slider";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -44,6 +49,8 @@ const taskFormSchema = z.object({
   status: z.enum(["todo", "in_progress", "held", "completed"]),
   dueDate: z.string().optional(),
   clientId: z.number().optional(),
+  assignedTo: z.string().nullable().optional(),
+  progress: z.number().int().min(0).max(100).default(0),
 });
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
@@ -57,7 +64,13 @@ interface Task {
   status: string;
   dueDate?: string;
   clientId?: number;
-  assignedTo: string;
+  assignedTo?: string | null;
+  createdBy?: string | null;
+  progress: number;
+  progressUpdatedAt?: string | null;
+  progressUpdater?: { firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null;
+  assignedAgent?: { id: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null;
+  creator?: { firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null;
   createdAt: string;
   updatedAt: string;
   client?: {
@@ -67,15 +80,28 @@ interface Task {
 }
 
 export default function Tasks() {
+  const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const isManager = user?.role === "manager" || user?.role === "admin";
+  const [scope, setScope] = useState<"all" | "assigned-to-me" | "created-by-me">(isManager ? "all" : "assigned-to-me");
+  const [progressTask, setProgressTask] = useState<number | null>(null);
+  const [progressDrafts, setProgressDrafts] = useState<Record<number, number>>({});
+  const [agentSearch, setAgentSearch] = useState("");
   const [activeTab, setActiveTab] = useState("chargebacks");
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: tasks = [], isLoading } = useQuery<Task[]>({
-    queryKey: ["/api/tasks"],
+  const { data: tasks = [], isLoading, isError } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", { scope }],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks?scope=${scope}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load tasks");
+      return res.json();
+    },
   });
+  const { data: agents = [] } = useQuery<Array<{ id: string; firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; role: string }>>({ queryKey: ["/api/users"] });
 
   const { data: clients = [] } = useQuery<Array<{ id: number; name: string }>>({
     queryKey: ["/api/clients", { all: true }],
@@ -87,6 +113,8 @@ export default function Tasks() {
       type: "task",
       priority: "medium",
       status: "todo",
+      progress: 0,
+      assignedTo: user?.role === "employee" ? user.id : null,
     },
   });
 
@@ -188,7 +216,9 @@ export default function Tasks() {
 
   const onSubmit = (data: TaskFormData) => {
     if (editingTask) {
-      updateTaskMutation.mutate({ id: editingTask.id, updates: data });
+      const updates: Partial<TaskFormData> = { ...data };
+      if (!isManager) delete updates.assignedTo;
+      updateTaskMutation.mutate({ id: editingTask.id, updates });
     } else {
       createTaskMutation.mutate(data);
     }
@@ -200,6 +230,8 @@ export default function Tasks() {
       type: (taskType as any) || "task",
       priority: "medium",
       status: "todo",
+      progress: 0,
+      assignedTo: user?.role === "employee" ? user.id : null,
     });
     setIsTaskDialogOpen(true);
   };
@@ -214,6 +246,8 @@ export default function Tasks() {
       status: task.status as any,
       dueDate: task.dueDate || "",
       clientId: task.clientId,
+      assignedTo: task.assignedTo ?? null,
+      progress: task.progress || 0,
     });
     setIsTaskDialogOpen(true);
   };
@@ -221,6 +255,16 @@ export default function Tasks() {
   const updateTaskStatus = (taskId: number, newStatus: string) => {
     updateTaskMutation.mutate({ id: taskId, updates: { status: newStatus as any } });
   };
+
+  const updateProgress = async (taskId: number, progress: number) => {
+    const response = await fetch(`/api/tasks/${taskId}/progress`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ progress }) });
+    if (!response.ok) throw new Error("Failed to update progress");
+    await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+  };
+
+  const agentName = (agent?: { firstName?: string | null; lastName?: string | null } | null) =>
+    agent ? [agent.firstName, agent.lastName].filter(Boolean).join(" ") || "Unknown agent" : "Unassigned";
+  const progressColor = (value: number) => value >= 100 ? "bg-emerald-500" : value >= 76 ? "bg-blue-500" : value >= 51 ? "bg-yellow-500" : value >= 26 ? "bg-orange-500" : "bg-red-500";
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -269,11 +313,11 @@ export default function Tasks() {
 
   const TaskTable = ({ tasks }: { tasks: Task[] }) => (
     <div className="space-y-4">
-      {isLoading ? (
+       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
         </div>
-      ) : tasks.length > 0 ? (
+       ) : isError ? <div className="py-16 text-center text-red-600">Unable to load tasks. Please try again.</div> : tasks.length > 0 ? (
         <div className="custom-scrollbar overflow-x-auto rounded-[20px] border border-slate-100 dark:border-slate-800">
           <Table>
             <TableHeader>
@@ -283,6 +327,8 @@ export default function Tasks() {
                 <TableHead>Priority</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Client</TableHead>
+                 <TableHead>Assigned To</TableHead>
+                 <TableHead>Progress</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -298,7 +344,7 @@ export default function Tasks() {
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-white">
-                          {task.title}
+                           <button className="text-left hover:text-blue-600" onClick={() => navigate(`/tasks/${task.id}`)}>{task.title}</button>
                         </div>
                         {task.description && (
                           <div className="max-w-[280px] truncate text-xs text-slate-500 dark:text-slate-400">
@@ -330,6 +376,42 @@ export default function Tasks() {
                   </TableCell>
 
                   <TableCell>{task.client?.name || "-"}</TableCell>
+                   <TableCell>
+                     <div className="flex items-center gap-2">
+                       <Avatar className="h-7 w-7"><AvatarImage src={task.assignedAgent?.profileImageUrl || undefined} /><AvatarFallback>{agentName(task.assignedAgent).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                       <span className="text-sm">{agentName(task.assignedAgent)}</span>
+                     </div>
+                   </TableCell>
+                   <TableCell onClick={(event) => event.stopPropagation()}>
+                     <Popover open={progressTask === task.id} onOpenChange={(open) => setProgressTask(open ? task.id : null)}>
+                       <PopoverTrigger asChild><button className="w-32 text-left" aria-label={`Edit progress for ${task.title}`}>
+                         <div className="flex items-center gap-2"><div className="h-2 w-full overflow-hidden rounded-full bg-slate-200"><div className={cn("h-full transition-all", progressColor(task.progress || 0))} style={{ width: `${task.progress || 0}%` }} /></div><span className="text-xs font-medium">{task.progress || 0}%</span></div>
+                       </button></PopoverTrigger>
+                       <PopoverContent className="w-64" onClick={(event) => event.stopPropagation()}>
+                          <Slider
+                            value={[progressDrafts[task.id] ?? task.progress ?? 0]}
+                            min={0}
+                            max={100}
+                            step={1}
+                            onValueChange={([value]) => setProgressDrafts((current) => ({ ...current, [task.id]: value }))}
+                            onValueCommit={async ([value]) => {
+                              try {
+                                await updateProgress(task.id, value);
+                                setProgressDrafts((current) => {
+                                  const next = { ...current };
+                                  delete next[task.id];
+                                  return next;
+                                });
+                                setProgressTask(null);
+                              } catch {
+                                toast({ title: "Error", description: "Could not save progress", variant: "destructive" });
+                              }
+                            }}
+                          />
+                          <div className="mt-2 text-center text-sm">{progressDrafts[task.id] ?? task.progress ?? 0}%</div>
+                       </PopoverContent>
+                     </Popover>
+                   </TableCell>
 
                   <TableCell>
                     {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}
@@ -371,19 +453,21 @@ export default function Tasks() {
                         <Edit className="h-4 w-4" />
                       </Button>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm("Are you sure you want to delete this task?")) {
-                            deleteTaskMutation.mutate(task.id);
-                          }
-                        }}
-                        className="h-9 w-9 rounded-xl p-0"
-                        data-testid={`button-delete-${task.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
+                      {isManager && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm("Are you sure you want to delete this task?")) {
+                              deleteTaskMutation.mutate(task.id);
+                            }
+                          }}
+                          className="h-9 w-9 rounded-xl p-0"
+                          data-testid={`button-delete-${task.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -495,6 +579,11 @@ export default function Tasks() {
               </CardHeader>
 
               <CardContent className="p-6">
+                <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Task scope">
+                  {isManager && <Button variant={scope === "all" ? "default" : "outline"} onClick={() => setScope("all")}>All Tasks</Button>}
+                  <Button variant={scope === "assigned-to-me" ? "default" : "outline"} onClick={() => setScope("assigned-to-me")}>My Tasks</Button>
+                  {isManager && <Button variant={scope === "created-by-me" ? "default" : "outline"} onClick={() => setScope("created-by-me")}>Created by Me</Button>}
+                </div>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                   <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[20px] bg-slate-100 p-2 md:grid-cols-4 xl:grid-cols-7 dark:bg-slate-800">
                     <TabsTrigger value="chargebacks" data-testid="tab-chargebacks" className="rounded-xl">
@@ -817,6 +906,61 @@ export default function Tasks() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="assignedTo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assign To</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild disabled={!isManager}>
+                          <FormControl>
+                            <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                              {field.value
+                                ? agentName(agents.find((agent) => agent.id === field.value))
+                                : "Unassigned"}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-2">
+                          <Input
+                            value={agentSearch}
+                            onChange={(event) => setAgentSearch(event.target.value)}
+                            placeholder="Search active agents..."
+                            className="mb-2"
+                          />
+                          <div className="max-h-52 space-y-1 overflow-y-auto">
+                            <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => field.onChange(null)}>
+                              Unassigned
+                            </Button>
+                            {agents
+                              .filter((agent) => `${agent.firstName || ""} ${agent.lastName || ""} ${agent.email || ""}`.toLowerCase().includes(agentSearch.toLowerCase()))
+                              .map((agent) => (
+                                <Button type="button" variant="ghost" className="w-full justify-start" key={agent.id} onClick={() => field.onChange(agent.id)}>
+                                  {agentName(agent)}
+                                </Button>
+                              ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                      {!isManager && <p className="text-xs text-muted-foreground">Employees can only assign tasks to themselves.</p>}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="progress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Progress: {field.value || 0}%</FormLabel>
+                      <FormControl><Slider min={0} max={100} step={1} value={[field.value || 0]} onValueChange={([value]) => field.onChange(value)} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

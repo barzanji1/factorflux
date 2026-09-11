@@ -1,0 +1,39 @@
+Build a Tickets module for internal issue tracking and support requests.
+
+Database
+
+ Create tickets table: id, ticketNumber (auto-generated, format TKT-0001), title, description, category (billing/technical/carrier/broker/document/payroll/other), priority (low/medium/high/urgent), status (open/in-progress/pending/resolved/closed), submittedBy, assignedTo (userId, nullable), carrierId (nullable), brokerId (nullable), invoiceId (nullable), resolution, createdAt, updatedAt, resolvedAt
+ Create ticket_comments table: id, ticketId, userId, comment, createdAt
+ Run db:push
+
+Backend
+
+ GET /api/tickets — list all, filterable by status, priority, category, assignedTo, date range
+ GET /api/tickets/:id — single ticket with comments
+ POST /api/tickets — create ticket, auto-generates ticket number
+ PATCH /api/tickets/:id — update status, priority, assignment, resolution
+ POST /api/tickets/:id/comments — add comment
+ DELETE /api/tickets/:id — admin only
+ All routes require requireAuth
+
+Frontend — Tickets Page (/tickets)
+
+ Summary cards: Open, In Progress, Pending, Resolved Today
+ Filter by: status, priority, category, assigned agent, date range
+ Table: Ticket#, Title, Category badge, Priority badge, Status badge, Submitted by, Assigned to, Created date, Actions
+ Priority color coding: Urgent=red, High=orange, Medium=yellow, Low=gray
+ + New Ticket button → modal:
+Title, Description, Category, Priority
+Link to Carrier, Broker, or Invoice (optional dropdowns)
+Assign to agent (manager/admin only)
+ Click ticket row → full ticket detail page:
+Ticket header: number, title, status, priority badges
+Details: category, linked records, submitted by, assigned to, dates
+Description section
+Comments thread — add comment, shows all comments with agent name and timestamp
+Update Status dropdown — change status inline
+Assign To dropdown — reassign ticket
+Resolution field — fill when closing/resolving
+ Agent sees all tickets they submitted + tickets assigned to them
+ Manager/Admin sees all tickets
+ Add Tickets to sidebar under WORKSPACE section

@@ -1923,15 +1923,24 @@ export class DatabaseStorage implements IStorage {
   // ─── User Permissions ──────────────────────────────────────────────────────
   async getUserPermissions(userId: string): Promise<string[]> {
     const rows = await db
-      .select({ permission: userPermissions.permission })
+      .select({ permission: userPermissions.permission, granted: userPermissions.granted })
       .from(userPermissions)
-      .where(and(eq(userPermissions.userId, userId), eq(userPermissions.granted, true)));
-    return rows.map((r) => r.permission);
+      .where(eq(userPermissions.userId, userId));
+    const granted = rows.filter((row) => row.granted).map((row) => row.permission);
+    return rows.length > 0 && granted.length === 0 ? ["__none__"] : granted;
   }
 
   async setUserPermissions(userId: string, granted: string[], updatedBy: string): Promise<void> {
     await db.delete(userPermissions).where(eq(userPermissions.userId, userId));
-    if (granted.length === 0) return;
+    if (granted.length === 0) {
+      await db.insert(userPermissions).values({
+        userId,
+        permission: "__none__",
+        granted: false,
+        updatedBy,
+      });
+      return;
+    }
     await db.insert(userPermissions).values(
       granted.map((p) => ({ userId, permission: p, granted: true, updatedBy })),
     );

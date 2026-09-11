@@ -28,6 +28,7 @@ import Vault from "@/pages/vault";
 import Factoring from "@/pages/factoring";
 import FundingQueue from "@/pages/funding-queue";
 import Tasks from "@/pages/tasks";
+import TaskDetail from "@/pages/task-detail";
 import Brokers from "@/pages/brokers";
 import FormDemo from "@/pages/form-demo";
 import LoginPage from "@/pages/login";
@@ -64,6 +65,8 @@ import PortalSubmissionsPage from "@/pages/portal-submissions";
 import CalendarPage from "@/pages/calendar";
 import Expenses from "@/pages/expenses";
 import Chat from "@/pages/chat";
+import Tickets from "@/pages/tickets";
+import TicketDetail from "@/pages/ticket-detail";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -135,6 +138,11 @@ function Router() {
       <Route path="/tasks">
         <ProtectedRoute>
           <Tasks />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/tasks/:id">
+        <ProtectedRoute>
+          <TaskDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/calendar">
@@ -311,6 +319,12 @@ function Router() {
         <ProtectedRoute>
           <Chat />
         </ProtectedRoute>
+      </Route>
+      <Route path="/tickets">
+        <ProtectedRoute><Tickets /></ProtectedRoute>
+      </Route>
+      <Route path="/tickets/:id">
+        <ProtectedRoute><TicketDetail /></ProtectedRoute>
       </Route>
       <Route path="/bulk-invoices">
         <ProtectedRoute>
