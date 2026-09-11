@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { queryClient } from "@/lib/queryClient";
 
 type Channel = {
   id: string | number;
@@ -73,7 +74,16 @@ export default function Chat() {
     try {
       const result = await getJson<Channel[]>("/api/chat/channels");
       setChannels((current) => JSON.stringify(current) === JSON.stringify(result) ? current : result);
-      setSelectedId((current) => current ?? result[0]?.id ?? null);
+      setSelectedId((current) => {
+        if (current !== null) return current;
+        const requestedId = window.sessionStorage.getItem("chat:open-channel");
+        if (requestedId) {
+          window.sessionStorage.removeItem("chat:open-channel");
+          const requestedChannel = result.find((channel) => String(channel.id) === requestedId);
+          if (requestedChannel) return requestedChannel.id;
+        }
+        return result[0]?.id ?? null;
+      });
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load channels");
@@ -98,6 +108,7 @@ export default function Chat() {
         if (requestId !== messageRequestRef.current) return;
         lastReadMessageRef.current[channelKey] = String(latestMessageId);
         setChannels((current) => current.map((channel) => String(channel.id) === channelKey && channel.unreadCount !== 0 ? { ...channel, unreadCount: 0 } : channel));
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/unread-count"] });
       }
     } catch (err) {
       if (requestId === messageRequestRef.current) setError(err instanceof Error ? err.message : "Unable to load messages");
@@ -119,6 +130,11 @@ export default function Chat() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length, selectedId]);
   useEffect(() => {
     getJson<ChatUser[]>("/api/chat/users").then(setUsers).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => undefined);
+    }
   }, []);
 
   const submitMessage = async () => {
@@ -168,8 +184,8 @@ export default function Chat() {
                 const label = isDirect ? channel.directName || channel.name : channel.name;
                 return <button key={channel.id} onClick={() => setSelectedId(channel.id)} className={cn("flex w-full items-center gap-3 border-l-2 px-2.5 py-2.5 text-left hover:bg-[#d4d0c8]", String(selectedId) === String(channel.id) ? "border-[#098b9f] bg-[#dff5f6]" : "border-transparent")}>
                   <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-xs font-bold", isDirect ? "bg-[#efc886] text-[#674c20]" : "bg-[#8bbfc1] text-[#154c51]")}>{isDirect ? initials(label) : <Hash className="h-4 w-4" />}</span>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-[#1a1a1a]">{label}</span><span className="block text-[10px] uppercase tracking-wider text-[#666]">{isDirect ? "Direct message" : `${channel.members?.length || 0} members`}</span></span>
-                  {channel.unreadCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#b54444] px-1 text-[10px] font-bold text-white">{channel.unreadCount}</span>}
+                  <span className="min-w-0 flex-1"><span className={cn("block truncate text-sm text-[#1a1a1a]", channel.unreadCount > 0 ? "font-bold" : "font-normal")}>{label}</span><span className="block text-[10px] uppercase tracking-wider text-[#666]">{isDirect ? "Direct message" : `${channel.members?.length || 0} members`}</span></span>
+                  {channel.unreadCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#b54444] px-1 text-[10px] font-bold text-white">{channel.unreadCount >= 10 ? "9+" : channel.unreadCount}</span>}
                 </button>;
               })}
           </div>

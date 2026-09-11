@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,20 @@ type NavItem = {
 type NavSection = {
   title: string;
   items: NavItem[];
+};
+
+type ChatChannelSummary = {
+  id: string | number;
+  name: string;
+  type: string;
+  unreadCount: number;
+  directName?: string | null;
+};
+
+type ChatMessageSummary = {
+  id: string | number;
+  senderId: string | number;
+  senderName: string;
 };
 
 const sidebarScrollPositions = {
@@ -159,6 +173,13 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     retry: false,
     enabled: canUseChat,
   });
+  const { data: notificationChannels } = useQuery<ChatChannelSummary[]>({
+    queryKey: ["/api/chat/channels"],
+    refetchInterval: 3000,
+    retry: false,
+    enabled: canUseChat && !isRouteActive(location, "/chat"),
+  });
+  const previousChannelUnreadRef = useRef<Record<string, number> | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const scrollPositionKey = mobile ? "mobile" : "desktop";
 
@@ -196,6 +217,34 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     const nav = navRef.current;
     if (nav) nav.scrollTop = sidebarScrollPositions[scrollPositionKey];
   }, [filteredSections, scrollPositionKey]);
+
+  useEffect(() => {
+    if (!notificationChannels) return;
+    const nextUnread = Object.fromEntries(notificationChannels.map((channel) => [String(channel.id), channel.unreadCount]));
+    const previousUnread = previousChannelUnreadRef.current;
+    previousChannelUnreadRef.current = nextUnread;
+    if (!previousUnread || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+
+    notificationChannels.forEach((channel) => {
+      const channelKey = String(channel.id);
+      if (channel.unreadCount <= (previousUnread[channelKey] ?? 0)) return;
+      fetch(`/api/chat/channels/${channel.id}/messages`, { credentials: "include" })
+        .then((response) => response.ok ? response.json() as Promise<ChatMessageSummary[]> : [])
+        .then((messages) => {
+          const latest = messages.at(-1);
+          if (!latest || String(latest.senderId) === String(authUser?.id)) return;
+          const channelName = channel.type === "direct" ? (channel.directName || channel.name) : `#${channel.name}`;
+          const notification = new Notification(`New message in ${channelName} from ${latest.senderName}`);
+          notification.onclick = () => {
+            window.focus();
+            window.sessionStorage.setItem("chat:open-channel", channelKey);
+            setLocation("/chat");
+            notification.close();
+          };
+        })
+        .catch(() => undefined);
+    });
+  }, [notificationChannels, authUser?.id, setLocation]);
 
   const navigateTo = (href: string) => {
     if (navRef.current) {
@@ -291,7 +340,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                        <span className="truncate text-[12.5px] font-medium leading-none">
                         {item.name}
                       </span>
-                       {item.name === "Chat" && !!chatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{chatUnread.count > 99 ? "99+" : chatUnread.count}</span>}
+                       {item.name === "Chat" && !!chatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{chatUnread.count >= 10 ? "9+" : chatUnread.count}</span>}
                     </button>
                   );
                 })}
