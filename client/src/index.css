@@ -4,22 +4,15 @@
 
 .logo-shine-wrapper {
   contain: paint;
+  overflow: hidden;
 }
 
-.logo-shine-wrapper::after {
-  position: absolute;
-  inset: 0;
-  content: "";
+.logo-shine-overlay {
   pointer-events: none;
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  background: linear-gradient(
-    105deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.3) 50%,
-    transparent 70%
-  );
   opacity: 0;
   transform: translateX(-160%);
+  transform-box: fill-box;
+  transform-origin: center;
   will-change: transform, opacity;
   animation: logo-shine-sweep 8s ease-in-out 4s infinite;
 }
@@ -46,7 +39,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .logo-shine-wrapper::after {
+  .logo-shine-overlay {
     animation: none;
     opacity: 0;
     transform: translateX(-160%);
