@@ -63,6 +63,8 @@ import {
   brokerFollowUps,
   invoiceAgingAlerts,
   notifications,
+  calendarEvents,
+  insertCalendarEventSchema,
   debtors,
   paymentApplicationLines,
   cashApplications,
@@ -110,6 +112,7 @@ import {
   getInvoiceDisplayStatus,
 } from "./services/lifecycleEngine";
 import { getDocumentCompleteness } from "./services/docValidation";
+import { expandCalendarEvent } from "./services/calendarScheduler";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2885,6 +2888,100 @@ ${message}
       console.error("Error fetching time entries:", error);
       res.status(500).json({ message: "Failed to fetch time entries" });
     }
+  });
+
+  // Calendar
+  const calendarRange = (req: any) => {
+    const fromValue = req.query.from ?? req.query.startDate;
+    const toValue = req.query.to ?? req.query.endDate;
+    const from = fromValue ? new Date(String(fromValue)) : new Date();
+    const to = toValue ? new Date(String(toValue)) : new Date(from.getTime() + 31 * 86400000);
+    if (toValue && /^\d{4}-\d{2}-\d{2}$/.test(String(toValue))) {
+      to.setUTCHours(23, 59, 59, 999);
+    }
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) throw new Error("Invalid calendar date range");
+    return { from, to };
+  };
+  const calendarVisible = (req: any, event: any) =>
+    req.user.role !== "employee" || event.assignedTo === req.user.id;
+  const calendarInput = (body: any, user: any, createdBy = user.id) => ({
+    ...body,
+    startAt: body.startAt ?? (body.startDate && body.startTime ? `${body.startDate}T${body.startTime}` : body.startDate),
+    endAt: body.endAt ?? (body.endDate && body.endTime ? `${body.endDate}T${body.endTime}` : body.endDate),
+    createdBy,
+    userId: body.userId || createdBy,
+    assignedTo: user.role === "employee" ? user.id : (body.assignedTo ?? null),
+    carrierId: body.carrierId ?? body.clientId ?? null,
+  });
+  const calendarOutput = (event: any) => ({
+    ...event,
+    startDate: (event.occurrenceStart ?? event.startAt)?.toISOString?.().slice(0, 10),
+    endDate: (event.occurrenceEnd ?? event.endAt)?.toISOString?.().slice(0, 10),
+    startTime: (event.occurrenceStart ?? event.startAt)?.toISOString?.().slice(11, 16),
+    endTime: (event.occurrenceEnd ?? event.endAt)?.toISOString?.().slice(11, 16),
+  });
+  const calendarResponse = (events: any[], from: Date, to: Date) =>
+    events.flatMap((event) => expandCalendarEvent(event, from, to).map(calendarOutput));
+
+  app.get(["/api/calendar/events", "/api/calendar"], requireAuth, async (req: any, res) => {
+    try {
+      const { from, to } = calendarRange(req);
+      const conditions: any[] = [];
+      if (req.user.role === "employee") conditions.push(eq(calendarEvents.assignedTo, req.user.id));
+      else if (req.query.userId) conditions.push(eq(calendarEvents.assignedTo, String(req.query.userId)));
+      const rows = await db.select().from(calendarEvents).where(conditions.length ? and(...conditions) : undefined).orderBy(calendarEvents.startAt);
+      res.json(calendarResponse(rows, from, to));
+    } catch (error: any) { res.status(400).json({ message: error.message || "Failed to fetch calendar events" }); }
+  });
+  app.get("/api/calendar/today", requireAuth, async (req: any, res) => {
+    const now = new Date(); const from = new Date(now); from.setHours(0, 0, 0, 0);
+    const to = new Date(from); to.setDate(to.getDate() + 1);
+    try {
+      const scope = or(eq(calendarEvents.assignedTo, req.user.id), eq(calendarEvents.createdBy, req.user.id));
+      const rows = await db.select().from(calendarEvents).where(scope).orderBy(calendarEvents.startAt);
+      res.json(calendarResponse(rows, from, to));
+    } catch { res.status(500).json({ message: "Failed to fetch today's events" }); }
+  });
+  app.post("/api/calendar/events", requireAuth, async (req: any, res) => {
+    try {
+      const input = insertCalendarEventSchema.parse(calendarInput(req.body, req.user));
+      if (input.endAt <= input.startAt) return res.status(400).json({ message: "Event end must be after start" });
+      const [assigned] = input.assignedTo ? await db.select({ id: users.id }).from(users).where(eq(users.id, input.assignedTo)) : [true];
+      if (!assigned) return res.status(400).json({ message: "Assigned user not found" });
+      for (const [table, id, label] of [[clients, input.carrierId, "Carrier"], [brokers, input.brokerId, "Broker"], [invoices, input.invoiceId, "Invoice"]] as const) {
+        if (id != null && !(await db.select({ id: (table as any).id }).from(table as any).where(eq((table as any).id, id))).length) return res.status(400).json({ message: `${label} not found` });
+      }
+      const [event] = await db.insert(calendarEvents).values(input).returning();
+      res.status(201).json(calendarOutput(event));
+    } catch (error: any) { res.status(400).json({ message: error?.issues?.[0]?.message || error.message || "Invalid calendar event" }); }
+  });
+  app.patch("/api/calendar/events/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const [existing] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, id));
+      if (!existing || !calendarVisible(req, existing)) return res.status(404).json({ message: "Calendar event not found" });
+      const patchBody = { ...existing, ...req.body,
+        createdBy: existing.createdBy,
+        userId: existing.userId,
+        assignedTo: req.user.role === "employee" ? req.user.id : (req.body.assignedTo !== undefined ? req.body.assignedTo : existing.assignedTo),
+      };
+      const merged = calendarInput(patchBody, req.user, existing.createdBy);
+      const updates = insertCalendarEventSchema.partial().parse(merged);
+      if (req.user.role === "employee" && updates.assignedTo !== req.user.id) {
+        return res.status(403).json({ message: "Employees may only assign events to themselves" });
+      }
+      if (merged.endAt <= merged.startAt) return res.status(400).json({ message: "Event end must be after start" });
+      if (updates.assignedTo && !(await db.select({ id: users.id }).from(users).where(eq(users.id, updates.assignedTo))).length) return res.status(400).json({ message: "Assigned user not found" });
+      const [event] = await db.update(calendarEvents).set({ ...updates, updatedAt: new Date(), reminderSentAt: null }).where(eq(calendarEvents.id, id)).returning();
+      res.json(calendarOutput(event));
+    } catch (error: any) { res.status(400).json({ message: error?.issues?.[0]?.message || error.message || "Invalid calendar event" }); }
+  });
+  app.delete("/api/calendar/events/:id", requireAuth, async (req: any, res) => {
+    const id = Number(req.params.id);
+    const [existing] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, id));
+    if (!existing || !calendarVisible(req, existing)) return res.status(404).json({ message: "Calendar event not found" });
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
+    res.status(204).send();
   });
 
   // Notifications

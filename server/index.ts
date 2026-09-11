@@ -147,6 +147,9 @@ export async function startServer(
   import("./services/invoiceAgingEngine")
     .then(m => m.startInvoiceAgingScheduler())
     .catch(e => console.warn("[agingScheduler] startup error:", e?.message));
+  import("./services/calendarScheduler")
+    .then(m => m.startCalendarScheduler())
+    .catch(e => console.warn("[calendarScheduler] startup error:", e?.message));
 
   import("./services/seedTemplates").then(m => m.seedDefaultTemplates()).catch(e =>
     console.warn("[templateSeed] error:", e?.message)

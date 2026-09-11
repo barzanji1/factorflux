@@ -145,6 +145,7 @@ export default function Dashboard() {
     totalRevenue: string;
     activeClients: number;
   }>({ queryKey: ["/api/dashboard/stats"] });
+  const { data: todayEvents } = useQuery<any[]>({ queryKey: ["/api/calendar/today"] });
 
   // A stale locally cached session can briefly render this page while the API
   // returns a 401 response object. Keep collection rendering safe until auth
@@ -154,6 +155,7 @@ export default function Dashboard() {
   const chargebacks = Array.isArray(chargebacksData) ? chargebacksData : [];
   const activities = Array.isArray(activitiesData) ? activitiesData : [];
   const exceptions = Array.isArray(exceptionsData) ? exceptionsData : [];
+  const schedule = Array.isArray(todayEvents) ? todayEvents : [];
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -419,6 +421,23 @@ export default function Dashboard() {
       )}
 
       {/* ── Main work area ────────────────────────────────────────────────── */}
+      <Card className="mb-5 p-4">
+        <SectionHeader title="Today's Schedule" count={schedule.length} href="/calendar" label="Open calendar" />
+        {schedule.length === 0 ? (
+          <p className="py-3 text-[12px] text-slate-400">Nothing scheduled for today.</p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {schedule.slice(0, 4).map((event: any) => (
+              <button key={event.id} type="button" onClick={() => go("/calendar")}
+                className="rounded-[9px] border border-slate-200 bg-slate-50 p-2.5 text-left hover:border-[#27aab8] dark:border-slate-700 dark:bg-slate-800/40">
+                <div className="truncate text-[12px] font-semibold text-slate-800 dark:text-slate-200">{event.title}</div>
+                <div className="mt-1 text-[10.5px] text-slate-500">{event.startTime || event.start || "All day"}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
+
       <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
 
         {/* ─ Funding Queue ─────────────────────────────────────────────── */}

@@ -452,7 +452,7 @@ export type InsertWrittenWarning = z.infer<typeof insertWrittenWarningSchema>;
 
 // Notifications table
 export const notifications = pgTable("notifications", {
-  id: integer("id").primaryKey(),
+  id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   title: varchar("title").notNull(),
   message: text("message").notNull(),
@@ -551,6 +551,46 @@ export const tasks = pgTable("tasks", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Calendar appointments and reminders. Recurring events remain a single row;
+// API consumers receive their materialized occurrences for the requested range.
+export const calendarEvents = pgTable("calendar_events", {
+  id: serial("id").primaryKey(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  eventType: varchar("event_type", { enum: ["meeting", "deadline", "followup", "reminder", "holiday", "closure"] }).default("meeting").notNull(),
+  status: varchar("status", { enum: ["scheduled", "completed", "cancelled"] }).default("scheduled").notNull(),
+  color: varchar("color"),
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at").notNull(),
+  allDay: boolean("all_day").default(false).notNull(),
+  recurrence: varchar("recurrence", { enum: ["none", "daily", "weekly", "monthly"] }).default("none").notNull(),
+  recurrenceEndAt: timestamp("recurrence_end_at"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  assignedTo: varchar("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "set null" }),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  lastDigestDate: timestamp("last_digest_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("calendar_events_assigned_start_idx").on(table.assignedTo, table.startAt),
+  index("calendar_events_range_idx").on(table.startAt, table.recurrenceEndAt),
+]);
+
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true, createdAt: true, updatedAt: true, reminderSentAt: true, lastDigestDate: true,
+}).extend({
+  startAt: z.coerce.date(),
+  endAt: z.coerce.date(),
+  recurrenceEndAt: z.coerce.date().nullable().optional(),
+});
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
 
 // Brokers table
 export const brokers = pgTable("brokers", {

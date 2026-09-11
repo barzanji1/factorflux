@@ -61,6 +61,7 @@ import PortalDashboard from "@/pages/portal/dashboard";
 import PortalSubmit from "@/pages/portal/submit";
 import PortalSubmissions from "@/pages/portal/submissions";
 import PortalSubmissionsPage from "@/pages/portal-submissions";
+import CalendarPage from "@/pages/calendar";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -132,6 +133,11 @@ function Router() {
       <Route path="/tasks">
         <ProtectedRoute>
           <Tasks />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/calendar">
+        <ProtectedRoute>
+          <CalendarPage />
         </ProtectedRoute>
       </Route>
       <Route path="/brokers">

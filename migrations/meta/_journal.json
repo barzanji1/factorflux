@@ -36,6 +36,13 @@
       "when": 1788976800000,
       "tag": "0004_fuel_advance_rebuild",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788977700000,
+      "tag": "0005_calendar_events",
+      "breakpoints": true
     }
   ]
 }
