@@ -40,15 +40,16 @@ export function FactorFluxLogo({ className, markClassName, showWordmark = true, 
             fill={inverted ? "#098b9f" : "#27aab8"}
           />
           {shine && (
-            <rect
-              className="logo-shine-overlay"
-              x="0"
-              y="0"
-              width="578.85"
-              height="527.45"
-              fill={`url(#${shineGradientId})`}
-              clipPath={`url(#${clipId})`}
-            />
+            <g clipPath={`url(#${clipId})`}>
+              <rect
+                className="logo-shine-overlay"
+                x="0"
+                y="0"
+                width="578.85"
+                height="527.45"
+                fill={`url(#${shineGradientId})`}
+              />
+            </g>
           )}
         </svg>
       </span>
