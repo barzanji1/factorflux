@@ -11,6 +11,7 @@ import { serveStatic } from "./static";
 import { log } from "./log";
 import { startAuthorityScheduler } from "./services/authorityScheduler";
 import { recoverStuckOcrJobs } from "./services/jobQueue";
+import { ensureDevAdmin } from "./services/devAdminBootstrap";
 
 const app = express();
 
@@ -96,6 +97,7 @@ app.use((req, res, next) => {
 export async function startServer(
   port = parseInt(process.env.PORT || "5000", 10)
 ) {
+  await ensureDevAdmin();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
