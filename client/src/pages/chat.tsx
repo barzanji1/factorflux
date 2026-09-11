@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, UserRound, Users, X } from "lucide-react";
+import Picker from "@emoji-mart/react";
+import emojiData from "@emoji-mart/data";
+import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,7 @@ type Message = {
   body: string;
   createdAt: string;
 };
+type EmojiSelection = { native: string };
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
@@ -54,10 +57,13 @@ export default function Chat() {
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const messageRequestRef = useRef(0);
   const selectedIdRef = useRef<string | number | null>(selectedId);
   const lastReadMessageRef = useRef<Record<string, string>>({});
@@ -136,6 +142,32 @@ export default function Chat() {
       Notification.requestPermission().catch(() => undefined);
     }
   }, []);
+  useEffect(() => {
+    if (!emojiPickerOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent | TouchEvent) => {
+      if (!emojiPickerRef.current?.contains(event.target as Node)) setEmojiPickerOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("touchstart", closeOnOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("touchstart", closeOnOutsideClick);
+    };
+  }, [emojiPickerOpen]);
+
+  const insertEmoji = (emoji: EmojiSelection) => {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? draft.length;
+    const end = textarea?.selectionEnd ?? start;
+    const nextDraft = `${draft.slice(0, start)}${emoji.native}${draft.slice(end)}`;
+    const nextCursor = start + emoji.native.length;
+    setDraft(nextDraft);
+    setEmojiPickerOpen(false);
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
 
   const submitMessage = async () => {
     const body = draft.trim();
@@ -206,7 +238,7 @@ export default function Chat() {
               </div>) : <div className="flex h-full flex-col items-center justify-center text-center text-[#707371]"><MessageCircle className="mb-3 h-10 w-10 text-[#8bbfc1]" /><p className="font-semibold">No messages here yet</p><p className="mt-1 text-xs">Send the first note to this conversation.</p></div>}
             <div ref={bottomRef} />
           </div>
-          <div className="border-t-2 border-[#808080] bg-[#d4d0c8] p-3 md:p-4"><div className="flex items-end gap-2 border-2 border-[#808080] border-r-white border-b-white bg-[#f9f8f2] p-1.5"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitMessage(); } }} placeholder={`Message ${selected.directName || selected.name}...`} rows={1} className="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" /><Button onClick={submitMessage} disabled={!draft.trim()} className="h-9 rounded-sm bg-[#098b9f] px-3 text-white hover:bg-[#087c8d]"><Send className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">Send</span></Button></div><p className="mt-1.5 px-1 text-[10px] text-[#777]">Enter to send · Shift + Enter for a new line</p></div>
+          <div className="border-t-2 border-[#808080] bg-[#d4d0c8] p-3 md:p-4"><div className="relative flex items-end gap-2 border-2 border-[#808080] border-r-white border-b-white bg-[#f9f8f2] p-1.5"><textarea ref={textareaRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitMessage(); } }} placeholder={`Message ${selected.directName || selected.name}...`} rows={1} className="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" /><div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="ghost" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="h-9 w-9 rounded-sm p-0 text-[#666] hover:bg-[#dff5f6] hover:text-[#098b9f]"><Smile className="h-5 w-5" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-md border border-[#808080] bg-white shadow-lg"><Picker data={emojiData} onEmojiSelect={insertEmoji} categories={["frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} className="h-9 rounded-sm bg-[#098b9f] px-3 text-white hover:bg-[#087c8d]"><Send className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">Send</span></Button></div><p className="mt-1.5 px-1 text-[10px] text-[#777]">Enter to send · Shift + Enter for a new line</p></div>
         </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
         </section>
       </div>
