@@ -59,6 +59,7 @@ export default function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageRequestRef = useRef(0);
   const selectedIdRef = useRef<string | number | null>(selectedId);
+  const lastReadMessageRef = useRef<Record<string, string>>({});
   selectedIdRef.current = selectedId;
 
   const selected = channels.find((channel) => String(channel.id) === String(selectedId));
@@ -71,7 +72,7 @@ export default function Chat() {
   const loadChannels = useCallback(async () => {
     try {
       const result = await getJson<Channel[]>("/api/chat/channels");
-      setChannels(result);
+      setChannels((current) => JSON.stringify(current) === JSON.stringify(result) ? current : result);
       setSelectedId((current) => current ?? result[0]?.id ?? null);
       setError("");
     } catch (err) {
@@ -81,18 +82,23 @@ export default function Chat() {
     }
   }, []);
 
-  const loadMessages = useCallback(async () => {
+  const loadMessages = useCallback(async (showLoading = false) => {
     if (selectedId === null) return;
     const channelId = selectedId;
     const requestId = ++messageRequestRef.current;
-    setLoadingMessages(true);
+    if (showLoading) setLoadingMessages(true);
     try {
       const result = await getJson<Message[]>(`/api/chat/channels/${channelId}/messages`);
       if (requestId !== messageRequestRef.current) return;
-      setMessages(result);
-      await sendJson(`/api/chat/channels/${channelId}/read`, "PATCH");
-      if (requestId !== messageRequestRef.current) return;
-      setChannels((current) => current.map((channel) => String(channel.id) === String(channelId) ? { ...channel, unreadCount: 0 } : channel));
+      setMessages((current) => JSON.stringify(current) === JSON.stringify(result) ? current : result);
+      const latestMessageId = result.at(-1)?.id;
+      const channelKey = String(channelId);
+      if (latestMessageId !== undefined && lastReadMessageRef.current[channelKey] !== String(latestMessageId)) {
+        await sendJson(`/api/chat/channels/${channelId}/read`, "PATCH");
+        if (requestId !== messageRequestRef.current) return;
+        lastReadMessageRef.current[channelKey] = String(latestMessageId);
+        setChannels((current) => current.map((channel) => String(channel.id) === channelKey && channel.unreadCount !== 0 ? { ...channel, unreadCount: 0 } : channel));
+      }
     } catch (err) {
       if (requestId === messageRequestRef.current) setError(err instanceof Error ? err.message : "Unable to load messages");
     } finally {
@@ -103,8 +109,8 @@ export default function Chat() {
   useEffect(() => { loadChannels(); const timer = window.setInterval(loadChannels, 3000); return () => window.clearInterval(timer); }, [loadChannels]);
   useEffect(() => {
     setMessages([]);
-    loadMessages();
-    const timer = window.setInterval(loadMessages, 3000);
+    loadMessages(true);
+    const timer = window.setInterval(() => loadMessages(false), 3000);
     return () => {
       messageRequestRef.current += 1;
       window.clearInterval(timer);
