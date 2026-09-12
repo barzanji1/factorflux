@@ -87,6 +87,7 @@ export default function Tasks() {
   const [progressTask, setProgressTask] = useState<number | null>(null);
   const [progressDrafts, setProgressDrafts] = useState<Record<number, number>>({});
   const [agentSearch, setAgentSearch] = useState("");
+  const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("chargebacks");
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -110,9 +111,12 @@ export default function Tasks() {
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
+      title: "",
+      description: "",
       type: "task",
       priority: "medium",
       status: "todo",
+      dueDate: "",
       progress: 0,
       assignedTo: user?.role === "employee" ? user.id : null,
     },
@@ -227,12 +231,17 @@ export default function Tasks() {
   const openCreateDialog = (taskType?: string) => {
     setEditingTask(null);
     form.reset({
+      title: "",
+      description: "",
       type: (taskType as any) || "task",
       priority: "medium",
       status: "todo",
+      dueDate: "",
       progress: 0,
       assignedTo: user?.role === "employee" ? user.id : null,
     });
+    setAgentSearch("");
+    setAssigneePickerOpen(false);
     setIsTaskDialogOpen(true);
   };
 
@@ -917,7 +926,13 @@ export default function Tasks() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assign To</FormLabel>
-                      <Popover>
+                      <Popover
+                        open={assigneePickerOpen}
+                        onOpenChange={(open) => {
+                          setAssigneePickerOpen(open);
+                          if (!open) setAgentSearch("");
+                        }}
+                      >
                         <PopoverTrigger asChild disabled={!isManager}>
                           <FormControl>
                             <Button type="button" variant="outline" className="w-full justify-start font-normal">
@@ -935,13 +950,32 @@ export default function Tasks() {
                             className="mb-2"
                           />
                           <div className="max-h-52 space-y-1 overflow-y-auto">
-                            <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => field.onChange(null)}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                field.onChange(null);
+                                setAssigneePickerOpen(false);
+                                setAgentSearch("");
+                              }}
+                            >
                               Unassigned
                             </Button>
                             {agents
                               .filter((agent) => `${agent.firstName || ""} ${agent.lastName || ""} ${agent.email || ""}`.toLowerCase().includes(agentSearch.toLowerCase()))
                               .map((agent) => (
-                                <Button type="button" variant="ghost" className="w-full justify-start" key={agent.id} onClick={() => field.onChange(agent.id)}>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="w-full justify-start"
+                                  key={agent.id}
+                                  onClick={() => {
+                                    field.onChange(agent.id);
+                                    setAssigneePickerOpen(false);
+                                    setAgentSearch("");
+                                  }}
+                                >
                                   {agentName(agent)}
                                 </Button>
                               ))}
