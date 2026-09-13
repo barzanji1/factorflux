@@ -71,6 +71,13 @@
       "when": 1788981300000,
       "tag": "0009_task_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788982200000,
+      "tag": "0010_broker_branches",
+      "breakpoints": true
     }
   ]
 }

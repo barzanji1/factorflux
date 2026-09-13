@@ -14,8 +14,9 @@ import RecordDetail, {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -24,7 +25,7 @@ import {
 import {
   Building2, ReceiptText, Phone, Mail, MapPin, ShieldCheck,
   CreditCard, DollarSign, Clock, FileText, Edit2, Ban,
-  CheckCircle2, AlertTriangle, User, Hash, TrendingUp,
+  CheckCircle2, AlertTriangle, User, Hash, TrendingUp, Plus, Trash2,
   MessageSquare, Send,
 } from "lucide-react";
 
@@ -85,6 +86,12 @@ export default function BrokerDetail() {
   const [statusDialog, setStatusDialog] = useState(false);
   const [newStatus, setNewStatus] = useState<"active" | "inactive" | "suspended">("inactive");
   const [noteText, setNoteText] = useState("");
+  const [branchDialog, setBranchDialog] = useState(false);
+  const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
+  const [branchForm, setBranchForm] = useState({
+    branchName: "", address: "", city: "", state: "", zip: "",
+    phone: "", email: "", contactName: "", status: "active" as "active" | "inactive",
+  });
 
   const { data: broker, isLoading } = useQuery<any>({
     queryKey: ["/api/brokers", brokerId],
@@ -101,8 +108,18 @@ export default function BrokerDetail() {
     enabled: !isNaN(brokerId),
   });
 
+  const { data: branches = [], isLoading: branchesLoading, isError: branchesError } = useQuery<any[]>({
+    queryKey: ["/api/brokers", brokerId, "branches"],
+    queryFn: async () => {
+      const response = await fetch(`/api/brokers/${brokerId}/branches`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load branches");
+      return response.json();
+    },
+    enabled: !isNaN(brokerId),
+  });
+
   const brokerInvoices = allInvoices.filter(
-    (inv: any) => inv.brokerId === brokerId || inv.debtorId === brokerId
+    (inv: any) => inv.brokerId != null ? inv.brokerId === brokerId : inv.debtorId === brokerId
   );
 
   const totalVolume = brokerInvoices.reduce((s: number, inv: any) => s + parseFloat(inv.amount ?? "0"), 0);
@@ -132,6 +149,58 @@ export default function BrokerDetail() {
   });
 
   const isAdmin = user?.role === "admin" || user?.role === "manager";
+
+  const branchPayload = () => ({
+    branchName: branchForm.branchName.trim(),
+    address: branchForm.address.trim() || null,
+    city: branchForm.city.trim() || null,
+    state: branchForm.state.trim() || null,
+    zip: branchForm.zip.trim() || null,
+    phone: branchForm.phone.trim() || null,
+    email: branchForm.email.trim() || null,
+    contactName: branchForm.contactName.trim() || null,
+    status: branchForm.status,
+  });
+  const branchMutation = useMutation({
+    mutationFn: async () => apiRequest(
+      editingBranchId ? "PATCH" : "POST",
+      editingBranchId ? `/api/brokers/${brokerId}/branches/${editingBranchId}` : `/api/brokers/${brokerId}/branches`,
+      branchPayload(),
+    ),
+    onSuccess: () => {
+      toast({ title: editingBranchId ? "Branch updated" : "Branch added" });
+      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
+      setBranchDialog(false);
+    },
+    onError: (error: Error) => toast({ title: "Failed to save branch", description: error.message, variant: "destructive" }),
+  });
+  const deleteBranchMutation = useMutation({
+    mutationFn: (branchId: number) => apiRequest("DELETE", `/api/brokers/${brokerId}/branches/${branchId}`),
+    onSuccess: () => {
+      toast({ title: "Branch removed" });
+      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
+    },
+    onError: (error: Error) => toast({ title: "Failed to remove branch", description: error.message, variant: "destructive" }),
+  });
+  const toggleBranchMutation = useMutation({
+    mutationFn: ({ branchId, status }: { branchId: number; status: "active" | "inactive" }) =>
+      apiRequest("PATCH", `/api/brokers/${brokerId}/branches/${branchId}`, { status }),
+    onSuccess: () => {
+      toast({ title: "Branch status updated" });
+      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
+    },
+    onError: (error: Error) => toast({ title: "Failed to update branch status", description: error.message, variant: "destructive" }),
+  });
+  const openBranchDialog = (branch?: any) => {
+    setEditingBranchId(branch?.id ?? null);
+    setBranchForm({
+      branchName: branch?.branchName ?? "", address: branch?.address ?? "",
+      city: branch?.city ?? "", state: branch?.state ?? "", zip: branch?.zip ?? "",
+      phone: branch?.phone ?? "", email: branch?.email ?? "",
+      contactName: branch?.contactName ?? "", status: branch?.status ?? "active",
+    });
+    setBranchDialog(true);
+  };
 
   const creditUtilPct = broker?.creditLimit && totalVolume
     ? Math.min(100, Math.round((totalVolume / broker.creditLimit) * 100))
@@ -308,6 +377,59 @@ export default function BrokerDetail() {
                   ),
                 },
                 {
+                  value: "branches",
+                  label: "Branches",
+                  icon: <MapPin className="h-3.5 w-3.5" />,
+                  count: branches.length,
+                  content: (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Broker Branches</h3>
+                          <p className="text-xs text-slate-500">Manage branch contacts and operating locations.</p>
+                        </div>
+                        {isAdmin && (
+                          <Button size="sm" onClick={() => openBranchDialog()} className="gap-2 rounded-xl bg-violet-600 text-xs text-white hover:bg-violet-700">
+                            <Plus className="h-3.5 w-3.5" /> Add Branch
+                          </Button>
+                        )}
+                      </div>
+                      {branchesLoading ? (
+                        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Loading branches...</div>
+                      ) : branchesError ? (
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Unable to load branches. Please try again.</div>
+                      ) : !branches.length ? (
+                        <EmptyTab icon={<MapPin className="h-7 w-7" />} label="No branches on file" />
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+                          <div className="min-w-[760px]">
+                            <div className="grid grid-cols-[1.3fr_1fr_0.7fr_1fr_1fr_0.7fr_auto] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900/60">
+                              <span>Branch Name</span><span>City</span><span>State</span><span>Phone</span><span>Contact</span><span>Status</span><span />
+                            </div>
+                            {branches.map((branch: any) => (
+                              <div key={branch.id} className="grid grid-cols-[1.3fr_1fr_0.7fr_1fr_1fr_0.7fr_auto] items-center gap-3 border-t border-slate-100 px-4 py-3 text-sm dark:border-slate-800">
+                                <span className="font-semibold text-slate-800 dark:text-white">{branch.branchName}</span>
+                                <span className="text-slate-600 dark:text-slate-300">{branch.city || "—"}</span>
+                                <span className="text-slate-600 dark:text-slate-300">{branch.state || "—"}</span>
+                                <span className="text-slate-600 dark:text-slate-300">{branch.phone || "—"}</span>
+                                <span className="text-slate-600 dark:text-slate-300">{branch.contactName || "—"}</span>
+                                <Badge className={cn("w-fit capitalize", branch.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>{branch.status}</Badge>
+                                {isAdmin ? (
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openBranchDialog(branch)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-[11px]" disabled={toggleBranchMutation.isPending} onClick={() => toggleBranchMutation.mutate({ branchId: branch.id, status: branch.status === "active" ? "inactive" : "active" })}>{branch.status === "active" ? "Deactivate" : "Activate"}</Button>
+                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-red-600" disabled={deleteBranchMutation.isPending} onClick={() => { if (window.confirm(`Remove ${branch.branchName}?`)) deleteBranchMutation.mutate(branch.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                  </div>
+                                ) : <span />}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+                {
                   value: "notes",
                   label: "Notes",
                   icon: <MessageSquare className="h-3.5 w-3.5" />,
@@ -372,6 +494,40 @@ export default function BrokerDetail() {
               {statusMutation.isPending ? "Suspending..." : "Confirm Suspend"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={branchDialog} onOpenChange={setBranchDialog}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-3xl border-slate-200 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle>{editingBranchId ? "Edit Branch" : "Add Branch"}</DialogTitle>
+            <DialogDescription>Store the branch contact and location used for broker invoices.</DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4 sm:grid-cols-2" onSubmit={event => { event.preventDefault(); if (branchForm.branchName.trim()) branchMutation.mutate(); }}>
+            {([
+              ["branchName", "Branch Name", true], ["address", "Address", false],
+              ["city", "City", false], ["state", "State", false], ["zip", "ZIP", false],
+              ["phone", "Phone", false], ["email", "Email", false], ["contactName", "Contact Name", false],
+            ] as const).map(([key, label, required]) => (
+              <div key={key} className={key === "address" ? "space-y-1.5 sm:col-span-2" : "space-y-1.5"}>
+                <label className="text-sm font-medium">{label}{required && <span className="text-red-500"> *</span>}</label>
+                <Input required={required} type={key === "email" ? "email" : "text"} value={branchForm[key]} onChange={event => setBranchForm(form => ({ ...form, [key]: event.target.value }))} />
+              </div>
+            ))}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Status</label>
+              <Select value={branchForm.status} onValueChange={status => setBranchForm(form => ({ ...form, status: status as "active" | "inactive" }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="sm:col-span-2">
+              <Button type="button" variant="outline" onClick={() => setBranchDialog(false)}>Cancel</Button>
+              <Button type="submit" disabled={branchMutation.isPending || !branchForm.branchName.trim()} className="bg-violet-600 text-white hover:bg-violet-700">
+                {branchMutation.isPending ? "Saving..." : editingBranchId ? "Save Changes" : "Add Branch"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

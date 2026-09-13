@@ -24,7 +24,7 @@ type Broker = {
 };
 
 const EMPTY = {
-  loadNumber: "", clientId: "", debtorId: "", branchName: "",
+  loadNumber: "", clientId: "", brokerId: "", branchId: "",
   buyout: "", amount: "", paymentType: "ACH", bankAccountId: "",
 };
 
@@ -131,7 +131,26 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
   const { toast } = useToast();
   const [values, setValues] = useState(EMPTY);
   const { data: carriersData = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients", { all: true }], enabled: open });
-  const { data: brokersData = [] } = useQuery<Broker[]>({ queryKey: ["/api/debtors"], enabled: open });
+  const { data: brokersData = [] } = useQuery<Broker[]>({
+    queryKey: ["/api/brokers", { all: true }],
+    queryFn: async () => {
+      const response = await fetch("/api/brokers?all=true", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load brokers");
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : payload.data ?? [];
+    },
+    enabled: open,
+  });
+  const { data: branchesData = [], isLoading: branchesLoading, isError: branchesError } = useQuery<any[]>({
+    queryKey: ["/api/brokers", values.brokerId, "branches"],
+    queryFn: async () => {
+      const response = await fetch(`/api/brokers/${values.brokerId}/branches`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load branches");
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : payload.data ?? [];
+    },
+    enabled: open && !!values.brokerId,
+  });
   const { data: bankAccountsData = [] } = useQuery<Array<{
     id: number; bankName?: string | null; accountType?: string | null; lastFour?: string | null;
   }>>({
@@ -144,10 +163,19 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
     enabled: open && !!values.clientId && values.paymentType === "ACH",
   });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
-  const brokers = Array.isArray(brokersData) ? brokersData : [];
+  const brokers = (Array.isArray(brokersData) ? brokersData : []).filter(item => item.status === "active");
+  const branches = (Array.isArray(branchesData) ? branchesData : []).filter(branch => branch.status === "active");
   const bankAccounts = Array.isArray(bankAccountsData) ? bankAccountsData : [];
   const carrier = carriers.find(item => String(item.id) === values.clientId);
-  const broker = brokers.find(item => String(item.id) === values.debtorId);
+  const broker = brokers.find(item => String(item.id) === values.brokerId);
+
+  useEffect(() => {
+    if (branches.length === 1 && values.branchId !== String(branches[0].id)) {
+      setValues(v => ({ ...v, branchId: String(branches[0].id) }));
+    } else if (values.branchId && !branches.some(branch => String(branch.id) === values.branchId)) {
+      setValues(v => ({ ...v, branchId: "" }));
+    }
+  }, [branches, values.branchId]);
 
   useEffect(() => { if (!open) setValues(EMPTY); }, [open]);
 
@@ -156,8 +184,8 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
       const response = await apiRequest("POST", "/api/invoices", {
         loadNumber: values.loadNumber.trim(),
         clientId: Number(values.clientId),
-        debtorId: Number(values.debtorId),
-        branchName: values.branchName.trim() || null,
+        brokerId: Number(values.brokerId),
+        branchId: Number(values.branchId),
         buyout: values.buyout === "" ? null : values.buyout === "yes",
         amount: values.amount,
         paymentType: values.paymentType,
@@ -174,7 +202,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
     onError: (error: Error) => toast({ title: "Unable to create invoice", description: error.message, variant: "destructive" }),
   });
 
-  const valid = values.loadNumber.trim() && values.clientId && values.debtorId && Number(values.amount) > 0;
+  const valid = values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId && Number(values.amount) > 0;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
@@ -195,10 +223,18 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                 <Input id="amount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => setValues(v => ({ ...v, amount: e.target.value }))} placeholder="0.00" />
               </div>
               <SearchSelect label="Carrier" required items={carriers} selected={carrier} onSelect={item => setValues(v => ({ ...v, clientId: String(item.id) }))} placeholder="Search carriers..." />
-              <SearchSelect label="Broker" required items={brokers} selected={broker} onSelect={item => setValues(v => ({ ...v, debtorId: String(item.id) }))} placeholder="Search brokers..." />
+              <SearchSelect label="Broker" required items={brokers} selected={broker} onSelect={item => setValues(v => ({ ...v, brokerId: String(item.id), branchId: "" }))} placeholder="Search brokers..." />
               <div className="space-y-1.5">
-                <Label htmlFor="branchName">Branch Name</Label>
-                <Input id="branchName" value={values.branchName} onChange={e => setValues(v => ({ ...v, branchName: e.target.value }))} placeholder="Enter branch name" />
+                <Label htmlFor="branchId">Branch <span className="text-red-500">*</span></Label>
+                <Select disabled={!values.brokerId || branchesLoading || branchesError || branches.length === 0} value={values.branchId} onValueChange={branchId => setValues(v => ({ ...v, branchId }))}>
+                  <SelectTrigger id="branchId"><SelectValue placeholder={!values.brokerId ? "Select a broker first" : branchesLoading ? "Loading branches..." : branchesError ? "Unable to load branches" : branches.length === 0 ? "No branches on file — add in broker profile." : "Select a branch"} /></SelectTrigger>
+                  <SelectContent>
+                    {branches.map(branch => <SelectItem key={branch.id} value={String(branch.id)}>{branch.branchName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {values.brokerId && !branchesLoading && branches.length === 0 && (
+                  <p className={cn("text-xs", branchesError ? "text-red-700" : "text-amber-700")}>{branchesError ? "Unable to load branches." : "No branches on file — add in broker profile."}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Buyout</Label>

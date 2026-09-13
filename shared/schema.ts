@@ -162,6 +162,8 @@ export const invoices = pgTable("invoices", {
   loadId: integer("load_id").references(() => loads.id, { onDelete: "set null" }),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   debtorId: integer("debtor_id").references(() => debtors.id),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  branchId: integer("branch_id").references(() => brokerBranches.id, { onDelete: "set null" }),
   paymentType: varchar("payment_type", { enum: ["ACH", "Wire"] }).default("ACH"),
   bankAccountId: integer("bank_account_id").references(() => clientVault.id),
   loadNumber: varchar("load_number"),
@@ -230,6 +232,8 @@ export const invoices = pgTable("invoices", {
 }, (table) => [
   index("invoices_invoice_number_idx").on(table.invoiceNumber),
   index("invoices_client_id_idx").on(table.clientId),
+  index("invoices_broker_id_idx").on(table.brokerId),
+  index("invoices_branch_id_idx").on(table.branchId),
   index("invoices_created_at_idx").on(table.createdAt),
   index("invoices_submitted_by_created_at_idx").on(table.submittedBy, table.createdAt),
   index("invoices_search_trgm_idx").using("gin", sql`(
@@ -677,6 +681,28 @@ export const brokers = pgTable("brokers", {
   ) gin_trgm_ops`),
 ]);
 
+// A broker may have multiple operating branches. Branches are kept separately
+// so invoices can retain both a relational reference and a historical name
+// snapshot in branchName.
+export const brokerBranches = pgTable("broker_branches", {
+  id: serial("id").primaryKey(),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "cascade" }).notNull(),
+  branchName: varchar("branch_name").notNull(),
+  address: varchar("address"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zip: varchar("zip"),
+  phone: varchar("phone"),
+  email: varchar("email"),
+  contactName: varchar("contact_name"),
+  status: varchar("status", { enum: ["active", "inactive"] }).default("active").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("broker_branches_broker_id_idx").on(table.brokerId),
+  index("broker_branches_status_idx").on(table.status),
+]);
+
 // Fuel Advances table
 export const fuelAdvances = pgTable("fuel_advances", {
   id: serial("id").primaryKey(),
@@ -815,6 +841,8 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   load: one(loads, { fields: [invoices.loadId], references: [loads.id] }),
   client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
   debtor: one(debtors, { fields: [invoices.debtorId], references: [debtors.id] }),
+  broker: one(brokers, { fields: [invoices.brokerId], references: [brokers.id] }),
+  branch: one(brokerBranches, { fields: [invoices.branchId], references: [brokerBranches.id] }),
   submittedByUser: one(users, { fields: [invoices.submittedBy], references: [users.id] }),
   approvedByUser: one(users, { fields: [invoices.approvedBy], references: [users.id] }),
   assignedToUser: one(users, { fields: [invoices.assignedTo], references: [users.id] }),
@@ -886,7 +914,13 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
 }));
 
 export const brokersRelations = relations(brokers, ({ many }) => ({
-  // Add relations to loads/invoices if needed in the future
+  branches: many(brokerBranches),
+  invoices: many(invoices),
+}));
+
+export const brokerBranchesRelations = relations(brokerBranches, ({ one, many }) => ({
+  broker: one(brokers, { fields: [brokerBranches.brokerId], references: [brokers.id] }),
+  invoices: many(invoices),
 }));
 
 export const fuelAdvancesRelations = relations(fuelAdvances, ({ one }) => ({
@@ -908,6 +942,16 @@ export const insertDebtorSchema = createInsertSchema(debtors).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertBrokerBranchSchema = createInsertSchema(brokerBranches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  branchName: z.string().trim().min(1),
+  email: z.string().trim().email().nullable().optional(),
+  status: z.enum(["active", "inactive"]).default("active"),
 });
 
 export const insertInvoiceStatusHistorySchema = createInsertSchema(invoiceStatusHistory).omit({
@@ -1105,6 +1149,8 @@ export type Load = typeof loads.$inferSelect;
 export type InsertLoad = z.infer<typeof insertLoadSchema>;
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type BrokerBranch = typeof brokerBranches.$inferSelect;
+export type InsertBrokerBranch = z.infer<typeof insertBrokerBranchSchema>;
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Activity = typeof activities.$inferSelect;

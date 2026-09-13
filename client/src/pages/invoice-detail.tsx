@@ -450,6 +450,7 @@ export default function InvoiceDetail() {
     },
     enabled: !isNaN(invoiceId),
   });
+  const canonicalBroker = detail?.broker ?? detail?.debtor;
   const canAgentCorrect = !isManager && ["draft", "rejected"].includes(String(detail?.status ?? ""));
   const carrierId = detail?.client?.id ?? detail?.clientId;
   const { data: carrierBankAccounts = [], isLoading: bankAccountsLoading } = useQuery<any[]>({
@@ -706,7 +707,7 @@ export default function InvoiceDetail() {
                         </div>
                          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[#444]">
                            {detail.client && <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-[#098b9f]" />Carrier: <strong>{detail.client.name}</strong></span>}
-                           {detail.debtor && <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-[#098b9f]" />Broker: <strong>{detail.debtor.name}</strong></span>}
+                            {canonicalBroker && <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-[#098b9f]" />Broker: <strong>{canonicalBroker.name}</strong></span>}
                            <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{fmtDate(detail.submittedAt ?? detail.createdAt)}</span>
                         </div>
                       </div>
@@ -817,18 +818,18 @@ export default function InvoiceDetail() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker profile</p>
-                          {detail.debtor ? <div className="space-y-2 text-sm">
-                            <p className="text-lg font-bold text-[#1a1a1a]">{detail.debtor.name}</p>
-                            <InfoRow label="Contact" value={detail.debtor.contactPerson || detail.debtor.contactName || "Not available"} />
-                            <InfoRow label="Email" value={detail.debtor.email || "Not available"} />
-                            <InfoRow label="Phone" value={detail.debtor.phone || "Not available"} />
-                            <InfoRow label="MC #" value={detail.debtor.mcNumber || "Not available"} />
-                            <InfoRow label="Credit limit" value={detail.debtor.creditLimit ? fmtCurrency(detail.debtor.creditLimit) : "Not available"} />
+                          {canonicalBroker ? <div className="space-y-2 text-sm">
+                            <p className="text-lg font-bold text-[#1a1a1a]">{canonicalBroker.name}</p>
+                            <InfoRow label="Contact" value={canonicalBroker.contactPerson || canonicalBroker.contactName || "Not available"} />
+                            <InfoRow label="Email" value={canonicalBroker.email || "Not available"} />
+                            <InfoRow label="Phone" value={canonicalBroker.phone || "Not available"} />
+                            <InfoRow label="MC #" value={canonicalBroker.mcNumber || "Not available"} />
+                            <InfoRow label="Credit limit" value={canonicalBroker.creditLimit ? fmtCurrency(canonicalBroker.creditLimit) : "Not available"} />
                           </div> : <EmptyTabState icon={<Building2 className="h-7 w-7" />} label="No broker details available" />}
                         </div>
                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Payment history</p>
-                          {detail.debtor?.paymentHistory?.length ? <div className="space-y-2">{detail.debtor.paymentHistory.map((p: any, i: number) => <InfoRow key={p.id ?? i} label={fmtDate(p.date)} value={`${fmtCurrency(p.amount)} · ${p.status || "recorded"}`} />)}</div> : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No payment history available" />}
+                          {canonicalBroker?.paymentHistory?.length ? <div className="space-y-2">{canonicalBroker.paymentHistory.map((p: any, i: number) => <InfoRow key={p.id ?? i} label={fmtDate(p.date)} value={`${fmtCurrency(p.amount)} · ${p.status || "recorded"}`} />)}</div> : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No payment history available" />}
                         </div>
                       </div>
                     </TabsContent>

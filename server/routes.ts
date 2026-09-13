@@ -16,7 +16,7 @@ import {
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
-import { eq, and, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt } from "drizzle-orm";
+import { eq, and, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -36,6 +36,7 @@ import {
   insertClientVaultSchema,
   insertTaskSchema,
   insertBrokerSchema,
+  insertBrokerBranchSchema,
   insertBrokerFollowUpSchema,
   insertBrokerFollowUpReminderSchema,
   insertLockboxEntrySchema,
@@ -48,6 +49,7 @@ import {
   tasks,
   clients,
   brokers,
+  brokerBranches,
   fuelAdvances,
   invoices,
   invoiceStatusHistory,
@@ -284,6 +286,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     req.user = user;
     next();
+  };
+
+  // Resolve canonical broker/branch references in one place. Legacy debtor-only
+  // invoices remain untouched, while every new broker-linked write gets an
+  // authoritative branch snapshot from the database.
+  const resolveInvoiceBrokerBranch = async (
+    input: Record<string, any>,
+    current?: typeof invoices.$inferSelect,
+  ) => {
+    const hasBroker = Object.prototype.hasOwnProperty.call(input, "brokerId");
+    const hasBranch = Object.prototype.hasOwnProperty.call(input, "branchId");
+    const hasBranchName = Object.prototype.hasOwnProperty.call(input, "branchName");
+    if (!hasBroker && !hasBranch && !hasBranchName) return input;
+
+    const currentBrokerId = current?.brokerId ?? null;
+    const currentBranchId = current?.branchId ?? null;
+    let brokerId = hasBroker ? input.brokerId ?? null : currentBrokerId;
+    let branchId = hasBranch ? input.branchId ?? null : currentBranchId;
+
+    // Switching brokers without explicitly selecting a branch cannot retain a
+    // branch from the previous broker.
+    if (hasBroker && brokerId !== currentBrokerId && !hasBranch) branchId = null;
+    if (hasBroker && brokerId == null) branchId = null;
+
+    if (brokerId != null) {
+      const [broker] = await db.select({ id: brokers.id, status: brokers.status })
+        .from(brokers).where(eq(brokers.id, brokerId)).limit(1);
+      if (!broker) throw Object.assign(new Error("Broker not found"), { status: 400 });
+      if (broker.status !== "active") throw Object.assign(new Error("Broker is not active"), { status: 400 });
+    }
+
+    if (branchId != null) {
+      if (brokerId == null) throw Object.assign(new Error("brokerId is required when branchId is supplied"), { status: 400 });
+      const [branch] = await db.select({
+        id: brokerBranches.id,
+        branchName: brokerBranches.branchName,
+        status: brokerBranches.status,
+      }).from(brokerBranches).where(and(
+        eq(brokerBranches.id, branchId),
+        eq(brokerBranches.brokerId, brokerId),
+      )).limit(1);
+      if (!branch) throw Object.assign(new Error("Branch not found for broker"), { status: 400 });
+      if (branch.status !== "active") throw Object.assign(new Error("Branch is not active"), { status: 400 });
+      input.branchName = branch.branchName;
+    } else if (hasBroker || hasBranch || (currentBrokerId != null && hasBranchName)) {
+      input.branchName = null;
+    }
+
+    if (hasBroker) input.brokerId = brokerId;
+    if (hasBranch || (hasBroker && brokerId !== currentBrokerId)) input.branchId = branchId;
+    return input;
   };
 
   const requireReportsPermission = async (req: any, res: any, next: any) => {
@@ -2079,7 +2132,9 @@ ${message}
       const enriched = await Promise.all(held.map(async (inv) => {
         try {
           const client = inv.clientId ? await storage.getClient(inv.clientId) : null;
-          const broker = inv.debtorId ? await storage.getDebtor(inv.debtorId) : null;
+          const broker = inv.brokerId
+            ? (await db.select({ name: brokers.name }).from(brokers).where(eq(brokers.id, inv.brokerId)).limit(1))[0]
+            : (inv.debtorId ? await storage.getDebtor(inv.debtorId) : null);
           return {
             ...inv,
             clientName: client?.name ?? null,
@@ -2139,31 +2194,42 @@ ${message}
         coalesce(${clients.mcNumber}, '') || ' ' ||
         coalesce(${clients.dotNumber}, '')
       )`;
+      const invoiceBrokerSearchDocument = sql`(
+        coalesce(${brokers.name}, '') || ' ' ||
+        coalesce(${brokers.contactPerson}, '') || ' ' ||
+        coalesce(${brokers.email}, '')
+      )`;
       const search = q ? or(
         ilike(invoiceSearchDocument, `%${q}%`), ilike(invoiceCarrierSearchDocument, `%${q}%`),
+        ilike(invoiceBrokerSearchDocument, `%${q}%`),
       ) : undefined;
       const where = scope && search ? and(scope, search) : scope || search;
       const query = db.select({
         invoice: invoices,
         carrierName: clients.name,
+        brokerName: brokers.name,
       }).from(invoices)
         .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .where(where)
         .orderBy(desc(invoices.createdAt));
       if (all) {
         const rows = await query;
-        return res.json(rows.map(({ invoice, carrierName }) => ({
+        return res.json(rows.map(({ invoice, carrierName, brokerName }) => ({
           ...withInvoiceDisplayStatus(invoice),
           carrierName,
+          brokerName,
         })));
       }
       const { page, limit, offset } = parseListPagination(req);
       const [{ total }] = await db.select({ total: count() }).from(invoices)
-        .leftJoin(clients, eq(invoices.clientId, clients.id)).where(where);
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(where);
       const rows = await query.limit(limit).offset(offset);
-      const data = rows.map(({ invoice, carrierName }) => ({
+      const data = rows.map(({ invoice, carrierName, brokerName }) => ({
         ...withInvoiceDisplayStatus(invoice),
         carrierName,
+        brokerName,
       }));
       res.json({ data, total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
@@ -2176,7 +2242,9 @@ ${message}
     try {
       // Always generate a unique invoice number server-side to prevent collisions
       const invoiceNumber = await storage.getNextInvoiceNumber();
-      const invoiceData = insertInvoiceSchema.parse({ ...req.body, invoiceNumber });
+      const invoiceData = await resolveInvoiceBrokerBranch(
+        insertInvoiceSchema.parse({ ...req.body, invoiceNumber }) as any,
+      );
       const {
         status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,
         fundedAt, heldReason, heldAt, heldBy, heldNotes, previousStatus,
@@ -2202,6 +2270,7 @@ ${message}
 
       res.status(201).json(withInvoiceDisplayStatus(invoice));
     } catch (error) {
+      if ((error as any)?.status === 400) return res.status(400).json({ message: (error as Error).message });
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
       }
@@ -2218,9 +2287,10 @@ ${message}
         carrierName: clients.name,
         advanceRate: clients.advanceRate,
         factoringFeeRate: clients.factoringFeeRate,
-        brokerName: debtors.name,
+        brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
       }).from(invoices)
         .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
         .where(inArray(invoices.status, ["submitted", "docs_pending", "under_review"]))
         .orderBy(invoices.submittedAt, invoices.createdAt);
@@ -2352,6 +2422,7 @@ ${message}
       const user = req.user;
       const currentInvoice = await storage.getInvoice(id);
       if (!currentInvoice) return res.status(404).json({ message: "Invoice not found" });
+      await resolveInvoiceBrokerBranch(invoiceData as any, currentInvoice);
       if (user.role === "employee" && (currentInvoice.submittedBy !== user.id || !["draft", "rejected"].includes(currentInvoice.status))) {
         return res.status(403).json({ message: "Agents may edit only their own draft or correction-required invoices" });
       }
@@ -2379,6 +2450,7 @@ ${message}
 
       res.json(withInvoiceDisplayStatus(invoice));
     } catch (error) {
+      if ((error as any)?.status === 400) return res.status(400).json({ message: (error as Error).message });
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
       }
@@ -2441,10 +2513,11 @@ ${message}
           bolNumber: invoices.bolNumber,
           notes: invoices.notes,
           clientName: clients.name,
-          debtorName: debtors.name,
+          debtorName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
         })
         .from(invoices)
         .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
         .where(eq(invoices.id, id))
         .limit(1);
@@ -2633,9 +2706,12 @@ ${message}
         id: invoiceAgingAlerts.id, invoiceId: invoiceAgingAlerts.invoiceId, alertType: invoiceAgingAlerts.alertType,
         triggeredAt: invoiceAgingAlerts.triggeredAt, acknowledgedAt: invoiceAgingAlerts.acknowledgedAt,
         acknowledgedBy: invoiceAgingAlerts.acknowledgedBy, status: invoiceAgingAlerts.status,
-        invoiceNumber: invoices.invoiceNumber, fundedAt: invoices.fundedAt, carrier: clients.name, broker: debtors.name,
+        invoiceNumber: invoices.invoiceNumber, fundedAt: invoices.fundedAt, carrier: clients.name,
+        broker: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
       }).from(invoiceAgingAlerts).innerJoin(invoices, eq(invoiceAgingAlerts.invoiceId, invoices.id))
-        .leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
         .where(eq(invoiceAgingAlerts.status, view as any)).orderBy(desc(invoiceAgingAlerts.triggeredAt));
       res.json(alerts);
     } catch (error) { console.error("Error fetching aging alerts:", error); res.status(500).json({ message: "Failed to fetch aging alerts" }); }
@@ -2658,9 +2734,11 @@ ${message}
   app.get("/api/invoices/chargebacks", requireAuth, async (_req, res) => {
     try {
       const rows = await db.select({
-        invoice: invoices, carrierName: clients.name, brokerName: debtors.name,
+        invoice: invoices, carrierName: clients.name,
+        brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
       }).from(invoices)
         .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
         .where(inArray(invoices.chargebackStatus, ["scheduled", "extended", "charged"] as any[]))
         .orderBy(desc(invoices.chargebackDate));
@@ -4935,6 +5013,76 @@ Trucking Pros Financial Team
     }
   });
 
+  // Branch routes must precede /api/brokers/:id so "branches" is never
+  // interpreted as a broker id by Express.
+  app.get("/api/brokers/:id/branches", requireAuth, async (req, res) => {
+    try {
+      const brokerId = Number(req.params.id);
+      if (!Number.isInteger(brokerId) || brokerId <= 0) return res.status(400).json({ message: "Invalid broker ID" });
+      const [broker] = await db.select({ id: brokers.id }).from(brokers).where(eq(brokers.id, brokerId)).limit(1);
+      if (!broker) return res.status(404).json({ message: "Broker not found" });
+      const branches = await db.select().from(brokerBranches)
+        .where(eq(brokerBranches.brokerId, brokerId))
+        .orderBy(brokerBranches.branchName, brokerBranches.id);
+      res.json(branches);
+    } catch (error) {
+      console.error("Error fetching broker branches:", error);
+      res.status(500).json({ message: "Failed to fetch broker branches" });
+    }
+  });
+
+  app.post("/api/brokers/:id/branches", requireAuth, requireManagerOrAdmin, async (req, res) => {
+    try {
+      const brokerId = Number(req.params.id);
+      if (!Number.isInteger(brokerId) || brokerId <= 0) return res.status(400).json({ message: "Invalid broker ID" });
+      const [broker] = await db.select({ id: brokers.id }).from(brokers).where(eq(brokers.id, brokerId)).limit(1);
+      if (!broker) return res.status(404).json({ message: "Broker not found" });
+      const branchData = insertBrokerBranchSchema.parse({ ...req.body, brokerId });
+      const [branch] = await db.insert(brokerBranches).values(branchData).returning();
+      res.status(201).json(branch);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid branch data", errors: error.errors });
+      console.error("Error creating broker branch:", error);
+      res.status(500).json({ message: "Failed to create broker branch" });
+    }
+  });
+
+  app.patch("/api/brokers/:id/branches/:branchId", requireAuth, requireManagerOrAdmin, async (req, res) => {
+    try {
+      const brokerId = Number(req.params.id);
+      const branchId = Number(req.params.branchId);
+      if (!Number.isInteger(brokerId) || brokerId <= 0 || !Number.isInteger(branchId) || branchId <= 0) {
+        return res.status(400).json({ message: "Invalid broker or branch ID" });
+      }
+      const updates = insertBrokerBranchSchema.omit({ brokerId: true }).partial().parse(req.body);
+      const [branch] = await db.update(brokerBranches).set({ ...updates, updatedAt: new Date() })
+        .where(and(eq(brokerBranches.id, branchId), eq(brokerBranches.brokerId, brokerId))).returning();
+      if (!branch) return res.status(404).json({ message: "Branch not found" });
+      res.json(branch);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid branch data", errors: error.errors });
+      console.error("Error updating broker branch:", error);
+      res.status(500).json({ message: "Failed to update broker branch" });
+    }
+  });
+
+  app.delete("/api/brokers/:id/branches/:branchId", requireAuth, requireManagerOrAdmin, async (req, res) => {
+    try {
+      const brokerId = Number(req.params.id);
+      const branchId = Number(req.params.branchId);
+      if (!Number.isInteger(brokerId) || brokerId <= 0 || !Number.isInteger(branchId) || branchId <= 0) {
+        return res.status(400).json({ message: "Invalid broker or branch ID" });
+      }
+      const [branch] = await db.delete(brokerBranches)
+        .where(and(eq(brokerBranches.id, branchId), eq(brokerBranches.brokerId, brokerId))).returning();
+      if (!branch) return res.status(404).json({ message: "Branch not found" });
+      res.json({ message: "Branch deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting broker branch:", error);
+      res.status(500).json({ message: "Failed to delete broker branch" });
+    }
+  });
+
   app.get("/api/brokers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -6656,9 +6804,14 @@ Trucking Pros Financial Team
     const allInvoices = await db.select({
       id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount, status: invoices.status,
       fundedAt: invoices.fundedAt, invoiceDate: invoices.invoiceDate, createdAt: invoices.createdAt,
-      clientId: invoices.clientId, carrier: clients.name, debtorId: invoices.debtorId, broker: debtors.name, debtorMcNumber: debtors.mcNumber,
+      clientId: invoices.clientId, carrier: clients.name, brokerId: invoices.brokerId, debtorId: invoices.debtorId,
+      broker: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
+      debtorMcNumber: sql<string | null>`coalesce(${brokers.mcNumber}, ${debtors.mcNumber})`,
       loadType: invoices.loadType, chargebackStatus: invoices.chargebackStatus,
-    }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+    }).from(invoices)
+      .leftJoin(clients, eq(invoices.clientId, clients.id))
+      .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+      .leftJoin(debtors, eq(invoices.debtorId, debtors.id));
     const lines = await db.select({
       invoiceId: paymentApplicationLines.invoiceId, appliedAmount: paymentApplicationLines.appliedAmount,
       variance: paymentApplicationLines.variance, varianceType: paymentApplicationLines.varianceType,
@@ -6700,7 +6853,8 @@ Trucking Pros Financial Team
         return { invoice, outstanding, ageDays };
       }).filter(({ invoice, outstanding, ageDays }) => predicate(invoice, outstanding, ageDays))
         .map(({ invoice, outstanding, ageDays }) => ({
-          invoiceNumber: invoice.invoiceNumber, carrier: invoice.carrier || `Carrier #${invoice.clientId}`,
+          invoiceNumber: invoice.invoiceNumber, brokerId: invoice.brokerId ?? invoice.debtorId,
+          carrier: invoice.carrier || `Carrier #${invoice.clientId}`,
           broker: invoice.broker || "Unassigned", amount: Number(invoice.amount), fundedDate: reportDate(invoice.fundedAt),
           ageDays, status: invoice.status, outstanding: +outstanding.toFixed(2),
           ...(chargebacks ? { chargebackStatus: invoice.chargebackStatus } : {}),
@@ -6727,6 +6881,7 @@ Trucking Pros Financial Team
         const invoice = invoiceByNumber.get(String(row.invoiceNumber))!;
         return {
           ...Object.fromEntries(globalColumns.invoice.slice(0, -1).map(column => [column.key, row[column.key]])),
+          brokerId: invoice.brokerId ?? invoice.debtorId,
           collected: +(applied.get(invoice.id) || 0).toFixed(2),
           shortPayAmount: row.outstanding,
         };
@@ -6741,13 +6896,18 @@ Trucking Pros Financial Team
       const payoutRows = await db.select({
         id: payouts.id, invoiceId: payouts.invoiceId, netPayout: payouts.netPayout, advanceAmount: payouts.advanceAmount,
         advancePaidAt: payouts.advancePaidAt, paymentStatus: payouts.paymentStatus, invoiceNumber: invoices.invoiceNumber,
-        invoiceAmount: invoices.amount, carrier: clients.name, broker: debtors.name, fundedAt: invoices.fundedAt,
-      }).from(payouts).innerJoin(invoices, eq(payouts.invoiceId, invoices.id)).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+         invoiceAmount: invoices.amount, brokerId: invoices.brokerId, debtorId: invoices.debtorId, carrier: clients.name,
+         broker: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`, fundedAt: invoices.fundedAt,
+       }).from(payouts).innerJoin(invoices, eq(payouts.invoiceId, invoices.id))
+         .leftJoin(clients, eq(invoices.clientId, clients.id))
+         .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+         .leftJoin(debtors, eq(invoices.debtorId, debtors.id));
       const today = businessDate(new Date());
       const rows = payoutRows.filter(row =>
         row.paymentStatus !== "pending_advance" && !!row.advancePaidAt && businessDate(row.advancePaidAt) === today,
       ).map(row => ({
-        payoutId: row.id, invoiceNumber: row.invoiceNumber, carrier: row.carrier || "Unknown", broker: row.broker || "Unassigned",
+        payoutId: row.id, invoiceNumber: row.invoiceNumber, brokerId: row.brokerId ?? row.debtorId,
+        carrier: row.carrier || "Unknown", broker: row.broker || "Unassigned",
         amount: Number(row.netPayout || row.advanceAmount), processedDate: row.advancePaidAt ? businessDate(row.advancePaidAt) : null,
       }));
       return { title: "Today's Deposits", columns: [{ key: "payoutId", label: "Payout #" }, { key: "invoiceNumber", label: "Invoice" }, { key: "carrier", label: "Carrier" }, { key: "broker", label: "Broker" }, { key: "amount", label: "Amount", type: "money" }, { key: "processedDate", label: "Processed", type: "date" }], rows, summary: { count: rows.length, totalAmount: +rows.reduce((s, r) => s + Number(r.amount), 0).toFixed(2) } };
@@ -6764,7 +6924,7 @@ Trucking Pros Financial Team
           if (cumulative >= Number(invoice.amount)) { end = event.date; break; }
         }
         if (!end) continue;
-        const key = String(invoice.debtorId || "unassigned");
+        const key = String(invoice.brokerId ?? invoice.debtorId ?? "unassigned");
         const days = Math.max(0, Math.floor((end.getTime() - invoice.fundedAt.getTime()) / 86400000));
         const group = groups.get(key) || { broker: invoice.broker || "Unassigned", count: 0, days: 0, amount: 0 };
         group.count++; group.days += days; group.amount += Number(invoice.amount); groups.set(key, group);
@@ -6922,8 +7082,10 @@ Trucking Pros Financial Team
         id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount,
         status: invoices.status, factoringStage: invoices.factoringStage, createdAt: invoices.createdAt,
         fundedAt: invoices.fundedAt, assignedTo: invoices.assignedTo, submittedBy: invoices.submittedBy,
-        clientId: invoices.clientId, clientName: clients.name, debtorId: invoices.debtorId, debtorName: debtors.name,
+        clientId: invoices.clientId, clientName: clients.name, brokerId: invoices.brokerId,
+        debtorId: invoices.debtorId, brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
       }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id));
       const relevantInvoices = invoiceRows.filter((invoice) => {
         const ownerId = invoice.assignedTo ?? invoice.submittedBy;
@@ -6966,7 +7128,8 @@ Trucking Pros Financial Team
           invoices: agentInvoices.map((invoice) => ({
             id: invoice.id, invoiceNumber: invoice.invoiceNumber, amount: invoice.amount, status: invoice.status,
             factoringStage: invoice.factoringStage, createdAt: invoice.createdAt, fundedAt: invoice.fundedAt,
-            carrierId: invoice.clientId, carrierName: invoice.clientName, brokerId: invoice.debtorId, brokerName: invoice.debtorName,
+            carrierId: invoice.clientId, carrierName: invoice.clientName,
+            brokerId: invoice.brokerId ?? invoice.debtorId, brokerName: invoice.brokerName,
           })),
         };
       });
@@ -7043,8 +7206,12 @@ Trucking Pros Financial Team
       id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount, status: invoices.status,
       invoiceDate: invoices.invoiceDate, dueDate: invoices.dueDate, createdAt: invoices.createdAt,
       chargebackStatus: invoices.chargebackStatus, clientId: invoices.clientId, clientName: clients.name,
-      debtorId: invoices.debtorId, debtorName: debtors.name,
-    }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(debtors, eq(invoices.debtorId, debtors.id));
+      brokerId: invoices.brokerId, debtorId: invoices.debtorId,
+      brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
+    }).from(invoices)
+      .leftJoin(clients, eq(invoices.clientId, clients.id))
+      .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+      .leftJoin(debtors, eq(invoices.debtorId, debtors.id));
     const applications = await db.select({ invoiceId: paymentApplicationLines.invoiceId, appliedAmount: paymentApplicationLines.appliedAmount }).from(paymentApplicationLines);
     const payoutsForInvoices = await db.select({
       invoiceId: payouts.invoiceId, reserveAmount: payouts.reserveAmount, reserveReleasedAt: payouts.reserveReleasedAt, paymentStatus: payouts.paymentStatus,
@@ -7053,7 +7220,7 @@ Trucking Pros Financial Team
     applications.forEach((line) => appliedByInvoice.set(line.invoiceId, (appliedByInvoice.get(line.invoiceId) || 0) + Number(line.appliedAmount)));
     const payoutByInvoice = new Map(payoutsForInvoices.map((payout) => [payout.invoiceId, payout]));
     const rows: ArRow[] = allInvoices.filter((invoice) => {
-      const entityId = kind === "carrier" ? invoice.clientId : invoice.debtorId;
+      const entityId = kind === "carrier" ? invoice.clientId : (invoice.brokerId ?? invoice.debtorId);
       return inReportRange(invoice.createdAt, range) && (!filterId || entityId === Number(filterId));
     }).map((invoice) => {
       const appliedAmount = appliedByInvoice.get(invoice.id) || 0;
@@ -7064,7 +7231,8 @@ Trucking Pros Financial Team
         outstanding: Math.max(0, Number(invoice.amount) - appliedAmount), status: invoice.status,
         invoiceDate: invoice.invoiceDate, dueDate: invoice.dueDate, createdAt: invoice.createdAt,
         carrierId: invoice.clientId, carrierName: invoice.clientName || `Carrier #${invoice.clientId}`,
-        brokerId: invoice.debtorId, brokerName: invoice.debtorName || (invoice.debtorId ? `Broker #${invoice.debtorId}` : "Unassigned"),
+        brokerId: invoice.brokerId ?? invoice.debtorId,
+        brokerName: invoice.brokerName || ((invoice.brokerId ?? invoice.debtorId) ? `Broker #${invoice.brokerId ?? invoice.debtorId}` : "Unassigned"),
         reserveHeld, chargebackExposure: ["scheduled", "extended", "charged"].includes(invoice.chargebackStatus) ? Math.max(0, Number(invoice.amount) - appliedAmount) : 0,
       };
     });
@@ -7120,7 +7288,7 @@ Trucking Pros Financial Team
   // prevents a carrier-only (or broker-only) query from inadvertently exposing
   // unrelated invoice activity.
   type CarrierBrokerReportRow = {
-    id: number; invoiceNumber: string; loadNumber: string | null; amount: number;
+    id: number; invoiceNumber: string; loadNumber: string | null; brokerId: number | null; amount: number;
     fundedDate: Date | null; ageDays: number; status: string; chargebackStatus: string;
     appliedAmount: number; collected: number; outstanding: number; shortPayAmount: number;
     accountStatus: "pending" | "overdue" | "charged_back" | "payment_plan";
@@ -7165,11 +7333,15 @@ Trucking Pros Financial Team
     const filters = carrierBrokerReportQuery(query, options);
     const invoiceRows = await db.select({
       id: invoices.id, invoiceNumber: invoices.invoiceNumber, loadNumber: invoices.loadNumber,
+      brokerId: invoices.brokerId, debtorId: invoices.debtorId,
       amount: invoices.amount, fundedDate: invoices.fundedAt, status: invoices.status,
       chargebackStatus: invoices.chargebackStatus, invoiceDate: invoices.invoiceDate,
       dueDate: invoices.dueDate, createdAt: invoices.createdAt, loadType: invoices.loadType,
       notes: invoices.notes,
-    }).from(invoices).where(and(eq(invoices.clientId, filters.carrierId), eq(invoices.debtorId, filters.brokerId)));
+    }).from(invoices).where(and(
+      eq(invoices.clientId, filters.carrierId),
+      or(eq(invoices.brokerId, filters.brokerId), and(isNull(invoices.brokerId), eq(invoices.debtorId, filters.brokerId))),
+    ));
     const invoiceIds = invoiceRows.map((invoice) => invoice.id);
     const applicationRows = invoiceIds.length
       ? await db.select({
@@ -7205,7 +7377,8 @@ Trucking Pros Financial Team
         const accountStatus: CarrierBrokerReportRow["accountStatus"] =
           paymentPlan ? "payment_plan" : chargedBack ? "charged_back" : overdue ? "overdue" : "pending";
         return {
-          id: invoice.id, invoiceNumber: invoice.invoiceNumber, loadNumber: invoice.loadNumber,
+           id: invoice.id, invoiceNumber: invoice.invoiceNumber, loadNumber: invoice.loadNumber,
+           brokerId: invoice.brokerId ?? invoice.debtorId,
           amount: Number(invoice.amount), fundedDate: invoice.fundedDate,
           ageDays: invoice.fundedDate ? Math.max(0, Math.floor((now - invoice.fundedDate.getTime()) / 86400000)) : 0,
           status: invoice.status, chargebackStatus: invoice.chargebackStatus,
@@ -7338,8 +7511,9 @@ Trucking Pros Financial Team
         id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount,
         invoiceDate: invoices.invoiceDate, dueDate: invoices.dueDate, fundedAt: invoices.fundedAt,
         loadNumber: invoices.loadNumber, bolNumber: invoices.bolNumber, loadId: invoices.loadId,
-        debtorName: debtors.name, loadLoadNumber: loads.loadNumber,
+         debtorName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`, loadLoadNumber: loads.loadNumber,
       }).from(invoices)
+         .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
         .leftJoin(loads, eq(invoices.loadId, loads.id))
         .where(eq(invoices.clientId, carrierId));
@@ -7526,12 +7700,14 @@ Trucking Pros Financial Team
           dueDate: invoices.dueDate,
           createdAt: invoices.createdAt,
           clientId: invoices.clientId,
+           brokerId: invoices.brokerId,
           debtorId: invoices.debtorId,
           clientName: clients.name,
-          debtorName: debtors.name,
+           debtorName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
         })
         .from(invoices)
         .leftJoin(clients, eq(invoices.clientId, clients.id))
+         .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
         .where(notInArray(invoices.status, ["paid", "settled", "funded", "rejected"] as any[]));
 
@@ -7558,7 +7734,7 @@ Trucking Pros Financial Team
         buckets[b].count++;
         buckets[b].total += amt;
         const carrier = inv.clientName ?? `Carrier #${inv.clientId}`;
-        const broker = inv.debtorName ?? (inv.debtorId ? `Broker #${inv.debtorId}` : "Unknown");
+        const broker = inv.debtorName ?? ((inv.brokerId ?? inv.debtorId) ? `Broker #${inv.brokerId ?? inv.debtorId}` : "Unknown");
         buckets[b].carriers[carrier] = (buckets[b].carriers[carrier] ?? 0) + amt;
         buckets[b].brokers[broker] = (buckets[b].brokers[broker] ?? 0) + amt;
       }
@@ -7628,21 +7804,24 @@ Trucking Pros Financial Team
           amount: invoices.amount,
           status: invoices.status,
           createdAt: invoices.createdAt,
+          brokerId: invoices.brokerId,
           debtorId: invoices.debtorId,
-          brokerName: debtors.name,
-          creditLimit: debtors.creditLimit,
-          avgDaysToPay: debtors.averageDaysToPay,
+          brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
+          creditLimit: sql<number | null>`coalesce(${brokers.creditLimit}, ${debtors.creditLimit})`,
+          debtorAvgDaysToPay: debtors.averageDaysToPay,
         })
         .from(invoices)
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id));
 
-      const brokerMap: Record<string, { debtorId: number | null; brokerName: string; invoiceCount: number; totalVolume: number; outstanding: number; paid: number; creditLimit: number | null; avgDaysToPay: number | null }> = {};
+      const brokerMap: Record<string, { brokerId: number | null; debtorId: number | null; brokerName: string; invoiceCount: number; totalVolume: number; outstanding: number; paid: number; creditLimit: number | null; avgDaysToPay: number | null }> = {};
 
       for (const row of rows) {
         if (startDate && new Date(row.createdAt!) < new Date(startDate)) continue;
         if (endDate   && new Date(row.createdAt!) > new Date(endDate))   continue;
-        const key = String(row.debtorId ?? 0);
-        if (!brokerMap[key]) brokerMap[key] = { debtorId: row.debtorId, brokerName: row.brokerName ?? "Unknown", invoiceCount: 0, totalVolume: 0, outstanding: 0, paid: 0, creditLimit: row.creditLimit ? parseFloat(String(row.creditLimit)) : null, avgDaysToPay: row.avgDaysToPay };
+        const canonicalBrokerId = row.brokerId ?? row.debtorId;
+        const key = String(canonicalBrokerId ?? 0);
+        if (!brokerMap[key]) brokerMap[key] = { brokerId: row.brokerId, debtorId: row.debtorId, brokerName: row.brokerName ?? "Unknown", invoiceCount: 0, totalVolume: 0, outstanding: 0, paid: 0, creditLimit: row.creditLimit ? parseFloat(String(row.creditLimit)) : null, avgDaysToPay: row.brokerId ? null : row.debtorAvgDaysToPay };
         const b = brokerMap[key];
         const amt = parseFloat(String(row.amount));
         b.invoiceCount++;

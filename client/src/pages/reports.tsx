@@ -292,7 +292,7 @@ function AgentTab() {
 
 // ─── Broker ───────────────────────────────────────────────────────────────────
 
-type BrokerRow = { debtorId: number | null; brokerName: string; invoiceCount: number; totalVolume: number; outstanding: number; paid: number; creditLimit: number | null; avgDaysToPay: number | null };
+type BrokerRow = { brokerId: number | null; debtorId: number | null; brokerName: string; invoiceCount: number; totalVolume: number; outstanding: number; paid: number; creditLimit: number | null; avgDaysToPay: number | null };
 
 function BrokerTab() {
   const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));

@@ -26,6 +26,7 @@ import {
   brokerFollowUpTemplates,
   invoices,
   clients,
+  brokers,
   debtors,
   eventLedger,
   exceptions,
@@ -473,22 +474,26 @@ export async function triggerBrokerFollowUp(
   const cadence: CadenceConfig = { ...DEFAULT_CADENCE, ...cadenceOverride };
 
   let clientName  = "Carrier";
-  let debtorName: string | undefined;
-  let debtorEmail: string | null = null;
+  let brokerName: string | undefined;
+  let brokerEmail: string | null = null;
 
   if (inv.clientId) {
     const [cl] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, inv.clientId));
     if (cl) clientName = cl.name;
   }
-  if (inv.debtorId) {
+  if (inv.brokerId) {
+    const [b] = await db.select({ email: brokers.email, name: brokers.name }).from(brokers).where(eq(brokers.id, inv.brokerId));
+    if (b?.email) brokerEmail = b.email;
+    if (b?.name) brokerName = b.name;
+  } else if (inv.debtorId) {
     const [d] = await db.select({ email: debtors.email, name: debtors.name }).from(debtors).where(eq(debtors.id, inv.debtorId));
-    if (d?.email) debtorEmail = d.email;
-    if (d?.name)  debtorName  = d.name;
+    if (d?.email) brokerEmail = d.email;
+    if (d?.name)  brokerName = d.name;
   }
 
   // 4. Build immediate email content (template-aware)
   const { subject: immediateSubject, body: immediateBody } = await resolveSubjectBody(
-    "immediate", 0, 1, inv.invoiceNumber, inv.amount, inv.loadNumber, clientName, inv.dueDate ?? null, debtorName,
+    "immediate", 0, 1, inv.invoiceNumber, inv.amount, inv.loadNumber, clientName, inv.dueDate ?? null, brokerName,
   );
 
   // 5. Insert broker_follow_up parent record
@@ -497,7 +502,7 @@ export async function triggerBrokerFollowUp(
     .values({
       invoiceId,
       clientId:      inv.clientId ?? null,
-      brokerId:      null,
+      brokerId:      inv.brokerId ?? null,
       triggerType,
       triggerStatus,
       subject:       immediateSubject,
@@ -517,7 +522,7 @@ export async function triggerBrokerFollowUp(
     inv.loadNumber,
     clientName,
     inv.dueDate ?? null,
-    debtorName,
+    brokerName,
   );
 
   // 7. Write to event_ledger
@@ -550,12 +555,12 @@ export async function triggerBrokerFollowUp(
   } catch (_) { /* best-effort */ }
 
   // 9. Send immediate email (best-effort) and capture SendGrid messageId
-  if (cadence.sendImmediately && debtorEmail) {
+  if (cadence.sendImmediately && brokerEmail) {
     try {
       const { success, messageId } = await sendEmailTracked({
         from:    "dosh@truckingprosfinancial.com",
         replyTo: "dosh@truckingprosfinancial.com",
-        to:      debtorEmail,
+          to:      brokerEmail,
         subject: immediateSubject,
         html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${immediateBody}</pre>`,
       });
@@ -624,6 +629,7 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
       body:           brokerFollowUpReminders.body,
       invoiceId:      brokerFollowUps.invoiceId,
       cadenceConfig:  brokerFollowUps.cadenceConfig,
+      brokerId:        invoices.brokerId,
       debtorId:       invoices.debtorId,
       invoiceNumber:  invoices.invoiceNumber,
     })
@@ -669,18 +675,17 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
     // ── Try to send email ──────────────────────────────────────────────────────
     let emailSent  = false;
     let messageId: string | undefined;
-    if (r.debtorId) {
+    if (r.brokerId || r.debtorId) {
       try {
-        const [debtor] = await db
-          .select({ email: debtors.email })
-          .from(debtors)
-          .where(eq(debtors.id, r.debtorId));
+        const [contact] = r.brokerId
+          ? await db.select({ email: brokers.email }).from(brokers).where(eq(brokers.id, r.brokerId))
+          : await db.select({ email: debtors.email }).from(debtors).where(eq(debtors.id, r.debtorId!));
 
-        if (debtor?.email) {
+        if (contact?.email) {
           const result = await sendEmailTracked({
             from:    "dosh@truckingprosfinancial.com",
             replyTo: "dosh@truckingprosfinancial.com",
-            to:      debtor.email,
+            to:      contact.email,
             subject: r.subject,
             html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${r.body}</pre>`,
           });

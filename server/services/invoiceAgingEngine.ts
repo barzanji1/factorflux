@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, isNotNull, isNull, lte, notInArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
-import { clients, debtors, eventLedger, invoiceAgingAlerts, invoices, invoiceStatusHistory, notifications, users } from "@shared/schema";
+import { brokers, clients, debtors, eventLedger, invoiceAgingAlerts, invoices, invoiceStatusHistory, notifications, users } from "@shared/schema";
 
 const DAY_MS = 86_400_000;
 
@@ -43,10 +43,12 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
 
   const funded = await db.select({
     id: invoices.id, invoiceNumber: invoices.invoiceNumber, fundedAt: invoices.fundedAt,
-    clientName: clients.name, brokerName: debtors.name,
+    clientName: clients.name,
+    brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
     chargebackStatus: invoices.chargebackStatus, chargebackDate: invoices.chargebackDate,
   }).from(invoices)
     .leftJoin(clients, eq(invoices.clientId, clients.id))
+    .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
     .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
     .where(and(isNotNull(invoices.fundedAt), notInArray(invoices.status, ["paid", "settled", "collected"] as any[])));
   const recipients = await db.select({ id: users.id }).from(users)

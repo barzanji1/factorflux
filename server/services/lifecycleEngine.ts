@@ -140,6 +140,15 @@ const guardNoOpenCriticalExceptions: Guard = async ({ invoiceId }) => {
 };
 
 const guardNoDeclinedCreditCheck: Guard = async ({ invoice }) => {
+  if (invoice.brokerId) {
+    const [cc] = await db.select({ id: creditChecks.id }).from(creditChecks)
+      .where(and(
+        eq(creditChecks.entityType, "broker"),
+        eq(creditChecks.entityId, invoice.brokerId),
+        eq(creditChecks.status, "declined"),
+      )).limit(1);
+    return cc ? { code: "credit_declined", message: "Broker has a declined credit check — review before approving", severity: "warning" } : null;
+  }
   if (!invoice.debtorId) return null;
   const [cc] = await db.select({ id: creditChecks.id }).from(creditChecks)
     .where(and(
