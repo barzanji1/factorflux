@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, CheckCircle2, Search, ShieldAlert, Truck, X } from "lucide-react";
+import { Building2, CheckCircle2, Search, ShieldAlert, Truck, Upload, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -24,11 +25,83 @@ type Broker = {
   email?: string | null; phone?: string | null; creditLimit?: string | null;
   averageDaysToPay?: number | null; notes?: string | null;
 };
+type Driver = { id: number; carrierId: number; firstName: string; lastName: string; status?: string | null };
+type PaperworkKey = "rateConfirmation" | "billOfLading" | "lumperReceipt" | "other";
+const PAPERWORK: Array<{ key: PaperworkKey; label: string; required?: boolean }> = [
+  { key: "rateConfirmation", label: "Rate Confirmation", required: true },
+  { key: "billOfLading", label: "Bill of Lading", required: true },
+  { key: "lumperReceipt", label: "Lumper Receipt" },
+  { key: "other", label: "Other" },
+];
+const MAX_PDF_SIZE = 5 * 1024 * 1024;
 
 const EMPTY = {
-  loadNumber: "", clientId: "", brokerId: "", branchId: "",
-  buyout: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
+  loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
+  buyout: "", lumper: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
+  driverId: "", instructionsSubject: "", instructionsDetails: "",
 };
+
+function formatFileSize(bytes: number) {
+  return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function PaperworkDropzone({
+  label, required, file, onFile, onRemove, onInvalid,
+}: {
+  label: string; required?: boolean; file: File | null;
+  onFile: (file: File) => void; onRemove: () => void; onInvalid: (message: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const validate = async (candidate: File) => {
+    if (candidate.type !== "application/pdf" || !candidate.name.toLowerCase().endsWith(".pdf")) {
+      onInvalid(`${label} must be a PDF file.`);
+      return;
+    }
+    if (candidate.size > MAX_PDF_SIZE) {
+      onInvalid(`${label} must be 5MB or smaller.`);
+      return;
+    }
+    try {
+      const bytes = new Uint8Array(await candidate.slice(0, 5).arrayBuffer());
+      if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]) !== "%PDF-") {
+        onInvalid(`${label} is not a valid PDF.`);
+        return;
+      }
+      onFile(candidate);
+    } catch {
+      onInvalid(`${label} could not be read.`);
+    }
+  };
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Upload ${label}${required ? ", required" : ""}`}
+      onKeyDown={event => { if ((event.key === "Enter" || event.key === " ") && !file) { event.preventDefault(); inputRef.current?.click(); } }}
+      onClick={() => !file && inputRef.current?.click()}
+      onDragOver={event => { event.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={event => { event.preventDefault(); setDragging(false); const dropped = event.dataTransfer.files[0]; if (dropped) void validate(dropped); }}
+      className={cn("rounded-xl border border-dashed p-3 transition-colors", dragging ? "border-blue-500 bg-blue-50" : file ? "border-emerald-400 bg-emerald-50/70" : "border-slate-300 hover:border-blue-400")}
+    >
+      <input ref={inputRef} type="file" className="hidden" accept="application/pdf,.pdf" onChange={event => {
+        const selected = event.target.files?.[0];
+        if (selected) void validate(selected);
+        event.currentTarget.value = "";
+      }} />
+      {file ? (
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+          <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{file.name}</p><p className="text-[11px] text-slate-500">{formatFileSize(file.size)}</p></div>
+          <button type="button" aria-label={`Remove ${label}`} className="rounded p-1 text-slate-500 hover:bg-white" onClick={event => { event.stopPropagation(); onRemove(); }}><X className="h-4 w-4" /></button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2.5"><Upload className="h-5 w-5 text-slate-500" /><span className="text-xs font-medium">{label}{required && <span className="text-red-500"> *</span>}</span></div>
+      )}
+    </div>
+  );
+}
 
 function SearchSelect<T extends { id: number; name: string }>({
   label, required, items, selected, onSelect, placeholder,
@@ -132,14 +205,26 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [values, setValues] = useState(EMPTY);
+  const [selectedBroker, setSelectedBroker] = useState<Broker>();
+  const [brokerSearch, setBrokerSearch] = useState("");
+  const [brokerQuery, setBrokerQuery] = useState("");
+  const [brokerOpen, setBrokerOpen] = useState(false);
+  const [paperwork, setPaperwork] = useState<Record<PaperworkKey, File | null>>({
+    rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null,
+  });
   const { data: carriersData = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients", { all: true }], enabled: open });
-  const { data: brokersData = [] } = useQuery<Broker[]>({
-    queryKey: ["/api/brokers", { all: true }],
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBrokerQuery(brokerSearch.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [brokerSearch]);
+  const { data: brokersResponse } = useQuery<{ data?: Broker[] } | Broker[]>({
+    queryKey: ["/api/brokers", brokerQuery, "active", 8],
     queryFn: async () => {
-      const response = await fetch("/api/brokers?all=true", { credentials: "include" });
+      const params = new URLSearchParams({ status: "active", limit: "8" });
+      if (brokerQuery) params.set("q", brokerQuery);
+      const response = await fetch(`/api/brokers?${params.toString()}`, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to load brokers");
-      const payload = await response.json();
-      return Array.isArray(payload) ? payload : payload.data ?? [];
+      return response.json();
     },
     enabled: open,
   });
@@ -164,12 +249,22 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
     },
     enabled: open && !!values.clientId && values.paymentType === "ACH",
   });
+  const { data: driversData = [] } = useQuery<Driver[]>({
+    queryKey: ["/api/drivers", values.clientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/drivers?carrierId=${values.clientId}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load drivers");
+      return response.json();
+    },
+    enabled: open && !!values.clientId,
+  });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
-  const brokers = (Array.isArray(brokersData) ? brokersData : []).filter(item => item.status === "active");
+  const brokers = (Array.isArray(brokersResponse) ? brokersResponse : brokersResponse?.data ?? []).filter(item => item.status === "active");
   const branches = (Array.isArray(branchesData) ? branchesData : []).filter(branch => branch.status === "active");
   const bankAccounts = Array.isArray(bankAccountsData) ? bankAccountsData : [];
   const carrier = carriers.find(item => String(item.id) === values.clientId);
-  const broker = brokers.find(item => String(item.id) === values.brokerId);
+  const broker = selectedBroker ?? brokers.find(item => String(item.id) === values.brokerId);
+  const drivers = driversData.filter(driver => driver.status === "active");
 
   useEffect(() => {
     if (branches.length === 1 && values.branchId !== String(branches[0].id)) {
@@ -179,33 +274,53 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
     }
   }, [branches, values.branchId]);
 
-  useEffect(() => { if (!open) setValues(EMPTY); }, [open]);
+  useEffect(() => {
+    if (!open) {
+      setValues(EMPTY);
+      setSelectedBroker(undefined);
+      setBrokerSearch("");
+      setBrokerOpen(false);
+      setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
+    }
+  }, [open]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/invoices", {
+      const metadata = {
         loadNumber: values.loadNumber.trim(),
         clientId: Number(values.clientId),
         brokerId: Number(values.brokerId),
         branchId: Number(values.branchId),
+        driverId: values.driverId ? Number(values.driverId) : null,
+        code: values.code.trim() || null,
         buyout: values.buyout === "" ? null : values.buyout === "yes",
+        lumper: values.lumper === "" ? null : values.lumper === "yes",
         amount: values.amount,
         paymentType: values.paymentType,
         bankAccountId: values.bankAccountId ? Number(values.bankAccountId) : null,
-         loadType: values.loadType,
-      });
+        loadType: values.loadType,
+        instructionsSubject: values.instructionsSubject.trim() || null,
+        instructionsDetails: values.instructionsDetails.trim() || null,
+        sourceChannel: "drag_drop",
+      };
+      const formData = new FormData();
+      formData.append("metadata", JSON.stringify(metadata));
+      PAPERWORK.forEach(({ key }) => { const file = paperwork[key]; if (file) formData.append(key, file); });
+      const response = await apiRequest("POST", "/api/invoices/with-documents", formData);
       return response.json();
     },
     onSuccess: invoice => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       toast({ title: "Invoice created", description: "The invoice is now pending review." });
       onOpenChange(false);
-      navigate(`/invoices/${invoice.id}`);
+      navigate("/invoices");
     },
     onError: (error: Error) => toast({ title: "Unable to create invoice", description: error.message, variant: "destructive" }),
   });
 
-  const valid = values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId && Number(values.amount) > 0 && isLoadType(values.loadType);
+  const valid = values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId
+    && values.lumper && Number(values.amount) > 0 && isLoadType(values.loadType)
+    && paperwork.rateConfirmation && paperwork.billOfLading;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
@@ -229,6 +344,17 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                 <Input id="loadNumber" required value={values.loadNumber} onChange={e => setValues(v => ({ ...v, loadNumber: e.target.value }))} placeholder="Enter load number" />
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="invoiceCode">Code</Label>
+                <Input id="invoiceCode" value={values.code} onChange={e => setValues(v => ({ ...v, code: e.target.value }))} placeholder="CA TO UT" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Lumper <span className="text-red-500">*</span></Label>
+                <Select value={values.lumper} onValueChange={lumper => setValues(v => ({ ...v, lumper }))}>
+                  <SelectTrigger><SelectValue placeholder="Select Yes or No" /></SelectTrigger>
+                  <SelectContent><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="amount">Invoice Amount <span className="text-red-500">*</span></Label>
                 <Input id="amount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => setValues(v => ({ ...v, amount: e.target.value }))} placeholder="0.00" />
               </div>
@@ -240,11 +366,29 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                  onSelect={item => setValues(v => ({
                    ...v,
                    clientId: String(item.id),
+                    driverId: "",
                    loadType: displayLoadType(item.cargoType),
                  }))}
                  placeholder="Search carriers..."
                />
-              <SearchSelect label="Broker" required items={brokers} selected={broker} onSelect={item => setValues(v => ({ ...v, brokerId: String(item.id), branchId: "" }))} placeholder="Search brokers..." />
+               <div className="relative space-y-1.5">
+                 <Label>Broker <span className="text-red-500">*</span></Label>
+                 <div className="relative">
+                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                   <Input className="h-11 pl-9" value={brokerOpen ? brokerSearch : broker?.name ?? ""} placeholder="Search brokers..." onFocus={() => { setBrokerOpen(true); setBrokerSearch(""); }} onChange={event => { setBrokerSearch(event.target.value); setBrokerOpen(true); }} />
+                   {broker && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { setSelectedBroker(undefined); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
+                 </div>
+                 {brokerOpen && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-950">
+                   {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { setSelectedBroker(item); setValues(v => ({ ...v, brokerId: String(item.id), branchId: "" })); setBrokerSearch(""); setBrokerOpen(false); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
+                 </div>}
+               </div>
+               <div className="space-y-1.5">
+                 <Label>Driver</Label>
+                 <Select disabled={!values.clientId} value={values.driverId} onValueChange={driverId => setValues(v => ({ ...v, driverId }))}>
+                   <SelectTrigger><SelectValue placeholder={!values.clientId ? "Select a carrier first" : "Select a driver (optional)"} /></SelectTrigger>
+                   <SelectContent>{drivers.map(driver => <SelectItem key={driver.id} value={String(driver.id)}>{driver.firstName} {driver.lastName}</SelectItem>)}</SelectContent>
+                 </Select>
+               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="branchId">Branch <span className="text-red-500">*</span></Label>
                 <Select disabled={!values.brokerId || branchesLoading || branchesError || branches.length === 0} value={values.branchId} onValueChange={branchId => setValues(v => ({ ...v, branchId }))}>
@@ -270,6 +414,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent>
                 </Select>
+                 <p className="text-xs font-medium text-red-600">Wire (same day funding) cutoff time is at 13:00:00 MT</p>
               </div>
               {values.paymentType === "ACH" && (
                 <div className="space-y-1.5 sm:col-span-2">
@@ -286,10 +431,26 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                   </Select>
                 </div>
               )}
+              <div className="space-y-4 sm:col-span-2">
+                <div>
+                  <h3 className="text-sm font-semibold">Instructions</h3>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Input value={values.instructionsSubject} onChange={e => setValues(v => ({ ...v, instructionsSubject: e.target.value }))} placeholder="Instructions Subject" />
+                    <Textarea value={values.instructionsDetails} onChange={e => setValues(v => ({ ...v, instructionsDetails: e.target.value }))} placeholder="please be clear and specific" rows={3} className="sm:col-span-2" />
+                  </div>
+                </div>
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold">Paperwork Uploads</h3>
+                   <p className="mt-1 text-xs font-medium text-red-600">Please upload only PDF files under 5MB</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {PAPERWORK.map(({ key, label, required }) => <PaperworkDropzone key={key} label={label} required={required} file={paperwork[key]} onFile={file => setPaperwork(current => ({ ...current, [key]: file }))} onRemove={() => setPaperwork(current => ({ ...current, [key]: null }))} onInvalid={message => toast({ title: "Invalid paperwork", description: message, variant: "destructive" })} />)}
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="button" variant="outline" onClick={() => setValues(EMPTY)}>Reset</Button>
+              <Button type="button" variant="outline" onClick={() => { setValues(EMPTY); setSelectedBroker(undefined); setBrokerSearch(""); setBrokerOpen(false); setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null }); }}>Reset</Button>
               <Button type="submit" disabled={!valid || mutation.isPending} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
                 {mutation.isPending ? "Creating..." : "Submit"}
               </Button>

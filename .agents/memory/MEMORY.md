@@ -12,3 +12,5 @@
 - [Permission override semantics](permission-override-semantics.md) — one explicit permission row replaces all role defaults; never seed a single module permission for default-only users.
 - [Direct-message identity](direct-message-identity.md) — canonical DM keys must encode participant IDs unambiguously; delimiter joins can collide and expose private threads.
 - [Controlled Radix sliders](controlled-radix-sliders.md) — controlled sliders need local draft state during drag; committing against unchanged query data can make them nonfunctional.
+- [Invoice paperwork integrity](invoice-paperwork-integrity.md) — commit invoice rows atomically and durably retry failed S3 compensation; never leave partial paperwork.
+- [Funding lifecycle integrity](funding-lifecycle-integrity.md) — payout, funded state, and audit writes are atomic; Fund and Hold must use compare-and-set transitions.

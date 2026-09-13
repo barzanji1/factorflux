@@ -49,6 +49,7 @@ import {
   users as userTable,
   tasks,
   clients,
+  clientVault,
   brokers,
   brokerBranches,
   fuelAdvances,
@@ -103,6 +104,7 @@ import {
   chatMessages,
   tickets,
   ticketComments,
+  s3CleanupQueue,
   ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
@@ -199,12 +201,110 @@ function handleUpload(field: string) {
   };
 }
 
+// Invoice intake uses one bounded memory-storage parser for all four paperwork
+// slots. Keeping this separate from handleUpload avoids changing the limits or
+// file types accepted by existing upload endpoints.
+function handleInvoicePaperworkUpload(req: any, res: any, next: any) {
+  const paperworkUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024, files: 4 },
+    fileFilter: (_req, file, cb) => {
+      const isPdf = file.mimetype.toLowerCase() === "application/pdf"
+        && path.extname(file.originalname).toLowerCase() === ".pdf";
+      if (isPdf) cb(null, true);
+      else cb(new Error("Invoice paperwork must be a PDF"));
+    },
+  }).fields([
+    { name: "rateConfirmation", maxCount: 1 },
+    { name: "billOfLading", maxCount: 1 },
+    { name: "lumperReceipt", maxCount: 1 },
+    { name: "other", maxCount: 1 },
+  ]);
+
+  paperworkUpload(req, res, (err: any) => {
+    if (!err) return next();
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "Each paperwork file must be 5MB or smaller." });
+    }
+    return res.status(400).json({ message: err.message || "Invoice paperwork upload rejected." });
+  });
+}
+
 function sanitizeOriginalName(name: string) {
   return name
     .normalize("NFKC")
     .replace(/[^\w.\- ()]/g, "_")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+async function queueS3Cleanup(key: string, reason: string, error: unknown) {
+  const lastError = error instanceof Error ? error.message : String(error);
+  try {
+    await db.insert(s3CleanupQueue).values({
+      s3Key: key,
+      reason,
+      lastError,
+    }).onConflictDoUpdate({
+      target: s3CleanupQueue.s3Key,
+      set: {
+        reason,
+        lastError,
+        updatedAt: new Date(),
+        resolvedAt: null,
+      },
+    });
+  } catch (queueError) {
+    // Cleanup failures must remain observable without leaking object contents
+    // or credentials. The original key is intentionally not logged.
+    console.error("[S3 cleanup] Could not enqueue cleanup retry:", queueError instanceof Error ? queueError.message : "unknown error");
+  }
+}
+
+async function cleanupS3KeyWithRetry(key: string, reason: string) {
+  try {
+    await deleteFromS3Strict(key);
+    return true;
+  } catch (error) {
+    await queueS3Cleanup(key, reason, error);
+    return false;
+  }
+}
+
+let s3CleanupProcessorStarted = false;
+async function processS3CleanupQueue() {
+  try {
+    const pending = await db.select().from(s3CleanupQueue)
+      .where(isNull(s3CleanupQueue.resolvedAt))
+      .orderBy(s3CleanupQueue.createdAt)
+      .limit(25);
+    for (const item of pending) {
+      try {
+        await deleteFromS3Strict(item.s3Key);
+        await db.update(s3CleanupQueue).set({
+          resolvedAt: new Date(),
+          updatedAt: new Date(),
+          lastError: null,
+        }).where(eq(s3CleanupQueue.id, item.id));
+      } catch (error) {
+        await db.update(s3CleanupQueue).set({
+          attempts: sql`${s3CleanupQueue.attempts} + 1`,
+          updatedAt: new Date(),
+          lastError: error instanceof Error ? error.message : String(error),
+        }).where(eq(s3CleanupQueue.id, item.id));
+      }
+    }
+  } catch (error) {
+    console.warn("[S3 cleanup] Queue processor unavailable:", error instanceof Error ? error.message : "unknown error");
+  }
+}
+
+function startS3CleanupProcessor() {
+  if (s3CleanupProcessorStarted) return;
+  s3CleanupProcessorStarted = true;
+  void processS3CleanupQueue();
+  const timer = setInterval(() => { void processS3CleanupQueue(); }, 5 * 60 * 1000);
+  timer.unref?.();
 }
 
 function sanitizeClientResponse(client: any, userRole?: string) {
@@ -243,6 +343,7 @@ function buildDocumentMetadata(document: any) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  startS3CleanupProcessor();
   // Auto-grant "earl" permission to all existing admin users who don't have it
   try {
     const adminUsers = await db.select().from(users).where(eq(users.role, "admin"));
@@ -2158,10 +2259,56 @@ ${message}
       if (req.user.role !== "manager" && req.user.role !== "admin") {
         return res.status(403).json({ message: "Manager or admin access required" });
       }
+      const invoiceId = Number(req.params.id);
+      if (!Number.isInteger(invoiceId) || invoiceId <= 0) return res.status(400).json({ message: "Invalid invoice ID" });
       const { reason, notes } = req.body as { reason: string; notes?: string };
       if (!reason?.trim()) return res.status(400).json({ message: "Hold reason is required" });
-      const inv = await storage.holdInvoice(Number(req.params.id), reason, req.user.id, notes);
-      await storage.createActivity({ userId: req.user.id, type: "invoice_held", description: `Invoice #${inv.invoiceNumber} placed on hold: ${reason}`, entityType: "invoice", entityId: inv.id });
+      const allowedHoldStatuses = ["submitted", "docs_pending", "under_review", "approved"] as const;
+      const outcome = await db.transaction(async (tx) => {
+        const [existing] = await tx.select({ id: invoices.id, status: invoices.status })
+          .from(invoices).where(eq(invoices.id, invoiceId));
+        if (!existing) return { kind: "not_found" as const };
+        if (!allowedHoldStatuses.includes(existing.status as typeof allowedHoldStatuses[number])) {
+          return { kind: "conflict" as const, status: existing.status };
+        }
+        const heldAt = new Date();
+        const [updated] = await tx.update(invoices).set({
+          previousStatus: existing.status,
+          status: "held",
+          heldReason: reason.trim(),
+          heldAt,
+          heldBy: req.user.id,
+          heldNotes: notes ?? null,
+          updatedAt: heldAt,
+        }).where(and(
+          eq(invoices.id, invoiceId),
+          inArray(invoices.status, [...allowedHoldStatuses]),
+        )).returning();
+        if (!updated) return { kind: "conflict" as const, status: existing.status };
+        const previousStatus = updated.previousStatus ?? existing.status;
+        await tx.insert(invoiceStatusHistory).values({
+          invoiceId,
+          oldStatus: previousStatus,
+          newStatus: "held",
+          changedBy: req.user.id,
+          reason: `Held: ${reason.trim()}`,
+        });
+        await tx.insert(eventLedger).values({
+          entityType: "invoice",
+          entityId: invoiceId,
+          eventType: "status_changed",
+          actorType: "user",
+          actorId: req.user.id,
+          payloadJson: { from: previousStatus, to: "held", reason: reason.trim() },
+        });
+        return { kind: "updated" as const, invoice: updated };
+      });
+      if (outcome.kind === "not_found") return res.status(404).json({ message: "Invoice not found" });
+      if (outcome.kind === "conflict") return res.status(409).json({ message: `Invoices in ${outcome.status} status cannot be placed on hold` });
+      const inv = outcome.invoice;
+      void storage.createActivity({ userId: req.user.id, type: "invoice_held", description: `Invoice #${inv.invoiceNumber} placed on hold: ${reason.trim()}`, entityType: "invoice", entityId: inv.id }).catch((error) => {
+        console.warn("Non-blocking hold activity failed:", error);
+      });
       res.json(inv);
     } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to hold invoice" }); }
   });
@@ -2193,6 +2340,7 @@ ${message}
       const invoiceSearchDocument = sql`(
         coalesce(${invoices.invoiceNumber}, '') || ' ' ||
         coalesce(${invoices.loadNumber}, '') || ' ' ||
+        coalesce(${invoices.code}, '') || ' ' ||
         coalesce(${invoices.branchName}, '') || ' ' ||
         coalesce(${invoices.bolNumber}, '') || ' ' ||
         coalesce(${invoices.status}, '')
@@ -2258,6 +2406,182 @@ ${message}
     }
   });
 
+  app.post("/api/invoices/with-documents", requireAuth, handleInvoicePaperworkUpload, async (req: any, res) => {
+    const uploadedKeys: string[] = [];
+    let transactionCommitted = false;
+    try {
+      const files = (req.files ?? {}) as Record<string, Express.Multer.File[]>;
+      const rateConfirmation = files.rateConfirmation?.[0];
+      const billOfLading = files.billOfLading?.[0];
+      if (!rateConfirmation || !billOfLading) {
+        return res.status(400).json({ message: "Rate Confirmation and Bill of Lading are required." });
+      }
+
+      const allFiles = Object.values(files).flat();
+      for (const file of allFiles) {
+        const isPdf = file.mimetype.toLowerCase() === "application/pdf"
+          && path.extname(file.originalname).toLowerCase() === ".pdf"
+          && file.size <= 5 * 1024 * 1024
+          && file.buffer.length >= 5
+          && file.buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+        if (!isPdf) {
+          return res.status(400).json({ message: `Invalid PDF paperwork file: ${sanitizeOriginalName(file.originalname)}` });
+        }
+      }
+
+      let metadata: Record<string, any>;
+      try {
+        metadata = JSON.parse(String(req.body?.metadata ?? "{}"));
+      } catch {
+        return res.status(400).json({ message: "metadata must be valid JSON." });
+      }
+      if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+        return res.status(400).json({ message: "metadata must be a JSON object." });
+      }
+
+      const invoiceNumber = await storage.getNextInvoiceNumber();
+      const parsed = insertInvoiceSchema.extend({
+        loadType: z.enum(LOAD_TYPES),
+        amount: z.coerce.number().positive("Amount must be greater than zero"),
+        clientId: z.coerce.number().int().positive(),
+        brokerId: z.coerce.number().int().positive(),
+        branchId: z.coerce.number().int().positive(),
+        driverId: z.coerce.number().int().positive().nullable().optional(),
+        bankAccountId: z.coerce.number().int().positive().nullable().optional(),
+        code: z.string().trim().max(255).nullable().optional(),
+        lumper: z.coerce.boolean().nullable().optional(),
+        instructionsSubject: z.string().trim().max(255).nullable().optional(),
+        instructionsDetails: z.string().trim().max(10000).nullable().optional(),
+        paymentType: z.enum(["ACH", "Wire"]).optional(),
+      }).parse({ ...metadata, invoiceNumber });
+      const invoiceData = await resolveInvoiceBrokerBranch(parsed as any);
+
+      const [carrier] = await db.select({ id: clients.id, status: clients.status })
+        .from(clients).where(eq(clients.id, invoiceData.clientId)).limit(1);
+      if (!carrier) return res.status(400).json({ message: "Carrier not found." });
+      if (carrier.status !== "active") return res.status(400).json({ message: "Carrier is not active." });
+
+      if (invoiceData.driverId != null) {
+        const [driver] = await db.select({ id: drivers.id, carrierId: drivers.carrierId, status: drivers.status })
+          .from(drivers).where(eq(drivers.id, invoiceData.driverId)).limit(1);
+        if (!driver || driver.status !== "active" || driver.carrierId !== invoiceData.clientId) {
+          return res.status(400).json({ message: "The selected driver is not available for this carrier." });
+        }
+      }
+      if (invoiceData.bankAccountId != null) {
+        const account = await storage.getVaultEntry(invoiceData.bankAccountId);
+        if (!account || account.clientId !== invoiceData.clientId || account.dataType !== "bank_account" || !account.isActive) {
+          return res.status(400).json({ message: "The selected bank account is not available for this carrier." });
+        }
+      }
+
+      const paperwork: Array<{ field: string; type: "rate_confirmation" | "bill_of_lading" | "lumper_receipt" | "other" }> = [
+        { field: "rateConfirmation", type: "rate_confirmation" },
+        { field: "billOfLading", type: "bill_of_lading" },
+        { field: "lumperReceipt", type: "lumper_receipt" },
+        { field: "other", type: "other" },
+      ];
+      const intakeKeyPrefix = crypto.randomUUID();
+      const uploadedDocuments: Array<Record<string, any>> = [];
+      for (const { field, type } of paperwork) {
+        const file = files[field]?.[0];
+        if (!file) continue;
+        const filename = `${type}-${crypto.randomUUID()}.pdf`;
+        const s3Key = `invoices/intake/${intakeKeyPrefix}/paperwork/${filename}`;
+        uploadedKeys.push(s3Key);
+        await uploadToS3(file.buffer, s3Key, "application/pdf");
+        uploadedDocuments.push({
+          filename,
+          originalName: sanitizeOriginalName(file.originalname),
+          mimeType: "application/pdf",
+          size: file.size,
+          s3Key,
+          documentType: type,
+          finalDocumentType: type,
+          loadId: null,
+          uploadedBy: req.user.id,
+          sourceChannel: metadata.sourceChannel === "manual" ? "manual" : "drag_drop",
+          status: "processed",
+        });
+      }
+
+      const {
+        status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,
+        fundedAt, heldReason, heldAt, heldBy, heldNotes, previousStatus,
+        ...draftData
+      } = invoiceData as any;
+      const committed = await db.transaction(async (tx) => {
+        const [invoice] = await tx.insert(invoices).values({
+          ...draftData,
+          invoiceNumber,
+          loadId: null,
+          submittedBy: req.user.id,
+          submittedAt: new Date(),
+          status: "submitted",
+          factoringStage: "verification",
+        }).returning();
+        await tx.insert(invoiceStatusHistory).values({
+          invoiceId: invoice.id,
+          oldStatus: null,
+          newStatus: "submitted",
+          changedBy: req.user.id,
+          reason: "Invoice created",
+        });
+        await tx.insert(eventLedger).values({
+          entityType: "invoice",
+          entityId: invoice.id,
+          eventType: "invoice.created",
+          actorType: "user",
+          actorId: req.user.id,
+          payloadJson: {
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
+            clientId: invoice.clientId,
+            brokerId: invoice.brokerId,
+            amount: invoice.amount,
+          },
+        });
+        const documents = await tx.insert(documentsTable).values(
+          uploadedDocuments.map((document) => ({ ...document, invoiceId: invoice.id })) as any,
+        ).returning();
+        return { invoice, documents };
+      });
+      transactionCommitted = true;
+      // Activity logging is intentionally best-effort after the atomic commit.
+      try {
+        await storage.createActivity({
+          userId: req.user.id,
+          type: "invoice_created",
+          description: `Created and submitted invoice ${committed.invoice.invoiceNumber} for funding review`,
+          entityType: "invoice",
+          entityId: committed.invoice.id,
+        });
+      } catch (activityError) {
+        console.warn("[invoice intake] Activity logging failed:", activityError instanceof Error ? activityError.message : "unknown error");
+      }
+      return res.status(201).json({
+        ...withInvoiceDisplayStatus(committed.invoice),
+        documents: committed.documents.map((document) => ({
+          id: document.id,
+          documentType: document.documentType,
+          finalDocumentType: document.finalDocumentType,
+          originalName: document.originalName,
+          size: document.size,
+        })),
+      });
+    } catch (error) {
+      // Any relational failure above has already been rolled back by the
+      // transaction. Cleanup happens only after that rollback completes.
+      if (!transactionCommitted) {
+        await Promise.all(uploadedKeys.map((key) => cleanupS3KeyWithRetry(key, "invoice intake compensation")));
+      }
+      if ((error as any)?.status === 400) return res.status(400).json({ message: (error as Error).message });
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      console.error("Error creating invoice with paperwork:", error);
+      return res.status(500).json({ message: "Failed to create invoice with paperwork." });
+    }
+  });
+
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
       // Always generate a unique invoice number server-side to prevent collisions
@@ -2299,27 +2623,96 @@ ${message}
     }
   });
 
-  // ─── Funding queue: pending-review invoices with required-document state ──
-  app.get("/api/invoices/funding/queue", requireManagerOrAdmin, async (_req: any, res) => {
+  // ─── Funding queue: actionable review and approved invoices ───────────────
+  app.get("/api/invoices/funding/queue", requireManagerOrAdmin, async (req: any, res) => {
     try {
+      const allowedStatuses = ["submitted", "docs_pending", "under_review", "approved", "held", "rejected", "funded"] as const;
+      const requestedStatuses = typeof req.query.status === "string" && req.query.status.trim()
+        ? req.query.status.split(",").map((value: string) => value.trim()).filter(Boolean)
+        : ["submitted", "docs_pending", "under_review", "approved"];
+      if (!requestedStatuses.length || requestedStatuses.some((status: string) => !(allowedStatuses as readonly string[]).includes(status))) {
+        return res.status(400).json({ message: "Invalid funding queue status filter" });
+      }
+      const loadType = typeof req.query.loadType === "string" && req.query.loadType !== "all" ? req.query.loadType : undefined;
+      if (loadType && !(LOAD_TYPES as readonly string[]).includes(loadType)) {
+        return res.status(400).json({ message: "Invalid load type filter" });
+      }
+      const paymentType = typeof req.query.paymentType === "string" && req.query.paymentType !== "all" ? req.query.paymentType : undefined;
+      if (paymentType && !["ACH", "Wire", "ach", "wire"].includes(paymentType)) {
+        return res.status(400).json({ message: "Invalid payment type filter" });
+      }
+      const parseId = (value: unknown, name: string) => {
+        if (value === undefined || value === "" || value === "all") return undefined;
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`Invalid ${name} filter`);
+        return parsed;
+      };
+      let carrierId: number | undefined;
+      let brokerId: number | undefined;
+      try {
+        carrierId = parseId(req.query.carrierId, "carrier");
+        brokerId = parseId(req.query.brokerId, "broker");
+      } catch (error) {
+        return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid entity filter" });
+      }
+      const page = Math.max(1, Number(req.query.page ?? 1));
+      const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 100)));
+      if (!Number.isInteger(page) || !Number.isInteger(pageSize)) return res.status(400).json({ message: "Invalid pagination" });
+      const dateFrom = typeof req.query.dateFrom === "string" && req.query.dateFrom ? new Date(`${req.query.dateFrom}T00:00:00.000Z`) : undefined;
+      const dateTo = typeof req.query.dateTo === "string" && req.query.dateTo ? new Date(`${req.query.dateTo}T23:59:59.999Z`) : undefined;
+      if ((dateFrom && Number.isNaN(dateFrom.getTime())) || (dateTo && Number.isNaN(dateTo.getTime())) || (dateFrom && dateTo && dateFrom > dateTo)) {
+        return res.status(400).json({ message: "Invalid date range" });
+      }
+      const search = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      const conditions = [
+        inArray(invoices.status, requestedStatuses as any),
+        carrierId ? eq(invoices.clientId, carrierId) : undefined,
+        brokerId ? eq(invoices.brokerId, brokerId) : undefined,
+        loadType ? eq(invoices.loadType, loadType as any) : undefined,
+        paymentType ? eq(invoices.paymentType, paymentType === "ach" ? "ACH" : paymentType === "wire" ? "Wire" : paymentType as any) : undefined,
+        dateFrom ? gte(invoices.submittedAt, dateFrom) : undefined,
+        dateTo ? lte(invoices.submittedAt, dateTo) : undefined,
+        search ? or(
+          ilike(invoices.invoiceNumber, `%${search}%`),
+          ilike(invoices.loadNumber, `%${search}%`),
+          ilike(clients.name, `%${search}%`),
+          ilike(brokers.name, `%${search}%`),
+        ) : undefined,
+      ].filter(Boolean) as any[];
       const queue = await db.select({
         invoice: invoices,
         carrierName: clients.name,
         advanceRate: clients.advanceRate,
         factoringFeeRate: clients.factoringFeeRate,
         brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
+        branchNameJoined: brokerBranches.branchName,
+        driverName: sql<string | null>`concat_ws(' ', ${drivers.firstName}, ${drivers.lastName})`,
+        submittedByName: sql<string | null>`concat_ws(' ', ${userTable.firstName}, ${userTable.lastName})`,
       }).from(invoices)
         .leftJoin(clients, eq(invoices.clientId, clients.id))
         .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+        .leftJoin(brokerBranches, eq(invoices.branchId, brokerBranches.id))
+        .leftJoin(drivers, eq(invoices.driverId, drivers.id))
+        .leftJoin(userTable, eq(invoices.submittedBy, userTable.id))
         .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
-        .where(inArray(invoices.status, ["submitted", "docs_pending", "under_review"]))
-        .orderBy(invoices.submittedAt, invoices.createdAt);
+        .where(and(...conditions))
+        .orderBy(desc(invoices.submittedAt), desc(invoices.createdAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+      const [{ total }] = await db.select({ total: count() }).from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+        .where(and(...conditions));
       const ids = queue.map((row) => row.invoice.id);
       const docs = ids.length
         ? await db.select({
+          id: documentsTable.id,
           invoiceId: documentsTable.invoiceId,
           documentType: documentsTable.documentType,
           finalDocumentType: documentsTable.finalDocumentType,
+          originalName: documentsTable.originalName,
+          size: documentsTable.size,
         }).from(documentsTable).where(inArray(documentsTable.invoiceId, ids))
         : [];
       const byInvoice = new Map<number, typeof docs>();
@@ -2327,26 +2720,76 @@ ${message}
         if (!document.invoiceId) continue;
         byInvoice.set(document.invoiceId, [...(byInvoice.get(document.invoiceId) ?? []), document]);
       }
-      res.json(queue.map(({ invoice, carrierName, advanceRate, factoringFeeRate, brokerName }) => {
+      const bankIds = queue.map(({ invoice }) => invoice.bankAccountId).filter((id): id is number => typeof id === "number");
+      const bankEntries = bankIds.length
+        ? await db.select({ id: clientVault.id, clientId: clientVault.clientId, label: clientVault.label, encryptedData: clientVault.encryptedData, isActive: clientVault.isActive })
+          .from(clientVault).where(inArray(clientVault.id, bankIds))
+        : [];
+      const bankById = new Map(bankEntries.map((entry) => {
+        let data: any = {};
+        try { data = JSON.parse(decryptVault(entry.encryptedData)); } catch { /* keep masked fallback */ }
+        const digits = String(data.accountNumber ?? "").replace(/\D/g, "");
+        return [entry.id, {
+          id: entry.id,
+          bankName: data.bankName || entry.label || "Bank account",
+          lastFour: digits ? digits.slice(-4).padStart(4, "•") : "••••",
+          paymentType: data.paymentType === "Wire" ? "Wire" : data.paymentType === "ACH" ? "ACH" : null,
+          isActive: entry.isActive,
+        }];
+      }));
+      res.json({
+        rows: queue.map(({ invoice, carrierName, advanceRate, factoringFeeRate, brokerName, branchNameJoined, driverName, submittedByName }) => {
         const invoiceDocs = byInvoice.get(invoice.id) ?? [];
         const types = new Set(invoiceDocs.flatMap((document) =>
           [document.documentType, document.finalDocumentType].filter(Boolean),
         ));
         const rateConfirmationPresent = types.has("rate_confirmation");
         const billOfLadingPresent = types.has("bill_of_lading") || types.has("bol");
+        const lumperPresent = types.has("lumper_receipt") || types.has("receipt");
+        const gross = Number(invoice.amount || 0);
+        const rate = Number(advanceRate ?? 80);
+        const feeRate = Number(factoringFeeRate ?? 3);
+        const advanceAmount = +(gross * rate / 100).toFixed(2);
+        const feeAmount = +(gross * feeRate / 100).toFixed(2);
         return {
           ...withInvoiceDisplayStatus(invoice),
           carrierName,
           advanceRate,
           factoringFeeRate,
           brokerName,
+          branchName: invoice.branchName ?? branchNameJoined ?? null,
+          driverName,
+          submittedByName: submittedByName?.trim() || null,
+          bankAccount: invoice.bankAccountId ? bankById.get(invoice.bankAccountId) ?? null : null,
+          payoutPreview: {
+            grossAmount: gross.toFixed(2),
+            advanceRate: rate.toFixed(2),
+            advanceAmount: advanceAmount.toFixed(2),
+            feeRate: feeRate.toFixed(2),
+            feeAmount: feeAmount.toFixed(2),
+            reserveAmount: (gross - advanceAmount).toFixed(2),
+            netFundingAmount: (advanceAmount - feeAmount).toFixed(2),
+          },
           documentPresence: {
             rateConfirmation: rateConfirmationPresent,
             billOfLading: billOfLadingPresent,
-            readyToFund: rateConfirmationPresent && billOfLadingPresent,
+            lumper: lumperPresent,
+            readyToFund: rateConfirmationPresent && billOfLadingPresent && !!invoice.bankAccountId && !!bankById.get(invoice.bankAccountId)?.isActive,
           },
+          documents: invoiceDocs.map((document) => ({
+            id: document.id,
+            type: document.finalDocumentType || document.documentType,
+            originalName: document.originalName,
+            size: document.size,
+            viewPath: `/api/documents/${document.id}/view`,
+            downloadPath: `/api/documents/${document.id}/download`,
+          })),
         };
-      }));
+        }),
+        page,
+        pageSize,
+        total: Number(total),
+      });
     } catch (error) {
       console.error("Error fetching funding queue:", error);
       res.status(500).json({ message: "Failed to fetch funding queue" });
@@ -2378,19 +2821,11 @@ ${message}
           continue;
         }
 
-        let result: any = { success: true, invoice: current };
-        if (["submitted", "docs_pending"].includes(current.status)) {
-          result = await performTransition(
-            item.invoiceId, "start_review", req.user.id, req.user.role,
-          );
+        if (current.status !== "approved") {
+          results.push({ invoiceId: item.invoiceId, success: false, error: "Only approved invoices can be funded" });
+          continue;
         }
-        if (result.success && ["submitted", "docs_pending", "under_review"].includes(current.status)) {
-          result = await performTransition(
-            item.invoiceId, "approve", req.user.id, req.user.role,
-          );
-        }
-        if (result.success) {
-          result = await performTransition(
+        const result = await performTransition(
           item.invoiceId,
           "fund",
           req.user.id,
@@ -2399,8 +2834,7 @@ ${message}
           body.force,
           item.paymentMethod,
           item.bankAccountVaultId,
-          );
-        }
+        );
         results.push({
           invoiceId: item.invoiceId,
           ...result,
@@ -4174,7 +4608,9 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get("/api/carriers/:id/bank-accounts", requireManagerOrAdmin, async (req: any, res) => {
+  // Masked account summaries are safe for authenticated invoice agents; vault
+  // mutations and decrypted entries remain manager/admin-only.
+  app.get("/api/carriers/:id/bank-accounts", requireAuth, requireModulePermission("invoices"), async (req: any, res) => {
     try {
       const carrierId = parseInt(req.params.id, 10);
       if (Number.isNaN(carrierId)) return res.status(400).json({ message: "Invalid carrier ID" });
@@ -4186,14 +4622,16 @@ Trucking Pros Financial Team
           let data: any = {};
           try { data = JSON.parse(decrypted); } catch { data = { accountNumber: decrypted }; }
           const digits = String(data.accountNumber ?? "").replace(/\D/g, "");
-          return {
+          const summary = {
             id: entry.id,
             bankName: data.bankName || "Bank",
-            accountType: data.accountType || null,
             paymentType: data.paymentType === "ACH" || data.paymentType === "Wire" ? data.paymentType : null,
-            nickname: data.nickname || entry.label,
             lastFour: digits.slice(-4).padStart(4, "•"),
           };
+          if (req.user.role === "manager" || req.user.role === "admin") {
+            return { ...summary, accountType: data.accountType || null, nickname: data.nickname || entry.label };
+          }
+          return summary;
         });
       res.json(accounts);
     } catch (error) {

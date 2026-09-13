@@ -130,6 +130,11 @@ function Router() {
           <FundingQueue />
         </ProtectedRoute>
       </Route>
+      <Route path="/sheets">
+        <ProtectedRoute>
+          <FundingQueue />
+        </ProtectedRoute>
+      </Route>
       <Route path="/payouts">
         <ProtectedRoute>
           <Payouts />

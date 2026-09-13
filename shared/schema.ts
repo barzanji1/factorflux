@@ -166,11 +166,14 @@ export const invoices = pgTable("invoices", {
   debtorId: integer("debtor_id").references(() => debtors.id),
   brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
   branchId: integer("branch_id").references(() => brokerBranches.id, { onDelete: "set null" }),
+  driverId: integer("driver_id").references(() => drivers.id, { onDelete: "set null" }),
   paymentType: varchar("payment_type", { enum: ["ACH", "Wire"] }).default("ACH"),
   bankAccountId: integer("bank_account_id").references(() => clientVault.id),
   loadNumber: varchar("load_number"),
+  code: varchar("code"),
   branchName: varchar("branch_name"),
   buyout: boolean("buyout"),
+  lumper: boolean("lumper"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency").default("USD").notNull(),
   invoiceDate: timestamp("invoice_date"),
@@ -181,6 +184,8 @@ export const invoices = pgTable("invoices", {
     enum: LOAD_TYPES,
   }),
   bolNumber: varchar("bol_number"),
+  instructionsSubject: varchar("instructions_subject"),
+  instructionsDetails: text("instructions_details"),
   status: varchar("status", {
     enum: [
       "draft",
@@ -236,11 +241,13 @@ export const invoices = pgTable("invoices", {
   index("invoices_client_id_idx").on(table.clientId),
   index("invoices_broker_id_idx").on(table.brokerId),
   index("invoices_branch_id_idx").on(table.branchId),
+  index("invoices_driver_id_idx").on(table.driverId),
   index("invoices_created_at_idx").on(table.createdAt),
   index("invoices_submitted_by_created_at_idx").on(table.submittedBy, table.createdAt),
   index("invoices_search_trgm_idx").using("gin", sql`(
     coalesce(${table.invoiceNumber}, '') || ' ' ||
     coalesce(${table.loadNumber}, '') || ' ' ||
+    coalesce(${table.code}, '') || ' ' ||
     coalesce(${table.branchName}, '') || ' ' ||
     coalesce(${table.bolNumber}, '') || ' ' ||
     coalesce(${table.status}, '')
@@ -319,6 +326,29 @@ export const documents = pgTable("documents", {
   }).default("processing").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Durable retry queue for S3 objects that could not be removed during
+// compensation or another cleanup operation.
+export const s3CleanupQueue = pgTable("s3_cleanup_queue", {
+  id: serial("id").primaryKey(),
+  s3Key: text("s3_key").notNull().unique(),
+  reason: text("reason"),
+  attempts: integer("attempts").default(0).notNull(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+}, (table) => [
+  index("s3_cleanup_queue_unresolved_created_idx").on(table.resolvedAt, table.createdAt),
+]);
+
+export const insertS3CleanupQueueSchema = createInsertSchema(s3CleanupQueue).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type S3CleanupQueue = typeof s3CleanupQueue.$inferSelect;
+export type InsertS3CleanupQueue = z.infer<typeof insertS3CleanupQueueSchema>;
 // New addition for document processing status
 export const invoiceStatusHistory = pgTable("invoice_status_history", {
   id: serial("id").primaryKey(),
@@ -845,6 +875,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   debtor: one(debtors, { fields: [invoices.debtorId], references: [debtors.id] }),
   broker: one(brokers, { fields: [invoices.brokerId], references: [brokers.id] }),
   branch: one(brokerBranches, { fields: [invoices.branchId], references: [brokerBranches.id] }),
+  driver: one(drivers, { fields: [invoices.driverId], references: [drivers.id] }),
   submittedByUser: one(users, { fields: [invoices.submittedBy], references: [users.id] }),
   approvedByUser: one(users, { fields: [invoices.approvedBy], references: [users.id] }),
   assignedToUser: one(users, { fields: [invoices.assignedTo], references: [users.id] }),
@@ -1713,6 +1744,11 @@ export const insertDriverSchema = createInsertSchema(drivers).omit({
 
 export type Driver = typeof drivers.$inferSelect;
 export type InsertDriver = z.infer<typeof insertDriverSchema>;
+
+export const driversRelations = relations(drivers, ({ one, many }) => ({
+  carrier: one(clients, { fields: [drivers.carrierId], references: [clients.id] }),
+  invoices: many(invoices),
+}));
 
 // ─── Trucks ───────────────────────────────────────────────────────────────────
 export const trucks = pgTable("trucks", {

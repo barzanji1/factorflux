@@ -18,9 +18,11 @@ import {
   invoiceStatusHistory,
   eventLedger,
   creditChecks,
+  clients,
+  clientVault,
 } from "../../shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { advanceInvoiceStage, type FactoringStage } from "./invoiceStage";
+import { advanceInvoiceStage, STAGE_META, type FactoringStage } from "./invoiceStage";
 import { guardDocsForReview, guardDocsForApproval } from "./docValidation";
 import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
 import { sendEmailTracked } from "../emailService";
@@ -651,6 +653,106 @@ export async function getAvailableTransitions(
   return result;
 }
 
+/**
+ * Funding is the one lifecycle transition that creates records in several
+ * tables. Keep these mandatory writes on the same transaction client so a
+ * partial payout can never leave an invoice looking funded (or vice versa).
+ */
+async function executeFundTransaction(
+  invoiceId: number,
+  actorId: string,
+  paymentMethod: "ach" | "wire" | undefined,
+  bankAccountVaultId: number,
+) {
+  return db.transaction(async (tx) => {
+    const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+    if (!invoice) throw new Error("Invoice not found");
+    if (invoice.status !== "approved") throw new Error(`Cannot fund invoice when status is "${invoice.status}"`);
+
+    const [account] = await tx.select({
+      id: clientVault.id,
+      clientId: clientVault.clientId,
+      dataType: clientVault.dataType,
+      isActive: clientVault.isActive,
+    }).from(clientVault).where(eq(clientVault.id, bankAccountVaultId));
+    if (!account || account.clientId !== invoice.clientId || account.dataType !== "bank_account" || !account.isActive) {
+      throw new Error("The selected bank account is not available for this carrier");
+    }
+
+    const [client] = await tx.select({
+      advanceRate: clients.advanceRate,
+      factoringFeeRate: clients.factoringFeeRate,
+    }).from(clients).where(eq(clients.id, invoice.clientId));
+    const invoiceAmount = parseFloat(invoice.amount);
+    const advanceRate = parseFloat(client?.advanceRate ?? "80.00");
+    const feeRate = parseFloat(client?.factoringFeeRate ?? "3.00");
+    const advanceAmount = +(invoiceAmount * advanceRate / 100).toFixed(2);
+    const feeAmount = +(invoiceAmount * feeRate / 100).toFixed(2);
+    const reserveAmount = +(invoiceAmount - advanceAmount).toFixed(2);
+    const netPayout = +(advanceAmount - feeAmount).toFixed(2);
+
+    await tx.insert(payouts).values({
+      invoiceId,
+      clientId: invoice.clientId,
+      invoiceAmount: String(invoiceAmount),
+      advanceRate: String(advanceRate),
+      feeRate: String(feeRate),
+      advanceAmount: String(advanceAmount),
+      feeAmount: String(feeAmount),
+      reserveAmount: String(reserveAmount),
+      netPayout: String(netPayout),
+      paymentMethod: paymentMethod ?? "ach",
+      bankAccountVaultId,
+      paymentStatus: "advance_paid",
+      advancePaidAt: new Date(),
+      notes: "Auto-created by lifecycle engine on invoice funding",
+      createdBy: actorId,
+    });
+
+    const currentStage = (invoice.factoringStage ?? "document_intake") as FactoringStage;
+    const stageAdvances = (STAGE_META.approval?.step ?? 0) > (STAGE_META[currentStage]?.step ?? 0);
+    const [updated] = await tx.update(invoices).set({
+      status: "funded",
+      fundedAt: invoice.fundedAt ?? new Date(),
+      factoringStage: stageAdvances ? "approval" : invoice.factoringStage,
+      updatedAt: new Date(),
+    }).where(and(eq(invoices.id, invoiceId), eq(invoices.status, "approved"))).returning();
+    if (!updated) throw new Error("Invoice status could not be updated");
+
+    await tx.insert(invoiceStatusHistory).values({
+      invoiceId,
+      oldStatus: invoice.status,
+      newStatus: "funded",
+      changedBy: actorId,
+    });
+    await tx.insert(eventLedger).values({
+      entityType: "invoice",
+      entityId: invoiceId,
+      eventType: "status_changed",
+      actorType: "user",
+      actorId,
+      payloadJson: { from: invoice.status, to: "funded", reason: null },
+    });
+    if (stageAdvances) {
+      await tx.insert(eventLedger).values({
+        entityType: "invoice",
+        entityId: invoiceId,
+        eventType: "stage_advanced",
+        actorType: "user",
+        actorId,
+        payloadJson: {
+          from: currentStage,
+          to: "approval",
+          fromLabel: STAGE_META[currentStage]?.label,
+          toLabel: STAGE_META.approval.label,
+          reason: null,
+        },
+      });
+    }
+    return updated;
+  });
+}
+
 /** Execute a transition — runs guards, then side effects, returns result. */
 export async function performTransition(
   invoiceId: number,
@@ -703,6 +805,24 @@ export async function performTransition(
     return { success: false, blockers: softBlockers, error: "Transition has warnings — use admin override to proceed" };
   if (softBlockers.length > 0 && force && actorRole !== "admin")
     return { success: false, blockers: softBlockers, error: "Only admins can override transition warnings" };
+
+  if (transitionId === "fund") {
+    try {
+      const updated = await executeFundTransaction(invoiceId, actorId, paymentMethod, bankAccountVaultId!);
+      // Email, notifications, activity, and follow-up work are deliberately
+      // post-commit and non-blocking. The first, second, and fourth fund
+      // effects are the transaction-owned payout/status/stage effects.
+      const postCommitEffects = def.sideEffects.filter((_fx, index) => ![0, 1, 3].includes(index));
+      void Promise.all(postCommitEffects.map(async (fx) => {
+        try { await fx(ctx); }
+        catch (err) { console.error(`[lifecycle] post-commit side-effect error in ${transitionId}:`, err); }
+      }));
+      return { success: true, invoice: updated };
+    } catch (err) {
+      console.error("[lifecycle] fund transaction rolled back:", err);
+      return { success: false, error: err instanceof Error ? err.message : "Funding transaction failed" };
+    }
+  }
 
   // Execute side effects
   for (const fx of def.sideEffects) {

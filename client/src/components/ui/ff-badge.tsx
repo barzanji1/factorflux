@@ -19,6 +19,8 @@ export type FFStatus =
   | "draft"
   | "pending"
   | "submitted"
+  | "docs_pending"
+  | "under_review"
   | "approved"
   | "paid"
   | "funded"
@@ -52,6 +54,14 @@ const STATUS_CONFIG: Record<
     label: "Submitted",
     className:
       "ff-badge-submitted",
+  },
+  docs_pending: {
+    label: "Documents Required",
+    className: "ff-badge-pending",
+  },
+  under_review: {
+    label: "Under Review",
+    className: "ff-badge-processing",
   },
   approved: {
     label: "Approved",

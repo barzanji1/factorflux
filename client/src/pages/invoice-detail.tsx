@@ -1169,8 +1169,10 @@ export default function InvoiceDetail() {
                           {[
                             { label: "Invoice #",    value: detail.invoiceNumber },
                             { label: "Load #",       value: detail.loadNumber || (detail.loadId ? `#${detail.loadId}` : "—") },
+                            { label: "Code",         value: detail.code || "—" },
                             { label: "Branch",       value: detail.branchName || "—" },
                             { label: "Buyout",       value: detail.buyout == null ? "—" : detail.buyout ? "Yes" : "No" },
+                            { label: "Lumper",       value: detail.lumper == null ? "—" : detail.lumper ? "Yes" : "No" },
                             { label: "Amount",       value: fmtCurrency(detail.amount) },
                             { label: "Invoice Date", value: fmtDate(detail.invoiceDate) },
                             { label: "Due Date",     value: fmtDate(detail.dueDate) },
@@ -1179,9 +1181,14 @@ export default function InvoiceDetail() {
                             { label: "Bank Account", value: carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId)
                               ? `${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).bankName} — ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).accountType || "account"} ending in ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).lastFour}`
                               : "—" },
-                             { label: "Load Type",    value: <LoadTypeBadge value={detail.loadType} /> },
+                            { label: "Load Type",    value: <LoadTypeBadge value={detail.loadType} /> },
+                            { label: "Driver",       value: detail.driver ? `${detail.driver.firstName} ${detail.driver.lastName}` : "—" },
                             { label: "Pickup",       value: detail.pickupLocation || "—" },
                             { label: "Delivery",     value: detail.deliveryLocation || "—" },
+                            { label: "Instructions Subject", value: detail.instructionsSubject || "—" },
+                            { label: "Instructions Details", value: detail.instructionsDetails
+                              ? <span className="whitespace-pre-wrap break-words">{detail.instructionsDetails}</span>
+                              : "—" },
                           ].map(({ label, value }) => (
                             <div key={label} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
                               <span className="text-xs font-medium text-slate-400">{label}</span>

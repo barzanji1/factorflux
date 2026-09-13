@@ -13,6 +13,7 @@ import {
   debtors,
   brokers,
   brokerBranches,
+  drivers,
 } from "../../shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -129,6 +130,14 @@ export async function getInvoiceDetail(invoiceId: number) {
   const [branch] = inv.branchId
     ? await db.select().from(brokerBranches).where(eq(brokerBranches.id, inv.branchId))
     : [null];
+  const [driver] = inv.driverId
+    ? await db.select({
+      id: drivers.id,
+      firstName: drivers.firstName,
+      lastName: drivers.lastName,
+      status: drivers.status,
+    }).from(drivers).where(eq(drivers.id, inv.driverId))
+    : [null];
 
   const [payout] = await db.select().from(payouts).where(eq(payouts.invoiceId, invoiceId));
 
@@ -169,6 +178,7 @@ export async function getInvoiceDetail(invoiceId: number) {
     // Canonical broker relation first; legacy debtor remains available above.
     broker: broker ?? debtor ?? null,
     branch: branch ?? null,
+    driver: driver ?? null,
     payout: payout ?? null,
     documents: docs,
     collections: invCollections,
