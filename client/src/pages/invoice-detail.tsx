@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import DocumentIntakeZone from "@/components/documents/document-intake-zone";
 import DocumentReviewDialog from "@/components/documents/document-review-dialog";
+import { LoadTypeBadge } from "@/components/load-type";
 
 // ─── Stage constants ───────────────────────────────────────────────────────────
 
@@ -1178,7 +1179,7 @@ export default function InvoiceDetail() {
                             { label: "Bank Account", value: carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId)
                               ? `${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).bankName} — ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).accountType || "account"} ending in ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).lastFour}`
                               : "—" },
-                            { label: "Load Type",    value: detail.loadType?.replace(/_/g, " ") || "—" },
+                             { label: "Load Type",    value: <LoadTypeBadge value={detail.loadType} /> },
                             { label: "Pickup",       value: detail.pickupLocation || "—" },
                             { label: "Delivery",     value: detail.deliveryLocation || "—" },
                           ].map(({ label, value }) => (

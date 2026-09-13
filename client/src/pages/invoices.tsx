@@ -29,6 +29,8 @@ import InvoiceModal from "@/components/modals/invoice-modal";
 import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
 import type { Invoice } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { LOAD_TYPES, LOAD_TYPE_LABELS, type LoadType } from "@shared/load-types";
+import { LoadTypeBadge } from "@/components/load-type";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -58,6 +60,7 @@ export default function Invoices() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [loadTypeFilter, setLoadTypeFilter] = useState<"all" | LoadType>("all");
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [isEditInvoiceOpen, setIsEditInvoiceOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -79,12 +82,13 @@ export default function Invoices() {
   }, [searchQuery]);
 
   const { data: invoicesResponse, isLoading: invoicesLoading, isError: invoicesError } = useQuery<InvoicesResponse>({
-    queryKey: ["/api/invoices", page, debouncedSearchQuery],
+    queryKey: ["/api/invoices", page, debouncedSearchQuery, loadTypeFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         limit: "50",
         q: debouncedSearchQuery,
+        loadType: loadTypeFilter === "all" ? "" : loadTypeFilter,
       });
       const res = await fetch(`/api/invoices?${params.toString()}`, {
         credentials: "include",
@@ -241,7 +245,7 @@ export default function Invoices() {
 
             <Card className="overflow-hidden rounded-[30px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
               <CardHeader className="border-b border-slate-200/70 px-6 py-5 dark:border-slate-800">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="mb-3 flex items-center gap-2">
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
@@ -261,9 +265,31 @@ export default function Invoices() {
                     </p>
                   </div>
 
-                   <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                     <span>Showing {firstInvoice}-{lastInvoice} of {totalInvoices} invoices</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="inline-flex flex-wrap items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
+                        {(["all", ...LOAD_TYPES] as const).map((type) => {
+                          const active = loadTypeFilter === type;
+                          const label = type === "all" ? "All" : LOAD_TYPE_LABELS[type];
+                          return (
+                            <button
+                              key={type}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => { setLoadTypeFilter(type); setPage(1); }}
+                              className={cn(
+                                "rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors",
+                                active ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700",
+                              )}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                        <span>Showing {firstInvoice}-{lastInvoice} of {totalInvoices} invoices</span>
+                      </div>
                   </div>
                 </div>
               </CardHeader>
@@ -312,6 +338,9 @@ export default function Invoices() {
                             Status
                           </th>
                           <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Load Type
+                          </th>
+                          <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                             Submitted
                           </th>
                           <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -342,6 +371,10 @@ export default function Invoices() {
 
                             <td className="px-6 py-5">
                               {isManager ? <FFBadge status={invoice.status} /> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{agentStatus(invoice.status)}</span>}
+                            </td>
+
+                            <td className="px-6 py-5">
+                              <LoadTypeBadge value={invoice.loadType} />
                             </td>
 
                             <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">

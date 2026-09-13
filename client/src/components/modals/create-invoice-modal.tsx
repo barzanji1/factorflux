@@ -11,11 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { displayLoadType, isLoadType } from "@shared/load-types";
+import { LoadTypeToggleGroup } from "@/components/load-type";
 
 type Carrier = {
   id: number; name: string; status?: string | null; mcNumber?: string | null;
   email?: string | null; phone?: string | null; advanceRate?: string | null;
-  factoringFeeRate?: string | null; notes?: string | null;
+  factoringFeeRate?: string | null; notes?: string | null; cargoType?: string | null;
 };
 type Broker = {
   id: number; name: string; status?: string | null; mcNumber?: string | null;
@@ -25,7 +27,7 @@ type Broker = {
 
 const EMPTY = {
   loadNumber: "", clientId: "", brokerId: "", branchId: "",
-  buyout: "", amount: "", paymentType: "ACH", bankAccountId: "",
+  buyout: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
 };
 
 function SearchSelect<T extends { id: number; name: string }>({
@@ -190,6 +192,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
         amount: values.amount,
         paymentType: values.paymentType,
         bankAccountId: values.bankAccountId ? Number(values.bankAccountId) : null,
+         loadType: values.loadType,
       });
       return response.json();
     },
@@ -202,7 +205,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
     onError: (error: Error) => toast({ title: "Unable to create invoice", description: error.message, variant: "destructive" }),
   });
 
-  const valid = values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId && Number(values.amount) > 0;
+  const valid = values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId && Number(values.amount) > 0 && isLoadType(values.loadType);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
@@ -213,6 +216,13 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
         <div className="grid gap-5 p-6 lg:grid-cols-[240px_minmax(0,1fr)_240px]">
           <StatusPanel kind="broker" record={broker} />
           <form className="space-y-5" onSubmit={event => { event.preventDefault(); if (valid) mutation.mutate(); }}>
+            <div className="space-y-2">
+              <Label>Load Type <span className="text-red-500">*</span></Label>
+              <LoadTypeToggleGroup
+                value={values.loadType}
+                onChange={loadType => setValues(v => ({ ...v, loadType }))}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="loadNumber">Load # <span className="text-red-500">*</span></Label>
@@ -222,7 +232,18 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                 <Label htmlFor="amount">Invoice Amount <span className="text-red-500">*</span></Label>
                 <Input id="amount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => setValues(v => ({ ...v, amount: e.target.value }))} placeholder="0.00" />
               </div>
-              <SearchSelect label="Carrier" required items={carriers} selected={carrier} onSelect={item => setValues(v => ({ ...v, clientId: String(item.id) }))} placeholder="Search carriers..." />
+               <SearchSelect
+                 label="Carrier"
+                 required
+                 items={carriers}
+                 selected={carrier}
+                 onSelect={item => setValues(v => ({
+                   ...v,
+                   clientId: String(item.id),
+                   loadType: displayLoadType(item.cargoType),
+                 }))}
+                 placeholder="Search carriers..."
+               />
               <SearchSelect label="Broker" required items={brokers} selected={broker} onSelect={item => setValues(v => ({ ...v, brokerId: String(item.id), branchId: "" }))} placeholder="Search brokers..." />
               <div className="space-y-1.5">
                 <Label htmlFor="branchId">Branch <span className="text-red-500">*</span></Label>

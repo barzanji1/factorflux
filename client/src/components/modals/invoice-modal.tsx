@@ -23,6 +23,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
+import { LOAD_TYPES, displayLoadType, type LoadType } from "@shared/load-types";
+import { LoadTypeToggleGroup } from "@/components/load-type";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -238,7 +240,7 @@ interface InvoiceModalProps {
 
 const invoiceFormSchema = insertInvoiceSchema.extend({
   invoiceNumber: z.string().min(1, "Invoice number is required"),
-  loadType: z.string().optional(),
+  loadType: z.enum(LOAD_TYPES, { required_error: "Load type is required" }),
   pickupLocation: z.string().optional(),
   deliveryLocation: z.string().optional(),
   clientId: z.string().min(1, "Client is required"),
@@ -275,7 +277,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       invoiceNumber: "",
-      loadType: "",
+       loadType: "other",
       pickupLocation: "",
       deliveryLocation: "",
       clientId: "",
@@ -303,7 +305,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
     if (invoice) {
       form.reset({
         invoiceNumber: invoice.invoiceNumber,
-        loadType: "otr_load",
+         loadType: displayLoadType(invoice.loadType),
         pickupLocation: "",
         deliveryLocation: "",
         clientId: invoice.clientId.toString(),
@@ -321,7 +323,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
     } else {
       form.reset({
         invoiceNumber: "",
-        loadType: "",
+         loadType: initialClient?.cargoType ? displayLoadType(initialClient.cargoType) : "other",
         pickupLocation: "",
         deliveryLocation: "",
         clientId: initialClient ? initialClient.id.toString() : "",
@@ -345,6 +347,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
     setSelectedClient(client);
     setClientSearch("");
     form.setValue("clientId", client.id.toString(), { shouldValidate: true });
+    form.setValue("loadType", displayLoadType(client.cargoType), { shouldValidate: true });
     setShowClientDropdown(false);
   };
 
@@ -515,7 +518,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
       clientId: parseInt(values.clientId),
       amount: values.amount,
       // Convert empty strings to undefined so enum/optional fields pass backend Zod validation
-      loadType: (values.loadType as string) || undefined,
+      loadType: values.loadType,
       bolNumber: values.bolNumber || undefined,
       pickupLocation: values.pickupLocation || undefined,
       deliveryLocation: values.deliveryLocation || undefined,
@@ -730,13 +733,9 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                         </FormLabel>
                         <FormControl>
                           <div className="pt-1">
-                            <PremiumPillGroup
-                              value={field.value as "otr_load" | "dump_truck_ticket"}
+                            <LoadTypeToggleGroup
+                              value={field.value as LoadType}
                               onChange={field.onChange}
-                              options={[
-                                { value: "otr_load", label: "OTR Load" },
-                                { value: "dump_truck_ticket", label: "Dump Truck Ticket" },
-                              ]}
                             />
                           </div>
                         </FormControl>

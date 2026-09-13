@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ProfileSection, ProfileField, EmptyState, DocumentList } from "@/components/carriers/carrier-profile-section";
 import { DriverSection } from "@/components/carriers/driver-section";
+import { LoadTypeBadge, LoadTypeToggleGroup } from "@/components/load-type";
 import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
 const money = (value: unknown) => value === null || value === undefined || value === "" ? "Not recorded" : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -216,7 +217,25 @@ export default function ClientDetail() {
             <div className="space-y-3">
               <ProfileSection title="AR" eyebrow="Funding position"><div className="grid gap-x-5 sm:grid-cols-2"><ProfileField label="Paid" value={money(paid)} tone="accent" /><ProfileField label="Open invoice value (derived)" value={money(onboarding.ar || openBalance)} tone="danger" /><ProfileField label="Max limit" value={money(onboarding.maxLimit)} /><ProfileField label="Current limit" value={money(onboarding.currentLimit)} /><ProfileField label="AR over eligible days" value={pretty(onboarding.arOver90Days)} /><ProfileField label="Availability" value={onboarding.availability ? money(onboarding.availability) : undefined} /></div></ProfileSection>
               <ProfileSection title="Shorts & chargebacks"><div className="grid gap-x-5 sm:grid-cols-3"><ProfileField label="Carrier shorts" value={money(client.shorts)} tone="danger" /><ProfileField label="Advanced shorts" value={money(onboarding.advancedShorts)} tone="danger" /><ProfileField label="Pending chargebacks" value={money(onboarding.pendingChargebacks)} tone="danger" /></div></ProfileSection>
-              <ProfileSection title="Cargo type"><div className="grid gap-x-5 sm:grid-cols-3"><ProfileField label="Dump" value={pretty(onboarding.dump || onboarding.dumpTruck)} /><ProfileField label="Driver support" value={pretty(onboarding.driverSupport)} /><ProfileField label="OTR" value={pretty(onboarding.otr || onboarding.operationClassification)} /></div></ProfileSection>
+              <ProfileSection title="Cargo type" eyebrow="Default for new invoices">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="font-bold uppercase tracking-wider text-[#718187]">Current</span>
+                    <LoadTypeBadge value={client.cargoType} />
+                  </div>
+                  <LoadTypeToggleGroup
+                    value={client.cargoType}
+                    disabled={!isManager || updateClient.isPending}
+                    onChange={(cargoType) => updateClient.mutate({ cargoType })}
+                  />
+                  {!isManager && <p className="text-[10px] text-[#718187]">Only managers and administrators can change the carrier default.</p>}
+                  <div className="grid gap-x-5 sm:grid-cols-3">
+                    <ProfileField label="Legacy dump flag" value={pretty(onboarding.dump || onboarding.dumpTruck)} />
+                    <ProfileField label="Driver support" value={pretty(onboarding.driverSupport)} />
+                    <ProfileField label="Legacy OTR" value={pretty(onboarding.otr || onboarding.operationClassification)} />
+                  </div>
+                </div>
+              </ProfileSection>
               <ProfileSection title="Other info"><div className="grid gap-x-5 sm:grid-cols-2"><ProfileField label="Since" value={date(onboarding.since)} /><ProfileField label="Referral" value={onboarding.referral} /><ProfileField label="Last invoice" value={date([...clientInvoices].sort((a, b) => new Date(b.invoiceDate || b.createdAt).getTime() - new Date(a.invoiceDate || a.createdAt).getTime())[0]?.invoiceDate)} /><ProfileField label="Date created" value={date(client.createdAt)} /></div></ProfileSection>
               <ProfileSection title="To do list" action={<Button onClick={() => openList("task")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Item", "Status"]} rows={(carrierTasks.length ? carrierTasks.filter((task: any) => task.status !== "completed") : (onboarding.toDo || onboarding.todo || [])).map((task: any) => [task.title || task.name, task.status])} empty="No open carrier to-do items are recorded" /></ProfileSection>
               <ProfileSection title="Dispatcher"><div className="flex items-center gap-3 border border-[#d0d9dc] bg-[#fbfcfb] p-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#d9edf0] text-[#087d8d]"><UserRound className="h-5 w-5" /></div><div className="min-w-0 flex-1"><p className="text-[12px] font-bold">{carrierDispatcher ? [carrierDispatcher.firstName, carrierDispatcher.lastName].filter(Boolean).join(" ") : onboarding.dispatcherName || "No dispatcher linked"}</p><p className="text-[10px] text-[#718187]">{carrierDispatcher?.phone || onboarding.dispatcherPhone || "Phone not recorded"} · {carrierDispatcher?.email || onboarding.dispatcherEmail || "Email not recorded"}</p></div><span className="text-[10px] text-[#9aa7ab]">{carrierDispatcher?.status || (onboarding.dispatcherName ? onboarding.dispatcherStatus || "Linked" : "Unavailable")}</span></div></ProfileSection>

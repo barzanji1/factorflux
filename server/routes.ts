@@ -26,6 +26,7 @@ import {
 } from "./services/firestore-records";
 import { deleteClientMirror } from "./services/firestore-record";
 import { db } from "./db";
+import { LOAD_TYPES } from "@shared/load-types";
 
 import {
   insertClientSchema,
@@ -1943,6 +1944,12 @@ ${message}
       if (Number.isNaN(id)) {
         return res.status(400).json({ message: "Invalid client id" });
       }
+      if (
+        req.user?.role === "employee" &&
+        Object.prototype.hasOwnProperty.call(req.body, "cargoType")
+      ) {
+        return res.status(403).json({ message: "Manager or admin access required to change carrier cargo type" });
+      }
 
       const { bankAccountNumber, abaRouting, owners, ...raw } = req.body;
       const existingClient = await storage.getClient(id);
@@ -2175,6 +2182,13 @@ ${message}
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const all = req.query.all === "true";
+      if (req.query.loadType !== undefined && typeof req.query.loadType !== "string") {
+        return res.status(400).json({ message: "Invalid load type filter" });
+      }
+      const loadType = typeof req.query.loadType === "string" ? req.query.loadType.trim() : "";
+      if (loadType && !(LOAD_TYPES as readonly string[]).includes(loadType)) {
+        return res.status(400).json({ message: "Invalid load type filter" });
+      }
       const scope = req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined;
       const invoiceSearchDocument = sql`(
         coalesce(${invoices.invoiceNumber}, '') || ' ' ||
@@ -2203,7 +2217,13 @@ ${message}
         ilike(invoiceSearchDocument, `%${q}%`), ilike(invoiceCarrierSearchDocument, `%${q}%`),
         ilike(invoiceBrokerSearchDocument, `%${q}%`),
       ) : undefined;
-      const where = scope && search ? and(scope, search) : scope || search;
+      let where = scope && search ? and(scope, search) : scope || search;
+      if (loadType) {
+        const loadTypeCondition = loadType === "other"
+          ? or(eq(invoices.loadType, "other"), isNull(invoices.loadType))
+          : eq(invoices.loadType, loadType as (typeof LOAD_TYPES)[number]);
+        where = where ? and(where, loadTypeCondition) : loadTypeCondition;
+      }
       const query = db.select({
         invoice: invoices,
         carrierName: clients.name,
@@ -2243,7 +2263,7 @@ ${message}
       // Always generate a unique invoice number server-side to prevent collisions
       const invoiceNumber = await storage.getNextInvoiceNumber();
       const invoiceData = await resolveInvoiceBrokerBranch(
-        insertInvoiceSchema.parse({ ...req.body, invoiceNumber }) as any,
+        insertInvoiceSchema.extend({ loadType: z.enum(LOAD_TYPES) }).parse({ ...req.body, invoiceNumber }) as any,
       );
       const {
         status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,

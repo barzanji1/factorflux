@@ -15,6 +15,7 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
+import { LOAD_TYPES } from "./load-types";
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -87,6 +88,7 @@ export const clients = pgTable("clients", {
   ratePercent: decimal("rate_percent", { precision: 6, scale: 2 }),
   advanceRate: decimal("advance_rate", { precision: 7, scale: 2 }).default("80.00"),
   factoringFeeRate: decimal("factoring_fee_rate", { precision: 7, scale: 2 }).default("3.00"),
+  cargoType: varchar("cargo_type", { enum: LOAD_TYPES }),
   language: varchar("language"),
   reviewed: timestamp("reviewed"),
   nextReview: timestamp("next_review"),
@@ -176,7 +178,7 @@ export const invoices = pgTable("invoices", {
   pickupLocation: text("pickup_location"),
   deliveryLocation: text("delivery_location"),
   loadType: varchar("load_type", {
-    enum: ["otr_load", "dump_truck_ticket", "other"],
+    enum: LOAD_TYPES,
   }),
   bolNumber: varchar("bol_number"),
   status: varchar("status", {
