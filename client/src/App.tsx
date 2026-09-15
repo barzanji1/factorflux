@@ -61,12 +61,15 @@ import PortalLogin from "@/pages/portal/login";
 import PortalDashboard from "@/pages/portal/dashboard";
 import PortalSubmit from "@/pages/portal/submit";
 import PortalSubmissions from "@/pages/portal/submissions";
+import PortalProfile from "@/pages/portal/profile";
 import PortalSubmissionsPage from "@/pages/portal-submissions";
 import CalendarPage from "@/pages/calendar";
 import Expenses from "@/pages/expenses";
 import Chat from "@/pages/chat";
 import Tickets from "@/pages/tickets";
 import TicketDetail from "@/pages/ticket-detail";
+import CarrierMessages from "@/pages/carrier-messages";
+import PortalChat from "@/pages/portal/chat";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -325,6 +328,11 @@ function Router() {
           <Chat />
         </ProtectedRoute>
       </Route>
+      <Route path="/carrier-messages">
+        <ProtectedRoute>
+          <CarrierMessages />
+        </ProtectedRoute>
+      </Route>
       <Route path="/tickets">
         <ProtectedRoute><Tickets /></ProtectedRoute>
       </Route>
@@ -353,6 +361,8 @@ function Router() {
       <Route path="/portal/dashboard"><PortalDashboard /></Route>
       <Route path="/portal/submit"><PortalSubmit /></Route>
       <Route path="/portal/submissions"><PortalSubmissions /></Route>
+      <Route path="/portal/chat"><PortalChat /></Route>
+      <Route path="/portal/profile"><PortalProfile /></Route>
       {/* Agent portal submissions */}
       <Route path="/portal-submissions">
         <ProtectedRoute><PortalSubmissionsPage /></ProtectedRoute>

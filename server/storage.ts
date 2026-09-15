@@ -1522,13 +1522,15 @@ export class DatabaseStorage implements IStorage {
   async createVaultEntry(entry: InsertClientVault): Promise<ClientVault> {
     const [newEntry] = await db.insert(clientVault).values(entry as any).returning();
 
-    await this.createActivity({
-      userId: entry.createdBy,
-      type: "vault_created",
-      description: `Created vault entry: ${entry.label}`,
-      entityType: "vault",
-      entityId: newEntry.id,
-    });
+    if (entry.createdBy) {
+      await this.createActivity({
+        userId: entry.createdBy,
+        type: "vault_created",
+        description: `Created vault entry: ${entry.label}`,
+        entityType: "vault",
+        entityId: newEntry.id,
+      });
+    }
 
     return newEntry;
   }

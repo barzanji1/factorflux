@@ -1,0 +1,47 @@
+Update the carrier portal invoice submission form to match the internal invoice creation form fields.
+
+Add these missing fields to /portal/submit:
+
+Load Type selector (at the top):
+
+ OTR, Dump, Hotshot, Other — badge/toggle buttons same as internal form
+ Required field
+ Auto-populates from carrier's cargo type in their profile if available
+
+Update existing fields:
+
+ Broker — keep existing text field but make it a searchable dropdown pulling from active brokers in the system
+ Branch — add after Broker, populates with broker's branches when broker is selected, required
+ Code — add route description field (e.g. "CA TO UT"), required
+ Lumper — Yes/No dropdown, required
+
+Add missing fields:
+
+ Driver — text input for driver name (carriers may not have drivers in system yet), required
+ Bank Account — dropdown showing carrier's bank accounts on file (added via portal profile), required
+If no bank accounts on file: show "Please add a bank account in your profile" with link
+ Instructions Subject — text field, optional
+ Instructions Details — textarea, optional
+ Wire cutoff warning in red: "Wire (same day funding) cutoff time is at 13:00:00 MT"
+
+Document uploads — already exist but verify these are working:
+
+ Rate Confirmation — PDF, max 5MB, required
+ Bill of Lading — PDF, max 5MB, required
+ Lumper Receipt — PDF, max 5MB, optional
+ Other — PDF, max 5MB, optional
+
+Carrier Portal Profile — add Bank Account section:
+
+ Carriers need to be able to add their bank accounts from the portal
+ /portal/profile page — add Bank Accounts section
+ Fields: Bank Name, Account Type (Checking/Savings), Routing Number, Account Number, Account Nickname
+ Account number masked by default with eye toggle to reveal
+ Multiple accounts supported
+ These sync to the carrier's Vault in FactorFlux internal system
+
+After submit:
+
+ Submission appears in FactorFlux Portal Submissions page with all new fields
+ Agent sees Load Type badge, Branch, Code, Lumper, Driver on submission detail
+ Create Invoice from Submission auto-populates all new fields into the invoice form

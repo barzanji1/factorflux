@@ -19,7 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ProfileSection, ProfileField, EmptyState, DocumentList } from "@/components/carriers/carrier-profile-section";
 import { DriverSection } from "@/components/carriers/driver-section";
 import { LoadTypeBadge, LoadTypeToggleGroup } from "@/components/load-type";
-import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
 const money = (value: unknown) => value === null || value === undefined || value === "" ? "Not recorded" : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Not recorded";
@@ -174,6 +174,7 @@ export default function ClientDetail() {
               </DropdownMenu>
               <Button size="sm" variant="outline" disabled title="Carrier email sending is unavailable because no safe send API is configured" aria-label="Send carrier email unavailable" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Mail className="h-3.5 w-3.5" />Send email</Button>
               <Button size="sm" variant="outline" disabled title="Carrier SMS sending is unavailable because no SMS API is configured" aria-label="Send carrier SMS unavailable" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Phone className="h-3.5 w-3.5" />Send SMS</Button>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/carrier-messages?carrierId=${clientId}`)} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><MessageCircle className="h-3.5 w-3.5" />Message Carrier</Button>
               <Button size="sm" variant="outline" disabled={!fmcsaUrl} title={fmcsaUrl ? "Open official FMCSA SAFER company snapshot" : "DOT number required for FMCSA lookup"} aria-label={fmcsaUrl ? "Open carrier on FMCSA" : "Carrier on FMCSA unavailable"} onClick={() => fmcsaUrl && window.open(fmcsaUrl, "_blank", "noopener,noreferrer")} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">Carrier on FMCSA</Button>
               {isManager && <Button size="sm" variant="outline" disabled={updateClient.isPending} onClick={() => updateClient.mutate({ status: client.status === "active" ? "inactive" : "active" })} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">{client.status === "active" ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{client.status === "active" ? "Set inactive" : "Activate"}</Button>}
             </div>

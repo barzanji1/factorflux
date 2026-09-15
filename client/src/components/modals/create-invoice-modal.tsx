@@ -38,7 +38,7 @@ const MAX_PDF_SIZE = 5 * 1024 * 1024;
 const EMPTY = {
   loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
   buyout: "", lumper: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
-  driverId: "", instructionsSubject: "", instructionsDetails: "",
+  driverId: "", driverName: "", instructionsSubject: "", instructionsDetails: "",
 };
 
 function formatFileSize(bytes: number) {
@@ -201,7 +201,15 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
   );
 }
 
-export default function CreateInvoiceModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+type InitialInvoiceValues = Partial<typeof EMPTY> & { brokerName?: string };
+
+export default function CreateInvoiceModal({
+  open, onOpenChange, initialValues,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialValues?: InitialInvoiceValues;
+}) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [values, setValues] = useState(EMPTY);
@@ -275,14 +283,19 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
   }, [branches, values.branchId]);
 
   useEffect(() => {
-    if (!open) {
+    if (open && initialValues) {
+      setValues({ ...EMPTY, ...initialValues });
+      if (initialValues.brokerId && initialValues.brokerName) {
+        setSelectedBroker({ id: Number(initialValues.brokerId), name: initialValues.brokerName });
+      }
+    } else if (!open) {
       setValues(EMPTY);
       setSelectedBroker(undefined);
       setBrokerSearch("");
       setBrokerOpen(false);
       setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
     }
-  }, [open]);
+  }, [open, initialValues]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -292,6 +305,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
         brokerId: Number(values.brokerId),
         branchId: Number(values.branchId),
         driverId: values.driverId ? Number(values.driverId) : null,
+        driverName: values.driverName.trim() || null,
         code: values.code.trim() || null,
         buyout: values.buyout === "" ? null : values.buyout === "yes",
         lumper: values.lumper === "" ? null : values.lumper === "yes",
@@ -384,7 +398,7 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                </div>
                <div className="space-y-1.5">
                  <Label>Driver</Label>
-                 <Select disabled={!values.clientId} value={values.driverId} onValueChange={driverId => setValues(v => ({ ...v, driverId }))}>
+                 <Select disabled={!values.clientId} value={values.driverId} onValueChange={driverId => setValues(v => ({ ...v, driverId, driverName: "" }))}>
                    <SelectTrigger><SelectValue placeholder={!values.clientId ? "Select a carrier first" : "Select a driver (optional)"} /></SelectTrigger>
                    <SelectContent>{drivers.map(driver => <SelectItem key={driver.id} value={String(driver.id)}>{driver.firstName} {driver.lastName}</SelectItem>)}</SelectContent>
                  </Select>
@@ -431,6 +445,10 @@ export default function CreateInvoiceModal({ open, onOpenChange }: { open: boole
                   </Select>
                 </div>
               )}
+               <div className="space-y-1.5">
+                 <Label htmlFor="driverName">Driver Name</Label>
+                 <Input id="driverName" value={values.driverName} onChange={event => setValues(v => ({ ...v, driverName: event.target.value, driverId: "" }))} placeholder="Carrier-entered driver name" />
+               </div>
               <div className="space-y-4 sm:col-span-2">
                 <div>
                   <h3 className="text-sm font-semibold">Instructions</h3>

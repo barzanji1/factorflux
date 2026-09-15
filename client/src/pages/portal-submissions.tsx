@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
@@ -11,15 +12,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Eye, Download, FileText, Search, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Eye, Download, FileText, Search, X, AlertTriangle, MessageCircle } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton-rows";
+import { LoadTypeBadge } from "@/components/load-type";
+import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
 
 interface Doc { id: number; documentType: string; originalName: string; mimeType?: string; size?: number; }
 interface Submission {
   id: number; portalUserId: number; companyName?: string;
   invoiceNumber?: string; loadNumber?: string; brokerName?: string;
+  carrierId?: number; brokerId?: number; branchId?: number; branchName?: string;
+  loadType?: string; code?: string; lumper?: boolean; driverName?: string;
+  bankAccountId?: number; bankAccount?: { bankName: string; nickname: string; lastFour: string };
+  instructionsSubject?: string; instructionsDetails?: string;
   amount?: string; paymentType?: string; status: string; notes?: string;
+  reviewedAt?: string | null; reviewedBy?: string | null;
   submittedAt?: string; documents?: Doc[];
 }
 
@@ -36,6 +44,7 @@ const DOC_LABEL: Record<string, string> = {
 };
 
 export default function PortalSubmissionsPage() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -43,9 +52,37 @@ export default function PortalSubmissionsPage() {
   const [detail, setDetail] = useState<Submission | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState("");
+  const [createInvoiceOpen, setCreateInvoiceOpen] = useState(false);
+  const [showUnreviewedOnly, setShowUnreviewedOnly] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const { data: submissions = [], isLoading } = useQuery<Submission[]>({
     queryKey: ["/api/carrier-portal/submissions"],
+    refetchInterval: 30000,
+  });
+  const { data: unreviewedCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/portal-submissions/unreviewed-count"],
+    refetchInterval: 30000,
+  });
+  const unreviewedCount = unreviewedCountData?.count ?? submissions.filter(item => !item.reviewedAt).length;
+
+  const reviewMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/carrier-portal/submissions/${id}/review`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message || "Unable to mark submission reviewed");
+      return body as Submission;
+    },
+    onSuccess: updated => {
+      queryClient.setQueryData<Submission[]>(["/api/carrier-portal/submissions"], current =>
+        current?.map(item => item.id === updated.id ? { ...item, reviewedAt: updated.reviewedAt, reviewedBy: updated.reviewedBy } : item),
+      );
+      queryClient.invalidateQueries({ queryKey: ["/api/portal-submissions/unreviewed-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/carrier-portal/submissions"] });
+    },
   });
 
   const updateMutation = useMutation({
@@ -62,6 +99,7 @@ export default function PortalSubmissionsPage() {
     },
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["/api/carrier-portal/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portal-submissions/unreviewed-count"] });
       setDetail((prev) => prev ? { ...prev, ...updated } : prev);
       toast({ title: "Submission updated" });
     },
@@ -70,16 +108,25 @@ export default function PortalSubmissionsPage() {
 
   const filtered = submissions.filter((s) => {
     const matchStatus = filterStatus === "all" || s.status === filterStatus;
+    const matchReview = !showUnreviewedOnly || !s.reviewedAt;
     const q = search.toLowerCase();
     const matchSearch = !q || [s.companyName, s.invoiceNumber, s.loadNumber, s.brokerName]
       .some((v) => v?.toLowerCase().includes(q));
-    return matchStatus && matchSearch;
+    return matchStatus && matchReview && matchSearch;
   }).sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
 
   function openDetail(s: Submission) {
     setDetail(s);
     setEditNotes(s.notes || "");
     setEditStatus(s.status);
+    if (!s.reviewedAt) reviewMutation.mutate(s.id);
+  }
+
+  function reviewIndicator(submission: Submission) {
+    if (submission.reviewedAt) return <Badge className="border-0 bg-slate-200 text-slate-700">REVIEWED</Badge>;
+    const age = Date.now() - new Date(submission.submittedAt || 0).getTime();
+    if (age <= 24 * 60 * 60 * 1000) return <Badge className="border-0 bg-blue-100 text-blue-700">NEW</Badge>;
+    return <Badge className="border-0 bg-amber-100 text-amber-800">PENDING</Badge>;
   }
 
   return (
@@ -89,6 +136,19 @@ export default function PortalSubmissionsPage() {
         <TopNav title="Portal Submissions" subtitle="Invoice submissions from the carrier portal" group="Workspace" />
         <main className="custom-scrollbar flex-1 overflow-auto p-6">
           <div className="max-w-7xl mx-auto space-y-6">
+            {unreviewedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUnreviewedOnly(true);
+                  window.setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left text-amber-900 shadow-sm transition-colors hover:bg-amber-100"
+              >
+                <AlertTriangle className="h-5 w-5 shrink-0 text-orange-600" />
+                <span className="font-semibold">⚠ {unreviewedCount} new carrier submission{unreviewedCount === 1 ? "" : "s"} require review</span>
+              </button>
+            )}
 
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3">
@@ -117,10 +177,11 @@ export default function PortalSubmissionsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {showUnreviewedOnly && <Button variant="outline" onClick={() => setShowUnreviewedOnly(false)}>Showing unreviewed · Clear</Button>}
             </div>
 
             {/* Table */}
-            <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+            <Card ref={tableRef} className="rounded-[24px] border border-[hsl(var(--border))]">
               <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -143,6 +204,7 @@ export default function PortalSubmissionsPage() {
                           <TableHead>Broker</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
                           <TableHead>Status</TableHead>
+                           <TableHead>Review</TableHead>
                           <TableHead>Submitted</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -160,10 +222,21 @@ export default function PortalSubmissionsPage() {
                               {s.amount ? `$${parseFloat(s.amount).toLocaleString()}` : "—"}
                             </TableCell>
                             <TableCell>{STATUS_BADGE[s.status]}</TableCell>
+                             <TableCell>{reviewIndicator(s)}</TableCell>
                             <TableCell className="text-xs text-slate-500">
                               {s.submittedAt ? new Date(s.submittedAt).toLocaleDateString() : "—"}
                             </TableCell>
                             <TableCell className="text-right">
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 aria-label="Message carrier"
+                                 title="Message carrier"
+                                 disabled={!s.carrierId}
+                                 onClick={(e) => { e.stopPropagation(); if (s.carrierId) navigate(`/carrier-messages?carrierId=${s.carrierId}`); }}
+                               >
+                                 <MessageCircle className="h-4 w-4" />
+                               </Button>
                               <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openDetail(s); }}>
                                 Review
                               </Button>
@@ -198,6 +271,11 @@ export default function PortalSubmissionsPage() {
                   ["Load #", detail.loadNumber],
                   ["Invoice #", detail.invoiceNumber],
                   ["Broker", detail.brokerName],
+                  ["Branch", detail.branchName],
+                  ["Code", detail.code],
+                  ["Lumper", detail.lumper == null ? "—" : detail.lumper ? "Yes" : "No"],
+                  ["Driver", detail.driverName],
+                  ["Bank Account", detail.bankAccount ? `${detail.bankAccount.nickname} · ${detail.bankAccount.bankName} ••••${detail.bankAccount.lastFour}` : "—"],
                   ["Amount", detail.amount ? `$${parseFloat(detail.amount).toLocaleString()}` : "—"],
                   ["Payment", detail.paymentType],
                   ["Submitted", detail.submittedAt ? new Date(detail.submittedAt).toLocaleString() : "—"],
@@ -208,6 +286,27 @@ export default function PortalSubmissionsPage() {
                   </div>
                 ))}
               </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
+                <div>
+                  <p className="text-xs text-slate-500">Load Type</p>
+                  <LoadTypeBadge value={detail.loadType} />
+                </div>
+                <Button onClick={() => {
+                  if (!detail.reviewedAt) reviewMutation.mutate(detail.id);
+                  setCreateInvoiceOpen(true);
+                }} disabled={!detail.carrierId || !detail.brokerId || !detail.branchId}>
+                  Create Invoice from Submission
+                </Button>
+              </div>
+
+              {(detail.instructionsSubject || detail.instructionsDetails) && (
+                <div className="rounded-xl border border-slate-200 p-3">
+                  <p className="text-xs font-semibold text-slate-500">Instructions</p>
+                  {detail.instructionsSubject && <p className="mt-1 font-medium">{detail.instructionsSubject}</p>}
+                  {detail.instructionsDetails && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{detail.instructionsDetails}</p>}
+                </div>
+              )}
 
               {/* Documents */}
               {detail.documents && detail.documents.length > 0 && (
@@ -273,6 +372,28 @@ export default function PortalSubmissionsPage() {
           )}
         </DialogContent>
       </Dialog>
+      {detail && (
+        <CreateInvoiceModal
+          open={createInvoiceOpen}
+          onOpenChange={setCreateInvoiceOpen}
+          initialValues={{
+            loadNumber: detail.loadNumber || "",
+            loadType: detail.loadType || "other",
+            clientId: detail.carrierId ? String(detail.carrierId) : "",
+            brokerId: detail.brokerId ? String(detail.brokerId) : "",
+            brokerName: detail.brokerName,
+            branchId: detail.branchId ? String(detail.branchId) : "",
+            code: detail.code || "",
+            lumper: detail.lumper == null ? "" : detail.lumper ? "yes" : "no",
+            driverName: detail.driverName || "",
+            amount: detail.amount || "",
+            paymentType: detail.paymentType === "wire" ? "Wire" : "ACH",
+            bankAccountId: detail.bankAccountId ? String(detail.bankAccountId) : "",
+            instructionsSubject: detail.instructionsSubject || "",
+            instructionsDetails: detail.instructionsDetails || "",
+          }}
+        />
+      )}
     </div>
   );
 }

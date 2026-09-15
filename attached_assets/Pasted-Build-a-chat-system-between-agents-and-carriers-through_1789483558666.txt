@@ -1,0 +1,63 @@
+Build a chat system between agents and carriers through the carrier portal.
+
+Database
+
+ Create portal_chats table: id, carrierId, portalUserId, agentId, createdAt
+ Create portal_chat_messages table: id, chatId, senderType (agent/carrier), senderId, message, attachmentUrl (nullable), attachmentName (nullable), read (boolean, default false), createdAt
+ Run db:push
+
+Backend
+
+ GET /api/portal/chat — carrier gets their own chat thread (requirePortalAuth)
+ POST /api/portal/chat/messages — carrier sends message (requirePortalAuth)
+ GET /api/portal/chat/messages — carrier fetches messages (requirePortalAuth)
+ GET /api/carrier-chat/:carrierId — agent gets chat thread for a carrier (requireAuth)
+ POST /api/carrier-chat/:carrierId/messages — agent sends message (requireAuth)
+ GET /api/carrier-chat/unread-count — total unread messages across all carrier chats (requireAuth)
+ All message endpoints poll-friendly — accepts ?since=timestamp to fetch only new messages
+ File attachment support — agents and carriers can send PDFs and images
+
+Frontend — Carrier Portal Side (/portal/chat)
+
+ Add Messages tab to carrier portal navigation
+ Clean chat UI — carrier sees messages from their assigned agent
+ Message bubbles: carrier messages right, agent messages left
+ Input box at bottom with send button and Enter key support
+ Attach file button — carrier can send Rate Con, BOL, photos directly in chat
+ Shows agent name and avatar on agent messages
+ Polls every 5 seconds for new messages
+ Unread message badge on Messages tab
+ Suggested quick messages for carriers:
+"What is the status of my invoice?"
+"I have uploaded my documents"
+"When will I receive my payment?"
+"I need a fuel advance"
+
+Frontend — Agent Side (inside FactorFlux)
+
+ Add Carrier Messages page at /carrier-messages
+ Left panel: list of all carriers with active chats
+Shows carrier name, last message preview, unread count badge, time
+Unread chats highlighted
+Search carriers by name
+ Right panel: full chat thread for selected carrier
+Agent messages right, carrier messages left
+Carrier name and MC# at top
+Link to carrier profile
+File attachment support
+Polls every 5 seconds
+ Quick Reply templates:
+"We have received your documents and are processing your invoice"
+"Your payment has been sent via [ACH/Wire]"
+"Please upload your Rate Confirmation and Bill of Lading"
+"Your invoice is currently under review"
+"We need additional documentation for this invoice"
+ Add Carrier Messages to sidebar under WORKSPACE with chat icon
+ Unread badge on sidebar item showing total unread carrier messages
+ When carrier sends a message — browser notification to agents: "New message from [Carrier Name]"
+
+Integration:
+
+ From carrier profile page — add Message Carrier button that opens the chat thread for that carrier
+ From Portal Submissions page — add Chat icon per submission that opens chat with that carrier
+ New carrier chat messages appear in the notification bell

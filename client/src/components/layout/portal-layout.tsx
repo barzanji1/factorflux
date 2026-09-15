@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Truck, LogOut, FileText, LayoutDashboard, PlusCircle } from "lucide-react";
+import { Truck, LogOut, FileText, LayoutDashboard, PlusCircle, UserRound, MessageCircle } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,13 @@ interface PortalLayoutProps {
   children: React.ReactNode;
 }
 
+interface PortalChatSummary {
+  unreadCount?: number;
+  unread?: number;
+  unreadMessages?: number;
+  agent?: { name?: string; avatar?: string; avatarUrl?: string };
+}
+
 export default function PortalLayout({ children }: PortalLayoutProps) {
   const [location] = useLocation();
   const queryClient = useQueryClient();
@@ -25,6 +32,18 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
     queryKey: ["/api/portal/me"],
     retry: false,
   });
+
+  const { data: chatSummary } = useQuery<PortalChatSummary>({
+    queryKey: ["/api/portal/chat"],
+    enabled: !!me,
+    refetchInterval: 5000,
+    retry: false,
+  });
+
+  const unreadMessages = Math.max(
+    0,
+    Number(chatSummary?.unreadCount ?? chatSummary?.unreadMessages ?? chatSummary?.unread ?? 0),
+  );
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -40,6 +59,8 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
     { href: "/portal/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/portal/submit",    label: "Submit Invoice", icon: PlusCircle },
     { href: "/portal/submissions", label: "My Submissions", icon: FileText },
+    { href: "/portal/chat", label: "Messages", icon: MessageCircle },
+    { href: "/portal/profile", label: "Profile", icon: UserRound },
   ];
 
   return (
@@ -66,7 +87,12 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
                   )}
                 >
                   <link.icon className="h-4 w-4" />
-                  {link.label}
+                  <span>{link.label}</span>
+                  {link.href === "/portal/chat" && unreadMessages > 0 && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] leading-none text-white">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </span>
+                  )}
                 </button>
               </Link>
             ))}
@@ -103,7 +129,14 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
                 )}
               >
                 <link.icon className="h-4 w-4" />
-                {link.label.split(" ")[0]}
+                <span className="relative">
+                  {link.label.split(" ")[0]}
+                  {link.href === "/portal/chat" && unreadMessages > 0 && (
+                    <span className="absolute -right-3 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[8px] leading-none text-white">
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
+                </span>
               </button>
             </Link>
           ))}

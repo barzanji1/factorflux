@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import type { Client, Invoice, Load, Notification } from "@shared/schema";
+import type { Client, Invoice, Load, Notification as AppNotification } from "@shared/schema";
 import {
   Bell,
   Plus,
@@ -88,9 +88,10 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
   const searchRef = useRef<HTMLDivElement>(null);
+  const previousNotificationIdsRef = useRef<Set<number> | null>(null);
   const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 250);
 
-  const { data: notifications = [] } = useQuery<Notification[]>({
+  const { data: notifications = [] } = useQuery<AppNotification[]>({
     queryKey: ["/api/notifications"],
     retry: false,
     staleTime: 20000,
@@ -104,6 +105,26 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
     refetchInterval: 30000,
   });
   const unreadCount = unreadCountData?.count ?? 0;
+
+  useEffect(() => {
+    const currentIds = new Set(notifications.map(notification => notification.id));
+    const previousIds = previousNotificationIdsRef.current;
+    previousNotificationIdsRef.current = currentIds;
+    if (!previousIds || typeof window.Notification === "undefined" || window.Notification.permission !== "granted") return;
+    notifications
+      .filter(notification =>
+        ["carrier_submission", "portal_chat"].includes(notification.entityType || "")
+        && !previousIds.has(notification.id),
+      )
+      .forEach(item => {
+        const browserNotification = new window.Notification(item.message);
+        browserNotification.onclick = () => {
+          window.focus();
+          setLocation(item.actionUrl || (item.entityType === "portal_chat" ? "/carrier-messages" : "/portal-submissions"));
+          browserNotification.close();
+        };
+      });
+  }, [notifications, setLocation]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: number) => {
@@ -167,7 +188,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
     setShowSearchResults(searchEnabled && (!!searchResults || isSearching));
   }, [searchEnabled, searchResults, isSearching]);
 
-  const handleNotificationClick = (n: Notification) => {
+  const handleNotificationClick = (n: AppNotification) => {
     if (!n.read) markAsReadMutation.mutate(n.id);
     const url = (n as any).actionUrl;
     if (url) setLocation(url);

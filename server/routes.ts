@@ -96,6 +96,8 @@ import {
   expenses,
   insertExpenseSchema,
   carrierPortalUsers,
+  portalChats,
+  portalChatMessages,
   carrierSubmissions,
   carrierSubmissionDocs,
   writtenWarnings,
@@ -2447,6 +2449,7 @@ ${message}
         brokerId: z.coerce.number().int().positive(),
         branchId: z.coerce.number().int().positive(),
         driverId: z.coerce.number().int().positive().nullable().optional(),
+        driverName: z.string().trim().max(255).nullable().optional(),
         bankAccountId: z.coerce.number().int().positive().nullable().optional(),
         code: z.string().trim().max(255).nullable().optional(),
         lumper: z.coerce.boolean().nullable().optional(),
@@ -9534,13 +9537,24 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
 
   const portalUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 },
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-      const allowed = /jpeg|jpg|png|pdf|tiff|tif/;
-      if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+      if (path.extname(file.originalname).toLowerCase() === ".pdf" && file.mimetype === "application/pdf") {
         return cb(null, true);
       }
-      cb(new Error("Only PDF, JPEG, JPG, PNG, and TIFF files are allowed"));
+      cb(new Error("Only PDF files up to 5MB are allowed"));
+    },
+  });
+  const portalChatUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, cb) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      const allowed = (extension === ".pdf" && file.mimetype.toLowerCase() === "application/pdf")
+        || ([".jpg", ".jpeg"].includes(extension) && file.mimetype.toLowerCase() === "image/jpeg")
+        || (extension === ".png" && file.mimetype.toLowerCase() === "image/png");
+      if (allowed) return cb(null, true);
+      cb(new Error("Attachments must be a PDF, JPEG, or PNG"));
     },
   });
 
@@ -9548,6 +9562,31 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     const portalUser = (req.session as any)?.portalUser;
     if (!portalUser) return res.status(401).json({ message: "Portal authentication required" });
     req.portalUser = portalUser;
+    next();
+  };
+
+  const userCanUseCarrierChat = async (user: any) => {
+    if (!user || !["employee", "manager", "admin"].includes(user.role)) return false;
+    if (user.role === "admin") return true;
+    const stored = await storage.getUserPermissions(user.id);
+    const permissions = stored.length ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee);
+    return (permissions as readonly string[]).includes("chat");
+  };
+
+  const requireChatAgent = async (req: any, res: any, next: any) => {
+    const user = (req.session as any)?.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+    try {
+      if (!(await userCanUseCarrierChat(user))) {
+        return res.status(403).json({ message: "Chat permission required" });
+      }
+    } catch {
+      return res.status(500).json({ message: "Unable to verify chat permission" });
+    }
+    if (user.status === "suspended" || user.status === "inactive") {
+      return res.status(403).json({ message: "Internal agent access required" });
+    }
+    req.user = user;
     next();
   };
 
@@ -9629,9 +9668,581 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     try {
       const [user] = await db.select().from(carrierPortalUsers).where(eq(carrierPortalUsers.id, req.portalUser.id)).limit(1);
       if (!user) return res.status(404).json({ message: "User not found" });
-      res.json({ id: user.id, email: user.email, companyName: user.companyName, mcNumber: user.mcNumber, dotNumber: user.dotNumber, status: user.status });
+      const [carrier] = user.carrierId
+        ? await db.select({ id: clients.id, cargoType: clients.cargoType }).from(clients).where(eq(clients.id, user.carrierId)).limit(1)
+        : [];
+      res.json({
+        id: user.id, email: user.email, companyName: user.companyName,
+        mcNumber: user.mcNumber, dotNumber: user.dotNumber, status: user.status,
+        carrierId: user.carrierId, cargoType: carrier?.cargoType ?? null,
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  // ── Carrier/Agent Chat ──────────────────────────────────────────────────────
+  const getActivePortalChatUser = async (portalUserId: number) => {
+    const [portalUser] = await db.select().from(carrierPortalUsers)
+      .where(and(eq(carrierPortalUsers.id, portalUserId), eq(carrierPortalUsers.status, "active"))).limit(1);
+    if (!portalUser?.carrierId) return null;
+    const [carrier] = await db.select({ id: clients.id, name: clients.name })
+      .from(clients).where(eq(clients.id, portalUser.carrierId)).limit(1);
+    if (!carrier) return null;
+    return { portalUser, carrier };
+  };
+
+  const chatSummary = (chat: any, carrierName?: string | null, portalCompanyName?: string | null) => ({
+    id: chat.id,
+    carrierId: chat.carrierId,
+    portalUserId: chat.portalUserId,
+    agentId: chat.agentId,
+    carrierLastReadAt: chat.carrierLastReadAt,
+    agentLastReadAt: chat.agentLastReadAt,
+    createdAt: chat.createdAt,
+    updatedAt: chat.updatedAt,
+    carrierName: carrierName ?? null,
+    portalCompanyName: portalCompanyName ?? null,
+  });
+
+  const chatMessageResponse = (message: any) => ({
+    id: message.id,
+    chatId: message.chatId,
+    senderType: message.senderType,
+    senderId: message.senderId,
+    message: message.message,
+    read: message.read,
+    createdAt: message.createdAt,
+    attachment: message.attachmentS3Key ? {
+      name: message.attachmentName,
+      mimeType: message.attachmentMimeType,
+      size: message.attachmentSize,
+      viewUrl: `/api/portal-chat/messages/${message.id}/attachment/view`,
+      downloadUrl: `/api/portal-chat/messages/${message.id}/attachment/download`,
+    } : null,
+  });
+
+  const enrichChatMessages = async (rows: any[], portalCompanyName?: string | null) => {
+    const agentIds = Array.from(new Set(rows
+      .filter((row) => row.senderType === "agent")
+      .map((row) => String(row.senderId))));
+    const agents = agentIds.length
+      ? await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+      }).from(users).where(inArray(users.id, agentIds))
+      : [];
+    const agentMap = new Map(agents.map((agent) => [agent.id, agent]));
+    return rows.map((row) => {
+      const response = chatMessageResponse(row);
+      const agent = row.senderType === "agent" ? agentMap.get(String(row.senderId)) : undefined;
+      return {
+        ...response,
+        senderName: row.senderType === "carrier"
+          ? portalCompanyName || "Carrier"
+          : [agent?.firstName, agent?.lastName].filter(Boolean).join(" ") || "TPF Agent",
+        senderAvatar: agent?.profileImageUrl || null,
+      };
+    });
+  };
+
+  const parseChatSince = (raw: unknown) => {
+    if (raw === undefined) return undefined;
+    if (typeof raw !== "string" || !raw || Number.isNaN(Date.parse(raw))) {
+      throw new Error("since must be a valid ISO timestamp");
+    }
+    return new Date(raw);
+  };
+
+  const loadChatMessageRows = async (chatId: number, since?: Date, afterId = 0) => {
+    if (since) {
+      return db.select().from(portalChatMessages).where(and(
+        eq(portalChatMessages.chatId, chatId),
+        or(
+          gt(portalChatMessages.createdAt, since),
+          and(eq(portalChatMessages.createdAt, since), gt(portalChatMessages.id, afterId)),
+        ),
+      )).orderBy(portalChatMessages.createdAt, portalChatMessages.id).limit(200);
+    }
+    const newest = await db.select().from(portalChatMessages)
+      .where(eq(portalChatMessages.chatId, chatId))
+      .orderBy(desc(portalChatMessages.createdAt), desc(portalChatMessages.id))
+      .limit(200);
+    return newest.reverse();
+  };
+
+  const getPortalChat = async (portalUserId: number, create = true) => {
+    const context = await getActivePortalChatUser(portalUserId);
+    if (!context) return null;
+    let [chat] = await db.select().from(portalChats).where(and(
+      eq(portalChats.carrierId, context.carrier.id),
+      eq(portalChats.portalUserId, portalUserId),
+    )).limit(1);
+    if (!chat && create) {
+      [chat] = await db.insert(portalChats).values({
+        carrierId: context.carrier.id,
+        portalUserId,
+      }).onConflictDoNothing({
+        target: [portalChats.carrierId, portalChats.portalUserId],
+      }).returning();
+      if (!chat) {
+        [chat] = await db.select().from(portalChats).where(and(
+          eq(portalChats.carrierId, context.carrier.id),
+          eq(portalChats.portalUserId, portalUserId),
+        )).limit(1);
+      }
+    }
+    return chat ? { chat, ...context } : null;
+  };
+
+  const getAgentChatForCarrier = async (carrierId: number, create = false) => {
+    let [chat] = await db.select({ chat: portalChats }).from(portalChats)
+      .innerJoin(carrierPortalUsers, and(
+        eq(carrierPortalUsers.id, portalChats.portalUserId),
+        eq(carrierPortalUsers.carrierId, portalChats.carrierId),
+        eq(carrierPortalUsers.status, "active"),
+      ))
+      .where(eq(portalChats.carrierId, carrierId))
+      .orderBy(desc(portalChats.updatedAt), desc(portalChats.id)).limit(1);
+    if (chat || !create) return chat ? { chat: chat.chat } : null;
+    const [portalUser] = await db.select({ id: carrierPortalUsers.id })
+      .from(carrierPortalUsers)
+      .where(and(eq(carrierPortalUsers.carrierId, carrierId), eq(carrierPortalUsers.status, "active")))
+      .orderBy(desc(carrierPortalUsers.id)).limit(1);
+    if (!portalUser) return null;
+    let [createdChat] = await db.insert(portalChats).values({ carrierId, portalUserId: portalUser.id })
+      .onConflictDoNothing({ target: [portalChats.carrierId, portalChats.portalUserId] }).returning();
+    if (!createdChat) {
+      [createdChat] = await db.select().from(portalChats).where(and(
+        eq(portalChats.carrierId, carrierId), eq(portalChats.portalUserId, portalUser.id),
+      )).limit(1);
+    }
+    return createdChat ? { chat: createdChat } : null;
+  };
+
+  // Returns the authenticated chat message only after checking either side's ownership.
+  const serveChatAttachment = async (req: any, res: any, mode: "view" | "download") => {
+    const messageId = Number(req.params.messageId);
+    if (!Number.isInteger(messageId) || messageId <= 0) return res.status(400).json({ message: "Invalid message" });
+    const [row] = await db.select({
+      message: portalChatMessages,
+      chat: portalChats,
+    }).from(portalChatMessages).innerJoin(portalChats, eq(portalChats.id, portalChatMessages.chatId))
+      .where(eq(portalChatMessages.id, messageId)).limit(1);
+    if (!row?.message.attachmentS3Key) return res.status(404).json({ message: "Attachment not found" });
+
+    const portalUserId = (req.session as any)?.portalUser?.id;
+    const internalUser = (req.session as any)?.user;
+    const [activePortalUser] = portalUserId
+      ? await db.select({ id: carrierPortalUsers.id, carrierId: carrierPortalUsers.carrierId }).from(carrierPortalUsers).where(and(
+        eq(carrierPortalUsers.id, portalUserId), eq(carrierPortalUsers.status, "active"),
+      )).limit(1)
+      : [];
+    const [activeAgent] = internalUser
+      ? await db.select({ id: users.id }).from(users).where(and(
+        eq(users.id, internalUser.id), eq(users.status, "active"),
+      )).limit(1)
+      : [];
+    const isPortalOwner = !!activePortalUser
+      && row.chat.portalUserId === activePortalUser.id
+      && row.chat.carrierId === activePortalUser.carrierId;
+    const isAgent = !!activeAgent && await userCanUseCarrierChat(internalUser);
+    if (!isPortalOwner && !isAgent) return res.status(403).json({ message: "Chat access required" });
+    const url = mode === "view"
+      ? await getSignedViewUrl(row.message.attachmentS3Key)
+      : await getSignedDownloadUrl(row.message.attachmentS3Key, row.message.attachmentName || "attachment");
+    return res.redirect(url);
+  };
+
+  app.get("/api/portal/chat", requirePortalAuth, async (req: any, res) => {
+    try {
+      const result = await getPortalChat(req.portalUser.id);
+      if (!result) return res.status(403).json({ message: "An active, linked portal account is required" });
+      const [carrier] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, result.chat.carrierId)).limit(1);
+      const [{ total }] = await db.select({ total: count() }).from(portalChatMessages).where(and(
+        eq(portalChatMessages.chatId, result.chat.id),
+        eq(portalChatMessages.senderType, "agent"),
+        eq(portalChatMessages.read, false),
+      ));
+      const [agent] = result.chat.agentId
+        ? await db.select({
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        }).from(users).where(eq(users.id, result.chat.agentId)).limit(1)
+        : [];
+      res.json({
+        ...chatSummary(result.chat, carrier?.name, result.portalUser.companyName),
+        unreadCount: Number(total),
+        agent: agent ? {
+          name: [agent.firstName, agent.lastName].filter(Boolean).join(" "),
+          profileImageUrl: agent.profileImageUrl,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Portal chat fetch error:", error);
+      res.status(500).json({ message: "Failed to load chat" });
+    }
+  });
+
+  app.post("/api/portal/chat/messages", requirePortalAuth, (req: any, res, next) => {
+    portalChatUpload.single("attachment")(req, res, (err: any) => {
+      if (!err) return next();
+      if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ message: "Attachment must be 10MB or smaller" });
+      res.status(400).json({ message: err.message || "Attachment upload rejected" });
+    });
+  }, async (req: any, res) => {
+    try {
+      const result = await getPortalChat(req.portalUser.id);
+      if (!result) return res.status(403).json({ message: "An active, linked portal account is required" });
+      const file = req.file as Express.Multer.File | undefined;
+      const text = typeof req.body.message === "string" ? req.body.message.trim() : "";
+      if (!text && !file) return res.status(400).json({ message: "Message or attachment is required" });
+      if (text.length > 10000) return res.status(400).json({ message: "Message must be 10,000 characters or fewer" });
+      if (file) {
+        const bytes = file.buffer;
+        const mime = file.mimetype.toLowerCase();
+        const validMagic = (mime === "application/pdf" && bytes.subarray(0, 5).toString("ascii") === "%PDF-")
+          || (mime === "image/jpeg" && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
+          || (mime === "image/png" && bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
+        if (!validMagic) return res.status(400).json({ message: "Attachment contents do not match its declared type" });
+      }
+      let attachmentS3Key: string | null = null;
+      if (file) {
+        attachmentS3Key = await uploadToS3(file.buffer, `portal-chat/${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`, file.mimetype);
+      }
+      const [created] = await db.insert(portalChatMessages).values({
+        chatId: result.chat.id,
+        senderType: "carrier",
+        senderId: String(result.portalUser.id),
+        message: text || null,
+        attachmentS3Key,
+        attachmentName: file ? sanitizeOriginalName(file.originalname) : null,
+        attachmentMimeType: file?.mimetype || null,
+        attachmentSize: file?.size || null,
+        read: false,
+      }).returning();
+      await db.update(portalChats).set({ updatedAt: new Date() }).where(eq(portalChats.id, result.chat.id));
+
+      try {
+        const agents = await db.select({ id: users.id, role: users.role }).from(users).where(and(
+          eq(users.status, "active"), inArray(users.role, ["employee", "manager", "admin"]),
+        ));
+        const notificationText = `New message from ${result.carrier.name}`;
+        const eligibleAgents = [];
+        for (const agent of agents) {
+          if (await userCanUseCarrierChat(agent)) eligibleAgents.push(agent);
+        }
+        await Promise.all(eligibleAgents.map((agent) => storage.createNotification({
+          userId: agent.id,
+          title: notificationText,
+          message: notificationText,
+          type: "info",
+          entityType: "portal_chat",
+          entityId: result.chat.id,
+          actionUrl: `/carrier-messages?carrierId=${result.carrier.id}`,
+        })));
+      } catch (notificationError) {
+        console.error("Carrier chat notification fan-out failed:", notificationError instanceof Error ? notificationError.message : "unknown error");
+      }
+      res.status(201).json(chatMessageResponse(created));
+    } catch (error) {
+      console.error("Portal chat message error:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/portal/chat/messages", requirePortalAuth, async (req: any, res) => {
+    try {
+      const result = await getPortalChat(req.portalUser.id);
+      if (!result) return res.status(403).json({ message: "An active, linked portal account is required" });
+      let since: Date | undefined;
+      try { since = parseChatSince(req.query.since); } catch (error) { return res.status(400).json({ message: (error as Error).message }); }
+      const afterId = Number(req.query.afterId || 0);
+      if (!Number.isInteger(afterId) || afterId < 0) return res.status(400).json({ message: "afterId must be a non-negative integer" });
+      const rows = await loadChatMessageRows(result.chat.id, since, afterId);
+      const unreadAgentIds = rows.filter(row => row.senderType === "agent" && !row.read).map(row => row.id);
+      if (unreadAgentIds.length) {
+        await db.update(portalChatMessages).set({ read: true }).where(inArray(portalChatMessages.id, unreadAgentIds));
+        await db.update(portalChats).set({ carrierLastReadAt: new Date() }).where(eq(portalChats.id, result.chat.id));
+      }
+      res.json(await enrichChatMessages(rows, result.portalUser.companyName));
+    } catch (error) {
+      console.error("Portal chat messages fetch error:", error);
+      res.status(500).json({ message: "Failed to load messages" });
+    }
+  });
+
+  app.get("/api/carrier-chat/unread-count", requireChatAgent, async (_req: any, res) => {
+    try {
+      const [{ total }] = await db.select({ total: count() }).from(portalChatMessages)
+        .innerJoin(portalChats, eq(portalChats.id, portalChatMessages.chatId))
+        .innerJoin(carrierPortalUsers, and(
+          eq(carrierPortalUsers.id, portalChats.portalUserId),
+          eq(carrierPortalUsers.carrierId, portalChats.carrierId),
+          eq(carrierPortalUsers.status, "active"),
+        ))
+        .where(and(eq(portalChatMessages.senderType, "carrier"), eq(portalChatMessages.read, false)));
+      res.json({ count: Number(total) });
+    } catch (error) {
+      console.error("Carrier chat unread count error:", error);
+      res.status(500).json({ message: "Failed to load unread count" });
+    }
+  });
+
+  app.get("/api/carrier-chat", requireChatAgent, async (_req: any, res) => {
+    try {
+      const rows = await db.select({
+        chat: portalChats,
+        carrierName: clients.name,
+        portalCompanyName: carrierPortalUsers.companyName,
+      }).from(portalChats)
+        .innerJoin(clients, eq(clients.id, portalChats.carrierId))
+        .innerJoin(carrierPortalUsers, and(
+          eq(carrierPortalUsers.id, portalChats.portalUserId),
+          eq(carrierPortalUsers.carrierId, portalChats.carrierId),
+          eq(carrierPortalUsers.status, "active"),
+        ))
+        .orderBy(desc(portalChats.updatedAt), desc(portalChats.id));
+      const result = [];
+      for (const row of rows) {
+        const [last] = await db.select().from(portalChatMessages)
+          .where(eq(portalChatMessages.chatId, row.chat.id))
+          .orderBy(desc(portalChatMessages.createdAt), desc(portalChatMessages.id)).limit(1);
+        const [{ total }] = await db.select({ total: count() }).from(portalChatMessages).where(and(
+          eq(portalChatMessages.chatId, row.chat.id), eq(portalChatMessages.senderType, "carrier"), eq(portalChatMessages.read, false),
+        ));
+        result.push({
+          ...chatSummary(row.chat, row.carrierName, row.portalCompanyName),
+          unreadCount: Number(total),
+          lastMessage: last ? chatMessageResponse(last) : null,
+        });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Carrier chat list error:", error);
+      res.status(500).json({ message: "Failed to load carrier chats" });
+    }
+  });
+
+  app.get("/api/carrier-chat/:carrierId", requireChatAgent, async (req: any, res) => {
+    try {
+      const carrierId = Number(req.params.carrierId);
+      if (!Number.isInteger(carrierId) || carrierId <= 0) return res.status(400).json({ message: "Invalid carrier" });
+      const result = await getAgentChatForCarrier(carrierId, true);
+      if (!result) return res.status(404).json({ message: "Carrier chat not found" });
+      let since: Date | undefined;
+      try { since = parseChatSince(req.query.since); } catch (error) { return res.status(400).json({ message: (error as Error).message }); }
+      const afterId = Number(req.query.afterId || 0);
+      if (!Number.isInteger(afterId) || afterId < 0) return res.status(400).json({ message: "afterId must be a non-negative integer" });
+      const [carrier] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, carrierId)).limit(1);
+      const rows = await loadChatMessageRows(result.chat.id, since, afterId);
+      const unreadCarrierIds = rows.filter(row => row.senderType === "carrier" && !row.read).map(row => row.id);
+      if (unreadCarrierIds.length) {
+        await db.update(portalChatMessages).set({ read: true }).where(inArray(portalChatMessages.id, unreadCarrierIds));
+        await db.update(portalChats).set({ agentLastReadAt: new Date() }).where(eq(portalChats.id, result.chat.id));
+      }
+      const [portalUser] = await db.select({ companyName: carrierPortalUsers.companyName })
+        .from(carrierPortalUsers).where(eq(carrierPortalUsers.id, result.chat.portalUserId)).limit(1);
+      res.json({
+        chat: chatSummary(result.chat, carrier?.name, portalUser?.companyName),
+        messages: await enrichChatMessages(rows, portalUser?.companyName),
+      });
+    } catch (error) {
+      console.error("Carrier chat fetch error:", error);
+      res.status(500).json({ message: "Failed to load carrier chat" });
+    }
+  });
+
+  app.post("/api/carrier-chat/:carrierId/messages", requireChatAgent, (req: any, res, next) => {
+    portalChatUpload.single("attachment")(req, res, (err: any) => {
+      if (!err) return next();
+      if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ message: "Attachment must be 10MB or smaller" });
+      res.status(400).json({ message: err.message || "Attachment upload rejected" });
+    });
+  }, async (req: any, res) => {
+    try {
+      const carrierId = Number(req.params.carrierId);
+      if (!Number.isInteger(carrierId) || carrierId <= 0) return res.status(400).json({ message: "Invalid carrier" });
+      const result = await getAgentChatForCarrier(carrierId, true);
+      if (!result) return res.status(404).json({ message: "Active portal user for carrier not found" });
+      const file = req.file as Express.Multer.File | undefined;
+      const text = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+      if (!text && !file) return res.status(400).json({ message: "Message or attachment is required" });
+      if (text.length > 10000) return res.status(400).json({ message: "Message must be 10,000 characters or fewer" });
+      if (file) {
+        const bytes = file.buffer;
+        const mime = file.mimetype.toLowerCase();
+        const validMagic = (mime === "application/pdf" && bytes.subarray(0, 5).toString("ascii") === "%PDF-")
+          || (mime === "image/jpeg" && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
+          || (mime === "image/png" && bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
+        if (!validMagic) return res.status(400).json({ message: "Attachment contents do not match its declared type" });
+      }
+      let attachmentS3Key: string | null = null;
+      if (file) {
+        attachmentS3Key = await uploadToS3(file.buffer, `portal-chat/${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`, file.mimetype);
+      }
+      const [created] = await db.insert(portalChatMessages).values({
+        chatId: result.chat.id,
+        senderType: "agent",
+        senderId: String(req.user.id),
+        message: text || null,
+        attachmentS3Key,
+        attachmentName: file ? sanitizeOriginalName(file.originalname) : null,
+        attachmentMimeType: file?.mimetype || null,
+        attachmentSize: file?.size || null,
+        read: false,
+      }).returning();
+      await db.update(portalChats).set({
+        agentId: sql`coalesce(${portalChats.agentId}, ${req.user.id})`,
+        updatedAt: new Date(),
+      }).where(eq(portalChats.id, result.chat.id));
+      res.status(201).json(chatMessageResponse(created));
+    } catch (error) {
+      console.error("Carrier chat message error:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/portal-chat/messages/:messageId/attachment/view", async (req: any, res) => {
+    try { return await serveChatAttachment(req, res, "view"); }
+    catch (error) { console.error("Chat attachment view error:", error); return res.status(500).json({ message: "Failed to view attachment" }); }
+  });
+  app.get("/api/portal-chat/messages/:messageId/attachment/download", async (req: any, res) => {
+    try { return await serveChatAttachment(req, res, "download"); }
+    catch (error) { console.error("Chat attachment download error:", error); return res.status(500).json({ message: "Failed to download attachment" }); }
+  });
+
+  app.get("/api/portal/brokers", requirePortalAuth, async (req, res) => {
+    try {
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      const conditions = [eq(brokers.status, "active" as const)];
+      if (q) conditions.push(ilike(brokers.name, `%${q}%`));
+      const rows = await db.select({ id: brokers.id, name: brokers.name })
+        .from(brokers).where(and(...conditions)).orderBy(brokers.name).limit(20);
+      res.json(rows);
+    } catch {
+      res.status(500).json({ message: "Failed to load brokers" });
+    }
+  });
+
+  app.get("/api/portal/brokers/:id/branches", requirePortalAuth, async (req, res) => {
+    try {
+      const brokerId = Number(req.params.id);
+      if (!Number.isInteger(brokerId)) return res.status(400).json({ message: "Invalid broker" });
+      const rows = await db.select({ id: brokerBranches.id, branchName: brokerBranches.branchName })
+        .from(brokerBranches)
+        .where(and(eq(brokerBranches.brokerId, brokerId), eq(brokerBranches.status, "active")))
+        .orderBy(brokerBranches.branchName);
+      res.json(rows);
+    } catch {
+      res.status(500).json({ message: "Failed to load branches" });
+    }
+  });
+
+  const portalBankAccountSummary = (entry: any) => {
+    const decrypted = decryptVault(entry.encryptedData);
+    const data = JSON.parse(decrypted);
+    const digits = String(data.accountNumber || "").replace(/\D/g, "");
+    return {
+      id: entry.id,
+      bankName: data.bankName,
+      accountType: data.accountType,
+      nickname: data.nickname || entry.label,
+      lastFour: digits.slice(-4).padStart(4, "•"),
+      createdAt: entry.createdAt,
+    };
+  };
+
+  app.get("/api/portal/bank-accounts", requirePortalAuth, async (req: any, res) => {
+    try {
+      const [portalUser] = await db.select().from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.id, req.portalUser.id)).limit(1);
+      if (!portalUser?.carrierId) return res.json([]);
+      const entries = await db.select().from(clientVault).where(and(
+        eq(clientVault.clientId, portalUser.carrierId),
+        eq(clientVault.dataType, "bank_account"),
+        eq(clientVault.isActive, true),
+      )).orderBy(desc(clientVault.createdAt));
+      res.json(entries.map(portalBankAccountSummary));
+    } catch (error) {
+      console.error("Portal bank accounts error:", error);
+      res.status(500).json({ message: "Failed to load bank accounts" });
+    }
+  });
+
+  app.post("/api/portal/bank-accounts", requirePortalAuth, async (req: any, res) => {
+    try {
+      const bankSchema = z.object({
+        bankName: z.string().trim().min(1).max(120),
+        accountType: z.enum(["checking", "savings"]),
+        routingNumber: z.string().regex(/^\d{9}$/, "Routing number must be 9 digits"),
+        accountNumber: z.string().regex(/^\d{4,17}$/, "Account number must be 4-17 digits"),
+        nickname: z.string().trim().min(1).max(80),
+      });
+      const value = bankSchema.parse(req.body);
+      const [portalUser] = await db.select().from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.id, req.portalUser.id)).limit(1);
+      if (!portalUser?.carrierId) {
+        return res.status(409).json({ message: "Your portal account is not linked to a carrier profile. Please contact TPF." });
+      }
+      const [entry] = await db.insert(clientVault).values({
+        clientId: portalUser.carrierId,
+        dataType: "bank_account",
+        label: value.nickname,
+        encryptedData: encryptVault(JSON.stringify({
+          bankName: value.bankName,
+          accountType: value.accountType,
+          routingNumber: value.routingNumber,
+          accountNumber: value.accountNumber,
+          nickname: value.nickname,
+        })),
+        notes: "Added from Carrier Portal",
+        createdBy: null,
+        createdByPortalUserId: portalUser.id,
+      }).returning();
+      res.status(201).json(portalBankAccountSummary(entry));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid bank account" });
+      console.error("Portal bank account create error:", error);
+      res.status(500).json({ message: "Failed to add bank account" });
+    }
+  });
+
+  app.get("/api/portal/bank-accounts/:id/reveal", requirePortalAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const [portalUser] = await db.select().from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.id, req.portalUser.id)).limit(1);
+      if (!portalUser?.carrierId) return res.status(404).json({ message: "Bank account not found" });
+      const [entry] = await db.select().from(clientVault).where(and(
+        eq(clientVault.id, id), eq(clientVault.clientId, portalUser.carrierId),
+        eq(clientVault.dataType, "bank_account"), eq(clientVault.isActive, true),
+      )).limit(1);
+      if (!entry) return res.status(404).json({ message: "Bank account not found" });
+      const data = JSON.parse(decryptVault(entry.encryptedData));
+      res.json({ accountNumber: data.accountNumber, routingNumber: data.routingNumber });
+    } catch {
+      res.status(500).json({ message: "Failed to reveal bank account" });
+    }
+  });
+
+  app.delete("/api/portal/bank-accounts/:id", requirePortalAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const [portalUser] = await db.select().from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.id, req.portalUser.id)).limit(1);
+      if (!portalUser?.carrierId) return res.status(404).json({ message: "Bank account not found" });
+      const [entry] = await db.update(clientVault).set({ isActive: false, updatedAt: new Date() }).where(and(
+        eq(clientVault.id, id), eq(clientVault.clientId, portalUser.carrierId),
+        eq(clientVault.dataType, "bank_account"),
+      )).returning({ id: clientVault.id });
+      if (!entry) return res.status(404).json({ message: "Bank account not found" });
+      res.json({ message: "Bank account removed" });
+    } catch {
+      res.status(500).json({ message: "Failed to remove bank account" });
     }
   });
 
@@ -9663,21 +10274,62 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     });
   }, async (req: any, res) => {
     try {
-      const { loadNumber, invoiceNumber, brokerName, amount, paymentType } = req.body;
-      if (!loadNumber || !brokerName) return res.status(400).json({ message: "Load number and broker name are required" });
+      const submissionSchema = z.object({
+        loadNumber: z.string().trim().min(1),
+        invoiceNumber: z.string().trim().optional(),
+        loadType: z.enum(LOAD_TYPES),
+        brokerId: z.coerce.number().int().positive(),
+        branchId: z.coerce.number().int().positive(),
+        code: z.string().trim().min(1),
+        lumper: z.enum(["yes", "no"]),
+        driverName: z.string().trim().min(1),
+        bankAccountId: z.coerce.number().int().positive(),
+        amount: z.coerce.number().positive(),
+        paymentType: z.enum(["ACH", "wire"]),
+        instructionsSubject: z.string().trim().optional(),
+        instructionsDetails: z.string().trim().optional(),
+      });
+      const data = submissionSchema.parse(req.body);
+      const files: Express.Multer.File[] = (req.files as Express.Multer.File[]) || [];
+      const docTypes: string[] = Array.isArray(req.body.documentTypes) ? req.body.documentTypes : (req.body.documentTypes ? [req.body.documentTypes] : []);
+      if (files.some(file => file.buffer.subarray(0, 5).toString() !== "%PDF-")) {
+        return res.status(400).json({ message: "Every upload must be a valid PDF file" });
+      }
+      if (!docTypes.includes("rate_confirmation") || !docTypes.includes("bol")) {
+        return res.status(400).json({ message: "Rate Confirmation and Bill of Lading are required" });
+      }
+      const [portalUser] = await db.select().from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.id, req.portalUser.id)).limit(1);
+      if (!portalUser?.carrierId) return res.status(409).json({ message: "Your account is not linked to a carrier profile" });
+      const [[broker], [branch], [bankAccount]] = await Promise.all([
+        db.select().from(brokers).where(and(eq(brokers.id, data.brokerId), eq(brokers.status, "active"))).limit(1),
+        db.select().from(brokerBranches).where(and(eq(brokerBranches.id, data.branchId), eq(brokerBranches.brokerId, data.brokerId), eq(brokerBranches.status, "active"))).limit(1),
+        db.select().from(clientVault).where(and(eq(clientVault.id, data.bankAccountId), eq(clientVault.clientId, portalUser.carrierId), eq(clientVault.dataType, "bank_account"), eq(clientVault.isActive, true))).limit(1),
+      ]);
+      if (!broker) return res.status(400).json({ message: "Select an active broker" });
+      if (!branch) return res.status(400).json({ message: "Select an active branch for this broker" });
+      if (!bankAccount) return res.status(400).json({ message: "Select an active bank account from your profile" });
       const [sub] = await db.insert(carrierSubmissions).values({
         portalUserId: req.portalUser.id,
-        carrierId: null,
-        loadNumber,
-        invoiceNumber: invoiceNumber || null,
-        brokerName,
-        amount: amount ? String(amount) : null,
-        paymentType: paymentType || "ACH",
+        carrierId: portalUser.carrierId,
+        loadNumber: data.loadNumber,
+        invoiceNumber: data.invoiceNumber || null,
+        loadType: data.loadType as any,
+        brokerId: broker.id,
+        brokerName: broker.name,
+        branchId: branch.id,
+        branchName: branch.branchName,
+        code: data.code,
+        lumper: data.lumper === "yes",
+        driverName: data.driverName,
+        bankAccountId: bankAccount.id,
+        amount: String(data.amount),
+        paymentType: data.paymentType,
+        instructionsSubject: data.instructionsSubject || null,
+        instructionsDetails: data.instructionsDetails || null,
         status: "submitted",
       }).returning();
 
-      const files: Express.Multer.File[] = (req.files as Express.Multer.File[]) || [];
-      const docTypes: string[] = Array.isArray(req.body.documentTypes) ? req.body.documentTypes : (req.body.documentTypes ? [req.body.documentTypes] : []);
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const dtype = (docTypes[i] || "other") as "rate_confirmation" | "bol" | "lumper_receipt" | "other";
@@ -9693,8 +10345,23 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
           s3Key: portalS3Key,
         });
       }
+      const activeAgents = await db.select({ id: users.id }).from(users).where(and(
+        eq(users.status, "active"),
+        inArray(users.role, ["employee", "manager", "admin"]),
+      ));
+      const formattedAmount = Number(sub.amount || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+      await Promise.all(activeAgents.map(agent => storage.createNotification({
+        userId: agent.id,
+        title: "New carrier submission",
+        message: `New carrier submission from ${portalUser.companyName} — ${formattedAmount}`,
+        type: "warning",
+        entityType: "carrier_submission",
+        entityId: sub.id,
+        actionUrl: "/portal-submissions",
+      })));
       res.status(201).json(sub);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid submission" });
       console.error("Portal submit error:", error);
       res.status(500).json({ message: "Submission failed" });
     }
@@ -9754,6 +10421,35 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   });
 
   // ── Agent-facing Portal Routes ─────────────────────────────────────────────
+  app.get("/api/portal-submissions/unreviewed-count", requireAuth, async (_req, res) => {
+    try {
+      const [{ total }] = await db.select({ total: count() }).from(carrierSubmissions)
+        .where(isNull(carrierSubmissions.reviewedAt));
+      res.json({ count: Number(total) });
+    } catch (error) {
+      console.error("Unreviewed portal submissions count error:", error);
+      res.status(500).json({ message: "Failed to fetch unreviewed count" });
+    }
+  });
+
+  app.post("/api/carrier-portal/submissions/:id/review", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid submission" });
+      const [updated] = await db.update(carrierSubmissions).set({
+        reviewedAt: new Date(),
+        reviewedBy: req.user.id,
+      }).where(and(eq(carrierSubmissions.id, id), isNull(carrierSubmissions.reviewedAt))).returning();
+      if (updated) return res.json(updated);
+      const [existing] = await db.select().from(carrierSubmissions).where(eq(carrierSubmissions.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Submission not found" });
+      res.json(existing);
+    } catch (error) {
+      console.error("Review portal submission error:", error);
+      res.status(500).json({ message: "Failed to mark submission reviewed" });
+    }
+  });
+
   app.get("/api/carrier-portal/submissions", requireAuth, async (_req, res) => {
     try {
       const subs = await db.select().from(carrierSubmissions).orderBy(desc(carrierSubmissions.submittedAt));
@@ -9761,14 +10457,28 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       const docs = subIds.length
         ? await db.select().from(carrierSubmissionDocs).where(inArray(carrierSubmissionDocs.submissionId, subIds))
         : [];
-      const userIds = [...new Set(subs.map((s) => s.portalUserId))];
+      const userIds = Array.from(new Set(subs.map((s) => s.portalUserId)));
       const portalUsers = userIds.length
         ? await db.select().from(carrierPortalUsers).where(inArray(carrierPortalUsers.id, userIds))
         : [];
       const userMap = Object.fromEntries(portalUsers.map((u) => [u.id, u]));
+      const bankIds = Array.from(new Set(subs.map(s => s.bankAccountId).filter((id): id is number => id != null)));
+      const bankEntries = bankIds.length
+        ? await db.select().from(clientVault).where(inArray(clientVault.id, bankIds))
+        : [];
+      const bankMap = Object.fromEntries(bankEntries.map(entry => {
+        try {
+          const data = JSON.parse(decryptVault(entry.encryptedData));
+          const digits = String(data.accountNumber || "").replace(/\D/g, "");
+          return [entry.id, { id: entry.id, bankName: data.bankName || "Bank", nickname: data.nickname || entry.label, lastFour: digits.slice(-4) }];
+        } catch {
+          return [entry.id, { id: entry.id, bankName: "Bank", nickname: entry.label, lastFour: "••••" }];
+        }
+      }));
       const result = subs.map((s) => ({
         ...s,
         companyName: userMap[s.portalUserId]?.companyName ?? null,
+        bankAccount: s.bankAccountId ? bankMap[s.bankAccountId] ?? null : null,
         documents: docs.filter((d) => d.submissionId === s.id),
       }));
       res.json(result);
@@ -9778,7 +10488,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   });
 
-  app.patch("/api/carrier-portal/submissions/:id", requireAuth, async (req, res) => {
+  app.patch("/api/carrier-portal/submissions/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const { status, notes } = req.body;
@@ -9790,7 +10500,12 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       if (!existing) return res.status(404).json({ message: "Submission not found" });
 
       const [updated] = await db.update(carrierSubmissions)
-        .set({ ...(status && { status }), ...(notes !== undefined && { notes }) })
+        .set({
+          ...(status && { status }),
+          ...(notes !== undefined && { notes }),
+          reviewedAt: existing.reviewedAt ?? new Date(),
+          reviewedBy: existing.reviewedBy ?? req.user.id,
+        })
         .where(eq(carrierSubmissions.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Submission not found" });

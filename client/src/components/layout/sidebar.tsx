@@ -76,6 +76,7 @@ const navSections: NavSection[] = [
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
       { name: "Chat",              href: "/chat",               icon: MessageCircle,   permission: "chat"               },
+      { name: "Carrier Messages",  href: "/carrier-messages",   icon: MessageCircle,   permission: "chat"               },
       { name: "Tickets",           href: "/tickets",            icon: Ticket,          permission: "tickets"            },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
@@ -173,6 +174,19 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     refetchInterval: 3000,
     retry: false,
     enabled: canUseChat,
+  });
+  const { data: carrierChatUnread } = useQuery<{ count: number }>({
+    queryKey: ["/api/carrier-chat/unread-count"],
+    refetchInterval: 5000,
+    retry: false,
+    enabled: canUseChat,
+  });
+  const canUsePortalSubmissions = !!authUser && (isAdmin || (!authLoading && permissions.includes("portal_submissions")));
+  const { data: portalSubmissionsUnreviewed } = useQuery<{ count: number }>({
+    queryKey: ["/api/portal-submissions/unreviewed-count"],
+    refetchInterval: 30000,
+    retry: false,
+    enabled: canUsePortalSubmissions,
   });
   const { data: notificationChannels } = useQuery<ChatChannelSummary[]>({
     queryKey: ["/api/chat/channels"],
@@ -342,6 +356,8 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                         {item.name}
                       </span>
                        {item.name === "Chat" && !!chatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{chatUnread.count >= 10 ? "9+" : chatUnread.count}</span>}
+                        {item.name === "Carrier Messages" && !!carrierChatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{carrierChatUnread.count >= 10 ? "9+" : carrierChatUnread.count}</span>}
+                        {item.name === "Portal Submissions" && !!portalSubmissionsUnreviewed?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">{portalSubmissionsUnreviewed.count >= 10 ? "9+" : portalSubmissionsUnreviewed.count}</span>}
                     </button>
                   );
                 })}

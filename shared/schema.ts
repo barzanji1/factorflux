@@ -167,6 +167,7 @@ export const invoices = pgTable("invoices", {
   brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
   branchId: integer("branch_id").references(() => brokerBranches.id, { onDelete: "set null" }),
   driverId: integer("driver_id").references(() => drivers.id, { onDelete: "set null" }),
+  driverName: varchar("driver_name"),
   paymentType: varchar("payment_type", { enum: ["ACH", "Wire"] }).default("ACH"),
   bankAccountId: integer("bank_account_id").references(() => clientVault.id),
   loadNumber: varchar("load_number"),
@@ -612,7 +613,8 @@ export const clientVault = pgTable("client_vault", {
   lastAccessedBy: varchar("last_accessed_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdByPortalUserId: integer("created_by_portal_user_id").references(() => carrierPortalUsers.id, { onDelete: "set null" }),
 });
 
 // Tasks table
@@ -1921,6 +1923,52 @@ export const insertCarrierPortalUserSchema = createInsertSchema(carrierPortalUse
 export type CarrierPortalUser = typeof carrierPortalUsers.$inferSelect;
 export type InsertCarrierPortalUser = z.infer<typeof insertCarrierPortalUserSchema>;
 
+// ─── Carrier/Portal Agent Chat ────────────────────────────────────────────────
+export const portalChats = pgTable("portal_chats", {
+  id: serial("id").primaryKey(),
+  carrierId: integer("carrier_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id, { onDelete: "cascade" }).notNull(),
+  agentId: varchar("agent_id").references(() => users.id, { onDelete: "set null" }),
+  carrierLastReadAt: timestamp("carrier_last_read_at"),
+  agentLastReadAt: timestamp("agent_last_read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("portal_chats_carrier_portal_user_uidx").on(table.carrierId, table.portalUserId),
+  index("portal_chats_carrier_idx").on(table.carrierId),
+  index("portal_chats_portal_user_idx").on(table.portalUserId),
+  index("portal_chats_agent_idx").on(table.agentId),
+]);
+
+export const portalChatMessages = pgTable("portal_chat_messages", {
+  id: serial("id").primaryKey(),
+  chatId: integer("chat_id").references(() => portalChats.id, { onDelete: "cascade" }).notNull(),
+  senderType: varchar("sender_type", { enum: ["agent", "carrier"] }).notNull(),
+  senderId: varchar("sender_id").notNull(),
+  message: text("message"),
+  attachmentS3Key: text("attachment_s3_key"),
+  attachmentName: varchar("attachment_name"),
+  attachmentMimeType: varchar("attachment_mime_type"),
+  attachmentSize: integer("attachment_size"),
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("portal_chat_messages_chat_created_idx").on(table.chatId, table.createdAt),
+  index("portal_chat_messages_chat_read_idx").on(table.chatId, table.read),
+  index("portal_chat_messages_sender_idx").on(table.senderType, table.senderId),
+]);
+
+export const insertPortalChatSchema = createInsertSchema(portalChats).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertPortalChatMessageSchema = createInsertSchema(portalChatMessages).omit({
+  id: true, createdAt: true,
+});
+export type PortalChat = typeof portalChats.$inferSelect;
+export type InsertPortalChat = z.infer<typeof insertPortalChatSchema>;
+export type PortalChatMessage = typeof portalChatMessages.$inferSelect;
+export type InsertPortalChatMessage = z.infer<typeof insertPortalChatMessageSchema>;
+
 // ─── Carrier Submissions ───────────────────────────────────────────────────────
 export const carrierSubmissions = pgTable("carrier_submissions", {
   id: serial("id").primaryKey(),
@@ -1928,11 +1976,23 @@ export const carrierSubmissions = pgTable("carrier_submissions", {
   portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id).notNull(),
   invoiceNumber: varchar("invoice_number"),
   loadNumber: varchar("load_number"),
+  loadType: varchar("load_type", { enum: LOAD_TYPES }),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
   brokerName: varchar("broker_name"),
+  branchId: integer("branch_id").references(() => brokerBranches.id, { onDelete: "set null" }),
+  branchName: varchar("branch_name"),
+  code: varchar("code"),
+  lumper: boolean("lumper"),
+  driverName: varchar("driver_name"),
+  bankAccountId: integer("bank_account_id").references(() => clientVault.id, { onDelete: "set null" }),
+  instructionsSubject: varchar("instructions_subject"),
+  instructionsDetails: text("instructions_details"),
   amount: decimal("amount", { precision: 12, scale: 2 }),
-  paymentType: varchar("payment_type", { enum: ["ACH", "check"] }).default("ACH"),
+  paymentType: varchar("payment_type", { enum: ["ACH", "check", "wire"] }).default("ACH"),
   status: varchar("status", { enum: ["submitted", "under_review", "approved", "funded", "rejected"] }).default("submitted").notNull(),
   notes: text("notes"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
   submittedAt: timestamp("submitted_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });
