@@ -46,6 +46,12 @@ interface TopNavProps {
   group?: string;
 }
 
+function normalizeCarrierChatUrl(url?: string | null) {
+  if (!url?.startsWith("/carrier-messages")) return url;
+  const query = url.includes("?") ? url.slice(url.indexOf("?")) : "";
+  return `/portal-submissions${query}`;
+}
+
 interface SearchResults {
   clients?: Client[];
   invoices?: Invoice[];
@@ -120,7 +126,8 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
         const browserNotification = new window.Notification(item.message);
         browserNotification.onclick = () => {
           window.focus();
-          setLocation(item.actionUrl || (item.entityType === "portal_chat" ? "/carrier-messages" : "/portal-submissions"));
+          const actionUrl = normalizeCarrierChatUrl(item.actionUrl);
+          setLocation(actionUrl || "/portal-submissions");
           browserNotification.close();
         };
       });
@@ -190,7 +197,8 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
 
   const handleNotificationClick = (n: AppNotification) => {
     if (!n.read) markAsReadMutation.mutate(n.id);
-    const url = (n as any).actionUrl;
+    const notificationUrl = (n as any).actionUrl;
+    const url = normalizeCarrierChatUrl(notificationUrl);
     if (url) setLocation(url);
   };
 

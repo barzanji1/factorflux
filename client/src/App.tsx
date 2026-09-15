@@ -68,7 +68,6 @@ import Expenses from "@/pages/expenses";
 import Chat from "@/pages/chat";
 import Tickets from "@/pages/tickets";
 import TicketDetail from "@/pages/ticket-detail";
-import CarrierMessages from "@/pages/carrier-messages";
 import PortalChat from "@/pages/portal/chat";
 
 function Router() {
@@ -326,11 +325,6 @@ function Router() {
       <Route path="/chat">
         <ProtectedRoute>
           <Chat />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/carrier-messages">
-        <ProtectedRoute>
-          <CarrierMessages />
         </ProtectedRoute>
       </Route>
       <Route path="/tickets">

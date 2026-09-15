@@ -18,7 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ProfileSection, ProfileField, EmptyState, DocumentList } from "@/components/carriers/carrier-profile-section";
 import { DriverSection } from "@/components/carriers/driver-section";
+import CarrierChatThread from "@/components/carriers/CarrierChatThread";
 import { LoadTypeBadge, LoadTypeToggleGroup } from "@/components/load-type";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
 const money = (value: unknown) => value === null || value === undefined || value === "" ? "Not recorded" : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -40,8 +42,12 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const clientId = Number(id);
-  const { user } = useAuth();
+  const { user, permissions, isLoading: authLoading } = useAuth();
   const isManager = user?.role === "admin" || user?.role === "manager";
+  const canUseCarrierChat = !!user && (
+    user.role === "admin"
+    || (!authLoading && (permissions.includes("chat") || permissions.includes("portal_submissions")))
+  );
   const { toast } = useToast();
   const qc = useQueryClient();
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -57,6 +63,7 @@ export default function ClientDetail() {
   const [listDialog, setListDialog] = useState<"email" | "phone" | "rule" | "monitor" | "message" | "truck" | "task" | null>(null);
   const [listEditing, setListEditing] = useState<any>(null);
   const [listForm, setListForm] = useState<any>({});
+  const [profileTab, setProfileTab] = useState("profile");
 
   const { data: client, isLoading } = useQuery<any>({ queryKey: ["/api/clients", clientId], enabled: Number.isFinite(clientId), queryFn: async () => { const response = await fetch(`/api/clients/${clientId}`, { credentials: "include" }); if (!response.ok) throw new Error("Carrier not found"); return response.json(); } });
   const { data: invoices = [] } = useQuery<any[]>({ queryKey: ["/api/invoices", { all: true }] });
@@ -143,6 +150,10 @@ export default function ClientDetail() {
     Object.values(revealTimers.current).forEach(clearTimeout);
   }, []);
 
+  useEffect(() => {
+    if (!canUseCarrierChat && profileTab === "messages") setProfileTab("profile");
+  }, [canUseCarrierChat, profileTab]);
+
   if (isLoading) return <div className="flex min-h-[100dvh]"><Sidebar /><main className="flex-1 bg-[#d4d0c8] p-6"><div className="animate-pulse space-y-3"><div className="h-20 bg-[#eef2f1]" /><div className="h-8 bg-[#eef2f1]" /><div className="h-96 bg-[#eef2f1]" /></div></main></div>;
   if (!client) return <div className="flex min-h-[100dvh]"><Sidebar /><main className="flex flex-1 flex-col items-center justify-center bg-[#d4d0c8]"><CircleAlert className="mb-2 h-10 w-10 text-[#9c4343]" /><p className="font-bold text-[#263b44]">Carrier record not found</p><Button variant="outline" className="mt-4 rounded-sm" onClick={() => navigate("/clients")}><ArrowLeft className="mr-2 h-4 w-4" />Back to carriers</Button></main></div>;
 
@@ -174,15 +185,21 @@ export default function ClientDetail() {
               </DropdownMenu>
               <Button size="sm" variant="outline" disabled title="Carrier email sending is unavailable because no safe send API is configured" aria-label="Send carrier email unavailable" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Mail className="h-3.5 w-3.5" />Send email</Button>
               <Button size="sm" variant="outline" disabled title="Carrier SMS sending is unavailable because no SMS API is configured" aria-label="Send carrier SMS unavailable" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Phone className="h-3.5 w-3.5" />Send SMS</Button>
-              <Button size="sm" variant="outline" onClick={() => navigate(`/carrier-messages?carrierId=${clientId}`)} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><MessageCircle className="h-3.5 w-3.5" />Message Carrier</Button>
+              {canUseCarrierChat && <Button size="sm" variant="outline" onClick={() => setProfileTab("messages")} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><MessageCircle className="h-3.5 w-3.5" />Message Carrier</Button>}
               <Button size="sm" variant="outline" disabled={!fmcsaUrl} title={fmcsaUrl ? "Open official FMCSA SAFER company snapshot" : "DOT number required for FMCSA lookup"} aria-label={fmcsaUrl ? "Open carrier on FMCSA" : "Carrier on FMCSA unavailable"} onClick={() => fmcsaUrl && window.open(fmcsaUrl, "_blank", "noopener,noreferrer")} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">Carrier on FMCSA</Button>
               {isManager && <Button size="sm" variant="outline" disabled={updateClient.isPending} onClick={() => updateClient.mutate({ status: client.status === "active" ? "inactive" : "active" })} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">{client.status === "active" ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{client.status === "active" ? "Set inactive" : "Activate"}</Button>}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
-            {[["Open AR", money(openBalance), "text-[#a33131]"], ["Paid", money(paid), "text-[#187455]"], ["Invoices", clientInvoices.length, "text-[#087d8d]"], ["Documents", clientDocs.length, "text-[#42616c]"], ["Advance", onboarding.prePay ? `${onboarding.prePay}%` : "Not recorded", "text-[#42616c]"], ["Current limit", money(onboarding.currentLimit), "text-[#42616c]"]].map(([label, value, color]) => <div key={String(label)} className="border border-[#9eabad] bg-[#eef3f1] px-3 py-2 shadow-[1px_1px_0_#fff]"><p className="text-[9px] font-bold uppercase tracking-wider text-[#718187]">{label}</p><p className={cn("mt-1 text-base font-bold", color)}>{value}</p></div>)}
-          </div>
-          <div className="grid items-start gap-3 xl:grid-cols-2">
+           <Tabs value={profileTab} onValueChange={setProfileTab}>
+             <TabsList>
+               <TabsTrigger value="profile">Profile</TabsTrigger>
+               {canUseCarrierChat && <TabsTrigger value="messages">Messages</TabsTrigger>}
+             </TabsList>
+             <TabsContent value="profile">
+           <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
+             {[["Open AR", money(openBalance), "text-[#a33131]"], ["Paid", money(paid), "text-[#187455]"], ["Invoices", clientInvoices.length, "text-[#087d8d]"], ["Documents", clientDocs.length, "text-[#42616c]"], ["Advance", onboarding.prePay ? `${onboarding.prePay}%` : "Not recorded", "text-[#42616c]"], ["Current limit", money(onboarding.currentLimit), "text-[#42616c]"]].map(([label, value, color]) => <div key={String(label)} className="border border-[#9eabad] bg-[#eef3f1] px-3 py-2 shadow-[1px_1px_0_#fff]"><p className="text-[9px] font-bold uppercase tracking-wider text-[#718187]">{label}</p><p className={cn("mt-1 text-base font-bold", color)}>{value}</p></div>)}
+           </div>
+           <div className="grid items-start gap-3 xl:grid-cols-2">
             <div className="space-y-3">
               <ProfileSection title={owners.length === 1 ? "Owner" : "Owners"} eyebrow="Identity & contact">
                 {owners.length ? (
@@ -262,8 +279,13 @@ export default function ClientDetail() {
               <ProfileSection title="Invoices" eyebrow="Funding activity" action={<Button onClick={() => setInvoiceOpen(true)} size="sm" className="h-7 gap-1 rounded-sm bg-[#098b9f] px-2 text-[10px] text-white hover:bg-[#08798b]"><Plus className="h-3 w-3" />Create invoice</Button>}><MiniTable columns={["Invoice", "Date", "Amount", "Status"]} rows={clientInvoices.map((invoice) => [<a key={invoice.id} className="text-[#087d8d] hover:underline" href={`/invoices/${invoice.id}`}>{invoice.invoiceNumber}</a>, date(invoice.invoiceDate || invoice.createdAt), money(invoice.amount), invoice.status])} empty="No invoices are recorded for this carrier" /></ProfileSection>
               <ProfileSection title="Aging report" className="scroll-mt-4" ><div id="aging-report" className="space-y-3"><p className="text-[11px] text-[#718187]">Download open funded invoices in the carrier aging format.</p><AgingPdfDownload carrierId={clientId} minDays={agingDays} onMinDaysChange={setAgingDays} compact /></div></ProfileSection>
             </div>
+            </div>
+             </TabsContent>
+             {canUseCarrierChat && <TabsContent value="messages" className="min-h-[520px]">
+               <CarrierChatThread carrierId={clientId} carrierName={client.name} mcNumber={client.mcNumber} />
+             </TabsContent>}
+           </Tabs>
           </div>
-        </div>
       </main>
     </div>
     <Dialog open={bankOpen} onOpenChange={setBankOpen}><DialogContent className="rounded-sm"><DialogHeader><DialogTitle>{editingBank ? "Edit bank account" : "Add bank account to Vault"}</DialogTitle><DialogDescription>Account and routing numbers are encrypted before storage.</DialogDescription></DialogHeader><div className="grid gap-3 sm:grid-cols-2"><div><Label>Bank name</Label><Input value={bank.bankName} onChange={(e) => setBank({ ...bank, bankName: e.target.value })} /></div><div><Label>Nickname</Label><Input value={bank.nickname} onChange={(e) => setBank({ ...bank, nickname: e.target.value })} /></div><div><Label>Payment type</Label><Select value={bank.paymentType} onValueChange={(value) => setBank({ ...bank, paymentType: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{bank.paymentType === "not_recorded" && <SelectItem value="not_recorded" disabled>Not recorded — choose one</SelectItem>}<SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent></Select></div><div><Label>Account type</Label><Select value={bank.accountType} onValueChange={(value) => setBank({ ...bank, accountType: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="checking">Checking</SelectItem><SelectItem value="savings">Savings</SelectItem></SelectContent></Select></div><div><Label>Routing number</Label><div className="relative"><Input className="pr-8" type={showRouting ? "text" : "password"} value={bank.routingNumber} onChange={(e) => setBank({ ...bank, routingNumber: e.target.value.replace(/\D/g, "").slice(0, 9) })} /><Button type="button" variant="ghost" size="icon" onClick={() => setShowRouting(!showRouting)} className="absolute right-0 top-0 h-9 w-8">{showRouting ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</Button></div></div><div><Label>Account number</Label><div className="relative"><Input className="pr-8" type={showAccount ? "text" : "password"} value={bank.accountNumber} onChange={(e) => setBank({ ...bank, accountNumber: e.target.value.replace(/\D/g, "") })} /><Button type="button" variant="ghost" size="icon" onClick={() => setShowAccount(!showAccount)} className="absolute right-0 top-0 h-9 w-8">{showAccount ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</Button></div></div></div><DialogFooter><Button variant="outline" onClick={() => setBankOpen(false)}>Cancel</Button><Button onClick={() => saveBank.mutate()} disabled={saveBank.isPending || !bank.bankName || bank.paymentType === "not_recorded" || bank.routingNumber.length !== 9 || !bank.accountNumber}>Save to Vault</Button></DialogFooter></DialogContent></Dialog>

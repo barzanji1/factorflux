@@ -80,7 +80,9 @@ export function PermissionWatcher() {
 
     // If the current page requires a revoked permission, kick the agent out
     const currentPermission = pathToPermission(locationRef.current);
-    if (currentPermission && revoked.includes(currentPermission)) {
+    const portalHubStillAvailable = currentPermission === "portal_submissions"
+      && (user?.role === "admin" || permissions.includes("portal_submissions") || permissions.includes("chat"));
+    if (currentPermission && revoked.includes(currentPermission) && !portalHubStillAvailable) {
       toast({
         title: "Access updated by administrator",
         description: "Your access to this page has been changed.",

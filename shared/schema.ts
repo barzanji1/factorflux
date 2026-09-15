@@ -1880,14 +1880,18 @@ export const carrierPortalUsers = pgTable("carrier_portal_users", {
   carrierId: integer("carrier_id").references(() => clients.id),
   mcNumber: varchar("mc_number"),
   dotNumber: varchar("dot_number"),
+  phone: varchar("phone"),
   companyName: varchar("company_name").notNull(),
-  status: varchar("status", { enum: ["pending", "active", "suspended"] }).default("pending").notNull(),
+  status: varchar("status", { enum: ["pending", "active", "suspended", "rejected"] }).default("pending").notNull(),
+  rejectionReason: text("rejection_reason"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   lastLoginAt: timestamp("last_login_at"),
 });
 
 export const insertCarrierPortalUserSchema = createInsertSchema(carrierPortalUsers).omit({
-  id: true, createdAt: true, lastLoginAt: true,
+  id: true, createdAt: true, lastLoginAt: true, rejectionReason: true, reviewedAt: true, reviewedBy: true,
 });
 export type CarrierPortalUser = typeof carrierPortalUsers.$inferSelect;
 export type InsertCarrierPortalUser = z.infer<typeof insertCarrierPortalUserSchema>;

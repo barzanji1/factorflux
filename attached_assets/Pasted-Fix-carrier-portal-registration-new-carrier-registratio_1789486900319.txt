@@ -1,0 +1,41 @@
+Fix carrier portal registration — new carrier registrations are not appearing in FactorFlux for agent approval.
+
+The problem:
+When a carrier registers at /portal/register, the registration completes but nothing appears in FactorFlux for agents to review and approve.
+
+Fix the full onboarding approval flow:
+
+Backend
+
+ Confirm carrier_portal_users table has the new registration record — check if it's being saved correctly
+ GET /api/carrier-portal/users — confirm it returns pending registrations with status pending
+ PATCH /api/carrier-portal/users/:id/approve — approves carrier, sets status to active, sends welcome email
+ PATCH /api/carrier-portal/users/:id/reject — rejects carrier with reason
+ GET /api/carrier-portal/pending-count — returns count of pending registrations
+ On new registration — create a notification for all agents and admins: "New carrier registration: [Company Name] is pending approval"
+
+Frontend — Portal Submissions page
+
+ Add a Pending Registrations tab alongside existing submissions
+ Shows all carriers with status pending — Company Name, MC#, DOT#, Email, Phone, Registered date
+ Approve button per row — activates carrier account, sends approval email
+ Reject button per row — requires reason, sends rejection email
+ Red alert badge on Portal Submissions sidebar item showing pending registration count
+ Alert banner at top of Portal Submissions page: "X carriers pending approval"
+
+Sidebar badge:
+
+ Portal Submissions badge should show BOTH pending registrations + unreviewed invoice submissions combined
+ Tooltip or breakdown: "X new submissions, Y pending registrations"
+
+On approval:
+
+ Carrier status changes to active
+ Carrier receives email: "Your Trucking Pros Financial carrier account has been approved. You can now log in at factorflux.io/portal"
+ Carrier account linked to existing carrier record in clients table if MC# matches
+ Agent sees confirmation: "Carrier [Name] approved successfully"
+
+On rejection:
+
+ Carrier receives email with rejection reason
+ Agent sees confirmation

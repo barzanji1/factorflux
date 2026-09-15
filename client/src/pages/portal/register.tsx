@@ -13,6 +13,7 @@ const schema = z.object({
   companyName: z.string().min(2, "Company name required"),
   mcNumber: z.string().optional(),
   dotNumber: z.string().optional(),
+  phone: z.string().optional(),
   email: z.string().email("Valid email required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
@@ -29,7 +30,7 @@ export default function PortalRegister() {
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(schema),
-    defaultValues: { companyName: "", mcNumber: "", dotNumber: "", email: "", password: "", confirmPassword: "" },
+    defaultValues: { companyName: "", mcNumber: "", dotNumber: "", phone: "", email: "", password: "", confirmPassword: "" },
   });
 
   const mutation = useMutation({
@@ -37,7 +38,7 @@ export default function PortalRegister() {
       const res = await fetch("/api/portal/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName: data.companyName, mcNumber: data.mcNumber, dotNumber: data.dotNumber, email: data.email, password: data.password }),
+        body: JSON.stringify({ companyName: data.companyName, mcNumber: data.mcNumber, dotNumber: data.dotNumber, phone: data.phone, email: data.email, password: data.password }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Registration failed");
@@ -110,6 +111,13 @@ export default function PortalRegister() {
                 </FormItem>
               )} />
             </div>
+            <FormField control={form.control} name="phone" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone</FormLabel>
+                <FormControl><Input {...field} type="tel" placeholder="(555) 123-4567" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem>
                 <FormLabel>Email Address *</FormLabel>

@@ -129,6 +129,13 @@ import {
 import { getDocumentCompleteness } from "./services/docValidation";
 import { expandCalendarEvent } from "./services/calendarScheduler";
 
+const escapeHtml = (value: unknown): string => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -9558,11 +9565,29 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     },
   });
 
-  const requirePortalAuth = (req: any, res: any, next: any) => {
-    const portalUser = (req.session as any)?.portalUser;
-    if (!portalUser) return res.status(401).json({ message: "Portal authentication required" });
-    req.portalUser = portalUser;
-    next();
+  const requirePortalAuth = async (req: any, res: any, next: any) => {
+    const sessionUser = (req.session as any)?.portalUser;
+    if (!sessionUser) return res.status(401).json({ message: "Portal authentication required" });
+    try {
+      const [portalUser] = await db.select().from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.id, sessionUser.id)).limit(1);
+      if (!portalUser || portalUser.status !== "active") {
+        delete (req.session as any).portalUser;
+        return res.status(403).json({ message: portalUser?.status === "pending" ? "Your account is pending approval." : "An active carrier portal account is required." });
+      }
+      const safeUser = {
+        id: portalUser.id,
+        email: portalUser.email,
+        companyName: portalUser.companyName,
+        status: portalUser.status,
+      };
+      (req.session as any).portalUser = safeUser;
+      req.portalUser = safeUser;
+      next();
+    } catch (error) {
+      console.error("Portal authorization error:", error);
+      res.status(500).json({ message: "Unable to verify portal access" });
+    }
   };
 
   const userCanUseCarrierChat = async (user: any) => {
@@ -9570,7 +9595,8 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     if (user.role === "admin") return true;
     const stored = await storage.getUserPermissions(user.id);
     const permissions = stored.length ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee);
-    return (permissions as readonly string[]).includes("chat");
+    return (permissions as readonly string[]).includes("chat")
+      || (permissions as readonly string[]).includes("portal_submissions");
   };
 
   const requireChatAgent = async (req: any, res: any, next: any) => {
@@ -9578,7 +9604,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     if (!user) return res.status(401).json({ message: "Authentication required" });
     try {
       if (!(await userCanUseCarrierChat(user))) {
-        return res.status(403).json({ message: "Chat permission required" });
+        return res.status(403).json({ message: "Chat or Portal Submissions permission required" });
       }
     } catch {
       return res.status(500).json({ message: "Unable to verify chat permission" });
@@ -9593,21 +9619,48 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   // ── Portal Auth ────────────────────────────────────────────────────────────
   app.post("/api/portal/register", async (req, res) => {
     try {
-      const { email, password, companyName, mcNumber, dotNumber } = req.body;
-      if (!email || !password || !companyName) {
-        return res.status(400).json({ message: "Email, password, and company name are required" });
-      }
-      const [existing] = await db.select().from(carrierPortalUsers).where(eq(carrierPortalUsers.email, email.toLowerCase())).limit(1);
-      if (existing) return res.status(409).json({ message: "An account with this email already exists" });
+      const parsed = z.object({
+        email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
+        password: z.string().min(8).max(200),
+        companyName: z.string().trim().min(2).max(255),
+        mcNumber: z.string().trim().max(50).optional(),
+        dotNumber: z.string().trim().max(50).optional(),
+        phone: z.string().trim().max(50).optional(),
+      }).safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Enter a valid company name, email, and password of at least 8 characters" });
+      const { email, password, companyName, mcNumber, dotNumber, phone } = parsed.data;
       const passwordHash = await bcrypt.hash(password, 10);
-      const [user] = await db.insert(carrierPortalUsers).values({
-        email: email.toLowerCase(),
-        passwordHash,
-        companyName,
-        mcNumber: mcNumber || null,
-        dotNumber: dotNumber || null,
-        status: "pending",
-      }).returning();
+      const { user } = await db.transaction(async (tx) => {
+        const [existing] = await tx.select().from(carrierPortalUsers)
+          .where(eq(carrierPortalUsers.email, email)).limit(1);
+        if (existing) throw Object.assign(new Error("An account with this email already exists"), { status: 409 });
+
+        const [created] = await tx.insert(carrierPortalUsers).values({
+          email,
+          passwordHash,
+          companyName,
+          mcNumber: mcNumber || null,
+          dotNumber: dotNumber || null,
+          phone: typeof phone === "string" && phone.trim() ? phone.trim() : null,
+          status: "pending",
+        }).returning();
+        const internalUsers = await tx.select({ id: users.id }).from(users).where(and(
+          eq(users.status, "active"),
+          or(eq(users.role, "employee"), eq(users.role, "manager"), eq(users.role, "admin")),
+        ));
+        if (internalUsers.length) {
+          await tx.insert(notifications).values(internalUsers.map((internalUser) => ({
+            userId: internalUser.id,
+            title: "New carrier registration",
+            message: `New carrier registration: ${companyName} is pending approval`,
+            type: "info" as const,
+            entityType: "carrier_portal_user",
+            entityId: created.id,
+            actionUrl: "/portal-submissions",
+          })));
+        }
+        return { user: created };
+      });
 
       // Send registration confirmation to carrier
       const regHtml = `
@@ -9617,7 +9670,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
             <p style="margin:4px 0 0;opacity:.8;font-size:13px;">Trucking Pros Financial</p>
           </div>
           <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
-            <p style="color:#374151;">Hi ${companyName},</p>
+            <p style="color:#374151;">Hi ${escapeHtml(companyName)},</p>
             <p style="color:#374151;">Thank you for registering on the Trucking Pros Financial carrier portal. Your account is <strong>pending approval</strong>.</p>
             <p style="color:#374151;">Our team will review your information and notify you once your account has been approved. This typically takes 1–2 business days.</p>
             <p style="color:#374151;">If you have questions, reply to this email or call us at <strong>385-495-4962</strong>.</p>
@@ -9635,7 +9688,10 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       }).catch(() => {});
 
       res.status(201).json({ message: "Registration successful. Pending approval.", id: user.id });
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 409 || error?.code === "23505") {
+        return res.status(409).json({ message: "An account with this email already exists" });
+      }
       console.error("Portal register error:", error);
       res.status(500).json({ message: "Registration failed" });
     }
@@ -9649,6 +9705,8 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       if (!user) return res.status(401).json({ message: "Invalid email or password" });
       const valid = await bcrypt.compare(password, user.passwordHash);
       if (!valid) return res.status(401).json({ message: "Invalid email or password" });
+      if (user.status === "pending") return res.status(403).json({ message: "Your account is pending approval." });
+      if (user.status === "rejected") return res.status(403).json({ message: "Your registration was rejected. Please contact TPF." });
       if (user.status === "suspended") return res.status(403).json({ message: "Your account has been suspended. Please contact TPF." });
       await db.update(carrierPortalUsers).set({ lastLoginAt: new Date() }).where(eq(carrierPortalUsers.id, user.id));
       (req.session as any).portalUser = { id: user.id, email: user.email, companyName: user.companyName, status: user.status };
@@ -9798,20 +9856,19 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   };
 
   const getAgentChatForCarrier = async (carrierId: number, create = false) => {
-    let [chat] = await db.select({ chat: portalChats }).from(portalChats)
-      .innerJoin(carrierPortalUsers, and(
-        eq(carrierPortalUsers.id, portalChats.portalUserId),
-        eq(carrierPortalUsers.carrierId, portalChats.carrierId),
-        eq(carrierPortalUsers.status, "active"),
-      ))
-      .where(eq(portalChats.carrierId, carrierId))
-      .orderBy(desc(portalChats.updatedAt), desc(portalChats.id)).limit(1);
-    if (chat || !create) return chat ? { chat: chat.chat } : null;
-    const [portalUser] = await db.select({ id: carrierPortalUsers.id })
+    const activePortalUsers = await db.select({ id: carrierPortalUsers.id })
       .from(carrierPortalUsers)
       .where(and(eq(carrierPortalUsers.carrierId, carrierId), eq(carrierPortalUsers.status, "active")))
-      .orderBy(desc(carrierPortalUsers.id)).limit(1);
+      .orderBy(desc(carrierPortalUsers.id));
+    if (activePortalUsers.length > 1) {
+      throw Object.assign(new Error("Multiple active portal accounts are linked to this carrier. Resolve the duplicate accounts before using chat."), { status: 409 });
+    }
+    const portalUser = activePortalUsers[0];
     if (!portalUser) return null;
+    let [chat] = await db.select({ chat: portalChats }).from(portalChats)
+      .where(and(eq(portalChats.carrierId, carrierId), eq(portalChats.portalUserId, portalUser.id)))
+      .orderBy(desc(portalChats.updatedAt), desc(portalChats.id)).limit(1);
+    if (chat || !create) return chat ? { chat: chat.chat } : null;
     let [createdChat] = await db.insert(portalChats).values({ carrierId, portalUserId: portalUser.id })
       .onConflictDoNothing({ target: [portalChats.carrierId, portalChats.portalUserId] }).returning();
     if (!createdChat) {
@@ -9942,7 +9999,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
           type: "info",
           entityType: "portal_chat",
           entityId: result.chat.id,
-          actionUrl: `/carrier-messages?carrierId=${result.carrier.id}`,
+          actionUrl: `/portal-submissions?carrierId=${result.chat.carrierId}`,
         })));
       } catch (notificationError) {
         console.error("Carrier chat notification fan-out failed:", notificationError instanceof Error ? notificationError.message : "unknown error");
@@ -9963,14 +10020,23 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       const afterId = Number(req.query.afterId || 0);
       if (!Number.isInteger(afterId) || afterId < 0) return res.status(400).json({ message: "afterId must be a non-negative integer" });
       const rows = await loadChatMessageRows(result.chat.id, since, afterId);
-      const unreadAgentIds = rows.filter(row => row.senderType === "agent" && !row.read).map(row => row.id);
-      if (unreadAgentIds.length) {
-        await db.update(portalChatMessages).set({ read: true }).where(inArray(portalChatMessages.id, unreadAgentIds));
+      const [{ unreadAgents }] = await db.select({ unreadAgents: count() }).from(portalChatMessages).where(and(
+        eq(portalChatMessages.chatId, result.chat.id),
+        eq(portalChatMessages.senderType, "agent"),
+        eq(portalChatMessages.read, false),
+      ));
+      if (Number(unreadAgents) > 0) {
+        await db.update(portalChatMessages).set({ read: true }).where(and(
+          eq(portalChatMessages.chatId, result.chat.id),
+          eq(portalChatMessages.senderType, "agent"),
+          eq(portalChatMessages.read, false),
+        ));
         await db.update(portalChats).set({ carrierLastReadAt: new Date() }).where(eq(portalChats.id, result.chat.id));
       }
       res.json(await enrichChatMessages(rows, result.portalUser.companyName));
     } catch (error) {
       console.error("Portal chat messages fetch error:", error);
+      if ((error as any)?.status) return res.status((error as any).status).json({ message: (error as Error).message });
       res.status(500).json({ message: "Failed to load messages" });
     }
   });
@@ -10039,9 +10105,17 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       if (!Number.isInteger(afterId) || afterId < 0) return res.status(400).json({ message: "afterId must be a non-negative integer" });
       const [carrier] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, carrierId)).limit(1);
       const rows = await loadChatMessageRows(result.chat.id, since, afterId);
-      const unreadCarrierIds = rows.filter(row => row.senderType === "carrier" && !row.read).map(row => row.id);
-      if (unreadCarrierIds.length) {
-        await db.update(portalChatMessages).set({ read: true }).where(inArray(portalChatMessages.id, unreadCarrierIds));
+      const [{ unreadCarriers }] = await db.select({ unreadCarriers: count() }).from(portalChatMessages).where(and(
+        eq(portalChatMessages.chatId, result.chat.id),
+        eq(portalChatMessages.senderType, "carrier"),
+        eq(portalChatMessages.read, false),
+      ));
+      if (Number(unreadCarriers) > 0) {
+        await db.update(portalChatMessages).set({ read: true }).where(and(
+          eq(portalChatMessages.chatId, result.chat.id),
+          eq(portalChatMessages.senderType, "carrier"),
+          eq(portalChatMessages.read, false),
+        ));
         await db.update(portalChats).set({ agentLastReadAt: new Date() }).where(eq(portalChats.id, result.chat.id));
       }
       const [portalUser] = await db.select({ companyName: carrierPortalUsers.companyName })
@@ -10052,6 +10126,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       });
     } catch (error) {
       console.error("Carrier chat fetch error:", error);
+      if ((error as any)?.status) return res.status((error as any).status).json({ message: (error as Error).message });
       res.status(500).json({ message: "Failed to load carrier chat" });
     }
   });
@@ -10102,6 +10177,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       res.status(201).json(chatMessageResponse(created));
     } catch (error) {
       console.error("Carrier chat message error:", error);
+      if ((error as any)?.status) return res.status((error as any).status).json({ message: (error as Error).message });
       res.status(500).json({ message: "Failed to send message" });
     }
   });
@@ -10421,7 +10497,9 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   });
 
   // ── Agent-facing Portal Routes ─────────────────────────────────────────────
-  app.get("/api/portal-submissions/unreviewed-count", requireAuth, async (_req, res) => {
+  const carrierPortalSubmissionPermission = requireModulePermission("portal_submissions");
+
+  app.get("/api/portal-submissions/unreviewed-count", carrierPortalSubmissionPermission, async (_req, res) => {
     try {
       const [{ total }] = await db.select({ total: count() }).from(carrierSubmissions)
         .where(isNull(carrierSubmissions.reviewedAt));
@@ -10432,7 +10510,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   });
 
-  app.post("/api/carrier-portal/submissions/:id/review", requireAuth, async (req: any, res) => {
+  app.post("/api/carrier-portal/submissions/:id/review", carrierPortalSubmissionPermission, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid submission" });
@@ -10450,7 +10528,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   });
 
-  app.get("/api/carrier-portal/submissions", requireAuth, async (_req, res) => {
+  app.get("/api/carrier-portal/submissions", carrierPortalSubmissionPermission, async (_req, res) => {
     try {
       const subs = await db.select().from(carrierSubmissions).orderBy(desc(carrierSubmissions.submittedAt));
       const subIds = subs.map((s) => s.id);
@@ -10488,7 +10566,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   });
 
-  app.patch("/api/carrier-portal/submissions/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/carrier-portal/submissions/:id", carrierPortalSubmissionPermission, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const { status, notes } = req.body;
@@ -10530,18 +10608,18 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
             const notifyHtml = `
               <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;">
                 <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
-                  <h2 style="margin:0;">Submission Update — ${statusLabels[status] ?? status}</h2>
+                  <h2 style="margin:0;">Submission Update — ${escapeHtml(statusLabels[status] ?? status)}</h2>
                   <p style="margin:4px 0 0;opacity:.8;font-size:13px;">Trucking Pros Financial</p>
                 </div>
                 <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
-                  <p style="color:#374151;">Hi ${portalUser.companyName},</p>
-                  <p style="color:#374151;">${statusMessages[status] ?? `Your submission status has been updated to <strong>${status}</strong>.`}</p>
+                  <p style="color:#374151;">Hi ${escapeHtml(portalUser.companyName)},</p>
+                  <p style="color:#374151;">${statusMessages[status] ?? `Your submission status has been updated to <strong>${escapeHtml(status)}</strong>.`}</p>
                   <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin:16px 0;">
-                    <p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Load #:</strong> ${existing.loadNumber}</p>
-                    ${existing.invoiceNumber ? `<p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Invoice #:</strong> ${existing.invoiceNumber}</p>` : ""}
-                    ${existing.amount ? `<p style="margin:0;font-size:13px;color:#374151;"><strong>Amount:</strong> $${existing.amount}</p>` : ""}
+                    <p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Load #:</strong> ${escapeHtml(existing.loadNumber)}</p>
+                    ${existing.invoiceNumber ? `<p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Invoice #:</strong> ${escapeHtml(existing.invoiceNumber)}</p>` : ""}
+                    ${existing.amount ? `<p style="margin:0;font-size:13px;color:#374151;"><strong>Amount:</strong> $${escapeHtml(existing.amount)}</p>` : ""}
                   </div>
-                  ${notes ? `<p style="color:#374151;font-size:13px;"><strong>Notes:</strong> ${notes}</p>` : ""}
+                  ${notes ? `<p style="color:#374151;font-size:13px;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
                   <p style="color:#374151;">Questions? Reply to this email or call us at <strong>385-495-4962</strong>.</p>
                   <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb;" />
                   <p style="color:#9ca3af;font-size:12px;margin:0;">Trucking Pros Financial · Support@Truckingprosfinancial.com · 385-495-4962</p>
@@ -10565,12 +10643,180 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   });
 
-  app.get("/api/carrier-portal/users", requireAdmin, async (_req, res) => {
+  const portalUserOutput = (user: typeof carrierPortalUsers.$inferSelect) => ({
+    id: user.id,
+    email: user.email,
+    carrierId: user.carrierId,
+    mcNumber: user.mcNumber,
+    dotNumber: user.dotNumber,
+    phone: user.phone,
+    companyName: user.companyName,
+    status: user.status,
+    rejectionReason: user.rejectionReason,
+    reviewedAt: user.reviewedAt,
+    reviewedBy: user.reviewedBy,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt,
+  });
+
+  app.get("/api/carrier-portal/users", carrierPortalSubmissionPermission, async (_req, res) => {
     try {
       const users = await db.select().from(carrierPortalUsers).orderBy(desc(carrierPortalUsers.createdAt));
-      res.json(users.map((u) => ({ ...u, passwordHash: undefined })));
+      res.json(users.map(portalUserOutput));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portal users" });
+    }
+  });
+
+  app.get("/api/carrier-portal/pending-count", carrierPortalSubmissionPermission, async (_req, res) => {
+    try {
+      const [{ total }] = await db.select({ total: count() }).from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.status, "pending"));
+      res.json({ count: Number(total) });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch pending portal user count" });
+    }
+  });
+
+  app.patch("/api/carrier-portal/users/:id/approve", carrierPortalSubmissionPermission, async (req: any, res) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid portal user" });
+
+      const result = await db.transaction(async (tx) => {
+        const [pendingUser] = await tx.select().from(carrierPortalUsers)
+          .where(and(eq(carrierPortalUsers.id, id), eq(carrierPortalUsers.status, "pending")))
+          .for("update").limit(1);
+        if (!pendingUser) {
+          const [existing] = await tx.select({ status: carrierPortalUsers.status })
+            .from(carrierPortalUsers).where(eq(carrierPortalUsers.id, id)).limit(1);
+          if (!existing) throw Object.assign(new Error("Portal user not found"), { status: 404 });
+          throw Object.assign(new Error("Only pending portal users can be approved"), { status: 409 });
+        }
+
+        const normalizedMc = pendingUser.mcNumber?.replace(/\D/g, "") || "";
+        const matchingClients = normalizedMc
+          ? await tx.select({ id: clients.id }).from(clients).where(
+            sql`regexp_replace(coalesce(${clients.mcNumber}, ''), '[^0-9]', '', 'g') = ${normalizedMc}`,
+          ).for("update").limit(2)
+          : [];
+        if (matchingClients.length > 1) {
+          throw Object.assign(new Error("Multiple carriers have this MC number. Resolve the duplicate carrier records before approval."), { status: 409 });
+        }
+        const matchedClient = matchingClients[0];
+        if (matchedClient) {
+          const activeAccounts = await tx.select({ id: carrierPortalUsers.id }).from(carrierPortalUsers)
+            .where(and(
+              eq(carrierPortalUsers.carrierId, matchedClient.id),
+              eq(carrierPortalUsers.status, "active"),
+            )).limit(1);
+          if (activeAccounts.length) {
+            throw Object.assign(new Error("This carrier already has an active portal account. Resolve the existing account before approval."), { status: 409 });
+          }
+        }
+        const reviewedAt = new Date();
+        const [updated] = await tx.update(carrierPortalUsers).set({
+          status: "active",
+          carrierId: matchedClient?.id ?? null,
+          rejectionReason: null,
+          reviewedAt,
+          reviewedBy: req.user.id,
+        }).where(and(eq(carrierPortalUsers.id, id), eq(carrierPortalUsers.status, "pending"))).returning();
+        if (!updated) throw Object.assign(new Error("Only pending portal users can be approved"), { status: 409 });
+        return { updated };
+      });
+
+      const { updated } = result;
+      const companyName = escapeHtml(updated.companyName);
+      const approvalHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;">
+          <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
+            <h2 style="margin:0;">Carrier Portal — Account Approved</h2>
+            <p style="margin:4px 0 0;opacity:.8;font-size:13px;">Trucking Pros Financial</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+            <p style="color:#374151;">Hi ${companyName},</p>
+            <p style="color:#374151;">Your Trucking Pros Financial carrier account has been approved. You can now log in at <a href="https://factorflux.io/portal">factorflux.io/portal</a>.</p>
+            <p style="color:#374151;">If you have questions, reply to this email or call us at <strong>385-495-4962</strong>.</p>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb;" />
+            <p style="color:#9ca3af;font-size:12px;margin:0;">Trucking Pros Financial · Support@Truckingprosfinancial.com · 385-495-4962</p>
+          </div>
+        </div>`;
+      const emailSent = await sendEmail({
+        to: updated.email,
+        from: "dosh@truckingprosfinancial.com",
+        replyTo: "dosh@truckingprosfinancial.com",
+        subject: "Carrier Portal — Account Approved",
+        html: approvalHtml,
+        text: `Hi ${updated.companyName},\n\nYour Trucking Pros Financial carrier account has been approved. You can now log in at https://factorflux.io/portal.\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
+      }).catch(() => false);
+      res.json({ ...portalUserOutput(updated), emailSent });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ message: error.message });
+      console.error("Approve portal user error:", error);
+      res.status(500).json({ message: "Failed to approve portal user" });
+    }
+  });
+
+  app.patch("/api/carrier-portal/users/:id/reject", carrierPortalSubmissionPermission, async (req: any, res) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid portal user" });
+      const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+      if (!reason) return res.status(400).json({ message: "A rejection reason is required" });
+      if (reason.length > 2000) return res.status(400).json({ message: "Rejection reason must be 2000 characters or fewer" });
+
+      const updated = await db.transaction(async (tx) => {
+        const [pendingUser] = await tx.select().from(carrierPortalUsers)
+          .where(and(eq(carrierPortalUsers.id, id), eq(carrierPortalUsers.status, "pending")))
+          .for("update").limit(1);
+        if (!pendingUser) {
+          const [existing] = await tx.select({ status: carrierPortalUsers.status })
+            .from(carrierPortalUsers).where(eq(carrierPortalUsers.id, id)).limit(1);
+          if (!existing) throw Object.assign(new Error("Portal user not found"), { status: 404 });
+          throw Object.assign(new Error("Only pending portal users can be rejected"), { status: 409 });
+        }
+        const [rejected] = await tx.update(carrierPortalUsers).set({
+          status: "rejected",
+          rejectionReason: reason,
+          reviewedAt: new Date(),
+          reviewedBy: req.user.id,
+        }).where(and(eq(carrierPortalUsers.id, id), eq(carrierPortalUsers.status, "pending"))).returning();
+        if (!rejected) throw Object.assign(new Error("Only pending portal users can be rejected"), { status: 409 });
+        return rejected;
+      });
+
+      if ((req.session as any)?.portalUser?.id === updated.id) delete (req.session as any).portalUser;
+      const companyName = escapeHtml(updated.companyName);
+      const escapedReason = escapeHtml(reason);
+      const rejectionHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;">
+          <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
+            <h2 style="margin:0;">Carrier Portal — Registration Update</h2>
+            <p style="margin:4px 0 0;opacity:.8;font-size:13px;">Trucking Pros Financial</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+            <p style="color:#374151;">Hi ${companyName},</p>
+            <p style="color:#374151;">We were unable to approve your carrier portal registration at this time.</p>
+            <p style="color:#374151;"><strong>Reason:</strong> ${escapedReason}</p>
+            <p style="color:#374151;">If you have questions, reply to this email or call us at <strong>385-495-4962</strong>.</p>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb;" />
+            <p style="color:#9ca3af;font-size:12px;margin:0;">Trucking Pros Financial · Support@Truckingprosfinancial.com · 385-495-4962</p>
+          </div>
+        </div>`;
+      const emailSent = await sendEmail({
+        to: updated.email,
+        from: "dosh@truckingprosfinancial.com",
+        replyTo: "dosh@truckingprosfinancial.com",
+        subject: "Carrier Portal — Registration Update",
+        html: rejectionHtml,
+        text: `Hi ${updated.companyName},\n\nWe were unable to approve your carrier portal registration at this time.\n\nReason: ${reason}\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
+      }).catch(() => false);
+      res.json({ ...portalUserOutput(updated), emailSent });
+    } catch (error: any) {
+      if (error?.status) return res.status(error.status).json({ message: error.message });
+      console.error("Reject portal user error:", error);
+      res.status(500).json({ message: "Failed to reject portal user" });
     }
   });
 
@@ -10578,14 +10824,14 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     try {
       const id = parseInt(req.params.id, 10);
       const { status, carrierId } = req.body;
-      const validStatuses = ["pending", "active", "suspended"];
+      const validStatuses = ["pending", "active", "suspended", "rejected"];
       if (status && !validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status" });
       const [updated] = await db.update(carrierPortalUsers)
         .set({ ...(status && { status }), ...(carrierId !== undefined && { carrierId }) })
         .where(eq(carrierPortalUsers.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Portal user not found" });
-      res.json({ ...updated, passwordHash: undefined });
+      res.json(portalUserOutput(updated));
     } catch (error) {
       res.status(500).json({ message: "Failed to update portal user" });
     }

@@ -76,7 +76,6 @@ const navSections: NavSection[] = [
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
       { name: "Chat",              href: "/chat",               icon: MessageCircle,   permission: "chat"               },
-      { name: "Carrier Messages",  href: "/carrier-messages",   icon: MessageCircle,   permission: "chat"               },
       { name: "Tickets",           href: "/tickets",            icon: Ticket,          permission: "tickets"            },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
@@ -168,31 +167,43 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const { permissions, user: authUser, isLoading: authLoading } = useAuth();
   const userRole = authUser?.role ?? "employee";
   const isAdmin = userRole === "admin";
-  const canUseChat = !!authUser && (isAdmin || (!authLoading && permissions.includes("chat")));
+  const canUsePortalSubmissions = !!authUser && (isAdmin || (!authLoading && permissions.includes("portal_submissions")));
+  const canUseInternalChat = !!authUser && (isAdmin || (!authLoading && permissions.includes("chat")));
+  const canUseCarrierChat = !!authUser && (isAdmin || (!authLoading && (permissions.includes("chat") || permissions.includes("portal_submissions"))));
   const { data: chatUnread } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-count"],
     refetchInterval: 3000,
     retry: false,
-    enabled: canUseChat,
+    enabled: canUseInternalChat,
   });
   const { data: carrierChatUnread } = useQuery<{ count: number }>({
     queryKey: ["/api/carrier-chat/unread-count"],
     refetchInterval: 5000,
     retry: false,
-    enabled: canUseChat,
+    enabled: canUseCarrierChat,
   });
-  const canUsePortalSubmissions = !!authUser && (isAdmin || (!authLoading && permissions.includes("portal_submissions")));
   const { data: portalSubmissionsUnreviewed } = useQuery<{ count: number }>({
     queryKey: ["/api/portal-submissions/unreviewed-count"],
     refetchInterval: 30000,
     retry: false,
     enabled: canUsePortalSubmissions,
   });
+  const { data: pendingRegistrations } = useQuery<{ count: number }>({
+    queryKey: ["/api/carrier-portal/pending-count"],
+    refetchInterval: 30000,
+    retry: false,
+    enabled: canUsePortalSubmissions,
+  });
+  const unreviewedSubmissionCount = portalSubmissionsUnreviewed?.count ?? 0;
+  const pendingRegistrationCount = pendingRegistrations?.count ?? 0;
+  const carrierUnreadCount = carrierChatUnread?.count ?? 0;
+  const portalSubmissionsTotal = unreviewedSubmissionCount + pendingRegistrationCount + carrierUnreadCount;
+  const portalSubmissionsBadgeLabel = `${unreviewedSubmissionCount} new submissions, ${pendingRegistrationCount} pending registrations, ${carrierUnreadCount} unread carrier messages`;
   const { data: notificationChannels } = useQuery<ChatChannelSummary[]>({
     queryKey: ["/api/chat/channels"],
     refetchInterval: 3000,
     retry: false,
-    enabled: canUseChat && !isRouteActive(location, "/chat"),
+    enabled: canUseInternalChat && !isRouteActive(location, "/chat"),
   });
   const previousChannelUnreadRef = useRef<Record<string, number> | null>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -217,6 +228,8 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           // Admins always see everything
           if (isAdmin) return true;
           if (i.permission === "chat" && !permissions.includes("chat")) return false;
+          if (i.name === "Portal Submissions" && !canUsePortalSubmissions && !canUseCarrierChat) return false;
+          if (i.name === "Portal Submissions" && (canUsePortalSubmissions || canUseCarrierChat)) return true;
           // Role gate for manager-only items
           if (i.role === "manager" && userRole !== "manager" && userRole !== "admin") return false;
           // Permission gate
@@ -225,7 +238,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         }),
       }))
       .filter(s => s.items.length > 0),
-    [userRole, isAdmin, permissions]
+    [userRole, isAdmin, permissions, canUsePortalSubmissions, canUseCarrierChat]
   );
 
   useLayoutEffect(() => {
@@ -356,8 +369,13 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                         {item.name}
                       </span>
                        {item.name === "Chat" && !!chatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{chatUnread.count >= 10 ? "9+" : chatUnread.count}</span>}
-                        {item.name === "Carrier Messages" && !!carrierChatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{carrierChatUnread.count >= 10 ? "9+" : carrierChatUnread.count}</span>}
-                        {item.name === "Portal Submissions" && !!portalSubmissionsUnreviewed?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">{portalSubmissionsUnreviewed.count >= 10 ? "9+" : portalSubmissionsUnreviewed.count}</span>}
+                         {item.name === "Portal Submissions" && portalSubmissionsTotal > 0 && <span
+                           className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white"
+                           title={portalSubmissionsBadgeLabel}
+                           aria-label={portalSubmissionsBadgeLabel}
+                         >
+                            {portalSubmissionsTotal >= 10 ? "9+" : portalSubmissionsTotal}
+                         </span>}
                     </button>
                   );
                 })}
