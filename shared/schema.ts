@@ -105,17 +105,6 @@ export const clients = pgTable("clients", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("clients_name_idx").on(table.name),
-  index("clients_search_trgm_idx").using("gin", sql`(
-    coalesce(${table.name}, '') || ' ' ||
-    coalesce(${table.preferredName}, '') || ' ' ||
-    coalesce(${table.email}, '') || ' ' ||
-    coalesce(${table.phone}, '') || ' ' ||
-    coalesce(${table.contactPerson}, '') || ' ' ||
-    coalesce(${table.city}, '') || ' ' ||
-    coalesce(${table.state}, '') || ' ' ||
-    coalesce(${table.mcNumber}, '') || ' ' ||
-    coalesce(${table.dotNumber}, '')
-  ) gin_trgm_ops`),
 ]);
 
 // New addition for debtors table
@@ -245,14 +234,6 @@ export const invoices = pgTable("invoices", {
   index("invoices_driver_id_idx").on(table.driverId),
   index("invoices_created_at_idx").on(table.createdAt),
   index("invoices_submitted_by_created_at_idx").on(table.submittedBy, table.createdAt),
-  index("invoices_search_trgm_idx").using("gin", sql`(
-    coalesce(${table.invoiceNumber}, '') || ' ' ||
-    coalesce(${table.loadNumber}, '') || ' ' ||
-    coalesce(${table.code}, '') || ' ' ||
-    coalesce(${table.branchName}, '') || ' ' ||
-    coalesce(${table.bolNumber}, '') || ' ' ||
-    coalesce(${table.status}, '')
-  ) gin_trgm_ops`),
 ]);
 
 // Documents table
@@ -701,18 +682,6 @@ export const brokers = pgTable("brokers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("brokers_name_idx").on(table.name),
-  index("brokers_search_trgm_idx").using("gin", sql`(
-    coalesce(${table.name}, '') || ' ' ||
-    coalesce(${table.contactPerson}, '') || ' ' ||
-    coalesce(${table.email}, '') || ' ' ||
-    coalesce(${table.phone}, '') || ' ' ||
-    coalesce(${table.address}, '') || ' ' ||
-    coalesce(${table.city}, '') || ' ' ||
-    coalesce(${table.state}, '') || ' ' ||
-    coalesce(${table.mcNumber}, '') || ' ' ||
-    coalesce(${table.dotNumber}, '') || ' ' ||
-    coalesce(${table.notes}, '')
-  ) gin_trgm_ops`),
 ]);
 
 // A broker may have multiple operating branches. Branches are kept separately
