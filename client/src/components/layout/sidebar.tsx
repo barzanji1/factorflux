@@ -9,7 +9,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, MessageCircle, Ticket,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, Ticket,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -75,7 +75,6 @@ const navSections: NavSection[] = [
       { name: "Invoices",          href: "/invoices",           icon: FileText,        permission: "invoices"           },
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
-      { name: "Chat",              href: "/chat",               icon: MessageCircle,   permission: "chat"               },
       { name: "Tickets",           href: "/tickets",            icon: Ticket,          permission: "tickets"            },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
@@ -170,12 +169,6 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const canUsePortalSubmissions = !!authUser && (isAdmin || (!authLoading && permissions.includes("portal_submissions")));
   const canUseInternalChat = !!authUser && (isAdmin || (!authLoading && permissions.includes("chat")));
   const canUseCarrierChat = !!authUser && (isAdmin || (!authLoading && (permissions.includes("chat") || permissions.includes("portal_submissions"))));
-  const { data: chatUnread } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-count"],
-    refetchInterval: 3000,
-    retry: false,
-    enabled: canUseInternalChat,
-  });
   const { data: carrierChatUnread } = useQuery<{ count: number }>({
     queryKey: ["/api/carrier-chat/unread-count"],
     refetchInterval: 5000,
@@ -203,7 +196,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     queryKey: ["/api/chat/channels"],
     refetchInterval: 3000,
     retry: false,
-    enabled: canUseInternalChat && !isRouteActive(location, "/chat"),
+    enabled: canUseInternalChat,
   });
   const previousChannelUnreadRef = useRef<Record<string, number> | null>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -266,13 +259,13 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           notification.onclick = () => {
             window.focus();
             window.sessionStorage.setItem("chat:open-channel", channelKey);
-            setLocation("/chat");
+            window.dispatchEvent(new CustomEvent("team-chat:open", { detail: { channelId: channelKey } }));
             notification.close();
           };
         })
         .catch(() => undefined);
     });
-  }, [notificationChannels, authUser?.id, setLocation]);
+  }, [notificationChannels, authUser?.id]);
 
   const navigateTo = (href: string) => {
     if (navRef.current) {
@@ -368,7 +361,6 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                        <span className="truncate text-[12.5px] font-medium leading-none">
                         {item.name}
                       </span>
-                       {item.name === "Chat" && !!chatUnread?.count && <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#b54444] px-1 text-[9px] font-bold text-white">{chatUnread.count >= 10 ? "9+" : chatUnread.count}</span>}
                          {item.name === "Portal Submissions" && portalSubmissionsTotal > 0 && <span
                            className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white"
                            title={portalSubmissionsBadgeLabel}

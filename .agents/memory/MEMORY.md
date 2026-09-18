@@ -15,3 +15,4 @@
 - [Invoice paperwork integrity](invoice-paperwork-integrity.md) — commit invoice rows atomically and durably retry failed S3 compensation; never leave partial paperwork.
 - [Funding lifecycle integrity](funding-lifecycle-integrity.md) — payout, funded state, and audit writes are atomic; Fund and Hold must use compare-and-set transitions.
 - [Publish-safe trigram indexes](publish-safe-trigram-indexes.md) — publish diff can corrupt deeply nested GIN expression indexes reconstructed from PostgreSQL catalogs.
+- [Chat notification cursors](chat-notification-cursors.md) — sound alerts require paginated message IDs plus a pre-list server watermark; unread deltas and client time lose or replay events.

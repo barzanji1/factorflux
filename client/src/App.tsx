@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -65,18 +65,21 @@ import PortalProfile from "@/pages/portal/profile";
 import PortalSubmissionsPage from "@/pages/portal-submissions";
 import CalendarPage from "@/pages/calendar";
 import Expenses from "@/pages/expenses";
-import Chat from "@/pages/chat";
 import Tickets from "@/pages/tickets";
 import TicketDetail from "@/pages/ticket-detail";
 import PortalChat from "@/pages/portal/chat";
+import { TeamChatDock } from "@/pages/chat";
 
 function Router() {
   useTheme(); // Initialize theme
+  const [location] = useLocation();
+  const isPublicRoute =
+    location === "/login" ||
+    location === "/portal" ||
+    location.startsWith("/portal/");
 
-  return (
-    <>
-      <PermissionWatcher />
-      <Switch>
+  const routes = (
+    <Switch>
       <Route path="/login">
         <LoginPage />
       </Route>
@@ -323,9 +326,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/chat">
-        <ProtectedRoute>
-          <Chat />
-        </ProtectedRoute>
+        <Redirect to="/" />
       </Route>
       <Route path="/tickets">
         <ProtectedRoute><Tickets /></ProtectedRoute>
@@ -363,7 +364,25 @@ function Router() {
       </Route>
       <Route path="*" component={NotFound} />
     </Switch>
-    </>
+  );
+
+  if (isPublicRoute) {
+    return (
+      <>
+        <PermissionWatcher />
+        {routes}
+      </>
+    );
+  }
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden">
+      <PermissionWatcher />
+      <div className="min-h-0 flex-1 overflow-hidden [&>div]:!h-full">
+        {routes}
+      </div>
+      <TeamChatDock />
+    </div>
   );
 }
 

@@ -16,7 +16,7 @@ import {
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
-import { eq, and, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -4168,6 +4168,9 @@ ${message}
   app.get("/api/chat/channels", chatPermission, async (req: any, res) => {
     try {
       const userId = req.user.id as string;
+      const [messageSnapshot] = await db.select({
+        cursor: sql<number>`coalesce(max(${chatMessages.id}), 0)`,
+      }).from(chatMessages);
       await ensurePublicChatMembership(userId);
       const channels = await db.select().from(chatChannels)
         .leftJoin(chatMembers, and(eq(chatMembers.channelId, chatChannels.id), eq(chatMembers.userId, userId)))
@@ -4187,6 +4190,7 @@ ${message}
           directName: directOther?.name || null,
         };
       }));
+      res.setHeader("X-Chat-Message-Cursor", String(messageSnapshot?.cursor ?? 0));
       res.json(result);
     } catch (error) {
       console.error("Error fetching chat channels:", error);
@@ -4246,6 +4250,8 @@ ${message}
     try {
       const channelId = chatChannelIdSchema.parse(req.params.id);
       const afterRaw = req.query.after;
+      const afterIdRaw = req.query.afterId;
+      const limitRaw = req.query.limit;
       let after: Date | undefined;
       if (afterRaw !== undefined) {
         if (typeof afterRaw !== "string" || !afterRaw || Number.isNaN(Date.parse(afterRaw))) {
@@ -4253,18 +4259,45 @@ ${message}
         }
         after = new Date(afterRaw);
       }
+      let afterId: number | undefined;
+      if (afterIdRaw !== undefined) {
+        if (typeof afterIdRaw !== "string" || !/^\d+$/.test(afterIdRaw)) {
+          return res.status(400).json({ message: "afterId must be a non-negative integer" });
+        }
+        afterId = Number(afterIdRaw);
+      }
+      if (after !== undefined && afterId !== undefined) {
+        return res.status(400).json({ message: "Use either after or afterId, not both" });
+      }
+      let pageLimit = 50;
+      if (afterId !== undefined) {
+        if (limitRaw !== undefined && (typeof limitRaw !== "string" || !/^\d+$/.test(limitRaw))) {
+          return res.status(400).json({ message: "limit must be an integer from 1 to 200" });
+        }
+        pageLimit = limitRaw === undefined ? 100 : Number(limitRaw);
+        if (pageLimit < 1 || pageLimit > 200) {
+          return res.status(400).json({ message: "limit must be an integer from 1 to 200" });
+        }
+      }
       const [membership] = await db.select().from(chatMembers)
         .where(and(eq(chatMembers.channelId, channelId), eq(chatMembers.userId, req.user.id)));
       if (!membership) return res.status(403).json({ message: "Chat channel access required" });
+      const messageFilter = afterId !== undefined
+        ? and(eq(chatMessages.channelId, channelId), gt(chatMessages.id, afterId))
+        : after
+          ? and(eq(chatMessages.channelId, channelId), gt(chatMessages.createdAt, after))
+          : eq(chatMessages.channelId, channelId);
       const messages = await db.select({
         id: chatMessages.id, channelId: chatMessages.channelId, senderId: chatMessages.senderId,
         body: chatMessages.body, createdAt: chatMessages.createdAt, editedAt: chatMessages.editedAt,
         senderName: sql<string>`trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, '')))`,
       }).from(chatMessages).innerJoin(users, eq(users.id, chatMessages.senderId))
-        .where(after ? and(eq(chatMessages.channelId, channelId), gt(chatMessages.createdAt, after)) : eq(chatMessages.channelId, channelId))
-        .orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
-        .limit(50);
-      res.json(messages.reverse());
+        .where(messageFilter)
+        .orderBy(...(afterId !== undefined
+          ? [asc(chatMessages.id)]
+          : [desc(chatMessages.createdAt), desc(chatMessages.id)]))
+        .limit(pageLimit);
+      res.json(afterId !== undefined ? messages : messages.reverse());
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid channel ID" });
       console.error("Error fetching chat messages:", error);
