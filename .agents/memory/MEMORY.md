@@ -16,3 +16,4 @@
 - [Funding lifecycle integrity](funding-lifecycle-integrity.md) — payout, funded state, and audit writes are atomic; Fund and Hold must use compare-and-set transitions.
 - [Publish-safe trigram indexes](publish-safe-trigram-indexes.md) — publish diff can corrupt deeply nested GIN expression indexes reconstructed from PostgreSQL catalogs.
 - [Chat notification cursors](chat-notification-cursors.md) — sound alerts require paginated message IDs plus a pre-list server watermark; unread deltas and client time lose or replay events.
+- [Approved tactile navigation](approved-tactile-navigation.md) — preserve the strongly beveled stacked sidebar-button direction, while keeping labels crisp and high-contrast.

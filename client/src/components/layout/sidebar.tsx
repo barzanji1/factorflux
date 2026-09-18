@@ -333,7 +333,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         <div className="space-y-4">
           {filteredSections.map(section => (
             <div key={section.title}>
-               <p className="mb-1 px-2 text-[9.5px] font-bold uppercase tracking-[0.2em] text-[#444]">
+               <p className="mb-1.5 px-2 text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-[#2f2f2f]">
                 {section.title}
               </p>
               <div className="space-y-[2px]">
@@ -351,14 +351,14 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#098b9f]",
                         active
                            ? "text-[#1a1a1a]"
-                           : "text-[#444]"
+                           : "text-[#1f1f1f]"
                       )}
                     >
                       <Icon className={cn(
                         "h-[14px] w-[14px] shrink-0 transition-colors",
-                         active ? "text-[#098b9f]" : "text-[#666] group-hover:text-[#098b9f]"
+                         active ? "text-[#087c8d]" : "text-[#454545] group-hover:text-[#087c8d]"
                       )} />
-                       <span className="truncate text-[12.5px] font-medium leading-none">
+                       <span className="truncate text-[13.5px] font-semibold leading-none tracking-[-0.01em]">
                         {item.name}
                       </span>
                          {item.name === "Portal Submissions" && portalSubmissionsTotal > 0 && <span
