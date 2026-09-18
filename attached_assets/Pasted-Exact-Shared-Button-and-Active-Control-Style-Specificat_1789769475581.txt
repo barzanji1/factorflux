@@ -1,0 +1,606 @@
+Exact Shared Button and Active-Control Style Specification
+1. Scope
+This specification reproduces the project’s shared Button component, its global beveled border/shadow treatment, its variants and sizes, and the teal selected state used by shared toggle controls.
+There are two different meanings of “active”:
+1. Pressed button state (:active) — the button moves 1px right and 1px down and changes from a raised bevel to an inset shadow. Its fill does not change solely because it is pressed.
+2. Selected toggle state (data-state="on") — the control receives the dark teal accent fill and white text.
+Both are required for identical behavior.
+
+2. Required font
+@import url(
+"https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+);
+
+body {
+font-family: "DM Sans", sans-serif;
+font-size: 14px;
+}
+
+Shared buttons use:
+font-family: "DM Sans", sans-serif; /* inherited */
+font-size: 0.875rem; /* 14px */
+line-height: 1.25rem; /* 20px, Tailwind text-sm */
+font-weight: 600; /* semibold */
+white-space: nowrap;
+
+Shared toggles use the same 14px / 20px text sizing but font-weight: 500.
+
+3. Theme variables
+Install these variables exactly. The existing light and .dark themes intentionally use the same button palette.
+:root,
+.dark {
+--background: 40 11% 80%;
+--foreground: 0 0% 10%;
+
+--muted: 40 9% 74%;
+--muted-foreground: 0 0% 27%;
+
+--border: 0 0% 66%;
+--input: 0 0% 100%;
+
+--primary: 182 56% 41%;
+--primary-foreground: 0 0% 100%;
+
+--secondary: 40 9% 74%;
+--secondary-foreground: 0 0% 10%;
+
+--accent: 183 49% 28%;
+--accent-foreground: 0 0% 100%;
+
+--destructive: 0 62% 42%;
+--destructive-foreground: 0 0% 100%;
+
+--ring: 183 49% 28%;
+--radius: 0.18rem;
+
+--button-primary-hover: #246669;
+--button-secondary-hover: #cfe9ea;
+--button-subtle-hover: #e5f3f3;
+--button-destructive-hover: #8f1f1f;
+}
+
+Approximate sRGB equivalents of the HSL variables:
+Token	HSL	sRGB hex
+--background	40 11% 80%	#d2cec6
+--foreground	0 0% 10%	#1a1a1a
+--muted / --secondary	40 9% 74%	#c3bfb7
+--border	0 0% 66%	#a8a8a8
+--primary	182 56% 41%	#2e9fa3
+--primary-foreground	0 0% 100%	#ffffff
+--accent / --ring	183 49% 28%	#24676a
+--accent-foreground	0 0% 100%	#ffffff
+--destructive	0 62% 42%	#ae2929
+Use the HSL variables as the source of truth. The hex values above are included for systems that cannot consume space-separated HSL channels.
+
+4. Tailwind token mapping
+The component expects these Tailwind mappings:
+// tailwind.config.ts
+export default {
+theme: {
+extend: {
+borderRadius: {
+lg: "var(--radius)",
+md: "calc(var(--radius) - 2px)",
+sm: "calc(var(--radius) - 4px)",
+},
+colors: {
+background: "hsl(var(--background) / <alpha-value>)",
+foreground: "hsl(var(--foreground) / <alpha-value>)",
+primary: {
+DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+foreground:
+"hsl(var(--primary-foreground) / <alpha-value>)",
+},
+secondary: {
+DEFAULT: "hsl(var(--secondary) / <alpha-value>)",
+foreground:
+"hsl(var(--secondary-foreground) / <alpha-value>)",
+},
+muted: {
+DEFAULT: "hsl(var(--muted) / <alpha-value>)",
+foreground:
+"hsl(var(--muted-foreground) / <alpha-value>)",
+},
+accent: {
+DEFAULT: "hsl(var(--accent) / <alpha-value>)",
+foreground:
+"hsl(var(--accent-foreground) / <alpha-value>)",
+},
+destructive: {
+DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
+foreground:
+"hsl(var(--destructive-foreground) / <alpha-value>)",
+},
+border: "hsl(var(--border) / <alpha-value>)",
+input: "hsl(var(--input) / <alpha-value>)",
+ring: "hsl(var(--ring) / <alpha-value>)",
+},
+},
+},
+};
+
+Radius resolution
+--radius is 0.18rem, or 2.88px at a 16px root size.
+Utility	Formula	Nominal result
+rounded-lg	var(--radius)	2.88px
+rounded-md	calc(var(--radius) - 2px)	0.88px
+rounded-sm	calc(var(--radius) - 4px)	negative; browsers clamp the used radius to 0px
+Therefore:
+* default-size and icon-size shared buttons use rounded-sm, which renders square;
+* small and large buttons add rounded-md, which resolves to approximately 0.88px;
+* toggles use rounded-md, approximately 0.88px.
+Do not replace these with conventional 4px, 6px, or 8px radii if identical appearance is required.
+
+5. Shared raised bevel
+Every shared Button receives the bevel-button class.
+.bevel-button {
+border: 1px solid #77746e !important;
+box-shadow:
+inset 1px 1px 0 rgba(255, 255, 255, 0.8),
+inset -1px -1px 0 rgba(70, 70, 70, 0.35),
+1px 1px 0 rgba(50, 50, 50, 0.2);
+transition:
+transform 0.12s ease,
+box-shadow 0.12s ease,
+background-color 0.12s ease,
+color 0.12s ease;
+}
+
+.bevel-button:active {
+transform: translate(1px, 1px);
+box-shadow: inset 1px 1px 2px rgba(50, 50, 50, 0.3);
+}
+
+Exact border
+width: 1px
+style: solid
+color: #77746e
+
+The !important is intentional. It makes this border win over variant-level border utilities and page-level overrides. As a result, even ghost and link variants visually retain the shared one-pixel bevel border.
+Exact raised shadow stack
+The normal shadow is not one shadow; it is three layers:
+1. top/left inner highlight:
+inset 1px 1px 0 rgba(255,255,255,0.8)
+
+2. bottom/right inner shade:
+inset -1px -1px 0 rgba(70,70,70,0.35)
+
+3. hard outer offset:
+1px 1px 0 rgba(50,50,50,0.2)
+
+The hard outer shadow requested in isolation is:
+x-offset: 1px
+y-offset: 1px
+blur: 0
+spread: 0
+color: rgba(50,50,50,0.2)
+
+Exact pressed state
+transform: translate(1px, 1px)
+shadow: inset 1px 1px 2px rgba(50,50,50,0.3)
+transition duration: 120ms
+transition easing: ease
+
+The pressed state removes all three raised-shadow layers and replaces them with the single inset shadow.
+
+6. Shared Button component
+Dependencies:
+npm install @radix-ui/react-slot class-variance-authority
+
+Exact component:
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const buttonVariants = cva(
+"bevel-button inline-flex items-center justify-center gap-2 " +
+"whitespace-nowrap rounded-sm text-sm font-semibold " +
+"ring-offset-background focus-visible:outline-none " +
+"disabled:pointer-events-none disabled:opacity-50 " +
+"[&_svg]:pointer-events-none [&_svg]:size-4 " +
+"[&_svg]:shrink-0",
+{
+variants: {
+variant: {
+default:
+"bg-primary text-primary-foreground hover:bg-primary/90",
+destructive:
+"bg-destructive text-destructive-foreground " +
+"hover:bg-destructive/90",
+outline:
+"border border-input bg-background hover:bg-accent " +
+"hover:text-accent-foreground",
+secondary:
+"bg-secondary text-secondary-foreground " +
+"hover:bg-secondary/80",
+ghost:
+"hover:bg-accent hover:text-accent-foreground",
+link:
+"text-primary underline-offset-4 hover:underline",
+},
+size: {
+default: "h-10 px-4 py-2",
+sm: "h-9 rounded-md px-3",
+lg: "h-11 rounded-md px-8",
+icon: "h-10 w-10",
+},
+},
+defaultVariants: {
+variant: "default",
+size: "default",
+},
+},
+);
+
+export interface ButtonProps
+extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+VariantProps<typeof buttonVariants> {
+asChild?: boolean;
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+(
+{
+className,
+variant,
+size,
+asChild = false,
+...props
+},
+ref,
+) => {
+const Comp = asChild ? Slot : "button";
+
+return (
+<Comp
+className={cn(
+buttonVariants({ variant, size, className }),
+)}
+data-button-variant={variant ?? "default"}
+data-button-size={size ?? "default"}
+ref={ref}
+{...props}
+/>
+);
+},
+);
+
+Button.displayName = "Button";
+
+export { Button, buttonVariants };
+
+The data-button-variant attribute is required. Global CSS uses it to enforce exact hover fills over conflicting local Tailwind classes.
+
+7. Base layout, spacing, and interaction
+All shared buttons use:
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: 0.5rem; /* 8px */
+white-space: nowrap;
+font-size: 0.875rem; /* 14px */
+line-height: 1.25rem; /* 20px */
+font-weight: 600;
+border-radius: max(0px, calc(0.18rem - 4px));
+
+SVG children use:
+width: 1rem; /* 16px */
+height: 1rem; /* 16px */
+flex-shrink: 0;
+pointer-events: none;
+
+Disabled state:
+pointer-events: none;
+opacity: 0.5;
+
+Size matrix
+Size	Height	Width	Horizontal padding	Vertical padding	Radius
+default	40px	content	16px	8px	used value 0px
+sm	36px	content	12px	inherited line centering	about 0.88px
+lg	44px	content	32px	inherited line centering	about 0.88px
+icon	40px	40px	none declared	none declared	used value 0px
+At viewport widths up to 640px, every .bevel-button also receives:
+min-height: 44px;
+
+This increases default, small, and icon buttons to a minimum 44px touch target on mobile. Width is unchanged.
+
+8. Variant fills and text colors
+Global hover rules override the component’s Tailwind hover utilities with !important. The table below describes the final rendered contract.
+8.1 Default
+normal background: hsl(182 56% 41%) = approximately #2e9fa3
+normal text: #ffffff
+hover background: #246669
+hover text: #ffffff
+pressed fill: whichever normal/hover fill currently applies
+
+8.2 Destructive
+normal background: hsl(0 62% 42%) = approximately #ae2929
+normal text: #ffffff
+hover background: #8f1f1f
+hover text: #ffffff
+pressed fill: whichever normal/hover fill currently applies
+
+8.3 Secondary
+normal background: hsl(40 9% 74%) = approximately #c3bfb7
+normal text: hsl(0 0% 10%) = #1a1a1a
+hover background: #cfe9ea
+hover text: #1a1a1a
+pressed fill: whichever normal/hover fill currently applies
+
+8.4 Outline
+normal background: hsl(40 11% 80%) = approximately #d2cec6
+normal text: inherited foreground = #1a1a1a
+declared variant border: 1px solid white from --input
+effective rendered border: 1px solid #77746e because .bevel-button is !important
+hover background: #cfe9ea
+hover text: #1a1a1a
+pressed fill: whichever normal/hover fill currently applies
+
+8.5 Ghost
+normal background: transparent
+normal text: inherited foreground = #1a1a1a
+effective rendered border: 1px solid #77746e
+hover background: #e5f3f3
+hover text: #1a1a1a
+pressed fill: whichever normal/hover fill currently applies
+
+8.6 Link
+normal background: transparent
+normal text: hsl(182 56% 41%) = approximately #2e9fa3
+effective rendered border: 1px solid #77746e
+text underline offset: 4px
+hover background: #e5f3f3
+hover text: #1a1a1a
+hover decoration: underline
+pressed fill: whichever normal/hover fill currently applies
+
+Exact global hover contract
+[data-button-variant="default"]:hover:not(:disabled) {
+background-color: var(--button-primary-hover) !important;
+color: #fff !important;
+}
+
+[data-button-variant="secondary"]:hover:not(:disabled),
+[data-button-variant="outline"]:hover:not(:disabled) {
+background-color: var(--button-secondary-hover) !important;
+color: #1a1a1a !important;
+}
+
+[data-button-variant="ghost"]:hover:not(:disabled),
+[data-button-variant="link"]:hover:not(:disabled) {
+background-color: var(--button-subtle-hover) !important;
+color: #1a1a1a !important;
+}
+
+[data-button-variant="destructive"]:hover:not(:disabled) {
+background-color: var(--button-destructive-hover) !important;
+color: #fff !important;
+}
+
+
+9. Focus treatment
+The shared component removes the browser’s default focus-visible outline:
+focus-visible:outline-none
+
+The project then applies this global focus-visible rule:
+*:focus-visible {
+outline: 2px solid #246669;
+outline-offset: 2px;
+}
+
+This dark teal focus ring is a CSS outline, not a box shadow.
+
+10. Teal selected/active toggle state
+The reusable teal highlighted state belongs to Toggle and ToggleGroupItem, not to the ordinary Button.
+Exact selected state:
+[data-state="on"] {
+background-color: hsl(var(--accent));
+color: hsl(var(--accent-foreground));
+}
+
+Resolved colors:
+selected background: hsl(183 49% 28%) ≈ #24676a
+selected text: hsl(0 0% 100%) = #ffffff
+
+The Radix Toggle primitive automatically emits data-state="on" and data-state="off".
+Exact Toggle component
+import * as React from "react";
+import * as TogglePrimitive from "@radix-ui/react-toggle";
+import {
+cva,
+type VariantProps,
+} from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const toggleVariants = cva(
+"inline-flex items-center justify-center rounded-md " +
+"text-sm font-medium ring-offset-background " +
+"transition-colors hover:bg-muted " +
+"hover:text-muted-foreground " +
+"focus-visible:outline-none focus-visible:ring-2 " +
+"focus-visible:ring-ring focus-visible:ring-offset-2 " +
+"disabled:pointer-events-none disabled:opacity-50 " +
+"data-[state=on]:bg-accent " +
+"data-[state=on]:text-accent-foreground " +
+"[&_svg]:pointer-events-none [&_svg]:size-4 " +
+"[&_svg]:shrink-0 gap-2",
+{
+variants: {
+variant: {
+default: "bg-transparent",
+outline:
+"border border-input bg-transparent " +
+"hover:bg-accent hover:text-accent-foreground",
+},
+size: {
+default: "h-10 px-3 min-w-10",
+sm: "h-9 px-2.5 min-w-9",
+lg: "h-11 px-5 min-w-11",
+},
+},
+defaultVariants: {
+variant: "default",
+size: "default",
+},
+},
+);
+
+const Toggle = React.forwardRef<
+React.ElementRef<typeof TogglePrimitive.Root>,
+React.ComponentPropsWithoutRef<typeof TogglePrimitive.Root>
+& VariantProps<typeof toggleVariants>
+>(({ className, variant, size, ...props }, ref) => (
+<TogglePrimitive.Root
+ref={ref}
+className={cn(
+toggleVariants({ variant, size, className }),
+)}
+{...props}
+/>
+));
+
+Toggle.displayName = TogglePrimitive.Root.displayName;
+
+export { Toggle, toggleVariants };
+
+Toggle size matrix:
+Size	Height	Min width	Horizontal padding	Radius
+default	40px	40px	12px	about 0.88px
+sm	36px	36px	10px	about 0.88px
+lg	44px	44px	20px	about 0.88px
+The Toggle does not include bevel-button, so it does not receive the hard offset shadow or the #77746e forced border unless a caller adds that class.
+
+11. Native-button compatibility hover
+The project also gives raw <button> elements a visible fallback hover state until they are migrated to the shared component:
+button:not([data-button-variant]):hover:not(:disabled) {
+background-color: var(--button-subtle-hover) !important;
+color: #1a1a1a !important;
+}
+
+This rule affects raw icon buttons and compact selectors. It does not affect the shared Button, because that component always emits data-button-variant.
+Be aware that this fallback can override a raw button’s local hover utility. Include it only if the destination project needs the same global behavior.
+
+12. Reduced-motion behavior
+The project globally collapses transitions and animations when the user requests reduced motion:
+@media (prefers-reduced-motion: reduce) {
+*,
+*::before,
+*::after {
+animation-duration: 0.01ms !important;
+transition-duration: 0.01ms !important;
+}
+}
+
+The pressed translate(1px, 1px) still applies, but the 120ms transition is effectively immediate.
+
+13. Framework-independent CSS implementation
+If the destination does not use Tailwind or CVA, this CSS reproduces the shared default button:
+:root {
+--ui-primary: hsl(182 56% 41%);
+--ui-primary-hover: #246669;
+--ui-primary-foreground: #fff;
+--ui-accent: hsl(183 49% 28%);
+--ui-accent-foreground: #fff;
+}
+
+.tp-button {
+box-sizing: border-box;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: 8px;
+
+height: 40px;
+padding: 8px 16px;
+
+border: 1px solid #77746e;
+border-radius: 0;
+
+background: var(--ui-primary);
+color: var(--ui-primary-foreground);
+
+font-family: "DM Sans", sans-serif;
+font-size: 14px;
+line-height: 20px;
+font-weight: 600;
+white-space: nowrap;
+
+box-shadow:
+inset 1px 1px 0 rgba(255, 255, 255, 0.8),
+inset -1px -1px 0 rgba(70, 70, 70, 0.35),
+1px 1px 0 rgba(50, 50, 50, 0.2);
+
+transition:
+transform 0.12s ease,
+box-shadow 0.12s ease,
+background-color 0.12s ease,
+color 0.12s ease;
+}
+
+.tp-button:hover:not(:disabled) {
+background-color: var(--ui-primary-hover);
+color: #fff;
+}
+
+.tp-button:active:not(:disabled) {
+transform: translate(1px, 1px);
+box-shadow: inset 1px 1px 2px rgba(50, 50, 50, 0.3);
+}
+
+.tp-button:focus-visible {
+outline: 2px solid #246669;
+outline-offset: 2px;
+}
+
+.tp-button:disabled {
+pointer-events: none;
+opacity: 0.5;
+}
+
+.tp-button > svg {
+width: 16px;
+height: 16px;
+flex-shrink: 0;
+pointer-events: none;
+}
+
+.tp-toggle[aria-pressed="true"],
+.tp-toggle[data-state="on"] {
+background-color: var(--ui-accent);
+color: var(--ui-accent-foreground);
+}
+
+@media (max-width: 640px) {
+.tp-button {
+min-height: 44px;
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+.tp-button {
+transition-duration: 0.01ms;
+}
+}
+
+
+14. Fidelity checklist
+*  Load DM Sans weights 400, 500, 600, and 700.
+*  Use the space-separated HSL theme variables.
+*  Apply the forced 1px solid #77746e border.
+*  Preserve all three normal box-shadow layers.
+*  Keep the hard outer shadow at exactly 1px 1px 0 rgba(50,50,50,.2).
+*  On press, translate exactly 1px, 1px.
+*  Replace the raised shadow with inset 1px 1px 2px rgba(50,50,50,.3).
+*  Use 120ms ease transitions.
+*  Keep default button radius effectively square.
+*  Use 40/36/44px size heights and the exact padding matrix.
+*  Enforce a 44px minimum button height on mobile.
+*  Add data-button-variant so global hover colors apply.
+*  Use #246669 for default-button hover and focus outline.
+*  Use #24676a/accent HSL for the selected toggle highlight.
+*  Do not apply the selected toggle fill to ordinary Button :active.
+*  Keep disabled opacity at 50% and disable pointer events.
+*  Preserve the optional raw native-button hover rule if matching the whole application.
