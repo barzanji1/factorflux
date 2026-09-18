@@ -2,6 +2,9 @@ import { db } from "../db";
 import {
   invoices,
   invoiceStatusHistory,
+  invoiceNotes,
+  invoiceChargebackEvents,
+  invoiceRefunds,
   eventLedger,
   documents,
   payouts,
@@ -14,8 +17,16 @@ import {
   brokers,
   brokerBranches,
   drivers,
+  loads,
+  users,
+  clientVault,
+  brokerFollowUps,
+  brokerFollowUpReminders,
+  activities,
+  creditChecks,
 } from "../../shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { decryptVault } from "./vaultCrypto";
 
 // ─── Stage definitions ─────────────────────────────────────────────────────
 
@@ -118,7 +129,14 @@ export async function getInvoiceDetail(invoiceId: number) {
   if (!inv) return null;
 
   const [client] = inv.clientId
-    ? await db.select().from(clients).where(eq(clients.id, inv.clientId))
+    ? await db.select({
+      id: clients.id, name: clients.name, preferredName: clients.preferredName,
+      email: clients.email, phone: clients.phone, address: clients.address,
+      city: clients.city, state: clients.state, zipCode: clients.zipCode,
+      contactPerson: clients.contactPerson, mcNumber: clients.mcNumber,
+      dotNumber: clients.dotNumber, creditLimit: clients.creditLimit,
+      status: clients.status, assignedProcessor: clients.assignedProcessor,
+    }).from(clients).where(eq(clients.id, inv.clientId))
     : [null];
 
   const [debtor] = inv.debtorId
@@ -138,6 +156,15 @@ export async function getInvoiceDetail(invoiceId: number) {
       status: drivers.status,
     }).from(drivers).where(eq(drivers.id, inv.driverId))
     : [null];
+  const load = inv.loadId
+    ? (await db.select().from(loads).where(eq(loads.id, inv.loadId)).limit(1))[0] ?? null
+    : null;
+  const [assignedProcessor] = client?.assignedProcessor
+    ? await db.select({
+      id: users.id, firstName: users.firstName, lastName: users.lastName,
+      email: users.email, profileImageUrl: users.profileImageUrl, role: users.role,
+    }).from(users).where(eq(users.id, client.assignedProcessor)).limit(1)
+    : [null];
 
   const [payout] = await db.select().from(payouts).where(eq(payouts.invoiceId, invoiceId));
 
@@ -146,6 +173,21 @@ export async function getInvoiceDetail(invoiceId: number) {
     .from(documents)
     .where(eq(documents.invoiceId, invoiceId))
     .orderBy(desc(documents.createdAt));
+  const documentUploaderIds = docs.map(doc => doc.uploadedBy).filter(Boolean) as string[];
+  const documentUploaders = documentUploaderIds.length
+    ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+      .from(users).where(inArray(users.id, documentUploaderIds))
+    : [];
+  const documentUploaderMap = new Map(documentUploaders.map(user => [user.id, user]));
+  const documentsWithMetadata = docs.map(doc => ({
+    id: doc.id, originalName: doc.originalName, mimeType: doc.mimeType, size: doc.size,
+    documentType: doc.documentType, finalDocumentType: doc.finalDocumentType,
+    status: doc.status, sourceChannel: doc.sourceChannel, uploadedBy: doc.uploadedBy,
+    createdAt: doc.createdAt,
+    uploader: doc.uploadedBy ? documentUploaderMap.get(doc.uploadedBy) ?? null : null,
+    viewUrl: `/api/documents/${doc.id}/view`,
+    downloadUrl: `/api/documents/${doc.id}/download`,
+  }));
 
   const invCollections = await db
     .select()
@@ -158,6 +200,14 @@ export async function getInvoiceDetail(invoiceId: number) {
     .from(paymentApplicationLines)
     .where(eq(paymentApplicationLines.invoiceId, invoiceId))
     .orderBy(desc(paymentApplicationLines.createdAt));
+  const cashApplicationIds = cashAppLines.map(line => line.cashApplicationId);
+  const cashApplicationsForInvoice = cashApplicationIds.length
+    ? await db.select().from(cashApplications).where(inArray(cashApplications.id, cashApplicationIds))
+    : [];
+  const cashApplicationMap = new Map(cashApplicationsForInvoice.map(application => [application.id, application]));
+  const appliedTotal = cashAppLines.reduce((total, line) => total + Number(line.appliedAmount || 0), 0);
+  const invoiceAmount = Number(inv.amount || 0);
+  const shortPayLine = cashAppLines.find(line => line.varianceType === "short_pay");
 
   const invExceptions = await db
     .select()
@@ -170,6 +220,103 @@ export async function getInvoiceDetail(invoiceId: number) {
     .from(invoiceStatusHistory)
     .where(eq(invoiceStatusHistory.invoiceId, invoiceId))
     .orderBy(desc(invoiceStatusHistory.createdAt));
+  const brokerFollowupRows = await db.select().from(brokerFollowUps)
+    .where(eq(brokerFollowUps.invoiceId, invoiceId)).orderBy(desc(brokerFollowUps.createdAt));
+  const followUpIds = brokerFollowupRows.map(followUp => followUp.id);
+  const reminderRows = followUpIds.length
+    ? await db.select().from(brokerFollowUpReminders).where(inArray(brokerFollowUpReminders.followUpId, followUpIds))
+    : [];
+  const remindersByFollowUp = new Map<number, typeof reminderRows>();
+  for (const reminder of reminderRows) {
+    const existing = remindersByFollowUp.get(reminder.followUpId) ?? [];
+    existing.push(reminder);
+    remindersByFollowUp.set(reminder.followUpId, existing);
+  }
+  const invoiceNoteRows = await db.select().from(invoiceNotes)
+    .where(eq(invoiceNotes.invoiceId, invoiceId)).orderBy(desc(invoiceNotes.createdAt));
+  const noteAuthorIds = invoiceNoteRows.map(note => note.createdBy).filter(Boolean) as string[];
+  const noteAuthors = noteAuthorIds.length
+    ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+      .from(users).where(inArray(users.id, noteAuthorIds))
+    : [];
+  const noteAuthorMap = new Map(noteAuthors.map(user => [user.id, user]));
+  const chargebackEvents = await db.select().from(invoiceChargebackEvents)
+    .where(eq(invoiceChargebackEvents.invoiceId, invoiceId)).orderBy(desc(invoiceChargebackEvents.createdAt));
+  const chargebackActorIds = chargebackEvents.map(event => event.actorId).filter(Boolean) as string[];
+  const chargebackActors = chargebackActorIds.length
+    ? await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+    }).from(users).where(inArray(users.id, chargebackActorIds))
+    : [];
+  const chargebackActorMap = new Map(chargebackActors.map(user => [user.id, user]));
+  const refunds = await db.select().from(invoiceRefunds)
+    .where(eq(invoiceRefunds.invoiceId, invoiceId)).orderBy(desc(invoiceRefunds.refundDate));
+  const refundAuthorIds = refunds.map(refund => refund.createdBy).filter(Boolean) as string[];
+  const refundAuthors = refundAuthorIds.length
+    ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+      .from(users).where(inArray(users.id, refundAuthorIds))
+    : [];
+  const refundAuthorMap = new Map(refundAuthors.map(user => [user.id, user]));
+
+  const relatedBrokerInvoices = (broker?.id || debtor?.id)
+    ? await db.select().from(invoices).where(and(
+      broker?.id
+        ? eq(invoices.brokerId, broker.id)
+        : eq(invoices.debtorId, debtor!.id),
+    )).orderBy(desc(invoices.invoiceDate), desc(invoices.createdAt))
+    : [];
+  const relatedBrokerInvoiceIds = relatedBrokerInvoices.map(row => row.id);
+  const relatedBrokerLines = relatedBrokerInvoiceIds.length
+    ? await db.select().from(paymentApplicationLines).where(inArray(paymentApplicationLines.invoiceId, relatedBrokerInvoiceIds))
+    : [];
+  const relatedBrokerApplied = new Map<number, number>();
+  for (const line of relatedBrokerLines) relatedBrokerApplied.set(line.invoiceId, (relatedBrokerApplied.get(line.invoiceId) ?? 0) + Number(line.appliedAmount || 0));
+  const brokerHistory = relatedBrokerInvoices.map(row => {
+    const applied = relatedBrokerApplied.get(row.id) ?? 0;
+    const balance = ["paid", "settled"].includes(row.status) ? 0 : Math.max(0, Number(row.amount) - applied);
+    return { id: row.id, invoiceNumber: row.invoiceNumber, invoiceDate: row.invoiceDate, amount: row.amount, status: row.status, appliedAmount: applied.toFixed(2), balance: balance.toFixed(2) };
+  });
+  const openBrokerStatuses = new Set(["submitted", "docs_pending", "under_review", "approved", "funded", "held"]);
+  const brokerCurrentAr = brokerHistory.reduce(
+    (sum, row) => sum + (openBrokerStatuses.has(row.status) ? Number(row.balance) : 0), 0,
+  ).toFixed(2);
+  const carrierInvoiceRows = await db.select().from(invoices)
+    .where(eq(invoices.clientId, inv.clientId))
+    .orderBy(desc(invoices.invoiceDate), desc(invoices.createdAt));
+  const carrierInvoices = carrierInvoiceRows.map(row => ({
+    id: row.id, invoiceNumber: row.invoiceNumber, invoiceDate: row.invoiceDate,
+    dueDate: row.dueDate, amount: row.amount, status: row.status,
+    fundedAt: row.fundedAt, createdAt: row.createdAt, isCurrent: row.id === invoiceId,
+  }));
+  const vaultEntries = await db.select().from(clientVault)
+    .where(and(eq(clientVault.clientId, inv.clientId), eq(clientVault.dataType, "bank_account")));
+  const maskBankAccount = (entry: typeof vaultEntries[number]) => {
+    let data: any = {};
+    try { data = JSON.parse(decryptVault(entry.encryptedData)); } catch { /* malformed legacy vault values remain masked */ }
+    const digits = String(data.accountNumber ?? "").replace(/\D/g, "");
+    return { id: entry.id, label: entry.label, bankName: data.bankName || "Bank", accountType: data.accountType || null, paymentType: data.paymentType || null, lastFour: digits.slice(-4).padStart(4, "•"), isActive: entry.isActive };
+  };
+  const allMaskedBankAccounts = vaultEntries.map(maskBankAccount);
+  const maskedBankAccounts = allMaskedBankAccounts.filter(account => account.isActive);
+  const latestCreditCheck = (broker?.id || debtor?.id)
+    ? (await db.select().from(creditChecks).where(and(
+      eq(creditChecks.entityType, broker?.id ? "broker" : "debtor"),
+      eq(creditChecks.entityId, broker?.id ?? debtor!.id),
+    )).orderBy(desc(creditChecks.createdAt)).limit(1))[0] ?? null
+    : null;
+  const fundedHistory = statusHistory.find(history => history.newStatus === "funded");
+  const paymentActorId = payout?.advancePaidBy ?? fundedHistory?.changedBy ?? payout?.createdBy ?? null;
+  const fundedActor = paymentActorId
+    ? (await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+      .from(users).where(eq(users.id, paymentActorId)).limit(1))[0] ?? null
+    : null;
+  const fundedAt = payout?.advancePaidAt ?? fundedHistory?.createdAt ?? null;
+  const paidPayoutStatuses = ["advance_paid", "reserve_pending", "reserve_released", "complete"];
+  const paymentSent = !!payout?.advancePaidAt && paidPayoutStatuses.includes(payout.paymentStatus);
+  const timeline = await getInvoiceTimeline(invoiceId);
 
   return {
     ...inv,
@@ -180,11 +327,71 @@ export async function getInvoiceDetail(invoiceId: number) {
     branch: branch ?? null,
     driver: driver ?? null,
     payout: payout ?? null,
-    documents: docs,
+    documents: documentsWithMetadata,
     collections: invCollections,
     cashAppLines,
     exceptions: invExceptions,
     statusHistory,
+    load,
+    assignedProcessorUser: assignedProcessor ?? null,
+    selectedBankAccount: inv.bankAccountId ? allMaskedBankAccounts.find(account => account.id === inv.bankAccountId) ?? null : null,
+    paperwork: documentsWithMetadata,
+    brokerHistory: {
+      invoices: brokerHistory,
+      totals: {
+        billed: brokerHistory.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2),
+        applied: brokerHistory.reduce((sum, row) => sum + Number(row.appliedAmount || 0), 0).toFixed(2),
+        outstanding: brokerHistory.reduce((sum, row) => sum + Number(row.balance || 0), 0).toFixed(2),
+      },
+      credit: {
+        creditLimit: broker?.creditLimit ?? debtor?.creditLimit ?? null,
+        currentAr: brokerCurrentAr,
+        latestCheck: latestCreditCheck,
+      },
+    },
+    carrierInvoices: {
+      invoices: carrierInvoices,
+      bankAccounts: maskedBankAccounts,
+    },
+    collectionsDetail: {
+      collections: invCollections,
+      brokerFollowUps: brokerFollowupRows.map(followUp => ({
+        ...followUp,
+        deliveryStatus: followUp.status,
+        reminders: (remindersByFollowUp.get(followUp.id) ?? []).map(reminder => ({
+          id: reminder.id, sequenceNumber: reminder.sequenceNumber,
+          scheduledSendAt: reminder.scheduledSendAt, actualSendAt: reminder.actualSendAt,
+          subject: reminder.subject, body: reminder.body, status: reminder.status,
+          deliveryStatus: reminder.deliveryStatus, editedBy: reminder.editedBy,
+        })),
+      })),
+      notes: invoiceNoteRows.map(note => ({ ...note, createdByUser: noteAuthorMap.get(note.createdBy) ?? null })),
+    },
+    chargeback: {
+      status: inv.chargebackStatus,
+      chargebackDate: inv.chargebackDate,
+      extension: inv.chargebackExtensionDate ? {
+        date: inv.chargebackExtensionDate, reason: inv.chargebackExtensionReason, by: inv.chargebackExtendedBy, at: inv.chargebackExtendedAt,
+      } : null,
+      history: chargebackEvents.map(event => ({
+        ...event,
+        actor: event.actorId ? chargebackActorMap.get(event.actorId) ?? null : null,
+      })),
+      refunds: refunds.map(refund => ({ ...refund, createdByUser: refundAuthorMap.get(refund.createdBy) ?? null })),
+      refundedAmount: refunds.reduce((sum, refund) => sum + Number(refund.amount || 0), 0).toFixed(2),
+    },
+    cash: {
+      applications: cashAppLines.map(line => ({ ...line, application: cashApplicationMap.get(line.cashApplicationId) ?? null })),
+      appliedTotal: appliedTotal.toFixed(2),
+      outstanding: Math.max(0, invoiceAmount - appliedTotal).toFixed(2),
+      shortPay: shortPayLine ? { amount: Math.max(0, invoiceAmount - appliedTotal).toFixed(2), reason: shortPayLine.varianceReason, lineId: shortPayLine.id } : (appliedTotal > 0 && appliedTotal < invoiceAmount ? { amount: (invoiceAmount - appliedTotal).toFixed(2), reason: null, lineId: null } : null),
+    },
+    payoutDetail: payout ? {
+      record: payout,
+      calculation: { invoiceAmount: payout.invoiceAmount, advanceRate: payout.advanceRate, advanceAmount: payout.advanceAmount, feeRate: payout.feeRate, feeAmount: payout.feeAmount, reserveAmount: payout.reserveAmount, netPayout: payout.netPayout },
+      funding: { status: payout.paymentStatus, fundedDate: fundedAt, fundedBy: fundedActor, paymentSent },
+    } : null,
+    timeline,
   };
 }
 
@@ -282,6 +489,7 @@ export async function getInvoiceTimeline(invoiceId: number): Promise<TimelineEve
         category: "payout",
         title: "Advance payment sent to carrier",
         description: `$${payout.advanceAmount} disbursed`,
+        actorId: payout.advancePaidBy ?? payout.createdBy,
         meta: { payoutId: payout.id },
       });
     }
@@ -348,10 +556,107 @@ export async function getInvoiceTimeline(invoiceId: number): Promise<TimelineEve
     });
   }
 
+  const notes = await db.select().from(invoiceNotes).where(eq(invoiceNotes.invoiceId, invoiceId));
+  for (const note of notes) {
+    events.push({
+      id: `note-${note.id}`,
+      timestamp: note.createdAt,
+      category: "collection",
+      title: "Invoice note added",
+      description: note.body,
+      actorId: note.createdBy,
+      meta: { noteId: note.id },
+    });
+  }
+
+  const followUps = await db.select().from(brokerFollowUps).where(eq(brokerFollowUps.invoiceId, invoiceId));
+  const followUpIds = followUps.map(followUp => followUp.id);
+  const reminderRows = followUpIds.length
+    ? await db.select().from(brokerFollowUpReminders).where(inArray(brokerFollowUpReminders.followUpId, followUpIds))
+    : [];
+  const followUpById = new Map(followUps.map(followUp => [followUp.id, followUp]));
+  for (const followUp of followUps) {
+    events.push({
+      id: `followup-${followUp.id}`,
+      timestamp: followUp.sentAt ?? followUp.createdAt,
+      category: "collection",
+      title: `Broker follow-up ${followUp.status}`,
+      description: followUp.subject,
+      actorId: followUp.sentBy,
+      meta: { followUpId: followUp.id, status: followUp.status, body: followUp.body },
+    });
+  }
+  for (const reminder of reminderRows) {
+    const parentFollowUp = followUpById.get(reminder.followUpId);
+    events.push({
+      id: `followup-reminder-${reminder.id}`,
+      timestamp: reminder.actualSendAt ?? reminder.scheduledSendAt,
+      category: "collection",
+      title: `Broker reminder ${reminder.status}`,
+      description: reminder.subject,
+      actorId: reminder.editedBy ?? parentFollowUp?.sentBy ?? null,
+      meta: {
+        reminderId: reminder.id, followUpId: reminder.followUpId,
+        scheduledSendAt: reminder.scheduledSendAt, actualSendAt: reminder.actualSendAt,
+        body: reminder.body, status: reminder.status, deliveryStatus: reminder.deliveryStatus,
+        editedBy: reminder.editedBy,
+        actorType: reminder.editedBy || parentFollowUp?.sentBy ? "user" : "system",
+      },
+    });
+  }
+
+  const chargebackEvents = await db.select().from(invoiceChargebackEvents).where(eq(invoiceChargebackEvents.invoiceId, invoiceId));
+  for (const event of chargebackEvents) {
+    events.push({
+      id: `chargeback-${event.id}`,
+      timestamp: event.createdAt,
+      category: "system",
+      title: `Chargeback ${event.eventType.replace(/_/g, " ")}`,
+      description: event.reason ?? event.eventType.replace(/_/g, " "),
+      actorId: event.actorId,
+      meta: { extensionDate: event.extensionDate, metadata: event.metadata },
+    });
+  }
+
+  const refunds = await db.select().from(invoiceRefunds).where(eq(invoiceRefunds.invoiceId, invoiceId));
+  for (const refund of refunds) {
+    events.push({
+      id: `refund-${refund.id}`,
+      timestamp: refund.refundDate,
+      category: "payment",
+      title: `Refund recorded: $${refund.amount}`,
+      description: `${refund.method}${refund.reference ? ` · ${refund.reference}` : ""}`,
+      actorId: refund.createdBy,
+      meta: { refundId: refund.id, amount: refund.amount, method: refund.method },
+    });
+  }
+
+  const activityRows = await db.select().from(activities).where(and(eq(activities.entityType, "invoice"), eq(activities.entityId, invoiceId)));
+  for (const activity of activityRows) {
+    events.push({
+      id: `activity-${activity.id}`,
+      timestamp: activity.createdAt,
+      category: "system",
+      title: activity.type.replace(/_/g, " "),
+      description: activity.description,
+      actorId: activity.userId,
+      meta: activity.metadata as Record<string, unknown> | undefined,
+    });
+  }
+
   // Sort newest first
-  return events.sort((a, b) => {
+  const sorted = events.sort((a, b) => {
     const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
     const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
     return tb - ta;
   });
+  const actorIds = Array.from(new Set(sorted.map(event => event.actorId).filter(Boolean))) as string[];
+  if (!actorIds.length) return sorted;
+  const actorRows = await db.select({
+    id: users.id,
+    name: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
+    email: users.email,
+  }).from(users).where(inArray(users.id, actorIds));
+  const actorMap = new Map(actorRows.map(actor => [actor.id, actor]));
+  return sorted.map(event => ({ ...event, actor: event.actorId ? actorMap.get(event.actorId) ?? null : null }));
 }

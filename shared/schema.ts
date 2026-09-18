@@ -100,11 +100,13 @@ export const clients = pgTable("clients", {
   source: varchar("source"),
   bankAccountEncrypted: text("bank_account_encrypted"),
   abaRoutingEncrypted: text("aba_routing_encrypted"),
+  assignedProcessor: varchar("assigned_processor").references(() => users.id, { onDelete: "set null" }),
   status: varchar("status", { enum: ["new_client", "active", "inactive"] }).default("new_client").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("clients_name_idx").on(table.name),
+  index("clients_assigned_processor_idx").on(table.assignedProcessor),
 ]);
 
 // New addition for debtors table
@@ -234,6 +236,47 @@ export const invoices = pgTable("invoices", {
   index("invoices_driver_id_idx").on(table.driverId),
   index("invoices_created_at_idx").on(table.createdAt),
   index("invoices_submitted_by_created_at_idx").on(table.submittedBy, table.createdAt),
+]);
+
+// Append-only notes keep invoice collection context separate from the mutable
+// invoice.notes field while preserving who entered each note and when.
+export const invoiceNotes = pgTable("invoice_notes", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  body: text("body").notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("invoice_notes_invoice_idx").on(table.invoiceId, table.createdAt),
+]);
+
+// Immutable chargeback lifecycle events support extension history and audit
+// reconstruction without overwriting the current invoice snapshot.
+export const invoiceChargebackEvents = pgTable("invoice_chargeback_events", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  eventType: varchar("event_type").notNull(),
+  extensionDate: timestamp("extension_date"),
+  reason: text("reason"),
+  actorId: varchar("actor_id").references(() => users.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("invoice_chargeback_events_invoice_idx").on(table.invoiceId, table.createdAt),
+]);
+
+export const invoiceRefunds = pgTable("invoice_refunds", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  refundDate: timestamp("refund_date").defaultNow().notNull(),
+  method: varchar("method").notNull(),
+  reference: varchar("reference"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("invoice_refunds_invoice_idx").on(table.invoiceId, table.refundDate),
 ]);
 
 // Documents table
@@ -678,10 +721,12 @@ export const brokers = pgTable("brokers", {
   paymentTerms: varchar("payment_terms", { enum: ["net15", "net30", "net45", "net60", "quickpay"] }).default("net30").notNull(),
   status: varchar("status", { enum: ["active", "inactive", "suspended"] }).default("active").notNull(),
   notes: text("notes"),
+  assignedProcessor: varchar("assigned_processor").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("brokers_name_idx").on(table.name),
+  index("brokers_assigned_processor_idx").on(table.assignedProcessor),
 ]);
 
 // A broker may have multiple operating branches. Branches are kept separately
@@ -822,7 +867,8 @@ export const debtorsRelations = relations(debtors, ({ many }) => ({
   invoices: many(invoices),
 }));
 
-export const clientsRelations = relations(clients, ({ many }) => ({
+export const clientsRelations = relations(clients, ({ one, many }) => ({
+  assignedProcessorUser: one(users, { fields: [clients.assignedProcessor], references: [users.id] }),
   loads: many(loads),
   invoices: many(invoices),
   followUps: many(followUps),
@@ -917,7 +963,8 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   progressUpdatedByUser: one(users, { fields: [tasks.progressUpdatedBy], references: [users.id] }),
 }));
 
-export const brokersRelations = relations(brokers, ({ many }) => ({
+export const brokersRelations = relations(brokers, ({ one, many }) => ({
+  assignedProcessorUser: one(users, { fields: [brokers.assignedProcessor], references: [users.id] }),
   branches: many(brokerBranches),
   invoices: many(invoices),
 }));
@@ -1129,6 +1176,7 @@ export const payouts = pgTable("payouts", {
     enum: ["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"],
   }).default("pending_advance").notNull(),
   advancePaidAt: timestamp("advance_paid_at"),
+  advancePaidBy: varchar("advance_paid_by").references(() => users.id),
   reserveReleasedAt: timestamp("reserve_released_at"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),

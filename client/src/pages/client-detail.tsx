@@ -20,6 +20,7 @@ import { ProfileSection, ProfileField, EmptyState, DocumentList } from "@/compon
 import { DriverSection } from "@/components/carriers/driver-section";
 import CarrierChatThread from "@/components/carriers/CarrierChatThread";
 import { LoadTypeBadge, LoadTypeToggleGroup } from "@/components/load-type";
+import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
@@ -82,7 +83,7 @@ export default function ClientDetail() {
   const dotNumber = String(onboarding.dotNumber || client?.dotNumber || "").trim();
   const fmcsaUrl = dotNumber ? `https://safer.fmcsa.dot.gov/query.asp?searchtype=ANY&query_type=queryCarrierSnapshot&query_param=USDOT&query_string=${encodeURIComponent(dotNumber)}` : "";
 
-  const updateClient = useMutation({ mutationFn: (payload: any) => apiRequest("PUT", `/api/clients/${clientId}`, { ...client, ...payload }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/clients", clientId] }); qc.invalidateQueries({ queryKey: ["/api/clients"] }); toast({ title: "Carrier record updated" }); }, onError: () => toast({ title: "Update failed", variant: "destructive" }) });
+  const updateClient = useMutation({ mutationFn: (payload: any) => apiRequest("PATCH", `/api/clients/${clientId}`, payload), onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/clients", clientId] }); qc.invalidateQueries({ queryKey: ["/api/clients"] }); toast({ title: "Carrier record updated" }); }, onError: () => toast({ title: "Update failed", variant: "destructive" }) });
   const saveProfile = useMutation({ mutationFn: (profile: any) => apiRequest("PATCH", `/api/clients/${clientId}`, { onboardingProfile: profile }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/clients", clientId] }); qc.invalidateQueries({ queryKey: ["/api/clients"] }); setListDialog(null); setListEditing(null); toast({ title: "Carrier profile updated" }); }, onError: (error: Error) => toast({ title: "Could not update carrier profile", description: error.message, variant: "destructive" }) });
   const profileList = (type: string) => {
     if (type === "email") return Array.isArray(onboarding.notificationEmails) ? onboarding.notificationEmails : Array.isArray(onboarding.emailAddresses) ? onboarding.emailAddresses : [];
@@ -173,6 +174,10 @@ export default function ClientDetail() {
             <div className="flex items-center gap-3"><Button variant="ghost" size="sm" onClick={() => navigate("/clients")} className="h-8 gap-1 rounded-sm px-2 text-[#52666d]"><ArrowLeft className="h-4 w-4" />Close / Back</Button><div className="h-7 w-px bg-[#b5c0c3]" /><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-bold tracking-tight text-[#203a46]">{client.name}</h1><StatusBadge status={client.status} /></div><p className="text-[10px] text-[#667a80]">MC {client.mcNumber || "Not recorded"} · DOT {dotNumber || "Not recorded"} · created {date(client.createdAt)}</p></div></div>
             <div className="flex flex-wrap gap-1.5">
               <Button size="sm" onClick={() => navigate(`/carriers/${clientId}/edit`)} className="h-8 gap-1 rounded-sm bg-[#098b9f] px-2.5 text-[11px] text-white hover:bg-[#08798b]"><Edit2 className="h-3.5 w-3.5" />Edit carrier</Button>
+               <div className="flex items-center gap-2 border border-[#c5d0d1] bg-white px-2 py-1">
+                 <span className="text-[10px] font-bold uppercase tracking-wide text-[#718187]">Assigned Processor</span>
+                 <div className="min-w-[170px]"><ProcessorAssignment record={client} endpoint={`/api/clients/${clientId}/assign`} queryKey={["/api/clients", clientId]} compact /></div>
+               </div>
               <Button size="sm" variant="outline" onClick={() => toast({ title: "UCC review is not available", description: "No review mutation is configured for this workspace." })} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><ShieldCheck className="h-3.5 w-3.5" />Review UCC</Button>
               <Button size="sm" variant="outline" onClick={() => toast({ title: "Corporation review is not available", description: "No review mutation is configured for this workspace." })} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">Review Corp</Button>
               <DropdownMenu>

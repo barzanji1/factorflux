@@ -407,7 +407,7 @@ export class DatabaseStorage implements IStorage {
         ...client,
         createdAt: new Date(),
         updatedAt: new Date(),
-      })
+      } as typeof clients.$inferInsert)
       .returning();
 
     return newClient;
@@ -419,7 +419,7 @@ export class DatabaseStorage implements IStorage {
       .set({
         ...client,
         updatedAt: new Date(),
-      })
+      } as Partial<typeof clients.$inferInsert>)
       .where(eq(clients.id, id))
       .returning();
 

@@ -55,6 +55,9 @@ import {
   fuelAdvances,
   invoices,
   invoiceStatusHistory,
+  invoiceNotes,
+  invoiceChargebackEvents,
+  invoiceRefunds,
   payouts,
   docRequirements,
   activities,
@@ -333,6 +336,15 @@ function sanitizeClientResponse(client: any, userRole?: string) {
   };
 }
 
+const assignmentUserFields = {
+  id: users.id,
+  name: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
+  firstName: users.firstName,
+  lastName: users.lastName,
+  profileImageUrl: users.profileImageUrl,
+  role: users.role,
+};
+
 function parseListPagination(req: any) {
   const pageValue = Number.parseInt(String(req.query.page ?? "1"), 10);
   const limitValue = Number.parseInt(String(req.query.limit ?? "50"), 10);
@@ -505,6 +517,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.user?.role !== "employee") return true;
     const document = await storage.getDocument(documentId);
     return !!document?.invoiceId && employeeCanModifyInvoice(req, document.invoiceId);
+  };
+
+  const isPrivilegedUser = (req: any) => req.user?.role === "manager" || req.user?.role === "admin";
+  const canAccessAssignedRecord = (req: any, assignedProcessor: string | null | undefined) =>
+    isPrivilegedUser(req) || assignedProcessor === req.user?.id;
+  const getAssignedProcessorUser = async (assignedProcessor: string | null | undefined) => {
+    if (!assignedProcessor) return null;
+    const [user] = await db.select(assignmentUserFields).from(users).where(eq(users.id, assignedProcessor)).limit(1);
+    return user ? { ...user, name: user.name || null } : null;
+  };
+  const enrichClientAssignment = async (client: any) => ({
+    ...client,
+    assignedProcessorUser: await getAssignedProcessorUser(client.assignedProcessor),
+  });
+  const enrichBrokerAssignment = async (broker: any) => ({
+    ...broker,
+    assignedProcessorUser: await getAssignedProcessorUser(broker.assignedProcessor),
+  });
+  const enrichAssignments = async (rows: any[]) => {
+    const ids = Array.from(new Set<string>(
+      rows.map(row => row.assignedProcessor).filter((id): id is string => typeof id === "string" && id.length > 0),
+    ));
+    if (!ids.length) return rows.map(row => ({ ...row, assignedProcessorUser: null }));
+    const assignedUsers = await db.select(assignmentUserFields).from(users).where(inArray(users.id, ids));
+    const userMap = new Map(assignedUsers.map(user => [user.id, { ...user, name: user.name || null }]));
+    return rows.map(row => ({ ...row, assignedProcessorUser: row.assignedProcessor ? userMap.get(row.assignedProcessor) ?? null : null }));
+  };
+  const validateAssignedProcessor = async (assignedProcessor: unknown) => {
+    if (assignedProcessor == null || assignedProcessor === "") return null;
+    if (typeof assignedProcessor !== "string") throw Object.assign(new Error("Invalid assigned processor"), { status: 400 });
+    const [user] = await db.select({ id: users.id }).from(users).where(and(
+      eq(users.id, assignedProcessor),
+      eq(users.status, "active"),
+      inArray(users.role, ["employee", "manager", "admin"]),
+    )).limit(1);
+    if (!user) throw Object.assign(new Error("Assigned processor must be an active employee, manager, or admin"), { status: 400 });
+    return assignedProcessor;
+  };
+  const canAccessClient = async (req: any, id: number | null | undefined) => {
+    if (isPrivilegedUser(req)) return true;
+    if (id == null) return false;
+    const [client] = await db.select({ assignedProcessor: clients.assignedProcessor }).from(clients).where(eq(clients.id, id)).limit(1);
+    return !!client && canAccessAssignedRecord(req, client.assignedProcessor);
+  };
+  const canAccessBroker = async (req: any, id: number) => {
+    if (isPrivilegedUser(req)) return true;
+    const [broker] = await db.select({ assignedProcessor: brokers.assignedProcessor }).from(brokers).where(eq(brokers.id, id)).limit(1);
+    return !!broker && canAccessAssignedRecord(req, broker.assignedProcessor);
+  };
+  const assignedCarrierScope = async (req: any, column: any) => {
+    if (isPrivilegedUser(req)) return undefined;
+    const assigned = await db.select({ id: clients.id }).from(clients).where(eq(clients.assignedProcessor, req.user.id));
+    return assigned.length ? inArray(column, assigned.map(row => row.id)) : sql`false`;
   };
 
   const withInvoiceDisplayStatus = (invoice: any) => ({
@@ -1603,7 +1668,8 @@ ${message}
       if (req.user.role !== "manager" && req.user.role !== "admin") return res.status(403).json({ message: "Manager or admin access required" });
       const id = parseInt(req.params.id, 10);
       const validTypes = [
-        "rate_confirmation", "bol", "commercial_invoice", "pod", "other",
+        "rate_confirmation", "bill_of_lading", "bol", "lumper_receipt",
+        "commercial_invoice", "invoice", "pod", "noa", "release_letter", "receipt", "other",
       ];
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid document ID" });
       if (!validTypes.includes(req.body.documentType)) {
@@ -1893,18 +1959,39 @@ ${message}
         coalesce(${clients.mcNumber}, '') || ' ' ||
         coalesce(${clients.dotNumber}, '')
       )`;
-      const where = q ? ilike(clientSearchDocument, `%${q}%`) : undefined;
+      const conditions: any[] = [];
+      if (q) conditions.push(ilike(clientSearchDocument, `%${q}%`));
+      if (_req.user.role === "employee" || _req.query.processor === "me") {
+        conditions.push(eq(clients.assignedProcessor, _req.user.id));
+      }
+      const where = conditions.length ? and(...conditions) : undefined;
       if (all) {
         const rows = await db.select().from(clients).where(where).orderBy(clients.name);
-        return res.json(rows.map(client => sanitizeClientResponse(client, _req.user.role)));
+        const enriched = await enrichAssignments(rows);
+        return res.json(enriched.map(client => sanitizeClientResponse(client, _req.user.role)));
       }
       const { page, limit, offset } = parseListPagination(_req);
       const [{ total }] = await db.select({ total: count() }).from(clients).where(where);
       const rows = await db.select().from(clients).where(where).orderBy(clients.name).limit(limit).offset(offset);
-      res.json({ data: rows.map(client => sanitizeClientResponse(client, _req.user.role)), total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
+      const enriched = await enrichAssignments(rows);
+      res.json({ data: enriched.map(client => sanitizeClientResponse(client, _req.user.role)), total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching clients:", error);
       res.status(500).json({ message: "Failed to fetch clients" });
+    }
+  });
+
+  app.get("/api/clients/search", requireAuth, async (req: any, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== "string") return res.status(400).json({ message: "Search query is required" });
+      const results = await storage.searchClients(q);
+      const visibleResults = results.filter(client => canAccessAssignedRecord(req, client.assignedProcessor));
+      const enriched = await enrichAssignments(visibleResults);
+      res.json(enriched.map(client => sanitizeClientResponse(client, req.user.role)));
+    } catch (error) {
+      console.error("Error searching clients:", error);
+      res.status(500).json({ message: "Failed to search clients" });
     }
   });
 
@@ -1914,7 +2001,8 @@ ${message}
       if (isNaN(id)) return res.status(400).json({ message: "Invalid client id" });
       const client = await storage.getClient(id);
       if (!client) return res.status(404).json({ message: "Client not found" });
-      res.json(sanitizeClientResponse(client, req.user.role));
+      if (!canAccessAssignedRecord(req, client.assignedProcessor)) return res.status(403).json({ message: "You can only access carriers assigned to you" });
+      res.json(sanitizeClientResponse(await enrichClientAssignment(client), req.user.role));
     } catch (error) {
       console.error("Error fetching client:", error);
       res.status(500).json({ message: "Failed to fetch client" });
@@ -1970,30 +2058,18 @@ ${message}
     }
   });
 
-  app.get("/api/clients/search", requireAuth, async (req: any, res) => {
-    try {
-      const { q } = req.query;
-
-      if (!q || typeof q !== "string") {
-        return res.status(400).json({ message: "Search query is required" });
-      }
-
-      const results = await storage.searchClients(q);
-      res.json(results.map(client => sanitizeClientResponse(client, req.user.role)));
-    } catch (error) {
-      console.error("Error searching clients:", error);
-      res.status(500).json({ message: "Failed to search clients" });
-    }
-  });
-
   app.post("/api/clients", requireAuth, async (req: any, res) => {
     try {
       const { bankAccountNumber, abaRouting, owners = [], ...raw } = req.body;
+      if (Object.prototype.hasOwnProperty.call(raw, "assignedProcessor")) {
+        raw.assignedProcessor = await validateAssignedProcessor(raw.assignedProcessor);
+      }
       const secureOwners = Array.isArray(owners) ? owners.slice(0, 3).map((owner: any) => ({
         ...owner, ssn: owner.ssn ? encryptVault(String(owner.ssn)) : null,
       })) : [];
       const clientData = insertClientSchema.parse({
         ...raw, owners: secureOwners,
+        ...(req.user.role === "employee" ? { assignedProcessor: req.user.id } : {}),
         bankAccountEncrypted: bankAccountNumber ? encryptVault(String(bankAccountNumber)) : null,
         abaRoutingEncrypted: abaRouting ? encryptVault(String(abaRouting)) : null,
       });
@@ -2017,7 +2093,7 @@ ${message}
         entityId: client.id,
       });
 
-      res.status(201).json(sanitizeClientResponse(client, req.user.role));
+      res.status(201).json(sanitizeClientResponse(await enrichClientAssignment(client), req.user.role));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -2031,7 +2107,7 @@ ${message}
     }
   });
 
-  app.get("/api/firebase-clients", async (_req: any, res) => {
+  app.get("/api/firebase-clients", requireManagerOrAdmin, async (_req: any, res) => {
     if (!firestore) {
       return res.status(503).json({ error: "Firestore not configured — FIREBASE_SERVICE_ACCOUNT not set." });
     }
@@ -2065,6 +2141,12 @@ ${message}
       const existingClient = await storage.getClient(id);
       if (!existingClient) {
         return res.status(404).json({ message: "Client not found" });
+      }
+      if (!canAccessAssignedRecord(req, existingClient.assignedProcessor)) {
+        return res.status(403).json({ message: "You can only edit carriers assigned to you" });
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, "assignedProcessor")) {
+        return res.status(403).json({ message: "Use the assignment endpoint to change the assigned processor" });
       }
       const existingOwners = (existingClient?.owners as any[] | null) ?? [];
       const updatePayload = { ...raw };
@@ -2120,7 +2202,7 @@ ${message}
         entityId: client.id,
       });
 
-      res.json(sanitizeClientResponse(client, req.user.role));
+      res.json(sanitizeClientResponse(await enrichClientAssignment(client), req.user.role));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -2137,7 +2219,30 @@ ${message}
   app.put("/api/clients/:id", requireAuth, updateClientHandler);
   app.patch("/api/clients/:id", requireAuth, updateClientHandler);
 
-  app.delete("/api/clients/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/clients/:id/assign", requireManagerOrAdmin, async (req: any, res: any) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid client id" });
+      const assignedProcessor = await validateAssignedProcessor(req.body?.assignedProcessor);
+      const [client] = await db.update(clients).set({ assignedProcessor, updatedAt: new Date() })
+        .where(eq(clients.id, id)).returning();
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "client_updated",
+        description: `Assigned processor ${assignedProcessor ?? "unassigned"} to carrier ${client.name}`,
+        entityType: "client",
+        entityId: client.id,
+      } as any);
+      res.json(sanitizeClientResponse(await enrichClientAssignment(client), req.user.role));
+    } catch (error: any) {
+      if (error?.status === 400) return res.status(400).json({ message: error.message });
+      console.error("Error assigning client processor:", error);
+      res.status(500).json({ message: "Failed to assign client processor" });
+    }
+  });
+
+  app.delete("/api/clients/:id", requireManagerOrAdmin, async (req: any, res) => {
     const id = Number(req.params.id);
 
     if (!Number.isInteger(id)) {
@@ -2926,6 +3031,7 @@ ${message}
   app.put("/api/invoices/:id/approve", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only approve your own invoice" });
       const result = await performTransition(id, "approve", req.user.id, req.user.role ?? "employee");
       res.status(result.success ? 200 : 400).json(
         result.success ? { ...result, invoice: withInvoiceDisplayStatus(result.invoice) } : result,
@@ -2941,6 +3047,7 @@ ${message}
       const id = parseInt(req.params.id, 10);
       const reason = String(req.body.reason ?? "").trim();
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid invoice ID" });
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only approve your own invoice" });
       if (!reason) return res.status(400).json({ message: "Override reason is required" });
       const result = await performTransition(
         id, "approve", req.user.id, req.user.role ?? "employee", reason, true,
@@ -3099,7 +3206,7 @@ ${message}
       const id = parseInt(req.params.id, 10);
       const invoice = await storage.getInvoice(id);
       if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      if ((req as any).user.role === "employee" && invoice.submittedBy !== (req as any).user.id) {
+      if (!await employeeCanAccessInvoice(req, id)) {
         return res.status(403).json({ message: "You may only view your own submitted invoices" });
       }
       const detail = await getInvoiceDetail(id);
@@ -3107,6 +3214,27 @@ ${message}
     } catch (err) {
       console.error("Error fetching invoice detail:", err);
       res.status(500).json({ message: "Failed to fetch invoice detail" });
+    }
+  });
+
+  app.post("/api/invoices/:id/notes", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid invoice id" });
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only add notes to your own submitted invoices" });
+      const body = z.object({ body: z.string().trim().min(1).max(10000) }).parse(req.body);
+      const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).limit(1);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      const [note] = await db.insert(invoiceNotes).values({ invoiceId: id, body: body.body, createdBy: req.user.id }).returning();
+      await db.insert(eventLedger).values({
+        entityType: "invoice", entityId: id, eventType: "invoice_note_added", actorType: "user", actorId: req.user.id,
+        payloadJson: { noteId: note.id },
+      });
+      res.status(201).json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
+      console.error("Error adding invoice note:", error);
+      res.status(500).json({ message: "Failed to add invoice note" });
     }
   });
 
@@ -3127,6 +3255,7 @@ ${message}
   app.get("/api/invoices/:id/available-transitions", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only view your own invoice transitions" });
       const transitions = await getAvailableTransitions(id, req.user?.role ?? "employee", req.user?.id);
       res.json(transitions.map((transition) => ({
         ...transition,
@@ -3150,6 +3279,7 @@ ${message}
         bankAccountVaultId: z.number().int().positive().optional(),
       });
       const { transitionId, reason, force, paymentMethod, bankAccountVaultId } = schema.parse(req.body);
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only transition your own invoice" });
       const result = await performTransition(
         id, transitionId, req.user.id, req.user.role ?? "employee", reason, force, paymentMethod, bankAccountVaultId,
       );
@@ -3213,10 +3343,10 @@ ${message}
     }
   });
 
-  app.post("/api/invoices/:id/extend-chargeback", requireAuth, async (req: any, res) => {
+  app.post("/api/invoices/:id/extend-chargeback", requireManagerOrAdmin, async (req: any, res) => {
     try {
-      if (!["employee", "manager", "admin"].includes(req.user?.role)) return res.status(403).json({ message: "Agent access required" });
       const id = Number(req.params.id);
+      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only extend chargeback for your own invoice" });
       const body = z.object({ extensionDate: z.string().min(1), reason: z.string().trim().min(3) }).parse(req.body);
       const extensionDate = new Date(body.extensionDate);
       if (Number.isNaN(extensionDate.getTime()) || extensionDate <= new Date()) return res.status(400).json({ message: "Extension date must be in the future" });
@@ -3238,12 +3368,45 @@ ${message}
         entityType: "invoice", entityId: id, eventType: "chargeback_extended", actorType: "user", actorId: req.user.id,
         payloadJson: { extensionDate, reason: body.reason, agentName },
       });
+      await db.insert(invoiceChargebackEvents).values({
+        invoiceId: id, eventType: "extended", extensionDate, reason: body.reason, actorId: req.user.id,
+        metadata: { agentName },
+      });
       await storage.createActivity({ userId: req.user.id, type: "chargeback_extended", description: `Extended chargeback for ${invoice.invoiceNumber} to ${extensionDate.toLocaleDateString()}: ${body.reason}`, entityType: "invoice", entityId: id } as any);
       res.json(invoice);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
       console.error("Error extending chargeback:", error);
       res.status(500).json({ message: "Failed to extend chargeback" });
+    }
+  });
+
+  app.post("/api/invoices/:id/chargeback/refunds", requireManagerOrAdmin, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid invoice id" });
+      const body = z.object({
+        amount: z.coerce.number().positive(),
+        refundDate: z.coerce.date().optional(),
+        method: z.string().trim().min(1).max(80),
+        reference: z.string().trim().max(200).optional().nullable(),
+        notes: z.string().trim().max(2000).optional().nullable(),
+      }).parse(req.body);
+      const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).limit(1);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      const [refund] = await db.insert(invoiceRefunds).values({
+        invoiceId: id, amount: body.amount.toFixed(2), refundDate: body.refundDate ?? new Date(),
+        method: body.method, reference: body.reference ?? null, notes: body.notes ?? null, createdBy: req.user.id,
+      }).returning();
+      await db.insert(invoiceChargebackEvents).values({
+        invoiceId: id, eventType: "refunded", reason: body.notes ?? null, actorId: req.user.id,
+        metadata: { refundId: refund.id, amount: refund.amount, method: refund.method, reference: refund.reference },
+      });
+      res.status(201).json(refund);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
+      console.error("Error recording invoice refund:", error);
+      res.status(500).json({ message: "Failed to record invoice refund" });
     }
   });
 
@@ -3362,8 +3525,10 @@ ${message}
         notes: z.string().optional(),
       });
       const { status, notes } = schema.parse(req.body);
+      const invoiceId = parseInt(req.params.id);
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only review your own invoice" });
       const review = await storage.createDocReview({
-        invoiceId: parseInt(req.params.id),
+        invoiceId,
         reviewedBy: req.user.id,
         status, notes,
       });
@@ -4891,6 +5056,7 @@ Trucking Pros Financial Team
   app.get("/api/broker-follow-ups/invoice/:invoiceId", requireAuth, async (req: any, res) => {
     try {
       const invoiceId = parseInt(req.params.invoiceId, 10);
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only view follow-ups for your own invoice" });
       const records = await db
         .select()
         .from(brokerFollowUps)
@@ -4906,6 +5072,7 @@ Trucking Pros Financial Team
   app.post("/api/broker-follow-ups/trigger", requireAuth, async (req: any, res) => {
     try {
       const { invoiceId } = z.object({ invoiceId: z.number() }).parse(req.body);
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only trigger follow-ups for your own invoice" });
       const id = await triggerBrokerFollowUp(invoiceId, req.user.id, "funded", "manual");
       if (!id) return res.status(404).json({ message: "Invoice not found" });
       const [record] = await db
@@ -4923,6 +5090,9 @@ Trucking Pros Financial Team
   app.patch("/api/broker-follow-ups/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const [existingFollowUp] = await db.select({ invoiceId: brokerFollowUps.invoiceId }).from(brokerFollowUps).where(eq(brokerFollowUps.id, id)).limit(1);
+      if (!existingFollowUp) return res.status(404).json({ message: "Not found" });
+      if (!await employeeCanAccessInvoice(req, existingFollowUp.invoiceId)) return res.status(403).json({ message: "You may only update follow-ups for your own invoice" });
       const updates: Record<string, unknown> = { ...req.body, updatedAt: new Date() };
       if (updates.status === "acknowledged" && !updates.acknowledgedAt) {
         updates.acknowledgedAt = new Date();
@@ -5446,7 +5616,7 @@ Trucking Pros Financial Team
   });
 
   // Brokers
-  app.get("/api/brokers", requireAuth, async (req, res) => {
+  app.get("/api/brokers", requireAuth, async (req: any, res) => {
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const conditions: any[] = [];
@@ -5469,12 +5639,18 @@ Trucking Pros Financial Team
       if (typeof req.query.paymentTerms === "string" && req.query.paymentTerms) {
         conditions.push(eq(brokers.paymentTerms, req.query.paymentTerms as any));
       }
+      if (req.user.role === "employee" || req.query.processor === "me") {
+        conditions.push(eq(brokers.assignedProcessor, req.user.id));
+      }
       const where = conditions.length ? and(...conditions) : undefined;
-      if (req.query.all === "true") return res.json(await db.select().from(brokers).where(where).orderBy(brokers.name));
+      if (req.query.all === "true") {
+        const rows = await db.select().from(brokers).where(where).orderBy(brokers.name);
+        return res.json(await enrichAssignments(rows));
+      }
       const { page, limit, offset } = parseListPagination(req);
       const [{ total }] = await db.select({ total: count() }).from(brokers).where(where);
       const data = await db.select().from(brokers).where(where).orderBy(brokers.name).limit(limit).offset(offset);
-      res.json({ data, total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
+      res.json({ data: await enrichAssignments(data), total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching brokers:", error);
       res.status(500).json({ message: "Failed to fetch brokers" });
@@ -5489,6 +5665,7 @@ Trucking Pros Financial Team
       if (!Number.isInteger(brokerId) || brokerId <= 0) return res.status(400).json({ message: "Invalid broker ID" });
       const [broker] = await db.select({ id: brokers.id }).from(brokers).where(eq(brokers.id, brokerId)).limit(1);
       if (!broker) return res.status(404).json({ message: "Broker not found" });
+      if (!(await canAccessBroker(req, brokerId))) return res.status(403).json({ message: "You can only access brokers assigned to you" });
       const branches = await db.select().from(brokerBranches)
         .where(eq(brokerBranches.brokerId, brokerId))
         .orderBy(brokerBranches.branchName, brokerBranches.id);
@@ -5559,19 +5736,27 @@ Trucking Pros Financial Team
       if (!broker) {
         return res.status(404).json({ message: "Broker not found" });
       }
+      if (!(await canAccessAssignedRecord(req, broker.assignedProcessor))) {
+        return res.status(403).json({ message: "You can only access brokers assigned to you" });
+      }
 
-      res.json(broker);
+      res.json(await enrichBrokerAssignment(broker));
     } catch (error) {
       console.error("Error fetching broker:", error);
       res.status(500).json({ message: "Failed to fetch broker" });
     }
   });
 
-  app.post("/api/brokers", requireAuth, async (req, res) => {
+  app.post("/api/brokers", requireAuth, async (req: any, res) => {
     try {
-      const brokerData = insertBrokerSchema.parse(req.body);
+      const input = { ...req.body };
+      if (req.user.role === "employee") input.assignedProcessor = req.user.id;
+      if (Object.prototype.hasOwnProperty.call(input, "assignedProcessor")) {
+        input.assignedProcessor = await validateAssignedProcessor(input.assignedProcessor);
+      }
+      const brokerData = insertBrokerSchema.parse(input);
       const [newBroker] = await db.insert(brokers).values(brokerData).returning();
-      res.status(201).json(newBroker);
+      res.status(201).json(await enrichBrokerAssignment(newBroker));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid broker data", errors: error.errors });
@@ -5581,10 +5766,19 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch("/api/brokers/:id", requireAuth, async (req, res) => {
+  app.patch("/api/brokers/:id", requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const updateData = insertBrokerSchema.partial().parse(req.body);
+      const [existingBroker] = await db.select().from(brokers).where(eq(brokers.id, id)).limit(1);
+      if (!existingBroker) return res.status(404).json({ message: "Broker not found" });
+      if (!canAccessAssignedRecord(req, existingBroker.assignedProcessor)) {
+        return res.status(403).json({ message: "You can only edit brokers assigned to you" });
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, "assignedProcessor")) {
+        return res.status(403).json({ message: "Use the assignment endpoint to change the assigned processor" });
+      }
+      const input = { ...req.body };
+      const updateData = insertBrokerSchema.partial().parse(input);
 
       const [updatedBroker] = await db
         .update(brokers)
@@ -5596,7 +5790,7 @@ Trucking Pros Financial Team
         return res.status(404).json({ message: "Broker not found" });
       }
 
-      res.json(updatedBroker);
+      res.json(await enrichBrokerAssignment(updatedBroker));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid broker data", errors: error.errors });
@@ -5606,7 +5800,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.delete("/api/brokers/:id", requireAuth, async (req, res) => {
+  app.delete("/api/brokers/:id", requireManagerOrAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const [deletedBroker] = await db.delete(brokers).where(eq(brokers.id, id)).returning();
@@ -5619,6 +5813,29 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deleting broker:", error);
       res.status(500).json({ message: "Failed to delete broker" });
+    }
+  });
+
+  app.patch("/api/brokers/:id/assign", requireManagerOrAdmin, async (req: any, res: any) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid broker id" });
+      const assignedProcessor = await validateAssignedProcessor(req.body?.assignedProcessor);
+      const [broker] = await db.update(brokers).set({ assignedProcessor, updatedAt: new Date() })
+        .where(eq(brokers.id, id)).returning();
+      if (!broker) return res.status(404).json({ message: "Broker not found" });
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "broker_updated",
+        description: `Assigned processor ${assignedProcessor ?? "unassigned"} to broker ${broker.name}`,
+        entityType: "debtor",
+        entityId: broker.id,
+      } as any);
+      res.json(await enrichBrokerAssignment(broker));
+    } catch (error: any) {
+      if (error?.status === 400) return res.status(400).json({ message: error.message });
+      console.error("Error assigning broker processor:", error);
+      res.status(500).json({ message: "Failed to assign broker processor" });
     }
   });
 
@@ -6047,9 +6264,10 @@ Trucking Pros Financial Team
     }
   });
 
-  app.get("/api/payouts/invoice/:invoiceId", requireAuth, async (req, res) => {
+  app.get("/api/payouts/invoice/:invoiceId", requireAuth, async (req: any, res) => {
     try {
       const invoiceId = parseInt(req.params.invoiceId, 10);
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only view payouts for your own invoice" });
       const payout = await storage.getPayoutByInvoice(invoiceId);
       if (!payout) return res.status(404).json({ message: "No payout found for this invoice" });
       res.json(payout);
@@ -6059,7 +6277,7 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post("/api/payouts", requireAuth, async (req: any, res) => {
+  app.post("/api/payouts", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const schema = z.object({
         invoiceId: z.number().int().positive(),
@@ -6074,6 +6292,7 @@ Trucking Pros Financial Team
       // Fetch invoice
       const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
       if (!inv) return res.status(404).json({ message: "Invoice not found" });
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only create payouts for your own invoice" });
 
       // Get current rates
       let settings = await storage.getPayoutSettings();
@@ -6126,6 +6345,7 @@ Trucking Pros Financial Team
       if (isNaN(id)) return res.status(400).json({ message: "Invalid payout id" });
       const [payout] = await db.select().from(payouts).where(eq(payouts.id, id)).limit(1);
       if (!payout) return res.status(404).json({ message: "Payout not found" });
+      if (!await employeeCanAccessInvoice(req, payout.invoiceId)) return res.status(403).json({ message: "You may only view payouts for your own invoice" });
       // Enrich with invoice + client info
       let invoiceNumber: string | null = null;
       let clientName: string | null = null;
@@ -6146,9 +6366,12 @@ Trucking Pros Financial Team
     }
   });
 
-  app.patch("/api/payouts/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/payouts/:id", requireManagerOrAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const [existingPayout] = await db.select({ invoiceId: payouts.invoiceId }).from(payouts).where(eq(payouts.id, id)).limit(1);
+      if (!existingPayout) return res.status(404).json({ message: "Payout not found" });
+      if (!await employeeCanAccessInvoice(req, existingPayout.invoiceId)) return res.status(403).json({ message: "You may only update payouts for your own invoice" });
       const schema = z.object({
         paymentStatus: z.enum(["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"]).optional(),
         notes: z.string().optional(),
@@ -6160,7 +6383,10 @@ Trucking Pros Financial Team
       // Auto-timestamp status transitions
       const now = new Date();
       const extra: Record<string, any> = {};
-      if (updates.paymentStatus === "advance_paid" && !updates.advancePaidAt) extra.advancePaidAt = now;
+      if (updates.paymentStatus === "advance_paid") {
+        if (!updates.advancePaidAt) extra.advancePaidAt = now;
+        extra.advancePaidBy = req.user.id;
+      }
       if (updates.paymentStatus === "reserve_released" && !updates.reserveReleasedAt) extra.reserveReleasedAt = now;
 
       const updated = await storage.updatePayout(id, { ...updates, ...extra } as any);
@@ -8316,7 +8542,8 @@ Trucking Pros Financial Team
           carrierName: clients.name,
         })
         .from(invoices)
-        .leftJoin(clients, eq(invoices.clientId, clients.id));
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .where(req.user.role === "employee" ? eq(clients.assignedProcessor, req.user.id) : undefined);
 
       const carrierMap: Record<string, { clientId: number; carrierName: string; invoiceCount: number; totalFunded: number; outstanding: number; amounts: number[] }> = {};
 
@@ -8422,6 +8649,8 @@ Trucking Pros Financial Team
         ilike(dispatchers.email, `%${q}%`), ilike(dispatchers.phone, `%${q}%`),
         ilike(dispatchers.notes, `%${q}%`),
       ));
+      const carrierScope = await assignedCarrierScope(req, dispatchers.carrierId);
+      if (carrierScope) conditions.push(carrierScope);
       const where = conditions.length ? and(...conditions) : undefined;
       if (req.query.all === "true") return res.json(await db.select().from(dispatchers).where(where).orderBy(dispatchers.lastName));
       const { page, limit, offset } = parseListPagination(req);
@@ -8439,6 +8668,7 @@ Trucking Pros Financial Team
       const id = parseInt(req.params.id, 10);
       const [row] = await db.select().from(dispatchers).where(eq(dispatchers.id, id)).limit(1);
       if (!row) return res.status(404).json({ message: "Dispatcher not found" });
+      if (!(await canAccessClient(req, row.carrierId))) return res.status(403).json({ message: "You can only access dispatchers for carriers assigned to you" });
       res.json(row);
     } catch (error) {
       console.error("Error fetching dispatcher:", error);
@@ -8450,6 +8680,7 @@ Trucking Pros Financial Team
     try {
       const userId = req.user?.claims?.sub ?? req.user?.id;
       const data = insertDispatcherSchema.parse({ ...req.body, createdBy: userId });
+      if (!(await canAccessClient(req, data.carrierId))) return res.status(403).json({ message: "You can only create dispatchers for carriers assigned to you" });
       const [row] = await db.insert(dispatchers).values(data).returning();
       res.status(201).json(row);
     } catch (error) {
@@ -8462,7 +8693,11 @@ Trucking Pros Financial Team
   app.patch("/api/dispatchers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select({ carrierId: dispatchers.carrierId }).from(dispatchers).where(eq(dispatchers.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Dispatcher not found" });
+      if (!(await canAccessClient(req, existing.carrierId))) return res.status(403).json({ message: "You can only edit dispatchers for carriers assigned to you" });
       const data = insertDispatcherSchema.partial().parse(req.body);
+      if (data.carrierId != null && !(await canAccessClient(req, data.carrierId))) return res.status(403).json({ message: "You can only move dispatchers to carriers assigned to you" });
       const [row] = await db.update(dispatchers).set(data).where(eq(dispatchers.id, id)).returning();
       if (!row) return res.status(404).json({ message: "Dispatcher not found" });
       res.json(row);
@@ -8476,6 +8711,9 @@ Trucking Pros Financial Team
   app.delete("/api/dispatchers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select({ carrierId: dispatchers.carrierId }).from(dispatchers).where(eq(dispatchers.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Dispatcher not found" });
+      if (!(await canAccessClient(req, existing.carrierId))) return res.status(403).json({ message: "You can only delete dispatchers for carriers assigned to you" });
       const [row] = await db
         .update(dispatchers)
         .set({ status: "inactive" })
@@ -9339,6 +9577,8 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
         ilike(trucks.licensePlate, `%${q}%`), ilike(trucks.state, `%${q}%`),
         ilike(trucks.notes, `%${q}%`),
       ));
+      const carrierScope = await assignedCarrierScope(req, trucks.carrierId);
+      if (carrierScope) conditions.push(carrierScope);
       const where = conditions.length ? and(...conditions) : undefined;
       if (req.query.all === "true") return res.json(await db.select().from(trucks).where(where).orderBy(trucks.truckNumber));
       const { page, limit, offset } = parseListPagination(req);
@@ -9356,6 +9596,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       const id = parseInt(req.params.id, 10);
       const [row] = await db.select().from(trucks).where(eq(trucks.id, id)).limit(1);
       if (!row) return res.status(404).json({ message: "Truck not found" });
+      if (!(await canAccessClient(req, row.carrierId))) return res.status(403).json({ message: "You can only access trucks for carriers assigned to you" });
       res.json(row);
     } catch (error) {
       console.error("Error fetching truck:", error);
@@ -9367,6 +9608,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     try {
       const userId = req.user?.claims?.sub ?? req.user?.id;
       const data = insertTruckSchema.parse({ ...req.body, createdBy: userId });
+      if (!(await canAccessClient(req, data.carrierId))) return res.status(403).json({ message: "You can only create trucks for carriers assigned to you" });
       const [row] = await db.insert(trucks).values(data).returning();
       res.status(201).json(row);
     } catch (error) {
@@ -9379,7 +9621,11 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   app.patch("/api/trucks/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select({ carrierId: trucks.carrierId }).from(trucks).where(eq(trucks.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Truck not found" });
+      if (!(await canAccessClient(req, existing.carrierId))) return res.status(403).json({ message: "You can only edit trucks for carriers assigned to you" });
       const data = insertTruckSchema.partial().parse(req.body);
+      if (data.carrierId != null && !(await canAccessClient(req, data.carrierId))) return res.status(403).json({ message: "You can only move trucks to carriers assigned to you" });
       const [row] = await db.update(trucks).set(data).where(eq(trucks.id, id)).returning();
       if (!row) return res.status(404).json({ message: "Truck not found" });
       res.json(row);
@@ -9393,6 +9639,9 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   app.delete("/api/trucks/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      const [existing] = await db.select({ carrierId: trucks.carrierId }).from(trucks).where(eq(trucks.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Truck not found" });
+      if (!(await canAccessClient(req, existing.carrierId))) return res.status(403).json({ message: "You can only delete trucks for carriers assigned to you" });
       const [row] = await db.delete(trucks).where(eq(trucks.id, id)).returning();
       if (!row) return res.status(404).json({ message: "Truck not found" });
       res.json(row);

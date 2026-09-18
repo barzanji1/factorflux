@@ -439,8 +439,10 @@ export default function InvoiceDetail() {
   const [chargebackDialogOpen, setChargebackDialogOpen] = useState(false);
   const [chargebackExtensionDate, setChargebackExtensionDate] = useState("");
   const [chargebackReason, setChargebackReason] = useState("");
+  const [collectionNote, setCollectionNote] = useState("");
   const [uploadingDocumentType, setUploadingDocumentType] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", paymentType: "ACH", bankAccountId: "" });
+  const [previewDocument, setPreviewDocument] = useState<any | null>(null);
+  const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", brokerId: "", paymentType: "ACH", bankAccountId: "" });
 
   const { data: detail, isLoading: detailLoading } = useQuery<any>({
     queryKey: ["/api/invoices", invoiceId, "detail"],
@@ -506,6 +508,17 @@ export default function InvoiceDetail() {
   });
 
   const { data: debtors = [] } = useQuery<any[]>({ queryKey: ["/api/debtors"], enabled: editOpen });
+  const { data: brokers = [] } = useQuery<any[]>({
+    queryKey: ["/api/brokers", "all"],
+    queryFn: async () => {
+      const response = await fetch("/api/brokers?all=true", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load brokers");
+      const payload = await response.json();
+      const rows = Array.isArray(payload) ? payload : payload?.data;
+      return Array.isArray(rows) ? rows : [];
+    },
+    enabled: editOpen,
+  });
 
   const overrideMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/invoices/${invoiceId}/override-approve`, { reason: overrideReason })).json(),
@@ -523,7 +536,8 @@ export default function InvoiceDetail() {
     mutationFn: async () => (await apiRequest("PUT", `/api/invoices/${invoiceId}`, {
       amount: editValues.amount,
       loadNumber: editValues.loadNumber || null,
-      debtorId: editValues.debtorId ? Number(editValues.debtorId) : null,
+       debtorId: editValues.debtorId ? Number(editValues.debtorId) : null,
+       brokerId: editValues.brokerId ? Number(editValues.brokerId) : null,
       paymentType: editValues.paymentType,
       bankAccountId: editValues.bankAccountId ? Number(editValues.bankAccountId) : null,
     })).json(),
@@ -562,6 +576,17 @@ export default function InvoiceDetail() {
     onError: () => toast({ title: "Error saving note", variant: "destructive" }),
   });
 
+  const noteMutation = useMutation({
+    mutationFn: async (body: string) => (await apiRequest("POST", `/api/invoices/${invoiceId}/notes`, { body })).json(),
+    onSuccess: () => {
+      setCollectionNote("");
+      toast({ title: "Collection note added" });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "timeline"] });
+    },
+    onError: (error: any) => toast({ title: "Could not add note", description: error.message, variant: "destructive" }),
+  });
+
   const documentTypeMutation = useMutation({
     mutationFn: async ({ documentId, documentType }: { documentId: number; documentType: string }) => {
       const res = await apiRequest("PATCH", `/api/documents/${documentId}/document-type`, { documentType });
@@ -585,7 +610,7 @@ export default function InvoiceDetail() {
   };
 
   const choosePaperworkFile = (type: string, label: string, existingDocument?: any) => {
-    if (existingDocument && !window.confirm(`Replace existing ${label}?`)) return;
+    if (existingDocument && !window.confirm(`Upload an additional ${label}? The existing document will be preserved.`)) return;
     document.getElementById(`paperwork-upload-${type}`)?.click();
   };
 
@@ -596,11 +621,8 @@ export default function InvoiceDetail() {
       formData.append("file", file);
       formData.append("documentType", type);
       await apiRequest("POST", `/api/invoices/${invoiceId}/documents`, formData);
-      if (existingDocument) {
-        await apiRequest("DELETE", `/api/documents/${existingDocument.id}`);
-      }
       await refreshPaperwork();
-      toast({ title: existingDocument ? `${label} replaced` : `${label} uploaded` });
+       toast({ title: existingDocument ? `${label} added as a new document` : `${label} uploaded` });
     } catch (error: any) {
       toast({
         title: `Unable to upload ${label}`,
@@ -717,6 +739,7 @@ export default function InvoiceDetail() {
                           amount: String(detail.amount ?? ""),
                           loadNumber: detail.loadNumber ?? "",
                           debtorId: detail.debtorId ? String(detail.debtorId) : "",
+                           brokerId: detail.brokerId ? String(detail.brokerId) : "",
                           paymentType: detail.paymentType ?? "ACH",
                           bankAccountId: detail.bankAccountId ? String(detail.bankAccountId) : "",
                         });
@@ -768,31 +791,20 @@ export default function InvoiceDetail() {
 
                 {/* ── Tabs ──────────────────────────────────────────────── */}
                 <div className="rounded-[28px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                     <Tabs defaultValue="invoice">
+                     <Tabs defaultValue="overview">
                     <div className="border-b border-slate-100 px-6 pt-5 dark:border-slate-800">
                        <TabsList className="custom-scrollbar flex h-auto w-full gap-1 overflow-x-auto rounded-none bg-transparent p-0">
-                         {(isManager ? [
-                           { value: "invoice",    label: "Invoice",      icon: <ReceiptText className="h-3.5 w-3.5" /> },
+                         {[
+                            { value: "overview",   label: "Overview",     icon: <ReceiptText className="h-3.5 w-3.5" /> },
                            { value: "paperwork",  label: "Paperwork",    icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length, alert: docStatus && !docStatus.canApprove },
                            { value: "broker",     label: "Broker",       icon: <Building2 className="h-3.5 w-3.5" /> },
                            { value: "carrier",    label: "Carrier",      icon: <User className="h-3.5 w-3.5" /> },
-                           { value: "notes",      label: "Notes",        icon: <MessageSquare className="h-3.5 w-3.5" /> },
-                           { value: "followup",   label: "Followup",     icon: <Clock className="h-3.5 w-3.5" /> },
-                           { value: "sheet",      label: "Sheet",        icon: <Banknote className="h-3.5 w-3.5" /> },
-                          { value: "collections", label: "Collections",   icon: <CreditCard className="h-3.5 w-3.5" />,  count: detail.collections?.length },
-                          { value: "chargeback",  label: "Chargeback",    icon: <AlertTriangle className="h-3.5 w-3.5" />, alert: ["scheduled", "extended", "charged"].includes(detail.chargebackStatus) },
-                          { value: "cashapp",     label: "Cash Applied",  icon: <DollarSign className="h-3.5 w-3.5" />,  count: detail.cashAppLines?.length },
-                          { value: "exceptions",  label: "Exceptions",    icon: <ShieldAlert className="h-3.5 w-3.5" />, count: detail.exceptions?.length },
+                            { value: "collections", label: "Collections", icon: <CreditCard className="h-3.5 w-3.5" />, count: detail.collections?.length },
+                            { value: "chargeback",  label: "Chargeback",   icon: <AlertTriangle className="h-3.5 w-3.5" />, alert: ["scheduled", "extended", "charged"].includes(detail.chargeback?.status ?? detail.chargebackStatus) },
+                            { value: "cashapp",     label: "Cash Applied", icon: <DollarSign className="h-3.5 w-3.5" />, count: detail.cash?.applications?.length ?? detail.cashAppLines?.length },
+                            { value: "sheet",      label: "Payout / Sheet", icon: <Banknote className="h-3.5 w-3.5" /> },
                            { value: "timeline",    label: "Timeline",      icon: <Activity className="h-3.5 w-3.5" /> },
-                        ] : [
-                           { value: "invoice", label: "Invoice", icon: <ReceiptText className="h-3.5 w-3.5" /> },
-                           { value: "paperwork", label: "Paperwork", icon: <FileText className="h-3.5 w-3.5" />, count: detail.documents?.length, alert: docStatus && !docStatus.canApprove },
-                           { value: "broker", label: "Broker", icon: <Building2 className="h-3.5 w-3.5" /> },
-                           { value: "carrier", label: "Carrier", icon: <User className="h-3.5 w-3.5" /> },
-                          { value: "notes", label: "Notes", icon: <MessageSquare className="h-3.5 w-3.5" /> },
-                           { value: "followup", label: "Followup", icon: <Clock className="h-3.5 w-3.5" /> },
-                           { value: "sheet", label: "Sheet", icon: <Banknote className="h-3.5 w-3.5" /> },
-                        ]).map(({ value, label, icon, count, alert }: any) => (
+                         ].map(({ value, label, icon, count, alert }: any) => (
                           <TabsTrigger key={value} value={value}
                             className="flex items-center gap-1.5 rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-xs font-semibold text-slate-500 transition-colors data-[state=active]:border-blue-600 data-[state=active]:text-blue-700 dark:text-slate-400 dark:data-[state=active]:text-blue-300">
                             {icon}{label}
@@ -807,15 +819,7 @@ export default function InvoiceDetail() {
                       </TabsList>
                     </div>
 
-                    {/* Employee notes */}
-                    <TabsContent value="notes" className="p-6">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-900/40">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white"><MessageSquare className="h-4 w-4 text-blue-600" />Invoice notes</div>
-                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{detail.notes || "No notes have been added to this invoice."}</p>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="broker" className="p-6">
+                     <TabsContent value="broker" className="p-6">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker profile</p>
@@ -825,13 +829,23 @@ export default function InvoiceDetail() {
                             <InfoRow label="Email" value={canonicalBroker.email || "Not available"} />
                             <InfoRow label="Phone" value={canonicalBroker.phone || "Not available"} />
                             <InfoRow label="MC #" value={canonicalBroker.mcNumber || "Not available"} />
+                            <InfoRow label="DOT #" value={canonicalBroker.dotNumber || "Not available"} />
+                            <InfoRow label="Branch" value={detail.branch?.branchName || detail.branchName || "Not available"} />
+                            <InfoRow label="Address" value={canonicalBroker.address || "Not available"} />
+                            <InfoRow label="Status" value={canonicalBroker.status || "Not available"} />
                             <InfoRow label="Credit limit" value={canonicalBroker.creditLimit ? fmtCurrency(canonicalBroker.creditLimit) : "Not available"} />
                           </div> : <EmptyTabState icon={<Building2 className="h-7 w-7" />} label="No broker details available" />}
                         </div>
-                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
-                          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Payment history</p>
-                          {canonicalBroker?.paymentHistory?.length ? <div className="space-y-2">{canonicalBroker.paymentHistory.map((p: any, i: number) => <InfoRow key={p.id ?? i} label={fmtDate(p.date)} value={`${fmtCurrency(p.amount)} · ${p.status || "recorded"}`} />)}</div> : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No payment history available" />}
-                        </div>
+                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker history</p>
+                           <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+                             <div><p className="text-lg font-bold">{fmtCurrency(detail.brokerHistory?.totals?.billed)}</p><p className="text-[10px] text-[#666]">Billed</p></div>
+                             <div><p className="text-lg font-bold text-teal-700">{fmtCurrency(detail.brokerHistory?.totals?.applied)}</p><p className="text-[10px] text-[#666]">Applied</p></div>
+                             <div><p className="text-lg font-bold text-amber-700">{fmtCurrency(detail.brokerHistory?.totals?.outstanding)}</p><p className="text-[10px] text-[#666]">Outstanding</p></div>
+                           </div>
+                           {detail.brokerHistory?.invoices?.length ? <div className="max-h-64 overflow-auto">{detail.brokerHistory.invoices.map((row: any) => <div key={row.id} className="flex items-center justify-between border-t border-[#d4d0c8] py-2 text-xs"><span><strong>{row.invoiceNumber}</strong><br /><span className="text-[#666]">{fmtDate(row.invoiceDate)} · {row.status}</span></span><span className="text-right">{fmtCurrency(row.amount)}<br /><span className="text-[#666]">Bal. {fmtCurrency(row.balance)}</span></span></div>)}</div> : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No broker history available" />}
+                           <div className="mt-3 border-t border-[#d4d0c8] pt-3 text-xs"><InfoRow label="Current AR" value={fmtCurrency(detail.brokerHistory?.credit?.currentAr)} /><InfoRow label="Latest credit check" value={detail.brokerHistory?.credit?.latestCheck ? `${fmtDate(detail.brokerHistory.credit.latestCheck.createdAt)} · ${detail.brokerHistory.credit.latestCheck.status || detail.brokerHistory.credit.latestCheck.result || "Recorded"}` : "Not available"} /></div>
+                         </div>
                       </div>
                     </TabsContent>
 
@@ -846,26 +860,33 @@ export default function InvoiceDetail() {
                             <InfoRow label="Phone" value={detail.client.phone || "Not available"} />
                             <InfoRow label="MC #" value={detail.client.mcNumber || "Not available"} />
                             <InfoRow label="DOT #" value={detail.client.dotNumber || "Not available"} />
+                            <InfoRow label="Address" value={[detail.client.address, detail.client.city, detail.client.state, detail.client.zipCode].filter(Boolean).join(", ") || "Not available"} />
+                            <InfoRow label="Status" value={detail.client.status || "Not available"} />
+                            <InfoRow label="Assigned processor" value={detail.assignedProcessorUser ? `${detail.assignedProcessorUser.firstName} ${detail.assignedProcessorUser.lastName}` : "Not assigned"} />
                           </div> : <EmptyTabState icon={<User className="h-7 w-7" />} label="No carrier details available" />}
                         </div>
                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Bank account</p>
-                          {carrierBankAccounts.length ? carrierBankAccounts.map((a: any) => <div key={a.id} className="mb-2 rounded-[3px] border border-[#b5b5b5] bg-white px-3 py-2 text-sm"><p className="font-semibold">{a.bankName || "Bank account"}</p><p className="text-xs text-[#666]">{a.accountType || "Account"} ending in {a.lastFour || "••••"}</p></div>) : <p className="text-sm text-[#666]">No bank account on file.</p>}
+                           {detail.carrierInvoices?.bankAccounts?.length ? detail.carrierInvoices.bankAccounts.map((a: any) => <div key={a.id} className="mb-2 rounded-[3px] border border-[#b5b5b5] bg-white px-3 py-2 text-sm"><p className="font-semibold">{a.bankName || "Bank account"}</p><p className="text-xs text-[#666]">{a.accountType || "Account"} ending in {a.lastFour || "••••"}</p></div>) : <p className="text-sm text-[#666]">No bank account on file.</p>}
                           <p className="mt-3 text-[11px] text-[#666]">Full bank credentials are restricted to authorized funding workflows.</p>
                         </div>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="followup" className="p-6">
-                      <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
-                        <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker follow-up history</p><p className="mt-1 text-xs text-[#666]">Scheduled reminders and contact records linked to this load.</p></div></div>
-                        {(detail.brokerFollowUps || detail.followUps || detail.followupHistory)?.length ? <div className="divide-y divide-[#c8c8c8]">{(detail.brokerFollowUps || detail.followUps || detail.followupHistory).map((f: any, i: number) => <div key={f.id ?? i} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-semibold">{f.subject || f.note || f.description || "Follow-up"}</p><p className="text-xs text-[#666]">{fmtDate(f.followUpDate || f.scheduledAt || f.createdAt)}{f.status ? ` · ${f.status}` : ""}</p></div><Badge className="border border-[#b5b5b5] bg-white text-[#444]">{f.outcome || f.type || "Recorded"}</Badge></div>)}</div> : <EmptyTabState icon={<Clock className="h-7 w-7" />} label="No follow-up history or reminders available" />}
+                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4 md:col-span-2">
+                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Other carrier invoices</p>
+                           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                             {(detail.carrierInvoices?.invoices ?? []).filter((row: any) => !row.isCurrent).map((row: any) => (
+                               <button key={row.id} type="button" onClick={() => navigate(`/invoices/${row.id}`)} className="flex items-center justify-between rounded-[3px] border border-[#b5b5b5] bg-white px-3 py-2 text-left text-xs hover:border-[#098b9f]">
+                                 <span><strong>{row.invoiceNumber}</strong><br /><span className="text-[#666]">{fmtDate(row.invoiceDate)} · {row.status}</span></span><span className="font-semibold">{fmtCurrency(row.amount)}</span>
+                               </button>
+                             ))}
+                           </div>
+                           {!detail.carrierInvoices?.invoices?.some((row: any) => !row.isCurrent) && <p className="text-sm text-[#666]">No other carrier invoices.</p>}
+                         </div>
                       </div>
                     </TabsContent>
 
                     {/* Doc Checklist */}
-                    <TabsContent value="doccheck" className="p-6">
-                      {docStatusLoading ? (
+                    {false && (
+                        docStatusLoading ? (
                         <div className="space-y-3">
                           {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
                         </div>
@@ -1129,48 +1150,56 @@ export default function InvoiceDetail() {
                               </div>
                             </div>
                           )}
-                        </div>
-                      )}
-                    </TabsContent>
+                         </div>
+                       )
+                     )}
 
                     <TabsContent value="chargeback" className="p-6">
-                      {!["scheduled", "extended", "charged"].includes(detail.chargebackStatus) ? (
-                        <EmptyTabState icon={<AlertTriangle className="h-7 w-7" />} label="No active chargeback for this invoice" />
-                      ) : (
-                        <div className="space-y-5">
-                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-900/50 dark:bg-orange-950/20">
+                         <div className="space-y-5">
+                           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-900/50 dark:bg-orange-950/20">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Chargeback Status</p>
-                              <Badge className={cn("mt-2 capitalize", detail.chargebackStatus === "charged" ? "bg-red-600" : detail.chargebackStatus === "extended" ? "bg-emerald-600" : "bg-amber-600")}>{detail.chargebackStatus}</Badge>
-                              <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">Chargeback date: <strong>{fmtDate(detail.chargebackDate)}</strong></p>
+                               <Badge className={cn("mt-2 capitalize", detail.chargeback.status === "charged" ? "bg-red-600" : detail.chargeback.status === "extended" ? "bg-emerald-600" : "bg-amber-600")}>{detail.chargeback.status}</Badge>
+                               <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">Chargeback date: <strong>{fmtDate(detail.chargeback.chargebackDate)}</strong></p>
                             </div>
-                            <Button onClick={() => setChargebackDialogOpen(true)} disabled={detail.chargebackStatus === "charged"}>Extend Chargeback</Button>
+                             {isManager && ["scheduled", "extended"].includes(detail.chargeback.status) && <Button onClick={() => setChargebackDialogOpen(true)} disabled={detail.chargeback.status === "charged"}>Extend Chargeback</Button>}
                           </div>
-                          {detail.chargebackExtensionReason && <div className="rounded-xl border p-4 text-sm">
+                           {detail.chargeback.extension && <div className="rounded-xl border p-4 text-sm">
                             <p className="font-semibold">Latest Extension</p>
-                            <p className="mt-1 text-slate-500">Extended {fmtDate(detail.chargebackExtendedAt)} to {fmtDate(detail.chargebackExtensionDate)}</p>
-                            <p className="mt-2">{detail.chargebackExtensionReason}</p>
+                             <p className="mt-1 text-slate-500">Extended {fmtDate(detail.chargeback.extension.at)} to {fmtDate(detail.chargeback.extension.date)}</p>
+                             <p className="mt-2">{detail.chargeback.extension.reason}</p>
                           </div>}
                           <div>
                             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Extension History</h3>
-                            {(timeline ?? []).filter((event: any) => event.title === "chargeback extended").length ? (
-                              <div className="space-y-2">{(timeline ?? []).filter((event: any) => event.title === "chargeback extended").map((event: any, index: number) => <div key={event.id ?? index} className="rounded-xl border p-3 text-sm"><p>Extended by {event.meta?.agentName || "Agent"} to {fmtDate(event.meta?.extensionDate)}</p><p className="mt-1">{event.meta?.reason}</p><p className="text-xs text-slate-400">{fmtDate(event.timestamp)}</p></div>)}</div>
+                             {detail.chargeback.history?.length ? (
+                               <div className="space-y-2">{detail.chargeback.history.map((event: any) => {
+                                 const actorName = event.actor?.name
+                                   || [event.actor?.firstName, event.actor?.lastName].filter(Boolean).join(" ")
+                                   || event.actorUser?.name
+                                   || [event.actorUser?.firstName, event.actorUser?.lastName].filter(Boolean).join(" ")
+                                   || event.metadata?.agentName
+                                   || event.actorId
+                                   || "System";
+                                 return <div key={event.id} className="rounded-xl border p-3 text-sm"><p className="font-semibold capitalize">{event.eventType.replace(/_/g, " ")}</p><p className="mt-1">{event.reason || "No reason recorded"}</p><p className="text-xs text-slate-400">{actorName} · {fmtDate(event.createdAt)}{event.extensionDate ? ` · through ${fmtDate(event.extensionDate)}` : ""}</p></div>;
+                               })}</div>
                             ) : <p className="text-sm text-slate-400">No extension history.</p>}
                           </div>
-                        </div>
-                      )}
+                           <div className="rounded-xl border p-4"><div className="flex justify-between text-sm"><span>Refunded</span><strong>{fmtCurrency(detail.chargeback.refundedAmount)}</strong></div>{detail.chargeback.refunds?.length ? <div className="mt-3 space-y-2">{detail.chargeback.refunds.map((refund: any) => <div key={refund.id} className="flex justify-between border-t pt-2 text-xs"><span>{fmtDate(refund.refundDate)} · {refund.method} · {refund.reference || "No reference"}<br /><span className="text-slate-400">{refund.createdByUser?.firstName || "Team"} {refund.createdByUser?.lastName || ""}</span></span><strong>{fmtCurrency(refund.amount)}</strong></div>)}</div> : <p className="mt-2 text-xs text-slate-400">No refunds recorded.</p>}</div>
+                         </div>
                     </TabsContent>
 
                     {/* Overview */}
-                    <TabsContent value="invoice" className="p-6">
+                     <TabsContent value="overview" className="p-6">
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <div className="space-y-3">
                           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Invoice Details</h3>
                           {[
                             { label: "Invoice #",    value: detail.invoiceNumber },
+                             { label: "Status",        value: <InvoiceStatusBadge status={detail.status} /> },
+                             { label: "Submitted",     value: fmtDate(detail.submittedAt ?? detail.createdAt) },
                             { label: "Load #",       value: detail.loadNumber || (detail.loadId ? `#${detail.loadId}` : "—") },
                             { label: "Code",         value: detail.code || "—" },
-                            { label: "Branch",       value: detail.branchName || "—" },
+                             { label: "Branch",       value: detail.branch?.branchName || detail.branchName || "—" },
                             { label: "Buyout",       value: detail.buyout == null ? "—" : detail.buyout ? "Yes" : "No" },
                             { label: "Lumper",       value: detail.lumper == null ? "—" : detail.lumper ? "Yes" : "No" },
                             { label: "Amount",       value: fmtCurrency(detail.amount) },
@@ -1178,9 +1207,7 @@ export default function InvoiceDetail() {
                             { label: "Due Date",     value: fmtDate(detail.dueDate) },
                             { label: "BOL Number",   value: detail.bolNumber || "—" },
                             { label: "Payment Type", value: detail.paymentType || "—" },
-                            { label: "Bank Account", value: carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId)
-                              ? `${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).bankName} — ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).accountType || "account"} ending in ${carrierBankAccounts.find((a: any) => a.id === detail.bankAccountId).lastFour}`
-                              : "—" },
+                             { label: "Selected Bank", value: detail.selectedBankAccount ? `${detail.selectedBankAccount.bankName} — ending in ${detail.selectedBankAccount.lastFour}` : "—" },
                             { label: "Load Type",    value: <LoadTypeBadge value={detail.loadType} /> },
                             { label: "Driver",       value: detail.driver ? `${detail.driver.firstName} ${detail.driver.lastName}` : "—" },
                             { label: "Pickup",       value: detail.pickupLocation || "—" },
@@ -1208,27 +1235,31 @@ export default function InvoiceDetail() {
                                 <div className="space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
                                   {detail.client.email && <p>{detail.client.email}</p>}
                                   {detail.client.phone && <p>{detail.client.phone}</p>}
-                                  {detail.client.mcNumber && <p>MC# {detail.client.mcNumber}</p>}
+                                   {detail.client.mcNumber && <p>MC# {detail.client.mcNumber}</p>}
+                                   {detail.client.dotNumber && <p>DOT# {detail.client.dotNumber}</p>}
+                                   {detail.assignedProcessorUser && <p>Processor: {detail.assignedProcessorUser.firstName} {detail.assignedProcessorUser.lastName}</p>}
                                 </div>
-                                <Button variant="ghost" size="sm" onClick={() => navigate("/clients")}
+                                <Button variant="ghost" size="sm" onClick={() => navigate(`/clients/${detail.client.id}`)}
                                   className="mt-2 h-7 gap-1 rounded-lg px-2 text-[11px] text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/20">
                                   <ExternalLink className="h-3 w-3" />View Client
                                 </Button>
                               </div>
                             </div>
                           )}
-                          {detail.debtor && (
+                           {canonicalBroker && (
                             <div>
                               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Debtor / Broker</h3>
                               <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                                 <div className="mb-1 flex items-center gap-2">
                                   <Building2 className="h-4 w-4 text-violet-500" />
-                                  <span className="font-semibold text-slate-800 dark:text-white">{detail.debtor.name}</span>
+                                   <span className="font-semibold text-slate-800 dark:text-white">{canonicalBroker.name}</span>
                                 </div>
                                 <div className="space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                  {detail.debtor.email && <p>{detail.debtor.email}</p>}
-                                  {detail.debtor.mcNumber && <p>MC# {detail.debtor.mcNumber}</p>}
-                                  {detail.debtor.creditLimit && <p>Credit limit: {fmtCurrency(detail.debtor.creditLimit)}</p>}
+                                   {canonicalBroker.email && <p>{canonicalBroker.email}</p>}
+                                   {canonicalBroker.phone && <p>{canonicalBroker.phone}</p>}
+                                   {canonicalBroker.mcNumber && <p>MC# {canonicalBroker.mcNumber}</p>}
+                                   {canonicalBroker.dotNumber && <p>DOT# {canonicalBroker.dotNumber}</p>}
+                                   {(detail.branch?.branchName || detail.branchName) && <p>Branch: {detail.branch?.branchName || detail.branchName}</p>}
                                 </div>
                               </div>
                             </div>
@@ -1248,12 +1279,18 @@ export default function InvoiceDetail() {
                       <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                           {[
-                            ["bol", "BOL"], ["rate_confirmation", "Rate Con"],
-                            ["lumper_receipt", "Lumper"], ["invoice", "Invoice"],
-                            ["noa", "NOA"], ["release_letter", "Release Letter"], ["other", "Other"],
-                          ].map(([type, label]) => {
-                            const rule = docStatus?.rules?.find((r: any) => r.documentType === type);
-                            const doc = detail.documents?.find((d: any) => d.documentType === type || d.finalDocumentType === type);
+                            { type: "bill_of_lading", label: "BOL", aliases: ["bill_of_lading", "bol"] },
+                            { type: "rate_confirmation", label: "Rate Con", aliases: ["rate_confirmation"] },
+                            { type: "lumper_receipt", label: "Lumper", aliases: ["lumper_receipt", "receipt"] },
+                            { type: "invoice", label: "Invoice", aliases: ["invoice", "commercial_invoice"] },
+                            { type: "noa", label: "NOA", aliases: ["noa"] },
+                            { type: "release_letter", label: "Release Letter", aliases: ["release_letter"] },
+                            { type: "other", label: "Other", aliases: ["other"] },
+                          ].map(({ type, label, aliases }) => {
+                            const rule = docStatus?.rules?.find((r: any) => aliases.includes(r.documentType));
+                            const doc = detail.documents?.find((d: any) =>
+                              aliases.includes(d.documentType) || aliases.includes(d.finalDocumentType)
+                            );
                             const present = !!rule?.present || !!doc;
                             const uploading = uploadingDocumentType === type;
                             return (
@@ -1272,14 +1309,14 @@ export default function InvoiceDetail() {
                                 <div
                                   role="button"
                                   tabIndex={0}
-                                  onClick={() => doc
-                                    ? window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer")
+                                   onClick={() => doc
+                                     ? setPreviewDocument(doc)
                                     : choosePaperworkFile(type, label)}
                                   onKeyDown={(event) => {
                                     if (event.key === "Enter" || event.key === " ") {
                                       event.preventDefault();
-                                      doc
-                                        ? window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer")
+                                       doc
+                                         ? setPreviewDocument(doc)
                                         : choosePaperworkFile(type, label);
                                     }
                                   }}
@@ -1299,7 +1336,7 @@ export default function InvoiceDetail() {
                                     {present && doc && !uploading && (
                                       <div className="flex items-center gap-1">
                                         <button type="button" title={`View ${label}`}
-                                          onClick={(event) => { event.stopPropagation(); window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer"); }}
+                                           onClick={(event) => { event.stopPropagation(); setPreviewDocument(doc); }}
                                           className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-100">
                                           <Eye className="h-4 w-4" />
                                         </button>
@@ -1320,7 +1357,7 @@ export default function InvoiceDetail() {
                                     <button type="button"
                                       onClick={(event) => { event.stopPropagation(); choosePaperworkFile(type, label, doc); }}
                                       className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:underline">
-                                      <Upload className="h-3 w-3" />Replace
+                                       <Upload className="h-3 w-3" />Add newer copy
                                     </button>
                                   )}
                                 </div>
@@ -1333,6 +1370,18 @@ export default function InvoiceDetail() {
                           {!docStatus.canApprove && <span>Missing: {(docStatus.missingForApproval || docStatus.missingForReview || []).join(", ") || "Review required"}</span>}
                           {isAdmin && !docStatus.overrideApplied && detail.status !== "approved" && <Button size="sm" variant="outline" className="h-7 rounded-[2px] text-[11px]" onClick={() => setOverrideOpen(true)}><ShieldCheck className="mr-1 h-3 w-3" />Override & Approve</Button>}
                         </div>}
+                         {previewDocument && (
+                           <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900 dark:border-slate-700">
+                             <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2 text-xs text-slate-200">
+                               <span className="truncate">{previewDocument.originalName}</span>
+                               <div className="flex items-center gap-2">
+                                 <a href={`/api/documents/${previewDocument.id}/download`} className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2 py-1 hover:bg-slate-600"><Download className="h-3 w-3" />Download</a>
+                                 <button type="button" onClick={() => setPreviewDocument(null)} className="rounded-md px-2 py-1 hover:bg-slate-700">Close</button>
+                               </div>
+                             </div>
+                             {String(previewDocument.mimeType || "").startsWith("image/") ? <img src={`/api/documents/${previewDocument.id}/view`} alt={previewDocument.originalName} className="mx-auto max-h-[520px] max-w-full object-contain" /> : <iframe title={`Preview ${previewDocument.originalName}`} src={`/api/documents/${previewDocument.id}/view`} className="h-[520px] w-full bg-white" />}
+                           </div>
+                         )}
                         {/* Drag-and-drop intake zone */}
                         <div>
                           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -1362,13 +1411,13 @@ export default function InvoiceDetail() {
                                      <FileText className="h-5 w-5 shrink-0 text-red-500" />
                                     <div>
                                       <p className="text-sm font-medium text-slate-800 dark:text-white">{doc.originalName}</p>
-                                      <p className="text-xs text-slate-400">{doc.documentType.replace(/_/g, " ")} · {(doc.size / 1024).toFixed(1)} KB</p>
+                                       <p className="text-xs text-slate-400">{doc.documentType.replace(/_/g, " ")} · {(doc.size / 1024).toFixed(1)} KB · {fmtDate(doc.createdAt)}</p>
+                                       <p className="text-[11px] text-slate-500">{doc.uploadedByUser ? `${doc.uploadedByUser.firstName || ""} ${doc.uploadedByUser.lastName || ""}`.trim() || doc.uploadedByUser.email : "Uploader unavailable"}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                     <Button asChild variant="outline" size="sm" className="h-8 rounded-lg px-2 text-[11px]">
-                                       <a href={`/api/documents/${doc.id}/view`} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1 h-3 w-3" />Open</a>
-                                     </Button>
+                                      <Button variant="outline" size="sm" className="h-8 rounded-lg px-2 text-[11px]" onClick={() => setPreviewDocument(doc)}><Eye className="mr-1 h-3 w-3" />View</Button>
+                                      <a href={`/api/documents/${doc.id}/download`} className="inline-flex h-8 items-center gap-1 rounded-lg border px-2 text-[11px]"><Download className="h-3 w-3" />Download</a>
                                     <Select
                                       value={doc.documentType || "other"}
                                       onValueChange={(documentType) =>
@@ -1381,9 +1430,12 @@ export default function InvoiceDetail() {
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
-                                        <SelectItem value="bol">Bill of Lading (BOL)</SelectItem>
+                                        <SelectItem value="bill_of_lading">Bill of Lading (BOL)</SelectItem>
+                                        <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
                                         <SelectItem value="commercial_invoice">Commercial Invoice</SelectItem>
                                         <SelectItem value="pod">Proof of Delivery (POD)</SelectItem>
+                                        <SelectItem value="noa">Notice of Assignment (NOA)</SelectItem>
+                                        <SelectItem value="release_letter">Release Letter</SelectItem>
                                         <SelectItem value="other">Other</SelectItem>
                                       </SelectContent>
                                     </Select>
@@ -1446,6 +1498,8 @@ export default function InvoiceDetail() {
                               {detail.payout.paymentStatus?.replace(/_/g, " ")}
                             </Badge>
                           </div>
+                           {detail.payoutDetail?.funding && <div className={cn("flex items-center gap-2 rounded-xl border px-4 py-3 text-sm", detail.payoutDetail.funding.paymentSent ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}><CheckCircle2 className="h-4 w-4" />Payment sent: <strong>{detail.payoutDetail.funding.paymentSent ? "Yes" : "No"}</strong></div>}
+                           {detail.payoutDetail?.funding && <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900/40 dark:bg-violet-950/20"><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Funding details</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-xs text-violet-600">Funding status</span><p className="font-semibold capitalize">{String(detail.payoutDetail.funding.status || "pending").replace(/_/g, " ")}</p></div><div><span className="text-xs text-violet-600">Funded date</span><p className="font-semibold">{fmtDate(detail.payoutDetail.funding.fundedDate)}</p></div><div><span className="text-xs text-violet-600">Funded by</span><p className="font-semibold">{detail.payoutDetail.funding.fundedBy ? `${detail.payoutDetail.funding.fundedBy.firstName || ""} ${detail.payoutDetail.funding.fundedBy.lastName || ""}`.trim() : "—"}</p></div></div></div>}
                           {detail.payout.notes && (
                             <p className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">{detail.payout.notes}</p>
                           )}
@@ -1481,15 +1535,9 @@ export default function InvoiceDetail() {
 
                     {/* Collections */}
                     <TabsContent value="collections" className="p-6">
-                      {!detail.collections?.length ? (
-                        <div className="flex flex-col items-center justify-center py-16">
-                          <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No collection records linked to this invoice" />
-                          <Button variant="outline" size="sm" onClick={() => navigate("/collections")} className="mt-2 gap-1.5 rounded-xl text-xs">
-                            <ExternalLink className="h-3.5 w-3.5" />Go to Collections
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
+                       <div className="space-y-5">
+                         {detail.collections?.length ? (
+                         <div className="space-y-2">
                           {detail.collections.map((c: any) => (
                             <div key={c.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                               <div className="flex items-center justify-between">
@@ -1507,18 +1555,53 @@ export default function InvoiceDetail() {
                               </div>
                             </div>
                           ))}
-                          <div className="pt-2">
-                            <Button variant="outline" size="sm" onClick={() => navigate("/collections")} className="gap-1.5 rounded-xl text-xs">
-                              <ExternalLink className="h-3.5 w-3.5" />Manage in Collections
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                         </div>
+                         ) : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No collection records linked to this invoice" />}
+                         {!!detail.collectionsDetail?.brokerFollowUps?.length && (
+                           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                             <h3 className="mb-3 text-sm font-semibold">Broker follow-ups</h3>
+                             <div className="space-y-3">
+                               {detail.collectionsDetail.brokerFollowUps.map((followUp: any) => (
+                                 <div key={followUp.id} className="border-t border-slate-200 pt-3 text-xs dark:border-slate-700">
+                                   <div className="flex justify-between gap-3"><strong>{followUp.subject || "Broker follow-up"}</strong><span className="text-slate-400">{fmtDate(followUp.sentAt || followUp.createdAt)}</span></div>
+                                   <p className="mt-1 whitespace-pre-wrap text-slate-600 dark:text-slate-300">{followUp.body || followUp.message || "No message body recorded."}</p>
+                                   <p className="mt-1 text-slate-400">Status: {followUp.status || "Recorded"} · Delivery: {followUp.deliveryStatus || "Not reported"}</p>
+                                   {!!(followUp.reminders || followUp.deliveryInstances || followUp.instances)?.length && (
+                                     <div className="mt-2 space-y-1 border-l-2 border-slate-200 pl-3 dark:border-slate-700">
+                                       {(followUp.reminders || followUp.deliveryInstances || followUp.instances).map((instance: any, instanceIndex: number) => (
+                                         <div key={instance.id ?? instanceIndex} className="text-[11px] text-slate-500 dark:text-slate-400">
+                                           <div className="flex flex-wrap gap-x-2">
+                                              <span>{instance.actualSendAt || instance.sentAt || instance.actualSentAt ? `Sent ${new Date(instance.actualSendAt || instance.sentAt || instance.actualSentAt).toLocaleString()}` : instance.scheduledSendAt || instance.scheduledAt || instance.scheduledFor ? `Scheduled ${new Date(instance.scheduledSendAt || instance.scheduledAt || instance.scheduledFor).toLocaleString()}` : "Time not recorded"}</span>
+                                             <span>· {instance.subject || followUp.subject || "Reminder"}</span>
+                                             <span>· {instance.status || "Recorded"}</span>
+                                             <span>· {instance.deliveryStatus || "Delivery not reported"}</span>
+                                           </div>
+                                           {(instance.body || instance.message) && <p className="mt-0.5 whitespace-pre-wrap">{instance.body || instance.message}</p>}
+                                         </div>
+                                       ))}
+                                     </div>
+                                   )}
+                                 </div>
+                               ))}
+                             </div>
+                           </div>
+                         )}
+                         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                           <div className="mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-semibold">Collection notes</h3><span className="text-xs text-slate-400">Append-only</span></div>
+                           <div className="flex gap-2"><Textarea value={collectionNote} onChange={e => setCollectionNote(e.target.value)} placeholder="Record a call, promise to pay, or collection context…" rows={2} /><Button disabled={!collectionNote.trim() || noteMutation.isPending} onClick={() => noteMutation.mutate(collectionNote.trim())}>{noteMutation.isPending ? "Saving…" : "Add note"}</Button></div>
+                           <div className="mt-4 space-y-2">{(detail.collectionsDetail?.notes ?? []).map((note: any) => <div key={note.id} className="border-t border-slate-200 pt-2 text-xs dark:border-slate-700"><p className="whitespace-pre-wrap">{note.body}</p><p className="mt-1 text-slate-400">{note.createdByUser?.firstName || "Team"} {note.createdByUser?.lastName || ""} · {fmtDate(note.createdAt)}</p></div>)}</div>
+                         </div>
+                       </div>
                     </TabsContent>
 
                     {/* Cash Application */}
                     <TabsContent value="cashapp" className="p-6">
-                      {!detail.cashAppLines?.length ? (
+                       <div className="mb-4 grid grid-cols-3 gap-3">
+                         <div className="rounded-xl border bg-slate-50 p-3"><p className="text-xs text-slate-400">Invoice amount</p><p className="text-lg font-semibold">{fmtCurrency(detail.amount)}</p></div>
+                         <div className="rounded-xl border bg-emerald-50 p-3"><p className="text-xs text-emerald-700">Applied</p><p className="text-lg font-semibold text-emerald-700">{fmtCurrency(detail.cash?.appliedTotal)}</p></div>
+                         <div className="rounded-xl border bg-amber-50 p-3"><p className="text-xs text-amber-700">Running balance</p><p className="text-lg font-semibold text-amber-700">{fmtCurrency(detail.cash?.outstanding)}</p></div>
+                       </div>
+                       {(detail.cash?.applications?.length ?? detail.cashAppLines?.length ?? 0) === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16">
                           <EmptyTabState icon={<DollarSign className="h-7 w-7" />} label="No payments applied to this invoice yet" />
                           <Button variant="outline" size="sm" onClick={() => navigate("/cash-application")} className="mt-2 gap-1.5 rounded-xl text-xs">
@@ -1527,14 +1610,15 @@ export default function InvoiceDetail() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          {detail.cashAppLines.map((l: any) => (
+                           {(detail.cash?.applications ?? detail.cashAppLines).map((l: any) => (
                             <div key={l.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                               <div className="flex items-center justify-between">
                                 <div>
                                   <p className="text-sm font-semibold text-slate-800 dark:text-white">Applied: {fmtCurrency(l.appliedAmount)}</p>
-                                  <p className="text-xs text-slate-400">Invoice total: {fmtCurrency(l.invoiceAmount)}</p>
-                                  {l.varianceReason && <p className="mt-0.5 text-xs text-slate-500">{l.varianceReason}</p>}
-                                </div>
+                                   <p className="text-xs text-slate-400">Invoice total: {fmtCurrency(l.invoiceAmount)}{l.application?.paymentDate ? ` · Paid ${fmtDate(l.application.paymentDate)}` : ""}</p>
+                                   {l.application && <p className="text-xs text-slate-500">{fmtCurrency(l.application.totalReceived)} received · {l.application.paymentMethod || "Method unavailable"} · {l.application.paymentReference || "No reference"} · {l.application.payorName || "Payor unavailable"}</p>}
+                                   {l.varianceReason && <p className="mt-0.5 text-xs text-slate-500">{l.varianceReason}</p>}
+                                  </div>
                                 <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
                                   l.varianceType === "full_match" ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
                                   l.varianceType === "short_pay"  ? "border-amber-200 bg-amber-50 text-amber-700" :
@@ -1550,13 +1634,14 @@ export default function InvoiceDetail() {
                               <ExternalLink className="h-3.5 w-3.5" />Manage in Cash Application
                             </Button>
                           </div>
+                           {detail.cash?.shortPay && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Short-pay: <strong>{fmtCurrency(detail.cash.shortPay.amount)}</strong>{detail.cash.shortPay.reason ? ` · ${detail.cash.shortPay.reason}` : ""}</div>}
                         </div>
                       )}
                     </TabsContent>
 
                     {/* Exceptions */}
-                    <TabsContent value="exceptions" className="p-6">
-                      {!detail.exceptions?.length ? (
+                     {false && (
+                       !detail.exceptions?.length ? (
                         <div className="flex flex-col items-center justify-center py-16">
                           <EmptyTabState icon={<ShieldAlert className="h-7 w-7" />} label="No exceptions on this invoice" />
                           <Button variant="outline" size="sm" onClick={() => navigate("/exceptions")} className="mt-2 gap-1.5 rounded-xl text-xs">
@@ -1592,31 +1677,32 @@ export default function InvoiceDetail() {
                             <Button variant="outline" size="sm" onClick={() => navigate("/exceptions")} className="gap-1.5 rounded-xl text-xs">
                               <ExternalLink className="h-3.5 w-3.5" />Manage in Exceptions
                             </Button>
-                          </div>
-                        </div>
-                      )}
-                    </TabsContent>
+                           </div>
+                         </div>
+                       )
+                     )}
 
                     {/* Timeline */}
                     <TabsContent value="timeline" className="p-6">
                       {timelineLoading ? (
                         <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
-                      ) : !timeline?.length ? (
+                       ) : !(timeline?.length || detail.timeline?.length) ? (
                         <EmptyTabState icon={<Activity className="h-7 w-7" />} label="No activity recorded yet" />
                       ) : (
                         <div className="relative space-y-0">
                           <div className="absolute left-[26px] top-4 bottom-4 w-px bg-slate-100 dark:bg-slate-800" />
-                          {timeline.map((event: any) => (
+                           {(timeline?.length ? timeline : detail.timeline).map((event: any) => (
                             <div key={event.id} className="relative flex gap-4 pb-5">
                               <div className="relative z-10 mt-0.5 shrink-0"><TimelineIcon category={event.category} /></div>
                               <div className="flex-1 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
                                 <div className="flex items-start justify-between gap-3">
                                   <p className="text-sm font-semibold text-slate-800 dark:text-white">{event.title}</p>
                                   <time className="shrink-0 text-[11px] text-slate-400">
-                                    {event.timestamp ? new Date(event.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+                                     {event.timestamp ? new Date(event.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""}
                                   </time>
                                 </div>
                                 {event.description && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{event.description}</p>}
+                                 {(event.actor?.name || event.actor?.firstName || event.actorUser?.name || event.actorUser?.firstName || event.actorName || event.actorId || event.meta?.actorType === "system") && <p className="mt-1 text-[11px] text-slate-400">By {event.actor?.name || [event.actor?.firstName, event.actor?.lastName].filter(Boolean).join(" ") || event.actorUser?.name || [event.actorUser?.firstName, event.actorUser?.lastName].filter(Boolean).join(" ") || event.actorName || event.actorId || "System"}</p>}
                               </div>
                             </div>
                           ))}
@@ -1707,7 +1793,7 @@ export default function InvoiceDetail() {
           <div className="grid gap-4">
             <div><label className="text-sm font-medium">Amount</label><Input type="number" value={editValues.amount} onChange={e => setEditValues(v => ({ ...v, amount: e.target.value }))} /></div>
             <div><label className="text-sm font-medium">Load Number</label><Input value={editValues.loadNumber} onChange={e => setEditValues(v => ({ ...v, loadNumber: e.target.value }))} /></div>
-            <div><label className="text-sm font-medium">Broker</label><Select value={editValues.debtorId || "none"} onValueChange={v => setEditValues(s => ({ ...s, debtorId: v === "none" ? "" : v }))}><SelectTrigger><SelectValue placeholder="Select broker" /></SelectTrigger><SelectContent><SelectItem value="none">No broker</SelectItem>{debtors.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}</SelectContent></Select></div>
+             <div><label className="text-sm font-medium">Broker</label><Select value={editValues.brokerId || "none"} onValueChange={v => setEditValues(s => ({ ...s, brokerId: v === "none" ? "" : v, debtorId: "" }))}><SelectTrigger><SelectValue placeholder="Select broker" /></SelectTrigger><SelectContent><SelectItem value="none">No broker</SelectItem>{brokers.map((broker: any) => <SelectItem key={broker.id} value={String(broker.id)}>{broker.name}</SelectItem>)}</SelectContent></Select></div>
             <div><label className="text-sm font-medium">Payment Type</label><Select value={editValues.paymentType} onValueChange={v => setEditValues(s => ({ ...s, paymentType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent></Select></div>
             {["ACH", "Wire"].includes(editValues.paymentType) && <div>
               <label className="text-sm font-medium">Bank Account</label>

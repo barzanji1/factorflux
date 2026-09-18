@@ -16,6 +16,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { ProcessorIdentity } from "@/components/assignments/processor-assignment";
 import { 
   Building, 
   Plus, 
@@ -65,12 +67,22 @@ interface Broker {
   zipCode?: string;
   mcNumber?: string;
   dotNumber?: string;
+  dba?: string;
   creditLimit?: number;
   paymentTerms: string;
   status: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  assignedProcessor?: string | null;
+  assignedProcessorUser?: {
+    id: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    profileImageUrl?: string;
+    role?: string;
+  } | null;
 }
 
 interface BrokersResponse {
@@ -78,6 +90,11 @@ interface BrokersResponse {
   total: number;
   page: number;
   totalPages: number;
+}
+
+function getBrokerDba(broker: Broker) {
+  if (broker.dba) return broker.dba;
+  return broker.notes?.match(/(?:^|\n)DBA:\s*(.+?)(?:\n|$)/i)?.[1]?.trim() || "—";
 }
 
 export default function Brokers() {
@@ -91,6 +108,9 @@ export default function Brokers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const isManager = user?.role === "admin" || user?.role === "manager";
+  const [processorFilter, setProcessorFilter] = useState<"all" | "me">("me");
 
   // Saved views
   const { allViews: savedViews } = useSavedViews("brokers");
@@ -109,6 +129,9 @@ export default function Brokers() {
     }, 300);
     return () => window.clearTimeout(timeout);
   }, [searchTerm]);
+  useEffect(() => {
+    setProcessorFilter(isManager ? "all" : "me");
+  }, [isManager]);
 
   // Fetch brokers server-side. Keep the payment terms filter separate from
   // status so saved views can continue to express either kind of filter.
@@ -121,7 +144,7 @@ export default function Brokers() {
       ? statusFilter.slice("quickpay_".length)
       : undefined;
   const { data: brokersResponse, isLoading } = useQuery<BrokersResponse>({
-    queryKey: ["/api/brokers", page, debouncedSearch, statusQuery, paymentTermsQuery],
+    queryKey: ["/api/brokers", page, debouncedSearch, statusQuery, paymentTermsQuery, processorFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
@@ -130,6 +153,7 @@ export default function Brokers() {
       });
       if (statusQuery) params.set("status", statusQuery);
       if (paymentTermsQuery) params.set("paymentTerms", paymentTermsQuery);
+      if (processorFilter === "me") params.set("processor", "me");
       const response = await fetch(`/api/brokers?${params.toString()}`, {
         credentials: "include",
       });
@@ -330,12 +354,16 @@ export default function Brokers() {
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <Input
-                placeholder="Search by name, contact, or email…"
+                placeholder="Search by name, MC#, DOT#, contact, or email…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 data-testid="input-search-brokers"
                 className="h-8 rounded-full pl-9 text-[12px]"
               />
+            </div>
+            <div className="flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+              {isManager && <button type="button" onClick={() => { setProcessorFilter("all"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "all" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-500"}`}>All Brokers</button>}
+              <button type="button" onClick={() => { setProcessorFilter("me"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "me" ? "bg-blue-600 text-white" : "text-slate-500"}`}>My Brokers</button>
             </div>
             <div className="flex gap-1.5">
               {(["all","active","suspended","inactive"] as const).map(s => (
@@ -416,16 +444,17 @@ export default function Brokers() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="ff-data-table w-full min-w-[860px]">
+              <table className="ff-data-table w-full min-w-[980px]">
                 <thead>
                   <tr>
-                    <th>Broker</th>
-                    <th>Contact Person</th>
-                    <th>Contact Info</th>
-                    <th>Location</th>
-                    <th>Terms</th>
-                    <th className="text-right">Credit Limit</th>
+                    <th>Broker Name</th>
+                    <th>MC#</th>
+                    <th>DOT#</th>
+                    <th>DBA</th>
                     <th>Status</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Assigned To</th>
                     <th className="pr-5">Actions</th>
                   </tr>
                 </thead>
@@ -440,53 +469,20 @@ export default function Brokers() {
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/20">
                             <Building className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                           </div>
-                          <div>
-                            <p className="font-medium text-slate-900 dark:text-white">{broker.name}</p>
-                            {broker.mcNumber && (
-                              <p className="text-[10.5px] text-slate-400 dark:text-slate-500">MC: {broker.mcNumber}</p>
-                            )}
-                          </div>
+                          <p className="font-medium text-slate-900 dark:text-white">{broker.name}</p>
                         </div>
                       </td>
-                      <td className="text-slate-700 dark:text-slate-300">{broker.contactPerson}</td>
-                      <td>
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="h-3 w-3 text-slate-400" />
-                            <span className="text-[11.5px] text-slate-600 dark:text-slate-400">{broker.phone}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Mail className="h-3 w-3 text-slate-400" />
-                            <span className="text-[11.5px] text-slate-600 dark:text-slate-400">{broker.email}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        {broker.city && broker.state ? (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-slate-400" />
-                            <span className="text-[11.5px] text-slate-600 dark:text-slate-400">{broker.city}, {broker.state}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600">—</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={broker.paymentTerms === "quickpay"
-                          ? "ff-badge ff-badge-overdue"
-                          : "ff-badge ff-badge-draft"
-                        }>
-                          {getPaymentTermsLabel(broker.paymentTerms)}
-                        </span>
-                      </td>
-                      <td className="text-right font-semibold text-slate-700 dark:text-slate-300">
-                        {broker.creditLimit ? `$${broker.creditLimit.toLocaleString()}` : <span className="text-slate-300 dark:text-slate-600">—</span>}
-                      </td>
+                      <td className="font-mono text-xs text-slate-600 dark:text-slate-300">{broker.mcNumber || "—"}</td>
+                      <td className="font-mono text-xs text-slate-600 dark:text-slate-300">{broker.dotNumber || "—"}</td>
+                      <td className="text-slate-700 dark:text-slate-300">{getBrokerDba(broker)}</td>
                       <td>
                         <span className={getBrokerBadge(broker.status)}>
                           {broker.status.charAt(0).toUpperCase() + broker.status.slice(1)}
                         </span>
                       </td>
+                      <td className="text-slate-600 dark:text-slate-400">{broker.email || "—"}</td>
+                      <td className="text-slate-600 dark:text-slate-400">{broker.phone || "—"}</td>
+                      <td><ProcessorIdentity person={broker.assignedProcessorUser} compact /></td>
                       <td className="pr-5">
                         <div className="flex items-center gap-1">
                           <button
@@ -504,14 +500,16 @@ export default function Brokers() {
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => { if (confirm("Delete this broker?")) deleteBrokerMutation.mutate(broker.id); }}
-                            data-testid={`button-delete-${broker.id}`}
-                            className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-slate-100 text-red-400 hover:bg-red-50 dark:bg-slate-800 dark:text-red-400"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {isManager && (
+                            <button
+                              type="button"
+                              onClick={() => { if (confirm("Delete this broker?")) deleteBrokerMutation.mutate(broker.id); }}
+                              data-testid={`button-delete-${broker.id}`}
+                              className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-slate-100 text-red-400 hover:bg-red-50 dark:bg-slate-800 dark:text-red-400"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

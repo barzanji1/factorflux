@@ -28,6 +28,7 @@ import {
   CheckCircle2, AlertTriangle, User, Hash, TrendingUp, Plus, Trash2,
   MessageSquare, Send,
 } from "lucide-react";
+import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -266,6 +267,10 @@ export default function BrokerDetail() {
                   >
                     <Edit2 className="h-3.5 w-3.5" />Edit Broker
                   </Button>
+                   <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                     <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned Processor</p>
+                     <ProcessorAssignment record={broker} endpoint={`/api/brokers/${brokerId}/assign`} queryKey={["/api/brokers", brokerId]} />
+                   </div>
                   {isAdmin && broker && broker.status !== "active" && (
                     <Button size="sm" onClick={() => statusMutation.mutate("active")}
                       disabled={statusMutation.isPending}

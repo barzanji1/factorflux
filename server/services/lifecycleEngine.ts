@@ -278,6 +278,7 @@ const fxCreatePayout: SideEffect = async ({ invoiceId, actorId, paymentMethod, b
     bankAccountVaultId,
     paymentStatus: "advance_paid",
     advancePaidAt: new Date(),
+    advancePaidBy: actorId,
     notes: "Auto-created by lifecycle engine on invoice funding",
     createdBy: actorId,
   });
@@ -705,6 +706,7 @@ async function executeFundTransaction(
       bankAccountVaultId,
       paymentStatus: "advance_paid",
       advancePaidAt: new Date(),
+      advancePaidBy: actorId,
       notes: "Auto-created by lifecycle engine on invoice funding",
       createdBy: actorId,
     });
