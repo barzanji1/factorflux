@@ -8,6 +8,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 
 const schema = z.object({
   companyName: z.string().min(2, "Company name required"),
@@ -68,9 +69,7 @@ export default function PortalRegister() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
       <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-md w-full shadow-sm">
         <div className="flex items-center gap-2 mb-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-            <Truck className="h-5 w-5 text-white" />
-          </div>
+          <FactorFluxLogo showWordmark={false} shine markClassName="h-9 w-9" />
           <div>
             <p className="font-bold text-slate-900 text-sm leading-none">Carrier Portal</p>
             <p className="text-slate-400 text-[10px]">Trucking Pros Financial</p>
