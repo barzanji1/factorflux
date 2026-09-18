@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data";
-import { AlertCircle, Bell, BellOff, Hash, MessageCircle, Minus, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X } from "lucide-react";
+import { AlertCircle, Bell, BellOff, Hash, Maximize2, MessageCircle, Minimize2, Minus, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -174,6 +174,7 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(!docked);
   const [closed, setClosed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const soundStorageKey = `team-chat:sound:${user?.id ?? "anonymous"}`;
   const [soundEnabled, setSoundEnabled] = useState(
     () => window.localStorage.getItem(soundStorageKey) !== "muted"
@@ -514,8 +515,12 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
         "flex flex-col bg-[#c0c0c0]",
         docked
           ? cn(
-              "pointer-events-auto fixed bottom-0 right-4 z-50 w-[min(320px,calc(100vw-1rem))] border-2 border-[#808080] shadow-[3px_3px_0_rgba(50,50,50,.28)]",
-              open ? "h-[min(420px,100dvh)]" : "h-12"
+              "pointer-events-auto fixed bottom-0 right-4 z-50 border-2 border-[#808080] shadow-[3px_3px_0_rgba(50,50,50,.28)] transition-[width,height] duration-200",
+              open
+                ? expanded
+                  ? "h-[min(720px,calc(100dvh-1rem))] w-[calc(100vw-1rem)] md:min-w-[560px] md:w-[min(50vw,760px)]"
+                  : "h-[min(420px,100dvh)] w-[min(320px,calc(100vw-1rem))]"
+                : "h-12 w-[min(320px,calc(100vw-1rem))]"
             )
           : "h-full"
       )}
@@ -531,6 +536,9 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
           <button type="button" onClick={toggleSound} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-white/80 hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label={soundEnabled ? "Mute Team Chat sounds" : "Unmute Team Chat sounds"} aria-pressed={!soundEnabled} title={soundEnabled ? "Mute chat sounds" : "Unmute chat sounds"}>
             {soundEnabled ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
           </button>
+          {open && <button type="button" onClick={() => setExpanded((value) => !value)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-white/80 hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label={expanded ? "Restore compact Team Chat" : "Enlarge Team Chat"} aria-pressed={expanded} title={expanded ? "Restore compact size" : "Enlarge chat"}>
+            {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </button>}
           <button type="button" onClick={() => setOpen((value) => !value)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-white/80 hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label={open ? "Collapse Team Chat" : "Expand Team Chat"} aria-expanded={open}>
             <Minus className="h-4 w-4" />
           </button>
@@ -543,7 +551,7 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
         "flex min-h-0 w-full flex-1 overflow-hidden border-2 border-[#808080] bg-[#d4d0c8] shadow-[inset_1px_1px_#fff]",
         docked && "flex-1"
       )}>
-        <aside className="flex w-[120px] shrink-0 flex-col border-r-2 border-[#808080] bg-[#c0c0c0]">
+        <aside className={cn("flex shrink-0 flex-col border-r-2 border-[#808080] bg-[#c0c0c0] transition-[width] duration-200", expanded ? "w-[190px]" : "w-[120px]")}>
           <div className="flex h-10 items-center justify-center border-b-2 border-[#808080] bg-[#dff5f6]">
             <button type="button" onClick={() => setPickerOpen(true)} title="New direct message" aria-label="New direct message" className="flex h-7 w-7 items-center justify-center rounded-sm bg-[#098b9f] text-white hover:bg-[#087c8d]"><Plus className="h-4 w-4" /></button>
           </div>
@@ -554,8 +562,9 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
               : visibleChannels.map((channel) => {
                 const isDirect = channel.type === "direct" || Boolean(channel.directName);
                 const label = isDirect ? channel.directName || channel.name : channel.name;
-                  return <button key={channel.id} onClick={() => setSelectedId(channel.id)} title={label} aria-label={label} className={cn("relative flex h-11 w-full items-center justify-center border-l-2 text-left hover:bg-[#d4d0c8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]", String(selectedId) === String(channel.id) ? "border-[#098b9f] bg-[#dff5f6]" : "border-transparent")}>
+                   return <button key={channel.id} onClick={() => setSelectedId(channel.id)} title={label} aria-label={label} className={cn("relative flex h-11 w-full items-center gap-2 border-l-2 text-left hover:bg-[#d4d0c8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]", expanded ? "justify-start px-2" : "justify-center", String(selectedId) === String(channel.id) ? "border-[#098b9f] bg-[#dff5f6]" : "border-transparent")}>
                    <span className={cn("flex h-8 w-8 items-center justify-center rounded-sm text-[10px] font-bold", isDirect ? "bg-[#efc886] text-[#674c20]" : "bg-[#8bbfc1] text-[#154c51]")}>{isDirect ? initials(label) : <Hash className="h-4 w-4" />}</span>
+                    {expanded && <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#1a1a1a]">{label}</span>}
                    {channel.unreadCount > 0 && <span className="absolute right-3 top-1.5 h-2.5 w-2.5 rounded-full border border-[#c0c0c0] bg-[#b54444]" aria-label={`${channel.unreadCount} unread`} />}
                 </button>;
               })}
