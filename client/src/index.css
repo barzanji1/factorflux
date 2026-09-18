@@ -772,11 +772,13 @@ body {
 }
 
 .bevel-button {
-  border: 1px solid #77746e !important;
+  border: 2px solid !important;
+  border-color: #ffffff #727272 #727272 #ffffff !important;
+  border-radius: 1px !important;
   box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.8),
-    inset -1px -1px 0 rgba(70, 70, 70, 0.35),
-    1px 1px 0 rgba(50, 50, 50, 0.2);
+    inset 1px 1px 0 rgba(255, 255, 255, 0.55),
+    inset -1px -1px 0 rgba(64, 64, 64, 0.18),
+    1px 1px 0 rgba(35, 35, 35, 0.28);
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease,
@@ -786,7 +788,39 @@ body {
 
 .bevel-button:active:not(:disabled) {
   transform: translate(1px, 1px);
-  box-shadow: inset 1px 1px 2px rgba(50, 50, 50, 0.3);
+  border-color: #727272 #ffffff #ffffff #727272 !important;
+  box-shadow: inset 1px 1px 1px rgba(40, 40, 40, 0.24);
+}
+
+.ff-sidebar-button {
+  border: 2px solid;
+  border-color: #ffffff #777777 #777777 #ffffff;
+  border-radius: 1px;
+  background: #c8c8c8;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.45),
+    1px 1px 0 rgba(48, 48, 48, 0.2);
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.ff-sidebar-button:hover {
+  background: #d4d0c8;
+  border-color: #ffffff #666666 #666666 #ffffff;
+}
+
+.ff-sidebar-button[aria-current="page"] {
+  background: #c8e7e9;
+  border-color: #ffffff #6f8587 #6f8587 #ffffff;
+  box-shadow:
+    inset 3px 0 0 #27aab8,
+    inset 1px 1px 0 rgba(255, 255, 255, 0.5),
+    1px 1px 0 rgba(48, 48, 48, 0.2);
+}
+
+.ff-sidebar-button:active {
+  border-color: #777777 #ffffff #ffffff #777777;
+  box-shadow: inset 1px 1px 1px rgba(40, 40, 40, 0.24);
+  transform: translate(1px, 1px);
 }
 
 [data-button-variant="default"]:hover:not(:disabled) {

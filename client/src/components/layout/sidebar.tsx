@@ -336,7 +336,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                <p className="mb-1 px-2 text-[9.5px] font-bold uppercase tracking-[0.2em] text-[#444]">
                 {section.title}
               </p>
-              <div className="space-y-px">
+              <div className="space-y-[2px]">
                 {section.items.map(item => {
                   const active = isRouteActive(location, item.href);
                   const Icon = item.icon;
@@ -347,11 +347,11 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                       onClick={() => navigateTo(item.href)}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                         "group flex w-full items-center gap-2 border-l-2 border-transparent px-2.5 py-2 text-left transition-colors duration-100",
+                         "ff-sidebar-button group flex min-h-10 w-full items-center gap-2 px-2.5 py-2 text-left transition-colors duration-100",
                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#098b9f]",
                         active
-                           ? "bg-[#dff5f6] text-[#1a1a1a] border-l-2 border-[#098b9f] pl-[9px]"
-                           : "text-[#1a1a1a] hover:bg-[#d4d0c8] hover:border-[#27aab8]"
+                           ? "text-[#1a1a1a]"
+                           : "text-[#444]"
                       )}
                     >
                       <Icon className={cn(
