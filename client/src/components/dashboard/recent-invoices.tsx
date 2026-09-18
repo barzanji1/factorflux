@@ -134,7 +134,7 @@ Thank you for your business!
 
   if (isLoading) {
     return (
-      <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+      <Card className="ff-dashboard-card rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
         <CardHeader className="border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">
@@ -156,7 +156,7 @@ Thank you for your business!
   }
 
   return (
-    <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+    <Card className="ff-dashboard-card rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
       <CardHeader className="border-b border-slate-100 dark:border-slate-800">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">

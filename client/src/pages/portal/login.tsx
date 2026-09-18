@@ -45,7 +45,7 @@ export default function PortalLogin() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    <div className="ff-auth-page ff-portal-shell min-h-screen bg-[#d4d0c8] flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-sm w-full shadow-sm">
         <div className="flex items-center gap-2.5 mb-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm">

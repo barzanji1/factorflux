@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 const badgeVariants = cva(
   [
     "inline-flex items-center gap-1",
-    "rounded-full px-2.5 py-1",
-    "text-xs font-semibold",
+    "rounded-sm px-2 py-1",
+    "text-[10px] font-bold uppercase tracking-[0.06em]",
     "border transition-all duration-200",
     "focus:outline-none focus:ring-2 focus:ring-ring/20 focus:ring-offset-2",
   ].join(" "),

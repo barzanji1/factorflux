@@ -61,7 +61,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#d4d0c8] flex items-center justify-center p-4">
+    <div className="ff-auth-page min-h-screen bg-[#d4d0c8] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="mx-auto mb-4 flex justify-center"><FactorFluxLogo /></div>

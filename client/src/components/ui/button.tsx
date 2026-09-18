@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
   "bevel-button inline-flex items-center justify-center gap-2 " +
-    "whitespace-nowrap rounded-sm text-sm font-semibold " +
+    "whitespace-nowrap rounded-sm text-[13px] font-semibold " +
     "ring-offset-background focus-visible:outline-none " +
     "disabled:pointer-events-none disabled:opacity-50 " +
     "[&_svg]:pointer-events-none [&_svg]:size-4 " +
@@ -23,15 +23,15 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground",
+          "bg-transparent hover:bg-accent hover:text-accent-foreground",
         link:
           "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "h-9 px-3",
+        sm: "h-8 rounded-sm px-2.5",
+        lg: "h-10 rounded-sm px-5",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: {

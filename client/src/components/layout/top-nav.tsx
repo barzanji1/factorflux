@@ -228,9 +228,8 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   const displayLastName = authUser?.lastName || "";
   const fullName = `${displayFirstName} ${displayLastName}`.trim() || "Agent";
   const userRole = authUser?.role || "Employee";
-  const avatarSrc =
-    authUser?.profileImageUrl ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=2563EB&color=fff`;
+  const avatarSrc = authUser?.profileImageUrl || "";
+  const initials = fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   const filteredNotifications = notifFilter === "unread"
     ? notifications.filter((n) => !n.read)
@@ -244,33 +243,33 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
         </SheetContent>
       </Sheet>
 
-      <header className="sticky top-0 z-30 border-b-2 border-[#808080] !bg-[#c0c0c0] px-4 py-3">
+      <header className="ff-top-nav sticky top-0 z-30 border-b-2 border-[#808080] !bg-[#c0c0c0] px-4 py-3">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center">
             <div className="flex min-w-0 items-start gap-3">
               <Button
                 variant="ghost"
                 size="icon"
-                className="mt-1 h-10 w-10 shrink-0 rounded-xl border border-slate-200 bg-white md:hidden dark:border-slate-800 dark:bg-slate-900"
+                 className="mt-1 h-10 w-10 shrink-0 rounded-sm border-2 border-[#808080] bg-white md:hidden"
                 onClick={() => setMobileNavOpen(true)}
               >
                 <Menu className="h-5 w-5" />
               </Button>
               <div className="min-w-0">
                 {group && (
-                  <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                   <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-[#444]">
                     <span>{group}</span>
                     <ChevronRight className="h-3 w-3" />
-                    <span className="text-slate-500 dark:text-slate-400">{title}</span>
+                     <span className="text-[#1a1a1a]">{title}</span>
                   </div>
                 )}
                 <h1 className="truncate text-xl font-bold tracking-tight text-[#1a1a1a]">{title}</h1>
-                {subtitle && <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
+                 {subtitle && <p className="mt-0.5 truncate text-sm text-[#444]">{subtitle}</p>}
               </div>
             </div>
 
             <div className="relative w-full max-w-2xl lg:ml-4" ref={searchRef}>
-              <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
+               <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[#666]" />
               <Input
                 type="text"
                 placeholder="Search carriers, load ledger, counterparties..."
@@ -280,7 +279,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                 className="qc-topbar-search h-12 w-full pl-11 pr-4 text-sm"
               />
               {showSearchResults && (
-                <div className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)] dark:bg-slate-900">
+                 <div className="ff-top-nav-menu absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-sm border-2 border-[#808080] bg-white shadow-[2px_2px_0_#404040]">
                   <div className="custom-scrollbar max-h-96 overflow-y-auto p-2">
                     {isSearching ? (
                       <div className="px-4 py-8 text-center text-sm text-slate-500">Searching...</div>
@@ -291,8 +290,8 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                             <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Clients</div>
                             {searchResults.clients.slice(0, 3).map((client) => (
                               <button key={`client-${client.id}`} type="button" onClick={() => handleSearchItemClick("client")}
-                                className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800">
-                                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"><Users className="h-4 w-4" /></div>
+                                 className="flex w-full items-start gap-3 rounded-sm px-3 py-3 text-left hover:bg-[#dff5f6]">
+                                 <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-sm border border-[#c0c0c0] bg-[#dff5f6] text-[#098b9f]"><Users className="h-4 w-4" /></div>
                                 <div className="min-w-0">
                                   <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{client.name}</div>
                                   <div className="truncate text-xs text-slate-500">{client.contactPerson}</div>
@@ -306,7 +305,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                             <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Invoices</div>
                             {searchResults.invoices.slice(0, 3).map((invoice) => (
                               <button key={`invoice-${invoice.id}`} type="button" onClick={() => handleSearchItemClick("invoice")}
-                                className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800">
+                                 className="flex w-full items-start gap-3 rounded-sm px-3 py-3 text-left hover:bg-[#dff5f6]">
                                 <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"><FileText className="h-4 w-4" /></div>
                                 <div className="min-w-0">
                                   <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">Invoice #{invoice.invoiceNumber}</div>
@@ -321,7 +320,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                             <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Loads</div>
                             {searchResults.loads.slice(0, 3).map((load) => (
                               <button key={`load-${load.id}`} type="button" onClick={() => handleSearchItemClick("load")}
-                                className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800">
+                                 className="flex w-full items-start gap-3 rounded-sm px-3 py-3 text-left hover:bg-[#dff5f6]">
                                 <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"><FolderOpen className="h-4 w-4" /></div>
                                 <div className="min-w-0">
                                   <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">Load #{load.id}</div>
@@ -345,7 +344,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
           <div className="flex flex-wrap items-center justify-end gap-3">
             {showHomeButton && (
               <Button variant="outline" size="sm" onClick={() => setLocation("/")}
-                className="h-11 rounded-xl border-blue-200 bg-white px-4 text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-blue-950/20">
+                 className="h-11 rounded-sm border-2 border-[#808080] bg-[#d4d0c8] px-4 text-[#1a1a1a] hover:bg-[#dff5f6]">
                 <Home className="mr-2 h-4 w-4" />
                 Home
               </Button>
@@ -353,15 +352,15 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button className="h-11 rounded-xl bg-blue-600 px-4 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)] hover:bg-blue-700">
+                 <Button className="h-11 rounded-sm border-2 border-[#fff] bg-[#27aab8] px-4 text-white shadow-[2px_2px_0_#404040] hover:bg-[#098b9f]">
                   <Plus className="mr-2 h-4 w-4" />
                   New
                   <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 rounded-2xl border border-[hsl(var(--border))] p-2">
+               <DropdownMenuContent align="end" className="w-56 rounded-sm border-2 border-[#808080] bg-[#fff] p-2 shadow-[2px_2px_0_#404040]">
                 {quickActions.map((action) => (
-                  <DropdownMenuItem key={action.label} onClick={action.action} className="cursor-pointer rounded-xl px-3 py-2.5">
+                   <DropdownMenuItem key={action.label} onClick={action.action} className="cursor-pointer rounded-sm px-3 py-2.5">
                     <action.icon className="mr-2 h-4 w-4" />
                     {action.label}
                   </DropdownMenuItem>
@@ -372,9 +371,9 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
             {/* ── Notification Bell ── */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm"
-                  className="relative h-11 w-11 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800">
-                  <Bell className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              <Button variant="ghost" size="sm"
+                   className="relative h-9 w-9 rounded-sm border-2 border-[#808080] bg-white hover:bg-[#dff5f6]">
+                   <Bell className="h-5 w-5 text-[#1a1a1a]" />
                   {unreadCount > 0 && (
                     <Badge variant="destructive"
                       className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">
@@ -384,7 +383,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                 </Button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent align="end" className="w-[380px] rounded-2xl border border-[hsl(var(--border))] p-0">
+               <DropdownMenuContent align="end" className="w-[min(380px,calc(100vw-1rem))] rounded-sm border-2 border-[#808080] bg-white p-0 shadow-[2px_2px_0_#404040]">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                   <div>
@@ -491,10 +490,9 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost"
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-2 pr-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800">
-                  <div className="mr-3 h-8 w-8 overflow-hidden rounded-full border border-slate-200 dark:border-slate-700">
-                    <img src={avatarSrc} alt="User Profile" className="h-full w-full object-cover"
-                      onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=2563EB&color=fff`; }} />
+                  className="h-9 rounded-sm border-2 border-[#808080] bg-white px-2 pr-3 hover:bg-[#dff5f6]">
+                  <div className="mr-2 flex h-7 w-7 items-center justify-center overflow-hidden rounded-sm border border-[#808080] bg-[#098b9f] text-[10px] font-bold text-white">
+                    {avatarSrc ? <img src={avatarSrc} alt="User Profile" className="h-full w-full object-cover" /> : initials}
                   </div>
                   <div className="hidden text-left md:block">
                     <div className="flex items-center gap-1.5">
@@ -506,7 +504,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                   <ChevronDown className="ml-2 h-4 w-4 text-slate-500" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 rounded-2xl border border-[hsl(var(--border))] p-2">
+               <DropdownMenuContent align="end" className="w-56 rounded-sm border-2 border-[#808080] bg-white p-2 shadow-[2px_2px_0_#404040]">
                 <div className="px-3 py-2">
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">{fullName}</p>
                   <p className="text-xs capitalize text-slate-500 dark:text-slate-400">{userRole}</p>

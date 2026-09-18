@@ -1,0 +1,48 @@
+Redesign the FactorFlux UI with a clean professional aesthetic inspired by Windows 95 — embossed cards, beveled buttons, light gray theme, with modern typography. Full redesign across all pages.
+Design System
+* Primary background: #d4d0c8 (classic Win95 gray)
+* Secondary background: #ffffff (content areas)
+* Sidebar background: #c0c0c0 (light gray)
+* Primary brand color: #27aab8 (teal from logo)
+* Dark accent: #098b9f
+* Text primary: #1a1a1a
+* Text secondary: #444444
+Embossed/Beveled Effects (CSS)
+* Cards: border: 2px solid; border-color: #ffffff #808080 #808080 #ffffff; background: #d4d0c8;
+* Buttons: raised bevel effect — border-color: #ffffff #808080 #808080 #ffffff on default, inverted on hover/active
+* Input fields: inset bevel — border-color: #808080 #ffffff #ffffff #808080
+* Sidebar nav items: flat on default, embossed on active/hover
+Sidebar
+* Full light gray (#c0c0c0) background
+* Replace current diamond icon with the FactorFlux SVG logo at top
+* Logo colors: #27aab8 and #098b9f — render inline SVG
+* "FactorFlux" text next to logo in bold dark text
+* "Freight Factoring OS" subtitle
+* Nav items: dark text, teal left border on active item
+* Section labels (WORKSPACE, FUNDING, etc.) in small caps, darker gray
+* User card at bottom with embossed border
+Top Navigation Bar
+* Light gray background matching sidebar
+* Search bar with inset bevel effect
+* "+ New" button with teal background and beveled border
+* Bell and profile with embossed button style
+Dashboard Cards (Today at a Glance)
+* Embossed card style — raised border effect
+* Stat number in large bold teal
+* Label in dark gray
+* Subtle gray background
+All Cards and Panels
+* Embossed border on all white/gray panels
+* Section headers with classic bold text
+* Table rows with subtle alternating #f0f0f0 / #ffffff
+* Hover states with teal left border highlight
+Buttons
+* Primary: teal background #27aab8, beveled border, white text
+* Secondary: gray #d4d0c8, beveled border, dark text
+* Danger: #cc0000, beveled border
+* All buttons: slight text-shadow for depth
+* Active state: inverted bevel (pressed effect)
+Typography
+* Primary font: keep current sans-serif but increase weight contrast
+* Headers: bold, dark, slightly larger
+* Labels: uppercase, tracked, smaller

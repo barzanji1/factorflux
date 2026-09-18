@@ -213,8 +213,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Inter", ui-sans-serif, system-ui, -apple-system,
-      BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: "DM Sans", "Segoe UI", Tahoma, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     min-height: 100vh;
     text-rendering: optimizeLegibility;
@@ -607,7 +606,9 @@
   to   { transform: rotate(360deg); }
 }
 
-/* ─── FactorFlux Win95 cockpit skin ─────────────────────────────────────── */
+/* ─── FactorFlux operating system skin ───────────────────────────────────
+   Canonical tactile palette. Keep this block last so shared primitives and
+   legacy modules converge on one deliberate visual language. */
 :root {
   --ff-bg: #d4d0c8;
   --ff-surface: #ffffff;
@@ -633,7 +634,7 @@
 body {
   background: var(--ff-bg);
   color: var(--ff-text-0);
-  font-family: "Segoe UI", Tahoma, Geneva, sans-serif;
+  font-family: "DM Sans", "Segoe UI", Tahoma, sans-serif;
 }
 
 .ff-card, .qc-card {
@@ -689,6 +690,56 @@ body {
 }
 .ff-data-table tbody tr:nth-child(odd) { background: #f0f0f0; }
 .ff-data-table tbody tr:hover { background: #dff5f6; box-shadow: inset 3px 0 #27aab8; }
+
+/* Shared surface contract */
+.ff-card, .qc-card {
+  box-shadow: 2px 2px 0 #808080, -2px -2px 0 #fff;
+}
+.ff-card > :first-child,
+.qc-card > :first-child { border-top-left-radius: 0; border-top-right-radius: 0; }
+.ff-card h1, .ff-card h2, .ff-card h3,
+.qc-card h1, .qc-card h2, .qc-card h3 { letter-spacing: -0.02em; }
+
+/* Dense operational controls */
+.ff-btn-primary, .qc-button-primary,
+[data-button-variant="default"] {
+  min-height: 32px;
+  background: #27aab8 !important;
+  border-color: #fff #098b9f #098b9f #fff !important;
+}
+.ff-btn-primary:hover, .qc-button-primary:hover,
+[data-button-variant="default"]:hover:not(:disabled) { background: #098b9f !important; }
+.ff-btn-secondary, .qc-button-secondary,
+[data-button-variant="secondary"], [data-button-variant="outline"] {
+  min-height: 32px;
+  background: #d4d0c8 !important;
+  border-color: #fff #808080 #808080 #fff !important;
+}
+.ff-btn-danger, [data-button-variant="destructive"] {
+  background: #b51f1f !important;
+  border-color: #fff #6e1111 #6e1111 #fff !important;
+}
+.ff-btn-danger:hover, [data-button-variant="destructive"]:hover:not(:disabled) { background: #8f1f1f !important; }
+.ff-input, .qc-topbar-search {
+  min-height: 32px;
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+}
+.ff-input:focus, .qc-topbar-search:focus {
+  border-color: #098b9f !important;
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18), 0 0 0 1px #27aab8 !important;
+}
+.ff-data-table thead th {
+  background: #c0c0c0;
+  color: #1a1a1a !important;
+  border-bottom: 2px solid #808080;
+}
+.ff-data-table tbody tr:nth-child(even) { background: #fff; }
+.ff-data-table tbody tr:hover {
+  background: #dff5f6 !important;
+  box-shadow: inset 3px 0 #27aab8;
+}
+.ff-data-table tbody td { color: #1a1a1a !important; }
+.uppercase, [data-label] { letter-spacing: .08em; }
 
 /* ─── Shared button and active-control contract ─────────────────────────── */
 :root,
@@ -760,18 +811,13 @@ body {
   color: #fff !important;
 }
 
-button:not([data-button-variant]):hover:not(:disabled) {
-  background-color: var(--button-subtle-hover) !important;
-  color: #1a1a1a !important;
-}
-
 [data-state="on"] {
   background-color: hsl(var(--accent));
   color: hsl(var(--accent-foreground));
 }
 
 *:focus-visible {
-  outline: 2px solid #246669;
+  outline: 2px solid #098b9f;
   outline-offset: 2px;
 }
 
@@ -788,4 +834,121 @@ button:not([data-button-variant]):hover:not(:disabled) {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ─── Scoped legacy normalization ─────────────────────────────────────────
+   The operating system skin is intentionally scoped to application and
+   carrier-portal shells. This lets older modules converge without touching
+   public/third-party surfaces or semantic status colors. */
+.ff-app-shell,
+.ff-portal-shell {
+  --ff-shell-bg: #d4d0c8;
+  --ff-shell-surface: #fff;
+  --ff-shell-muted: #f0f0f0;
+  --ff-shell-rail: #c0c0c0;
+  --ff-shell-border: #808080;
+  --ff-shell-ink: #1a1a1a;
+  --ff-shell-copy: #444;
+  --ff-shell-teal: #098b9f;
+  --ff-shell-teal-light: #dff5f6;
+}
+
+/* Old rounded SaaS geometry becomes compact, tactile controls. Avatars,
+   pills, and status dots remain rounded-full by design. */
+.ff-app-shell :is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"], [class~="rounded-[20px]"], [class~="rounded-[18px]"], [class~="rounded-[16px]"], [class~="rounded-[14px]"], [class~="rounded-[12px]"], [class~="rounded-[10px]"], [class~="rounded-[9px]"]):not([class~="rounded-full"]),
+.ff-portal-shell :is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"], [class~="rounded-[20px]"], [class~="rounded-[18px]"], [class~="rounded-[16px]"], [class~="rounded-[14px]"], [class~="rounded-[12px]"], [class~="rounded-[10px]"], [class~="rounded-[9px]"]):not([class~="rounded-full"]) {
+  border-radius: 2px !important;
+}
+
+/* Neutral legacy palette: slate/gray utilities are not status semantics. */
+.ff-app-shell :is([class~="text-slate-900"], [class~="text-slate-800"], [class~="text-slate-700"], [class~="text-slate-600"], [class~="text-slate-500"], [class~="text-slate-400"], [class~="text-gray-900"], [class~="text-gray-800"], [class~="text-gray-700"], [class~="text-gray-600"], [class~="text-gray-500"], [class~="text-gray-400"]),
+.ff-portal-shell :is([class~="text-slate-900"], [class~="text-slate-800"], [class~="text-slate-700"], [class~="text-slate-600"], [class~="text-slate-500"], [class~="text-slate-400"], [class~="text-gray-900"], [class~="text-gray-800"], [class~="text-gray-700"], [class~="text-gray-600"], [class~="text-gray-500"], [class~="text-gray-400"]) {
+  color: var(--ff-shell-copy) !important;
+}
+.ff-app-shell :is([class~="bg-slate-50"], [class~="bg-slate-100"], [class~="bg-slate-200"], [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"]) ,
+.ff-portal-shell :is([class~="bg-slate-50"], [class~="bg-slate-100"], [class~="bg-slate-200"], [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"]) {
+  background-color: var(--ff-shell-muted) !important;
+}
+.ff-app-shell :is([class~="border-slate-100"], [class~="border-slate-200"], [class~="border-slate-300"], [class~="border-gray-100"], [class~="border-gray-200"], [class~="border-gray-300"]),
+.ff-portal-shell :is([class~="border-slate-100"], [class~="border-slate-200"], [class~="border-slate-300"], [class~="border-gray-100"], [class~="border-gray-200"], [class~="border-gray-300"]) {
+  border-color: var(--ff-shell-border) !important;
+}
+
+/* Blue action language maps to FactorFlux teal; red/amber/emerald remain
+   semantic danger, warning, and success signals. */
+.ff-app-shell :is([class~="text-blue-400"], [class~="text-blue-500"], [class~="text-blue-600"], [class~="text-blue-700"]),
+.ff-portal-shell :is([class~="text-blue-400"], [class~="text-blue-500"], [class~="text-blue-600"], [class~="text-blue-700"]) {
+  color: var(--ff-shell-teal) !important;
+}
+.ff-app-shell :is([class~="bg-blue-50"], [class~="bg-blue-100"]),
+.ff-portal-shell :is([class~="bg-blue-50"], [class~="bg-blue-100"]) {
+  background-color: var(--ff-shell-teal-light) !important;
+}
+.ff-app-shell :is([class~="bg-blue-600"], [class~="bg-blue-700"]),
+.ff-portal-shell :is([class~="bg-blue-600"], [class~="bg-blue-700"]) {
+  background-color: #27aab8 !important;
+  color: #fff !important;
+}
+.ff-app-shell :is([class~="hover:bg-blue-600"], [class~="hover:bg-blue-700"]):hover,
+.ff-portal-shell :is([class~="hover:bg-blue-600"], [class~="hover:bg-blue-700"]):hover {
+  background-color: #098b9f !important;
+  color: #fff !important;
+}
+.ff-app-shell :is([class~="border-blue-100"], [class~="border-blue-200"], [class~="border-blue-300"]),
+.ff-portal-shell :is([class~="border-blue-100"], [class~="border-blue-200"], [class~="border-blue-300"]) {
+  border-color: #27aab8 !important;
+}
+
+/* Shared shell surfaces and menus carry a Windows-era embossed panel edge. */
+.ff-app-shell :is(.ff-card, .qc-card, [class~="bg-white"], [class~="bg-slate-50"]),
+.ff-portal-shell :is(.ff-card, .qc-card, [class~="bg-white"]) {
+  color: var(--ff-shell-ink);
+}
+.ff-app-shell .ff-dashboard-card {
+  border: 2px solid;
+  border-color: #fff #808080 #808080 #fff !important;
+  border-radius: 2px !important;
+  background: #fff !important;
+  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff !important;
+}
+.ff-app-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]),
+.ff-portal-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]) {
+  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff !important;
+}
+
+/* The requested application theme is light. Neutralize legacy dark-only
+   slate islands without changing semantic red, amber, or emerald states. */
+.dark .ff-app-shell [class*="dark:bg-slate-"],
+.dark .ff-portal-shell [class*="dark:bg-slate-"] {
+  background-color: var(--ff-shell-muted) !important;
+}
+.dark .ff-app-shell [class*="dark:text-slate-"],
+.dark .ff-portal-shell [class*="dark:text-slate-"] {
+  color: var(--ff-shell-copy) !important;
+}
+.dark .ff-app-shell [class*="dark:border-slate-"],
+.dark .ff-portal-shell [class*="dark:border-slate-"] {
+  border-color: var(--ff-shell-border) !important;
+}
+
+.ff-top-nav [class~="rounded-xl"],
+.ff-top-nav [class~="rounded-2xl"],
+.ff-top-nav [class~="rounded-3xl"] {
+  border-radius: 2px !important;
+}
+.ff-top-nav-menu [class~="rounded-xl"],
+.ff-top-nav-menu [class~="rounded-2xl"] {
+  border-radius: 2px !important;
+}
+
+/* Entry screens use the same tactile shell without changing auth behavior. */
+.ff-auth-page > div > :is(.rounded-2xl, .rounded-xl, .ff-card) {
+  border: 2px solid;
+  border-color: #fff #808080 #808080 #fff;
+  border-radius: 2px !important;
+  background: #fff;
+  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff;
+}
+.ff-auth-page a {
+  color: #098b9f;
 }

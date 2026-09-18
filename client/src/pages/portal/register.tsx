@@ -50,7 +50,7 @@ export default function PortalRegister() {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+      <div className="ff-auth-page ff-portal-shell min-h-screen bg-[#d4d0c8] flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-md w-full text-center shadow-sm">
           <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
             <Truck className="h-6 w-6 text-emerald-600" />
@@ -66,7 +66,7 @@ export default function PortalRegister() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
+    <div className="ff-auth-page ff-portal-shell min-h-screen bg-[#d4d0c8] flex items-center justify-center px-4 py-8">
       <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-md w-full shadow-sm">
         <div className="flex items-center gap-2 mb-6">
           <FactorFluxLogo showWordmark={false} shine markClassName="h-9 w-9" />

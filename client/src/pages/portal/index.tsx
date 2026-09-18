@@ -5,7 +5,7 @@ import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 
 export default function PortalLanding() {
   return (
-    <div className="min-h-screen bg-[#d4d0c8] flex flex-col">
+    <div className="ff-portal-shell min-h-screen bg-[#d4d0c8] flex flex-col">
       <header className="px-6 py-4 flex items-center justify-between max-w-5xl mx-auto w-full">
          <FactorFluxLogo />
         <div className="flex items-center gap-2">

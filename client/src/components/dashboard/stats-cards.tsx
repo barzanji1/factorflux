@@ -68,7 +68,7 @@ export default function StatsCards() {
         const t = TINT_CLASSES[item.tint];
         return (
           <Card key={item.title}
-            className="rounded-[20px] border border-slate-200/80 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.05)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+             className="ff-dashboard-card rounded-[20px] border border-slate-200/80 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.05)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-[hsl(var(--card))]">
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>

@@ -376,7 +376,7 @@ function Router() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="ff-app-shell flex h-screen flex-col overflow-hidden">
       <PermissionWatcher />
       <div className="min-h-0 flex-1 overflow-hidden [&>div]:!h-full">
         {routes}

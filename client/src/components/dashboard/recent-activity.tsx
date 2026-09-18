@@ -131,7 +131,7 @@ export default function RecentActivity() {
 
   if (isLoading) {
     return (
-      <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+        <Card className="ff-dashboard-card rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
         <CardHeader className="border-b border-slate-100 dark:border-slate-800">
           <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
             Recent Activity
@@ -150,7 +150,7 @@ export default function RecentActivity() {
   }
 
   return (
-    <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+    <Card className="ff-dashboard-card rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
       <CardHeader className="border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center justify-between gap-3">
           <div>

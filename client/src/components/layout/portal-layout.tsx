@@ -65,8 +65,8 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div className="ff-portal-shell min-h-[100dvh] bg-[#d4d0c8] text-[#1a1a1a]">
+      <header className="sticky top-0 z-40 border-b-2 border-[#808080] bg-[#c0c0c0]">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/portal/dashboard" className="flex items-center gap-2">
             <FactorFluxLogo
@@ -74,16 +74,15 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
               shine
               markClassName="h-8 w-8"
             />
-            <span className="font-semibold text-slate-900 text-sm">Carrier Portal</span>
-            <span className="hidden sm:inline text-xs text-slate-400">— TPF</span>
+            <span className="text-sm font-bold text-[#1a1a1a]">Carrier Portal</span>
+            <span className="hidden text-xs text-[#444] sm:inline">— TPF</span>
           </Link>
 
           <nav className="hidden sm:flex items-center gap-1">
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <button
+              <Link key={link.href} href={link.href}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                    "bevel-button flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
                     location === link.href || location.startsWith(link.href)
                       ? "bg-blue-50 text-blue-700"
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -96,7 +95,6 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
                       {unreadMessages > 99 ? "99+" : unreadMessages}
                     </span>
                   )}
-                </button>
               </Link>
             ))}
           </nav>
@@ -107,10 +105,10 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
                 {me.companyName}
               </span>
             )}
-            <Button
+              <Button
               variant="ghost"
               size="sm"
-              className="gap-1.5 text-slate-600"
+               className="gap-1.5"
               onClick={() => logoutMutation.mutate()}
             >
               <LogOut className="h-4 w-4" />
@@ -122,15 +120,10 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
         {/* Mobile nav */}
         <div className="sm:hidden border-t border-slate-100 flex">
           {navLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="flex-1">
-              <button
-                className={cn(
-                  "w-full flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-                  location === link.href
-                    ? "text-blue-700"
-                    : "text-slate-500"
-                )}
-              >
+            <Link key={link.href} href={link.href} className={cn(
+                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                location === link.href ? "bg-[#dff5f6] text-[#098b9f]" : "text-[#444]"
+              )}>
                 <link.icon className="h-4 w-4" />
                 <span className="relative">
                   {link.label.split(" ")[0]}
@@ -140,7 +133,6 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
                     </span>
                   )}
                 </span>
-              </button>
             </Link>
           ))}
         </div>
