@@ -115,22 +115,23 @@ export default function LoginPage() {
                             {...field}
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
-                            className="pl-10 pr-10"
+                            className="pl-10 pr-14"
+                            autoComplete="current-password"
                             disabled={isLoading}
                           />
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            className="absolute bottom-[2px] right-[2px] top-[2px] flex w-10 items-center justify-center border-l-2 border-[#808080] bg-[#d4d0c8] text-[#555] hover:bg-[#c8e7e9] hover:text-[#098b9f] focus-visible:z-10"
                             onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-pressed={showPassword}
                           >
                             {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-gray-400" />
+                              <EyeOff className="h-4 w-4" />
                             ) : (
-                              <Eye className="h-4 w-4 text-gray-400" />
+                              <Eye className="h-4 w-4" />
                             )}
-                          </Button>
+                          </button>
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -163,8 +164,7 @@ export default function LoginPage() {
             </Form>
 
             <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
-              <p>TPF Pulse OS 1.4.2</p>
-              <p className="mt-1 text-xs">Contact IT support for credential issues</p>
+              <p className="text-xs">Contact IT support for credential issues</p>
             </div>
           </CardContent>
         </Card>

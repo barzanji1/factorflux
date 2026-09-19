@@ -80,8 +80,8 @@ export default function PortalLogin() {
                 <FormLabel>Password</FormLabel>
                 <FormControl>
                   <div className="relative">
-                    <Input {...field} type={showPw ? "text" : "password"} placeholder="Your password" autoComplete="current-password" />
-                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <Input {...field} type={showPw ? "text" : "password"} placeholder="Your password" autoComplete="current-password" className="pr-14" />
+                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute bottom-[2px] right-[2px] top-[2px] flex w-10 items-center justify-center border-l-2 border-[#808080] bg-[#d4d0c8] text-[#555] hover:bg-[#c8e7e9] hover:text-[#098b9f] focus-visible:z-10" aria-label={showPw ? "Hide password" : "Show password"} aria-pressed={showPw}>
                       {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
