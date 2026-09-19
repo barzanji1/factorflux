@@ -19,48 +19,20 @@
   animation: logo-shine-sweep 8s ease-in-out 4s infinite;
 }
 
-.logo-shine-container {
-  position: relative;
-  display: inline-block;
-  overflow: hidden;
-  width: 36px;
-  height: 36px;
-  border-radius: 4px;
-}
-
-.logo-shine-container::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    105deg,
-    transparent 42%,
-    rgba(255, 255, 255, 0.15) 50%,
-    transparent 58%
-  );
-  animation: logoShine 12s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes logoShine {
+@keyframes logoPulseGlow {
   0% {
-    transform: translateX(-100%);
+    filter: drop-shadow(0 0 0px rgba(39, 170, 184, 0));
   }
-  16.6667% {
-    transform: translateX(200%);
+  50% {
+    filter: drop-shadow(0 0 8px rgba(39, 170, 184, 0.7));
   }
   100% {
-    transform: translateX(200%);
+    filter: drop-shadow(0 0 0px rgba(39, 170, 184, 0));
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .logo-shine-container::after {
-    animation: none;
-  }
+.ff-logo-img {
+  animation: logoPulseGlow 4s ease-in-out infinite;
 }
 
 @keyframes logo-shine-sweep {
@@ -85,6 +57,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ff-logo-img {
+    animation: none;
+  }
+
   .logo-shine-overlay {
     animation: none;
     opacity: 0;
