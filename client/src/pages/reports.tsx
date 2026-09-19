@@ -152,7 +152,7 @@ function AgingTab() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-4 gap-3">{BUCKETS.map(b => <div key={b} className="h-32 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
+        <div className="grid grid-cols-4 gap-3">{BUCKETS.map(b => <div key={b} className="h-32 rounded-[22px] bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -161,7 +161,7 @@ function AgingTab() {
               const pct = grandTotal > 0 ? ((bkt?.total ?? 0) / grandTotal) * 100 : 0;
               const s = BUCKET_CFG[b];
               return (
-                <div key={b} className={cn("rounded-xl border p-4", s.badge)}>
+                <div key={b} className={cn("rounded-[22px] border p-4", s.badge)}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold">{b} days</span>
                     <span className="text-[10px] font-medium opacity-60">{pct.toFixed(1)}%</span>
@@ -419,7 +419,7 @@ function DailyARTab() {
         </Button>
       </div>
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-[22px] bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -785,7 +785,7 @@ function CarrierArTab() {
       <CardContent className="grid gap-5 p-5 lg:grid-cols-2">
         {Array.from(new Set(CARRIER_BROKER_REPORTS.map(item => item.category))).map(category => <section key={category}>
           <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{category}</h3>
-          <div className="divide-y overflow-hidden rounded-xl border">{CARRIER_BROKER_REPORTS.filter(item => item.category === category).map(item => <button key={item.id} type="button" onClick={() => setReport(item)}
+          <div className="divide-y overflow-hidden rounded-[22px] border">{CARRIER_BROKER_REPORTS.filter(item => item.category === category).map(item => <button key={item.id} type="button" onClick={() => setReport(item)}
             className={cn("flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950/20", report?.id === item.id && "bg-blue-50 font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300")}>
             <span>{item.title}</span><ChevronRight className="h-4 w-4" />
           </button>)}</div>

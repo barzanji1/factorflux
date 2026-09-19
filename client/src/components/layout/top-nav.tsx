@@ -383,7 +383,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                 </Button>
               </DropdownMenuTrigger>
 
-               <DropdownMenuContent align="end" className="w-[min(380px,calc(100vw-1rem))] rounded-sm border-2 border-[#808080] bg-white p-0 shadow-[2px_2px_0_#404040]">
+               <DropdownMenuContent align="end" className="ff-notification-panel w-[min(380px,calc(100vw-1rem))] rounded-sm border-2 border-[#808080] bg-white p-0 shadow-[2px_2px_0_#404040]">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                   <div>
