@@ -113,7 +113,7 @@ export default function BulkInvoices() {
                 <div className="flex h-10 w-10 items-center justify-center border border-[#098b9f] bg-[#d9edf0] text-[#087d8d]"><Layers3 className="h-5 w-5" /></div>
                 <div><h2 className="text-lg font-bold tracking-tight text-[#203a46]">Bulk invoice batches</h2><p className="text-[10px] uppercase tracking-[0.14em] text-[#667a80]">Broker ledger · {batches.length} batches on file</p></div>
               </div>
-              <Button onClick={openCreate} className="h-9 gap-2 rounded-none bg-[#087d8d] px-3 text-[11px] text-white hover:bg-[#066b79]"><Plus className="h-4 w-4" />New Bulk Invoice</Button>
+              <Button onClick={openCreate} className="ff-bulk-new-button h-9 gap-2 rounded-none bg-[#087d8d] px-3 text-[11px] text-white hover:bg-[#066b79]"><Plus className="h-4 w-4" />New Bulk Invoice</Button>
             </section>
 
             <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
