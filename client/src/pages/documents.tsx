@@ -298,7 +298,7 @@ function DocumentRow({ doc, onView, onDownload }: {
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost" size="sm"
-                    className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-600"
+                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
                     onClick={() => reclassifyMutation.mutate()}
                     disabled={reclassifyMutation.isPending}
                   >
@@ -316,7 +316,7 @@ function DocumentRow({ doc, onView, onDownload }: {
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost" size="sm"
-                    className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-600"
+                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
                     onClick={() => onView(doc.id)}
                   >
                     <Eye className="h-3.5 w-3.5" />
@@ -331,7 +331,7 @@ function DocumentRow({ doc, onView, onDownload }: {
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost" size="sm"
-                    className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-600"
+                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
                     onClick={() => onDownload(doc.id)}
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -488,11 +488,11 @@ export default function Documents() {
                 { label: "Agent Overrides",     value: agentCount, icon: <UserCheck className="h-4 w-4" />,  color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
                 { label: "Low Confidence",      value: lowConf,    icon: <AlertTriangle className="h-4 w-4" />, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
               ].map(s => (
-                <div key={s.label} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div key={s.label} className="ff-dashboard-card p-4">
                   <div className={cn("mb-2 flex h-8 w-8 items-center justify-center rounded-lg", s.bg, s.color)}>
                     {s.icon}
                   </div>
-                  <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{s.value}</p>
+                  <p className="ff-stat-value text-2xl tracking-tight">{s.value}</p>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
                 </div>
               ))}
@@ -506,12 +506,12 @@ export default function Documents() {
                   placeholder="Search by filename…"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="pl-8 h-9 rounded-xl text-sm"
+                  className="pl-8 h-9 text-sm"
                 />
               </div>
 
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9 w-44 rounded-xl text-sm">
+                <SelectTrigger className="h-9 w-44 text-sm">
                   <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
@@ -528,7 +528,7 @@ export default function Documents() {
               </Select>
 
               <Select value={srcFilter} onValueChange={setSrcFilter}>
-                <SelectTrigger className="h-9 w-36 rounded-xl text-sm">
+                <SelectTrigger className="h-9 w-36 text-sm">
                   <Brain className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
                   <SelectValue placeholder="All sources" />
                 </SelectTrigger>
@@ -541,7 +541,7 @@ export default function Documents() {
               </Select>
 
               <Select value={confFilter} onValueChange={setConfFilter}>
-                <SelectTrigger className="h-9 w-40 rounded-xl text-sm">
+                <SelectTrigger className="h-9 w-40 text-sm">
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
                   <SelectValue placeholder="All confidence" />
                 </SelectTrigger>
@@ -556,7 +556,7 @@ export default function Documents() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 gap-1.5 rounded-xl text-sm ml-auto"
+                className="h-9 gap-1.5 text-sm ml-auto"
                 onClick={() => batchMutation.mutate()}
                 disabled={batchMutation.isPending}
               >
@@ -568,7 +568,7 @@ export default function Documents() {
             </div>
 
             {/* ── Table ──────────────────────────────────────────────────── */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))] overflow-hidden">
+            <div className="ff-card ff-table-container overflow-hidden">
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -589,7 +589,7 @@ export default function Documents() {
                   </p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
+                <table className="ff-data-table w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40">
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
