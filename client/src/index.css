@@ -1085,6 +1085,10 @@ div:has(> table.ff-data-table) {
   border-bottom-left-radius: calc(var(--ff-card-radius) - 2px) !important;
 }
 
+.ff-card.ff-bulk-surface > .ff-new-bulk-button {
+  border-radius: 0 !important;
+}
+
 /* Entry screens use the same tactile shell without changing auth behavior. */
 .ff-auth-page > div > :is(.rounded-2xl, .rounded-xl, .ff-card) {
   border: 2px solid;
