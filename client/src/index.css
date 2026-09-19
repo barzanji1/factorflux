@@ -976,7 +976,7 @@ body {
 .ff-app-shell .ff-dashboard-card {
   border: 2px solid;
   border-color: #fff #808080 #808080 #fff !important;
-  border-radius: 2px !important;
+  border-radius: var(--ff-card-radius) !important;
   background: #fff !important;
   box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff !important;
 }
@@ -1021,6 +1021,11 @@ body {
 .ff-notification-panel,
 .ff-toast-panel,
 div:has(> table.ff-data-table) {
+  border-radius: var(--ff-card-radius) !important;
+}
+
+.ff-app-shell :is(.ff-card, .qc-card, .ff-stat-card, .ff-dashboard-card),
+.ff-portal-shell :is(.ff-card, .qc-card, .ff-stat-card, .ff-dashboard-card) {
   border-radius: var(--ff-card-radius) !important;
 }
 
