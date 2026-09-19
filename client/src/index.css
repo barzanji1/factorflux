@@ -1029,6 +1029,50 @@ div:has(> table.ff-data-table) {
   border-radius: var(--ff-card-radius) !important;
 }
 
+.ff-ticket-surface,
+.ff-app-shell .ff-ticket-surface,
+.ff-portal-shell .ff-ticket-surface,
+.ff-ticket-comment {
+  border-radius: 12px !important;
+}
+
+.ff-ticket-surface > :first-child,
+.ff-card.ff-ticket-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-ticket-surface > :last-child,
+.ff-card.ff-ticket-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-bulk-surface,
+.ff-app-shell .ff-bulk-surface,
+.ff-portal-shell .ff-bulk-surface {
+  border-radius: 12px !important;
+}
+
+.ff-bulk-surface > :first-child,
+.ff-card.ff-bulk-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-bulk-surface > :last-child,
+.ff-card.ff-bulk-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-bulk-input {
+  border-radius: 6px !important;
+}
+
+.ff-bulk-dynamic-row:nth-child(even) { background: #f0f0f0; }
+.ff-bulk-dynamic-row:nth-child(odd) { background: #ffffff; }
+
 .ff-card > :first-child,
 .qc-card > :first-child {
   border-top-left-radius: calc(var(--ff-card-radius) - 2px) !important;
