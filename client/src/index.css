@@ -19,25 +19,6 @@
   animation: logo-shine-sweep 8s ease-in-out 4s infinite;
 }
 
-@keyframes logoSway {
-  0% {
-    transform: translateX(0px);
-  }
-  25% {
-    transform: translateX(-4px);
-  }
-  75% {
-    transform: translateX(4px);
-  }
-  100% {
-    transform: translateX(0px);
-  }
-}
-
-.ff-logo-img {
-  animation: logoSway 3s ease-in-out infinite;
-}
-
 @keyframes logo-shine-sweep {
   0% {
     opacity: 0;
@@ -60,10 +41,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ff-logo-img {
-    animation: none;
-  }
-
   .logo-shine-overlay {
     animation: none;
     opacity: 0;

@@ -285,7 +285,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     >
       {/* Brand */}
       <div className="border-b-2 border-[#808080] px-3 py-4">
-        <FactorFluxLogo shine markSrc="/images/ff-logo-emboss.png" />
+        <FactorFluxLogo markSrc="/images/ff-logo-emboss.png" />
         <div className="min-w-0">
           <p className="truncate pl-11 text-[10px] text-[#444] mt-0.5">
             Freight Factoring OS
