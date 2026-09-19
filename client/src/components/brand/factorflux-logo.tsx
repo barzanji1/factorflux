@@ -17,13 +17,11 @@ export function FactorFluxLogo({ className, markClassName, markSrc, showWordmark
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className={cn(
-        "relative inline-flex shrink-0",
-        shine && "logo-shine-wrapper",
-        markSrc && shine && "logo-shine-wrapper-image",
-      )}>
+      <span className={cn("relative inline-flex shrink-0", shine && !markSrc && "logo-shine-wrapper")}>
         {markSrc ? (
-          <img src={markSrc} alt="" aria-hidden="true" className={cn("h-9 w-9 shrink-0 object-contain", markClassName)} />
+          <div className={cn(shine && "logo-shine-container")}>
+            <img src={markSrc} alt="" aria-hidden="true" className={cn("block h-9 w-9 shrink-0 object-contain", markClassName)} />
+          </div>
         ) : (
           <svg viewBox="0 0 578.85 527.45" aria-hidden="true" className={cn("h-9 w-9 shrink-0", markClassName)}>
           {shine && (

@@ -19,44 +19,47 @@
   animation: logo-shine-sweep 8s ease-in-out 4s infinite;
 }
 
-.logo-shine-wrapper-image {
+.logo-shine-container {
   position: relative;
   display: inline-block;
-  width: 2.25rem;
-  height: 2.25rem;
   overflow: hidden;
-  clip-path: inset(0);
-  line-height: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
 }
 
-.logo-shine-wrapper-image::after {
+.logo-shine-container::after {
   content: "";
-  pointer-events: none;
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  clip-path: inset(0);
   background: linear-gradient(
     105deg,
     transparent 35%,
-    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0.2) 50%,
     transparent 65%
   );
-  transform: translateX(-100%);
-  will-change: transform;
-  animation: embossed-logo-shine-sweep 8s linear infinite;
+  animation: logoShine 8s ease-in-out infinite;
+  pointer-events: none;
 }
 
-@keyframes embossed-logo-shine-sweep {
+@keyframes logoShine {
   0% {
     transform: translateX(-100%);
   }
-  18.75% {
+  15% {
     transform: translateX(200%);
   }
   100% {
     transform: translateX(200%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-shine-container::after {
+    animation: none;
   }
 }
 
@@ -88,10 +91,6 @@
     transform: translateX(-160%);
   }
 
-  .logo-shine-wrapper-image::after {
-    animation: none;
-    transform: translateX(-100%);
-  }
 }
 
 /* ─── FactorFlux Design System v2 ─────────────────────────────────────────────
