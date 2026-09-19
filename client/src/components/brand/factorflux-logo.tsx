@@ -4,21 +4,20 @@ import { useId } from "react";
 type FactorFluxLogoProps = {
   className?: string;
   markClassName?: string;
-  markWrapperClassName?: string;
   wordmarkClassName?: string;
   showWordmark?: boolean;
   inverted?: boolean;
   shine?: boolean;
 };
 
-export function FactorFluxLogo({ className, markClassName, markWrapperClassName, wordmarkClassName, showWordmark = true, inverted = false, shine = false }: FactorFluxLogoProps) {
+export function FactorFluxLogo({ className, markClassName, wordmarkClassName, showWordmark = true, inverted = false, shine = false }: FactorFluxLogoProps) {
   const instanceId = useId().replace(/:/g, "");
   const clipId = `factorflux-mark-clip-${instanceId}`;
   const shineGradientId = `factorflux-shine-gradient-${instanceId}`;
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className={cn("relative inline-flex shrink-0", shine && "logo-shine-wrapper", markWrapperClassName)}>
+      <span className={cn("relative inline-flex shrink-0", shine && "logo-shine-wrapper")}>
         <svg viewBox="0 0 578.85 527.45" aria-hidden="true" className={cn("h-9 w-9 shrink-0", markClassName)}>
           {shine && (
             <defs>
