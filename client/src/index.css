@@ -21,22 +21,21 @@
 
 @keyframes logoSway {
   0% {
-    transform: rotate(0deg);
+    transform: translateX(0px);
   }
   25% {
-    transform: rotate(-8deg);
+    transform: translateX(-4px);
   }
   75% {
-    transform: rotate(8deg);
+    transform: translateX(4px);
   }
   100% {
-    transform: rotate(0deg);
+    transform: translateX(0px);
   }
 }
 
 .ff-logo-img {
-  animation: logoSway 4s ease-in-out infinite;
-  transform-origin: center center;
+  animation: logoSway 3s ease-in-out infinite;
 }
 
 @keyframes logo-shine-sweep {
