@@ -4,13 +4,12 @@ import { useId } from "react";
 type FactorFluxLogoProps = {
   className?: string;
   markClassName?: string;
-  wordmarkClassName?: string;
   showWordmark?: boolean;
   inverted?: boolean;
   shine?: boolean;
 };
 
-export function FactorFluxLogo({ className, markClassName, wordmarkClassName, showWordmark = true, inverted = false, shine = false }: FactorFluxLogoProps) {
+export function FactorFluxLogo({ className, markClassName, showWordmark = true, inverted = false, shine = false }: FactorFluxLogoProps) {
   const instanceId = useId().replace(/:/g, "");
   const clipId = `factorflux-mark-clip-${instanceId}`;
   const shineGradientId = `factorflux-shine-gradient-${instanceId}`;
@@ -59,7 +58,7 @@ export function FactorFluxLogo({ className, markClassName, wordmarkClassName, sh
         </svg>
       </span>
       {showWordmark && (
-        <span className={cn("font-bold tracking-[-0.03em] text-[15px]", inverted ? "text-white" : "text-[#1a1a1a]", wordmarkClassName)}>
+        <span className={cn("font-bold tracking-[-0.03em] text-[15px]", inverted ? "text-white" : "text-[#1a1a1a]")}>
           FactorFlux
         </span>
       )}
