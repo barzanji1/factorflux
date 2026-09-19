@@ -19,20 +19,24 @@
   animation: logo-shine-sweep 8s ease-in-out 4s infinite;
 }
 
-@keyframes logoPulseGlow {
+@keyframes logoSway {
   0% {
-    filter: drop-shadow(0 0 0px rgba(39, 170, 184, 0));
+    transform: rotate(0deg);
   }
-  50% {
-    filter: drop-shadow(0 0 8px rgba(39, 170, 184, 0.7));
+  25% {
+    transform: rotate(-8deg);
+  }
+  75% {
+    transform: rotate(8deg);
   }
   100% {
-    filter: drop-shadow(0 0 0px rgba(39, 170, 184, 0));
+    transform: rotate(0deg);
   }
 }
 
 .ff-logo-img {
-  animation: logoPulseGlow 4s ease-in-out infinite;
+  animation: logoSway 4s ease-in-out infinite;
+  transform-origin: center center;
 }
 
 @keyframes logo-shine-sweep {
