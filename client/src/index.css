@@ -1137,6 +1137,30 @@ div:has(> table.ff-data-table) {
   border-bottom-left-radius: 10px !important;
 }
 
+.ff-payments-surface,
+.ff-app-shell .ff-payments-page .ff-payments-surface,
+.ff-portal-shell .ff-payments-page .ff-payments-surface {
+  border-radius: 12px !important;
+}
+
+.ff-payments-page .ff-table-container,
+.ff-app-shell .ff-payments-page .ff-table-container,
+.ff-portal-shell .ff-payments-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-payments-surface > :first-child,
+.ff-card.ff-payments-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-payments-surface > :last-child,
+.ff-card.ff-payments-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
 /* Entry screens use the same tactile shell without changing auth behavior. */
 .ff-auth-page > div > :is(.rounded-2xl, .rounded-xl, .ff-card) {
   border: 2px solid;
