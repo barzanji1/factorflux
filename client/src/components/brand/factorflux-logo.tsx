@@ -4,12 +4,13 @@ import { useId } from "react";
 type FactorFluxLogoProps = {
   className?: string;
   markClassName?: string;
+  markSrc?: string;
   showWordmark?: boolean;
   inverted?: boolean;
   shine?: boolean;
 };
 
-export function FactorFluxLogo({ className, markClassName, showWordmark = true, inverted = false, shine = false }: FactorFluxLogoProps) {
+export function FactorFluxLogo({ className, markClassName, markSrc, showWordmark = true, inverted = false, shine = false }: FactorFluxLogoProps) {
   const instanceId = useId().replace(/:/g, "");
   const clipId = `factorflux-mark-clip-${instanceId}`;
   const shineGradientId = `factorflux-shine-gradient-${instanceId}`;
@@ -17,7 +18,13 @@ export function FactorFluxLogo({ className, markClassName, showWordmark = true, 
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <span className={cn("relative inline-flex shrink-0", shine && "logo-shine-wrapper")}>
-        <svg viewBox="0 0 578.85 527.45" aria-hidden="true" className={cn("h-9 w-9 shrink-0", markClassName)}>
+        {markSrc ? (
+          <>
+            <img src={markSrc} alt="" aria-hidden="true" className={cn("h-9 w-9 shrink-0 object-contain", markClassName)} />
+            {shine && <span aria-hidden="true" className="logo-shine-overlay logo-shine-overlay-image" />}
+          </>
+        ) : (
+          <svg viewBox="0 0 578.85 527.45" aria-hidden="true" className={cn("h-9 w-9 shrink-0", markClassName)}>
           {shine && (
             <defs>
               <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
@@ -55,7 +62,8 @@ export function FactorFluxLogo({ className, markClassName, showWordmark = true, 
               />
             </g>
           )}
-        </svg>
+          </svg>
+        )}
       </span>
       {showWordmark && (
         <span className={cn("font-bold tracking-[-0.03em] text-[15px]", inverted ? "text-white" : "text-[#1a1a1a]")}>

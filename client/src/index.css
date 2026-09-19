@@ -19,6 +19,17 @@
   animation: logo-shine-sweep 8s ease-in-out 4s infinite;
 }
 
+.logo-shine-overlay-image {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 38%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 62%
+  );
+}
+
 @keyframes logo-shine-sweep {
   0% {
     opacity: 0;
