@@ -8,6 +8,7 @@ import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -86,9 +87,9 @@ function StatTile({ label, value, sub, color = "blue" }: { label: string; value:
     slate: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
   };
   return (
-    <div className={cn("rounded-xl p-4 border border-white/50", colors[color])}>
+    <div className={cn("ff-card p-4", colors[color])}>
       <p className="text-xs font-medium opacity-70">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
+      <p className="mt-1 text-2xl font-bold text-[#098b9f]">{value}</p>
       {sub && <p className="text-[11px] opacity-60 mt-0.5">{sub}</p>}
     </div>
   );
@@ -246,7 +247,7 @@ function AgentTab() {
         </Button>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {["Agent", "Invoices", "Total Volume", "Total Funded", "Avg Days to Fund", "Funded %"].map(h => (
@@ -312,7 +313,7 @@ function BrokerTab() {
         </Button>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {["Broker", "Invoices", "Total Volume", "Outstanding", "Paid", "Credit Limit", "Avg Days to Pay"].map(h => (
@@ -373,7 +374,7 @@ function CarrierTab() {
         </Button>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {["Carrier", "Invoices", "Total Funded", "Outstanding", "Avg Invoice Size"].map(h => (
@@ -547,7 +548,7 @@ function MonthlyTab() {
       </Card>
 
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {["Month", "Invoices", "Volume", "Advanced", "Fees", "Fee Rate"].map(h => (
@@ -609,7 +610,7 @@ const money = (row: ArRow, ...keys: string[]) => Number(keys.map(k => (row as Re
 const arValue = (row: ArRow, bucket: string) => Number(row.aging?.[bucket] ?? (row as Record<string, unknown>)[bucket] ?? 0);
 
 function ReportToolbar({ start, end, onDates, children }: { start: string; end: string; onDates: (s: string, e: string) => void; children?: ReactNode }) {
-  return <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+  return <div className="ff-card flex flex-wrap items-end justify-between gap-3 p-3">
     <div className="flex flex-wrap items-end gap-2">
       <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">From</label><Input type="date" value={start} onChange={e => onDates(e.target.value, end)} className="h-8 w-36 text-xs" /></div>
       <span className="mb-2 text-xs text-slate-400">to</span>
@@ -624,7 +625,7 @@ function InvoiceDrilldown({ open, onOpenChange, title, invoices }: { open: boole
     <DialogHeader className="border-b border-slate-200 px-6 py-5 dark:border-slate-700"><DialogTitle>{title}</DialogTitle><DialogDescription>Invoice activity for the selected reporting period.</DialogDescription></DialogHeader>
     <div className="max-h-[60vh] overflow-auto p-6">
       {!invoices?.length ? <div className="py-12 text-center text-sm text-slate-500">No invoice detail was returned for this selection.</div> :
-        <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="border-b text-left text-[10px] uppercase tracking-wider text-slate-500">{["Invoice","Status","Amount","Funded","Date"].map(h => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>
+        <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[640px] text-sm"><thead><tr className="border-b text-left text-[10px] uppercase tracking-wider text-slate-500">{["Invoice","Status","Amount","Funded","Date"].map(h => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>
           <tbody className="divide-y">{invoices.map((inv, i) => <tr key={String(inv.id ?? i)}><td className="px-3 py-2 font-semibold">{String(inv.invoiceNumber ?? inv.number ?? inv.id ?? "—")}</td><td className="px-3 py-2">{String(inv.status ?? "—")}</td><td className="px-3 py-2 tabular-nums">{inv.amount != null ? fmt(Number(inv.amount)) : "—"}</td><td className="px-3 py-2 tabular-nums">{inv.fundedAmount != null ? fmt(Number(inv.fundedAmount)) : "—"}</td><td className="px-3 py-2">{String(inv.createdAt ?? inv.date ?? "—")}</td></tr>)}</tbody>
         </table></div>}
     </div>
@@ -656,10 +657,10 @@ function AgentPerformanceTab() {
       <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("agent_performance.csv", csv)}><Download className="h-3.5 w-3.5" /> CSV</Button>
       {manager && <Button size="sm" className="h-8 gap-1.5" onClick={() => setWarningOpen(true)}><AlertTriangle className="h-3.5 w-3.5" /> Issue warning</Button>}
     </ReportToolbar>
-    <Card className="overflow-hidden border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-sm"><thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Agent","Role","Invoices","Volume funded","Avg days","Reviews","Hours"].map(h => <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>)}</tr></thead><tbody className="divide-y">{query.isLoading ? <SkeletonRows cols={7} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelected(r)} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20"><td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td><td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td><td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td><td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td><td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td><td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td><td className="px-4 py-3 tabular-nums">{r.clockHoursWorked ?? "—"}</td></tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">No agents found for this period.</td></tr>}</tbody></table></div></Card>
+    <Card className="overflow-hidden border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[850px] text-sm"><thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Agent","Role","Invoices","Volume funded","Avg days","Reviews","Hours"].map(h => <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>)}</tr></thead><tbody className="divide-y">{query.isLoading ? <SkeletonRows cols={7} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelected(r)} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20"><td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td><td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td><td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td><td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td><td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td><td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td><td className="px-4 py-3 tabular-nums">{r.clockHoursWorked ?? "—"}</td></tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">No agents found for this period.</td></tr>}</tbody></table></div></Card>
     <Card className="border border-slate-200 dark:border-slate-700"><CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings</CardTitle><span className="text-xs text-slate-500">{warnings.length} recorded</span></CardHeader><CardContent className="p-0"><div className="divide-y">{warnings.length ? warnings.map(w => <div key={w.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800">{w.severity}</span></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div><div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</span> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" onClick={() => acknowledge.mutate(w.id)}>Acknowledge</Button> : <span>Pending</span>}</div></div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">No written warnings in scope.</div>}</div></CardContent></Card>
     <InvoiceDrilldown open={!!selected} onOpenChange={v => !v && setSelected(null)} title={selected ? `${selected.firstName ?? ""} ${selected.lastName ?? ""} · invoice detail` : "Invoice detail"} invoices={selected?.invoices} />
-    <Dialog open={warningOpen} onOpenChange={setWarningOpen}><DialogContent><DialogHeader><DialogTitle>Issue written warning</DialogTitle><DialogDescription>Record a performance issue for an agent. The agent will be able to acknowledge it.</DialogDescription></DialogHeader><div className="space-y-4"><div><label className="text-xs font-semibold">Agent</label><Select value={warningForm.userId} onValueChange={v => setWarningForm(f => ({ ...f, userId: v }))}><SelectTrigger className="mt-1"><SelectValue placeholder="Select agent" /></SelectTrigger><SelectContent>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div><div><label className="text-xs font-semibold">Severity</label><Select value={warningForm.severity} onValueChange={v => setWarningForm(f => ({ ...f, severity: v }))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verbal">Verbal</SelectItem><SelectItem value="written">Written</SelectItem><SelectItem value="final">Final</SelectItem></SelectContent></Select></div><div><label className="text-xs font-semibold">Reason</label><textarea value={warningForm.reason} onChange={e => setWarningForm(f => ({ ...f, reason: e.target.value }))} className="mt-1 min-h-24 w-full rounded-md border border-slate-300 bg-transparent p-2 text-sm" placeholder="Describe the issue and expected correction." /></div></div><DialogFooter><Button variant="outline" onClick={() => setWarningOpen(false)}>Cancel</Button><Button disabled={!warningForm.userId || !warningForm.reason || createWarning.isPending} onClick={() => createWarning.mutate()}>Save warning</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={warningOpen} onOpenChange={setWarningOpen}><DialogContent><DialogHeader><DialogTitle>Issue written warning</DialogTitle><DialogDescription>Record a performance issue for an agent. The agent will be able to acknowledge it.</DialogDescription></DialogHeader><div className="space-y-4"><div><label className="text-xs font-semibold">Agent</label><Select value={warningForm.userId} onValueChange={v => setWarningForm(f => ({ ...f, userId: v }))}><SelectTrigger className="mt-1"><SelectValue placeholder="Select agent" /></SelectTrigger><SelectContent>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div><div><label className="text-xs font-semibold">Severity</label><Select value={warningForm.severity} onValueChange={v => setWarningForm(f => ({ ...f, severity: v }))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verbal">Verbal</SelectItem><SelectItem value="written">Written</SelectItem><SelectItem value="final">Final</SelectItem></SelectContent></Select></div><div><label className="text-xs font-semibold">Reason</label><Textarea value={warningForm.reason} onChange={e => setWarningForm(f => ({ ...f, reason: e.target.value }))} className="mt-1 min-h-24 w-full p-2 text-sm" placeholder="Describe the issue and expected correction." /></div></div><DialogFooter><Button variant="outline" onClick={() => setWarningOpen(false)}>Cancel</Button><Button disabled={!warningForm.userId || !warningForm.reason || createWarning.isPending} onClick={() => createWarning.mutate()}>Save warning</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 
@@ -763,7 +764,7 @@ function CarrierArTab() {
   const pdfParams = report ? new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(params)), reportType: report.endpoint, title: report.title }).toString() : "";
 
   return <div className="space-y-5">
-    <Card className="border-slate-200 shadow-sm dark:border-slate-700">
+    <Card>
       <CardHeader className="border-b pb-4"><CardTitle className="text-base">Carrier / Broker AR Report</CardTitle></CardHeader>
       <CardContent className="p-5">
         <div className="grid gap-4 md:grid-cols-2">
@@ -802,7 +803,7 @@ function CarrierArTab() {
       </CardHeader>
       <CardContent className="p-0">
         {reportQuery.isLoading ? <div className="h-48 animate-pulse bg-slate-100 dark:bg-slate-800" /> : reportQuery.isError ? <div className="p-10 text-center text-sm text-red-600">Unable to generate this report.</div> :
-          <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm">
+          <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[900px] text-sm">
             <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Invoice #","Load #","Amount","Funded Date","Age","Status","Chargeback", report.endpoint === "short-pay" ? "Short Pay Amount" : "Outstanding"].map(head => <th key={head} className="px-4 py-3">{head}</th>)}</tr></thead>
             <tbody className="divide-y">{rows.length ? rows.map(row => <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
               <td className="px-4 py-3 font-semibold">{row.invoiceNumber}</td><td className="px-4 py-3">{row.loadNumber || "—"}</td>
@@ -905,7 +906,7 @@ function GlobalReportsTab() {
       <p className="mt-0.5 text-sm text-slate-500">Select any report to view current results and export them.</p>
     </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {GLOBAL_REPORT_GROUPS.map(group => <Card key={group.title} className={cn("overflow-hidden border-t-4 shadow-sm", group.accent)}>
+      {GLOBAL_REPORT_GROUPS.map(group => <Card key={group.title} className={cn("overflow-hidden border-t-4", group.accent)}>
         <CardHeader className="border-b bg-slate-50/70 px-4 py-3 dark:bg-slate-800/40">
           <CardTitle className="text-sm uppercase tracking-wider">{group.title}</CardTitle>
         </CardHeader>
@@ -920,7 +921,7 @@ function GlobalReportsTab() {
       </Card>)}
     </div>
 
-    {reportId && <Card className="overflow-hidden border-slate-200 shadow-sm dark:border-slate-700">
+    {reportId && <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between gap-4 border-b">
         <div>
           <CardTitle className="text-base">{report?.title ?? "Generating report…"}</CardTitle>
@@ -936,7 +937,7 @@ function GlobalReportsTab() {
       <CardContent className="p-0">
         {reportQuery.isLoading ? <div className="h-56 animate-pulse bg-slate-100 dark:bg-slate-800" />
           : reportQuery.isError ? <div className="p-12 text-center text-sm text-red-600">Unable to generate this report.</div>
-          : report ? <div className="overflow-x-auto"><table className="w-full min-w-max text-sm">
+          : report ? <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-max text-sm">
             <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">
               {report.columns.map(column => <th key={column.key} className="whitespace-nowrap px-4 py-3">{column.label}</th>)}
             </tr></thead>
@@ -955,7 +956,7 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState<TabId>("global");
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav title="Reports" subtitle="Financial reporting and analytics" />

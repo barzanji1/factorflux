@@ -322,16 +322,16 @@ export default function Brokers() {
           ].map(s => {
             const Icon = s.icon;
             return (
-              <div key={s.label} className="rounded-[12px] border border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+              <Card key={s.label} className="ff-dashboard-card px-4 py-3">
                 <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
                 <p className="mt-0.5 text-[22px] font-bold tracking-tight text-slate-900 dark:text-white">{s.value}</p>
-              </div>
+              </Card>
             );
           })}
         </div>
 
         {/* ── Search + filter bar ──────────────────────────────────────── */}
-        <div className="mb-5 overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+        <Card className="mb-5 overflow-hidden">
           {/* Saved view pills */}
           <div className="flex items-center gap-1.5 px-5 pt-3 pb-1.5 border-b border-slate-100 dark:border-slate-800">
             <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-600">Views</span>
@@ -361,7 +361,7 @@ export default function Brokers() {
                 className="h-8 rounded-full pl-9 text-[12px]"
               />
             </div>
-            <div className="flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex border-2 border-[#808080] bg-[#d4d0c8] p-1">
               {isManager && <button type="button" onClick={() => { setProcessorFilter("all"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "all" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-500"}`}>All Brokers</button>}
               <button type="button" onClick={() => { setProcessorFilter("me"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "me" ? "bg-blue-600 text-white" : "text-slate-500"}`}>My Brokers</button>
             </div>
@@ -390,10 +390,10 @@ export default function Brokers() {
               <Plus className="h-3 w-3" /> Add Broker
             </button>
           </div>
-        </div>
+        </Card>
 
         {/* ── Broker table ─────────────────────────────────────────────── */}
-        <div className="overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+        <Card className="overflow-hidden">
           {isLoading ? (
              <div className="space-y-3 p-5">
                {[1, 2, 3, 4, 5].map((row) => (
@@ -546,7 +546,7 @@ export default function Brokers() {
                </div>
             </div>
           )}
-        </div>
+        </Card>
       </div>
       </main>
 

@@ -156,7 +156,7 @@ export default function Invoices() {
   }, [invoices, totalInvoices]);
 
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -168,7 +168,7 @@ export default function Invoices() {
 
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
-            <section className="mb-8 overflow-hidden rounded-[32px] border border-slate-200/80 bg-white/85 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <section className="ff-card mb-8 overflow-hidden">
               <div className="flex flex-col gap-6 border-b border-slate-200/70 px-6 py-6 sm:px-7 xl:flex-row xl:items-center xl:justify-between dark:border-slate-800">
                 <div className="min-w-0">
                   <div className="mb-3 flex items-center gap-2">
@@ -196,13 +196,13 @@ export default function Invoices() {
                          setSearchQuery(e.target.value);
                          setPage(1);
                        }}
-                      className="h-12 rounded-2xl border-slate-200 bg-white pl-11 pr-4 text-[15px] shadow-sm transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:bg-slate-950"
+                      className="h-10 pl-11 pr-4 text-[13px]"
                     />
                   </div>
 
                   <Button
                     onClick={handleCreateInvoice}
-                    className="h-12 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] hover:bg-blue-700"
+                    className="h-10 px-4 text-white"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Create Invoice
@@ -243,12 +243,12 @@ export default function Invoices() {
               </div>
             </section>
 
-            <Card className="overflow-hidden rounded-[30px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <Card className="overflow-hidden">
               <CardHeader className="border-b border-slate-200/70 px-6 py-5 dark:border-slate-800">
                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="mb-3 flex items-center gap-2">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+                      <div className="flex h-8 w-8 items-center justify-center border-2 border-[#808080] bg-[#d4d0c8] text-slate-900">
                         <ReceiptText className="h-4.5 w-4.5" />
                       </div>
                       <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -266,7 +266,7 @@ export default function Invoices() {
                   </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="inline-flex flex-wrap items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
+                      <div className="inline-flex flex-wrap items-center gap-1 border-2 border-[#808080] bg-[#d4d0c8] p-1">
                         {(["all", ...LOAD_TYPES] as const).map((type) => {
                           const active = loadTypeFilter === type;
                           const label = type === "all" ? "All" : LOAD_TYPE_LABELS[type];
@@ -277,7 +277,7 @@ export default function Invoices() {
                               aria-pressed={active}
                               onClick={() => { setLoadTypeFilter(type); setPage(1); }}
                               className={cn(
-                                "rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors",
+                                "px-3 py-1.5 text-xs font-semibold transition-colors",
                                 active ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700",
                               )}
                             >
@@ -310,7 +310,7 @@ export default function Invoices() {
                   </div>
                 ) : invoicesError ? (
                   <div className="px-6 py-20 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[22px] border border-red-200 bg-red-50 text-red-500 shadow-sm dark:border-red-900/40 dark:bg-red-950/20">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center border border-red-200 bg-red-50 text-red-500 dark:border-red-900/40 dark:bg-red-950/20">
                       <ReceiptText className="h-7 w-7" />
                     </div>
                     <p className="text-base font-semibold text-slate-900 dark:text-white">
@@ -322,7 +322,7 @@ export default function Invoices() {
                   </div>
                 ) : invoiceList.length > 0 ? (
                   <div className="custom-scrollbar overflow-x-auto">
-                    <table className="w-full min-w-[940px]">
+                    <table className="ff-data-table w-full min-w-[940px]">
                       <thead>
                         <tr className="border-b border-slate-200/70 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/40">
                           <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -425,7 +425,7 @@ export default function Invoices() {
                   </div>
                 ) : (
                   <div className="px-6 py-20 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[22px] border border-slate-200 bg-slate-50 text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center border border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                       <ReceiptText className="h-7 w-7" />
                     </div>
 
@@ -442,7 +442,7 @@ export default function Invoices() {
                     {!searchQuery && (
                       <Button
                         onClick={handleCreateInvoice}
-                        className="mt-6 h-11 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] hover:bg-blue-700"
+                        className="mt-6 h-10 px-4 text-white"
                       >
                         Create Invoice
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -507,30 +507,30 @@ function PremiumStatCard({
   icon: React.ReactNode;
   tint: "blue" | "amber" | "emerald" | "violet";
 }) {
-  const styles = {
+    const styles = {
     blue: {
       wrap: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400",
-      glow: "shadow-[0_8px_20px_rgba(37,99,235,0.14)]",
+      glow: "",
     },
     amber: {
       wrap: "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400",
-      glow: "shadow-[0_8px_20px_rgba(245,158,11,0.14)]",
+      glow: "",
     },
     emerald: {
       wrap: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400",
-      glow: "shadow-[0_8px_20px_rgba(16,185,129,0.14)]",
+      glow: "",
     },
     violet: {
       wrap: "bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400",
-      glow: "shadow-[0_8px_20px_rgba(139,92,246,0.14)]",
+      glow: "",
     },
   }[tint];
 
   return (
-    <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+    <div className="ff-dashboard-card border p-4">
       <div
         className={cn(
-          "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl",
+          "mb-3 flex h-9 w-9 items-center justify-center border-2 border-[#808080]",
           styles.wrap,
           styles.glow
         )}
@@ -539,7 +539,7 @@ function PremiumStatCard({
       </div>
 
       <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-[#098b9f]">
         {value}
       </p>
     </div>
@@ -561,7 +561,7 @@ function ActionIconButton({
       size="sm"
       onClick={onClick}
       title={title}
-      className="h-10 w-10 rounded-2xl border border-transparent bg-transparent p-0 text-slate-500 transition-all hover:border-slate-200 hover:bg-white hover:text-slate-700 hover:shadow-sm dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+      className="h-8 w-8 border border-transparent bg-transparent p-0 text-slate-500 transition-colors hover:border-slate-200 hover:bg-white hover:text-slate-700"
     >
       {icon}
     </Button>

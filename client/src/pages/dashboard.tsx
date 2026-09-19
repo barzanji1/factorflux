@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
+import { Card } from "@/components/ui/card";
 import { FFBadge } from "@/components/ui/ff-badge";
 import { FFEmpty } from "@/components/ui/ff-empty";
 import TimeClock from "@/components/time-tracking/time-clock";
@@ -103,17 +104,6 @@ function SectionHeader({
           <ChevronRight className="h-3 w-3" />
         </button>
       )}
-    </div>
-  );
-}
-
-function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn(
-      "rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]",
-      className
-    )}>
-      {children}
     </div>
   );
 }
@@ -317,7 +307,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => go("/exceptions")}
-              className="flex w-full items-center gap-3 rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
+              className="flex w-full items-center gap-3 border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
             >
               <CircleSlash className="h-4 w-4 shrink-0 text-red-500" />
               <span className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
@@ -332,7 +322,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => go("/exceptions")}
-              className="flex w-full items-center gap-3 rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
+              className="flex w-full items-center gap-3 border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
             >
               <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
               <span className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
@@ -362,7 +352,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={() => go(tile.href)}
                 className={cn(
-                  "group relative flex flex-col rounded-[12px] border p-4 text-left transition-all duration-150",
+                  "ff-dashboard-card group relative flex flex-col border p-4 text-left transition-all duration-150",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30",
                   s.tile
                 )}
@@ -399,7 +389,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => go("/factoring")}
-              className="flex items-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-[12px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
+              className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-[12px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
             >
               <Zap className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               {approvedCount} load{approvedCount !== 1 ? "s" : ""} approved — ready to fund
@@ -410,7 +400,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => go("/factoring")}
-              className="flex items-center gap-2 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2 text-[12px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
+              className="flex items-center gap-2 border border-amber-200 bg-amber-50 px-3.5 py-2 text-[12px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
             >
               <Clock3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
               {staleCount} item{staleCount !== 1 ? "s" : ""} sitting 2+ days in queue
@@ -547,7 +537,7 @@ export default function Dashboard() {
 
           {/* Queue total */}
           {queueItems.length > 0 && (
-            <div className="mt-3 flex items-center justify-between rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800/40">
+            <div className="mt-3 flex items-center justify-between border border-slate-200 bg-slate-50 px-3 py-2 dark:bg-slate-800/40">
               <div className="flex items-center gap-3 text-[11.5px] text-slate-500 dark:text-slate-400">
                 <span>Total in queue</span>
                 {approvedCount > 0 && (
@@ -719,7 +709,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => go("/exceptions")}
-            className="flex w-full items-center justify-between rounded-[12px] border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50 dark:border-red-900/40 dark:bg-red-950/10"
+            className="flex w-full items-center justify-between border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50 dark:border-red-900/40 dark:bg-red-950/10"
           >
             <div className="flex items-center gap-3">
               <ShieldAlert className="h-4 w-4 text-red-500" />

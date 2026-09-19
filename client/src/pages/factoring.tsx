@@ -7,6 +7,7 @@ import TopNav from "@/components/layout/top-nav";
 import { FFBadge } from "@/components/ui/ff-badge";
 import { FFEmpty } from "@/components/ui/ff-empty";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -216,7 +217,7 @@ export default function Factoring() {
   }
 
   const actionBtn = (action: RowAction) => cn(
-    "rounded-[7px] px-2.5 py-1.5 text-[11px] font-semibold transition-colors whitespace-nowrap",
+    "px-2.5 py-1.5 text-[11px] font-semibold transition-colors whitespace-nowrap",
     action.danger
       ? "bg-red-600 text-white hover:bg-red-700"
       : action.tid === "fund"
@@ -229,7 +230,7 @@ export default function Factoring() {
   );
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="flex h-screen">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Funding Queue" subtitle="Review, approve, and advance factored loads" group="Funding" />
@@ -244,26 +245,26 @@ export default function Factoring() {
                 { label: "Ready to Fund", value: counts.approved ?? 0, sub: "approved, pending advance", warn: false },
                 { label: "Held",          value: counts.held ?? 0, sub: "rejected / blocked", warn: (counts.held ?? 0) > 0 },
               ].map(s => (
-                <div key={s.label} className="rounded-[12px] border border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div key={s.label} className="ff-card px-4 py-3">
                   <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
-                  <p className={cn("mt-0.5 text-[22px] font-bold tracking-tight", s.warn ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white")}>{s.value}</p>
+                  <p className={cn("mt-0.5 text-[22px] font-bold tracking-tight", s.warn ? "text-red-600 dark:text-red-400" : "text-[#098b9f]")}>{s.value}</p>
                   <p className="text-[11px] text-slate-400 dark:text-slate-500">{s.sub}</p>
                 </div>
               ))}
             </div>
-            <section id="aging-alerts" className="overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <Card className="overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3 dark:border-slate-800">
                 <div><h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white"><AlertTriangle className="h-4 w-4 text-amber-500" /> Aging Alerts</h2><p className="text-[11px] text-slate-500">Funded invoices requiring collections follow-up</p></div>
                 <div className="flex gap-1">{(["pending", "resolved"] as const).map(view => <button key={view} onClick={() => setAgingView(view)} className={cn("rounded-full px-3 py-1 text-[11px] font-semibold capitalize", agingView === view ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-600 dark:bg-slate-800")}>{view}</button>)}</div>
               </div>
               {agingAlerts.length === 0 ? <p className="px-5 py-7 text-[12px] text-slate-400">No {agingView} aging alerts.</p> : <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[680px]"><thead><tr><th>Invoice</th><th>Carrier</th><th>Broker</th><th>Days Funded</th><th>Alert</th><th className="pr-5">Action</th></tr></thead><tbody>{agingAlerts.map(alert => { const urgent = alert.alertType === "day_90"; return <tr key={alert.id}><td><button onClick={() => go(`/invoices/${alert.invoiceId}`)} className="font-mono font-semibold text-blue-700 hover:underline dark:text-blue-400">{alert.invoiceNumber}</button></td><td>{alert.carrier ?? "—"}</td><td>{alert.broker ?? "—"}</td><td>{ageDays(alert.fundedAt) ?? "—"}d</td><td><span className={cn("rounded-full px-2 py-1 text-[10px] font-bold", urgent ? "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300")}>{urgent ? "90 DAY PAST DUE" : "60 DAY"}</span></td><td className="pr-5">{agingView === "pending" && <Button size="sm" onClick={() => acknowledgeAging.mutate(alert.id)} disabled={acknowledgeAging.isPending} className="h-7 text-[11px]">Acknowledge</Button>}</td></tr>; })}</tbody></table></div>}
-            </section>
+            </Card>
 
             {/* ── Queue card ─────────────────────────────────────────────── */}
-            <div className="overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <Card className="overflow-hidden">
 
               {/* Sticky filter bar */}
-              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-sm dark:border-slate-800 dark:bg-[hsl(var(--card))/95]">
+              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white dark:border-slate-800">
                 <div className="flex flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap gap-1.5">
                     {QUEUE_TABS.map(tab => {
@@ -435,14 +436,14 @@ export default function Factoring() {
                   </span>
                 </div>
               )}
-            </div>
+            </Card>
           </div>
         </main>
       </div>
 
       {/* ── Reason dialog ─────────────────────────────────────────────────── */}
       <Dialog open={!!reasonDlg} onOpenChange={o => !o && setReasonDlg(null)}>
-        <DialogContent className="max-w-sm rounded-2xl">
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>
               {reasonDlg?.tid === "reject"        ? "Reject Invoice"         :
@@ -462,19 +463,19 @@ export default function Factoring() {
               onChange={e => setReason(e.target.value)}
               rows={3}
               placeholder="Describe the reason…"
-              className="mt-1 rounded-xl text-sm"
+              className="mt-1 text-sm"
               autoFocus
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReasonDlg(null)} className="rounded-xl">
+            <Button variant="outline" onClick={() => setReasonDlg(null)}>
               Cancel
             </Button>
             <Button
               onClick={confirmReason}
               disabled={!reason.trim() || doTransition.isPending}
               className={cn(
-                "rounded-xl text-white",
+                "text-white",
                 reasonDlg?.tid === "reject"
                   ? "bg-red-600 hover:bg-red-700"
                   : "bg-blue-600 hover:bg-blue-700"

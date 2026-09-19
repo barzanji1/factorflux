@@ -618,6 +618,12 @@
   --ff-border: #808080;
   --ff-border-strong: #404040;
   --ff-border-focus: #098b9f;
+  --ff-primary: #27aab8;
+  --ff-primary-dark: #098b9f;
+  --ff-raised-highlight: #ffffff;
+  --ff-raised-shadow: #808080;
+  --ff-inset-shadow: #808080;
+  --ff-panel-header: #404040;
   --ff-text-0: #1a1a1a;
   --ff-text-1: #444444;
   --ff-text-2: #666666;
@@ -640,7 +646,7 @@ body {
 
 .ff-card, .qc-card {
   border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
+  border-color: var(--ff-raised-highlight) var(--ff-raised-shadow) var(--ff-raised-shadow) var(--ff-raised-highlight);
   border-radius: 0;
   background: var(--ff-surface);
   box-shadow: none;
@@ -653,7 +659,7 @@ body {
   border: 2px solid;
   border-color: #fff #4a4a4a #4a4a4a #fff;
   border-radius: 2px;
-  background: #27aab8;
+  background: var(--ff-primary);
   color: #fff;
   text-shadow: 1px 1px rgba(0,0,0,.25);
 }
@@ -663,7 +669,7 @@ body {
 .ff-btn-danger:active { border-color: #4a4a4a #fff #fff #4a4a4a; }
 .ff-btn-secondary, .qc-button-secondary {
   border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
+  border-color: var(--ff-raised-highlight) var(--ff-raised-shadow) var(--ff-raised-shadow) var(--ff-raised-highlight);
   border-radius: 2px;
   background: #d4d0c8;
   color: #1a1a1a;
@@ -680,7 +686,7 @@ body {
 .ff-btn-danger:hover { background: #a80000; }
 .ff-input, .qc-topbar-search {
   border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
+  border-color: var(--ff-inset-shadow) var(--ff-raised-highlight) var(--ff-raised-highlight) var(--ff-inset-shadow);
   border-radius: 0;
   background: #fff;
   box-shadow: none;
@@ -730,8 +736,8 @@ body {
   box-shadow: inset 1px 1px 0 rgba(0,0,0,.18), 0 0 0 1px #27aab8 !important;
 }
 .ff-data-table thead th {
-  background: #c0c0c0;
-  color: #1a1a1a !important;
+  background: var(--ff-panel-header);
+  color: #fff !important;
   border-bottom: 2px solid #808080;
 }
 .ff-data-table tbody tr:nth-child(even) { background: #fff; }
@@ -741,6 +747,32 @@ body {
 }
 .ff-data-table tbody td { color: #1a1a1a !important; }
 .uppercase, [data-label] { letter-spacing: .08em; }
+
+/* Canonical reusable retro surfaces. Pages should compose these instead of
+   defining their own card, statistic, header, table, or field chrome. */
+.ff-panel-header {
+  border-bottom: 2px solid var(--ff-raised-shadow);
+  background: var(--ff-surface-tint);
+  color: var(--ff-text-0);
+  font-weight: 700;
+}
+.ff-stat-card {
+  border: 2px solid;
+  border-color: var(--ff-raised-highlight) var(--ff-raised-shadow) var(--ff-raised-shadow) var(--ff-raised-highlight);
+  background: var(--ff-surface);
+  box-shadow: 2px 2px 0 var(--ff-raised-shadow), -1px -1px 0 var(--ff-raised-highlight);
+}
+.ff-stat-value { color: var(--ff-primary-dark); font-weight: 800; }
+
+:is(.ff-app-shell, .ff-portal-shell) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+:is(.ff-app-shell, .ff-portal-shell) textarea,
+:is(.ff-app-shell, .ff-portal-shell) select {
+  border: 2px solid !important;
+  border-color: var(--ff-inset-shadow) var(--ff-raised-highlight) var(--ff-raised-highlight) var(--ff-inset-shadow) !important;
+  border-radius: 0 !important;
+  background: #fff;
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+}
 
 /* ─── Shared button and active-control contract ─────────────────────────── */
 :root,

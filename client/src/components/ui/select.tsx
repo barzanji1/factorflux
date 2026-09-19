@@ -135,9 +135,9 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       [
-        "relative flex w-full cursor-default select-none items-center rounded-xl",
+        "relative flex w-full cursor-default select-none items-center",
         "py-2.5 pl-9 pr-3 text-sm font-medium outline-none",
-        "transition-all duration-200",
+        "transition-colors duration-150",
         "focus:bg-accent focus:text-accent-foreground",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       ].join(" "),
