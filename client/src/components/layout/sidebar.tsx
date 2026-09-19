@@ -285,7 +285,11 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     >
       {/* Brand */}
       <div className="border-b-2 border-[#808080] px-3 py-4">
-        <FactorFluxLogo shine />
+        <FactorFluxLogo
+          shine
+          markWrapperClassName="rounded-[4px] border-2 border-[#ffffff] border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] p-1 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8),inset_-1px_-1px_2px_rgba(0,0,0,0.3)]"
+          wordmarkClassName="rounded-[4px] border-2 border-[#ffffff] border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] px-1.5 py-1 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8),inset_-1px_-1px_2px_rgba(0,0,0,0.3)]"
+        />
         <div className="min-w-0">
           <p className="truncate pl-11 text-[10px] text-[#444] mt-0.5">
             Freight Factoring OS
@@ -298,7 +302,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
 
       {/* User */}
       <div className="border-b-2 border-[#808080] px-3 py-2.5">
-        <div className="flex items-center gap-2.5 border-2 border-[#fff] border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] px-2.5 py-2">
+        <div className="flex items-center gap-2.5 rounded-[4px] border-2 border-[#fff] border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] px-2.5 py-2 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8),inset_-1px_-1px_2px_rgba(0,0,0,0.3)]">
           {user.profileImageUrl ? (
             <img
               src={user.profileImageUrl}
