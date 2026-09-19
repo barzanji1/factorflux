@@ -274,14 +274,14 @@ export default function PortalSubmissionsPage() {
   }
 
   function reviewIndicator(submission: Submission) {
-    if (submission.reviewedAt) return <Badge className="border-0 bg-slate-200 text-slate-700">REVIEWED</Badge>;
+    if (submission.reviewedAt) return <Badge className="rounded-full border-0 bg-slate-200 text-slate-700">REVIEWED</Badge>;
     const age = Date.now() - new Date(submission.submittedAt || 0).getTime();
-    if (age <= 24 * 60 * 60 * 1000) return <Badge className="border-0 bg-blue-100 text-blue-700">NEW</Badge>;
-    return <Badge className="border-0 bg-amber-100 text-amber-800">PENDING</Badge>;
+    if (age <= 24 * 60 * 60 * 1000) return <Badge className="rounded-full border-0 bg-blue-100 text-blue-700">NEW</Badge>;
+    return <Badge className="rounded-full border-0 bg-amber-100 text-amber-800">PENDING</Badge>;
   }
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="ff-portal-submissions flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Portal Submissions" subtitle="Invoice submissions from the carrier portal" group="Workspace" />
@@ -294,7 +294,7 @@ export default function PortalSubmissionsPage() {
                   setShowUnreviewedOnly(true);
                   window.setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
                 }}
-                className="flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left text-amber-900 shadow-sm transition-colors hover:bg-amber-100"
+                className="ff-portal-submission-surface flex w-full items-center gap-3 border border-amber-300 bg-amber-50 px-4 py-3 text-left text-amber-900 shadow-sm transition-colors hover:bg-amber-100"
               >
                 <AlertTriangle className="h-5 w-5 shrink-0 text-orange-600" />
                 <span className="font-semibold">⚠ {unreviewedCount} new carrier submission{unreviewedCount === 1 ? "" : "s"} require review</span>
@@ -305,7 +305,7 @@ export default function PortalSubmissionsPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("registrations")}
-                className="flex w-full items-center gap-3 rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-left text-blue-900 shadow-sm transition-colors hover:bg-blue-100"
+                className="ff-portal-submission-surface flex w-full items-center gap-3 border border-blue-300 bg-blue-50 px-4 py-3 text-left text-blue-900 shadow-sm transition-colors hover:bg-blue-100"
               >
                 <UserCheck className="h-5 w-5 shrink-0 text-blue-600" />
                 <span className="font-semibold">⚠ {pendingCount} carrier{pendingCount === 1 ? "" : "s"} pending approval</span>
@@ -313,7 +313,7 @@ export default function PortalSubmissionsPage() {
             )}
 
             {!canUseHub ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+              <div className="ff-portal-submission-surface border border-red-200 bg-red-50 p-5 text-sm text-red-700">
                 Portal Submissions or Chat permission is required to access this page.
               </div>
             ) : <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -358,7 +358,7 @@ export default function PortalSubmissionsPage() {
                 </div>
 
                 {/* Table */}
-                <Card ref={tableRef} className="mt-6 rounded-[24px] border border-[hsl(var(--border))]">
+                <Card ref={tableRef} className="ff-portal-submission-surface mt-6 border border-[hsl(var(--border))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="h-5 w-5" />
@@ -438,7 +438,7 @@ export default function PortalSubmissionsPage() {
               </TabsContent>}
 
               {canUsePortal && <TabsContent value="registrations">
-                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                <Card className="ff-portal-submission-surface border border-[hsl(var(--border))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                     <CardTitle className="flex items-center gap-2">
                       <UserCheck className="h-5 w-5" />
@@ -508,7 +508,7 @@ export default function PortalSubmissionsPage() {
               </TabsContent>}
 
               {canUseChat && <TabsContent value="messages">
-                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                <Card className="ff-portal-submission-surface border border-[hsl(var(--border))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                     <CardTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5" />Carrier Messages</CardTitle>
                     <CardDescription>{chatSummaries.length} conversation{chatSummaries.length === 1 ? "" : "s"}</CardDescription>
@@ -550,7 +550,7 @@ export default function PortalSubmissionsPage() {
           setRejectionReason("");
         }
       }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="ff-portal-submission-surface max-w-lg">
           <DialogHeader>
             <DialogTitle>Reject carrier registration</DialogTitle>
             <DialogDescription>
@@ -597,7 +597,7 @@ export default function PortalSubmissionsPage() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail} onOpenChange={(o) => { if (!o) setDetail(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="ff-portal-submission-surface max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Submission #{detail?.id} — {detail?.companyName || `Portal User #${detail?.portalUserId}`}
@@ -629,7 +629,7 @@ export default function PortalSubmissionsPage() {
                 ))}
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
+              <div className="ff-portal-submission-surface flex items-center justify-between border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
                 <div>
                   <p className="text-xs text-slate-500">Load Type</p>
                   <LoadTypeBadge value={detail.loadType} />
@@ -643,7 +643,7 @@ export default function PortalSubmissionsPage() {
               </div>
 
               {(detail.instructionsSubject || detail.instructionsDetails) && (
-                <div className="rounded-xl border border-slate-200 p-3">
+                <div className="ff-portal-submission-surface border border-slate-200 p-3">
                   <p className="text-xs font-semibold text-slate-500">Instructions</p>
                   {detail.instructionsSubject && <p className="mt-1 font-medium">{detail.instructionsSubject}</p>}
                   {detail.instructionsDetails && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{detail.instructionsDetails}</p>}
@@ -656,7 +656,7 @@ export default function PortalSubmissionsPage() {
                   <p className="text-xs font-semibold text-slate-500 mb-2">Documents ({detail.documents.length})</p>
                   <div className="space-y-1.5">
                     {detail.documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center gap-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2">
+                      <div key={doc.id} className="ff-portal-submission-surface flex items-center gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2">
                         <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
                         <span className="text-sm flex-1 truncate">{doc.originalName}</span>
                         <Badge variant="outline" className="text-[10px] px-1.5">{DOC_LABEL[doc.documentType] || doc.documentType}</Badge>
@@ -715,7 +715,7 @@ export default function PortalSubmissionsPage() {
         </DialogContent>
       </Dialog>
       <Sheet open={!!chatCarrier} onOpenChange={(open) => !open && closeChat()}>
-        <SheetContent side="right" className="flex w-full flex-col sm:max-w-xl">
+        <SheetContent side="right" className="ff-portal-submission-surface flex w-full flex-col sm:max-w-xl">
           <SheetHeader className="shrink-0 pr-8">
             <SheetTitle>Carrier messages</SheetTitle>
             <SheetDescription>
