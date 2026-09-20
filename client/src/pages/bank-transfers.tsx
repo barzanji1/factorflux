@@ -9,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,7 +18,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Plus, MoreHorizontal, Download, Landmark,
-  CheckCircle2, Clock, XCircle, Loader2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,20 +57,16 @@ type FormData = z.infer<typeof formSchema>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive"; icon: any }> = {
-  pending:    { label: "Pending",    variant: "secondary",   icon: Clock       },
-  processing: { label: "Processing", variant: "default",     icon: Loader2     },
-  completed:  { label: "Completed",  variant: "default",     icon: CheckCircle2 },
-  failed:     { label: "Failed",     variant: "destructive", icon: XCircle     },
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  pending:    { label: "Pending",    className: "ff-badge-pending" },
+  processing: { label: "Processing", className: "ff-badge-processing" },
+  completed:  { label: "Completed",  className: "ff-badge-funded" },
+  failed:     { label: "Failed",     className: "ff-badge-rejected" },
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: "secondary", icon: Clock };
-  return (
-    <Badge variant={cfg.variant} className={status === "completed" ? "bg-green-600 hover:bg-green-700" : undefined}>
-      {cfg.label}
-    </Badge>
-  );
+  const cfg = STATUS_CONFIG[status] ?? { label: status, className: "ff-badge-draft" };
+  return <span className={`ff-badge ${cfg.className}`}>{cfg.label}</span>;
 }
 
 function fmt(n: string | number) {
@@ -230,7 +224,7 @@ export default function BankTransfers() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="ff-bank-transfers-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav />
@@ -259,8 +253,23 @@ export default function BankTransfers() {
             </div>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card className="ff-dashboard-card ff-bank-transfers-surface">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><Landmark className="h-5 w-5" /></div>
+                <div><p className="text-xs text-muted-foreground">Filtered Transfers</p><p className="text-xl font-bold">{filtered.length}</p></div>
+              </CardContent>
+            </Card>
+            <Card className="ff-dashboard-card ff-bank-transfers-surface">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><Download className="h-5 w-5" /></div>
+                <div><p className="text-xs text-muted-foreground">Filtered Total</p><p className="text-xl font-bold text-[#087d8d]">{fmt(totalFiltered)}</p></div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Filters */}
-          <Card>
+          <Card className="ff-bank-transfers-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -302,7 +311,7 @@ export default function BankTransfers() {
                     placeholder="To"
                   />
                   {(dateFrom || dateTo) && (
-                    <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+                    <Button variant="outline" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>
                       Clear
                     </Button>
                   )}
@@ -312,9 +321,9 @@ export default function BankTransfers() {
           </Card>
 
           {/* Table */}
-          <Card>
+          <Card className="ff-table-container ff-bank-transfers-surface overflow-hidden">
             <CardContent className="p-0">
-              <Table>
+              <Table className="ff-data-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -349,9 +358,9 @@ export default function BankTransfers() {
                           {t.carrierId ? carrierMap[t.carrierId] ?? `#${t.carrierId}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={t.transferType === "ACH" ? "secondary" : "outline"}>
-                            {t.transferType}
-                          </Badge>
+                          <span className={`ff-badge ${t.transferType === "ACH" ? "ff-badge-approved" : "ff-badge-pending"}`}>
+                            {t.transferType === "wire" ? "Wire" : t.transferType}
+                          </span>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {t.bankAccountName ?? "—"}
@@ -365,7 +374,7 @@ export default function BankTransfers() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost">
+                              <Button size="sm" variant="outline">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -406,7 +415,7 @@ export default function BankTransfers() {
 
       {/* New / Edit Transfer Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="ff-bank-transfers-surface max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Transfer" : "New Transfer"}</DialogTitle>
           </DialogHeader>

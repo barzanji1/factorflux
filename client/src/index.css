@@ -1161,6 +1161,54 @@ div:has(> table.ff-data-table) {
   border-bottom-left-radius: 10px !important;
 }
 
+.ff-fuel-advance-surface,
+.ff-app-shell .ff-fuel-advance-page .ff-fuel-advance-surface,
+.ff-portal-shell .ff-fuel-advance-page .ff-fuel-advance-surface {
+  border-radius: 12px !important;
+}
+
+.ff-fuel-advance-page .ff-table-container,
+.ff-app-shell .ff-fuel-advance-page .ff-table-container,
+.ff-portal-shell .ff-fuel-advance-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-fuel-advance-surface > :first-child,
+.ff-card.ff-fuel-advance-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-fuel-advance-surface > :last-child,
+.ff-card.ff-fuel-advance-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-bank-transfers-surface,
+.ff-app-shell .ff-bank-transfers-page .ff-bank-transfers-surface,
+.ff-portal-shell .ff-bank-transfers-page .ff-bank-transfers-surface {
+  border-radius: 12px !important;
+}
+
+.ff-bank-transfers-page .ff-table-container,
+.ff-app-shell .ff-bank-transfers-page .ff-table-container,
+.ff-portal-shell .ff-bank-transfers-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-bank-transfers-surface > :first-child,
+.ff-card.ff-bank-transfers-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-bank-transfers-surface > :last-child,
+.ff-card.ff-bank-transfers-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
 /* Entry screens use the same tactile shell without changing auth behavior. */
 .ff-auth-page > div > :is(.rounded-2xl, .rounded-xl, .ff-card) {
   border: 2px solid;
