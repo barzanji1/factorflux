@@ -229,7 +229,7 @@ function TemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => { onOpenChange(v); if (!v) resetForm(); }}>
-      <DialogContent className="sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="ff-followups-surface sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Template" : "New Template"}</DialogTitle>
         </DialogHeader>
@@ -279,7 +279,7 @@ function TemplateDialog({
                     key={ph}
                     type="button"
                     onClick={() => insertPlaceholder(ph)}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-mono text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors"
+                    className="bevel-button bg-[#d4d0c8] px-2 py-0.5 text-[11px] font-mono text-slate-700"
                   >
                     {ph}
                   </button>
@@ -294,14 +294,14 @@ function TemplateDialog({
                   <button
                     type="button"
                     onClick={() => setPreview(v => !v)}
-                    className="flex items-center gap-1 text-[11px] text-blue-600 hover:underline"
+                    className="bevel-button flex items-center gap-1 bg-[#d4d0c8] px-2 py-1 text-[11px] text-slate-700"
                   >
                     <Eye className="h-3 w-3" />
                     {preview ? "Edit" : "Preview"}
                   </button>
                 </div>
                 {preview ? (
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-2">
+                  <div className="ff-card ff-followups-surface border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-2">
                     <p className="text-[11px] font-semibold text-slate-500">Subject:</p>
                     <p className="text-[13px] text-slate-800 dark:text-slate-200">{applyPreview(subject)}</p>
                     <hr className="border-slate-200 dark:border-slate-700" />
@@ -325,7 +325,7 @@ function TemplateDialog({
             )} />
 
             <FormField control={form.control} name="isDefault" render={({ field }) => (
-              <FormItem className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-3 py-2.5">
+              <FormItem className="ff-card ff-followups-surface flex items-center gap-3 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-3 py-2.5">
                 <Switch checked={field.value} onCheckedChange={field.onChange} id="tpl-default" />
                 <div>
                   <Label htmlFor="tpl-default" className="text-sm font-medium cursor-pointer">
@@ -365,34 +365,34 @@ function reminderTypeLabel(type: string): string {
 }
 
 const REMINDER_STATUS_COLOR: Record<string, string> = {
-  scheduled: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800",
-  sent:      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800",
-  skipped:   "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800",
-  paused:    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
-  canceled:  "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800",
+  scheduled: "ff-badge-submitted",
+  sent:      "ff-badge-funded",
+  skipped:   "ff-badge-pending",
+  paused:    "ff-badge-draft",
+  canceled:  "ff-badge-rejected",
 };
 
 const BFU_STATUS_COLOR: Record<string, string> = {
-  pending:      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400",
-  sent:         "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400",
-  acknowledged: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400",
-  failed:       "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400",
+  pending:      "ff-badge-pending",
+  sent:         "ff-badge-submitted",
+  acknowledged: "ff-badge-funded",
+  failed:       "ff-badge-rejected",
 };
 
 function getPriorityColor(priority: string) {
   switch (priority) {
-    case "high":   return "bg-red-100 text-red-800 border-red-200";
-    case "medium": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    case "low":    return "bg-green-100 text-green-800 border-green-200";
-    default:       return "bg-gray-100 text-gray-800 border-gray-200";
+    case "high":   return "ff-badge-rejected";
+    case "medium": return "ff-badge-pending";
+    case "low":    return "ff-badge-funded";
+    default:       return "ff-badge-draft";
   }
 }
 
 function getStatusColor(status: string) {
   switch (status) {
-    case "completed":   return "bg-green-100 text-green-800 border-green-200";
-    case "in-progress": return "bg-blue-100 text-blue-800 border-blue-200";
-    default:            return "bg-gray-100 text-gray-800 border-gray-200";
+    case "completed":   return "ff-badge-funded";
+    case "in-progress": return "ff-badge-submitted";
+    default:            return "ff-badge-pending";
   }
 }
 
@@ -536,7 +536,7 @@ function ReminderTimeline({
           </Button>
           <Button
             size="sm"
-            variant="ghost"
+          variant="outline"
             className="h-6 px-2 text-[10.5px] gap-1"
             onClick={() => setEditingCadence(v => !v)}
           >
@@ -548,7 +548,7 @@ function ReminderTimeline({
 
       {/* Cadence editor */}
       {editingCadence && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40 p-3 space-y-3">
+        <div className="ff-card ff-followups-surface border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40 p-3 space-y-3">
           <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Cadence Settings</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
             <div className="flex items-center gap-2">
@@ -556,6 +556,7 @@ function ReminderTimeline({
                 id={`si-${bfuId}`}
                 checked={localCadence.sendImmediately}
                 onCheckedChange={v => setLocalCadence(c => ({ ...c, sendImmediately: v }))}
+                className="ff-followups-switch"
               />
               <Label htmlFor={`si-${bfuId}`} className="text-[12px] cursor-pointer">Send Immediately</Label>
             </div>
@@ -564,6 +565,7 @@ function ReminderTimeline({
                 id={`sd-${bfuId}`}
                 checked={localCadence.sendOnDueDate}
                 onCheckedChange={v => setLocalCadence(c => ({ ...c, sendOnDueDate: v }))}
+                className="ff-followups-switch"
               />
               <Label htmlFor={`sd-${bfuId}`} className="text-[12px] cursor-pointer">Send on Due Date</Label>
             </div>
@@ -573,7 +575,7 @@ function ReminderTimeline({
                 value={overdueInput}
                 onChange={e => setOverdueInput(e.target.value)}
                 placeholder="3, 7, 14"
-                className="h-7 text-[12px]"
+                className="ff-followups-field h-7 text-[12px]"
               />
             </div>
             <div>
@@ -584,7 +586,7 @@ function ReminderTimeline({
                 max={12}
                 value={localCadence.weeklyCount}
                 onChange={e => setLocalCadence(c => ({ ...c, weeklyCount: parseInt(e.target.value) || 0 }))}
-                className="h-7 text-[12px] w-20"
+                className="ff-followups-field h-7 text-[12px] w-20"
               />
             </div>
           </div>
@@ -601,7 +603,7 @@ function ReminderTimeline({
               {updateCadenceMut.isPending ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
               Save
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 px-3 text-[11px]" onClick={() => setEditingCadence(false)}>
+            <Button size="sm" variant="outline" className="h-7 px-3 text-[11px]" onClick={() => setEditingCadence(false)}>
               Cancel
             </Button>
           </div>
@@ -632,7 +634,7 @@ function ReminderTimeline({
               >
                 {/* Step dot */}
                 <div className={cn(
-                  "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold",
+                  "ff-followup-step relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold",
                   r.status === "sent"     ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300" :
                   r.status === "canceled" ? "border-red-300 bg-red-50 text-red-400 dark:bg-red-950/20" :
                   r.status === "skipped"  ? "border-amber-300 bg-amber-50 text-amber-600 dark:bg-amber-950/20" :
@@ -649,7 +651,7 @@ function ReminderTimeline({
                       {reminderTypeLabel(r.reminderType)}
                     </span>
                     <span className={cn(
-                      "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold capitalize",
+                      "ff-badge gap-1 capitalize",
                       REMINDER_STATUS_COLOR[r.status],
                     )}>
                       {r.status === "sent" && <CheckCheck className="mr-0.5 h-2.5 w-2.5" />}
@@ -663,32 +665,32 @@ function ReminderTimeline({
                     {r.status === "sent" && (() => {
                       const ds = r.deliveryStatus;
                       if (!ds || ds === "pending") return (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        <span className="ff-badge ff-badge-draft gap-1">
                           🕐 Pending
                         </span>
                       );
                       if (ds === "delivered") return (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                        <span className="ff-badge ff-badge-funded gap-1">
                           ✅ Delivered
                         </span>
                       );
                       if (ds === "bounced") return (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
+                        <span className="ff-badge ff-badge-rejected gap-1">
                           ❌ Bounced
                         </span>
                       );
                       if (ds === "failed") return (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
+                        <span className="ff-badge ff-badge-rejected gap-1">
                           ❌ Failed
                         </span>
                       );
                       if (ds === "spam") return (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                        <span className="ff-badge ff-badge-pending gap-1">
                           ⚠ Spam
                         </span>
                       );
                       if (ds === "unsubscribed") return (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                        <span className="ff-badge ff-badge-draft gap-1">
                           Unsubscribed
                         </span>
                       );
@@ -721,7 +723,7 @@ function ReminderTimeline({
                 <div className="flex items-start gap-1 pt-0.5 shrink-0">
                   {r.status === "scheduled" && (
                     <button type="button" onClick={() => openReminderEditor(r)}
-                      className="flex items-center gap-0.5 rounded-md bg-blue-50 px-2 py-1 text-[10.5px] font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400">
+                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium">
                       <Pencil className="h-3 w-3" /> Edit
                     </button>
                   )}
@@ -730,7 +732,7 @@ function ReminderTimeline({
                       type="button"
                       onClick={() => handleReminderAction(r, "restore")}
                       disabled={updateReminder.isPending}
-                      className="flex items-center gap-0.5 rounded-md bg-slate-100 px-2 py-1 text-[10.5px] font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-50"
+                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium text-slate-700 disabled:opacity-50"
                       title="Restore to scheduled"
                     >
                       <RotateCcw className="h-3 w-3" /> Restore
@@ -741,7 +743,7 @@ function ReminderTimeline({
                       type="button"
                       onClick={() => handleReminderAction(r, "skip")}
                       disabled={updateReminder.isPending}
-                      className="flex items-center gap-0.5 rounded-md bg-amber-50 px-2 py-1 text-[10.5px] font-medium text-amber-700 hover:bg-amber-100 dark:bg-amber-950/20 dark:text-amber-400 disabled:opacity-50"
+                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium text-amber-700 disabled:opacity-50"
                       title="Skip this reminder"
                     >
                       <SkipForward className="h-3 w-3" /> Skip
@@ -752,7 +754,7 @@ function ReminderTimeline({
                       type="button"
                       onClick={() => handleReminderAction(r, "cancel")}
                       disabled={updateReminder.isPending}
-                      className="flex items-center gap-0.5 rounded-md bg-red-50 px-2 py-1 text-[10.5px] font-medium text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 disabled:opacity-50"
+                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium text-red-700 disabled:opacity-50"
                       title="Cancel this reminder"
                     >
                       <Ban className="h-3 w-3" /> Cancel
@@ -765,13 +767,13 @@ function ReminderTimeline({
         </div>
       )}
       <Dialog open={!!editingReminder} onOpenChange={open => !open && setEditingReminder(null)}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="ff-followups-surface max-w-xl">
           <DialogHeader><DialogTitle>Edit Scheduled Reminder</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Send date & time</Label><Input className="mt-1" type="datetime-local" value={reminderDraft.scheduledSendAt} onChange={e => setReminderDraft(d => ({ ...d, scheduledSendAt: e.target.value }))} /></div>
             <div><Label>Subject</Label><Input className="mt-1" value={reminderDraft.subject} onChange={e => setReminderDraft(d => ({ ...d, subject: e.target.value }))} /></div>
             <div><Label>Message</Label><Textarea className="mt-1 min-h-36" value={reminderDraft.body} onChange={e => setReminderDraft(d => ({ ...d, body: e.target.value }))} /></div>
-            <div className="flex flex-wrap gap-1"><span className="mr-1 text-[11px] text-slate-500">Insert:</span>{["{{brokerName}}", "{{invoiceNumber}}", "{{loadNumber}}", "{{amountDue}}", "{{dueDate}}"].map(token => <button type="button" key={token} onClick={() => setReminderDraft(d => ({ ...d, body: `${d.body}${d.body ? " " : ""}${token}` }))} className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50">{token}</button>)}</div>
+            <div className="flex flex-wrap gap-1"><span className="mr-1 text-[11px] text-slate-500">Insert:</span>{["{{brokerName}}", "{{invoiceNumber}}", "{{loadNumber}}", "{{amountDue}}", "{{dueDate}}"].map(token => <button type="button" key={token} onClick={() => setReminderDraft(d => ({ ...d, body: `${d.body}${d.body ? " " : ""}${token}` }))} className="bevel-button bg-[#d4d0c8] px-1.5 py-0.5 text-[10px] text-slate-700">{token}</button>)}</div>
           </div>
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEditingReminder(null)}>Cancel</Button><Button disabled={!reminderDraft.scheduledSendAt || !reminderDraft.subject.trim() || !reminderDraft.body.trim() || editReminderMut.isPending} onClick={() => editReminderMut.mutate()}>{editReminderMut.isPending ? "Saving…" : "Save reminder"}</Button></div>
         </DialogContent>
@@ -944,7 +946,7 @@ export default function FollowUpPage() {
   });
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="ff-followups-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav title="Follow Ups" subtitle="Manage client follow-ups, pending tasks, and broker automations" />
@@ -963,7 +965,7 @@ export default function FollowUpPage() {
                   Manage client follow-ups, tasks, and broker payment reminder cadences
                 </p>
                 {deliverySummary && deliverySummary.total > 0 && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 px-3 py-1 text-[12px] font-medium text-red-700 dark:text-red-400">
+                  <div className="ff-badge ff-badge-rejected mt-2 gap-1.5">
                     ❌ {deliverySummary.total} delivery issue{deliverySummary.total !== 1 ? "s" : ""} —&nbsp;
                     {deliverySummary.bounced > 0 && `${deliverySummary.bounced} bounced`}
                     {deliverySummary.bounced > 0 && deliverySummary.failed > 0 && ", "}
@@ -980,7 +982,7 @@ export default function FollowUpPage() {
                     Add Follow Up
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="ff-followups-surface sm:max-w-[500px]">
                   <DialogHeader>
                     <DialogTitle>Create Follow Up Task</DialogTitle>
                   </DialogHeader>
@@ -1047,6 +1049,21 @@ export default function FollowUpPage() {
               </Dialog>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { label: "Open Manual Tasks", value: followUps.filter(item => item.status !== "completed").length },
+                { label: "Unacknowledged Automations", value: pendingBfuCount },
+                { label: "Email Templates", value: templates.length },
+              ].map(stat => (
+                <Card key={stat.label} className="ff-dashboard-card ff-followups-surface">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
+                    <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
             {/* Tabs */}
             <Tabs defaultValue="manual">
               <TabsList className="mb-4">
@@ -1054,7 +1071,7 @@ export default function FollowUpPage() {
                   <Clock className="h-4 w-4" />
                   Manual Tasks
                   {filteredFollowUps.length > 0 && (
-                    <span className="ml-1 rounded-full bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold">
+                    <span className="ff-followups-count ml-1">
                       {filteredFollowUps.length}
                     </span>
                   )}
@@ -1063,7 +1080,7 @@ export default function FollowUpPage() {
                   <Mail className="h-4 w-4" />
                   Broker Automations
                   {pendingBfuCount > 0 && (
-                    <span className="ml-1 rounded-full bg-orange-500 text-white px-1.5 py-0.5 text-[10px] font-bold">
+                    <span className="ff-followups-count ml-1">
                       {pendingBfuCount}
                     </span>
                   )}
@@ -1071,7 +1088,7 @@ export default function FollowUpPage() {
                 <TabsTrigger value="templates" className="flex items-center gap-2">
                   <LayoutTemplate className="h-4 w-4" />
                   Templates
-                  <span className="ml-1 rounded-full bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold">
+                  <span className="ff-followups-count ml-1">
                     {templates.length}
                   </span>
                 </TabsTrigger>
@@ -1079,7 +1096,7 @@ export default function FollowUpPage() {
 
               {/* ── Manual follow-ups ─────────────────────────────────────────── */}
               <TabsContent value="manual" className="space-y-4">
-                <Card>
+                <Card className="ff-followups-surface">
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
                       <div className="flex items-center gap-2 flex-1 min-w-64">
@@ -1119,7 +1136,7 @@ export default function FollowUpPage() {
                       <p className="text-gray-600 mt-2">Loading follow-ups...</p>
                     </div>
                   ) : filteredFollowUps.length === 0 ? (
-                    <Card>
+                      <Card className="ff-followups-surface">
                       <CardContent className="p-8 text-center">
                         <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No follow-ups found</h3>
@@ -1132,14 +1149,14 @@ export default function FollowUpPage() {
                     </Card>
                   ) : (
                     filteredFollowUps.map(followUp => (
-                      <Card key={followUp.id} className="hover:shadow-md transition-shadow">
+                        <Card key={followUp.id} className="ff-followups-surface ff-followups-task-card hover:shadow-md transition-shadow">
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{followUp.title}</h3>
-                                <Badge className={getPriorityColor(followUp.priority)}>{followUp.priority}</Badge>
-                                <Badge className={getStatusColor(followUp.status)}>
+                                <Badge className={`ff-badge ${getPriorityColor(followUp.priority)}`}>{followUp.priority}</Badge>
+                                <Badge className={`ff-badge ${getStatusColor(followUp.status)}`}>
                                   <span className="flex items-center gap-1">
                                     {getStatusIcon(followUp.status)}
                                     {followUp.status.replace("-", " ")}
@@ -1183,7 +1200,7 @@ export default function FollowUpPage() {
 
               {/* ── Broker automations ────────────────────────────────────────── */}
               <TabsContent value="broker" className="space-y-4">
-                <div className="flex items-start gap-3 rounded-xl border border-orange-200/70 bg-orange-50/60 px-4 py-3 dark:border-orange-900/40 dark:bg-orange-950/10">
+                <div className="ff-followups-surface flex items-start gap-3 border border-orange-200/70 bg-orange-50/60 px-4 py-3 dark:border-orange-900/40 dark:bg-orange-950/10">
                   <Zap className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
                   <p className="text-[12.5px] text-orange-800 dark:text-orange-300">
                     <span className="font-semibold">Automated follow-ups</span> are triggered when an invoice is funded.
@@ -1191,7 +1208,7 @@ export default function FollowUpPage() {
                   </p>
                 </div>
 
-                <Card>
+                <Card className="ff-followups-surface">
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
                       <div className="flex items-center gap-2 flex-1 min-w-64">
@@ -1221,7 +1238,7 @@ export default function FollowUpPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto" />
                   </div>
                 ) : filteredBfu.length === 0 ? (
-                  <Card>
+                    <Card className="ff-followups-surface">
                     <CardContent className="p-8 text-center">
                       <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No broker follow-ups yet</h3>
@@ -1239,7 +1256,7 @@ export default function FollowUpPage() {
                       const cadence = localCadences[bfu.id] ?? bfu.cadenceConfig;
                       return (
                         <Card key={bfu.id} className={cn(
-                          "overflow-hidden transition-shadow",
+                          "ff-followups-surface ff-followups-automation-row overflow-hidden transition-shadow",
                           isExpanded && "ring-1 ring-orange-200 dark:ring-orange-800",
                         )}>
                           {/* Row header */}
@@ -1273,19 +1290,19 @@ export default function FollowUpPage() {
                             {/* Trigger */}
                             <div>
                               <span className={cn(
-                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold border",
+                                "ff-badge gap-1",
                                 bfu.triggerType === "auto"
-                                  ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400"
-                                  : "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/20 dark:text-violet-400",
+                                  ? "ff-followups-source-rules"
+                                  : "ff-followups-source-agent",
                               )}>
                                 {bfu.triggerType === "auto" ? <Zap className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                                {bfu.triggerType}
+                                {bfu.triggerType === "auto" ? "Rules" : "Agent"}
                               </span>
                             </div>
                             {/* Status */}
                             <div>
                               <span className={cn(
-                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold border capitalize",
+                                "ff-badge gap-1 capitalize",
                                 BFU_STATUS_COLOR[bfu.status] ?? "bg-gray-50 text-gray-600 border-gray-200",
                               )}>
                                 {bfu.status === "acknowledged" && <CheckCheck className="h-3 w-3" />}
@@ -1295,7 +1312,7 @@ export default function FollowUpPage() {
                             </div>
                             {/* Cadence paused badge */}
                             {cadence?.paused && (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 text-[10px] font-bold">
+                              <span className="ff-badge ff-badge-pending gap-1">
                                 <Pause className="h-2.5 w-2.5" /> Paused
                               </span>
                             )}
@@ -1311,7 +1328,7 @@ export default function FollowUpPage() {
 
                           {/* Expanded detail */}
                           {isExpanded && (
-                            <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 px-5 py-4">
+                            <div className="ff-followups-expanded border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 px-5 py-4">
                               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
                                 {/* Left: reminder timeline */}
@@ -1329,7 +1346,7 @@ export default function FollowUpPage() {
                                   </div>
                                   <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Email Body Preview</p>
-                                    <pre className="text-[11.5px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-sans bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700 max-h-48 overflow-auto">
+                                    <pre className="ff-card ff-followups-surface text-[11.5px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-sans bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 max-h-48 overflow-auto">
                                       {bfu.body}
                                     </pre>
                                   </div>
@@ -1414,7 +1431,7 @@ export default function FollowUpPage() {
                     <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading templates…
                   </div>
                 ) : templates.length === 0 ? (
-                  <Card>
+                    <Card className="ff-followups-surface">
                     <CardContent className="flex flex-col items-center justify-center py-16 text-slate-400">
                       <LayoutTemplate className="h-10 w-10 mb-3 opacity-40" />
                       <p className="text-sm font-medium">No templates yet</p>
@@ -1430,7 +1447,7 @@ export default function FollowUpPage() {
                       <div key={tt}>
                         <div className="flex items-center gap-2 mb-2">
                           <span className={cn(
-                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                            "ff-badge",
                             TRIGGER_TYPE_COLORS[tt],
                           )}>
                             {TRIGGER_TYPE_LABELS[tt]}
@@ -1442,7 +1459,7 @@ export default function FollowUpPage() {
                             <Card
                               key={tpl.id}
                               className={cn(
-                                "border transition-colors",
+                                "ff-followups-surface ff-followups-template-card border transition-colors",
                                 tpl.isDefault && "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/10",
                               )}
                             >
@@ -1452,7 +1469,7 @@ export default function FollowUpPage() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="text-[13px] font-semibold text-slate-900 dark:text-white">{tpl.name}</span>
                                       {tpl.isDefault && (
-                                        <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-300 bg-blue-100 dark:border-blue-700 dark:bg-blue-900/30 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">
+                                        <span className="ff-badge ff-badge-submitted gap-1">
                                           <Star className="h-2.5 w-2.5" /> Default
                                         </span>
                                       )}
@@ -1473,7 +1490,7 @@ export default function FollowUpPage() {
                                         title="Set as default"
                                         disabled={setDefaultTplMutation.isPending}
                                         onClick={() => setDefaultTplMutation.mutate(tpl.id)}
-                                        className="flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                                        className="bevel-button flex items-center gap-1 bg-[#d4d0c8] px-2 py-1 text-[11px] text-slate-700 disabled:opacity-50"
                                       >
                                         <Star className="h-3 w-3" /> Set default
                                       </button>
@@ -1482,7 +1499,7 @@ export default function FollowUpPage() {
                                       type="button"
                                       title="Preview"
                                       onClick={() => setPreviewTpl(tpl)}
-                                      className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                      className="bevel-button bg-[#d4d0c8] p-1.5 text-slate-700"
                                     >
                                       <Eye className="h-3.5 w-3.5" />
                                     </button>
@@ -1490,7 +1507,7 @@ export default function FollowUpPage() {
                                       type="button"
                                       title="Edit"
                                       onClick={() => { setEditingTpl(tpl); setTplDialogOpen(true); }}
-                                      className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1.5 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                      className="bevel-button bg-[#d4d0c8] p-1.5 text-slate-700"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
                                     </button>
@@ -1499,7 +1516,7 @@ export default function FollowUpPage() {
                                       title="Delete"
                                       disabled={deleteTplMutation.isPending}
                                       onClick={() => { if (confirm(`Delete template "${tpl.name}"?`)) deleteTplMutation.mutate(tpl.id); }}
-                                      className="rounded-md border border-red-200 dark:border-red-800 bg-white dark:bg-slate-800 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
+                                      className="bevel-button bg-[#d4d0c8] p-1.5 text-red-700 disabled:opacity-50"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
@@ -1515,7 +1532,7 @@ export default function FollowUpPage() {
                 )}
 
                 {/* Placeholder legend */}
-                <Card className="border-dashed border-slate-300 dark:border-slate-700">
+                <Card className="ff-followups-surface border-dashed border-slate-300 dark:border-slate-700">
                   <CardContent className="p-4">
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Available placeholders</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -1547,7 +1564,7 @@ export default function FollowUpPage() {
 
             {/* ── Template preview dialog ───────────────────────────────────── */}
             <Dialog open={!!previewTpl} onOpenChange={v => { if (!v) setPreviewTpl(null); }}>
-              <DialogContent className="sm:max-w-[580px]">
+              <DialogContent className="ff-followups-surface sm:max-w-[580px]">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
@@ -1558,18 +1575,18 @@ export default function FollowUpPage() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
                       <span className={cn(
-                        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                        "ff-badge",
                         TRIGGER_TYPE_COLORS[previewTpl.triggerType],
                       )}>
                         {TRIGGER_TYPE_LABELS[previewTpl.triggerType]}
                       </span>
                       {previewTpl.isDefault && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-300 bg-blue-100 dark:border-blue-700 dark:bg-blue-900/30 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">
+                        <span className="ff-badge ff-badge-submitted gap-1">
                           <Star className="h-2.5 w-2.5" /> Default
                         </span>
                       )}
                     </div>
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div className="ff-followups-surface border border-slate-200 dark:border-slate-700 overflow-hidden">
                       <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Subject</p>
                         <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200">

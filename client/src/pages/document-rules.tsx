@@ -79,7 +79,7 @@ function RuleDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md rounded-3xl border-slate-200 dark:border-slate-800">
+      <DialogContent className="ff-rules-surface max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
             <FileCheck className="h-5 w-5 text-blue-500" />
@@ -97,7 +97,7 @@ function RuleDialog({
               value={form.documentType ?? ""}
               onChange={e => set("documentType", e.target.value)}
               placeholder="e.g. rate_confirmation"
-              className="rounded-xl border-slate-200 text-sm dark:border-slate-700"
+              className="text-sm"
               disabled={isEdit}
             />
             <p className="text-[11px] text-slate-400">Must match the document type used during upload (snake_case)</p>
@@ -109,7 +109,7 @@ function RuleDialog({
               value={form.label ?? ""}
               onChange={e => set("label", e.target.value)}
               placeholder="e.g. Rate Confirmation"
-              className="rounded-xl border-slate-200 text-sm dark:border-slate-700"
+              className="text-sm"
             />
           </div>
 
@@ -120,7 +120,7 @@ function RuleDialog({
               onChange={e => set("description", e.target.value)}
               placeholder="Explain what this document is and why it's needed..."
               rows={2}
-              className="rounded-xl border-slate-200 text-sm dark:border-slate-700"
+              className="text-sm"
             />
           </div>
 
@@ -128,7 +128,7 @@ function RuleDialog({
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Required For Stage</label>
               <Select value={form.requiredForStage} onValueChange={v => set("requiredForStage", v)}>
-                <SelectTrigger className="rounded-xl border-slate-200 text-sm dark:border-slate-700">
+                <SelectTrigger className="text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -143,7 +143,7 @@ function RuleDialog({
                 type="number"
                 value={form.sortOrder ?? 0}
                 onChange={e => set("sortOrder", parseInt(e.target.value) || 0)}
-                className="rounded-xl border-slate-200 text-sm dark:border-slate-700"
+                className="text-sm"
               />
             </div>
           </div>
@@ -161,12 +161,12 @@ function RuleDialog({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isSaving} className="rounded-xl text-xs">Cancel</Button>
+           <Button variant="outline" size="sm" onClick={onClose} disabled={isSaving} className="text-xs">Cancel</Button>
           <Button
             size="sm"
             disabled={isSaving || !form.documentType || !form.label}
             onClick={() => onSave(form)}
-            className="rounded-xl bg-blue-600 text-xs text-white hover:bg-blue-700"
+            className="text-xs"
           >
             {isSaving ? "Saving..." : isEdit ? "Save Changes" : "Add Rule"}
           </Button>
@@ -188,6 +188,8 @@ export default function DocumentRules() {
   const [editRule,   setEditRule]   = useState<DocumentRule | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
   const [deleteId,   setDeleteId]   = useState<number | null>(null);
+  const [stageFilter, setStageFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const { data: rules = [], isLoading } = useQuery<DocumentRule[]>({
     queryKey: ["/api/document-rules"],
@@ -221,11 +223,15 @@ export default function DocumentRules() {
     onSuccess: () => invalidate(),
   });
 
-  const reviewRules   = rules.filter(r => r.requiredForStage === "start_review");
-  const approvalRules = rules.filter(r => r.requiredForStage === "approve");
+  const filteredRules = rules.filter(rule =>
+    (stageFilter === "all" || rule.requiredForStage === stageFilter) &&
+    (statusFilter === "all" || (statusFilter === "active" ? rule.active : !rule.active))
+  );
+  const reviewRules   = filteredRules.filter(r => r.requiredForStage === "start_review");
+  const approvalRules = filteredRules.filter(r => r.requiredForStage === "approve");
 
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="ff-rules-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Rules" subtitle="Configure required documents for load approval and funding" group="Admin" />
@@ -243,14 +249,48 @@ export default function DocumentRules() {
               </div>
               {isManager && (
                 <Button onClick={() => setShowAdd(true)}
-                  className="shrink-0 gap-2 rounded-2xl bg-blue-600 text-sm text-white shadow-[0_4px_12px_rgba(37,99,235,0.22)] hover:bg-blue-700">
+                  className="shrink-0 gap-2 text-sm">
                   <Plus className="h-4 w-4" />Add Rule
                 </Button>
               )}
             </div>
 
+            <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {[
+                { label: "Total Rules", value: rules.length },
+                { label: "Active", value: rules.filter(rule => rule.active).length },
+                { label: "Required", value: rules.filter(rule => rule.required).length },
+                { label: "Inactive", value: rules.filter(rule => !rule.active).length },
+              ].map(stat => (
+                <div key={stat.label} className="ff-rules-surface ff-stat-card p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
+                  <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="ff-rules-surface mb-5 flex flex-wrap items-center gap-3 bg-white p-4">
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger className="w-[190px]"><SelectValue placeholder="Rule stage" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All rule stages</SelectItem>
+                  <SelectItem value="start_review">Begin Review</SelectItem>
+                  <SelectItem value="approve">Approval</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs font-semibold text-slate-500">{filteredRules.length} matching rules</span>
+            </div>
+
             {/* Info banner */}
-            <div className="mb-5 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+            <div className="ff-rules-surface mb-5 flex items-start gap-3 border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-950/20">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
               <div className="text-xs text-blue-700 dark:text-blue-300">
                 <span className="font-semibold">How this works: </span>
@@ -318,7 +358,7 @@ export default function DocumentRules() {
 
       {/* Delete confirmation */}
       <AlertDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }}>
-        <AlertDialogContent className="rounded-3xl">
+        <AlertDialogContent className="ff-rules-surface">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this rule?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -327,9 +367,9 @@ export default function DocumentRules() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="rounded-xl bg-red-600 text-white hover:bg-red-700"
+              className="ff-btn-danger"
               onClick={() => deleteId !== null && deleteMut.mutate(deleteId)}
             >
               Delete
@@ -353,7 +393,7 @@ function RuleGroup({
   onToggle: (id: number, field: string, value: boolean) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+    <div className="ff-rules-surface overflow-hidden bg-white">
       <div className={cn(
         "flex items-center gap-2 border-b px-5 py-4",
         color === "blue" ? "border-blue-100 bg-blue-50/60 dark:border-blue-900/30 dark:bg-blue-950/10" : "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/30 dark:bg-emerald-950/10",
@@ -365,7 +405,7 @@ function RuleGroup({
           <h3 className="text-sm font-semibold text-slate-800 dark:text-white">{title}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
         </div>
-        <span className="ml-auto rounded-full bg-white/80 px-2.5 py-0.5 text-[11px] font-bold text-slate-600 shadow-sm dark:bg-slate-800 dark:text-slate-300">
+        <span className="ff-badge ff-badge-draft ml-auto">
           {rules.length}
         </span>
       </div>
@@ -379,13 +419,13 @@ function RuleGroup({
         <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
           {rules.map(rule => (
             <div key={rule.id} className={cn(
-              "flex items-start gap-3 px-5 py-4 transition-colors",
+              "ff-rule-card flex items-start gap-3 px-5 py-4 transition-colors",
               !rule.active && "opacity-50",
             )}>
               <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
 
               <div className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                 rule.active ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400" : "bg-slate-100 text-slate-400 dark:bg-slate-800",
               )}>
                 {rule.active ? <CheckCircle2 className="h-4 w-4" /> : <FileCheck className="h-4 w-4" />}
@@ -394,19 +434,22 @@ function RuleGroup({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-slate-800 dark:text-white">{rule.label}</span>
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  <Badge className="ff-badge ff-rules-type">
                     {rule.documentType}
-                  </code>
+                  </Badge>
+                  <StageBadge stage={rule.requiredForStage} />
+                  <span className="ff-rules-priority">Priority {rule.sortOrder}</span>
                   {!rule.required && (
                     <Badge className="rounded-full border border-slate-200 bg-white px-2 py-0 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-900">
                       Optional
                     </Badge>
                   )}
                   {!rule.active && (
-                    <Badge className="rounded-full border border-slate-200 bg-white px-2 py-0 text-[10px] text-slate-400 dark:border-slate-700 dark:bg-slate-900">
+                    <Badge className="ff-badge ff-badge-draft">
                       Inactive
                     </Badge>
                   )}
+                  {rule.active && <Badge className="ff-badge ff-badge-funded">Active</Badge>}
                 </div>
                 {rule.description && (
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{rule.description}</p>
@@ -430,13 +473,13 @@ function RuleGroup({
                     />
                     <span className="text-[11px] text-slate-400">Required</span>
                   </label>
-                  <Button variant="ghost" size="sm" onClick={() => onEdit(rule)}
-                    className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-blue-600">
+                   <Button size="sm" onClick={() => onEdit(rule)}
+                    className="ff-rules-edit h-8 w-8 p-0">
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   {isAdmin && (
-                    <Button variant="ghost" size="sm" onClick={() => onDelete(rule.id)}
-                      className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-red-600">
+                    <Button variant="destructive" size="sm" onClick={() => onDelete(rule.id)}
+                      className="ff-rules-delete h-8 w-8 p-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}

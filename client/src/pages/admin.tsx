@@ -111,14 +111,14 @@ type RatesForm = z.infer<typeof ratesSchema>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const ROLE_BADGE: Record<string, JSX.Element> = {
-  admin: <Badge className="bg-purple-600 text-white">Admin</Badge>,
-  manager: <Badge className="bg-blue-600 text-white">Manager</Badge>,
-  employee: <Badge variant="outline">Employee</Badge>,
+  admin: <Badge className="ff-badge ff-admin-role-admin">Admin</Badge>,
+  manager: <Badge className="ff-badge ff-admin-role-manager">Manager</Badge>,
+  employee: <Badge className="ff-badge ff-admin-role-employee">Employee</Badge>,
 };
 const STATUS_BADGE: Record<string, JSX.Element> = {
-  active: <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Active</Badge>,
-  suspended: <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Suspended</Badge>,
-  inactive: <Badge variant="outline" className="text-slate-500">Inactive</Badge>,
+  active: <Badge className="ff-badge ff-badge-funded">Active</Badge>,
+  suspended: <Badge className="ff-badge ff-badge-pending">Suspended</Badge>,
+  inactive: <Badge className="ff-badge ff-badge-draft">Inactive</Badge>,
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -373,9 +373,9 @@ export default function Admin() {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const PORTAL_STATUS_BADGE: Record<string, JSX.Element> = {
-    pending:   <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Pending</Badge>,
-    active:    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Active</Badge>,
-    suspended: <Badge className="bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300">Suspended</Badge>,
+    pending:   <Badge className="ff-badge ff-badge-pending">Pending</Badge>,
+    active:    <Badge className="ff-badge ff-badge-funded">Active</Badge>,
+    suspended: <Badge className="ff-badge ff-badge-pending">Suspended</Badge>,
   };
 
   function exportTtCsv(rows: TtSummaryRow[], filename = "time-tracking.csv") {
@@ -674,7 +674,7 @@ export default function Admin() {
   const watchFee = ratesForm.watch("feeRate") ?? 3;
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="ff-admin-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Team Settings" subtitle="User roles, permissions, and system configuration" group="Admin" />
@@ -689,7 +689,7 @@ export default function Admin() {
                 { label: "Managers", value: users.filter((u) => u.role === "manager").length, icon: UserPlus, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/30" },
                 { label: "Suspended", value: users.filter((u) => u.status === "suspended").length, icon: Ban, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
               ].map((stat) => (
-                <Card key={stat.label} className="rounded-[20px] border border-[hsl(var(--border))]">
+                <Card key={stat.label} className="ff-admin-surface ff-stat-card">
                   <CardContent className="p-4 flex items-center gap-3">
                     <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${stat.bg}`}>
                       <stat.icon className={`h-5 w-5 ${stat.color}`} />
@@ -704,16 +704,16 @@ export default function Admin() {
             </div>
 
             {/* ── Tab Navigation ── */}
-            <div className="flex gap-1 rounded-2xl border border-[hsl(var(--border))] bg-slate-50 dark:bg-slate-900 p-1">
+            <div className="ff-admin-tabs ff-admin-surface flex gap-1 p-1">
               {TABS.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                    "ff-admin-tab flex flex-1 items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium",
                     activeTab === tab.id
-                      ? "bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                      ? "is-active"
+                      : ""
                   )}
                 >
                   <tab.icon className="h-4 w-4" />
@@ -726,7 +726,7 @@ export default function Admin() {
             {/* TAB: USERS                                                     */}
             {/* ══════════════════════════════════════════════════════════════ */}
             {activeTab === "users" && (
-              <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+              <Card className="ff-admin-surface border border-[hsl(var(--border))]">
                 <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <div>
@@ -772,7 +772,7 @@ export default function Admin() {
                     />
                   ) : (
                     <div className="overflow-x-auto">
-                      <Table>
+                      <Table className="ff-data-table">
                         <TableHeader>
                           <TableRow>
                             <TableHead>Name</TableHead>
@@ -810,19 +810,19 @@ export default function Admin() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center justify-end gap-1">
-                                  <Button variant="ghost" size="sm" onClick={() => { setPermToggles({}); openPermissions(u); }} title="Manage Permissions">
+                                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => { setPermToggles({}); openPermissions(u); }} title="Manage Permissions">
                                     <KeyRound className="h-4 w-4 text-blue-500" />
                                   </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Edit">
+                                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => openEdit(u)} title="Edit">
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                   {!isSelf(u.id) && (
-                                    <Button variant="ghost" size="sm" onClick={() => handleSuspend(u)} disabled={updateMutation.isPending} title={u.status === "suspended" ? "Reactivate" : "Suspend"}>
+                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => handleSuspend(u)} disabled={updateMutation.isPending} title={u.status === "suspended" ? "Reactivate" : "Suspend"}>
                                       {u.status === "suspended" ? <CheckCircle className="h-4 w-4 text-emerald-600" /> : <Ban className="h-4 w-4 text-amber-600" />}
                                     </Button>
                                   )}
                                   {!isSelf(u.id) && (
-                                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(u)} title="Remove">
+                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setDeleteTarget(u)} title="Remove">
                                       <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
                                   )}
@@ -886,7 +886,7 @@ export default function Admin() {
                         </div>
 
                         {/* Live preview */}
-                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-5">
+                        <div className="ff-admin-surface border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-5">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">Preview — $10,000 invoice</p>
                           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                             {[
@@ -895,7 +895,7 @@ export default function Admin() {
                               { label: "Reserve", value: `$${((10000 * (100 - watchAdvance)) / 100).toFixed(2)}`, color: "text-violet-600 dark:text-violet-400" },
                               { label: "Net Payout", value: `$${((10000 * watchAdvance / 100) - (10000 * watchFee / 100)).toFixed(2)}`, color: "text-emerald-600 dark:text-emerald-400" },
                             ].map(({ label, value, color }) => (
-                              <div key={label} className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 text-center">
+                              <div key={label} className="ff-admin-surface bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 text-center">
                                 <p className="text-xs text-slate-500 mb-1">{label}</p>
                                 <p className={`font-bold text-lg ${color}`}>{value}</p>
                               </div>
@@ -963,13 +963,13 @@ export default function Admin() {
                             </Badge>
                             <span className="text-xs text-slate-400">{stageDocs.length} document{stageDocs.length !== 1 ? "s" : ""}</span>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => addDocRow(stage)} className="gap-1 h-7 text-xs">
+                          <Button variant="outline" size="sm" onClick={() => addDocRow(stage)} className="gap-1 h-7 text-xs">
                             <Plus className="h-3 w-3" /> Add
                           </Button>
                         </div>
 
                         {stageDocs.length === 0 ? (
-                          <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 py-4 text-center text-sm text-slate-400">
+                          <div className="ff-admin-surface border border-dashed border-slate-200 dark:border-slate-700 py-4 text-center text-sm text-slate-400">
                             No documents configured for this stage
                           </div>
                         ) : (
@@ -978,7 +978,7 @@ export default function Admin() {
                               const absIdx = effectiveDocItems.findIndex((d, gi) => d.stage === stage && effectiveDocItems.filter((x) => x.stage === stage).indexOf(d) === relIdx && gi >= 0);
                               const globalIdx = effectiveDocItems.map((d, i) => ({ d, i })).filter(({ d }) => d.stage === stage)[relIdx]?.i ?? -1;
                               return (
-                                <div key={relIdx} className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">
+                                <div key={relIdx} className="ff-admin-surface flex items-start gap-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">
                                   <Switch
                                     checked={doc.required}
                                     onCheckedChange={(v) => updateDoc(globalIdx, { required: v })}
@@ -1002,7 +1002,7 @@ export default function Admin() {
                                     <Badge variant={doc.required ? "default" : "outline"} className="text-xs hidden sm:inline-flex">
                                       {doc.required ? "Required" : "Optional"}
                                     </Badge>
-                                    <Button variant="ghost" size="sm" onClick={() => removeDocRow(globalIdx)} className="h-7 w-7 p-0 text-red-400 hover:text-red-600">
+                                    <Button variant="outline" size="sm" onClick={() => removeDocRow(globalIdx)} className="h-7 w-7 p-0 text-red-600">
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                   </div>
@@ -1034,7 +1034,7 @@ export default function Admin() {
                     { label: "Pending Approval", value: portalUsers.filter(u => u.status === "pending").length, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
                     { label: "Active Carriers", value: portalUsers.filter(u => u.status === "active").length, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
                   ].map((s) => (
-                    <Card key={s.label} className="rounded-[20px] border border-[hsl(var(--border))]">
+                    <Card key={s.label} className="ff-admin-surface ff-stat-card">
                       <CardContent className="p-4 flex items-center gap-3">
                         <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${s.bg}`}>
                           <Globe className={`h-5 w-5 ${s.color}`} />
@@ -1056,7 +1056,7 @@ export default function Admin() {
                   </a>
                 </div>
 
-                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                <Card className="ff-admin-surface border border-[hsl(var(--border))]">
                   <CardContent className="p-0">
                     {portalLoading ? (
                       <SkeletonRows rows={5} cols={5} />
@@ -1064,7 +1064,7 @@ export default function Admin() {
                       <EmptyState icon={Globe} title="No registered carriers" description="Carriers will appear here once they register through the portal." />
                     ) : (
                       <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="ff-data-table">
                           <TableHeader>
                             <TableRow>
                               <TableHead>Company</TableHead>
@@ -1098,7 +1098,7 @@ export default function Admin() {
                                     {u.status === "pending" && (
                                       <Button
                                         size="sm"
-                                        className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        className="h-8 px-3 text-xs"
                                         onClick={() => approvePortalMutation.mutate({ id: u.id, status: "active" })}
                                         disabled={approvePortalMutation.isPending}
                                       >
@@ -1109,7 +1109,7 @@ export default function Admin() {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-7 px-2 text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
+                                        className="h-8 px-3 text-xs text-amber-700"
                                         onClick={() => approvePortalMutation.mutate({ id: u.id, status: "suspended" })}
                                         disabled={approvePortalMutation.isPending}
                                       >
@@ -1120,7 +1120,7 @@ export default function Admin() {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-7 px-2 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                        className="h-8 px-3 text-xs text-emerald-700"
                                         onClick={() => approvePortalMutation.mutate({ id: u.id, status: "active" })}
                                         disabled={approvePortalMutation.isPending}
                                       >
@@ -1138,7 +1138,7 @@ export default function Admin() {
                   </CardContent>
                 </Card>
 
-                <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 px-4 py-3 flex items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
+                <div className="ff-admin-surface border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 px-4 py-3 flex items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
                   <Globe className="h-4 w-4 flex-shrink-0" />
                   <span>The carrier portal is accessible at <span className="font-mono font-semibold">/portal</span> — share this link with carriers to let them self-register.</span>
                 </div>
@@ -1152,7 +1152,7 @@ export default function Admin() {
               <div className="space-y-4">
                 {/* Live Now Banner */}
                 {ttLive.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-3">
+                  <div className="ff-admin-surface flex flex-wrap items-center gap-3 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500">
                       <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
                     </div>
@@ -1167,7 +1167,7 @@ export default function Admin() {
                   </div>
                 )}
 
-                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                <Card className="ff-admin-surface border border-[hsl(var(--border))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1190,7 +1190,7 @@ export default function Admin() {
                       <EmptyState icon={Clock} title="No time entries yet" description="Agents will appear here once they clock in." />
                     ) : (
                       <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="ff-data-table">
                           <TableHeader>
                             <TableRow>
                               <TableHead>Agent</TableHead>
@@ -1230,22 +1230,22 @@ export default function Admin() {
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   {row.todayHours > 0 ? (
-                                    <span className={row.todayHours > 8 ? "text-amber-600 font-semibold" : ""}>{row.todayHours.toFixed(2)} h</span>
+                                    <><span className={row.todayHours > 8 ? "text-amber-600 font-semibold" : ""}>{row.todayHours.toFixed(2)} h</span><div className="ff-admin-hours ml-auto mt-1"><span style={{ width: `${Math.min((row.todayHours / 8) * 100, 100)}%` }} /></div></>
                                   ) : <span className="text-slate-400">—</span>}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   {row.weekHours > 0 ? (
-                                    <span className={row.weekHours > 40 ? "text-red-600 font-semibold" : ""}>{row.weekHours.toFixed(2)} h</span>
+                                    <><span className={row.weekHours > 40 ? "text-red-600 font-semibold" : ""}>{row.weekHours.toFixed(2)} h</span><div className="ff-admin-hours ml-auto mt-1"><span style={{ width: `${Math.min((row.weekHours / 40) * 100, 100)}%` }} /></div></>
                                   ) : <span className="text-slate-400">—</span>}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
-                                  {row.periodHours > 0 ? `${row.periodHours.toFixed(2)} h` : <span className="text-slate-400">—</span>}
+                                  {row.periodHours > 0 ? <><span>{row.periodHours.toFixed(2)} h</span><div className="ff-admin-hours ml-auto mt-1"><span style={{ width: `${Math.min((row.periodHours / 80) * 100, 100)}%` }} /></div></> : <span className="text-slate-400">—</span>}
                                 </TableCell>
                                 <TableCell className="text-xs text-slate-400">
                                   {row.lastActivity ? new Date(row.lastActivity).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Button variant="ghost" size="sm" onClick={() => setTtDrillAgent(row.userId)} className="gap-1.5 text-xs">
+                                  <Button variant="outline" size="sm" onClick={() => setTtDrillAgent(row.userId)} className="gap-1.5 text-xs">
                                     <ChevronRight className="h-4 w-4" />
                                     Detail
                                   </Button>
@@ -1394,7 +1394,7 @@ export default function Admin() {
 
       {/* ── Add Agent ─────────────────────────────────────────────────────── */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="ff-admin-surface sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5" /> Add New Agent</DialogTitle>
             <DialogDescription>Create a new agent account. A welcome email with login credentials will be sent automatically.</DialogDescription>
@@ -1431,7 +1431,7 @@ export default function Admin() {
                   <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input {...field} type="password" placeholder="Min 6 characters" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/20 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
+              <div className="ff-admin-surface flex items-center gap-2 bg-blue-50 dark:bg-blue-950/20 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
                 <Mail className="h-4 w-4 flex-shrink-0" />
                 Login credentials will be emailed to the agent automatically.
               </div>
@@ -1448,7 +1448,7 @@ export default function Admin() {
 
       {/* ── Edit User ─────────────────────────────────────────────────────── */}
       <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) setEditUser(null); }}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="ff-admin-surface sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5" /> Edit User</DialogTitle>
             <DialogDescription>Update name, email, or role for {editUser?.firstName} {editUser?.lastName}.</DialogDescription>
@@ -1494,7 +1494,7 @@ export default function Admin() {
 
       {/* ── Delete Confirm ────────────────────────────────────────────────── */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="ff-admin-surface">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600">
               <Trash2 className="h-5 w-5" /> Remove User Account
@@ -1502,7 +1502,7 @@ export default function Admin() {
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>Are you sure you want to permanently remove this account? This cannot be undone.</p>
-                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3">
+                <div className="ff-admin-surface border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3">
                   <p className="font-semibold text-slate-900 dark:text-white text-sm">{deleteTarget?.firstName} {deleteTarget?.lastName}</p>
                   {deleteTarget?.email && <p className="text-sm text-slate-500">{deleteTarget.email}</p>}
                   {deleteTarget?.role && <p className="text-xs text-slate-400 capitalize mt-1">{deleteTarget.role}</p>}
@@ -1525,7 +1525,7 @@ export default function Admin() {
 
       {/* ── Notify User ───────────────────────────────────────────────────── */}
       <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="ff-admin-surface sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Send Notification</DialogTitle>
             <DialogDescription>Send an in-app notification to a user. Use this to request missing information or communicate important updates.</DialogDescription>
@@ -1560,7 +1560,7 @@ export default function Admin() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+              <div className="ff-admin-surface flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 This will appear as a warning notification in the user's notification center.
               </div>
@@ -1577,7 +1577,7 @@ export default function Admin() {
 
       {/* ── Permissions Dialog ─────────────────────────────────────────────── */}
       <Dialog open={!!permTarget} onOpenChange={(o) => { if (!o) { setPermTarget(null); setPermToggles({}); } }}>
-        <DialogContent className="sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="ff-admin-surface sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-blue-500" />
@@ -1595,7 +1595,7 @@ export default function Admin() {
           ) : (
             <div className="space-y-5 py-2">
               {/* Header bar */}
-              <div className="flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
+              <div className="ff-admin-surface flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   <span className="font-semibold text-slate-900 dark:text-white">{grantedCount}</span> of {allKeys.length} permissions granted
                 </p>
@@ -1617,13 +1617,13 @@ export default function Admin() {
 
               {/* Permission sections */}
               {PERMISSION_SECTIONS.map((section) => (
-                <div key={section.label}>
-                  <div className="mb-2 flex items-center gap-2">
+                 <div key={section.label} className="ff-admin-permission-section ff-admin-surface">
+                   <div className="ff-admin-section-header mb-2 flex items-center gap-2 px-3 py-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{section.label}</p>
                     <div className="flex-1 border-t border-slate-100 dark:border-slate-800" />
                     <button
                       type="button"
-                      className="text-[10px] text-blue-500 hover:underline"
+                       className="bevel-button bg-[#d4d0c8] px-2 py-1 text-[10px] text-slate-700"
                       onClick={() => {
                         const allOn = section.items.every(i => activeToggles[i.key]);
                         setPermToggles(prev => ({
@@ -1636,9 +1636,9 @@ export default function Admin() {
                       {section.items.every(i => activeToggles[i.key]) ? "Disable all" : "Enable all"}
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+                   <div className="grid grid-cols-2 gap-x-3 gap-y-3 p-3 pt-1 sm:grid-cols-3">
                     {section.items.map((item) => (
-                      <div key={item.key} className="flex items-center justify-between gap-3 rounded-lg border border-[hsl(var(--border))] bg-white dark:bg-slate-900 px-3 py-2.5">
+                       <div key={item.key} className="ff-admin-surface flex items-center justify-between gap-3 border border-[hsl(var(--border))] bg-white dark:bg-slate-900 px-3 py-2.5">
                         <Label htmlFor={`perm-${item.key}`} className="text-sm font-medium cursor-pointer">
                           {item.label}
                         </Label>

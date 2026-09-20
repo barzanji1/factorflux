@@ -87,7 +87,7 @@ function StatTile({ label, value, sub, color = "blue" }: { label: string; value:
     slate: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
   };
   return (
-    <div className={cn("ff-card p-4", colors[color])}>
+    <div className={cn("ff-card ff-reports-surface p-4", colors[color])}>
       <p className="text-xs font-medium opacity-70">{label}</p>
       <p className="mt-1 text-2xl font-bold text-[#098b9f]">{value}</p>
       {sub && <p className="text-[11px] opacity-60 mt-0.5">{sub}</p>}
@@ -98,9 +98,9 @@ function StatTile({ label, value, sub, color = "blue" }: { label: string; value:
 function DateRange({ start, end, onChange }: { start: string; end: string; onChange: (s: string, e: string) => void }) {
   return (
     <div className="flex items-center gap-2">
-      <Input type="date" value={start} onChange={e => onChange(e.target.value, end)} className="h-8 text-xs w-36" />
+      <Input type="date" value={start} onChange={e => onChange(e.target.value, end)} className="ff-input h-8 text-xs w-36" />
       <span className="text-slate-400 text-xs">to</span>
-      <Input type="date" value={end} onChange={e => onChange(start, e.target.value)} className="h-8 text-xs w-36" />
+      <Input type="date" value={end} onChange={e => onChange(start, e.target.value)} className="ff-input h-8 text-xs w-36" />
     </div>
   );
 }
@@ -152,7 +152,7 @@ function AgingTab() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-4 gap-3">{BUCKETS.map(b => <div key={b} className="h-32 rounded-[22px] bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
+        <div className="grid grid-cols-4 gap-3">{BUCKETS.map(b => <div key={b} className="ff-reports-surface h-32 bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -161,7 +161,7 @@ function AgingTab() {
               const pct = grandTotal > 0 ? ((bkt?.total ?? 0) / grandTotal) * 100 : 0;
               const s = BUCKET_CFG[b];
               return (
-                <div key={b} className={cn("rounded-[22px] border p-4", s.badge)}>
+                <div key={b} className={cn("ff-reports-bucket ff-reports-surface border p-4", s.badge)}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold">{b} days</span>
                     <span className="text-[10px] font-medium opacity-60">{pct.toFixed(1)}%</span>
@@ -324,10 +324,10 @@ function BrokerTab() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {isLoading ? <SkeletonRows cols={7} /> : data.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">No data for selected range.</td></tr>
-            ) : data.map(row => {
+            ) : data.map((row, index) => {
               const utilizationPct = row.creditLimit && row.creditLimit > 0 ? (row.outstanding / row.creditLimit) * 100 : null;
               return (
-                <tr key={row.debtorId ?? "unknown"} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                <tr key={`${row.debtorId ?? "unknown"}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                   <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{row.brokerName}</td>
                   <td className="px-4 py-3 tabular-nums">{row.invoiceCount}</td>
                   <td className="px-4 py-3 tabular-nums font-medium">{fmt(row.totalVolume)}</td>
@@ -419,7 +419,7 @@ function DailyARTab() {
         </Button>
       </div>
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-[22px] bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="ff-reports-surface h-28 bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -610,7 +610,7 @@ const money = (row: ArRow, ...keys: string[]) => Number(keys.map(k => (row as Re
 const arValue = (row: ArRow, bucket: string) => Number(row.aging?.[bucket] ?? (row as Record<string, unknown>)[bucket] ?? 0);
 
 function ReportToolbar({ start, end, onDates, children }: { start: string; end: string; onDates: (s: string, e: string) => void; children?: ReactNode }) {
-  return <div className="ff-card flex flex-wrap items-end justify-between gap-3 p-3">
+  return <div className="ff-card ff-reports-surface flex flex-wrap items-end justify-between gap-3 p-3">
     <div className="flex flex-wrap items-end gap-2">
       <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">From</label><Input type="date" value={start} onChange={e => onDates(e.target.value, end)} className="h-8 w-36 text-xs" /></div>
       <span className="mb-2 text-xs text-slate-400">to</span>
@@ -621,7 +621,7 @@ function ReportToolbar({ start, end, onDates, children }: { start: string; end: 
 }
 
 function InvoiceDrilldown({ open, onOpenChange, title, invoices }: { open: boolean; onOpenChange: (v: boolean) => void; title: string; invoices?: Array<Record<string, unknown>> }) {
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-4xl overflow-hidden p-0">
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="ff-reports-surface max-w-4xl overflow-hidden p-0">
     <DialogHeader className="border-b border-slate-200 px-6 py-5 dark:border-slate-700"><DialogTitle>{title}</DialogTitle><DialogDescription>Invoice activity for the selected reporting period.</DialogDescription></DialogHeader>
     <div className="max-h-[60vh] overflow-auto p-6">
       {!invoices?.length ? <div className="py-12 text-center text-sm text-slate-500">No invoice detail was returned for this selection.</div> :
@@ -658,9 +658,9 @@ function AgentPerformanceTab() {
       {manager && <Button size="sm" className="h-8 gap-1.5" onClick={() => setWarningOpen(true)}><AlertTriangle className="h-3.5 w-3.5" /> Issue warning</Button>}
     </ReportToolbar>
     <Card className="overflow-hidden border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[850px] text-sm"><thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Agent","Role","Invoices","Volume funded","Avg days","Reviews","Hours"].map(h => <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>)}</tr></thead><tbody className="divide-y">{query.isLoading ? <SkeletonRows cols={7} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelected(r)} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20"><td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td><td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td><td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td><td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td><td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td><td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td><td className="px-4 py-3 tabular-nums">{r.clockHoursWorked ?? "—"}</td></tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">No agents found for this period.</td></tr>}</tbody></table></div></Card>
-    <Card className="border border-slate-200 dark:border-slate-700"><CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings</CardTitle><span className="text-xs text-slate-500">{warnings.length} recorded</span></CardHeader><CardContent className="p-0"><div className="divide-y">{warnings.length ? warnings.map(w => <div key={w.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800">{w.severity}</span></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div><div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</span> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" onClick={() => acknowledge.mutate(w.id)}>Acknowledge</Button> : <span>Pending</span>}</div></div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">No written warnings in scope.</div>}</div></CardContent></Card>
+    <Card className="border border-slate-200 dark:border-slate-700"><CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings</CardTitle><span className="text-xs text-slate-500">{warnings.length} recorded</span></CardHeader><CardContent className="space-y-2 p-3">{warnings.length ? warnings.map(w => <div key={w.id} className="ff-card ff-reports-surface flex flex-wrap items-center justify-between gap-3 px-4 py-3"><div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><span className={`ff-badge ${w.severity === "final" ? "ff-badge-rejected" : w.severity === "written" ? "ff-badge-pending" : "ff-badge-draft"} uppercase`}>{w.severity}</span></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div><div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <span className="ff-badge ff-badge-funded gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</span> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" onClick={() => acknowledge.mutate(w.id)}>Acknowledge</Button> : <span className="ff-badge ff-badge-pending">Pending</span>}</div></div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">No written warnings in scope.</div>}</CardContent></Card>
     <InvoiceDrilldown open={!!selected} onOpenChange={v => !v && setSelected(null)} title={selected ? `${selected.firstName ?? ""} ${selected.lastName ?? ""} · invoice detail` : "Invoice detail"} invoices={selected?.invoices} />
-    <Dialog open={warningOpen} onOpenChange={setWarningOpen}><DialogContent><DialogHeader><DialogTitle>Issue written warning</DialogTitle><DialogDescription>Record a performance issue for an agent. The agent will be able to acknowledge it.</DialogDescription></DialogHeader><div className="space-y-4"><div><label className="text-xs font-semibold">Agent</label><Select value={warningForm.userId} onValueChange={v => setWarningForm(f => ({ ...f, userId: v }))}><SelectTrigger className="mt-1"><SelectValue placeholder="Select agent" /></SelectTrigger><SelectContent>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div><div><label className="text-xs font-semibold">Severity</label><Select value={warningForm.severity} onValueChange={v => setWarningForm(f => ({ ...f, severity: v }))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verbal">Verbal</SelectItem><SelectItem value="written">Written</SelectItem><SelectItem value="final">Final</SelectItem></SelectContent></Select></div><div><label className="text-xs font-semibold">Reason</label><Textarea value={warningForm.reason} onChange={e => setWarningForm(f => ({ ...f, reason: e.target.value }))} className="mt-1 min-h-24 w-full p-2 text-sm" placeholder="Describe the issue and expected correction." /></div></div><DialogFooter><Button variant="outline" onClick={() => setWarningOpen(false)}>Cancel</Button><Button disabled={!warningForm.userId || !warningForm.reason || createWarning.isPending} onClick={() => createWarning.mutate()}>Save warning</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={warningOpen} onOpenChange={setWarningOpen}><DialogContent className="ff-reports-surface"><DialogHeader><DialogTitle>Issue written warning</DialogTitle><DialogDescription>Record a performance issue for an agent. The agent will be able to acknowledge it.</DialogDescription></DialogHeader><div className="space-y-4"><div><label className="text-xs font-semibold">Agent</label><Select value={warningForm.userId} onValueChange={v => setWarningForm(f => ({ ...f, userId: v }))}><SelectTrigger className="mt-1"><SelectValue placeholder="Select agent" /></SelectTrigger><SelectContent>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div><div><label className="text-xs font-semibold">Severity</label><Select value={warningForm.severity} onValueChange={v => setWarningForm(f => ({ ...f, severity: v }))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verbal">Verbal</SelectItem><SelectItem value="written">Written</SelectItem><SelectItem value="final">Final</SelectItem></SelectContent></Select></div><div><label className="text-xs font-semibold">Reason</label><Textarea value={warningForm.reason} onChange={e => setWarningForm(f => ({ ...f, reason: e.target.value }))} className="mt-1 min-h-24 w-full p-2 text-sm" placeholder="Describe the issue and expected correction." /></div></div><DialogFooter><Button variant="outline" onClick={() => setWarningOpen(false)}>Cancel</Button><Button disabled={!warningForm.userId || !warningForm.reason || createWarning.isPending} onClick={() => createWarning.mutate()}>Save warning</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 
@@ -710,7 +710,7 @@ function SearchableEntitySelect({ label, items, value, onChange, placeholder }: 
         onChange={e => { setSearch(e.target.value); setOpen(true); }} placeholder={placeholder} className="h-10 pl-9 pr-9" />
       {selected && <button type="button" onClick={() => { onChange(""); setSearch(""); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>}
     </div>
-    {open && <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-900">
+    {open && <div className="ff-reports-surface absolute z-30 mt-1 max-h-60 w-full overflow-auto border bg-white p-1 shadow-xl dark:bg-slate-900">
       {filtered.length ? filtered.map(item => <button key={item.id} type="button" onClick={() => { onChange(String(item.id)); setOpen(false); setSearch(""); }}
         className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">{item.name}</button>)
         : <p className="px-3 py-5 text-center text-xs text-slate-500">No matches found</p>}
@@ -773,9 +773,9 @@ function CarrierArTab() {
         </div>
         <div className="mt-5 flex justify-end gap-2 border-t pt-4">
           <AgingPdfDownload carrierId={carrierId} minDays={agingPdfDays} onMinDaysChange={setAgingPdfDays} compact />
-          <Button variant="ghost" onClick={() => { setSelection(null); setReport(null); }}>Cancel</Button>
+          <Button variant="outline" onClick={() => { setSelection(null); setReport(null); }}>Cancel</Button>
           <Button variant="outline" onClick={reset}>Reset</Button>
-          <Button disabled={!carrierId || !brokerId} onClick={() => { setSelection({ carrierId, brokerId }); setReport(null); }} className="bg-blue-600 text-white hover:bg-blue-700">Submit</Button>
+          <Button disabled={!carrierId || !brokerId} onClick={() => { setSelection({ carrierId, brokerId }); setReport(null); }}>Submit</Button>
         </div>
       </CardContent>
     </Card>
@@ -785,8 +785,8 @@ function CarrierArTab() {
       <CardContent className="grid gap-5 p-5 lg:grid-cols-2">
         {Array.from(new Set(CARRIER_BROKER_REPORTS.map(item => item.category))).map(category => <section key={category}>
           <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{category}</h3>
-          <div className="divide-y overflow-hidden rounded-[22px] border">{CARRIER_BROKER_REPORTS.filter(item => item.category === category).map(item => <button key={item.id} type="button" onClick={() => setReport(item)}
-            className={cn("flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950/20", report?.id === item.id && "bg-blue-50 font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300")}>
+          <div className="ff-reports-surface divide-y overflow-hidden border">{CARRIER_BROKER_REPORTS.filter(item => item.category === category).map(item => <button key={item.id} type="button" onClick={() => setReport(item)}
+            className={cn("ff-reports-link flex w-full items-center justify-between px-3 py-2.5 text-left text-sm", report?.id === item.id && "font-semibold text-[#087d8d]")}>
             <span>{item.title}</span><ChevronRight className="h-4 w-4" />
           </button>)}</div>
         </section>)}
@@ -906,14 +906,14 @@ function GlobalReportsTab() {
       <p className="mt-0.5 text-sm text-slate-500">Select any report to view current results and export them.</p>
     </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {GLOBAL_REPORT_GROUPS.map(group => <Card key={group.title} className={cn("overflow-hidden border-t-4", group.accent)}>
-        <CardHeader className="border-b bg-slate-50/70 px-4 py-3 dark:bg-slate-800/40">
+      {GLOBAL_REPORT_GROUPS.map(group => <Card key={group.title} className={cn("ff-reports-surface overflow-hidden border-t-4", group.accent)}>
+        <CardHeader className="ff-reports-section-header border-b px-4 py-3">
           <CardTitle className="text-sm uppercase tracking-wider">{group.title}</CardTitle>
         </CardHeader>
         <CardContent className="p-2">
           <div className="divide-y dark:divide-slate-800">
             {group.reports.map(item => <button key={item.id} type="button" onClick={() => setReportId(item.id)}
-              className={cn("flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30 dark:hover:text-blue-300", reportId === item.id && "bg-blue-50 font-semibold text-blue-700 dark:bg-blue-950/30 dark:text-blue-300")}>
+              className={cn("ff-reports-link flex w-full items-center justify-between gap-2 px-2.5 py-2.5 text-left text-sm", reportId === item.id && "font-semibold text-[#087d8d]")}>
               <span>{item.label}</span><ChevronRight className="h-4 w-4 shrink-0 opacity-60" />
             </button>)}
           </div>
@@ -956,7 +956,7 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState<TabId>("global");
 
   return (
-    <div className="flex h-screen">
+    <div className="ff-reports-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav title="Reports" subtitle="Financial reporting and analytics" />
@@ -973,7 +973,7 @@ export default function Reports() {
               </div>
             </div>
 
-            <div className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 w-fit flex-wrap">
+            <div className="ff-reports-tabs ff-reports-surface flex gap-1 p-1 w-fit flex-wrap">
               {TABS.map(tab => {
                 const Icon = tab.icon;
                 return (
@@ -981,10 +981,10 @@ export default function Reports() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-all",
+                      "ff-reports-tab flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold",
                       activeTab === tab.id
-                        ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
+                        ? "is-active"
+                        : "",
                     )}
                   >
                     <Icon className="h-3.5 w-3.5" />

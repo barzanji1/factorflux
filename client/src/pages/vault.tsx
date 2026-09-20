@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,6 +87,7 @@ export default function VaultPage() {
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<VaultEntry | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<VaultEntry | null>(null);
   const [revealedValues, setRevealedValues] = useState<Record<number, string | null>>({});
   const [revealingId, setRevealingId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -260,7 +262,7 @@ export default function VaultPage() {
   };
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="ff-vault-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Vault" subtitle="Secure storage for confidential carrier and client records" group="Admin" />
@@ -282,7 +284,7 @@ export default function VaultPage() {
               )}
             </div>
 
-            <Card className="mb-6 border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20">
+            <Card className="ff-vault-surface mb-6 border-red-300 bg-amber-50 dark:border-red-900/40 dark:bg-red-950/20">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center text-red-800 dark:text-red-300 text-base">
                   <AlertTriangle className="h-4 w-4 mr-2" />
@@ -297,7 +299,7 @@ export default function VaultPage() {
               </CardContent>
             </Card>
 
-            <Card className="mb-6">
+            <Card className="ff-vault-surface mb-6">
               <CardHeader>
                 <CardTitle>Select Client</CardTitle>
                 <CardDescription>Choose a client to view their confidential information</CardDescription>
@@ -322,8 +324,8 @@ export default function VaultPage() {
             </Card>
 
             {selectedClient && (
-              <Card>
-                <CardHeader>
+              <Card className="ff-vault-surface">
+                <CardHeader className="ff-vault-panel-header">
                   <CardTitle className="flex items-center">
                     <Lock className="h-5 w-5 mr-2" />
                     Confidential Information
@@ -348,7 +350,7 @@ export default function VaultPage() {
                       </Button>
                     </div>
                   ) : (
-                    <Table>
+                    <Table className="ff-vault-table">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Type</TableHead>
@@ -361,25 +363,26 @@ export default function VaultPage() {
                       </TableHeader>
                       <TableBody>
                         {vaultEntries.map((entry) => (
-                          <TableRow key={entry.id}>
+                          <TableRow key={entry.id} className="ff-vault-entry">
                             <TableCell>
                               <Badge variant={DATA_TYPE_VARIANTS[entry.dataType] || "outline"}>
                                 {DATA_TYPE_LABELS[entry.dataType] || entry.dataType}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-medium">{entry.label}</TableCell>
+                            <TableCell className="font-bold text-slate-900">{entry.label}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 {revealedValues[entry.id] !== undefined ? (
-                                  <span className="font-mono text-sm bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                  <span className="ff-vault-value font-mono text-sm">
                                     {revealedValues[entry.id]}
                                   </span>
                                 ) : (
-                                  <span className="text-gray-400 font-mono">••••••••</span>
+                                  <span className="ff-vault-value font-mono text-slate-500">••••••••</span>
                                 )}
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
+                                  className="h-8 w-8 p-0"
                                   disabled={revealingId === entry.id}
                                   onClick={() => handleReveal(entry)}
                                   data-testid={`button-toggle-visibility-${entry.id}`}
@@ -417,8 +420,9 @@ export default function VaultPage() {
                             <TableCell>
                               <div className="flex gap-1">
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
+                                  className="h-8 w-8 p-0"
                                   disabled={revealingId === entry.id}
                                   onClick={() => openEditDialog(entry)}
                                   data-testid={`button-edit-${entry.id}`}
@@ -430,12 +434,11 @@ export default function VaultPage() {
                                   )}
                                 </Button>
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
+                                  className="h-8 w-8 p-0"
                                   onClick={() => {
-                                    if (confirm("Delete this vault entry? This cannot be undone.")) {
-                                      deleteVaultMutation.mutate(entry.id);
-                                    }
+                                    setDeleteTarget(entry);
                                   }}
                                   data-testid={`button-delete-${entry.id}`}
                                 >
@@ -453,7 +456,7 @@ export default function VaultPage() {
             )}
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogContent className="sm:max-w-[560px]">
+              <DialogContent className="ff-vault-surface sm:max-w-[560px]">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <Lock className="h-5 w-5" />
@@ -593,6 +596,32 @@ export default function VaultPage() {
                 </Form>
               </DialogContent>
             </Dialog>
+            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+              <AlertDialogContent className="ff-vault-surface">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-red-700">
+                    <Trash2 className="h-5 w-5" />
+                    Delete Vault Entry
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Delete “{deleteTarget?.label}”? This permanently removes the encrypted entry and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="ff-btn-danger"
+                    disabled={deleteVaultMutation.isPending}
+                    onClick={() => {
+                      if (deleteTarget) deleteVaultMutation.mutate(deleteTarget.id);
+                      setDeleteTarget(null);
+                    }}
+                  >
+                    {deleteVaultMutation.isPending ? "Deleting…" : "Delete Entry"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </main>
       </div>

@@ -185,7 +185,7 @@ function StageCard({
         onDragOver={e => e.preventDefault()}
         onDrop={e => onDrop(e, index)}
         className={cn(
-          "group rounded-[14px] border transition-all duration-150 select-none",
+          "ff-workflow-stage group border transition-all duration-150 select-none",
           dragging
             ? "opacity-30 scale-[0.97] border-slate-300 dark:border-slate-700"
             : "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]",
@@ -214,7 +214,7 @@ function StageCard({
               type="button"
               onClick={onMoveUp}
               disabled={disabled || index === 0}
-              className="flex h-4 w-4 items-center justify-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-20 dark:hover:bg-slate-800 dark:hover:text-slate-400 transition-colors"
+               className="ff-workflow-icon-button flex h-5 w-5 items-center justify-center text-slate-600 disabled:opacity-20"
               title="Move up"
             >
               <ArrowUp className="h-3 w-3" />
@@ -223,7 +223,7 @@ function StageCard({
               type="button"
               onClick={onMoveDown}
               disabled={disabled || index === total - 1}
-              className="flex h-4 w-4 items-center justify-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-20 dark:hover:bg-slate-800 dark:hover:text-slate-400 transition-colors"
+               className="ff-workflow-icon-button flex h-5 w-5 items-center justify-center text-slate-600 disabled:opacity-20"
               title="Move down"
             >
               <ArrowDown className="h-3 w-3" />
@@ -232,15 +232,15 @@ function StageCard({
 
           {/* Step number */}
           <div className={cn(
-            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-            stage.enabled ? COLOR_ICON[stage.color] : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600",
+             "ff-workflow-stage-number flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+             stage.enabled ? "" : "opacity-50",
           )}>
             {stage.enabled ? enabledSeq : <EyeOff className="h-3 w-3" />}
           </div>
 
           {/* Icon */}
           <div className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]",
+             "ff-workflow-stage-icon flex h-8 w-8 shrink-0 items-center justify-center",
             COLOR_ICON[stage.color],
             !stage.enabled && "!bg-slate-100 !text-slate-400 dark:!bg-slate-800 dark:!text-slate-600",
           )}>
@@ -257,16 +257,16 @@ function StageCard({
                 {stage.label}
               </span>
               {stage.autoAdvance && (
-                <span className="inline-flex items-center gap-0.5 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-400">
+                <span className="ff-badge ff-workflow-auto">
                   <Zap className="h-2.5 w-2.5" /> Auto
                 </span>
               )}
               {stage.requiresApproval && (
-                <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-400">
+                <span className="ff-badge ff-workflow-gated">
                   <Shield className="h-2.5 w-2.5" /> Gated
                 </span>
               )}
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+              <span className="ff-badge ff-badge-draft">
                 SLA {slaLabel(stage.slaHours)}
               </span>
               {invoiceCount > 0 && (
@@ -290,7 +290,7 @@ function StageCard({
                 checked={stage.enabled}
                 onCheckedChange={v => onChange({ enabled: v })}
                 disabled={disabled}
-                className="data-[state=checked]:bg-emerald-500"
+                className="ff-workflow-switch"
               />
               <span className="hidden text-[11px] text-slate-400 sm:inline">
                 {stage.enabled ? "On" : "Off"}
@@ -299,7 +299,7 @@ function StageCard({
             <button
               type="button"
               onClick={onToggleExpand}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+              className="ff-workflow-icon-button flex h-8 w-8 items-center justify-center"
               title={expanded ? "Collapse" : "Configure"}
             >
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -323,7 +323,7 @@ function StageCard({
                   value={stage.slaHours}
                   onChange={e => onChange({ slaHours: Number(e.target.value) || 0 })}
                   disabled={disabled}
-                  className="h-8 rounded-lg text-sm"
+                  className="h-8 text-sm"
                 />
                 <p className="mt-1 text-[10.5px] text-slate-400">Alert when stage exceeds this</p>
               </div>
@@ -337,7 +337,7 @@ function StageCard({
                   value={stage.autoAdvanceCondition}
                   onChange={e => onChange({ autoAdvanceCondition: e.target.value, autoAdvance: !!e.target.value })}
                   disabled={disabled}
-                  className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  className="h-8 w-full border border-input bg-background px-2.5 text-sm disabled:opacity-50"
                 >
                   {AUTO_ADVANCE_OPTIONS.map(o => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -364,7 +364,7 @@ function StageCard({
                       checked={!!stage[field]}
                       onCheckedChange={v => onChange({ [field]: v })}
                       disabled={disabled}
-                      className="shrink-0 data-[state=checked]:bg-blue-600"
+                    className="ff-workflow-switch shrink-0"
                     />
                   </label>
                 ))}
@@ -381,7 +381,7 @@ function StageCard({
                   disabled={disabled}
                   rows={2}
                   placeholder="Internal notes shown to agents when a load enters this stage…"
-                  className="resize-none rounded-lg text-sm"
+                  className="resize-none text-sm"
                 />
               </div>
             </div>
@@ -438,7 +438,7 @@ function PipelinePreview({
   const totalActive = enabled.reduce((s, x) => s + (stageCounts[x.id] ?? 0), 0);
 
   return (
-    <div className="rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+    <div className="ff-workflow-surface">
       <div className="border-b border-slate-100 dark:border-slate-800 px-5 py-3">
         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Live Pipeline Preview</p>
       </div>
@@ -451,7 +451,7 @@ function PipelinePreview({
               <div key={s.id} className="flex items-center">
                 <div className="flex flex-col items-center gap-1.5 w-[76px]">
                   <div className={cn(
-                    "relative flex h-10 w-10 items-center justify-center rounded-xl border-2 transition-all",
+                      "ff-workflow-preview-stage relative flex h-10 w-10 items-center justify-center border-2 transition-all",
                     COLOR_BG[s.color], COLOR_TEXT[s.color],
                   )}>
                     <Icon className="h-4.5 w-4.5" />
@@ -474,7 +474,7 @@ function PipelinePreview({
                   <span className="text-[9px] text-slate-400">{slaLabel(s.slaHours)}</span>
                 </div>
                 {i < enabled.length - 1 && (
-                  <ChevronRight className="mx-0.5 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-700" />
+                  <ChevronRight className="ff-workflow-connector mx-0.5 h-4 w-4 shrink-0" />
                 )}
               </div>
             );
@@ -494,7 +494,7 @@ function PipelinePreview({
           { label: "Manager-gated",  value: enabled.filter(s => s.requiresApproval).length,         color: "blue"   },
           { label: "Total SLA",      value: slaLabel(totalSla),                                     color: "amber"  },
         ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900/30">
+          <div key={label} className="ff-workflow-summary-stat px-3 py-1.5">
             <p className="text-[10px] text-slate-400">{label}</p>
             <p className={cn(
               "text-[14px] font-bold",
@@ -704,7 +704,7 @@ export default function WorkflowBuilder() {
   const enabledCount = stages.filter(s => s.enabled).length;
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="ff-workflow-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
@@ -717,9 +717,9 @@ export default function WorkflowBuilder() {
           <div className="mx-auto w-full max-w-[1200px] p-6 xl:p-8">
 
             {/* ── Top bar ───────────────────────────────────────────────────── */}
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="ff-workflow-surface mb-5 flex flex-wrap items-center justify-between gap-3 p-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.25)]">
+                 <div className="ff-workflow-stage-icon flex h-9 w-9 items-center justify-center bg-[#27aab8] text-white">
                   <Layers className="h-[18px] w-[18px]" />
                 </div>
                 <div>
@@ -743,7 +743,7 @@ export default function WorkflowBuilder() {
                   type="button"
                   onClick={undo}
                   disabled={!isManager || history.length === 0}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+                   className="ff-workflow-icon-button flex h-8 w-8 items-center justify-center disabled:opacity-30"
                   title="Undo (Ctrl+Z)"
                 >
                   <Undo2 className="h-3.5 w-3.5" />
@@ -752,7 +752,7 @@ export default function WorkflowBuilder() {
                   type="button"
                   onClick={redo}
                   disabled={!isManager || future.length === 0}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 transition-colors"
+                   className="ff-workflow-icon-button flex h-8 w-8 items-center justify-center disabled:opacity-30"
                   title="Redo (Ctrl+Y)"
                 >
                   <Redo2 className="h-3.5 w-3.5" />
@@ -766,7 +766,7 @@ export default function WorkflowBuilder() {
                   size="sm"
                   onClick={enableAll}
                   disabled={!isManager}
-                  className="gap-1 text-[11.5px] rounded-lg h-8"
+                   className="gap-1 text-[11.5px] h-8"
                 >
                   <ToggleRight className="h-3.5 w-3.5 text-emerald-500" /> Enable All
                 </Button>
@@ -775,7 +775,7 @@ export default function WorkflowBuilder() {
                   size="sm"
                   onClick={disableAll}
                   disabled={!isManager}
-                  className="gap-1 text-[11.5px] rounded-lg h-8"
+                   className="gap-1 text-[11.5px] h-8"
                 >
                   <ToggleLeft className="h-3.5 w-3.5 text-slate-400" /> Disable All
                 </Button>
@@ -787,7 +787,7 @@ export default function WorkflowBuilder() {
                   size="sm"
                   onClick={() => setShowReset(true)}
                   disabled={!isManager}
-                  className="gap-1.5 text-[11.5px] rounded-lg h-8"
+                   className="gap-1.5 text-[11.5px] h-8"
                 >
                   <RotateCcw className="h-3.5 w-3.5" /> Reset
                 </Button>
@@ -796,9 +796,9 @@ export default function WorkflowBuilder() {
                   onClick={save}
                   disabled={!hasUnsaved || !isManager || saveMutation.isPending}
                   className={cn(
-                    "gap-1.5 text-[11.5px] rounded-lg h-8 transition-all",
+                    "gap-1.5 text-[11.5px] h-8 transition-all",
                     hasUnsaved
-                      ? "bg-blue-600 text-white hover:bg-blue-700 shadow-[0_4px_12px_rgba(37,99,235,0.22)]"
+                       ? ""
                       : "bg-slate-100 text-slate-400 dark:bg-slate-800",
                   )}
                   title="Save (Ctrl+S)"
@@ -815,7 +815,7 @@ export default function WorkflowBuilder() {
 
             {/* ── Banners ───────────────────────────────────────────────────── */}
             {hasUnsaved && (
-              <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <div className="ff-workflow-surface mb-3 flex items-center gap-2 border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span className="text-[12px] text-amber-700 dark:text-amber-400">
                   You have unsaved changes —
@@ -827,7 +827,7 @@ export default function WorkflowBuilder() {
               </div>
             )}
 
-            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+            <div className="ff-workflow-surface mb-4 flex items-start gap-3 border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-950/20">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
               <div className="text-[12px] text-blue-700 dark:text-blue-300">
                 <span className="font-semibold">Drag stages to reorder · use ▲▼ buttons for precise ordering · </span>
@@ -838,7 +838,7 @@ export default function WorkflowBuilder() {
             </div>
 
             {!isManager && (
-              <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <div className="ff-workflow-surface mb-4 flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                 <p className="text-[12px] text-amber-700 dark:text-amber-400">
                   Read-only mode — Manager or Admin role required to make changes.
@@ -902,7 +902,7 @@ export default function WorkflowBuilder() {
               {/* ── Right: preview panel ─────────────────────────────────────── */}
               <div className="space-y-4">
                 {configLoading ? (
-                  <div className="flex items-center gap-2 rounded-[14px] border border-slate-200 bg-white p-4 text-[12px] text-slate-400 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                  <div className="ff-workflow-surface flex items-center gap-2 p-4 text-[12px] text-slate-400">
                     <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
                     Loading saved config…
                   </div>
@@ -911,7 +911,7 @@ export default function WorkflowBuilder() {
                 )}
 
                 {/* Config summary card */}
-                <div className="rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div className="ff-workflow-surface">
                   <div className="border-b border-slate-100 dark:border-slate-800 px-5 py-3">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Config Summary</p>
                   </div>
@@ -942,7 +942,7 @@ export default function WorkflowBuilder() {
                 </div>
 
                 {/* Keyboard shortcuts cheatsheet */}
-                <div className="rounded-[14px] border border-slate-200/80 bg-white px-5 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div className="ff-workflow-surface px-5 py-3">
                   <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">Keyboard Shortcuts</p>
                   {[
                     ["Ctrl+S", "Save to database"],
@@ -967,7 +967,7 @@ export default function WorkflowBuilder() {
 
       {/* Reset confirmation dialog */}
       <Dialog open={showReset} onOpenChange={setShowReset}>
-        <DialogContent className="sm:max-w-[400px]">
+         <DialogContent className="ff-workflow-surface sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Reset to Default Pipeline?</DialogTitle>
           </DialogHeader>

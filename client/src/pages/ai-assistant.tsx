@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Send, Sparkles, Bot, User, RotateCcw } from "lucide-react";
+import { Send, Sparkles, RotateCcw, Smile } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
@@ -15,6 +15,7 @@ import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  timestamp?: string;
 }
 
 const STARTERS = [
@@ -25,29 +26,34 @@ const STARTERS = [
   "How do I match a payment in Lockbox?",
 ];
 
-function MessageBubble({ msg }: { msg: Message }) {
+function MessageBubble({ msg, userInitials }: { msg: Message; userInitials: string }) {
   const isUser = msg.role === "user";
   return (
     <div className={cn("flex items-end gap-2 mb-4", isUser ? "flex-row-reverse" : "flex-row")}>
       {/* Avatar */}
       <div className={cn(
-        "flex-shrink-0 flex items-center justify-center rounded-full w-8 h-8",
-        isUser ? "bg-primary text-primary-foreground" : "bg-background border border-border overflow-hidden"
+        "ff-earl-avatar flex-shrink-0 flex items-center justify-center rounded-full w-8 h-8",
+        isUser ? "ff-earl-user-avatar" : "ff-earl-assistant-avatar overflow-hidden"
       )}>
         {isUser
-          ? <User className="h-4 w-4" />
+          ? <span className="text-[10px] font-extrabold">{userInitials}</span>
           : <FactorFluxLogo showWordmark={false} markClassName="h-6 w-6" />
         }
       </div>
 
       {/* Bubble */}
       <div className={cn(
-        "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
+        "ff-earl-message max-w-[75%] rounded-xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
         isUser
-          ? "bg-primary text-primary-foreground rounded-br-sm"
-          : "bg-muted text-foreground rounded-bl-sm"
+          ? "ff-earl-message-user rounded-br-sm"
+          : "ff-earl-message-assistant rounded-bl-sm"
       )}>
         {msg.content}
+        {msg.timestamp && (
+          <div className={cn("ff-earl-timestamp mt-1.5", isUser ? "text-right text-white/75" : "text-slate-500")}>
+            {new Date(msg.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -56,9 +62,10 @@ function MessageBubble({ msg }: { msg: Message }) {
 export default function AIAssistant() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const { permissions } = useAuth();
+  const { permissions, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -76,11 +83,13 @@ export default function AIAssistant() {
 
   const chatMutation = useMutation({
     mutationFn: async (msgs: Message[]) => {
-      const res = await apiRequest("POST", "/api/ai/chat", { messages: msgs });
+      const res = await apiRequest("POST", "/api/ai/chat", {
+        messages: msgs.map(({ role, content }) => ({ role, content })),
+      });
       return res.json() as Promise<{ message: string }>;
     },
     onSuccess: (data) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: data.message, timestamp: new Date().toISOString() }]);
     },
     onError: (e: any) => {
       let msg = "Failed to get a response";
@@ -97,7 +106,7 @@ export default function AIAssistant() {
   function send(text?: string) {
     const content = (text ?? input).trim();
     if (!content || chatMutation.isPending) return;
-    const updated: Message[] = [...messages, { role: "user", content }];
+    const updated: Message[] = [...messages, { role: "user", content, timestamp: new Date().toISOString() }];
     setMessages(updated);
     setInput("");
     chatMutation.mutate(updated);
@@ -116,27 +125,28 @@ export default function AIAssistant() {
   }
 
   const isEmpty = messages.length === 0;
+  const userInitials = `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase() || "U";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="ff-earl-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav />
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="ff-earl-chat m-4 flex flex-col flex-1 overflow-hidden md:m-6">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+          <div className="ff-earl-header flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Sparkles className="h-5 w-5 text-primary" />
+              <div className="ff-earl-assistant-avatar flex h-10 w-10 items-center justify-center rounded-full">
+                <FactorFluxLogo showWordmark={false} markClassName="h-7 w-7" />
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Earl</h1>
-                <p className="text-xs text-muted-foreground">Powered by Claude · FactorFlux knowledge base</p>
+                <p className="text-xs text-muted-foreground">AI Assistant powered by Claude</p>
               </div>
             </div>
             {!isEmpty && (
-              <Button variant="ghost" size="sm" onClick={reset} className="gap-2 text-muted-foreground">
+              <Button variant="outline" size="sm" onClick={reset} className="gap-2 text-muted-foreground">
                 <RotateCcw className="h-4 w-4" /> New conversation
               </Button>
             )}
@@ -147,7 +157,7 @@ export default function AIAssistant() {
             {isEmpty ? (
               <div className="flex flex-col items-center justify-center h-full gap-8 max-w-xl mx-auto text-center">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <div className="ff-earl-assistant-avatar flex h-16 w-16 items-center justify-center rounded-full">
                     <FactorFluxLogo showWordmark={false} markClassName="h-10 w-10" />
                   </div>
                   <div>
@@ -164,7 +174,7 @@ export default function AIAssistant() {
                     <button
                       key={q}
                       onClick={() => send(q)}
-                      className="text-left rounded-xl border border-border bg-card hover:bg-accent/50 px-4 py-3 text-sm text-foreground transition-colors"
+                       className="ff-earl-starter text-left px-4 py-3 text-sm transition-colors"
                     >
                       {q}
                     </button>
@@ -174,18 +184,18 @@ export default function AIAssistant() {
             ) : (
               <div className="max-w-2xl mx-auto">
                 {messages.map((msg, i) => (
-                  <MessageBubble key={i} msg={msg} />
+                   <MessageBubble key={i} msg={msg} userInitials={userInitials} />
                 ))}
                 {chatMutation.isPending && (
                   <div className="flex items-end gap-2 mb-4">
-                    <div className="flex-shrink-0 flex items-center justify-center rounded-full w-8 h-8 bg-background border border-border overflow-hidden">
+                     <div className="ff-earl-avatar ff-earl-assistant-avatar flex-shrink-0 flex items-center justify-center rounded-full w-8 h-8 overflow-hidden">
                       <FactorFluxLogo showWordmark={false} markClassName="h-6 w-6" />
                     </div>
-                    <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
+                     <div className="ff-earl-message ff-earl-message-assistant rounded-xl rounded-bl-sm px-4 py-3">
                       <div className="flex gap-1 items-center h-4">
-                        <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                         <span className="ff-earl-typing-dot" style={{ animationDelay: "0ms" }} />
+                         <span className="ff-earl-typing-dot" style={{ animationDelay: "150ms" }} />
+                         <span className="ff-earl-typing-dot" style={{ animationDelay: "300ms" }} />
                       </div>
                     </div>
                   </div>
@@ -196,23 +206,49 @@ export default function AIAssistant() {
           </div>
 
           {/* Input */}
-          <div className="flex-shrink-0 border-t border-border bg-background px-6 py-4">
-            <div className="max-w-2xl mx-auto flex items-end gap-2">
+           <div className="flex-shrink-0 border-t border-border bg-[#d4d0c8] px-6 py-4">
+             <div className="max-w-2xl mx-auto flex items-end gap-2">
               <Textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask anything about FactorFlux… (Enter to send, Shift+Enter for new line)"
-                className="resize-none min-h-[44px] max-h-[160px] text-sm"
+                 className="ff-earl-input resize-none min-h-[44px] max-h-[160px] text-sm"
                 rows={1}
                 disabled={chatMutation.isPending}
               />
-              <Button
+               <div className="relative">
+                 <Button
+                   type="button"
+                   variant="outline"
+                   size="icon"
+                   aria-label="Choose emoji"
+                   className="ff-earl-icon-button h-11 w-11"
+                   onClick={() => setEmojiOpen(open => !open)}
+                 >
+                   <Smile className="h-4 w-4" />
+                 </Button>
+                 {emojiOpen && (
+                   <div className="ff-earl-emoji-picker absolute bottom-[calc(100%+8px)] right-0 z-20 grid grid-cols-5 gap-1 p-2">
+                     {["👍", "✅", "🙂", "🎉", "🚚", "💵", "📄", "⚠️", "🙏", "👋"].map(emoji => (
+                       <button
+                         key={emoji}
+                         type="button"
+                         className="ff-earl-emoji-option"
+                         onClick={() => { setInput(value => value + emoji); setEmojiOpen(false); textareaRef.current?.focus(); }}
+                       >
+                         {emoji}
+                       </button>
+                     ))}
+                   </div>
+                 )}
+               </div>
+               <Button
                 onClick={() => send()}
                 disabled={!input.trim() || chatMutation.isPending}
                 size="icon"
-                className="flex-shrink-0 h-11 w-11"
+                 className="flex-shrink-0 h-11 w-11"
               >
                 <Send className="h-4 w-4" />
               </Button>

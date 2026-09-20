@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, MoreHorizontal, Download, BadgeDollarSign, Trash2, PlusCircle } from "lucide-react";
+import { Plus, MoreHorizontal, Download, BadgeDollarSign, Trash2, PlusCircle, LockKeyhole } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,17 +79,14 @@ const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 
 const STATUS_COLOR: Record<string, string> = {
-  draft: "secondary",
-  approved: "default",
-  paid: "default",
+  draft: "ff-badge-draft",
+  approved: "ff-badge-submitted",
+  paid: "ff-badge-funded",
 };
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <Badge
-      variant={STATUS_COLOR[status] as any}
-      className={status === "paid" ? "bg-green-600 hover:bg-green-700" : status === "approved" ? "bg-blue-600 hover:bg-blue-700" : ""}
-    >
+    <Badge className={`ff-badge ${STATUS_COLOR[status] ?? "ff-badge-draft"}`}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
@@ -162,6 +159,7 @@ export default function Payroll() {
 
   const isManager = authData?.user?.role === "admin" || authData?.user?.role === "manager";
   const userMap = Object.fromEntries(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`]));
+  const userById = Object.fromEntries(users.map((u) => [u.id, u]));
   const employees = users.filter((u) => u.role !== undefined);
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
@@ -261,7 +259,7 @@ export default function Payroll() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="ff-payroll-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav />
@@ -290,8 +288,24 @@ export default function Payroll() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[
+              { label: "Gross Payroll", value: fmt(totals.gross) },
+              { label: "Deductions", value: fmt(totals.ded) },
+              { label: "Net Payroll", value: fmt(totals.net) },
+              { label: "Paid Entries", value: String(filtered.filter((entry) => entry.status === "paid").length) },
+            ].map((stat) => (
+              <Card key={stat.label} className="ff-payroll-surface ff-stat-card">
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
+                  <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           {/* Filters */}
-          <Card>
+          <Card className="ff-payroll-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <Select value={empFilter} onValueChange={setEmpFilter}>
@@ -317,7 +331,7 @@ export default function Payroll() {
                   <span className="text-muted-foreground text-sm">to</span>
                   <Input type="date" className="w-[155px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                   {(dateFrom || dateTo) && (
-                    <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>Clear</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>Clear</Button>
                   )}
                 </div>
               </div>
@@ -325,9 +339,9 @@ export default function Payroll() {
           </Card>
 
           {/* Table */}
-          <Card>
+          <Card className="ff-payroll-surface">
             <CardContent className="p-0">
-              <Table>
+              <Table className="ff-data-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
@@ -347,8 +361,18 @@ export default function Payroll() {
                     <TableRow><TableCell colSpan={8} className="text-center py-12 text-muted-foreground">No payroll entries found.</TableCell></TableRow>
                   ) : filtered.map((e) => (
                     <TableRow key={e.id}>
-                      <TableCell className="font-medium">{userMap[e.employeeId] ?? e.employeeId}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <div className="ff-payroll-avatar">
+                            {(userById[e.employeeId]?.firstName?.[0] ?? "?")}{userById[e.employeeId]?.lastName?.[0] ?? ""}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{userMap[e.employeeId] ?? e.employeeId}</p>
+                            <p className="text-[10px] text-slate-500">{userById[e.employeeId]?.role ?? "Employee"}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="ff-payroll-period text-sm">
                         {fmtDate(e.payPeriodStart)} – {fmtDate(e.payPeriodEnd)}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
@@ -361,19 +385,19 @@ export default function Payroll() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="outline" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {e.status === "draft" && (
                               <DropdownMenuItem onClick={() => openEdit(e)}>Edit</DropdownMenuItem>
                             )}
                             {isManager && e.status === "draft" && (
-                              <DropdownMenuItem onClick={() => statusMutation.mutate({ id: e.id, status: "approved" })}>
+                              <DropdownMenuItem className="ff-payroll-action-approve" onClick={() => statusMutation.mutate({ id: e.id, status: "approved" })}>
                                 Approve
                               </DropdownMenuItem>
                             )}
                             {isManager && e.status === "approved" && (
-                              <DropdownMenuItem onClick={() => statusMutation.mutate({ id: e.id, status: "paid" })}>
+                              <DropdownMenuItem className="ff-payroll-action-paid" onClick={() => statusMutation.mutate({ id: e.id, status: "paid" })}>
                                 Mark Paid
                               </DropdownMenuItem>
                             )}
@@ -387,6 +411,11 @@ export default function Payroll() {
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        {!isManager && e.status !== "paid" && (
+                          <span className="ff-badge ff-badge-draft ml-1 gap-1" title="Manager or administrator approval required">
+                            <LockKeyhole className="h-3 w-3" /> Restricted
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -399,7 +428,7 @@ export default function Payroll() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="ff-payroll-surface max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Payroll Entry" : "New Payroll Entry"}</DialogTitle>
           </DialogHeader>
@@ -466,7 +495,7 @@ export default function Payroll() {
               </div>
 
               {/* Auto-computed preview */}
-              <div className="rounded-md bg-muted/50 px-4 py-3 grid grid-cols-3 gap-4 text-sm">
+              <div className="ff-payroll-surface bg-muted/50 px-4 py-3 grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Gross Pay</p>
                   <p className="font-semibold">{fmt(computedGross)}</p>
@@ -482,8 +511,8 @@ export default function Payroll() {
               </div>
 
               {/* Deductions */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
+              <div className="ff-payroll-deductions ff-payroll-surface">
+                <div className="ff-payroll-section-header flex items-center justify-between px-3 py-2">
                   <FormLabel>Deductions</FormLabel>
                   <Button
                     type="button"
@@ -495,9 +524,9 @@ export default function Payroll() {
                     <PlusCircle className="h-3.5 w-3.5" /> Add
                   </Button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 p-3">
                   {deductionFields.map((field, idx) => (
-                    <div key={field.id} className="flex gap-2 items-start">
+                    <div key={field.id} className="ff-payroll-surface flex gap-2 items-start bg-white p-2">
                       <FormField control={form.control} name={`deductions.${idx}.deductionType`} render={({ field: f }) => (
                         <Select value={f.value} onValueChange={f.onChange}>
                           <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
@@ -514,7 +543,7 @@ export default function Payroll() {
                       <FormField control={form.control} name={`deductions.${idx}.description`} render={({ field: f }) => (
                         <Input placeholder="Description" className="flex-1" {...f} />
                       )} />
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeDeduction(idx)}>
+                      <Button type="button" variant="outline" size="sm" className="h-9 w-9 p-0" onClick={() => removeDeduction(idx)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
