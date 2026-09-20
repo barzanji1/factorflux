@@ -6,7 +6,6 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,18 +67,18 @@ type Debtor = { id: number; name: string; mcNumber?: string | null; dotNumber?: 
 type Broker = { id: number; name: string; mcNumber?: string | null; dotNumber?: string | null; creditLimit?: number | null; };
 
 const RISK_CONFIG = {
-  low: { label: "Low Risk", icon: ShieldCheck, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50", badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
-  medium: { label: "Medium Risk", icon: Shield, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50", badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
-  high: { label: "High Risk", icon: ShieldAlert, color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900/50", badge: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300" },
-  critical: { label: "Critical Risk", icon: ShieldX, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/50", badge: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
+  low: { label: "Low Risk", icon: ShieldCheck, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50", badge: "ff-badge-funded" },
+  medium: { label: "Medium Risk", icon: Shield, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50", badge: "ff-badge-pending" },
+  high: { label: "High Risk", icon: ShieldAlert, color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900/50", badge: "ff-badge-overdue" },
+  critical: { label: "Critical Risk", icon: ShieldX, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/50", badge: "ff-badge-rejected" },
 };
 
 const STATUS_CONFIG = {
-  pending: { label: "Pending", icon: Clock, color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  approved: { label: "Approved", icon: CheckCircle2, color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
-  approved_with_conditions: { label: "Conditional", icon: AlertTriangle, color: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
-  declined: { label: "Declined", icon: XCircle, color: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
-  expired: { label: "Expired", icon: RefreshCw, color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
+  pending: { label: "Pending", icon: Clock, color: "ff-badge-pending" },
+  approved: { label: "Approved", icon: CheckCircle2, color: "ff-badge-funded" },
+  approved_with_conditions: { label: "Conditional", icon: AlertTriangle, color: "ff-badge-partial" },
+  declined: { label: "Declined", icon: XCircle, color: "ff-badge-rejected" },
+  expired: { label: "Expired", icon: RefreshCw, color: "ff-badge-draft" },
 };
 
 function scoreBar(score: number | null | undefined) {
@@ -88,8 +87,8 @@ function scoreBar(score: number | null | undefined) {
   const color = score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-amber-500" : score >= 30 ? "bg-orange-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-2">
-      <div className="h-2 flex-1 rounded-full bg-slate-200 dark:bg-slate-700">
-        <div className={cn("h-2 rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
+      <div className="ff-review-rating-track h-3 flex-1">
+        <div className={cn("h-full transition-all", color)} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tabular-nums w-6 text-right">{score}</span>
     </div>
@@ -175,7 +174,7 @@ export default function CreditChecks() {
   }
 
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="ff-credit-checks-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Credit Review" subtitle="Broker and debtor risk assessments with approval indicators" group="Risk" />
@@ -191,7 +190,7 @@ export default function CreditChecks() {
                 { label: "Declined", value: stats.declined, color: "red" },
                 { label: "High / Critical", value: stats.highRisk, color: "orange" },
               ].map(s => (
-                <Card key={s.label} className="rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <Card key={s.label} className="ff-dashboard-card ff-credit-checks-surface border border-slate-200 bg-white dark:border-slate-800">
                   <CardContent className="p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
                     <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{s.value}</p>
@@ -201,17 +200,17 @@ export default function CreditChecks() {
             </div>
 
             {/* Main Card */}
-            <Card className="rounded-[28px] border border-slate-200/80 bg-white/85 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <Card className="ff-table-container ff-credit-checks-surface overflow-hidden border border-slate-200 bg-white dark:border-slate-800">
               <CardHeader className="border-b border-slate-200/70 px-6 py-5 dark:border-slate-800">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">Credit Assessments</CardTitle>
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                      <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search entity…" className="h-10 pl-9 w-56 rounded-xl" />
+                      <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search entity…" className="h-10 pl-9 w-56" />
                     </div>
                     <Select value={filterType} onValueChange={v => setFilterType(v as typeof filterType)}>
-                      <SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-10 w-32"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="debtor">Debtors</SelectItem>
@@ -219,7 +218,7 @@ export default function CreditChecks() {
                       </SelectContent>
                     </Select>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger className="h-10 w-36 rounded-xl"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-10 w-36"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Statuses</SelectItem>
                         <SelectItem value="pending">Pending</SelectItem>
@@ -229,7 +228,7 @@ export default function CreditChecks() {
                         <SelectItem value="expired">Expired</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button onClick={() => setShowDialog(true)} className="h-10 rounded-xl bg-blue-600 px-4 text-white hover:bg-blue-700">
+                    <Button onClick={() => setShowDialog(true)} className="h-10 px-4">
                       <Plus className="mr-1.5 h-4 w-4" /> New Check
                     </Button>
                   </div>
@@ -247,13 +246,13 @@ export default function CreditChecks() {
                     </div>
                     <p className="text-base font-semibold text-slate-900 dark:text-white">No credit checks found</p>
                     <p className="mt-1 text-sm text-slate-500">Run your first assessment using the button above.</p>
-                    <Button onClick={() => setShowDialog(true)} className="mt-6 h-10 rounded-xl bg-blue-600 px-5 text-white hover:bg-blue-700">
+                    <Button onClick={() => setShowDialog(true)} className="mt-6 h-10 px-5">
                       <Plus className="mr-1.5 h-4 w-4" /> New Credit Check
                     </Button>
                   </div>
                 ) : (
                   <div className="custom-scrollbar overflow-x-auto">
-                    <table className="w-full min-w-[880px]">
+                    <table className="ff-data-table w-full min-w-[880px]">
                       <thead>
                         <tr className="border-b border-slate-200/70 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/40">
                           {["Entity", "Type", "Risk Score", "Risk Tier", "Credit Limit", "Avg Days to Pay", "Status", "Actions"].map(h => (
@@ -274,7 +273,7 @@ export default function CreditChecks() {
                                 {c.mcNumber && <div className="text-xs text-slate-500">MC: {c.mcNumber}</div>}
                               </td>
                               <td className="px-5 py-4">
-                                <div className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+                                <div className={`ff-badge ${c.entityType === "broker" ? "ff-badge-submitted" : "ff-badge-approved"}`}>
                                   {c.entityType === "broker" ? <Building2 className="h-3.5 w-3.5" /> : <Truck className="h-3.5 w-3.5" />}
                                   <span className="capitalize">{c.entityType}</span>
                                 </div>
@@ -282,7 +281,7 @@ export default function CreditChecks() {
                               <td className="px-5 py-4 w-36">{scoreBar(c.riskScore)}</td>
                               <td className="px-5 py-4">
                                 {risk ? (
-                                  <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", risk.badge)}>
+                                  <span className={cn("ff-badge gap-1.5", risk.badge)}>
                                     <RiskIcon className="h-3 w-3" />
                                     {risk.label}
                                   </span>
@@ -299,7 +298,7 @@ export default function CreditChecks() {
                                 ) : "—"}
                               </td>
                               <td className="px-5 py-4">
-                                <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", status.color)}>
+                                <span className={cn("ff-badge gap-1.5", status.color)}>
                                   <StatusIcon className="h-3 w-3" />
                                   {status.label}
                                 </span>
@@ -308,21 +307,23 @@ export default function CreditChecks() {
                                 <div className="flex gap-1.5">
                                   {c.status === "pending" && (
                                     <>
-                                      <button
+                                      <Button
+                                        size="sm"
                                         onClick={() => updateMutation.mutate({ id: c.id, status: "approved" })}
-                                        className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400"
-                                      >Approve</button>
-                                      <button
+                                      >Approve</Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
                                         onClick={() => updateMutation.mutate({ id: c.id, status: "declined" })}
-                                        className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
-                                      >Decline</button>
+                                      >Decline</Button>
                                     </>
                                   )}
                                   {c.status !== "pending" && (
-                                    <button
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
                                       onClick={() => updateMutation.mutate({ id: c.id, status: "pending" })}
-                                      className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
-                                    >Re-review</button>
+                                    >Re-review</Button>
                                   )}
                                 </div>
                               </td>
@@ -341,7 +342,7 @@ export default function CreditChecks() {
 
       {/* New Check Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-lg rounded-2xl">
+        <DialogContent className="ff-credit-checks-surface max-w-lg">
           <DialogHeader>
             <DialogTitle>New Credit Assessment</DialogTitle>
           </DialogHeader>
@@ -350,7 +351,7 @@ export default function CreditChecks() {
               <div>
                 <Label>Entity Type</Label>
                 <Select value={form.entityType} onValueChange={v => setForm(f => ({ ...f, entityType: v as "broker" | "debtor", entityId: "" }))}>
-                  <SelectTrigger className="mt-1 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="debtor">Debtor</SelectItem>
                     <SelectItem value="broker">Broker</SelectItem>
@@ -360,7 +361,7 @@ export default function CreditChecks() {
               <div>
                 <Label>Select {form.entityType === "debtor" ? "Debtor" : "Broker"}</Label>
                 <Select value={form.entityId} onValueChange={v => setForm(f => ({ ...f, entityId: v }))}>
-                  <SelectTrigger className="mt-1 rounded-xl"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Choose…" /></SelectTrigger>
                   <SelectContent>
                     {entityOptions.map(e => <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>)}
                   </SelectContent>
@@ -370,12 +371,12 @@ export default function CreditChecks() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Risk Score (0–100)</Label>
-                <Input type="number" min={0} max={100} value={form.riskScore} onChange={e => setForm(f => ({ ...f, riskScore: e.target.value }))} placeholder="e.g. 72" className="mt-1 rounded-xl" />
+                <Input type="number" min={0} max={100} value={form.riskScore} onChange={e => setForm(f => ({ ...f, riskScore: e.target.value }))} placeholder="e.g. 72" className="mt-1" />
               </div>
               <div>
                 <Label>Risk Tier</Label>
                 <Select value={form.riskTier} onValueChange={v => setForm(f => ({ ...f, riskTier: v as typeof f.riskTier }))}>
-                  <SelectTrigger className="mt-1 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
@@ -388,17 +389,17 @@ export default function CreditChecks() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Approved Credit Limit ($)</Label>
-                <Input type="number" value={form.creditLimit} onChange={e => setForm(f => ({ ...f, creditLimit: e.target.value }))} placeholder="e.g. 50000" className="mt-1 rounded-xl" />
+                <Input type="number" value={form.creditLimit} onChange={e => setForm(f => ({ ...f, creditLimit: e.target.value }))} placeholder="e.g. 50000" className="mt-1" />
               </div>
               <div>
                 <Label>Avg Days to Pay</Label>
-                <Input type="number" value={form.avgDaysToPay} onChange={e => setForm(f => ({ ...f, avgDaysToPay: e.target.value }))} placeholder="e.g. 35" className="mt-1 rounded-xl" />
+                <Input type="number" value={form.avgDaysToPay} onChange={e => setForm(f => ({ ...f, avgDaysToPay: e.target.value }))} placeholder="e.g. 35" className="mt-1" />
               </div>
             </div>
             <div>
               <Label>Initial Status</Label>
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as typeof f.status }))}>
-                <SelectTrigger className="mt-1 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending Review</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
@@ -409,12 +410,12 @@ export default function CreditChecks() {
             </div>
             <div>
               <Label>Notes</Label>
-              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Assessment notes, conditions, or risk factors…" className="mt-1 rounded-xl" rows={3} />
+              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Assessment notes, conditions, or risk factors…" className="mt-1" rows={3} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)} className="rounded-xl">Cancel</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700">
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending}>
               {createMutation.isPending ? "Saving…" : "Create Assessment"}
             </Button>
           </DialogFooter>

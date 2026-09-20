@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -174,7 +173,7 @@ export default function Dispatchers() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="ff-dispatchers-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav />
@@ -198,8 +197,23 @@ export default function Dispatchers() {
             </Button>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              { label: "Filtered Dispatchers", value: filtered.length },
+              { label: "Active Dispatchers", value: dispatchers.filter((d) => d.status === "active").length },
+              { label: "Carrier Linked", value: dispatchers.filter((d) => d.carrierId !== null).length },
+            ].map((stat) => (
+              <Card key={stat.label} className="ff-dashboard-card ff-dispatchers-surface">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><Headset className="h-5 w-5" /></div>
+                  <div><p className="text-xs text-muted-foreground">{stat.label}</p><p className="text-xl font-bold text-[#087d8d]">{stat.value}</p></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           {/* Filters */}
-          <Card>
+          <Card className="ff-dispatchers-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <div className="relative flex-1 min-w-[200px]">
@@ -237,9 +251,9 @@ export default function Dispatchers() {
           </Card>
 
           {/* Table */}
-          <Card>
+          <Card className="ff-table-container ff-dispatchers-surface overflow-hidden">
             <CardContent className="p-0">
-              <Table>
+              <Table className="ff-data-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -284,21 +298,22 @@ export default function Dispatchers() {
                         </TableCell>
                         <TableCell>
                           {d.carrierId ? (
-                            <span className="text-sm">{carrierMap[d.carrierId] ?? `#${d.carrierId}`}</span>
+                            <span className="ff-badge ff-badge-submitted">{carrierMap[d.carrierId] ?? `#${d.carrierId}`}</span>
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={d.status === "active" ? "default" : "secondary"}>
-                            {d.status}
-                          </Badge>
+                          <span className={`ff-badge ${d.status === "active" ? "ff-badge-funded" : "ff-badge-draft"}`}>
+                            {d.status === "active" ? "Active" : "Inactive"}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
+                              aria-label={`Edit ${d.firstName} ${d.lastName}`}
                               onClick={() => openEdit(d)}
                             >
                               <Edit className="h-4 w-4" />
@@ -306,8 +321,8 @@ export default function Dispatchers() {
                             {d.status === "active" && (
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:text-destructive"
+                                variant="destructive"
+                                aria-label={`Deactivate ${d.firstName} ${d.lastName}`}
                                 onClick={() => deactivateMutation.mutate(d.id)}
                                 disabled={deactivateMutation.isPending}
                               >
@@ -328,7 +343,7 @@ export default function Dispatchers() {
 
       {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="ff-dispatchers-surface max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Dispatcher" : "Add Dispatcher"}</DialogTitle>
           </DialogHeader>

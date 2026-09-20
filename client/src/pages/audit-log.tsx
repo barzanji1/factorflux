@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import {
   ClipboardList,
   Search,
@@ -26,6 +26,9 @@ import {
   Activity,
   RefreshCw,
   Mail,
+  Download,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 type AuditEntry = {
@@ -60,6 +63,8 @@ type UnifiedEntry = {
   entityId: number;
   actorName: string | null;
   actorType: string;
+  actionType: string;
+  metadata: Record<string, unknown> | null;
   createdAt: string;
   icon: React.ElementType;
   color: string;
@@ -101,14 +106,16 @@ const EVENT_TYPE_COLOR: Record<string, string> = {
 };
 
 const ENTITY_COLOR: Record<string, string> = {
-  invoice: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400",
-  client: "bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400",
-  debtor: "bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400",
-  load: "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400",
-  document: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  user: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400",
-  payout: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400",
-  vault: "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400",
+  invoice: "ff-badge-submitted",
+  client: "ff-badge-hold",
+  debtor: "ff-badge-hold",
+  carrier: "ff-badge-approved",
+  broker: "ff-badge-pending",
+  load: "ff-badge-pending",
+  document: "ff-badge-draft",
+  user: "ff-badge-funded",
+  payout: "ff-badge-funded",
+  vault: "ff-badge-rejected",
 };
 
 function formatEventType(et: string) {
@@ -123,6 +130,15 @@ function timeAgo(dateStr: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+function actionBadge(action: string): string {
+  const normalized = action.toLowerCase();
+  if (normalized.includes("delete") || normalized.includes("declin") || normalized.includes("fail") || normalized.includes("bounce")) return "ff-badge-rejected";
+  if (normalized.includes("fund") || normalized.includes("approve") || normalized.includes("deliver")) return "ff-badge-funded";
+  if (normalized.includes("create") || normalized.includes("trigger") || normalized.includes("upload")) return "ff-badge-submitted";
+  if (normalized.includes("update") || normalized.includes("change") || normalized.includes("edit")) return "ff-badge-pending";
+  return "ff-badge-draft";
 }
 
 function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): UnifiedEntry[] {
@@ -157,6 +173,8 @@ function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): U
     entityId: e.entityId,
     actorName: e.actorName ?? e.actorId ?? null,
     actorType: e.actorType,
+    actionType: e.eventType,
+    metadata: e.payloadJson ?? null,
     createdAt: e.createdAt,
     icon: EVENT_TYPE_ICON[e.eventType] ?? EVENT_ICON[e.entityType] ?? Activity,
     color: EVENT_TYPE_COLOR[e.eventType] ?? ENTITY_COLOR[e.entityType] ?? "bg-slate-100 text-slate-600",
@@ -171,6 +189,8 @@ function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): U
     entityId: s.invoiceId,
     actorName: s.changedByName ?? s.changedBy ?? null,
     actorType: "user",
+    actionType: s.newStatus,
+    metadata: { oldStatus: s.oldStatus, newStatus: s.newStatus, reason: s.reason },
     createdAt: s.createdAt,
     icon: ArrowRight,
     color: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400",
@@ -184,7 +204,10 @@ function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): U
 export default function AuditLog() {
   const [search, setSearch] = useState("");
   const [filterEntity, setFilterEntity] = useState("all");
-  const [filterActor, setFilterActor] = useState("all");
+  const [filterAction, setFilterAction] = useState("all");
+  const [filterUser, setFilterUser] = useState("all");
+  const [dateRange, setDateRange] = useState("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: events = [], isLoading: eventsLoading, refetch } = useQuery<AuditEntry[]>({
     queryKey: ["/api/audit/events"],
@@ -197,7 +220,13 @@ export default function AuditLog() {
 
   const filtered = unified.filter(e => {
     if (filterEntity !== "all" && e.entityType !== filterEntity) return false;
-    if (filterActor !== "all" && e.actorType !== filterActor) return false;
+    if (filterAction !== "all" && e.actionType !== filterAction) return false;
+    if (filterUser !== "all" && (e.actorName ?? e.actorType) !== filterUser) return false;
+    if (dateRange !== "all") {
+      const age = Date.now() - new Date(e.createdAt).getTime();
+      const maxAge = dateRange === "today" ? 86400000 : Number(dateRange) * 86400000;
+      if (age > maxAge) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       if (!e.title.toLowerCase().includes(q) && !e.detail.toLowerCase().includes(q) && !(e.actorName?.toLowerCase().includes(q))) return false;
@@ -206,11 +235,28 @@ export default function AuditLog() {
   });
 
   const entityTypes = Array.from(new Set(unified.map(e => e.entityType))).sort();
+  const actionTypes = Array.from(new Set(unified.map(e => e.actionType))).sort();
+  const users = Array.from(new Set(unified.map(e => e.actorName ?? e.actorType))).sort();
 
   const isLoading = eventsLoading || histLoading;
 
+  function exportCsv() {
+    const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
+    const rows = filtered.map(e => [
+      e.createdAt, formatEventType(e.actionType), e.entityType, e.entityId,
+      e.actorName ?? e.actorType, e.detail, JSON.stringify(e.metadata ?? {}),
+    ].map(escape).join(","));
+    const csv = ["Timestamp,Action,Entity Type,Entity ID,User,Details,Metadata", ...rows].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="ff-audit-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Audit Trail" subtitle="Complete event history — status changes, entity updates, and system actions" group="Risk" />
@@ -225,7 +271,7 @@ export default function AuditLog() {
                 { label: "System Events", value: unified.filter(e => e.actorType === "system").length },
                 { label: "User Actions", value: unified.filter(e => e.actorType === "user").length },
               ].map(s => (
-                <Card key={s.label} className="rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <Card key={s.label} className="ff-dashboard-card ff-audit-surface border border-slate-200 bg-white dark:border-slate-800">
                   <CardContent className="p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
                     <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{s.value}</p>
@@ -235,37 +281,55 @@ export default function AuditLog() {
             </div>
 
             {/* Main Log */}
-            <Card className="rounded-[28px] border border-slate-200/80 bg-white/85 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <Card className="ff-table-container ff-audit-surface overflow-hidden border border-slate-200 bg-white dark:border-slate-800">
               <CardHeader className="border-b border-slate-200/70 px-6 py-5 dark:border-slate-800">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                     <ClipboardList className="h-5 w-5 text-slate-500" />
-                    Event Timeline
-                    <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{filtered.length}</span>
+                    Event Logs
+                    <span className="ff-badge ff-badge-draft ml-2">{filtered.length}</span>
                   </CardTitle>
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                      <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search events…" className="h-10 pl-9 w-52 rounded-xl" />
+                      <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search events…" className="h-10 pl-9 w-52" />
                     </div>
+                    <Select value={dateRange} onValueChange={setDateRange}>
+                      <SelectTrigger className="h-10 w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Dates</SelectItem>
+                        <SelectItem value="today">Today</SelectItem>
+                        <SelectItem value="7">Last 7 Days</SelectItem>
+                        <SelectItem value="30">Last 30 Days</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Select value={filterEntity} onValueChange={setFilterEntity}>
-                      <SelectTrigger className="h-10 w-36 rounded-xl"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-10 w-36"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Entities</SelectItem>
                         {entityTypes.map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Select value={filterActor} onValueChange={setFilterActor}>
-                      <SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue /></SelectTrigger>
+                    <Select value={filterAction} onValueChange={setFilterAction}>
+                      <SelectTrigger className="h-10 w-40"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Actors</SelectItem>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="system">System</SelectItem>
+                        <SelectItem value="all">All Actions</SelectItem>
+                        {actionTypes.map(t => <SelectItem key={t} value={t}>{formatEventType(t)}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <button onClick={() => refetch()} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <Select value={filterUser} onValueChange={setFilterUser}>
+                      <SelectTrigger className="h-10 w-36"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Users</SelectItem>
+                        {users.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" onClick={exportCsv} className="gap-1.5">
+                      <Download className="h-3.5 w-3.5" /> Export CSV
+                    </Button>
+                    <Button variant="outline" onClick={() => refetch()} className="gap-1.5">
                       <RefreshCw className="h-3.5 w-3.5" /> Refresh
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -283,40 +347,40 @@ export default function AuditLog() {
                     <p className="mt-1 text-sm text-slate-500">Events appear here as actions are performed in the system.</p>
                   </div>
                 ) : (
-                  <div className="relative">
-                    {/* Timeline line */}
-                    <div className="absolute left-[3.5rem] top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-800" />
-                    <div className="divide-y divide-slate-100/80 dark:divide-slate-800">
+                  <div className="overflow-x-auto">
+                    <table className="ff-data-table w-full min-w-[980px]">
+                      <thead><tr>
+                        {["Action", "Entity", "Details", "User", "Timestamp", ""].map((heading, index) => (
+                          <th key={`${heading}-${index}`} className={index === 5 ? "w-12" : ""}>{heading}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
                       {filtered.map(e => {
                         const Icon = e.icon;
+                        const isExpanded = expandedId === e.id;
                         return (
-                          <div key={e.id} className="flex items-start gap-4 px-6 py-4 hover:bg-slate-50/70 dark:hover:bg-slate-900/30 transition-colors">
-                            <div className={cn("relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm", e.color)}>
-                              <Icon className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1 pt-0.5">
-                              <div className="flex flex-wrap items-baseline gap-2">
-                                <span className="text-sm font-semibold text-slate-900 dark:text-white">{e.title}</span>
-                                <span className="text-xs text-slate-500 dark:text-slate-400">{e.detail}</span>
-                              </div>
-                              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                                {e.actorName && (
-                                  <span className="flex items-center gap-1">
-                                    <User className="h-3 w-3" />
-                                    {e.actorName}
-                                  </span>
-                                )}
-                                <span className={cn(
-                                  "rounded-full px-1.5 py-0.5 font-medium",
-                                  e.actorType === "system" ? "bg-slate-100 text-slate-500 dark:bg-slate-800" : "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
-                                )}>{e.actorType}</span>
-                              </div>
-                            </div>
-                            <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500 tabular-nums pt-1">{timeAgo(e.createdAt)}</span>
-                          </div>
+                          <>
+                            <tr key={e.id}>
+                              <td><span className={`ff-badge ${actionBadge(e.actionType)}`}><Icon className="h-3 w-3" />{formatEventType(e.actionType)}</span></td>
+                              <td><span className={`ff-badge ${ENTITY_COLOR[e.entityType] ?? "ff-badge-draft"}`}>{e.entityType} #{e.entityId}</span></td>
+                              <td><p className="font-semibold">{e.title}</p><p className="text-xs text-slate-500">{e.detail}</p></td>
+                              <td><span className="flex items-center gap-1 text-xs"><User className="h-3 w-3" />{e.actorName ?? e.actorType}</span></td>
+                              <td className="font-mono text-xs tabular-nums"><div>{new Date(e.createdAt).toLocaleString()}</div><div className="text-slate-500">{timeAgo(e.createdAt)}</div></td>
+                              <td><Button size="sm" variant="outline" aria-label={`${isExpanded ? "Collapse" : "Expand"} log details`} onClick={() => setExpandedId(isExpanded ? null : e.id)}>{isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></td>
+                            </tr>
+                            {isExpanded && (
+                              <tr key={`${e.id}-detail`}><td colSpan={6} className="!bg-[#f0f0f0]">
+                                <div className="ff-card ff-audit-surface p-4">
+                                  <p className="mb-2 text-xs font-bold uppercase tracking-wide">Log Entry Details</p>
+                                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs">{JSON.stringify(e.metadata ?? { detail: e.detail }, null, 2)}</pre>
+                                </div>
+                              </td></tr>
+                            )}
+                          </>
                         );
                       })}
-                    </div>
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </CardContent>

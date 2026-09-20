@@ -1209,6 +1209,158 @@ div:has(> table.ff-data-table) {
   border-bottom-left-radius: 10px !important;
 }
 
+.ff-dispatchers-surface,
+.ff-app-shell .ff-dispatchers-page .ff-dispatchers-surface,
+.ff-portal-shell .ff-dispatchers-page .ff-dispatchers-surface {
+  border-radius: 12px !important;
+}
+
+.ff-dispatchers-page .ff-table-container,
+.ff-app-shell .ff-dispatchers-page .ff-table-container,
+.ff-portal-shell .ff-dispatchers-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-dispatchers-surface > :first-child,
+.ff-card.ff-dispatchers-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-dispatchers-surface > :last-child,
+.ff-card.ff-dispatchers-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-trucks-surface,
+.ff-app-shell .ff-trucks-page .ff-trucks-surface,
+.ff-portal-shell .ff-trucks-page .ff-trucks-surface {
+  border-radius: 12px !important;
+}
+
+.ff-trucks-page .ff-table-container,
+.ff-app-shell .ff-trucks-page .ff-table-container,
+.ff-portal-shell .ff-trucks-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-trucks-surface > :first-child,
+.ff-card.ff-trucks-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-trucks-surface > :last-child,
+.ff-card.ff-trucks-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-release-letters-surface,
+.ff-app-shell .ff-release-letters-page .ff-release-letters-surface,
+.ff-portal-shell .ff-release-letters-page .ff-release-letters-surface {
+  border-radius: 12px !important;
+}
+
+.ff-release-letters-page .ff-table-container,
+.ff-app-shell .ff-release-letters-page .ff-table-container,
+.ff-portal-shell .ff-release-letters-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-release-letters-surface > :first-child,
+.ff-card.ff-release-letters-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-release-letters-surface > :last-child,
+.ff-card.ff-release-letters-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-credit-checks-surface,
+.ff-app-shell .ff-credit-checks-page .ff-credit-checks-surface,
+.ff-portal-shell .ff-credit-checks-page .ff-credit-checks-surface {
+  border-radius: 12px !important;
+}
+
+.ff-credit-checks-page .ff-table-container,
+.ff-app-shell .ff-credit-checks-page .ff-table-container,
+.ff-portal-shell .ff-credit-checks-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-credit-checks-surface > :first-child,
+.ff-card.ff-credit-checks-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-credit-checks-surface > :last-child,
+.ff-card.ff-credit-checks-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-held-surface,
+.ff-app-shell .ff-held-page .ff-held-surface,
+.ff-portal-shell .ff-held-page .ff-held-surface {
+  border-radius: 12px !important;
+}
+
+.ff-held-page .ff-table-container,
+.ff-app-shell .ff-held-page .ff-table-container,
+.ff-portal-shell .ff-held-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-held-surface > :first-child,
+.ff-card.ff-held-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-held-surface > :last-child,
+.ff-card.ff-held-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-audit-surface,
+.ff-app-shell .ff-audit-page .ff-audit-surface,
+.ff-portal-shell .ff-audit-page .ff-audit-surface {
+  border-radius: 12px !important;
+}
+
+.ff-audit-page .ff-table-container,
+.ff-app-shell .ff-audit-page .ff-table-container,
+.ff-portal-shell .ff-audit-page .ff-table-container {
+  border-radius: 12px !important;
+}
+
+.ff-audit-surface > :first-child,
+.ff-card.ff-audit-surface > :first-child {
+  border-top-left-radius: 10px !important;
+  border-top-right-radius: 10px !important;
+}
+
+.ff-audit-surface > :last-child,
+.ff-card.ff-audit-surface > :last-child {
+  border-bottom-right-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+
+.ff-review-rating-track {
+  overflow: hidden;
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+  border-radius: 999px;
+  background: #fff;
+}
+
 /* Entry screens use the same tactile shell without changing auth behavior. */
 .ff-auth-page > div > :is(.rounded-2xl, .rounded-xl, .ff-card) {
   border: 2px solid;

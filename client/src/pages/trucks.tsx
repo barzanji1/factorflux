@@ -9,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,12 +59,13 @@ type TruckFormData = z.infer<typeof truckFormSchema>;
 // ─── Status badge helper ──────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, "default" | "secondary" | "destructive"> = {
-    active: "default",
-    inactive: "secondary",
-    "out-of-service": "destructive",
+  const map: Record<string, { label: string; className: string }> = {
+    active: { label: "Active", className: "ff-badge-funded" },
+    inactive: { label: "Inactive", className: "ff-badge-draft" },
+    "out-of-service": { label: "Out of Service", className: "ff-badge-rejected" },
   };
-  return <Badge variant={map[status] ?? "secondary"}>{status}</Badge>;
+  const badge = map[status] ?? { label: status, className: "ff-badge-draft" };
+  return <span className={`ff-badge ${badge.className}`}>{badge.label}</span>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ export default function Trucks() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="ff-trucks-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav />
@@ -231,8 +231,23 @@ export default function Trucks() {
             </Button>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              { label: "Filtered Trucks", value: filtered.length },
+              { label: "Active Trucks", value: truckList.filter((truck) => truck.status === "active").length },
+              { label: "Out of Service", value: truckList.filter((truck) => truck.status === "out-of-service").length },
+            ].map((stat) => (
+              <Card key={stat.label} className="ff-dashboard-card ff-trucks-surface">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><TruckIcon className="h-5 w-5" /></div>
+                  <div><p className="text-xs text-muted-foreground">{stat.label}</p><p className="text-xl font-bold text-[#087d8d]">{stat.value}</p></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           {/* Filters */}
-          <Card>
+          <Card className="ff-trucks-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <div className="relative flex-1 min-w-[180px]">
@@ -284,9 +299,9 @@ export default function Trucks() {
           </Card>
 
           {/* Table */}
-          <Card>
+          <Card className="ff-table-container ff-trucks-surface overflow-hidden">
             <CardContent className="p-0">
-              <Table>
+              <Table className="ff-data-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Truck #</TableHead>
@@ -326,24 +341,24 @@ export default function Trucks() {
                         <TableCell className="text-sm">{t.licensePlate ?? "—"}</TableCell>
                         <TableCell className="text-sm">{t.state ?? "—"}</TableCell>
                         <TableCell className="text-sm">
-                          {t.carrierId ? carrierMap[t.carrierId] ?? `#${t.carrierId}` : "—"}
+                          {t.carrierId ? <span className="ff-badge ff-badge-submitted">{carrierMap[t.carrierId] ?? `#${t.carrierId}`}</span> : "—"}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {t.dispatcherId ? dispatcherMap[t.dispatcherId] ?? `#${t.dispatcherId}` : "—"}
+                          {t.dispatcherId ? <span className="ff-badge ff-badge-approved">{dispatcherMap[t.dispatcherId] ?? `#${t.dispatcherId}`}</span> : "—"}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={t.status} />
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button size="sm" variant="ghost" onClick={() => openEdit(t)}>
+                            <Button size="sm" variant="outline" aria-label={`Edit truck ${t.truckNumber}`} onClick={() => openEdit(t)}>
                               <Edit className="h-4 w-4" />
                             </Button>
                             {t.status === "active" && (
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:text-destructive"
+                                variant="destructive"
+                                aria-label={`Deactivate truck ${t.truckNumber}`}
                                 onClick={() => deactivateMutation.mutate(t.id)}
                                 disabled={deactivateMutation.isPending}
                               >
@@ -364,7 +379,7 @@ export default function Trucks() {
 
       {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="ff-trucks-surface max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Truck" : "Add Truck"}</DialogTitle>
           </DialogHeader>

@@ -9,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,19 +59,19 @@ const fmt = (n: string | number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n));
 
 const TYPE_STYLES: Record<string, string> = {
-  standard:    "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  conditional: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  final:       "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  standard:    "ff-badge-submitted",
+  conditional: "ff-badge-pending",
+  final:       "ff-badge-hold",
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  draft:        "bg-muted text-muted-foreground",
-  sent:         "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  acknowledged: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  draft:        "ff-badge-draft",
+  sent:         "ff-badge-approved",
+  acknowledged: "ff-badge-funded",
 };
 
 function Chip({ label, cls }: { label: string; cls: string }) {
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
+  return <span className={`ff-badge ${cls}`}>{label}</span>;
 }
 
 function buildTemplate(
@@ -280,7 +279,7 @@ export default function ReleaseLetters() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="ff-release-letters-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav />
@@ -302,8 +301,23 @@ export default function ReleaseLetters() {
             </Button>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              { label: "Filtered Letters", value: filtered.length },
+              { label: "Sent Letters", value: letters.filter((letter) => letter.status === "sent").length },
+              { label: "Acknowledged", value: letters.filter((letter) => letter.status === "acknowledged").length },
+            ].map((stat) => (
+              <Card key={stat.label} className="ff-dashboard-card ff-release-letters-surface">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><MailOpen className="h-5 w-5" /></div>
+                  <div><p className="text-xs text-muted-foreground">{stat.label}</p><p className="text-xl font-bold text-[#087d8d]">{stat.value}</p></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           {/* Filters */}
-          <Card>
+          <Card className="ff-release-letters-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <Select value={carrierFilter} onValueChange={setCarrierFilter}>
@@ -334,9 +348,9 @@ export default function ReleaseLetters() {
           </Card>
 
           {/* Table */}
-          <Card>
+          <Card className="ff-table-container ff-release-letters-surface overflow-hidden">
             <CardContent className="p-0">
-              <Table>
+              <Table className="ff-data-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Invoice #</TableHead>
@@ -370,7 +384,7 @@ export default function ReleaseLetters() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="outline" aria-label={`Actions for release letter ${l.id}`}><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => setPreviewLetter(l)} className="gap-2">
@@ -405,7 +419,7 @@ export default function ReleaseLetters() {
 
       {/* Generate Letter Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="ff-release-letters-surface max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Generate Release Letter</DialogTitle>
           </DialogHeader>
@@ -514,7 +528,7 @@ export default function ReleaseLetters() {
 
       {/* Preview Dialog */}
       <Dialog open={!!previewLetter} onOpenChange={() => setPreviewLetter(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="ff-release-letters-surface max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               Release Letter Preview
@@ -534,7 +548,7 @@ export default function ReleaseLetters() {
                 <div><p className="text-muted-foreground">Invoice</p><p className="font-medium">{previewLetter.invoiceId ? `#${previewLetter.invoiceId}` : "—"}</p></div>
               </div>
               <Separator />
-              <div className="rounded-md bg-muted/30 p-4 whitespace-pre-wrap font-mono text-sm leading-relaxed">
+              <div className="ff-card ff-release-letters-surface bg-white p-4 whitespace-pre-wrap font-mono text-sm leading-relaxed">
                 {previewLetter.content}
               </div>
               <div className="flex justify-end gap-3">
@@ -560,7 +574,7 @@ export default function ReleaseLetters() {
 
       {/* Send Email Dialog */}
       <Dialog open={sendDialogId !== null} onOpenChange={() => { setSendDialogId(null); setSendEmailState(""); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="ff-release-letters-surface max-w-md">
           <DialogHeader>
             <DialogTitle>Send Release Letter</DialogTitle>
           </DialogHeader>
