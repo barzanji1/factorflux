@@ -311,7 +311,7 @@ export default function CollectionsPage() {
   const bulkStatusActions = BULK_STATUS[activeTab];
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Collections" subtitle="Manage funds owed to TPF and track carrier performance" group="Recovery" />
@@ -320,7 +320,7 @@ export default function CollectionsPage() {
 
             {/* ── Overdue nudge banner ────────────────────────────────────── */}
             {counts.overdue > 0 && (
-              <div className="flex items-center gap-3 rounded-[12px] border border-amber-200/60 bg-amber-50/50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/10">
+              <div className="flex items-center gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
                 <p className="text-[12.5px] font-medium text-amber-800 dark:text-amber-300">
                   <span className="font-bold">{counts.overdue} account{counts.overdue !== 1 ? "s" : ""}</span> overdue —{" "}
@@ -344,7 +344,7 @@ export default function CollectionsPage() {
                 { label: "In Progress", value: counts.in_progress ?? 0,    sub: "being worked" },
                 { label: "Overdue",     value: counts.overdue ?? 0,        sub: "past due date", warn: (counts.overdue ?? 0) > 0 },
               ].map(s => (
-                <div key={s.label} className="rounded-[12px] border border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+                <div key={s.label} className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
                   <p className={cn("mt-0.5 text-[22px] font-bold tracking-tight", (s as any).warn ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white")}>{s.value}</p>
                   <p className="text-[11px] text-slate-400 dark:text-slate-500">{s.sub}</p>
@@ -353,10 +353,10 @@ export default function CollectionsPage() {
             </div>
 
             {/* ── Queue card ─────────────────────────────────────────────── */}
-            <div className="overflow-hidden rounded-[14px] border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <div className="overflow-hidden rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
 
               {/* Sticky filter bar */}
-              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-sm dark:border-slate-800 dark:bg-[hsl(var(--card))/95]">
+              <div className="sticky top-0 z-10 border-b-2 border-[#808080] bg-[#d4d0c8]">
 
                 {/* Saved view pills */}
                 <div className="flex items-center gap-1.5 px-5 pt-3 pb-1.5">
@@ -369,8 +369,8 @@ export default function CollectionsPage() {
                       className={cn(
                         "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
                         activeViewId === view.id
-                          ? "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-400"
+                          ? "border-[#087888] bg-[#27aab8] text-white"
+                          : "border-[#808080] bg-white text-slate-600 hover:bg-[#dff5f6]"
                       )}
                     >
                       <span>{view.emoji}</span> {view.label}
@@ -391,8 +391,8 @@ export default function CollectionsPage() {
                           className={cn(
                             "rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors",
                             isActive
-                              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400",
+                              ? "border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white"
+                              : "border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white text-slate-600 hover:bg-[#dff5f6]",
                             tab.id === "overdue" && !isActive && count > 0 && "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400"
                           )}
                         >
@@ -408,13 +408,13 @@ export default function CollectionsPage() {
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search client or description…"
-                        className="h-8 w-[220px] rounded-full pl-9 text-[12px]"
+                        className="h-8 w-[220px] rounded-lg border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-white pl-9 text-[12px] shadow-[inset_1px_1px_0_rgba(0,0,0,0.15)]"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={openCreate}
-                      className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-blue-700"
+                      className="flex items-center gap-1.5 rounded-lg border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] px-3 py-1.5 text-[11.5px] font-semibold text-white shadow-[1px_1px_0_#808080] hover:bg-[#098b9f]"
                     >
                       <Plus className="h-3 w-3" /> New
                     </button>
@@ -455,7 +455,7 @@ export default function CollectionsPage() {
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
                 </div>
               ) : rows.length === 0 ? (
-                <div className="px-8 py-10">
+                <div className="m-4 rounded-xl border-2 border-dashed border-[#808080] bg-white px-8 py-10">
                   {collections.length === 0 ? (
                     <FFOnboarding
                       title="No collection cases yet"
@@ -484,7 +484,7 @@ export default function CollectionsPage() {
                   )}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-b-xl">
                   <table className="ff-data-table w-full min-w-[820px]">
                     <thead>
                       <tr>
@@ -507,10 +507,10 @@ export default function CollectionsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map(c => {
+                      {rows.map((c, index) => {
                         const isSel = selected.has(c.id);
                         return (
-                          <tr key={c.id} className={cn(rowUrgencyClass(c), isSel && "!bg-blue-50/50 dark:!bg-blue-950/10")}>
+                          <tr key={c.id} className={cn(index % 2 === 0 ? "bg-white" : "bg-[#f0f0f0]", rowUrgencyClass(c), isSel && "!bg-[#dff5f6]")}>
                             <td className="pl-5">
                               <button type="button" onClick={() => toggleRow(c.id)} className="text-slate-400 hover:text-blue-600">
                                 {isSel ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" /> : <Square className="h-3.5 w-3.5" />}
@@ -564,10 +564,10 @@ export default function CollectionsPage() {
                                     className={cn(
                                       "rounded-[7px] px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors disabled:opacity-50",
                                       a.nextStatus === "paid"
-                                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                        ? "border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white hover:bg-[#098b9f]"
                                         : a.nextStatus === "written_off"
                                           ? "bg-slate-600 text-white hover:bg-slate-700"
-                                          : "bg-blue-600 text-white hover:bg-blue-700"
+                                          : "border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white hover:bg-[#098b9f]"
                                     )}
                                   >
                                     {a.label}
@@ -576,7 +576,7 @@ export default function CollectionsPage() {
                                 <button
                                   type="button"
                                   onClick={() => openEdit(c)}
-                                  className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                                  className="bevel-button flex h-6 w-6 items-center justify-center rounded-md bg-[#d4d0c8] text-slate-600"
                                   title="Edit"
                                 >
                                   <Edit2 className="h-3 w-3" />
@@ -584,7 +584,7 @@ export default function CollectionsPage() {
                                 <button
                                   type="button"
                                   onClick={() => { if (confirm("Delete this collection?")) deleteMut.mutate(c.id); }}
-                                  className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-red-400 hover:bg-red-50 dark:bg-slate-800 dark:text-red-400"
+                                  className="bevel-button flex h-6 w-6 items-center justify-center rounded-md bg-[#d4d0c8] text-red-600"
                                   title="Delete"
                                 >
                                   <Trash2 className="h-3 w-3" />
