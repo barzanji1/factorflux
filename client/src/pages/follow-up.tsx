@@ -229,7 +229,7 @@ function TemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => { onOpenChange(v); if (!v) resetForm(); }}>
-      <DialogContent className="ff-followups-surface sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Template" : "New Template"}</DialogTitle>
         </DialogHeader>
@@ -301,7 +301,7 @@ function TemplateDialog({
                   </button>
                 </div>
                 {preview ? (
-                  <div className="ff-card ff-followups-surface border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-2">
+                  <div className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] p-3 space-y-2">
                     <p className="text-[11px] font-semibold text-slate-500">Subject:</p>
                     <p className="text-[13px] text-slate-800 dark:text-slate-200">{applyPreview(subject)}</p>
                     <hr className="border-slate-200 dark:border-slate-700" />
@@ -325,7 +325,7 @@ function TemplateDialog({
             )} />
 
             <FormField control={form.control} name="isDefault" render={({ field }) => (
-              <FormItem className="ff-card ff-followups-surface flex items-center gap-3 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-3 py-2.5">
+              <FormItem className="flex items-center gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-3 py-2.5 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                 <Switch checked={field.value} onCheckedChange={field.onChange} id="tpl-default" />
                 <div>
                   <Label htmlFor="tpl-default" className="text-sm font-medium cursor-pointer">
@@ -548,7 +548,7 @@ function ReminderTimeline({
 
       {/* Cadence editor */}
       {editingCadence && (
-        <div className="ff-card ff-followups-surface border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40 p-3 space-y-3">
+        <div className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white p-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)] space-y-3">
           <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Cadence Settings</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
             <div className="flex items-center gap-2">
@@ -634,7 +634,7 @@ function ReminderTimeline({
               >
                 {/* Step dot */}
                 <div className={cn(
-                  "ff-followup-step relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold",
+                  "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white text-[10px] font-bold shadow-[1px_1px_0_#808080]",
                   r.status === "sent"     ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300" :
                   r.status === "canceled" ? "border-red-300 bg-red-50 text-red-400 dark:bg-red-950/20" :
                   r.status === "skipped"  ? "border-amber-300 bg-amber-50 text-amber-600 dark:bg-amber-950/20" :
@@ -767,7 +767,7 @@ function ReminderTimeline({
         </div>
       )}
       <Dialog open={!!editingReminder} onOpenChange={open => !open && setEditingReminder(null)}>
-        <DialogContent className="ff-followups-surface max-w-xl">
+        <DialogContent className="max-w-xl rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
           <DialogHeader><DialogTitle>Edit Scheduled Reminder</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Send date & time</Label><Input className="mt-1" type="datetime-local" value={reminderDraft.scheduledSendAt} onChange={e => setReminderDraft(d => ({ ...d, scheduledSendAt: e.target.value }))} /></div>
@@ -982,7 +982,7 @@ export default function FollowUpPage() {
                     Add Follow Up
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="ff-followups-surface sm:max-w-[500px]">
+                <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[500px]">
                   <DialogHeader>
                     <DialogTitle>Create Follow Up Task</DialogTitle>
                   </DialogHeader>
@@ -1055,7 +1055,7 @@ export default function FollowUpPage() {
                 { label: "Unacknowledged Automations", value: pendingBfuCount },
                 { label: "Email Templates", value: templates.length },
               ].map(stat => (
-                <Card key={stat.label} className="ff-dashboard-card ff-followups-surface">
+                <Card key={stat.label} className="ff-dashboard-card rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <CardContent className="p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
                     <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
@@ -1096,7 +1096,7 @@ export default function FollowUpPage() {
 
               {/* ── Manual follow-ups ─────────────────────────────────────────── */}
               <TabsContent value="manual" className="space-y-4">
-                <Card className="ff-followups-surface">
+                <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
                       <div className="flex items-center gap-2 flex-1 min-w-64">
@@ -1136,7 +1136,7 @@ export default function FollowUpPage() {
                       <p className="text-gray-600 mt-2">Loading follow-ups...</p>
                     </div>
                   ) : filteredFollowUps.length === 0 ? (
-                      <Card className="ff-followups-surface">
+                      <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                       <CardContent className="p-8 text-center">
                         <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No follow-ups found</h3>
@@ -1149,7 +1149,7 @@ export default function FollowUpPage() {
                     </Card>
                   ) : (
                     filteredFollowUps.map(followUp => (
-                        <Card key={followUp.id} className="ff-followups-surface ff-followups-task-card hover:shadow-md transition-shadow">
+                        <Card key={followUp.id} className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] transition-shadow hover:bg-[#f0f0f0] hover:shadow-md">
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -1200,7 +1200,7 @@ export default function FollowUpPage() {
 
               {/* ── Broker automations ────────────────────────────────────────── */}
               <TabsContent value="broker" className="space-y-4">
-                <div className="ff-followups-surface flex items-start gap-3 border border-orange-200/70 bg-orange-50/60 px-4 py-3 dark:border-orange-900/40 dark:bg-orange-950/10">
+                <div className="flex items-start gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <Zap className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
                   <p className="text-[12.5px] text-orange-800 dark:text-orange-300">
                     <span className="font-semibold">Automated follow-ups</span> are triggered when an invoice is funded.
@@ -1208,7 +1208,7 @@ export default function FollowUpPage() {
                   </p>
                 </div>
 
-                <Card className="ff-followups-surface">
+                <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
                       <div className="flex items-center gap-2 flex-1 min-w-64">
@@ -1238,7 +1238,7 @@ export default function FollowUpPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto" />
                   </div>
                 ) : filteredBfu.length === 0 ? (
-                    <Card className="ff-followups-surface">
+                    <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                     <CardContent className="p-8 text-center">
                       <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No broker follow-ups yet</h3>
@@ -1256,7 +1256,7 @@ export default function FollowUpPage() {
                       const cadence = localCadences[bfu.id] ?? bfu.cadenceConfig;
                       return (
                         <Card key={bfu.id} className={cn(
-                          "ff-followups-surface ff-followups-automation-row overflow-hidden transition-shadow",
+                          "overflow-hidden rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] transition-shadow odd:bg-white even:bg-[#f0f0f0]",
                           isExpanded && "ring-1 ring-orange-200 dark:ring-orange-800",
                         )}>
                           {/* Row header */}
@@ -1328,7 +1328,7 @@ export default function FollowUpPage() {
 
                           {/* Expanded detail */}
                           {isExpanded && (
-                            <div className="ff-followups-expanded border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 px-5 py-4">
+                            <div className="mx-2 mb-2 rounded-xl border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-white px-5 py-4 shadow-[inset_1px_1px_0_rgba(0,0,0,0.2)]">
                               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
                                 {/* Left: reminder timeline */}
@@ -1346,7 +1346,7 @@ export default function FollowUpPage() {
                                   </div>
                                   <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Email Body Preview</p>
-                                    <pre className="ff-card ff-followups-surface text-[11.5px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-sans bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 max-h-48 overflow-auto">
+                                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-xl border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-white p-3 font-sans text-[11.5px] text-slate-600 shadow-[inset_1px_1px_0_rgba(0,0,0,0.15)]">
                                       {bfu.body}
                                     </pre>
                                   </div>
@@ -1431,7 +1431,7 @@ export default function FollowUpPage() {
                     <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading templates…
                   </div>
                 ) : templates.length === 0 ? (
-                    <Card className="ff-followups-surface">
+                    <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                     <CardContent className="flex flex-col items-center justify-center py-16 text-slate-400">
                       <LayoutTemplate className="h-10 w-10 mb-3 opacity-40" />
                       <p className="text-sm font-medium">No templates yet</p>
@@ -1459,7 +1459,7 @@ export default function FollowUpPage() {
                             <Card
                               key={tpl.id}
                               className={cn(
-                                "ff-followups-surface ff-followups-template-card border transition-colors",
+                                "rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] transition-colors",
                                 tpl.isDefault && "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/10",
                               )}
                             >
@@ -1532,7 +1532,7 @@ export default function FollowUpPage() {
                 )}
 
                 {/* Placeholder legend */}
-                <Card className="ff-followups-surface border-dashed border-slate-300 dark:border-slate-700">
+                <Card className="rounded-xl border-2 border-dashed border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <CardContent className="p-4">
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Available placeholders</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -1564,7 +1564,7 @@ export default function FollowUpPage() {
 
             {/* ── Template preview dialog ───────────────────────────────────── */}
             <Dialog open={!!previewTpl} onOpenChange={v => { if (!v) setPreviewTpl(null); }}>
-              <DialogContent className="ff-followups-surface sm:max-w-[580px]">
+              <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[580px]">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
@@ -1586,7 +1586,7 @@ export default function FollowUpPage() {
                         </span>
                       )}
                     </div>
-                    <div className="ff-followups-surface border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div className="overflow-hidden rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                       <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Subject</p>
                         <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200">
