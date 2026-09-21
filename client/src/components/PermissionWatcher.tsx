@@ -2,49 +2,10 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-
-const ROUTE_PERMISSION_MAP: Record<string, string> = {
-  "/": "dashboard",
-  "/clients": "carriers",
-  "/invoices": "invoices",
-  "/documents": "documents",
-  "/tasks": "tasks",
-  "/bulk-invoices": "bulk_invoices",
-  "/portal-submissions": "portal_submissions",
-  "/factoring": "factoring",
-  "/payouts": "payments",
-  "/lockbox": "lockbox",
-  "/fuel-advance": "fuel_advance",
-  "/bank-transfers": "bank_transfers",
-  "/dispatchers": "dispatchers",
-  "/trucks": "trucks",
-  "/release-letters": "release_letters",
-  "/brokers": "brokers",
-  "/credit-checks": "cb_reviews",
-  "/fmcsa-authority": "mc_check",
-  "/held": "held",
-  "/audit-log": "logs",
-  "/collections": "followups",
-  "/follow-up": "followups",
-  "/reports": "reports",
-  "/admin": "admin",
-  "/payroll": "payroll",
-  "/vault": "vault",
-  "/help": "help",
-  "/document-rules": "rules",
-  "/workflow-builder": "workflow_builder",
-};
-
-function pathToPermission(pathname: string): string | null {
-  if (ROUTE_PERMISSION_MAP[pathname]) return ROUTE_PERMISSION_MAP[pathname];
-  for (const [route, perm] of Object.entries(ROUTE_PERMISSION_MAP)) {
-    if (route !== "/" && pathname.startsWith(route + "/")) return perm;
-  }
-  return null;
-}
+import { pathToPermission } from "@/lib/routePermissions";
 
 export function PermissionWatcher() {
-  const { permissions, isAuthenticated, user } = useAuth();
+  const { permissions, permissionsLoaded, isAuthenticated, user } = useAuth();
   const [location, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -59,7 +20,7 @@ export function PermissionWatcher() {
 
   useEffect(() => {
     // Admins are never affected
-    if (!isAuthenticated || user?.role === "admin") {
+    if (!isAuthenticated || user?.role === "admin" || !permissionsLoaded) {
       prevPermissionsRef.current = permissions;
       initializedRef.current = false;
       return;
@@ -91,7 +52,7 @@ export function PermissionWatcher() {
       });
       navigate("/");
     }
-  }, [permissions]); // intentionally only watching permissions
+  }, [permissions, permissionsLoaded]); // intentionally only watching permissions
 
   return null;
 }

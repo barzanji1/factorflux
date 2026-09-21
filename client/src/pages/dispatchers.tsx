@@ -66,7 +66,9 @@ export default function Dispatchers() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Dispatcher | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() =>
+    typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("search") ?? "",
+  );
   const [carrierFilter, setCarrierFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 

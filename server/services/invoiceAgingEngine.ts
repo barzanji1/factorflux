@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, lte, notInArray, or, sql } fr
 import { db } from "../db";
 import { storage } from "../storage";
 import { brokers, clients, debtors, eventLedger, invoiceAgingAlerts, invoices, invoiceStatusHistory, notifications, users } from "@shared/schema";
+import { recalculateBrokerCreditSafe } from "./brokerCreditEngine";
 
 const DAY_MS = 86_400_000;
 
@@ -43,6 +44,7 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
 
   const funded = await db.select({
     id: invoices.id, invoiceNumber: invoices.invoiceNumber, fundedAt: invoices.fundedAt,
+    brokerId: invoices.brokerId,
     clientName: clients.name,
     brokerName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
     chargebackStatus: invoices.chargebackStatus, chargebackDate: invoices.chargebackDate,
@@ -118,6 +120,7 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
           metadata: JSON.stringify({ category: "chargeback", severity: "red", status: "charged" }),
         } as any);
         await db.insert(eventLedger).values({ entityType: "invoice", entityId: invoice.id, eventType: "chargeback_applied", actorType: "system", actorId: "system", payloadJson: { days, broker } });
+        if (invoice.brokerId != null) recalculateBrokerCreditSafe(invoice.brokerId);
       }
     } else if (days >= 60) {
       const chargebackDate = new Date(invoice.fundedAt!.getTime() + 60 * DAY_MS);

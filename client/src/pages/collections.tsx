@@ -433,10 +433,10 @@ export default function CollectionsPage() {
                         onClick={() => bulkUpdateStatus(a.nextStatus)}
                         disabled={updateMut.isPending}
                         className={cn(
-                          "rounded-[7px] px-3 py-1 text-[11.5px] font-semibold text-white disabled:opacity-50",
+                          "rounded-lg border-2 px-3 py-1 text-[11.5px] font-semibold text-white shadow-[1px_1px_0_#808080] disabled:opacity-50",
                           a.nextStatus === "paid" ? "bg-emerald-600 hover:bg-emerald-700"
                             : a.nextStatus === "written_off" ? "bg-slate-600 hover:bg-slate-700"
-                            : "bg-blue-600 hover:bg-blue-700"
+                            : "border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] hover:bg-[#098b9f]"
                         )}
                       >
                         {a.label}
@@ -614,7 +614,7 @@ export default function CollectionsPage() {
 
       {/* ── Create / Edit dialog ──────────────────────────────────────────── */}
       <Dialog open={dlgOpen} onOpenChange={o => { if (!o) { setDlgOpen(false); setEditing(null); } }}>
-        <DialogContent className="max-w-lg rounded-2xl">
+        <DialogContent className="max-w-lg rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Collection" : "New Collection"}</DialogTitle>
           </DialogHeader>
@@ -694,8 +694,8 @@ export default function CollectionsPage() {
                 </FormItem>
               )} />
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDlgOpen(false)} className="rounded-xl">Cancel</Button>
-                <Button type="submit" disabled={createMut.isPending || updateMut.isPending} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700">
+                <Button type="button" variant="outline" onClick={() => setDlgOpen(false)} className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#d4d0c8] shadow-[1px_1px_0_#808080]">Cancel</Button>
+                <Button type="submit" disabled={createMut.isPending || updateMut.isPending} className="rounded-xl border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white shadow-[1px_1px_0_#808080] hover:bg-[#098b9f]">
                   {(createMut.isPending || updateMut.isPending) ? "Saving…" : editing ? "Update" : "Create"}
                 </Button>
               </DialogFooter>

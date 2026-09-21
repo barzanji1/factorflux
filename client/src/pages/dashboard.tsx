@@ -124,6 +124,9 @@ export default function Dashboard() {
       return response.json();
     },
   });
+  const { data: creditAlertsData } = useQuery<{ fCount: number; dCount: number; worst: Array<{ id: number; name: string; creditGrade: string | null; creditScore: number | null }> }>({
+    queryKey: ["/api/brokers/credit-alerts"],
+  });
   const { data: chargebacksData } = useQuery<Array<{ chargebackStatus: "scheduled" | "extended" | "charged" }>>({
     queryKey: ["/api/invoices/chargebacks"],
   });
@@ -408,6 +411,24 @@ export default function Dashboard() {
             </button>
           )}
         </section>
+      )}
+
+      {(creditAlertsData?.fCount ?? 0) + (creditAlertsData?.dCount ?? 0) > 0 && (
+        <Card className="mb-5 border-red-200 bg-red-50/50 p-4 dark:border-red-900/40 dark:bg-red-950/10">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-red-600" /><h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Broker Credit Alerts</h2></div>
+            <button type="button" onClick={() => go("/brokers")} className="flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:underline">View brokers <ArrowRight className="h-3 w-3" /></button>
+          </div>
+          <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">{creditAlertsData?.fCount ?? 0} F-grade and {creditAlertsData?.dCount ?? 0} D-grade broker{((creditAlertsData?.fCount ?? 0) + (creditAlertsData?.dCount ?? 0)) === 1 ? "" : "s"} require attention.</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(creditAlertsData?.worst ?? []).slice(0, 5).map(broker => (
+              <button key={broker.id} type="button" onClick={() => go(`/brokers/${broker.id}`)} className="flex items-center justify-between rounded-xl border border-red-100 bg-white px-3 py-2 text-left hover:border-red-300 dark:border-red-900/30 dark:bg-slate-900/50">
+                <span className="min-w-0 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{broker.name}</span>
+                <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">{broker.creditGrade ?? "—"} · {broker.creditScore ?? "—"}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
       )}
 
       {/* ── Main work area ────────────────────────────────────────────────── */}

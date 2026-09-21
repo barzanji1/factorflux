@@ -1,0 +1,58 @@
+Harden the permission system — enforce permissions at the API level, not just the UI. Every route must verify the requesting user has the required permission before returning data.
+
+Create a permission middleware:
+
+ Create server/middleware/requirePermission.ts
+ Function signature: requirePermission(permission: string)
+ Checks user_permissions table for the requesting user's permission
+ If permission is granted: false or missing → return 403 Forbidden with message: "You don't have permission to access this resource"
+ Admin users bypass all permission checks — always have full access
+ Cache permissions per request to avoid multiple DB queries per request
+
+Apply requirePermission to every route group:
+
+carriers → requirePermission('carriers')
+invoices → requirePermission('invoices')
+documents → requirePermission('documents')
+tasks → requirePermission('tasks')
+bulk_invoices → requirePermission('bulk_invoices')
+portal_submissions → requirePermission('portal_submissions')
+factoring/sheets → requirePermission('factoring')
+payments → requirePermission('payments')
+lockbox → requirePermission('lockbox')
+fuel_advance → requirePermission('fuel_advance')
+bank_transfers → requirePermission('bank_transfers')
+dispatchers → requirePermission('dispatchers')
+trucks → requirePermission('trucks')
+release_letters → requirePermission('release_letters')
+brokers → requirePermission('brokers')
+cb_reviews → requirePermission('cb_reviews')
+mc_check → requirePermission('mc_check')
+held → requirePermission('held')
+logs → requirePermission('logs')
+followups → requirePermission('followups')
+reports → requirePermission('reports')
+payroll → requirePermission('payroll')
+vault → requirePermission('vault')
+rules → requirePermission('rules')
+workflow_builder → requirePermission('workflow_builder')
+admin routes → requirePermission('admin')
+earl/ai-chat → requirePermission('earl')
+calendar → requirePermission('calendar')
+expenses → requirePermission('expenses')
+tickets → requirePermission('tickets')
+bulk_sms → requirePermission('bulk_sms')
+
+Additional security:
+
+ GET /api/auth/permissions — returns only the current user's own permissions, never another user's
+ Employees cannot access any route prefixed with /api/admin regardless of toggles
+ Suspended users get 403 on every authenticated route — not just login
+ Log every 403 permission denial to the audit trail: who tried to access what and when
+ Test: create an agent with only carriers permission — confirm they get 403 on all other endpoints even if they call the API directly
+
+Frontend hardening:
+
+ If API returns 403 — show a clean "Access Denied" page instead of an error or blank screen
+ Clear any cached data from unauthorized endpoints
+ Re-fetch permissions on every page load — don't rely on stale cached permissions from login

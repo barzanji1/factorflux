@@ -12,6 +12,7 @@ import { log } from "./log";
 import { startAuthorityScheduler } from "./services/authorityScheduler";
 import { recoverStuckOcrJobs } from "./services/jobQueue";
 import { ensureDevAdmin } from "./services/devAdminBootstrap";
+import { startBrokerCreditScheduler } from "./services/brokerCreditEngine";
 
 const app = express();
 
@@ -57,7 +58,13 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buffer) => {
+    if ((req as any).originalUrl.split("?")[0] === "/api/webhooks/sendgrid") {
+      (req as any).rawBody = Buffer.from(buffer);
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: false }));
 
 app.use("/uploads", express.static(uploadsDir));
@@ -135,6 +142,7 @@ export async function startServer(
   });
 
   startAuthorityScheduler();
+  startBrokerCreditScheduler();
 
   // Recover any jobs that were stuck in "queued"/"processing" before the restart
   recoverStuckOcrJobs().catch(e =>

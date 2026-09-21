@@ -23,7 +23,7 @@ type Carrier = {
 type Broker = {
   id: number; name: string; status?: string | null; mcNumber?: string | null;
   email?: string | null; phone?: string | null; creditLimit?: string | null;
-  averageDaysToPay?: number | null; notes?: string | null;
+  averageDaysToPay?: number | null; notes?: string | null; creditGrade?: string | null; creditScore?: number | null;
 };
 type Driver = { id: number; carrierId: number; firstName: string; lastName: string; status?: string | null };
 type PaperworkKey = "rateConfirmation" | "billOfLading" | "lumperReceipt" | "other";
@@ -152,6 +152,7 @@ function SearchSelect<T extends { id: number; name: string }>({
 
 function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Carrier | Broker }) {
   const isCarrier = kind === "carrier";
+  const brokerRecord = !isCarrier && record ? record as Broker : undefined;
   const status = record?.status ?? "Not selected";
   const favorable = status === "active" || status === "approved";
   return (
@@ -177,6 +178,19 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
               {status.replace(/_/g, " ")}
             </Badge>
           </div>
+          {!isCarrier && (
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+              <span className="text-xs text-slate-500">Credit grade</span>
+               <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", brokerRecord?.creditGrade === "A" ? "bg-emerald-100 text-emerald-700" : brokerRecord?.creditGrade === "B" ? "bg-teal-100 text-teal-700" : brokerRecord?.creditGrade === "C" ? "bg-yellow-100 text-yellow-700" : brokerRecord?.creditGrade === "D" ? "bg-orange-100 text-orange-700" : brokerRecord?.creditGrade === "F" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-500")}>{brokerRecord?.creditGrade ?? "Not rated"}{brokerRecord?.creditScore != null && ` · ${brokerRecord.creditScore}`}</span>
+            </div>
+          )}
+           {!isCarrier && (brokerRecord?.creditGrade === "D" || brokerRecord?.creditGrade === "F") && (
+             <p className={cn("rounded-xl border px-3 py-2 text-xs font-semibold", brokerRecord.creditGrade === "F" ? "border-red-300 bg-red-50 text-red-800" : "border-orange-200 bg-orange-50 text-orange-800")}>
+               {brokerRecord.creditGrade === "F"
+                 ? "This broker is flagged as high risk."
+                 : "This broker has a poor credit rating. Proceed with caution."}
+             </p>
+          )}
           <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
             <p>MC#: <strong>{record.mcNumber || "Not recorded"}</strong></p>
             {isCarrier ? (

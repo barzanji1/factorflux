@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -8,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PermissionWatcher } from "@/components/PermissionWatcher";
 import { useTheme } from "@/hooks/useTheme";
 import NotFound from "@/pages/not-found";
+import AccessDenied from "@/pages/access-denied";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Invoices from "@/pages/invoices";
@@ -72,7 +74,16 @@ import { TeamChatDock } from "@/pages/chat";
 
 function Router() {
   useTheme(); // Initialize theme
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+  const [accessDenied, setAccessDenied] = useState(false);
+  useEffect(() => {
+    const handleAccessDenied = () => setAccessDenied(true);
+    window.addEventListener("app:access-denied", handleAccessDenied);
+    return () => window.removeEventListener("app:access-denied", handleAccessDenied);
+  }, []);
+  if (accessDenied) {
+    return <AccessDenied onBack={() => { setAccessDenied(false); navigate("/"); }} />;
+  }
   const isPublicRoute =
     location === "/login" ||
     location === "/portal" ||

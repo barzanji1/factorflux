@@ -117,7 +117,13 @@ export default function Factoring() {
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({ queryKey: ["/api/invoices", { all: true }] });
   type AgingAlert = { id: number; invoiceId: number; invoiceNumber: string; carrier: string | null; broker: string | null; fundedAt: string; alertType: "day_60" | "day_90"; status: string };
   const [agingView, setAgingView] = useState<"pending" | "resolved">("pending");
-  const { data: agingAlerts = [] } = useQuery<AgingAlert[]>({ queryKey: ["/api/invoices/aging-alerts", agingView], queryFn: () => fetch(`/api/invoices/aging-alerts?view=${agingView}`, { credentials: "include" }).then(r => r.json()) });
+  const { data: agingAlerts = [] } = useQuery<AgingAlert[]>({
+    queryKey: ["/api/invoices/aging-alerts", agingView],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/invoices/aging-alerts?view=${agingView}`);
+      return response.json();
+    },
+  });
   const acknowledgeAging = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/invoices/aging-alerts/${id}/acknowledge`, {}),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/invoices/aging-alerts"] }); toast({ title: "Aging alert acknowledged" }); },

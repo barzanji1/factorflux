@@ -96,6 +96,20 @@ import {
   type PermissionKey,
 } from "@shared/schema";
 import { db } from "./db";
+import { recalculateBrokerCreditSafe } from "./services/brokerCreditEngine";
+
+async function triggerBrokerCreditForInvoices(invoiceIds: number[]): Promise<void> {
+  try {
+    if (!invoiceIds.length) return;
+    const rows = await db.select({ brokerId: invoices.brokerId }).from(invoices)
+      .where(inArray(invoices.id, invoiceIds));
+    new Set(rows.map(row => row.brokerId).filter((id): id is number => id != null)).forEach((brokerId) => {
+      recalculateBrokerCreditSafe(brokerId);
+    });
+  } catch (error) {
+    console.warn("[brokerCredit] trigger lookup failed:", error instanceof Error ? error.message : error);
+  }
+}
 import { eq, desc, like, or, and, count, sql, inArray, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -1657,6 +1671,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
     }
+    await triggerBrokerCreditForInvoices(lines.map(line => line.invoiceId));
     return inserted;
   }
 
@@ -1747,6 +1762,7 @@ export class DatabaseStorage implements IStorage {
     const entryStatus: LockboxEntry["status"] = totalApplied >= received - 0.01 ? "matched" : "partial";
     await db.update(lockboxEntries).set({ status: entryStatus }).where(eq(lockboxEntries.id, entryId));
 
+    await triggerBrokerCreditForInvoices(lines.map(line => line.invoiceId));
     return { cashApplication: { ...ca, status: caStatus }, lines };
   }
 
@@ -1769,6 +1785,16 @@ export class DatabaseStorage implements IStorage {
     const patch: Record<string, unknown> = { ...updates, updatedAt: new Date() };
     if (updates.status === "resolved" && !updates.resolvedAt) patch.resolvedAt = new Date();
     const [row] = await db.update(exceptions).set(patch).where(eq(exceptions.id, id)).returning();
+    if (row?.entityType === "broker" && row.entityId != null) {
+      recalculateBrokerCreditSafe(row.entityId);
+    } else if (row?.entityType === "invoice" && row.entityId != null) {
+      await triggerBrokerCreditForInvoices([row.entityId]);
+    } else if (row?.entityType === "payment" && row.entityId != null) {
+      const affectedLines = await db.select({ invoiceId: paymentApplicationLines.invoiceId })
+        .from(paymentApplicationLines)
+        .where(eq(paymentApplicationLines.cashApplicationId, row.entityId));
+      await triggerBrokerCreditForInvoices(affectedLines.map(line => line.invoiceId));
+    }
     return row;
   }
 

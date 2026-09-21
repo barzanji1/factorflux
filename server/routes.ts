@@ -51,6 +51,7 @@ import {
   clients,
   clientVault,
   brokers,
+  brokerCreditScores,
   brokerBranches,
   fuelAdvances,
   invoices,
@@ -114,9 +115,18 @@ import {
   ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
 import Anthropic from "@anthropic-ai/sdk";
+import { EventWebhook } from "@sendgrid/eventwebhook";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
 import { classifyDocumentAI } from "./services/aiClassifier";
+import { recalculateAllBrokerCredit, recalculateBrokerCredit, recalculateBrokerCreditSafe } from "./services/brokerCreditEngine";
+import {
+  authenticateCurrentUser,
+  requirePermission,
+  requireAnyPermission,
+  auditAuthorizationDenial,
+  DENIED_MESSAGE,
+} from "./middleware/requirePermission";
 
 import { sendEmail } from "./emailService";
 import {
@@ -380,35 +390,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn("[startup] Could not seed earl permission (non-fatal):", err?.message);
   }
 
-  const requireAuth = (req: any, res: any, next: any) => {
-    const user = (req.session as any)?.user;
-    if (!user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-    req.user = user;
-    next();
-  };
+  const requireAuth = authenticateCurrentUser;
 
   const requireAdmin = (req: any, res: any, next: any) => {
-    const user = (req.session as any)?.user;
-    if (!user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-    if (user.role !== "admin") {
+    authenticateCurrentUser(req, res, async () => {
+      if (req.user.role === "admin") return next();
+      // A manager may be delegated the admin module, but employee accounts
+      // remain ineligible for administrative endpoints regardless of toggles.
+      if (req.user.role === "manager" && String(req.originalUrl || "").split("?")[0].startsWith("/api/admin")) {
+        return requirePermission("admin")(req, res, next);
+      }
+      await auditAuthorizationDenial(req, req.user, "admin");
       return res.status(403).json({ message: "Admin access required" });
-    }
-    req.user = user;
-    next();
+    });
   };
 
   const requireManagerOrAdmin = (req: any, res: any, next: any) => {
-    const user = (req.session as any)?.user;
-    if (!user) return res.status(401).json({ message: "Authentication required" });
-    if (user.role !== "manager" && user.role !== "admin") {
-      return res.status(403).json({ message: "Manager or admin access required" });
-    }
-    req.user = user;
-    next();
+    authenticateCurrentUser(req, res, async () => {
+      if (req.user.role !== "manager" && req.user.role !== "admin") {
+        await auditAuthorizationDenial(req, req.user, "manager_or_admin");
+        return res.status(403).json({ message: "Manager or admin access required" });
+      }
+      next();
+    });
   };
 
   // Resolve canonical broker/branch references in one place. Legacy debtor-only
@@ -462,37 +466,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return input;
   };
 
-  const requireReportsPermission = async (req: any, res: any, next: any) => {
-    const user = (req.session as any)?.user;
-    if (!user) return res.status(401).json({ message: "Authentication required" });
-    if (user.role === "admin") { req.user = user; return next(); }
-    try {
-      const stored = await storage.getUserPermissions(user.id);
-      const permissions = stored.length ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee);
-      if (!(permissions as readonly string[]).includes("reports")) return res.status(403).json({ message: "Reports permission required" });
-      req.user = user;
-      next();
-    } catch {
-      res.status(500).json({ message: "Unable to verify reports permission" });
-    }
-  };
+  const requireReportsPermission = requirePermission("reports");
 
-  const requireModulePermission = (permission: string) => async (req: any, res: any, next: any) => {
-    const user = (req.session as any)?.user;
-    if (!user) return res.status(401).json({ message: "Authentication required" });
-    if (user.role === "admin") { req.user = user; return next(); }
-    try {
-      const stored = await storage.getUserPermissions(user.id);
-      const permissions = stored.length ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee);
-      if (!(permissions as readonly string[]).includes(permission)) {
-        return res.status(403).json({ message: `${permission.replace(/_/g, " ")} permission required` });
-      }
-      req.user = user;
-      next();
-    } catch {
-      res.status(500).json({ message: `Unable to verify ${permission.replace(/_/g, " ")} permission` });
-    }
-  };
+  const requireModulePermission = requirePermission;
 
   const employeeCanAccessInvoice = async (req: any, invoiceId: number) => {
     if (req.user?.role !== "employee") return true;
@@ -631,6 +607,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ status: "ok", ts: Date.now() });
   });
 
+  // Apply a single permission gate to route groups whose handlers historically
+  // only checked authentication. Public authentication and carrier/portal
+  // callbacks are intentionally excluded before this protected API boundary.
+  const publicApiPath = (pathname: string) =>
+    pathname === "/api/auth/login"
+    || pathname === "/api/auth/logout"
+    || pathname === "/api/auth/verify"
+    || pathname.startsWith("/api/portal/")
+    || pathname === "/api/portal"
+    || pathname.startsWith("/api/portal-chat/")
+    || pathname.startsWith("/api/carrier/register")
+    || pathname.startsWith("/api/carrier-registration/")
+    || pathname === "/api/webhooks/sendgrid";
+  const permissionGroups: Array<[string, string]> = [
+    ["/api/firebase-test", "admin"],
+    ["/api/firebase-clients", "carriers"],
+    ["/api/version-check", "settings"],
+    ["/api/time-tracking", "payroll"],
+    ["/api/notifications", "dashboard"],
+    ["/api/payout-settings", "payments"],
+    ["/api/carrier-chat", "chat"],
+    ["/api/document-rules", "rules"],
+    ["/api/load-documents", "documents"],
+    ["/api/doc-field-candidates", "documents"],
+    ["/api/workflow-config", "workflow_builder"],
+    ["/api/broker-follow-up-reminders", "followups"],
+    ["/api/broker-follow-up-templates", "followups"],
+    ["/api/broker-follow-ups", "followups"],
+    ["/api/portal-submissions", "portal_submissions"],
+    ["/api/carrier-portal", "portal_submissions"],
+    ["/api/bulk-invoices", "bulk_invoices"],
+    ["/api/release-letters", "release_letters"],
+    ["/api/bank-transfers", "bank_transfers"],
+    ["/api/fuel-card-applications", "fuel_advance"],
+    ["/api/fuel-advances", "fuel_advance"],
+    ["/api/cash-applications", "payments"],
+    ["/api/credit-checks", "cb_reviews"],
+    ["/api/authority-checks", "mc_check"],
+    ["/api/authority-alerts", "mc_check"],
+    ["/api/ach-settings", "payments"],
+    ["/api/bulk-sms", "bulk_sms"],
+    ["/api/calendar", "calendar"],
+    ["/api/ai/chat", "earl"],
+    ["/api/payouts", "payments"],
+    ["/api/exceptions", "payments"],
+    ["/api/payments", "payments"],
+    ["/api/activities", "logs"],
+    ["/api/held", "held"],
+    ["/api/collections", "followups"],
+    ["/api/audit", "logs"],
+    ["/api/dispatchers", "dispatchers"],
+    ["/api/trucks", "trucks"],
+    ["/api/drivers", "trucks"],
+    ["/api/payroll", "payroll"],
+    ["/api/reports", "reports"],
+    ["/api/follow-ups", "followups"],
+    ["/api/followups", "followups"],
+    ["/api/loads", "factoring"],
+    ["/api/downloads", "documents"],
+    ["/api/download", "documents"],
+    ["/api/documents", "documents"],
+    ["/api/invoices", "invoices"],
+    ["/api/tasks", "tasks"],
+    ["/api/debtors", "factoring"],
+    ["/api/clients", "carriers"],
+    ["/api/carriers", "carriers"],
+    ["/api/brokers", "brokers"],
+    ["/api/tickets", "tickets"],
+    ["/api/expenses", "expenses"],
+    ["/api/vault", "vault"],
+    ["/api/lockbox", "lockbox"],
+    ["/api/messages", "carriers"],
+    ["/api/warnings", "invoices"],
+    ["/api/chat", "chat"],
+    ["/api/dashboard", "dashboard"],
+    ["/api/desktop", "settings"],
+    ["/api/support", "help"],
+    ["/api/search", "dashboard"],
+    ["/api/user", "settings"],
+    ["/api/users", "chat"],
+    ["/api/email", "admin"],
+    ["/api/test", "admin"],
+    ["/api/admin", "admin"],
+  ];
+  app.use("/api", (req: any, res: any, next: any) => {
+    const pathname = String(req.originalUrl || "").split("?")[0];
+    if (publicApiPath(pathname)) return next();
+    if (pathname === "/api/carrier-chat" || pathname.startsWith("/api/carrier-chat/")) {
+      return requireAnyPermission(["chat", "portal_submissions"])(req, res, next);
+    }
+    // Invoice reads are shared by the factoring and invoice modules, while
+    // lifecycle/funding mutations and queues belong exclusively to factoring.
+    if (pathname === "/api/invoices" || pathname.startsWith("/api/invoices/")) {
+      const factoringOnly = /^\/api\/invoices\/(?:funding(?:\/|$)|[^/]+\/(?:transition|available-transitions|approve|override-approve|extend-chargeback|hold|release|chargeback\/refunds)|aging-alerts(?:\/|$)|chargebacks(?:\/|$))/.test(pathname);
+      if (factoringOnly) return requirePermission("factoring")(req, res, next);
+      if (req.method === "GET" && /^\/api\/invoices(?:\/[^/]+\/detail)?$/.test(pathname)) {
+        return requireAnyPermission(["invoices", "factoring"])(req, res, next);
+      }
+    }
+    const group = permissionGroups.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+    return (group ? requirePermission(group[1]) : requireAuth)(req, res, next);
+  });
+
   app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {
     streamTestPdf(
       res,
@@ -713,7 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/verify", async (req, res) => {
+  app.get("/api/auth/verify", requireAuth, async (req: any, res) => {
     const sessionUser = (req.session as any)?.user;
     if (!sessionUser) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -1356,10 +1435,15 @@ ${message}
   });
 
   // Admin — User Management
+  const adminUserOutput = (user: any) => {
+    const { password: _password, ...safeUser } = user;
+    return safeUser;
+  };
+
   app.get("/api/admin/users", requireAdmin, async (_req: any, res) => {
     try {
       const allUsers = await storage.getAllUsers();
-      res.json(allUsers);
+      res.json(allUsers.map(adminUserOutput));
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -1436,7 +1520,7 @@ ${message}
         description: `Created new agent account: ${firstName} ${lastName} (${email}) with role: ${role}`,
       });
 
-      res.status(201).json(newUser);
+      res.status(201).json(adminUserOutput(newUser));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0]?.message });
       console.error("Error creating agent:", error);
@@ -1472,7 +1556,7 @@ ${message}
         description: `Updated user ${id}: ${JSON.stringify(updates)}`,
       });
 
-      res.json(updatedUser);
+      res.json(adminUserOutput(updatedUser));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0]?.message });
       console.error("Error updating user:", error);
@@ -3373,6 +3457,7 @@ ${message}
         metadata: { agentName },
       });
       await storage.createActivity({ userId: req.user.id, type: "chargeback_extended", description: `Extended chargeback for ${invoice.invoiceNumber} to ${extensionDate.toLocaleDateString()}: ${body.reason}`, entityType: "invoice", entityId: id } as any);
+      if (invoice.brokerId != null) recalculateBrokerCreditSafe(invoice.brokerId);
       res.json(invoice);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
@@ -3558,21 +3643,232 @@ ${message}
   // Search
   app.get("/api/search", requireAuth, async (req: any, res) => {
     try {
-      const { q } = req.query;
-      if (!q || typeof q !== "string") {
-        return res.status(400).json({ message: "Search query is required" });
+      const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      if (query.length < 2) {
+        return res.json({ groups: [] });
       }
+      const pattern = `%${query}%`;
 
-      const [clientResults, invoiceResults, loadResults] = await Promise.all([
-        storage.searchClients(q),
-        storage.searchInvoices(q),
-        storage.searchLoads(q),
+      const [
+        carrierResults,
+        brokerResults,
+        invoiceResults,
+        loadResults,
+        fuelAdvanceResults,
+        ticketResults,
+        taskResults,
+        dispatcherResults,
+        truckResults,
+      ] = await Promise.all([
+        db.select({
+          id: clients.id,
+          name: clients.name,
+          mcNumber: clients.mcNumber,
+          dotNumber: clients.dotNumber,
+          contactPerson: clients.contactPerson,
+        }).from(clients).where(or(
+          ilike(clients.name, pattern),
+          ilike(clients.mcNumber, pattern),
+          ilike(clients.dotNumber, pattern),
+          ilike(clients.contactPerson, pattern),
+          ilike(clients.email, pattern),
+        )).limit(5),
+        db.select({
+          id: brokers.id,
+          name: brokers.name,
+          mcNumber: brokers.mcNumber,
+          contactPerson: brokers.contactPerson,
+        }).from(brokers).where(or(
+          ilike(brokers.name, pattern),
+          ilike(brokers.mcNumber, pattern),
+          ilike(brokers.contactPerson, pattern),
+          ilike(brokers.email, pattern),
+        )).limit(5),
+        db.select({
+          id: invoices.id,
+          invoiceNumber: invoices.invoiceNumber,
+          loadNumber: invoices.loadNumber,
+          amount: invoices.amount,
+          status: invoices.status,
+        }).from(invoices).where(and(
+          or(
+            ilike(invoices.invoiceNumber, pattern),
+            ilike(invoices.loadNumber, pattern),
+            ilike(invoices.code, pattern),
+            ilike(invoices.driverName, pattern),
+          ),
+          req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
+        )).limit(5),
+        db.select({
+          id: loads.id,
+          loadNumber: loads.loadNumber,
+          pickupLocation: loads.pickupLocation,
+          deliveryLocation: loads.deliveryLocation,
+        }).from(loads).where(or(
+          ilike(loads.loadNumber, pattern),
+          ilike(loads.pickupLocation, pattern),
+          ilike(loads.deliveryLocation, pattern),
+          ilike(loads.driverName, pattern),
+        )).limit(5),
+        db.select({
+          id: fuelAdvances.id,
+          carrierName: fuelAdvances.carrierName,
+          advanceAmount: fuelAdvances.advanceAmount,
+        }).from(fuelAdvances).where(or(
+          ilike(fuelAdvances.carrierName, pattern),
+          ilike(fuelAdvances.notes, pattern),
+        )).limit(5),
+        db.select({
+          id: tickets.id,
+          ticketNumber: tickets.ticketNumber,
+          title: tickets.title,
+          status: tickets.status,
+        }).from(tickets).where(and(
+          or(
+            ilike(tickets.ticketNumber, pattern),
+            ilike(tickets.title, pattern),
+            ilike(tickets.description, pattern),
+          ),
+          req.user.role === "employee"
+            ? or(eq(tickets.submittedBy, req.user.id), eq(tickets.assignedTo, req.user.id))
+            : undefined,
+        )).limit(5),
+        db.select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+        }).from(tasks).where(and(
+          or(ilike(tasks.title, pattern), ilike(tasks.description, pattern)),
+          req.user.role === "employee"
+            ? or(eq(tasks.createdBy, req.user.id), eq(tasks.assignedTo, req.user.id))
+            : undefined,
+        )).limit(5),
+        db.select({
+          id: dispatchers.id,
+          firstName: dispatchers.firstName,
+          lastName: dispatchers.lastName,
+          email: dispatchers.email,
+          phone: dispatchers.phone,
+        }).from(dispatchers).where(or(
+          ilike(dispatchers.firstName, pattern),
+          ilike(dispatchers.lastName, pattern),
+          ilike(sql<string>`concat(${dispatchers.firstName}, ' ', ${dispatchers.lastName})`, pattern),
+          ilike(dispatchers.email, pattern),
+          ilike(dispatchers.phone, pattern),
+        )).limit(5),
+        db.select({
+          id: trucks.id,
+          truckNumber: trucks.truckNumber,
+          vin: trucks.vin,
+          make: trucks.make,
+          model: trucks.model,
+          licensePlate: trucks.licensePlate,
+        }).from(trucks).where(or(
+          ilike(trucks.truckNumber, pattern),
+          ilike(trucks.vin, pattern),
+          ilike(trucks.make, pattern),
+          ilike(trucks.model, pattern),
+          ilike(trucks.licensePlate, pattern),
+        )).limit(5),
       ]);
 
       res.json({
-        clients: clientResults,
-        invoices: invoiceResults,
-        loads: loadResults,
+        groups: [
+          {
+            type: "carriers",
+            label: "Carriers",
+            results: carrierResults.map(item => ({
+              id: item.id,
+              title: item.name,
+              subtitle: [item.mcNumber && `MC ${item.mcNumber}`, item.dotNumber && `DOT ${item.dotNumber}`, item.contactPerson].filter(Boolean).join(" · "),
+              href: `/clients/${item.id}`,
+            })),
+          },
+          {
+            type: "brokers",
+            label: "Brokers",
+            results: brokerResults.map(item => ({
+              id: item.id,
+              title: item.name,
+              subtitle: [item.mcNumber && `MC ${item.mcNumber}`, item.contactPerson].filter(Boolean).join(" · "),
+              href: `/brokers/${item.id}`,
+            })),
+          },
+          {
+            type: "invoices",
+            label: "Invoices",
+            results: invoiceResults.map(item => ({
+              id: item.id,
+              title: `Invoice ${item.invoiceNumber}`,
+              subtitle: [item.loadNumber && `Load ${item.loadNumber}`, `$${item.amount}`, item.status].filter(Boolean).join(" · "),
+              href: `/invoices/${item.id}`,
+            })),
+          },
+          {
+            type: "loads",
+            label: "Load Ledger",
+            results: loadResults.map(item => ({
+              id: item.id,
+              title: `Load ${item.loadNumber}`,
+              subtitle: [item.pickupLocation, item.deliveryLocation].filter(Boolean).join(" → "),
+              href: `/loads/${item.id}`,
+            })),
+          },
+          {
+            type: "fuelAdvances",
+            label: "Fuel Advances",
+            results: fuelAdvanceResults.map(item => ({
+              id: item.id,
+              title: item.carrierName,
+              subtitle: `$${item.advanceAmount}`,
+              href: `/fuel-advance/${item.id}`,
+            })),
+          },
+          {
+            type: "tickets",
+            label: "Tickets",
+            results: ticketResults.map(item => ({
+              id: item.id,
+              title: `${item.ticketNumber}: ${item.title}`,
+              subtitle: item.status,
+              href: `/tickets/${item.id}`,
+            })),
+          },
+          {
+            type: "tasks",
+            label: "Tasks",
+            results: taskResults.map(item => ({
+              id: item.id,
+              title: item.title,
+              subtitle: item.status,
+              href: `/tasks/${item.id}`,
+            })),
+          },
+          {
+            type: "dispatchers",
+            label: "Dispatchers",
+            results: dispatcherResults.map(item => {
+              const name = `${item.firstName} ${item.lastName}`.trim();
+              return {
+                id: item.id,
+                title: name,
+                subtitle: item.email || item.phone || "",
+                href: `/dispatchers?search=${encodeURIComponent(name)}`,
+              };
+            }),
+          },
+          {
+            type: "trucks",
+            label: "Trucks",
+            results: truckResults.map(item => ({
+              id: item.id,
+              title: `Truck ${item.truckNumber}`,
+              subtitle: [item.make, item.model, item.licensePlate, item.vin].filter(Boolean).join(" · "),
+              href: `/trucks?search=${encodeURIComponent(item.truckNumber)}`,
+            })),
+          },
+        ].filter(group => group.results.length > 0),
       });
     } catch (error) {
       console.error("Error performing global search:", error);
@@ -5672,21 +5968,65 @@ Trucking Pros Financial Team
       if (typeof req.query.paymentTerms === "string" && req.query.paymentTerms) {
         conditions.push(eq(brokers.paymentTerms, req.query.paymentTerms as any));
       }
+      if (typeof req.query.creditGrade === "string" && ["A", "B", "C", "D", "F"].includes(req.query.creditGrade)) {
+        conditions.push(eq(brokers.creditGrade, req.query.creditGrade as any));
+      }
       if (req.user.role === "employee" || req.query.processor === "me") {
         conditions.push(eq(brokers.assignedProcessor, req.user.id));
       }
       const where = conditions.length ? and(...conditions) : undefined;
+      const creditSort = req.query.creditSort === "asc" || req.query.creditSort === "desc"
+        ? req.query.creditSort
+        : null;
+      const orderBy = creditSort === "asc"
+        ? [asc(brokers.creditScore), asc(brokers.name)]
+        : creditSort === "desc"
+          ? [desc(brokers.creditScore), asc(brokers.name)]
+          : [asc(brokers.name)];
       if (req.query.all === "true") {
-        const rows = await db.select().from(brokers).where(where).orderBy(brokers.name);
+        const rows = await db.select().from(brokers).where(where).orderBy(...orderBy);
         return res.json(await enrichAssignments(rows));
       }
       const { page, limit, offset } = parseListPagination(req);
       const [{ total }] = await db.select({ total: count() }).from(brokers).where(where);
-      const data = await db.select().from(brokers).where(where).orderBy(brokers.name).limit(limit).offset(offset);
+      const data = await db.select().from(brokers).where(where).orderBy(...orderBy).limit(limit).offset(offset);
       res.json({ data: await enrichAssignments(data), total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
     } catch (error) {
       console.error("Error fetching brokers:", error);
       res.status(500).json({ message: "Failed to fetch brokers" });
+    }
+  });
+
+  app.get("/api/brokers/credit-alerts", requireAuth, async (req: any, res) => {
+    try {
+      const conditions = [inArray(brokers.creditGrade, ["D", "F"] as any[])];
+      if (req.user.role === "employee") conditions.push(eq(brokers.assignedProcessor, req.user.id));
+      const risky = await db.select({
+        id: brokers.id,
+        name: brokers.name,
+        creditGrade: brokers.creditGrade,
+        creditScore: brokers.creditScore,
+      }).from(brokers)
+        .where(and(...conditions))
+        .orderBy(asc(brokers.creditScore), brokers.name);
+      res.json({
+        fCount: risky.filter(broker => broker.creditGrade === "F").length,
+        dCount: risky.filter(broker => broker.creditGrade === "D").length,
+        worst: risky.slice(0, 5),
+      });
+    } catch (error) {
+      console.error("Error fetching broker credit alerts:", error);
+      res.status(500).json({ message: "Failed to fetch broker credit alerts" });
+    }
+  });
+
+  app.post("/api/brokers/calculate-all-credit", requireAdmin, async (_req, res) => {
+    try {
+      const results = await recalculateAllBrokerCredit();
+      res.json({ calculated: results.length, results });
+    } catch (error) {
+      console.error("Error recalculating all broker credit:", error);
+      res.status(500).json({ message: "Failed to recalculate broker credit" });
     }
   });
 
@@ -7345,8 +7685,32 @@ Trucking Pros Financial Team
     }
   });
 
-  // ── SendGrid delivery webhook (no auth) ────────────────────────────────────
-  app.post("/api/webhooks/sendgrid", async (req: any, res) => {
+  const verifySendGridWebhook = (req: any, res: any, next: any) => {
+    const verificationKey = process.env.SENDGRID_EVENT_WEBHOOK_PUBLIC_KEY;
+    if (!verificationKey) {
+      console.error("[sendgrid-webhook] SENDGRID_EVENT_WEBHOOK_PUBLIC_KEY is not configured");
+      return res.status(503).json({ message: "Webhook verification is not configured" });
+    }
+    const signature = req.get("X-Twilio-Email-Event-Webhook-Signature");
+    const timestamp = req.get("X-Twilio-Email-Event-Webhook-Timestamp");
+    if (!signature || !timestamp || !Buffer.isBuffer(req.rawBody)) {
+      return res.status(401).json({ message: "Invalid webhook signature" });
+    }
+    try {
+      const verifier = new EventWebhook();
+      const publicKey = verifier.convertPublicKeyToECDSA(verificationKey);
+      if (!verifier.verifySignature(publicKey, req.rawBody, signature, timestamp)) {
+        return res.status(401).json({ message: "Invalid webhook signature" });
+      }
+      return next();
+    } catch (error) {
+      console.warn("[sendgrid-webhook] Signature verification failed:", error instanceof Error ? error.message : "unknown error");
+      return res.status(401).json({ message: "Invalid webhook signature" });
+    }
+  };
+
+  // ── SendGrid delivery webhook — externally reachable with signed payloads ──
+  app.post("/api/webhooks/sendgrid", verifySendGridWebhook, async (req: any, res) => {
     try {
       const events: any[] = Array.isArray(req.body) ? req.body : [];
       let matched = 0;
@@ -9872,6 +10236,26 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   };
 
+  // Submission documents may be reached from a public portal URL, but the
+  // document itself must belong to the submission in the URL. Internal users
+  // use the normal audited portal_submissions permission gate instead.
+  const requirePortalDocumentAccess = async (req: any, res: any, next: any) => {
+    if ((req.session as any)?.portalUser) {
+      return requirePortalAuth(req, res, async () => {
+        const submissionId = Number(req.params.id);
+        const [submission] = await db.select({ id: carrierSubmissions.id })
+          .from(carrierSubmissions)
+          .where(and(
+            eq(carrierSubmissions.id, submissionId),
+            eq(carrierSubmissions.portalUserId, req.portalUser.id),
+          )).limit(1);
+        if (!submission) return res.status(404).json({ message: "Submission not found" });
+        next();
+      });
+    }
+    return requireAnyPermission(["portal_submissions"])(req, res, next);
+  };
+
   const userCanUseCarrierChat = async (user: any) => {
     if (!user || !["employee", "manager", "admin"].includes(user.role)) return false;
     if (user.role === "admin") return true;
@@ -9881,22 +10265,7 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       || (permissions as readonly string[]).includes("portal_submissions");
   };
 
-  const requireChatAgent = async (req: any, res: any, next: any) => {
-    const user = (req.session as any)?.user;
-    if (!user) return res.status(401).json({ message: "Authentication required" });
-    try {
-      if (!(await userCanUseCarrierChat(user))) {
-        return res.status(403).json({ message: "Chat or Portal Submissions permission required" });
-      }
-    } catch {
-      return res.status(500).json({ message: "Unable to verify chat permission" });
-    }
-    if (user.status === "suspended" || user.status === "inactive") {
-      return res.status(403).json({ message: "Internal agent access required" });
-    }
-    req.user = user;
-    next();
-  };
+  const requireChatAgent = requireAnyPermission(["chat", "portal_submissions"]);
 
   // ── Portal Auth ────────────────────────────────────────────────────────────
   app.post("/api/portal/register", async (req, res) => {
@@ -10165,13 +10534,6 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
   const serveChatAttachment = async (req: any, res: any, mode: "view" | "download") => {
     const messageId = Number(req.params.messageId);
     if (!Number.isInteger(messageId) || messageId <= 0) return res.status(400).json({ message: "Invalid message" });
-    const [row] = await db.select({
-      message: portalChatMessages,
-      chat: portalChats,
-    }).from(portalChatMessages).innerJoin(portalChats, eq(portalChats.id, portalChatMessages.chatId))
-      .where(eq(portalChatMessages.id, messageId)).limit(1);
-    if (!row?.message.attachmentS3Key) return res.status(404).json({ message: "Attachment not found" });
-
     const portalUserId = (req.session as any)?.portalUser?.id;
     const internalUser = (req.session as any)?.user;
     const [activePortalUser] = portalUserId
@@ -10184,11 +10546,27 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
         eq(users.id, internalUser.id), eq(users.status, "active"),
       )).limit(1)
       : [];
+    if (!activePortalUser && !activeAgent) return res.status(401).json({ message: "Authentication required" });
+    const isAgent = !!activeAgent && await userCanUseCarrierChat(internalUser);
+    if (activeAgent && !isAgent && !activePortalUser) {
+      await auditAuthorizationDenial(req, internalUser, "any:chat,portal_submissions");
+      return res.status(403).json({ message: DENIED_MESSAGE });
+    }
+
+    const [row] = await db.select({
+      message: portalChatMessages,
+      chat: portalChats,
+    }).from(portalChatMessages).innerJoin(portalChats, eq(portalChats.id, portalChatMessages.chatId))
+      .where(eq(portalChatMessages.id, messageId)).limit(1);
+    if (!row?.message.attachmentS3Key) return res.status(404).json({ message: "Attachment not found" });
+
     const isPortalOwner = !!activePortalUser
       && row.chat.portalUserId === activePortalUser.id
       && row.chat.carrierId === activePortalUser.carrierId;
-    const isAgent = !!activeAgent && await userCanUseCarrierChat(internalUser);
-    if (!isPortalOwner && !isAgent) return res.status(403).json({ message: "Chat access required" });
+    if (!isPortalOwner && !isAgent) {
+      if (activeAgent) await auditAuthorizationDenial(req, internalUser, "any:chat,portal_submissions");
+      return res.status(403).json({ message: DENIED_MESSAGE });
+    }
     const url = mode === "view"
       ? await getSignedViewUrl(row.message.attachmentS3Key)
       : await getSignedDownloadUrl(row.message.attachmentS3Key, row.message.attachmentName || "attachment");
@@ -10738,10 +11116,14 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   });
 
-  app.get("/api/portal/submissions/:id/documents/:docId/view", async (req: any, res) => {
+  app.get("/api/portal/submissions/:id/documents/:docId/view", requirePortalDocumentAccess, async (req: any, res) => {
     try {
       const docId = parseInt(req.params.docId, 10);
-      const [doc] = await db.select().from(carrierSubmissionDocs).where(eq(carrierSubmissionDocs.id, docId)).limit(1);
+      const submissionId = parseInt(req.params.id, 10);
+      const [doc] = await db.select().from(carrierSubmissionDocs).where(and(
+        eq(carrierSubmissionDocs.id, docId),
+        eq(carrierSubmissionDocs.submissionId, submissionId),
+      )).limit(1);
       if (!doc) return res.status(404).json({ message: "Document not found" });
       if (doc.s3Key) {
         const url = await getSignedViewUrl(doc.s3Key);
@@ -10758,10 +11140,14 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
     }
   });
 
-  app.get("/api/portal/submissions/:id/documents/:docId/download", async (req: any, res) => {
+  app.get("/api/portal/submissions/:id/documents/:docId/download", requirePortalDocumentAccess, async (req: any, res) => {
     try {
       const docId = parseInt(req.params.docId, 10);
-      const [doc] = await db.select().from(carrierSubmissionDocs).where(eq(carrierSubmissionDocs.id, docId)).limit(1);
+      const submissionId = parseInt(req.params.id, 10);
+      const [doc] = await db.select().from(carrierSubmissionDocs).where(and(
+        eq(carrierSubmissionDocs.id, docId),
+        eq(carrierSubmissionDocs.submissionId, submissionId),
+      )).limit(1);
       if (!doc) return res.status(404).json({ message: "Document not found" });
       if (doc.s3Key) {
         const url = await getSignedDownloadUrl(doc.s3Key, doc.originalName);
@@ -11116,6 +11502,50 @@ Always be helpful, concise, and specific to FactorFlux workflows. If an agent de
       res.json(portalUserOutput(updated));
     } catch (error) {
       res.status(500).json({ message: "Failed to update portal user" });
+    }
+  });
+
+  // Credit reports are scoped to the broker assignment for employees. History
+  // is read-only; only managers/admins may force a recalculation.
+  app.get("/api/brokers/:id/credit", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid broker id" });
+      if (!(await canAccessBroker(req, id))) return res.status(403).json({ message: "You may only access brokers assigned to you" });
+      const [broker] = await db.select().from(brokers).where(eq(brokers.id, id)).limit(1);
+      if (!broker) return res.status(404).json({ message: "Broker not found" });
+      const [latest] = await db.select().from(brokerCreditScores)
+        .where(eq(brokerCreditScores.brokerId, id)).orderBy(desc(brokerCreditScores.lastCalculatedAt)).limit(1);
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const historyNewestFirst = await db.select().from(brokerCreditScores)
+        .where(and(
+          eq(brokerCreditScores.brokerId, id),
+          gte(brokerCreditScores.lastCalculatedAt, twelveMonthsAgo),
+        ))
+        .orderBy(desc(brokerCreditScores.lastCalculatedAt))
+        .limit(50);
+      res.json({
+        broker: { id: broker.id, name: broker.name, creditGrade: broker.creditGrade, creditScore: broker.creditScore },
+        current: latest ?? null,
+        history: historyNewestFirst.reverse(),
+      });
+    } catch (error) {
+      console.error("Error fetching broker credit:", error);
+      res.status(500).json({ message: "Failed to fetch broker credit" });
+    }
+  });
+
+  app.post("/api/brokers/:id/calculate-credit", requireManagerOrAdmin, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid broker id" });
+      const result = await recalculateBrokerCredit(id);
+      res.status(201).json(result);
+    } catch (error: any) {
+      if (error?.message === "Broker not found") return res.status(404).json({ message: error.message });
+      console.error("Error recalculating broker credit:", error);
+      res.status(500).json({ message: "Failed to recalculate broker credit" });
     }
   });
 

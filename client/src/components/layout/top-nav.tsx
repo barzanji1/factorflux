@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import type { Client, Invoice, Load, Notification as AppNotification } from "@shared/schema";
+import type { Notification as AppNotification } from "@shared/schema";
 import {
   Bell,
   Plus,
@@ -53,12 +53,23 @@ function normalizeCarrierChatUrl(url?: string | null) {
 }
 
 interface SearchResults {
-  clients?: Client[];
-  invoices?: Invoice[];
-  loads?: Load[];
+  groups: SearchResultGroup[];
 }
 
-function useDebouncedValue<T>(value: T, delay = 250) {
+interface SearchResultItem {
+  id: number;
+  title: string;
+  subtitle?: string;
+  href: string;
+}
+
+interface SearchResultGroup {
+  type: string;
+  label: string;
+  results: SearchResultItem[];
+}
+
+function useDebouncedValue<T>(value: T, delay = 300) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedValue(value), delay);
@@ -92,10 +103,11 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
   const searchRef = useRef<HTMLDivElement>(null);
   const previousNotificationIdsRef = useRef<Set<number> | null>(null);
-  const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 250);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 300);
 
   const { data: notifications = [] } = useQuery<AppNotification[]>({
     queryKey: ["/api/notifications"],
@@ -165,7 +177,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
     },
   });
 
-  const searchEnabled = debouncedSearchQuery.length > 2;
+  const searchEnabled = debouncedSearchQuery.length >= 2;
   const { data: searchResults, isFetching: isSearching } = useQuery<SearchResults>({
     queryKey: ["/api/search", debouncedSearchQuery],
     enabled: searchEnabled,
@@ -175,11 +187,11 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
       return res.json();
     },
   });
-  const totalSearchResults = useMemo(() => (
-    (searchResults?.clients?.length ?? 0) +
-    (searchResults?.invoices?.length ?? 0) +
-    (searchResults?.loads?.length ?? 0)
-  ), [searchResults]);
+  const flattenedSearchResults = useMemo(
+    () => searchResults?.groups.flatMap(group => group.results) ?? [],
+    [searchResults],
+  );
+  const totalSearchResults = flattenedSearchResults.length;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -193,7 +205,14 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
 
   useEffect(() => {
     setShowSearchResults(searchEnabled && (!!searchResults || isSearching));
+    setActiveSearchIndex(-1);
   }, [searchEnabled, searchResults, isSearching]);
+
+  useEffect(() => {
+    setSearchQuery("");
+    setShowSearchResults(false);
+    setActiveSearchIndex(-1);
+  }, [location]);
 
   const handleNotificationClick = (n: AppNotification) => {
     if (!n.read) markAsReadMutation.mutate(n.id);
@@ -202,11 +221,31 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
     if (url) setLocation(url);
   };
 
-  const handleSearchItemClick = (type: "client" | "invoice" | "load") => {
+  const handleSearchItemClick = (item: SearchResultItem) => {
     setSearchQuery("");
     setShowSearchResults(false);
-    const routes = { client: "/clients", invoice: "/invoices", load: "/loads" };
-    setLocation(routes[type]);
+    setActiveSearchIndex(-1);
+    setLocation(item.href);
+  };
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setShowSearchResults(false);
+      setActiveSearchIndex(-1);
+      return;
+    }
+    if (!showSearchResults || flattenedSearchResults.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveSearchIndex(index => (index + 1) % flattenedSearchResults.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveSearchIndex(index => index <= 0 ? flattenedSearchResults.length - 1 : index - 1);
+    } else if (event.key === "Enter" && activeSearchIndex >= 0) {
+      event.preventDefault();
+      handleSearchItemClick(flattenedSearchResults[activeSearchIndex]);
+    }
   };
 
   const quickActions = [
@@ -274,62 +313,58 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                 type="text"
                 placeholder="Search carriers, load ledger, counterparties..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setActiveSearchIndex(-1);
+                  if (e.target.value.trim().length < 2) setShowSearchResults(false);
+                }}
                 onFocus={() => searchEnabled && setShowSearchResults(true)}
+                onKeyDown={handleSearchKeyDown}
+                role="combobox"
+                aria-expanded={showSearchResults}
+                aria-controls="global-search-results"
                 className="qc-topbar-search h-12 w-full pl-11 pr-4 text-sm"
               />
               {showSearchResults && (
-                 <div className="ff-top-nav-menu absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-sm border-2 border-[#808080] bg-white shadow-[2px_2px_0_#404040]">
+                 <div id="global-search-results" className="ff-top-nav-menu absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-sm border-2 border-[#808080] bg-white shadow-[2px_2px_0_#404040]">
                   <div className="custom-scrollbar max-h-96 overflow-y-auto p-2">
                     {isSearching ? (
                       <div className="px-4 py-8 text-center text-sm text-slate-500">Searching...</div>
                     ) : (
                       <>
-                        {searchResults?.clients && searchResults.clients.length > 0 && (
-                          <div className="mb-2">
-                            <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Clients</div>
-                            {searchResults.clients.slice(0, 3).map((client) => (
-                              <button key={`client-${client.id}`} type="button" onClick={() => handleSearchItemClick("client")}
-                                 className="flex w-full items-start gap-3 rounded-sm px-3 py-3 text-left hover:bg-[#dff5f6]">
-                                 <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-sm border border-[#c0c0c0] bg-[#dff5f6] text-[#098b9f]"><Users className="h-4 w-4" /></div>
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{client.name}</div>
-                                  <div className="truncate text-xs text-slate-500">{client.contactPerson}</div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {searchResults?.invoices && searchResults.invoices.length > 0 && (
-                          <div className="mb-2 border-t border-slate-100 pt-2 dark:border-slate-800">
-                            <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Invoices</div>
-                            {searchResults.invoices.slice(0, 3).map((invoice) => (
-                              <button key={`invoice-${invoice.id}`} type="button" onClick={() => handleSearchItemClick("invoice")}
-                                 className="flex w-full items-start gap-3 rounded-sm px-3 py-3 text-left hover:bg-[#dff5f6]">
-                                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"><FileText className="h-4 w-4" /></div>
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">Invoice #{invoice.invoiceNumber}</div>
-                                  <div className="truncate text-xs text-slate-500">${invoice.amount}</div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {searchResults?.loads && searchResults.loads.length > 0 && (
-                          <div className="border-t border-slate-100 pt-2 dark:border-slate-800">
-                            <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Loads</div>
-                            {searchResults.loads.slice(0, 3).map((load) => (
-                              <button key={`load-${load.id}`} type="button" onClick={() => handleSearchItemClick("load")}
-                                 className="flex w-full items-start gap-3 rounded-sm px-3 py-3 text-left hover:bg-[#dff5f6]">
-                                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"><FolderOpen className="h-4 w-4" /></div>
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">Load #{load.id}</div>
-                                  <div className="truncate text-xs text-slate-500">{(load as any).pickupLocation} → {(load as any).deliveryLocation}</div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        {searchResults?.groups.map((group, groupIndex) => {
+                          const priorCount = searchResults.groups
+                            .slice(0, groupIndex)
+                            .reduce((count, priorGroup) => count + priorGroup.results.length, 0);
+                          return (
+                            <div key={group.type} className={cn(groupIndex > 0 && "border-t border-slate-100 pt-2")}>
+                              <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{group.label}</div>
+                              {group.results.map((item, itemIndex) => {
+                                const resultIndex = priorCount + itemIndex;
+                                return (
+                                  <button
+                                    key={`${group.type}-${item.id}`}
+                                    type="button"
+                                    onMouseEnter={() => setActiveSearchIndex(resultIndex)}
+                                    onClick={() => handleSearchItemClick(item)}
+                                    className={cn(
+                                      "flex w-full items-start gap-3 rounded-sm px-3 py-3 text-left hover:bg-[#dff5f6]",
+                                      activeSearchIndex === resultIndex && "bg-[#dff5f6]",
+                                    )}
+                                  >
+                                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#c0c0c0] bg-[#dff5f6] text-[#098b9f]">
+                                      <Search className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="truncate text-sm font-semibold text-slate-900">{item.title}</div>
+                                      {item.subtitle && <div className="truncate text-xs text-slate-500">{item.subtitle}</div>}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
                         {searchEnabled && totalSearchResults === 0 && (
                           <div className="px-4 py-8 text-center text-sm text-slate-500">No results for "{debouncedSearchQuery}"</div>
                         )}

@@ -113,7 +113,7 @@ const navSections: NavSection[] = [
   {
     title: "Recovery",
     items: [
-      { name: "Followups", href: "/collections", icon: RotateCcw, permission: "followups" },
+      { name: "Followups", href: "/follow-up", icon: RotateCcw, permission: "followups" },
       { name: "Reports",   href: "/reports",     icon: BarChart3, permission: "reports"   },
     ],
   },
@@ -163,7 +163,7 @@ function isRouteActive(current: string, href: string) {
 
 export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const { permissions, user: authUser, isLoading: authLoading } = useAuth();
+  const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading } = useAuth();
   const userRole = authUser?.role ?? "employee";
   const isAdmin = userRole === "admin";
   const canUsePortalSubmissions = !!authUser && (isAdmin || (!authLoading && permissions.includes("portal_submissions")));
@@ -226,12 +226,12 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           // Role gate for manager-only items
           if (i.role === "manager" && userRole !== "manager" && userRole !== "admin") return false;
           // Permission gate
-          if (i.permission && permissions.length > 0 && !permissions.includes(i.permission)) return false;
+           if (i.permission && (!permissionsLoaded || !permissions.includes(i.permission))) return false;
           return true;
         }),
       }))
       .filter(s => s.items.length > 0),
-    [userRole, isAdmin, permissions, canUsePortalSubmissions, canUseCarrierChat]
+     [userRole, isAdmin, permissions, permissionsLoaded, canUsePortalSubmissions, canUseCarrierChat]
   );
 
   useLayoutEffect(() => {

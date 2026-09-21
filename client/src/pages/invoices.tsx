@@ -15,7 +15,6 @@ import {
   Search,
   Eye,
   Download,
-  Edit,
   FileText,
   ArrowRight,
   ReceiptText,
@@ -403,9 +402,6 @@ export default function Invoices() {
                                 </a>
 
                                 {!isManager && ["draft", "rejected"].includes(String(invoice.status)) && (
-                                  <ActionIconButton title="Edit Invoice" onClick={() => handleEditInvoice(invoice)} icon={<Edit className="h-4 w-4" />} />
-                                )}
-                                {!isManager && ["draft", "rejected"].includes(String(invoice.status)) && (
                                   <Button
                                     size="sm"
                                     onClick={() => submitMutation.mutate(invoice.id)}
@@ -415,7 +411,6 @@ export default function Invoices() {
                                     Submit for Funding
                                   </Button>
                                 )}
-                                {isManager && <ActionIconButton title="Edit Invoice" onClick={() => handleEditInvoice(invoice)} icon={<Edit className="h-4 w-4" />} />}
                               </div>
                             </td>
                           </tr>

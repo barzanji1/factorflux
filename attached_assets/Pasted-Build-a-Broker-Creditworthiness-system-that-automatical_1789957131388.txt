@@ -1,0 +1,97 @@
+Build a Broker Creditworthiness system that automatically calculates and grades each broker based on payment behavior.
+
+Database
+
+ Create broker_credit_scores table: id, brokerId, grade (A/B/C/D/F), score (0-100), avgDaysToPayment, totalInvoices, totalPaid, totalOutstanding, totalChargebacks, totalShortPays, totalDisputes, lastCalculatedAt, createdAt
+ Add creditGrade (text) and creditScore (integer) columns to brokers table for quick access
+ Run db:push
+
+Credit Score Calculation Engine
+
+ Create server/services/brokerCreditEngine.ts
+ Calculate score (0-100) based on these weighted factors:
+Payment Speed (40 points):
+- Pays in 0-30 days: 40pts
+- Pays in 31-45 days: 30pts
+- Pays in 46-60 days: 20pts
+- Pays in 61-90 days: 10pts
+- Pays in 90+ days: 0pts
+
+Payment Reliability (30 points):
+- 0% late invoices: 30pts
+- 1-10% late: 20pts
+- 11-25% late: 10pts
+- 26-50% late: 5pts
+- 50%+ late: 0pts
+
+Chargeback Rate (20 points):
+- 0 chargebacks: 20pts
+- 1-2 chargebacks: 15pts
+- 3-5 chargebacks: 8pts
+- 6+ chargebacks: 0pts
+
+Short Pay / Disputes (10 points):
+- 0 short pays: 10pts
+- 1-2 short pays: 7pts
+- 3-5 short pays: 3pts
+- 6+ short pays: 0pts
+
+Grade thresholds:
+
+A: 85-100 (Excellent — pay fast, no issues)
+B: 70-84 (Good — minor delays)
+C: 50-69 (Fair — occasional late pays)
+D: 30-49 (Poor — frequent delays or chargebacks)
+F: 0-29 (Critical — do not factor)
+
+Backend
+
+ POST /api/brokers/:id/calculate-credit — calculates and saves credit score for one broker
+ POST /api/brokers/calculate-all-credit — batch calculate all brokers, requires admin
+ GET /api/brokers/:id/credit — returns full credit report for a broker
+ Run credit calculation automatically when:
+Invoice is marked paid/collected
+Chargeback is applied to a broker
+Short pay is recorded
+ Schedule daily recalculation of all broker scores at midnight
+
+Frontend — Broker Profile Credit Panel
+
+ Add Credit Score section to broker profile right panel
+ Large grade badge: A/B/C/D/F with color coding:
+A: green
+B: teal
+C: yellow
+D: orange
+F: red
+ Score gauge: circular progress showing 0-100
+ Breakdown bars:
+Payment Speed score / 40
+Payment Reliability score / 30
+Chargeback Rate score / 20
+Short Pay score / 10
+ Key stats: Avg Days to Pay, Total Invoices, Total Chargebacks, Short Pays
+ Last calculated timestamp
+ Recalculate button — triggers fresh calculation
+ Credit history chart — grade over time (last 12 months)
+
+Frontend — Brokers List Page
+
+ Add Grade column to brokers table showing A/B/C/D/F badge
+ Add Score column showing 0-100
+ Filter brokers by grade: All / A / B / C / D / F
+ Sort by score ascending/descending
+ Color code rows: A=green tint, F=red tint
+
+Frontend — Invoice Creation
+
+ When broker is selected in invoice creation form — show their credit grade badge next to broker name
+ If broker is grade D or F — show warning: "⚠ This broker has a poor credit rating. Proceed with caution."
+ If broker is grade F — show red alert: "🚫 This broker is flagged as high risk."
+
+Frontend — Dashboard
+
+ Add Broker Credit Alerts widget showing:
+Count of F-grade brokers
+Count of D-grade brokers
+Top 5 worst-performing brokers with grades

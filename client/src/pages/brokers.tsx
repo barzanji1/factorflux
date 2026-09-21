@@ -33,6 +33,8 @@ import {
   Calendar,
   ExternalLink,
   Search,
+  ArrowUpDown,
+  ShieldAlert,
 } from "lucide-react";
 
 // Broker form schema
@@ -83,6 +85,8 @@ interface Broker {
     profileImageUrl?: string;
     role?: string;
   } | null;
+  creditGrade?: "A" | "B" | "C" | "D" | "F" | null;
+  creditScore?: number | null;
 }
 
 interface BrokersResponse {
@@ -111,6 +115,8 @@ export default function Brokers() {
   const { user } = useAuth();
   const isManager = user?.role === "admin" || user?.role === "manager";
   const [processorFilter, setProcessorFilter] = useState<"all" | "me">("me");
+  const [creditGradeFilter, setCreditGradeFilter] = useState<"all" | "A" | "B" | "C" | "D" | "F">("all");
+  const [creditSort, setCreditSort] = useState<"none" | "asc" | "desc">("none");
 
   // Saved views
   const { allViews: savedViews } = useSavedViews("brokers");
@@ -144,7 +150,7 @@ export default function Brokers() {
       ? statusFilter.slice("quickpay_".length)
       : undefined;
   const { data: brokersResponse, isLoading } = useQuery<BrokersResponse>({
-    queryKey: ["/api/brokers", page, debouncedSearch, statusQuery, paymentTermsQuery, processorFilter],
+    queryKey: ["/api/brokers", page, debouncedSearch, statusQuery, paymentTermsQuery, processorFilter, creditGradeFilter, creditSort],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
@@ -154,6 +160,8 @@ export default function Brokers() {
       if (statusQuery) params.set("status", statusQuery);
       if (paymentTermsQuery) params.set("paymentTerms", paymentTermsQuery);
       if (processorFilter === "me") params.set("processor", "me");
+      if (creditGradeFilter !== "all") params.set("creditGrade", creditGradeFilter);
+      if (creditSort !== "none") params.set("creditSort", creditSort);
       const response = await fetch(`/api/brokers?${params.toString()}`, {
         credentials: "include",
       });
@@ -162,6 +170,7 @@ export default function Brokers() {
     },
   });
   const brokers = brokersResponse?.data ?? [];
+  const visibleBrokers = brokers;
   const totalBrokers = brokersResponse?.total ?? 0;
   const totalPages = brokersResponse?.totalPages ?? 1;
 
@@ -365,7 +374,7 @@ export default function Brokers() {
               {isManager && <button type="button" onClick={() => { setProcessorFilter("all"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "all" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-500"}`}>All Brokers</button>}
               <button type="button" onClick={() => { setProcessorFilter("me"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "me" ? "bg-blue-600 text-white" : "text-slate-500"}`}>My Brokers</button>
             </div>
-            <div className="flex gap-1.5">
+             <div className="flex gap-1.5">
               {(["all","active","suspended","inactive"] as const).map(s => (
                 <button
                   key={s}
@@ -381,6 +390,18 @@ export default function Brokers() {
                 </button>
               ))}
             </div>
+             <Select value={creditGradeFilter} onValueChange={value => { setCreditGradeFilter(value as typeof creditGradeFilter); setPage(1); }}>
+               <SelectTrigger className="h-8 w-[108px] rounded-full text-[11px]"><SelectValue placeholder="Credit grade" /></SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="all">All grades</SelectItem>
+                 {["A", "B", "C", "D", "F"].map(grade => <SelectItem key={grade} value={grade}>Grade {grade}</SelectItem>)}
+               </SelectContent>
+             </Select>
+             <button type="button" onClick={() => { setCreditSort(value => value === "none" ? "desc" : value === "desc" ? "asc" : "none"); setPage(1); }}
+               className="flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+               title={creditSort === "none" ? "Sort by credit score" : `Credit score ${creditSort === "asc" ? "ascending" : "descending"}`}>
+               <ArrowUpDown className="h-3 w-3" /> Score{creditSort !== "none" ? ` ${creditSort === "asc" ? "↑" : "↓"}` : ""}
+             </button>
             <button
               type="button"
               onClick={openCreateDialog}
@@ -451,7 +472,9 @@ export default function Brokers() {
                     <th>MC#</th>
                     <th>DOT#</th>
                     <th>DBA</th>
-                    <th>Status</th>
+                     <th>Status</th>
+                     <th>Credit Grade</th>
+                     <th>Score</th>
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Assigned To</th>
@@ -459,10 +482,10 @@ export default function Brokers() {
                   </tr>
                 </thead>
                 <tbody>
-                   {brokers.map((broker) => (
+                    {visibleBrokers.map((broker) => (
                     <tr
                       key={broker.id}
-                      className={broker.status === "suspended" ? "ff-row-urgent" : broker.status === "inactive" ? "ff-row-stale" : ""}
+                       className={`${broker.status === "suspended" ? "ff-row-urgent" : broker.status === "inactive" ? "ff-row-stale" : ""} ${broker.creditGrade === "A" ? "bg-emerald-50/60" : broker.creditGrade === "F" ? "bg-red-50/70" : ""}`}
                     >
                       <td>
                         <div className="flex items-center gap-2">
@@ -480,6 +503,17 @@ export default function Brokers() {
                           {broker.status.charAt(0).toUpperCase() + broker.status.slice(1)}
                         </span>
                       </td>
+                       <td>
+                         <span className={`inline-flex min-w-7 items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${
+                           broker.creditGrade === "A" ? "border-emerald-200 bg-emerald-100 text-emerald-700" :
+                           broker.creditGrade === "B" ? "border-teal-200 bg-teal-100 text-teal-700" :
+                           broker.creditGrade === "C" ? "border-yellow-200 bg-yellow-100 text-yellow-700" :
+                           broker.creditGrade === "D" ? "border-orange-200 bg-orange-100 text-orange-700" :
+                           broker.creditGrade === "F" ? "border-red-200 bg-red-100 text-red-700" :
+                           "border-slate-200 bg-slate-100 text-slate-500"
+                         }`}>{broker.creditGrade ?? "—"}</span>
+                       </td>
+                       <td className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{broker.creditScore ?? "—"}</td>
                       <td className="text-slate-600 dark:text-slate-400">{broker.email || "—"}</td>
                       <td className="text-slate-600 dark:text-slate-400">{broker.phone || "—"}</td>
                       <td><ProcessorIdentity person={broker.assignedProcessorUser} compact /></td>

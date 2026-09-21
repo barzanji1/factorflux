@@ -18,6 +18,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   permissions: string[];
+  permissionsLoaded: boolean;
+  permissionsLoading: boolean;
   hasPermission: (key: string) => boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -42,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
 
   const hasPermission = (key: string): boolean => {
     if (user?.role === "admin") return true;
@@ -50,6 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
+      setPermissionsLoaded(false);
+      setPermissionsLoading(true);
       console.log("Checking authentication...");
       const authFlag = localStorage.getItem("isAuthenticated");
       const userData = localStorage.getItem("user");
@@ -62,45 +68,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(true);
         console.log("Setting authenticated state from localStorage");
 
-        setTimeout(async () => {
-          try {
-            const response = await fetch("/api/auth/verify", { credentials: "include" });
-            if (!response.ok) {
-              console.log("Server verification failed, clearing auth state");
-              localStorage.removeItem("isAuthenticated");
-              localStorage.removeItem("user");
-              setUser(null);
-              setIsAuthenticated(false);
-              setPermissions([]);
-            } else {
-              console.log("Server verification successful");
-              // Update user state from server — picks up profileImageUrl and any other fresh fields
-              const verifyData = await response.json();
-              if (verifyData.user) {
-                setUser(verifyData.user);
-                localStorage.setItem("user", JSON.stringify(verifyData.user));
-              }
-              const perms = await fetchPermissions();
-              setPermissions(perms);
-            }
-          } catch (error) {
-            console.log("Network error during verification:", error);
+        const response = await fetch("/api/auth/verify", { credentials: "include" });
+        if (!response.ok) {
+          console.log("Server verification failed, clearing auth state");
+          localStorage.removeItem("isAuthenticated");
+          localStorage.removeItem("user");
+          setUser(null);
+          setIsAuthenticated(false);
+          setPermissions([]);
+        } else {
+          console.log("Server verification successful");
+          const verifyData = await response.json();
+          if (verifyData.user) {
+            setUser(verifyData.user);
+            localStorage.setItem("user", JSON.stringify(verifyData.user));
           }
-        }, 100);
+          const perms = await fetchPermissions();
+          setPermissions(perms);
+          setPermissionsLoaded(true);
+        }
       } else {
         console.log("No valid auth data in localStorage");
         setUser(null);
         setIsAuthenticated(false);
         setPermissions([]);
+        setPermissionsLoaded(true);
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       setUser(null);
       setIsAuthenticated(false);
       setPermissions([]);
+      setPermissionsLoaded(true);
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("user");
     } finally {
+      setPermissionsLoading(false);
       setIsLoading(false);
     }
   };
@@ -125,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const perms = await fetchPermissions();
         setPermissions(perms);
+        setPermissionsLoaded(true);
 
         return true;
       }
@@ -165,6 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated,
         permissions,
+        permissionsLoaded,
+        permissionsLoading,
         hasPermission,
         login,
         logout,

@@ -10,6 +10,7 @@
 - [Fuel advance compatibility](fuel-advance-compatibility.md) — preserve legacy fuel-advance reads/API fields while normalized workflow fields are adopted.
 - [External Neon verification](external-neon-verification.md) — database callbacks may target a different managed DB; verify app data through the configured Neon connection.
 - [Permission override semantics](permission-override-semantics.md) — one explicit permission row replaces all role defaults; never seed a single module permission for default-only users.
+- [API authorization coverage](api-authorization-coverage.md) — inventory every concrete API prefix; alternate aliases and signed provider callbacks must not fall through generic auth.
 - [Direct-message identity](direct-message-identity.md) — canonical DM keys must encode participant IDs unambiguously; delimiter joins can collide and expose private threads.
 - [Controlled Radix sliders](controlled-radix-sliders.md) — controlled sliders need local draft state during drag; committing against unchanged query data can make them nonfunctional.
 - [Invoice paperwork integrity](invoice-paperwork-integrity.md) — commit invoice rows atomically and durably retry failed S3 compensation; never leave partial paperwork.
@@ -17,3 +18,4 @@
 - [Publish-safe trigram indexes](publish-safe-trigram-indexes.md) — publish diff can corrupt deeply nested GIN expression indexes reconstructed from PostgreSQL catalogs.
 - [Chat notification cursors](chat-notification-cursors.md) — sound alerts require paginated message IDs plus a pre-list server watermark; unread deltas and client time lose or replay events.
 - [Approved tactile navigation](approved-tactile-navigation.md) — preserve the strongly beveled stacked sidebar-button direction, while keeping labels crisp and high-contrast.
+- [Broker credit recomputation](broker-credit-recomputation.md) — portfolio runs need bounded concurrency, while each broker must be serialized across processes to prevent stale scores.

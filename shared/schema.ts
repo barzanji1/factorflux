@@ -11,6 +11,7 @@ import {
   integer,
   primaryKey,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -404,7 +405,7 @@ export const eventLedger = pgTable("event_ledger", {
 
 // Activity log table
 export const activities = pgTable("activities", {
-  id: integer("id").primaryKey(),
+  id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   type: varchar("type").notNull(),
   description: text("description").notNull(),
@@ -715,6 +716,8 @@ export const brokers = pgTable("brokers", {
   dotNumber: varchar("dot_number"),
   creditLimit: integer("credit_limit").default(0),
   currentAr: decimal("current_ar", { precision: 12, scale: 2 }).default("0"),
+  creditGrade: varchar("credit_grade", { enum: ["A", "B", "C", "D", "F"] }),
+  creditScore: integer("credit_score"),
   website: text("website"),
   fmcsaUrl: text("fmcsa_url"),
   source: varchar("source"),
@@ -734,7 +737,7 @@ export const brokers = pgTable("brokers", {
 // snapshot in branchName.
 export const brokerBranches = pgTable("broker_branches", {
   id: serial("id").primaryKey(),
-  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "cascade" }).notNull(),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "restrict" }).notNull(),
   branchName: varchar("branch_name").notNull(),
   address: varchar("address"),
   city: varchar("city"),
@@ -1069,7 +1072,9 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
 export const insertBrokerSchema = createInsertSchema(brokers).omit({
   id: true,
   createdAt: true,
-  updatedAt: true
+  updatedAt: true,
+  creditGrade: true,
+  creditScore: true,
 });
 
 export const insertFuelAdvanceSchema = createInsertSchema(fuelAdvances).omit({
@@ -1357,6 +1362,38 @@ export const exceptions = pgTable("exceptions", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Immutable broker credit calculations.  The broker snapshot is intentionally
+// kept on each row so reports remain reproducible after the broker changes.
+export const brokerCreditScores = pgTable("broker_credit_scores", {
+  id: serial("id").primaryKey(),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "restrict" }).notNull(),
+  grade: varchar("grade", { enum: ["A", "B", "C", "D", "F"] }).notNull(),
+  score: integer("score").notNull(),
+  paymentSpeedScore: integer("payment_speed_score").notNull(),
+  paymentReliabilityScore: integer("payment_reliability_score").notNull(),
+  chargebackScore: integer("chargeback_score").notNull(),
+  shortPayScore: integer("short_pay_score").notNull(),
+  avgDaysToPayment: integer("avg_days_to_payment"),
+  totalInvoices: integer("total_invoices").notNull().default(0),
+  totalPaid: decimal("total_paid", { precision: 14, scale: 2 }).notNull().default("0"),
+  totalOutstanding: decimal("total_outstanding", { precision: 14, scale: 2 }).notNull().default("0"),
+  totalChargebacks: integer("total_chargebacks").notNull().default(0),
+  totalShortPays: integer("total_short_pays").notNull().default(0),
+  totalDisputes: integer("total_disputes").notNull().default(0),
+  lateInvoiceCount: integer("late_invoice_count").notNull().default(0),
+  paidInvoiceCount: integer("paid_invoice_count").notNull().default(0),
+  lastCalculatedAt: timestamp("last_calculated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("broker_credit_scores_broker_idx").on(table.brokerId, table.lastCalculatedAt),
+  check("broker_credit_scores_grade_check", sql`${table.grade} in ('A', 'B', 'C', 'D', 'F')`),
+  check("broker_credit_scores_score_check", sql`${table.score} between 0 and 100`),
+  check("broker_credit_scores_payment_speed_check", sql`${table.paymentSpeedScore} between 0 and 40`),
+  check("broker_credit_scores_payment_reliability_check", sql`${table.paymentReliabilityScore} between 0 and 30`),
+  check("broker_credit_scores_chargeback_check", sql`${table.chargebackScore} between 0 and 20`),
+  check("broker_credit_scores_short_pay_check", sql`${table.shortPayScore} between 0 and 10`),
+]);
 
 export const insertExceptionSchema = createInsertSchema(exceptions).omit({
   id: true, createdAt: true, updatedAt: true, resolvedAt: true,
@@ -2128,7 +2165,7 @@ export const ALL_PERMISSIONS = [
   "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
   "factoring","payments","lockbox","fuel_advance","bank_transfers",
   "dispatchers","trucks","release_letters",
-  "brokers","cb_reviews","mc_check","held","logs",
+  "brokers","cb_reviews","mc_check","held","logs","calendar","bulk_sms",
   "followups","reports",
   "payroll","expenses","vault","help","settings","rules","workflow_builder","admin",
   "earl","chat","tickets",
@@ -2141,7 +2178,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, PermissionKey[]> = {
     "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
     "factoring","payments","lockbox","fuel_advance","bank_transfers",
     "dispatchers","trucks","release_letters",
-    "brokers","cb_reviews","mc_check","held","logs",
+    "brokers","cb_reviews","mc_check","held","logs","calendar","bulk_sms",
     "followups","reports",
     "payroll","expenses","vault","help","settings","rules","workflow_builder",
     "chat","tickets",
