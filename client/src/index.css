@@ -1353,6 +1353,23 @@ div:has(> table.ff-data-table) {
   border-bottom-left-radius: 10px !important;
 }
 
+.ff-audit-detail {
+  border: 2px solid;
+  border-color: #fff #808080 #808080 #fff;
+  border-radius: 12px !important;
+  background: #fff;
+  box-shadow: 2px 2px 0 rgba(128,128,128,.55);
+}
+
+.ff-audit-detail table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ff-audit-detail tr:nth-child(even) td {
+  background: #f8f8f5;
+}
+
 .ff-followups-surface,
 .ff-followups-page .ff-card,
 .ff-app-shell .ff-followups-page .ff-followups-surface,

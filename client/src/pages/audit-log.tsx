@@ -122,6 +122,115 @@ function formatEventType(et: string) {
   return et.replace(/\./g, " → ").replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 }
 
+type DetailRow = { label: string; value: unknown };
+
+function firstDetailValue(metadata: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return null;
+}
+
+function formatDetailValue(value: unknown, label = ""): string {
+  if (value === undefined || value === null || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number" && /amount/i.test(label)) {
+    return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  }
+  if (Array.isArray(value)) return value.map(item => formatDetailValue(item)).join(", ");
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, nested]) => `${formatEventType(key)}: ${formatDetailValue(nested)}`)
+      .join(" · ");
+  }
+  return String(value).replace(/_/g, " ");
+}
+
+function detailPresentation(entry: UnifiedEntry): { title: string; rows: DetailRow[] } {
+  const metadata = entry.metadata ?? {};
+  const invoiceNumber = firstDetailValue(metadata, "invoiceNumber", "invoiceNo", "invoiceId") ?? entry.entityId;
+
+  if (entry.entityType === "document") {
+    return {
+      title: "Document Upload Details",
+      rows: [
+        { label: "Invoice #", value: invoiceNumber },
+        { label: "Document Type", value: firstDetailValue(metadata, "documentType", "type") },
+        { label: "File Name", value: firstDetailValue(metadata, "originalName", "fileName", "filename") },
+      ],
+    };
+  }
+
+  if (entry.kind === "status" || entry.entityType === "invoice") {
+    return {
+      title: entry.kind === "status" || /status|stage/i.test(entry.actionType) ? "Status Change Details" : "Invoice Activity Details",
+      rows: [
+        { label: "Invoice #", value: invoiceNumber },
+        { label: "Previous Status", value: firstDetailValue(metadata, "previousStatus", "oldStatus", "from") },
+        { label: "New Status", value: firstDetailValue(metadata, "newStatus", "status", "to") },
+        { label: "Changed By", value: firstDetailValue(metadata, "changedByName", "changedBy") ?? entry.actorName },
+      ],
+    };
+  }
+
+  if (entry.entityType === "carrier" || entry.entityType === "client") {
+    return {
+      title: "Carrier Change Details",
+      rows: [
+        { label: "Carrier Name", value: firstDetailValue(metadata, "carrierName", "clientName", "name") },
+        { label: "Field Changed", value: firstDetailValue(metadata, "fieldChanged", "field", "fieldName") },
+        { label: "Old Value", value: firstDetailValue(metadata, "oldValue", "previousValue", "from") },
+        { label: "New Value", value: firstDetailValue(metadata, "newValue", "currentValue", "to") },
+      ],
+    };
+  }
+
+  if (entry.entityType === "broker" || entry.entityType === "debtor") {
+    return {
+      title: "Broker Change Details",
+      rows: [
+        { label: "Broker Name", value: firstDetailValue(metadata, "brokerName", "debtorName", "name") },
+        { label: "Field Changed", value: firstDetailValue(metadata, "fieldChanged", "field", "fieldName") },
+        { label: "Old Value", value: firstDetailValue(metadata, "oldValue", "previousValue", "from") },
+        { label: "New Value", value: firstDetailValue(metadata, "newValue", "currentValue", "to") },
+      ],
+    };
+  }
+
+  if (entry.entityType === "user") {
+    return {
+      title: "User Activity Details",
+      rows: [
+        { label: "Agent Name", value: firstDetailValue(metadata, "agentName", "userName", "name") ?? entry.actorName },
+        { label: "Action", value: formatEventType(entry.actionType) },
+        { label: "Affected Account", value: firstDetailValue(metadata, "affectedAccount", "accountName", "targetUserName", "targetEmail") },
+      ],
+    };
+  }
+
+  if (entry.entityType === "payment" || entry.entityType === "payout") {
+    return {
+      title: "Payment Details",
+      rows: [
+        { label: "Invoice #", value: invoiceNumber },
+        { label: "Amount", value: firstDetailValue(metadata, "amount", "paymentAmount", "appliedAmount") },
+        { label: "Payment Method", value: firstDetailValue(metadata, "paymentMethod", "method") },
+        { label: "Reference #", value: firstDetailValue(metadata, "referenceNumber", "reference", "transactionId") },
+      ],
+    };
+  }
+
+  const rows = Object.entries(metadata).map(([key, value]) => ({
+    label: formatEventType(key),
+    value,
+  }));
+  return {
+    title: `${formatEventType(entry.actionType)} Details`,
+    rows: rows.length ? rows : [{ label: "Details", value: entry.detail }],
+  };
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
@@ -358,6 +467,7 @@ export default function AuditLog() {
                       {filtered.map(e => {
                         const Icon = e.icon;
                         const isExpanded = expandedId === e.id;
+                        const detailView = detailPresentation(e);
                         return (
                           <>
                             <tr key={e.id}>
@@ -370,9 +480,24 @@ export default function AuditLog() {
                             </tr>
                             {isExpanded && (
                               <tr key={`${e.id}-detail`}><td colSpan={6} className="!bg-[#f0f0f0]">
-                                <div className="ff-card ff-audit-surface p-4">
-                                  <p className="mb-2 text-xs font-bold uppercase tracking-wide">Log Entry Details</p>
-                                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs">{JSON.stringify(e.metadata ?? { detail: e.detail }, null, 2)}</pre>
+                                 <div className="ff-card ff-audit-surface ff-audit-detail p-4">
+                                   <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">{detailView.title}</p>
+                                   <div className="overflow-hidden rounded-xl border-2 border-[#808080] bg-white">
+                                     <table className="w-full text-xs">
+                                       <tbody>
+                                         {detailView.rows.map(row => (
+                                           <tr key={row.label} className="border-b border-slate-200 last:border-b-0">
+                                             <th className="w-1/3 bg-[#d4d0c8] px-3 py-2 text-left font-semibold text-slate-600">
+                                               {row.label}
+                                             </th>
+                                             <td className="break-words px-3 py-2 text-slate-900">
+                                               {formatDetailValue(row.value, row.label)}
+                                             </td>
+                                           </tr>
+                                         ))}
+                                       </tbody>
+                                     </table>
+                                   </div>
                                 </div>
                               </td></tr>
                             )}
