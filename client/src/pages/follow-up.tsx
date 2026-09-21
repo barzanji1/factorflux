@@ -946,7 +946,7 @@ export default function FollowUpPage() {
   });
 
   return (
-    <div className="ff-followups-page flex h-screen bg-[#d4d0c8]">
+    <div className="min-h-screen bg-[#d4d0c8] p-6">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav title="Follow Ups" subtitle="Manage client follow-ups, pending tasks, and broker automations" />
@@ -1055,7 +1055,7 @@ export default function FollowUpPage() {
                 { label: "Unacknowledged Automations", value: pendingBfuCount },
                 { label: "Email Templates", value: templates.length },
               ].map(stat => (
-                <Card key={stat.label} className="ff-dashboard-card rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                <Card key={stat.label} className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
                   <CardContent className="p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
                     <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
@@ -1095,7 +1095,7 @@ export default function FollowUpPage() {
               </TabsList>
 
               {/* ── Manual follow-ups ─────────────────────────────────────────── */}
-              <TabsContent value="manual" className="space-y-4">
+              <TabsContent value="manual" className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
                 <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
@@ -1199,7 +1199,7 @@ export default function FollowUpPage() {
               </TabsContent>
 
               {/* ── Broker automations ────────────────────────────────────────── */}
-              <TabsContent value="broker" className="space-y-4">
+              <TabsContent value="broker" className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
                 <div className="flex items-start gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <Zap className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
                   <p className="text-[12.5px] text-orange-800 dark:text-orange-300">
@@ -1406,7 +1406,7 @@ export default function FollowUpPage() {
               </TabsContent>
 
               {/* ── Templates tab ─────────────────────────────────────────── */}
-              <TabsContent value="templates" className="space-y-4">
+              <TabsContent value="templates" className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
                 {/* Header row */}
                 <div className="flex items-center justify-between">
                   <div>
