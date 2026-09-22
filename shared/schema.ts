@@ -187,6 +187,7 @@ export const invoices = pgTable("invoices", {
   bolNumber: varchar("bol_number"),
   instructionsSubject: varchar("instructions_subject"),
   instructionsDetails: text("instructions_details"),
+  paymentReference: varchar("payment_reference"),
   status: varchar("status", {
     enum: [
       "draft",
@@ -1183,7 +1184,7 @@ export const payouts = pgTable("payouts", {
   feeAmount: decimal("fee_amount", { precision: 12, scale: 2 }).notNull(),
   reserveAmount: decimal("reserve_amount", { precision: 12, scale: 2 }).notNull(),
   netPayout: decimal("net_payout", { precision: 12, scale: 2 }).notNull(),
-  paymentMethod: varchar("payment_method", { enum: ["ach", "wire"] }).default("ach").notNull(),
+  paymentMethod: varchar("payment_method", { enum: ["ach", "wire", "check"] }).default("ach").notNull(),
   bankAccountVaultId: integer("bank_account_vault_id").references(() => clientVault.id),
   paymentStatus: varchar("payment_status", {
     enum: ["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"],
@@ -1201,10 +1202,45 @@ export const insertPayoutSchema = createInsertSchema(payouts).omit({
   id: true, createdAt: true, updatedAt: true,
 });
 
+// Immutable funding receipts. A new row is created for every version; receipt
+// rows are never updated or deleted by the application.
+export const fundingReceipts = pgTable("funding_receipts", {
+  id: serial("id").primaryKey(),
+  receiptNo: varchar("receipt_no").notNull(),
+  invoiceId: integer("invoice_id").references(() => invoices.id).notNull(),
+  version: integer("version").notNull(),
+  carrierId: integer("carrier_id").references(() => clients.id).notNull(),
+  brokerId: integer("broker_id").references(() => brokers.id),
+  invoiceAmount: decimal("invoice_amount", { precision: 12, scale: 2 }).notNull(),
+  advancePct: decimal("advance_pct", { precision: 7, scale: 2 }).notNull(),
+  feeAmount: decimal("fee_amount", { precision: 12, scale: 2 }).notNull(),
+  reserveAmount: decimal("reserve_amount", { precision: 12, scale: 2 }).notNull(),
+  netFunded: decimal("net_funded", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method", { enum: ["ach", "wire", "check"] }).notNull(),
+  paymentReference: varchar("payment_reference"),
+  fundedAt: timestamp("funded_at").notNull(),
+  fundedByUserId: varchar("funded_by_user_id").references(() => users.id).notNull(),
+  s3Key: text("s3_key").notNull(),
+  auditHash: varchar("audit_hash", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("funding_receipts_receipt_no_version_uq").on(table.receiptNo, table.version),
+  uniqueIndex("funding_receipts_invoice_version_uq").on(table.invoiceId, table.version),
+  index("funding_receipts_invoice_idx").on(table.invoiceId, table.createdAt),
+  index("funding_receipts_receipt_no_idx").on(table.receiptNo),
+  check("funding_receipts_version_positive", sql`${table.version} > 0`),
+]);
+
+export const insertFundingReceiptSchema = createInsertSchema(fundingReceipts).omit({
+  id: true,
+});
+
 export type PayoutSettings = typeof payoutSettings.$inferSelect;
 export type InsertPayoutSettings = z.infer<typeof insertPayoutSettingsSchema>;
 export type Payout = typeof payouts.$inferSelect;
 export type InsertPayout = z.infer<typeof insertPayoutSchema>;
+export type FundingReceipt = typeof fundingReceipts.$inferSelect;
+export type InsertFundingReceipt = z.infer<typeof insertFundingReceiptSchema>;
 
 export type FuelCardApplication = typeof fuelCardApplications.$inferSelect;
 export type InsertFuelCardApplication = typeof fuelCardApplications.$inferInsert;

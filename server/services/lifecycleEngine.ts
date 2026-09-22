@@ -26,6 +26,12 @@ import { advanceInvoiceStage, STAGE_META, type FactoringStage } from "./invoiceS
 import { guardDocsForReview, guardDocsForApproval } from "./docValidation";
 import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
 import { sendEmailTracked } from "../emailService";
+import {
+  compensateFundingReceiptUpload,
+  issueInitialFundingReceipt,
+  sendFundingReceiptEmail,
+  type IssuedFundingReceipt,
+} from "./fundingReceiptService";
 import { decryptVault } from "./vaultCrypto";
 
 // ─── Blocker types ────────────────────────────────────────────────────────────
@@ -47,7 +53,7 @@ interface Ctx {
   actorRole: string;
   reason?: string;
   force?: boolean;
-  paymentMethod?: "ach" | "wire";
+  paymentMethod?: "ach" | "wire" | "check";
   bankAccountVaultId?: number;
 }
 
@@ -214,16 +220,6 @@ function fxStage(stage: FactoringStage): SideEffect {
     advanceInvoiceStage(invoiceId, stage, actorId, reason);
 }
 
-/** Create activity log entry */
-function fxActivity(type: string, desc: (ctx: Ctx) => string): SideEffect {
-  return async (ctx) => {
-    await storage.createActivity({
-      userId: ctx.actorId, type, description: desc(ctx),
-      entityType: "invoice", entityId: ctx.invoiceId,
-    });
-  };
-}
-
 /** Notify invoice submitter (if different from actor) */
 function fxNotify(title: (ctx: Ctx) => string, msg: (ctx: Ctx) => string): SideEffect {
   return async (ctx) => {
@@ -295,10 +291,13 @@ const fxSendFundingConfirmation: SideEffect = async ({ invoiceId, actorId }) => 
     if (!inv || !payout) return;
     const carrier = await storage.getClient(inv.clientId);
     if (!carrier?.email) {
-      await storage.createActivity({
-        userId: actorId, type: "funding_email_skipped",
-        description: `Funding confirmation not sent for ${inv.invoiceNumber} — carrier has no email on file`,
-        entityType: "invoice", entityId: invoiceId,
+      await db.insert(eventLedger).values({
+        entityType: "invoice",
+        entityId: invoiceId,
+        eventType: "funding_email_skipped",
+        actorType: "system",
+        actorId,
+        payloadJson: { reason: "Carrier has no email on file" },
       });
       return;
     }
@@ -356,15 +355,6 @@ Trucking Pros Financial Team`;
       subject,
       text,
     });
-    await storage.createActivity({
-      userId: actorId,
-      type: result.success ? "funding_email_sent" : "funding_email_failed",
-      description: result.success
-        ? `Funding confirmation emailed to ${carrier.name} for ${inv.invoiceNumber}`
-        : `Funding confirmation email failed for ${inv.invoiceNumber}`,
-      entityType: "invoice", entityId: invoiceId,
-      metadata: result.messageId ? { messageId: result.messageId } : undefined,
-    } as any);
     await db.insert(eventLedger).values({
       entityType: "invoice", entityId: invoiceId,
       eventType: result.success ? "funding_email_sent" : "funding_email_failed",
@@ -424,7 +414,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
       fxSetStatus("submitted"),
       fxCheckDocsAutoDowngrade,
       fxStage("document_intake"),
-      fxActivity("invoice_submitted", ctx => `Invoice ${ctx.invoice.invoiceNumber} submitted for review`),
     ],
   },
 
@@ -441,7 +430,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     guards: [],
     sideEffects: [
       fxSetStatus("docs_pending"),
-      fxActivity("docs_requested", ctx => `Documents requested for ${ctx.invoice.invoiceNumber}: ${ctx.reason}`),
       fxNotify(
         ctx => `Documents Needed — ${ctx.invoice.invoiceNumber}`,
         ctx => `Additional documents are required before your invoice can be reviewed: ${ctx.reason}`,
@@ -462,7 +450,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     sideEffects: [
       fxSetStatus("under_review"),
       fxStage("verification"),
-      fxActivity("invoice_under_review", ctx => `Invoice ${ctx.invoice.invoiceNumber} moved to under review`),
     ],
   },
 
@@ -478,7 +465,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     guards: [guardHasApprovalDocs, guardNoOpenCriticalExceptions, guardNoDeclinedCreditCheck],
     sideEffects: [
       fxSetStatus("approved"),
-      fxActivity("invoice_approved", ctx => `Invoice ${ctx.invoice.invoiceNumber} approved`),
       fxNotify(
         ctx => `Invoice Approved — ${ctx.invoice.invoiceNumber}`,
         ctx => `Your invoice ${ctx.invoice.invoiceNumber} has been approved and is ready for funding`,
@@ -499,7 +485,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     guards: [guardHasReason],
     sideEffects: [
       fxSetStatus("rejected"),
-      fxActivity("invoice_rejected", ctx => `Invoice ${ctx.invoice.invoiceNumber} rejected: ${ctx.reason}`),
       fxNotify(
         ctx => `Invoice Rejected — ${ctx.invoice.invoiceNumber}`,
         ctx => `Your invoice ${ctx.invoice.invoiceNumber} was rejected: ${ctx.reason}`,
@@ -523,7 +508,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
       fxSendFundingConfirmation,
       // Funding completes Advance; Approval is the next active lifecycle stage.
       fxStage("approval"),
-      fxActivity("invoice_funded", ctx => `Invoice ${ctx.invoice.invoiceNumber} funded — payout record auto-created`),
       fxNotify(
         ctx => `Invoice Funded — ${ctx.invoice.invoiceNumber}`,
         ctx => `Invoice ${ctx.invoice.invoiceNumber} has been funded. Your advance payment is being processed.`,
@@ -548,7 +532,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     sideEffects: [
       fxSetStatus("paid"),
       fxStage("collections"),
-      fxActivity("invoice_collected", ctx => `Payment collected for invoice ${ctx.invoice.invoiceNumber}`),
     ],
   },
 
@@ -566,7 +549,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
       fxSetStatus("settled"),
       fxReleaseReserve,
       fxStage("final_settlement"),
-      fxActivity("invoice_settled", ctx => `Invoice ${ctx.invoice.invoiceNumber} settled — reserve released`),
       fxNotify(
         ctx => `Invoice Settled — ${ctx.invoice.invoiceNumber}`,
         ctx => `Invoice ${ctx.invoice.invoiceNumber} is settled and your reserve has been released.`,
@@ -587,7 +569,6 @@ export const TRANSITION_DEFS: TransitionDef[] = [
     guards: [],
     sideEffects: [
       fxSetStatus("draft"),
-      fxActivity("invoice_reopened", ctx => `Invoice ${ctx.invoice.invoiceNumber} reopened for editing`),
     ],
   },
 ];
@@ -662,10 +643,12 @@ export async function getAvailableTransitions(
 async function executeFundTransaction(
   invoiceId: number,
   actorId: string,
-  paymentMethod: "ach" | "wire" | undefined,
+  paymentMethod: "ach" | "wire" | "check" | undefined,
   bankAccountVaultId: number,
 ) {
-  return db.transaction(async (tx) => {
+  let issuedReceipt: IssuedFundingReceipt | null = null;
+  try {
+    return await db.transaction(async (tx) => {
     const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
     if (!invoice) throw new Error("Invoice not found");
     if (invoice.status !== "approved") throw new Error(`Cannot fund invoice when status is "${invoice.status}"`);
@@ -683,6 +666,8 @@ async function executeFundTransaction(
     const [client] = await tx.select({
       advanceRate: clients.advanceRate,
       factoringFeeRate: clients.factoringFeeRate,
+      name: clients.name,
+      email: clients.email,
     }).from(clients).where(eq(clients.id, invoice.clientId));
     const invoiceAmount = parseFloat(invoice.amount);
     const advanceRate = parseFloat(client?.advanceRate ?? "80.00");
@@ -751,8 +736,35 @@ async function executeFundTransaction(
         },
       });
     }
-    return updated;
-  });
+    issuedReceipt = await issueInitialFundingReceipt(tx as any, {
+      invoiceId,
+      invoiceNumber: invoice.invoiceNumber,
+      carrierId: invoice.clientId,
+      carrierName: client?.name,
+      carrierEmail: client?.email,
+      brokerId: invoice.brokerId,
+      invoiceAmount,
+      advancePct: advanceRate,
+      feeAmount,
+      reserveAmount,
+      netFunded: netPayout,
+      paymentMethod: paymentMethod ?? "ach",
+      paymentReference: invoice.paymentReference,
+      fundedAt: updated.fundedAt ?? new Date(),
+      fundedByUserId: actorId,
+    });
+    return {
+      invoice: updated,
+      receiptIssue: issuedReceipt,
+      carrierEmail: client?.email ?? null,
+      invoiceNumber: invoice.invoiceNumber,
+    };
+    });
+  } catch (error) {
+    const uploaded = issuedReceipt as IssuedFundingReceipt | null;
+    if (uploaded) await compensateFundingReceiptUpload(uploaded.receipt);
+    throw error;
+  }
 }
 
 /** Execute a transition — runs guards, then side effects, returns result. */
@@ -763,7 +775,7 @@ export async function performTransition(
   actorRole: string,
   reason?: string,
   force?: boolean,
-  paymentMethod?: "ach" | "wire",
+  paymentMethod?: "ach" | "wire" | "check",
   bankAccountVaultId?: number,
 ): Promise<TransitionResult> {
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
@@ -810,7 +822,29 @@ export async function performTransition(
 
   if (transitionId === "fund") {
     try {
-      const updated = await executeFundTransaction(invoiceId, actorId, paymentMethod, bankAccountVaultId!);
+      const funded = await executeFundTransaction(invoiceId, actorId, paymentMethod, bankAccountVaultId!);
+      const receiptDelivery = await sendFundingReceiptEmail(
+        funded.receiptIssue.receipt,
+        funded.invoiceNumber,
+        funded.carrierEmail,
+        funded.receiptIssue.pdf,
+      ).catch(err => {
+        console.error("[funding-receipt] email failed:", err);
+        return { success: false, messageId: undefined };
+      });
+      await db.insert(eventLedger).values({
+        entityType: "invoice",
+        entityId: invoiceId,
+        eventType: receiptDelivery.success ? "funding_receipt_email_sent" : "funding_receipt_email_failed",
+        actorType: "system",
+        actorId,
+        payloadJson: {
+          receiptNo: funded.receiptIssue.receipt.receiptNo,
+          version: funded.receiptIssue.receipt.version,
+          recipient: funded.carrierEmail,
+          messageId: receiptDelivery.messageId ?? null,
+        },
+      }).catch(err => console.error("[funding-receipt] email audit failed:", err));
       // Email, notifications, activity, and follow-up work are deliberately
       // post-commit and non-blocking. The first, second, and fourth fund
       // effects are the transaction-owned payout/status/stage effects.
@@ -819,7 +853,7 @@ export async function performTransition(
         try { await fx(ctx); }
         catch (err) { console.error(`[lifecycle] post-commit side-effect error in ${transitionId}:`, err); }
       }));
-      return { success: true, invoice: updated };
+      return { success: true, invoice: funded.invoice };
     } catch (err) {
       console.error("[lifecycle] fund transaction rolled back:", err);
       return { success: false, error: err instanceof Error ? err.message : "Funding transaction failed" };

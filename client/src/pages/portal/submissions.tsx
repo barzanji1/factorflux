@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, FileText, ChevronDown, ChevronUp, Download, Eye } from "lucide-react";
+import { Loader2, FileText, ChevronDown, ChevronUp, Download, Eye, ReceiptText } from "lucide-react";
 import PortalLayout from "@/components/layout/portal-layout";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface PortalUser { id: number; status: string; }
 interface Doc { id: number; documentType: string; originalName: string; size?: number; mimeType?: string; }
+interface FundingReceipt { receiptNo: string; version: number; fundedAt?: string | null; createdAt?: string | null; paymentReference?: string | null; }
 interface Submission {
   id: number; invoiceNumber?: string; loadNumber?: string; brokerName?: string;
   amount?: string; paymentType?: string; status: string; notes?: string;
-  submittedAt?: string; documents?: Doc[];
+  submittedAt?: string; documents?: Doc[]; receipts?: FundingReceipt[];
 }
 
 const STATUS_BADGE: Record<string, JSX.Element> = {
@@ -141,6 +142,41 @@ export default function PortalSubmissions() {
                         </div>
                       </div>
                     )}
+
+                     {s.status === "funded" && (
+                       <div>
+                         <p className="text-xs font-semibold text-slate-500 mb-2">Funding Receipts</p>
+                         {!s.receipts?.length ? (
+                           <p className="rounded-lg bg-white px-3 py-2 text-xs text-slate-400 border border-slate-200">
+                             No funding receipt available yet.
+                           </p>
+                         ) : (
+                           <div className="space-y-1.5">
+                             {s.receipts.map((receipt) => (
+                               <div key={`${receipt.receiptNo}-${receipt.version}`} className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2">
+                                 <ReceiptText className="h-4 w-4 text-violet-500 flex-shrink-0" />
+                                 <div className="min-w-0 flex-1">
+                                   <p className="truncate text-sm font-medium text-slate-700">{receipt.receiptNo} · Version {receipt.version}</p>
+                                   <p className="text-xs text-slate-400">
+                                     {receipt.createdAt || receipt.fundedAt ? new Date(receipt.createdAt || receipt.fundedAt || "").toLocaleDateString() : "Date unavailable"}
+                                     {" · "}{receipt.paymentReference || "Payment reference pending"}
+                                   </p>
+                                 </div>
+                                 <a
+                                   href={`/api/portal/submissions/${s.id}/receipts/${encodeURIComponent(receipt.receiptNo)}/download?version=${receipt.version}`}
+                                   target="_blank"
+                                   rel="noreferrer"
+                                   className="p-1 text-slate-400 hover:text-blue-600"
+                                   title="Download funding receipt"
+                                 >
+                                   <Download className="h-3.5 w-3.5" />
+                                 </a>
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                       </div>
+                     )}
                   </div>
                 )}
               </Card>

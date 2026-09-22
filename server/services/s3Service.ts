@@ -54,7 +54,8 @@ export async function getSignedViewUrl(key: string): Promise<string> {
 
 export async function getSignedDownloadUrl(
   key: string,
-  filename: string
+  filename: string,
+  expiresIn = 3600,
 ): Promise<string> {
   if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const client = getClient();
@@ -65,7 +66,7 @@ export async function getSignedDownloadUrl(
       Key: key,
       ResponseContentDisposition: `attachment; filename="${filename}"`,
     }),
-    { expiresIn: 3600 }
+    { expiresIn }
   );
 }
 
@@ -85,6 +86,14 @@ export async function deleteFromS3Strict(key: string): Promise<void> {
   await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
+export async function downloadFromS3(key: string): Promise<Buffer> {
+  if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
+  const client = getClient();
+  const { Body } = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  if (!Body) throw new Error(`[S3] Empty body for key: ${key}`);
+  return Buffer.from(await Body.transformToByteArray());
+}
+
 export async function downloadToTemp(key: string, destPath: string): Promise<void> {
   if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const { createWriteStream } = await import("fs");
@@ -94,7 +103,7 @@ export async function downloadToTemp(key: string, destPath: string): Promise<voi
   if (!Body) throw new Error(`[S3] Empty body for key: ${key}`);
   await new Promise<void>((resolve, reject) => {
     const writeStream = createWriteStream(destPath);
-    (Body as Readable).pipe(writeStream);
+    (Body as any).pipe(writeStream);
     writeStream.on("finish", resolve);
     writeStream.on("error", reject);
   });

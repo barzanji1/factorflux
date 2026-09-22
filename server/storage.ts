@@ -634,6 +634,18 @@ export class DatabaseStorage implements IStorage {
       changedBy: releasedBy,
       reason: releaseNote ? `Released: ${releaseNote}` : "Released from hold",
     });
+    await this.createEvent({
+      entityType: "invoice",
+      entityId: id,
+      eventType: "status_changed",
+      actorType: "user",
+      actorId: releasedBy,
+      payloadJson: {
+        from: "held",
+        to: restoreStatus,
+        reason: releaseNote || "Released from hold",
+      },
+    });
     return updated;
   }
 
@@ -694,7 +706,7 @@ export class DatabaseStorage implements IStorage {
       await this.createEvent({
         entityType: "invoice",
         entityId: updatedInvoice.id,
-        eventType: "invoice.status_changed",
+        eventType: "status_changed",
         actorType: "user",
         actorId:
           updatedInvoice.approvedBy ||
@@ -702,24 +714,28 @@ export class DatabaseStorage implements IStorage {
           updatedInvoice.assignedTo ||
           null,
         payloadJson: {
-          oldStatus: existing.status,
-          newStatus: invoice.status,
+          from: existing.status,
+          to: invoice.status,
+          reason: null,
         },
       });
     }
 
-    await this.createEvent({
-      entityType: "invoice",
-      entityId: updatedInvoice.id,
-      eventType: "invoice.updated",
-      actorType: "user",
-      actorId:
-        updatedInvoice.approvedBy ||
-        updatedInvoice.submittedBy ||
-        updatedInvoice.assignedTo ||
-        null,
-      payloadJson: invoice,
-    });
+    const { status: _status, updatedAt: _updatedAt, ...updatedFields } = invoice as any;
+    if (Object.keys(updatedFields).length > 0) {
+      await this.createEvent({
+        entityType: "invoice",
+        entityId: updatedInvoice.id,
+        eventType: "invoice.updated",
+        actorType: "user",
+        actorId:
+          updatedInvoice.approvedBy ||
+          updatedInvoice.submittedBy ||
+          updatedInvoice.assignedTo ||
+          null,
+        payloadJson: updatedFields,
+      });
+    }
 
     return updatedInvoice;
   }

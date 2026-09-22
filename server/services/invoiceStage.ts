@@ -407,256 +407,219 @@ export interface TimelineEvent {
   meta?: Record<string, unknown>;
 }
 
-export async function getInvoiceTimeline(invoiceId: number): Promise<TimelineEvent[]> {
-  const events: TimelineEvent[] = [];
+type TimelineEventFormat = {
+  category: TimelineEvent["category"];
+  title: (payload: Record<string, unknown>) => string;
+  description: (payload: Record<string, unknown>) => string;
+};
 
-  // 1. Status history
-  const history = await db
-    .select()
-    .from(invoiceStatusHistory)
-    .where(eq(invoiceStatusHistory.invoiceId, invoiceId));
+const timelineText = (value: unknown, fallback = "—") =>
+  value === null || value === undefined || value === "" ? fallback : String(value);
 
-  for (const h of history) {
-    events.push({
-      id: `status-${h.id}`,
-      timestamp: h.createdAt,
-      category: "status",
-      title: `Status changed to ${h.newStatus}`,
-      description: h.reason ?? `Invoice status updated from ${h.oldStatus ?? "—"} → ${h.newStatus}`,
-      actorId: h.changedBy,
-      meta: { oldStatus: h.oldStatus, newStatus: h.newStatus },
-    });
+const withTimelineReason = (description: string, payload: Record<string, unknown>) =>
+  payload.reason ? `${description}. Reason: ${String(payload.reason)}` : description;
+
+const statusChangedFormat: TimelineEventFormat = {
+  category: "status",
+  title: payload => `Status changed to ${timelineText(payload.to ?? payload.newStatus)}`,
+  description: payload => withTimelineReason(
+    `Invoice status updated from ${timelineText(payload.from ?? payload.oldStatus)} → ${timelineText(payload.to ?? payload.newStatus)}`,
+    payload,
+  ),
+};
+
+const invoiceTimelineEventFormats: Record<string, TimelineEventFormat> = {
+  status_changed: statusChangedFormat,
+  "invoice.status_changed": statusChangedFormat,
+  "invoice.created": {
+    category: "status",
+    title: payload => `Invoice created${payload.status ? ` as ${payload.status}` : ""}`,
+    description: payload => payload.invoiceNumber
+      ? `Invoice ${payload.invoiceNumber} was created`
+      : "Invoice record created",
+  },
+  "invoice.updated": {
+    category: "system",
+    title: payload => Object.prototype.hasOwnProperty.call(payload, "assignedTo")
+      ? (payload.assignedTo ? "Invoice assigned" : "Invoice unassigned")
+      : "Invoice updated",
+    description: payload => Object.prototype.hasOwnProperty.call(payload, "assignedTo")
+      ? (payload.assignedTo
+          ? `Invoice assigned to ${timelineText(payload.assignedTo)}`
+          : "Invoice assignment removed")
+      : `Invoice fields updated: ${Object.keys(payload).filter(key => key !== "updatedAt").join(", ") || "record details"}`,
+  },
+  stage_advanced: {
+    category: "stage",
+    title: payload => `Stage advanced: ${timelineText(payload.fromLabel ?? payload.from)} → ${timelineText(payload.toLabel ?? payload.to)}`,
+    description: payload => withTimelineReason(
+      `Factoring stage moved to ${timelineText(payload.toLabel ?? payload.to)}`,
+      payload,
+    ),
+  },
+  auto_docs_pending: {
+    category: "status",
+    title: () => "Documents marked pending",
+    description: payload => timelineText(payload.reason, "Required invoice documents are missing"),
+  },
+  invoice_note_added: {
+    category: "collection",
+    title: () => "Invoice note added",
+    description: payload => timelineText(payload.body, "A note was added to the invoice"),
+  },
+  invoice_aging_alert_triggered: {
+    category: "system",
+    title: payload => `${timelineText(payload.alertType, "Invoice aging")} alert triggered`,
+    description: payload => `Invoice reached ${timelineText(payload.days, "the configured")} aging days`,
+  },
+  invoice_aging_alert_acknowledged: {
+    category: "system",
+    title: payload => `${timelineText(payload.alertType, "Invoice aging")} alert acknowledged`,
+    description: () => "Invoice aging alert acknowledged",
+  },
+  chargeback_scheduled: {
+    category: "system",
+    title: () => "Chargeback scheduled",
+    description: payload => `Chargeback scheduled after ${timelineText(payload.days)} days${payload.broker ? ` for ${payload.broker}` : ""}`,
+  },
+  chargeback_applied: {
+    category: "system",
+    title: () => "Chargeback applied",
+    description: payload => `Chargeback applied after ${timelineText(payload.days)} days${payload.broker ? ` for ${payload.broker}` : ""}`,
+  },
+  chargeback_extended: {
+    category: "system",
+    title: () => "Chargeback extended",
+    description: payload => withTimelineReason(
+      `Chargeback extended to ${payload.extensionDate ? new Date(String(payload.extensionDate)).toLocaleDateString("en-US") : "a later date"}`,
+      payload,
+    ),
+  },
+  chargeback_refunded: {
+    category: "payment",
+    title: () => "Chargeback refund recorded",
+    description: payload => withTimelineReason(
+      `${timelineText(payload.amount, "Refund")} recorded via ${timelineText(payload.method, "unspecified method")}${payload.reference ? ` · ${payload.reference}` : ""}`,
+      payload,
+    ),
+  },
+  funding_email_sent: {
+    category: "payout",
+    title: () => "Funding confirmation sent",
+    description: payload => `Funding confirmation emailed to ${timelineText(payload.recipient, "the carrier")}`,
+  },
+  funding_email_failed: {
+    category: "payout",
+    title: () => "Funding confirmation failed",
+    description: payload => `Funding confirmation could not be sent to ${timelineText(payload.recipient, "the carrier")}`,
+  },
+  funding_email_skipped: {
+    category: "payout",
+    title: () => "Funding confirmation skipped",
+    description: payload => timelineText(payload.reason, "The carrier has no email address on file"),
+  },
+  payout_created: {
+    category: "payout",
+    title: () => "Payout record created",
+    description: payload => `Net payout ${timelineText(payload.netPayout)}${payload.paymentStatus ? ` · ${payload.paymentStatus}` : ""}`,
+  },
+  receipt_issued: {
+    category: "payout",
+    title: payload => `Funding receipt ${timelineText(payload.receiptNo)} issued`,
+    description: payload => `Receipt version ${timelineText(payload.version, "1")} is available for download`,
+  },
+  payment_reference_set: {
+    category: "payout",
+    title: () => "Payment reference recorded",
+    description: payload => `Funding payment reference set to ${timelineText(payload.to)}`,
+  },
+  funding_receipt_email_sent: {
+    category: "payout",
+    title: () => "Funding receipt emailed",
+    description: payload => `Funding receipt emailed to ${timelineText(payload.recipient, "the carrier")}`,
+  },
+  funding_receipt_email_failed: {
+    category: "payout",
+    title: () => "Funding receipt email failed",
+    description: payload => `Funding receipt could not be emailed to ${timelineText(payload.recipient, "the carrier")}`,
+  },
+  doc_confirmed: {
+    category: "document",
+    title: payload => `${timelineText(payload.documentType, "Invoice document").replace(/_/g, " ")} confirmed`,
+    description: payload => `Document review completed${payload.completenessPercent !== undefined ? ` · ${payload.completenessPercent}% complete` : ""}`,
+  },
+  document_requirements_overridden: {
+    category: "document",
+    title: () => "Document requirements overridden",
+    description: payload => withTimelineReason("Invoice document requirements were overridden", payload),
+  },
+  broker_followup_reminder_edited: {
+    category: "collection",
+    title: () => "Broker follow-up reminder edited",
+    description: () => "A scheduled broker follow-up reminder was updated",
+  },
+  broker_followup_triggered: {
+    category: "collection",
+    title: payload => `Broker follow-up ${payload.triggerType === "auto" ? "automatically triggered" : "triggered"}`,
+    description: payload => timelineText(payload.subject, "Broker follow-up sequence started"),
+  },
+};
+
+function formatInvoiceTimelineEvent(eventType: string, payload: Record<string, unknown>) {
+  const brokerDeliveryStatus = eventType.startsWith("broker_followup_delivery_")
+    ? eventType.slice("broker_followup_delivery_".length).replace(/_/g, " ")
+    : null;
+  if (brokerDeliveryStatus) {
+    return {
+      category: "collection" as const,
+      title: `Broker follow-up ${brokerDeliveryStatus}`,
+      description: payload.email
+        ? `Broker follow-up delivery update for ${payload.email}`
+        : "Broker follow-up delivery status updated",
+    };
   }
+  const format = invoiceTimelineEventFormats[eventType];
+  if (format) {
+    return {
+      category: format.category,
+      title: format.title(payload),
+      description: format.description(payload),
+    };
+  }
+  return {
+    category: "system" as const,
+    title: eventType.replace(/[._]/g, " ").replace(/\b\w/g, letter => letter.toUpperCase()),
+    description: "Invoice event recorded",
+  };
+}
 
-  // 2. Event ledger (stage advances, etc.)
+export async function getInvoiceTimeline(invoiceId: number): Promise<TimelineEvent[]> {
   const ledgerEvents = await db
     .select()
     .from(eventLedger)
-    .where(and(eq(eventLedger.entityType, "invoice"), eq(eventLedger.entityId, invoiceId)));
+    .where(and(eq(eventLedger.entityType, "invoice"), eq(eventLedger.entityId, invoiceId)))
+    .orderBy(desc(eventLedger.createdAt), desc(eventLedger.id));
 
-  for (const e of ledgerEvents) {
-    const payload = (e.payloadJson as Record<string, unknown>) ?? {};
-    const isStage = e.eventType === "stage_advanced";
-    events.push({
-      id: `ledger-${e.id}`,
-      timestamp: e.createdAt,
-      category: isStage ? "stage" : "system",
-      title: isStage
-        ? `Stage advanced: ${payload.fromLabel} → ${payload.toLabel}`
-        : e.eventType.replace(/_/g, " "),
-      description: isStage
-        ? (payload.reason as string) ?? `Factoring stage moved to ${payload.toLabel}`
-        : JSON.stringify(payload),
-      actorId: e.actorId,
-      meta: payload,
-    });
-  }
-
-  // 3. Documents uploaded for this invoice
-  const docs = await db
-    .select()
-    .from(documents)
-    .where(eq(documents.invoiceId, invoiceId));
-
-  for (const d of docs) {
-    events.push({
-      id: `doc-${d.id}`,
-      timestamp: d.createdAt,
-      category: "document",
-      title: `Document uploaded: ${d.documentType.replace(/_/g, " ")}`,
-      description: d.originalName,
-      actorId: d.uploadedBy,
-      meta: { documentType: d.documentType, filename: d.filename },
-    });
-  }
-
-  // 4. Payout record for this invoice
-  const [payout] = await db.select().from(payouts).where(eq(payouts.invoiceId, invoiceId));
-  if (payout) {
-    events.push({
-      id: `payout-created-${payout.id}`,
-      timestamp: payout.createdAt,
-      category: "payout",
-      title: "Payout record created",
-      description: `Net payout: $${payout.netPayout} | Advance: $${payout.advanceAmount} | Fee: $${payout.feeAmount}`,
-      actorId: payout.createdBy,
-      meta: { payoutId: payout.id, netPayout: payout.netPayout, status: payout.paymentStatus },
-    });
-    if (payout.advancePaidAt) {
-      events.push({
-        id: `payout-advance-${payout.id}`,
-        timestamp: payout.advancePaidAt,
-        category: "payout",
-        title: "Advance payment sent to carrier",
-        description: `$${payout.advanceAmount} disbursed`,
-        actorId: payout.advancePaidBy ?? payout.createdBy,
-        meta: { payoutId: payout.id },
-      });
-    }
-    if (payout.reserveReleasedAt) {
-      events.push({
-        id: `payout-reserve-${payout.id}`,
-        timestamp: payout.reserveReleasedAt,
-        category: "payout",
-        title: "Reserve released",
-        description: `$${payout.reserveAmount} reserve released to carrier`,
-        meta: { payoutId: payout.id },
-      });
-    }
-  }
-
-  // 5. Cash application lines
-  const lines = await db
-    .select()
-    .from(paymentApplicationLines)
-    .where(eq(paymentApplicationLines.invoiceId, invoiceId));
-
-  for (const l of lines) {
-    events.push({
-      id: `cashapp-${l.id}`,
-      timestamp: l.createdAt,
-      category: "payment",
-      title: `Payment applied: $${l.appliedAmount}`,
-      description: `${l.varianceType.replace(/_/g, " ")} — Invoice amount $${l.invoiceAmount}`,
-      meta: { appliedAmount: l.appliedAmount, varianceType: l.varianceType },
-    });
-  }
-
-  // 6. Collections for this invoice
-  const invCollections = await db
-    .select()
-    .from(collections)
-    .where(eq(collections.invoiceId, invoiceId));
-
-  for (const c of invCollections) {
-    events.push({
-      id: `coll-${c.id}`,
-      timestamp: c.createdAt,
-      category: "collection",
-      title: `Collection opened: $${c.amount}`,
-      description: c.description,
-      meta: { collectionId: c.id, status: c.status, priority: c.priority },
-    });
-  }
-
-  // 7. Exceptions for this invoice
-  const invExceptions = await db
-    .select()
-    .from(exceptions)
-    .where(and(eq(exceptions.entityType, "invoice"), eq(exceptions.entityId, invoiceId)));
-
-  for (const e of invExceptions) {
-    events.push({
-      id: `exc-${e.id}`,
-      timestamp: e.createdAt,
-      category: "exception",
-      title: `Exception: ${e.title}`,
-      description: e.description ?? e.type.replace(/_/g, " "),
-      meta: { exceptionId: e.id, type: e.type, severity: e.severity, status: e.status },
-    });
-  }
-
-  const notes = await db.select().from(invoiceNotes).where(eq(invoiceNotes.invoiceId, invoiceId));
-  for (const note of notes) {
-    events.push({
-      id: `note-${note.id}`,
-      timestamp: note.createdAt,
-      category: "collection",
-      title: "Invoice note added",
-      description: note.body,
-      actorId: note.createdBy,
-      meta: { noteId: note.id },
-    });
-  }
-
-  const followUps = await db.select().from(brokerFollowUps).where(eq(brokerFollowUps.invoiceId, invoiceId));
-  const followUpIds = followUps.map(followUp => followUp.id);
-  const reminderRows = followUpIds.length
-    ? await db.select().from(brokerFollowUpReminders).where(inArray(brokerFollowUpReminders.followUpId, followUpIds))
-    : [];
-  const followUpById = new Map(followUps.map(followUp => [followUp.id, followUp]));
-  for (const followUp of followUps) {
-    events.push({
-      id: `followup-${followUp.id}`,
-      timestamp: followUp.sentAt ?? followUp.createdAt,
-      category: "collection",
-      title: `Broker follow-up ${followUp.status}`,
-      description: followUp.subject,
-      actorId: followUp.sentBy,
-      meta: { followUpId: followUp.id, status: followUp.status, body: followUp.body },
-    });
-  }
-  for (const reminder of reminderRows) {
-    const parentFollowUp = followUpById.get(reminder.followUpId);
-    events.push({
-      id: `followup-reminder-${reminder.id}`,
-      timestamp: reminder.actualSendAt ?? reminder.scheduledSendAt,
-      category: "collection",
-      title: `Broker reminder ${reminder.status}`,
-      description: reminder.subject,
-      actorId: reminder.editedBy ?? parentFollowUp?.sentBy ?? null,
-      meta: {
-        reminderId: reminder.id, followUpId: reminder.followUpId,
-        scheduledSendAt: reminder.scheduledSendAt, actualSendAt: reminder.actualSendAt,
-        body: reminder.body, status: reminder.status, deliveryStatus: reminder.deliveryStatus,
-        editedBy: reminder.editedBy,
-        actorType: reminder.editedBy || parentFollowUp?.sentBy ? "user" : "system",
-      },
-    });
-  }
-
-  const chargebackEvents = await db.select().from(invoiceChargebackEvents).where(eq(invoiceChargebackEvents.invoiceId, invoiceId));
-  for (const event of chargebackEvents) {
-    events.push({
-      id: `chargeback-${event.id}`,
+  const events = ledgerEvents.map((event): TimelineEvent => {
+    const payload = (event.payloadJson as Record<string, unknown>) ?? {};
+    const formatted = formatInvoiceTimelineEvent(event.eventType, payload);
+    return {
+      id: `ledger-${event.id}`,
       timestamp: event.createdAt,
-      category: "system",
-      title: `Chargeback ${event.eventType.replace(/_/g, " ")}`,
-      description: event.reason ?? event.eventType.replace(/_/g, " "),
+      category: formatted.category,
+      title: formatted.title,
+      description: formatted.description,
       actorId: event.actorId,
-      meta: { extensionDate: event.extensionDate, metadata: event.metadata },
-    });
-  }
-
-  const refunds = await db.select().from(invoiceRefunds).where(eq(invoiceRefunds.invoiceId, invoiceId));
-  for (const refund of refunds) {
-    events.push({
-      id: `refund-${refund.id}`,
-      timestamp: refund.refundDate,
-      category: "payment",
-      title: `Refund recorded: $${refund.amount}`,
-      description: `${refund.method}${refund.reference ? ` · ${refund.reference}` : ""}`,
-      actorId: refund.createdBy,
-      meta: { refundId: refund.id, amount: refund.amount, method: refund.method },
-    });
-  }
-
-  const activityRows = await db.select().from(activities).where(and(eq(activities.entityType, "invoice"), eq(activities.entityId, invoiceId)));
-  for (const activity of activityRows) {
-    events.push({
-      id: `activity-${activity.id}`,
-      timestamp: activity.createdAt,
-      category: "system",
-      title: activity.type.replace(/_/g, " "),
-      description: activity.description,
-      actorId: activity.userId,
-      meta: activity.metadata as Record<string, unknown> | undefined,
-    });
-  }
-
-  // Sort newest first
-  const sorted = events.sort((a, b) => {
-    const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-    const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-    return tb - ta;
+      meta: { ...payload, actorType: event.actorType },
+    };
   });
-  const actorIds = Array.from(new Set(sorted.map(event => event.actorId).filter(Boolean))) as string[];
-  if (!actorIds.length) return sorted;
+  const actorIds = Array.from(new Set(events.map(event => event.actorId).filter(id => id && id !== "system"))) as string[];
+  if (!actorIds.length) return events;
   const actorRows = await db.select({
     id: users.id,
     name: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
     email: users.email,
   }).from(users).where(inArray(users.id, actorIds));
   const actorMap = new Map(actorRows.map(actor => [actor.id, actor]));
-  return sorted.map(event => ({ ...event, actor: event.actorId ? actorMap.get(event.actorId) ?? null : null }));
+  return events.map(event => ({ ...event, actor: event.actorId ? actorMap.get(event.actorId) ?? null : null }));
 }

@@ -63,6 +63,16 @@ interface AvailableTransition {
   requiresReason: boolean;
 }
 
+interface FundingReceipt {
+  receiptNo: string;
+  version: number;
+  fundedAt?: string | null;
+  createdAt?: string | null;
+  paymentReference?: string | null;
+  paymentMethod?: string | null;
+  netFunded?: string | number | null;
+}
+
 // ─── Stage pipeline ───────────────────────────────────────────────────────────
 
 function StagePipeline({ current }: { current: FactoringStage }) {
@@ -434,11 +444,12 @@ export default function InvoiceDetail() {
   const [overrideReason, setOverrideReason] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [fundTransition, setFundTransition] = useState<AvailableTransition | null>(null);
-  const [fundMethod, setFundMethod] = useState<"ach" | "wire">("ach");
+  const [fundMethod, setFundMethod] = useState<"ach" | "wire" | "check">("ach");
   const [fundBankAccountId, setFundBankAccountId] = useState("");
   const [chargebackDialogOpen, setChargebackDialogOpen] = useState(false);
   const [chargebackExtensionDate, setChargebackExtensionDate] = useState("");
   const [chargebackReason, setChargebackReason] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
   const [collectionNote, setCollectionNote] = useState("");
   const [uploadingDocumentType, setUploadingDocumentType] = useState<string | null>(null);
   const [previewDocument, setPreviewDocument] = useState<any | null>(null);
@@ -484,6 +495,20 @@ export default function InvoiceDetail() {
     },
     enabled: !isNaN(invoiceId),
   });
+
+  const { data: receipts = [], isLoading: receiptsLoading } = useQuery<FundingReceipt[]>({
+    queryKey: ["/api/invoices", invoiceId, "receipts"],
+    queryFn: async () => {
+      const r = await fetch(`/api/invoices/${invoiceId}/receipts`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to fetch funding receipts");
+      return r.json();
+    },
+    enabled: !isNaN(invoiceId) && !!detail,
+  });
+
+  useEffect(() => {
+    setPaymentReference(String(detail?.paymentReference ?? ""));
+  }, [detail?.paymentReference]);
 
   const { data: transitions = [], isLoading: transitionsLoading } = useQuery<AvailableTransition[]>({
     queryKey: ["/api/invoices", invoiceId, "available-transitions"],
@@ -547,6 +572,26 @@ export default function InvoiceDetail() {
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
     },
     onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
+
+  const paymentReferenceMutation = useMutation({
+    mutationFn: async () => (await apiRequest("PATCH", `/api/invoices/${invoiceId}/payment-reference`, {
+      paymentReference: paymentReference.trim(),
+    })).json(),
+    onSuccess: () => {
+      toast({ title: "Payment reference updated" });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "receipts"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "timeline"] });
+    },
+    onError: (e: any) => toast({ title: "Payment reference update failed", description: e.message, variant: "destructive" }),
+  });
+
+  const resendReceiptMutation = useMutation({
+    mutationFn: async ({ receiptNo, version }: { receiptNo: string; version: number }) =>
+      (await apiRequest("POST", `/api/receipts/${encodeURIComponent(receiptNo)}/resend`, { version })).json(),
+    onSuccess: () => toast({ title: "Receipt resent" }),
+    onError: (e: any) => toast({ title: "Receipt resend failed", description: e.message, variant: "destructive" }),
   });
   const extendChargebackMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/invoices/${invoiceId}/extend-chargeback`, {
@@ -635,7 +680,7 @@ export default function InvoiceDetail() {
   };
 
   const transitionMutation = useMutation({
-    mutationFn: async ({ transitionId, reason, force, paymentMethod, bankAccountVaultId }: { transitionId: string; reason?: string; force?: boolean; paymentMethod?: "ach" | "wire"; bankAccountVaultId?: number }) => {
+    mutationFn: async ({ transitionId, reason, force, paymentMethod, bankAccountVaultId }: { transitionId: string; reason?: string; force?: boolean; paymentMethod?: "ach" | "wire" | "check"; bankAccountVaultId?: number }) => {
       const res = await apiRequest("POST", `/api/invoices/${invoiceId}/transition`, { transitionId, reason, force, paymentMethod, bankAccountVaultId });
       return res.json();
     },
@@ -1500,6 +1545,83 @@ export default function InvoiceDetail() {
                           </div>
                            {detail.payoutDetail?.funding && <div className={cn("flex items-center gap-2 rounded-xl border px-4 py-3 text-sm", detail.payoutDetail.funding.paymentSent ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}><CheckCircle2 className="h-4 w-4" />Payment sent: <strong>{detail.payoutDetail.funding.paymentSent ? "Yes" : "No"}</strong></div>}
                            {detail.payoutDetail?.funding && <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900/40 dark:bg-violet-950/20"><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Funding details</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-xs text-violet-600">Funding status</span><p className="font-semibold capitalize">{String(detail.payoutDetail.funding.status || "pending").replace(/_/g, " ")}</p></div><div><span className="text-xs text-violet-600">Funded date</span><p className="font-semibold">{fmtDate(detail.payoutDetail.funding.fundedDate)}</p></div><div><span className="text-xs text-violet-600">Funded by</span><p className="font-semibold">{detail.payoutDetail.funding.fundedBy ? `${detail.payoutDetail.funding.fundedBy.firstName || ""} ${detail.payoutDetail.funding.fundedBy.lastName || ""}`.trim() : "—"}</p></div></div></div>}
+                           <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/30">
+                             <div className="flex items-center justify-between gap-3">
+                               <div>
+                                 <p className="text-sm font-semibold text-slate-800 dark:text-white">Funding receipts</p>
+                                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Immutable receipt versions issued when this invoice is funded.</p>
+                               </div>
+                               <ReceiptText className="h-5 w-5 text-violet-500" />
+                             </div>
+                             {receiptsLoading ? (
+                               <div className="mt-4 space-y-2">
+                                 <Skeleton className="h-10 w-full rounded-lg" />
+                                 <Skeleton className="h-10 w-full rounded-lg" />
+                               </div>
+                             ) : receipts.length === 0 ? (
+                               <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+                                 No funding receipt has been issued yet.
+                               </p>
+                             ) : (
+                               <div className="mt-4 space-y-2">
+                                 {receipts.map((receipt) => (
+                                   <div key={`${receipt.receiptNo}-${receipt.version}`} className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-800/50">
+                                     <div className="min-w-0 flex-1">
+                                       <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                         {receipt.receiptNo} · Version {receipt.version}
+                                       </p>
+                                       <p className="text-xs text-slate-500 dark:text-slate-400">
+                                         {receipt.createdAt || receipt.fundedAt ? new Date(receipt.createdAt || receipt.fundedAt || "").toLocaleDateString() : "Date unavailable"}
+                                         {" · "}{receipt.paymentReference || "Payment reference pending"}
+                                       </p>
+                                     </div>
+                                     <a
+                                       href={`/api/receipts/${encodeURIComponent(receipt.receiptNo)}/download?version=${receipt.version}`}
+                                       target="_blank"
+                                       rel="noreferrer"
+                                       className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                     >
+                                       <Download className="h-3.5 w-3.5" />Download
+                                     </a>
+                                     {isManager && (
+                                       <Button
+                                         type="button"
+                                         size="sm"
+                                         variant="outline"
+                                         className="rounded-xl text-xs"
+                                         disabled={resendReceiptMutation.isPending}
+                                         onClick={() => resendReceiptMutation.mutate({ receiptNo: receipt.receiptNo, version: receipt.version })}
+                                       >
+                                         Resend
+                                       </Button>
+                                     )}
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
+                             {isManager && (
+                               <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Payment reference</label>
+                                 <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                                   <Input
+                                     value={paymentReference}
+                                     onChange={(e) => setPaymentReference(e.target.value)}
+                                     placeholder="ACH, wire, or check reference"
+                                     className="h-9 rounded-xl text-sm"
+                                   />
+                                   <Button
+                                     type="button"
+                                     size="sm"
+                                     className="h-9 rounded-xl text-xs"
+                                    disabled={paymentReferenceMutation.isPending || !paymentReference.trim() || paymentReference.trim() === String(detail?.paymentReference ?? "").trim()}
+                                     onClick={() => paymentReferenceMutation.mutate()}
+                                   >
+                                     {paymentReferenceMutation.isPending ? "Saving..." : "Save reference"}
+                                   </Button>
+                                 </div>
+                               </div>
+                             )}
+                           </div>
                           {detail.payout.notes && (
                             <p className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">{detail.payout.notes}</p>
                           )}
@@ -1750,9 +1872,9 @@ export default function InvoiceDetail() {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Payment Method</label>
-            <Select value={fundMethod} onValueChange={(v: "ach" | "wire") => setFundMethod(v)}>
+            <Select value={fundMethod} onValueChange={(v: "ach" | "wire" | "check") => setFundMethod(v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="ach">ACH</SelectItem><SelectItem value="wire">Wire</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="ach">ACH</SelectItem><SelectItem value="wire">Wire</SelectItem><SelectItem value="check">Check</SelectItem></SelectContent>
             </Select>
           </div>
           <div>

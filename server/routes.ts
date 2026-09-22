@@ -66,6 +66,7 @@ import {
   invoiceChargebackEvents,
   invoiceRefunds,
   payouts,
+  fundingReceipts,
   docRequirements,
   activities,
   docExtractionJobs,
@@ -146,6 +147,15 @@ import {
   getInvoiceDisplayStatus,
 } from "./services/lifecycleEngine";
 import { getDocumentCompleteness } from "./services/docValidation";
+import {
+  compensateFundingReceiptUpload,
+  getFundingReceipt,
+  getFundingReceiptDownloadUrl,
+  issueFundingReceiptVersion,
+  listFundingReceipts,
+  sendFundingReceiptEmail,
+  type IssuedFundingReceipt,
+} from "./services/fundingReceiptService";
 import { expandCalendarEvent } from "./services/calendarScheduler";
 
 const escapeHtml = (value: unknown): string => String(value ?? "")
@@ -2514,11 +2524,7 @@ ${message}
       });
       if (outcome.kind === "not_found") return res.status(404).json({ message: "Invoice not found" });
       if (outcome.kind === "conflict") return res.status(409).json({ message: `Invoices in ${outcome.status} status cannot be placed on hold` });
-      const inv = outcome.invoice;
-      void storage.createActivity({ userId: req.user.id, type: "invoice_held", description: `Invoice #${inv.invoiceNumber} placed on hold: ${reason.trim()}`, entityType: "invoice", entityId: inv.id }).catch((error) => {
-        console.warn("Non-blocking hold activity failed:", error);
-      });
-      res.json(inv);
+      res.json(outcome.invoice);
     } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to hold invoice" }); }
   });
 
@@ -2529,7 +2535,6 @@ ${message}
       }
       const { releaseNote } = req.body as { releaseNote?: string };
       const inv = await storage.releaseInvoice(Number(req.params.id), req.user.id, releaseNote);
-      await storage.createActivity({ userId: req.user.id, type: "invoice_released", description: `Invoice #${inv.invoiceNumber} released from hold`, entityType: "invoice", entityId: inv.id });
       res.json(inv);
     } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to release invoice" }); }
   });
@@ -2757,18 +2762,6 @@ ${message}
         return { invoice, documents };
       });
       transactionCommitted = true;
-      // Activity logging is intentionally best-effort after the atomic commit.
-      try {
-        await storage.createActivity({
-          userId: req.user.id,
-          type: "invoice_created",
-          description: `Created and submitted invoice ${committed.invoice.invoiceNumber} for funding review`,
-          entityType: "invoice",
-          entityId: committed.invoice.id,
-        });
-      } catch (activityError) {
-        console.warn("[invoice intake] Activity logging failed:", activityError instanceof Error ? activityError.message : "unknown error");
-      }
       return res.status(201).json({
         ...withInvoiceDisplayStatus(committed.invoice),
         documents: committed.documents.map((document) => ({
@@ -2812,14 +2805,6 @@ ${message}
         submittedAt: new Date(),
         status: "submitted",
         factoringStage: "verification",
-      });
-
-      await storage.createActivity({
-        userId: req.user.id,
-        type: "invoice_created",
-        description: `Created and submitted invoice ${invoice.invoiceNumber} for funding review`,
-        entityType: "invoice",
-        entityId: invoice.id,
       });
 
       res.status(201).json(withInvoiceDisplayStatus(invoice));
@@ -3014,7 +2999,7 @@ ${message}
         items: z.array(z.object({
           invoiceId: z.number().int().positive(),
           bankAccountVaultId: z.number().int().positive(),
-          paymentMethod: z.enum(["ach", "wire"]).optional(),
+          paymentMethod: z.enum(["ach", "wire", "check"]).optional(),
         })).min(1).max(100),
         force: z.boolean().optional(),
       }).parse(req.body);
@@ -3103,14 +3088,6 @@ ${message}
       };
 
       const invoice = await storage.updateInvoice(id, updatePayload);
-
-      await storage.createActivity({
-        userId: req.user.id,
-        type: "invoice_updated",
-        description: `Updated invoice: ${invoice.invoiceNumber}`,
-        entityType: "invoice",
-        entityId: invoice.id,
-      });
 
       res.json(withInvoiceDisplayStatus(invoice));
     } catch (error) {
@@ -3323,7 +3300,7 @@ ${message}
       const [note] = await db.insert(invoiceNotes).values({ invoiceId: id, body: body.body, createdBy: req.user.id }).returning();
       await db.insert(eventLedger).values({
         entityType: "invoice", entityId: id, eventType: "invoice_note_added", actorType: "user", actorId: req.user.id,
-        payloadJson: { noteId: note.id },
+        payloadJson: { noteId: note.id, body: note.body },
       });
       res.status(201).json(note);
     } catch (error) {
@@ -3343,6 +3320,153 @@ ${message}
     } catch (err) {
       console.error("Error fetching invoice timeline:", err);
       res.status(500).json({ message: "Failed to fetch invoice timeline" });
+    }
+  });
+
+  app.get("/api/invoices/:id/receipts", requireAuth, async (req: any, res) => {
+    try {
+      const invoiceId = Number(req.params.id);
+      if (!Number.isInteger(invoiceId) || invoiceId < 1) return res.status(400).json({ message: "Invalid invoice ID" });
+      if (!await employeeCanAccessInvoice(req, invoiceId)) return res.status(403).json({ message: "You may only view receipts for accessible invoices" });
+      res.json(await listFundingReceipts(invoiceId));
+    } catch (error) {
+      console.error("Error fetching funding receipts:", error);
+      res.status(500).json({ message: "Failed to fetch funding receipts" });
+    }
+  });
+
+  app.get("/api/receipts/:receiptNo/download", requirePermission("factoring"), async (req: any, res) => {
+    try {
+      const receiptNo = z.string().regex(/^FR-\d{4}-\d{6}$/).parse(req.params.receiptNo);
+      const version = req.query.version === undefined ? undefined : z.coerce.number().int().positive().parse(req.query.version);
+      const receipt = await getFundingReceipt(receiptNo, version);
+      if (!receipt) return res.status(404).json({ message: "Funding receipt not found" });
+      if (!await employeeCanAccessInvoice(req, receipt.invoiceId)) return res.status(403).json({ message: "You may only download receipts for accessible invoices" });
+      res.redirect(await getFundingReceiptDownloadUrl(receipt));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid receipt number or version" });
+      console.error("Error downloading funding receipt:", error);
+      res.status(500).json({ message: "Failed to download funding receipt" });
+    }
+  });
+
+  app.post("/api/receipts/:receiptNo/resend", requireManagerOrAdmin, requirePermission("factoring"), async (req: any, res) => {
+    try {
+      const receiptNo = z.string().regex(/^FR-\d{4}-\d{6}$/).parse(req.params.receiptNo);
+      const { version } = z.object({ version: z.coerce.number().int().positive().optional() }).parse(req.body ?? {});
+      const receipt = await getFundingReceipt(receiptNo, version);
+      if (!receipt) return res.status(404).json({ message: "Funding receipt not found" });
+      if (!await employeeCanAccessInvoice(req, receipt.invoiceId)) return res.status(403).json({ message: "You may only resend receipts for accessible invoices" });
+      const [row] = await db.select({
+        invoiceNumber: invoices.invoiceNumber,
+        carrierEmail: clients.email,
+      }).from(invoices)
+        .innerJoin(clients, eq(invoices.clientId, clients.id))
+        .where(eq(invoices.id, receipt.invoiceId))
+        .limit(1);
+      if (!row) return res.status(404).json({ message: "Invoice not found" });
+      if (!row.carrierEmail) return res.status(409).json({ message: "Carrier primary contact has no email address" });
+      const delivery = await sendFundingReceiptEmail(receipt, row.invoiceNumber, row.carrierEmail);
+      if (!delivery.success) return res.status(502).json({ message: "Receipt email could not be delivered" });
+      res.json({ success: true, receiptNo: receipt.receiptNo, version: receipt.version });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid receipt resend request" });
+      console.error("Error resending funding receipt:", error);
+      res.status(500).json({ message: "Failed to resend funding receipt" });
+    }
+  });
+
+  app.patch("/api/invoices/:id/payment-reference", requireManagerOrAdmin, requirePermission("factoring"), async (req: any, res) => {
+    let issued: IssuedFundingReceipt | null = null;
+    let receiptTransactionCommitted = false;
+    try {
+      const invoiceId = z.coerce.number().int().positive().parse(req.params.id);
+      const { paymentReference } = z.object({
+        paymentReference: z.string().trim().min(1).max(200),
+      }).parse(req.body);
+      const outcome = await db.transaction(async tx => {
+        const [row] = await tx.select({
+          invoice: invoices,
+          payout: payouts,
+          carrierName: clients.name,
+          carrierEmail: clients.email,
+        }).from(invoices)
+          .innerJoin(payouts, eq(payouts.invoiceId, invoices.id))
+          .innerJoin(clients, eq(clients.id, invoices.clientId))
+          .where(eq(invoices.id, invoiceId))
+          .limit(1);
+        if (!row) throw Object.assign(new Error("Funded invoice not found"), { status: 404 });
+        if (row.invoice.status !== "funded") throw Object.assign(new Error("Payment references may only be set on funded invoices"), { status: 409 });
+        if (row.invoice.paymentReference === paymentReference) {
+          throw Object.assign(new Error("Payment reference is unchanged"), { status: 409 });
+        }
+        const [latest] = await tx.select().from(fundingReceipts)
+          .where(eq(fundingReceipts.invoiceId, invoiceId))
+          .orderBy(desc(fundingReceipts.version))
+          .limit(1);
+        if (!latest) throw Object.assign(new Error("Initial funding receipt not found"), { status: 409 });
+        const [updatedInvoice] = await tx.update(invoices)
+          .set({ paymentReference, updatedAt: new Date() })
+          .where(eq(invoices.id, invoiceId))
+          .returning();
+        await tx.insert(eventLedger).values({
+          entityType: "invoice",
+          entityId: invoiceId,
+          eventType: "payment_reference_set",
+          actorType: "user",
+          actorId: req.user.id,
+          payloadJson: { from: row.invoice.paymentReference, to: paymentReference },
+        });
+        issued = await issueFundingReceiptVersion(tx as any, {
+          receiptNo: latest.receiptNo,
+          invoiceId,
+          invoiceNumber: row.invoice.invoiceNumber,
+          carrierId: row.invoice.clientId,
+          carrierName: row.carrierName,
+          carrierEmail: row.carrierEmail,
+          brokerId: row.invoice.brokerId,
+          invoiceAmount: row.payout.invoiceAmount,
+          advancePct: row.payout.advanceRate,
+          feeAmount: row.payout.feeAmount,
+          reserveAmount: row.payout.reserveAmount,
+          netFunded: row.payout.netPayout,
+          paymentMethod: row.payout.paymentMethod,
+          paymentReference,
+          fundedAt: row.invoice.fundedAt ?? row.payout.advancePaidAt ?? latest.fundedAt,
+          fundedByUserId: row.payout.advancePaidBy ?? latest.fundedByUserId,
+          issuedByUserId: req.user.id,
+        });
+        return { invoice: updatedInvoice, carrierEmail: row.carrierEmail };
+      });
+      receiptTransactionCommitted = true;
+      const createdReceipt = issued as IssuedFundingReceipt | null;
+      if (!createdReceipt) throw new Error("Funding receipt version was not created");
+      try {
+        const delivery = await sendFundingReceiptEmail(createdReceipt.receipt, outcome.invoice.invoiceNumber, outcome.carrierEmail, createdReceipt.pdf);
+        await db.insert(eventLedger).values({
+          entityType: "invoice",
+          entityId: outcome.invoice.id,
+          eventType: delivery.success ? "funding_receipt_email_sent" : "funding_receipt_email_failed",
+          actorType: "system",
+          actorId: req.user.id,
+          payloadJson: {
+            receiptNo: createdReceipt.receipt.receiptNo,
+            version: createdReceipt.receipt.version,
+            recipient: outcome.carrierEmail,
+            messageId: delivery.messageId ?? null,
+          },
+        });
+      } catch (deliveryError) {
+        console.error("[funding-receipt] version delivery audit failed:", deliveryError);
+      }
+      res.json({ invoice: withInvoiceDisplayStatus(outcome.invoice), receipt: createdReceipt.receipt });
+    } catch (error: any) {
+      const uploaded = issued as IssuedFundingReceipt | null;
+      if (uploaded && !receiptTransactionCommitted) await compensateFundingReceiptUpload(uploaded.receipt);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message ?? "Invalid payment reference" });
+      if (error?.status) return res.status(error.status).json({ message: error.message });
+      console.error("Error setting funding payment reference:", error);
+      res.status(500).json({ message: "Failed to set payment reference" });
     }
   });
 
@@ -3370,7 +3494,7 @@ ${message}
         transitionId: z.string().min(1),
         reason: z.string().optional(),
         force: z.boolean().optional(),
-        paymentMethod: z.enum(["ach", "wire"]).optional(),
+        paymentMethod: z.enum(["ach", "wire", "check"]).optional(),
         bankAccountVaultId: z.number().int().positive().optional(),
       });
       const { transitionId, reason, force, paymentMethod, bankAccountVaultId } = schema.parse(req.body);
@@ -3415,7 +3539,6 @@ ${message}
       }).where(and(eq(invoiceAgingAlerts.id, id), eq(invoiceAgingAlerts.status, "pending"))).returning();
       if (!alert) return res.status(404).json({ message: "Pending aging alert not found" });
       await db.insert(eventLedger).values({ entityType: "invoice", entityId: alert.invoiceId, eventType: "invoice_aging_alert_acknowledged", actorType: "user", actorId: req.user.id, payloadJson: { alertId: id, alertType: alert.alertType } });
-      await storage.createActivity({ userId: req.user.id, type: "invoice_aging_alert_acknowledged", description: `Acknowledged ${alert.alertType} aging alert`, entityType: "invoice", entityId: alert.invoiceId } as any);
       res.json(alert);
     } catch (error) { console.error("Error acknowledging aging alert:", error); res.status(500).json({ message: "Failed to acknowledge aging alert" }); }
   });
@@ -3467,7 +3590,6 @@ ${message}
         invoiceId: id, eventType: "extended", extensionDate, reason: body.reason, actorId: req.user.id,
         metadata: { agentName },
       });
-      await storage.createActivity({ userId: req.user.id, type: "chargeback_extended", description: `Extended chargeback for ${invoice.invoiceNumber} to ${extensionDate.toLocaleDateString()}: ${body.reason}`, entityType: "invoice", entityId: id } as any);
       if (invoice.brokerId != null) recalculateBrokerCreditSafe(invoice.brokerId);
       res.json(invoice);
     } catch (error: any) {
@@ -3497,6 +3619,16 @@ ${message}
       await db.insert(invoiceChargebackEvents).values({
         invoiceId: id, eventType: "refunded", reason: body.notes ?? null, actorId: req.user.id,
         metadata: { refundId: refund.id, amount: refund.amount, method: refund.method, reference: refund.reference },
+      });
+      await db.insert(eventLedger).values({
+        entityType: "invoice", entityId: id, eventType: "chargeback_refunded", actorType: "user", actorId: req.user.id,
+        payloadJson: {
+          refundId: refund.id,
+          amount: refund.amount,
+          method: refund.method,
+          reference: refund.reference,
+          reason: refund.notes,
+        },
       });
       res.status(201).json(refund);
     } catch (error) {
@@ -5558,7 +5690,6 @@ Trucking Pros Financial Team
       const [followUp] = await db.select({ invoiceId: brokerFollowUps.invoiceId }).from(brokerFollowUps).where(eq(brokerFollowUps.id, followUpId));
       if (followUp) {
         await db.insert(eventLedger).values({ entityType: "invoice", entityId: followUp.invoiceId, eventType: "broker_followup_reminder_edited", actorType: "user", actorId: req.user.id, payloadJson: { followUpId, reminderId } });
-        await storage.createActivity({ userId: req.user.id, type: "broker_followup_reminder_edited", description: `Edited scheduled broker follow-up reminder #${reminderId}`, entityType: "invoice", entityId: followUp.invoiceId } as any);
       }
       res.json(updated);
     } catch (error) {
@@ -6719,12 +6850,20 @@ Trucking Pros Financial Team
         createdBy: req.user.id,
       });
 
-      await storage.createActivity({
-        userId: req.user.id,
-        type: "invoice_created",
+      await db.insert(eventLedger).values({
         entityType: "invoice",
         entityId: invoiceId,
-        description: `Created payout record for invoice ${inv.invoiceNumber}: net payout $${netPayout}`,
+        eventType: "payout_created",
+        actorType: "user",
+        actorId: req.user.id,
+        payloadJson: {
+          payoutId: payout.id,
+          netPayout,
+          advanceAmount,
+          feeAmount,
+          reserveAmount,
+          paymentStatus: payout.paymentStatus,
+        },
       });
 
       advanceInvoiceStage(invoiceId, "advance", req.user.id, "Payout record created — advance processing").catch(() => {});
@@ -7616,17 +7755,6 @@ Trucking Pros Financial Team
             canApprove:          completeness.canApprove,
           },
         });
-        // Notify managers if completeness just reached a milestone
-        if (completeness.canStartReview || completeness.canApprove) {
-          const milestone = completeness.canApprove ? "ready for approval" : "ready for review";
-          await storage.createActivity({
-            userId:      req.user.id,
-            type:        "workflow_milestone",
-            description: `Invoice #${doc.invoiceId} is now ${milestone} — all required documents confirmed`,
-            entityType:  "invoice",
-            entityId:    doc.invoiceId,
-          });
-        }
       }
 
       res.status(201).json({ ...review, invoiceId: doc.invoiceId });
@@ -9407,6 +9535,7 @@ RESPOND:
     { name: "send_carrier_message", description: "Send a message to a carrier via portal chat; requires confirmation", input_schema: { type: "object", properties: { carrier_id: { type: "string", minLength: 1, maxLength: 40 }, message: { type: "string", minLength: 1, maxLength: 10000 } }, required: ["carrier_id", "message"], additionalProperties: false } },
     { name: "get_carrier_invoices", description: "Get safe invoices for a specific carrier", input_schema: { type: "object", properties: { carrier_id: { type: "string", minLength: 1, maxLength: 40 }, status: { type: "string", maxLength: 40 } }, required: ["carrier_id"], additionalProperties: false } },
     { name: "get_broker_credit", description: "Get broker credit score and grade", input_schema: { type: "object", properties: { broker_id: { type: "string", minLength: 1, maxLength: 40 } }, required: ["broker_id"], additionalProperties: false } },
+    { name: "get_funding_receipt", description: "Get the latest funding receipt by invoice number or carrier MC number, optionally narrowed by load number", input_schema: { type: "object", properties: { invoice_no: { type: "string", minLength: 1, maxLength: 80 }, mc: { type: "string", minLength: 1, maxLength: 80 }, load_no: { type: "string", minLength: 1, maxLength: 80 } }, additionalProperties: false } },
   ];
   const earlPositiveId = z.preprocess(
     value => typeof value === "string" ? value.trim() : value,
@@ -9437,6 +9566,13 @@ RESPOND:
       status: z.enum(["draft", "submitted", "docs_pending", "under_review", "approved", "rejected", "funded", "settled", "paid", "held"]).optional(),
     }).strict(),
     get_broker_credit: z.object({ broker_id: earlPositiveId }).strict(),
+    get_funding_receipt: z.object({
+      invoice_no: earlText(1, 80).optional(),
+      mc: earlText(1, 80).optional(),
+      load_no: earlText(1, 80).optional(),
+    }).strict().refine(value => Boolean(value.invoice_no || value.mc), {
+      message: "Provide invoice_no or mc",
+    }),
   };
   const earlMutationTools = new Set(["hold_invoice", "assign_task", "send_carrier_message"]);
   const earlToolPermission: Record<string, string[]> = {
@@ -9445,6 +9581,7 @@ RESPOND:
     get_aging_report: ["factoring", "reports"], get_sheets_queue: ["factoring"], get_dashboard_stats: ["dashboard"],
     hold_invoice: ["factoring"], assign_task: ["tasks"], send_carrier_message: ["chat", "portal_submissions"],
     get_carrier_invoices: ["invoices", "factoring"], get_broker_credit: ["brokers"],
+    get_funding_receipt: ["factoring"],
   };
   const earlHasPermission = async (req: any, permissions: string[]) => {
     if (req.user?.role === "admin") return true;
@@ -9551,6 +9688,54 @@ RESPOND:
       const fields = earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName });
       return { data: fields, cards: [earlCard("invoice", String(row.invoice.invoiceNumber), fields, row.invoice.id)] };
     }
+    if (tool === "get_funding_receipt") {
+      const invoiceNo = args.invoice_no ? String(args.invoice_no).trim() : null;
+      const mc = args.mc ? String(args.mc).trim() : null;
+      const loadNo = args.load_no ? String(args.load_no).trim() : null;
+      const identity = invoiceNo
+        ? eq(invoices.invoiceNumber, invoiceNo)
+        : ilike(clients.mcNumber, mc!);
+      const [row] = await db.select({
+        receipt: fundingReceipts,
+        invoiceNumber: invoices.invoiceNumber,
+        loadNumber: invoices.loadNumber,
+        carrierName: clients.name,
+        mcNumber: clients.mcNumber,
+      }).from(fundingReceipts)
+        .innerJoin(invoices, eq(fundingReceipts.invoiceId, invoices.id))
+        .innerJoin(clients, eq(invoices.clientId, clients.id))
+        .where(and(
+          identity,
+          loadNo ? ilike(invoices.loadNumber, loadNo) : undefined,
+          req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
+        ))
+        .orderBy(desc(fundingReceipts.createdAt), desc(fundingReceipts.version))
+        .limit(1);
+      if (!row) return { data: { message: "Funding receipt not found" } };
+      const downloadLink = `/api/receipts/${encodeURIComponent(row.receipt.receiptNo)}/download?version=${row.receipt.version}`;
+      const fields = {
+        receiptNo: row.receipt.receiptNo,
+        version: row.receipt.version,
+        invoiceNumber: row.invoiceNumber,
+        loadNumber: row.loadNumber,
+        carrier: row.carrierName,
+        mcNumber: row.mcNumber,
+        invoiceAmount: row.receipt.invoiceAmount,
+        advancePct: row.receipt.advancePct,
+        feeAmount: row.receipt.feeAmount,
+        reserveAmount: row.receipt.reserveAmount,
+        netFunded: row.receipt.netFunded,
+        paymentMethod: row.receipt.paymentMethod,
+        paymentReference: row.receipt.paymentReference ?? "pending",
+        fundedAt: row.receipt.fundedAt,
+        auditHash: row.receipt.auditHash,
+        downloadLink,
+      };
+      return {
+        data: fields,
+        cards: [earlCard("funding_receipt", `${row.receipt.receiptNo} v${row.receipt.version}`, fields, row.receipt.id)],
+      };
+    }
     if (tool === "get_carrier_invoices") {
       const carrierId = Number(args.carrier_id); if (!Number.isInteger(carrierId) || !(await canAccessClient(req, carrierId))) return { data: { message: "Carrier not found or not accessible" } };
       const rows = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(eq(invoices.clientId, carrierId), args.status ? eq(invoices.status, String(args.status) as any) : undefined, req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).orderBy(desc(invoices.createdAt)).limit(50);
@@ -9597,7 +9782,6 @@ RESPOND:
         return { kind: "updated" as const, invoice: updated };
       });
       if (outcome.kind === "not_found") throw new Error("Invoice not found"); if (outcome.kind === "conflict") throw new Error(`Invoices in ${outcome.status} status cannot be placed on hold`);
-      await storage.createActivity({ userId: req.user.id, type: "invoice_held", description: `Invoice #${outcome.invoice.invoiceNumber} placed on hold: ${reason}`, entityType: "invoice", entityId: outcome.invoice.id }).catch(() => undefined);
       return { message: `Invoice ${outcome.invoice.invoiceNumber} placed on hold.` };
     }
     if (tool === "assign_task") {
@@ -11376,9 +11560,29 @@ RESPOND:
       const docs = subIds.length
         ? await db.select().from(carrierSubmissionDocs).where(inArray(carrierSubmissionDocs.submissionId, subIds))
         : [];
+      const submissionInvoiceNumbers = subs.map(s => s.invoiceNumber).filter((value): value is string => Boolean(value));
+      const receiptRows = submissionInvoiceNumbers.length
+        ? await db.select({
+            invoiceNumber: invoices.invoiceNumber,
+            carrierId: invoices.clientId,
+            receipt: fundingReceipts,
+          }).from(fundingReceipts)
+            .innerJoin(invoices, eq(fundingReceipts.invoiceId, invoices.id))
+            .where(inArray(invoices.invoiceNumber, submissionInvoiceNumbers))
+            .orderBy(desc(fundingReceipts.version))
+        : [];
       const result = subs.map((s) => ({
         ...s,
         documents: docs.filter((d) => d.submissionId === s.id),
+        receipts: receiptRows
+          .filter(row => row.invoiceNumber === s.invoiceNumber && row.carrierId === s.carrierId)
+          .map(row => ({
+            receiptNo: row.receipt.receiptNo,
+            version: row.receipt.version,
+            fundedAt: row.receipt.fundedAt,
+            createdAt: row.receipt.createdAt,
+            paymentReference: row.receipt.paymentReference,
+          })),
       }));
       res.json(result);
     } catch (error) {
@@ -11545,6 +11749,32 @@ RESPOND:
       fs.createReadStream(filePath).pipe(res);
     } catch (error) {
       res.status(500).json({ message: "Failed to download document" });
+    }
+  });
+
+  app.get("/api/portal/submissions/:id/receipts/:receiptNo/download", requirePortalAuth, async (req: any, res) => {
+    try {
+      const submissionId = z.coerce.number().int().positive().parse(req.params.id);
+      const receiptNo = z.string().regex(/^FR-\d{4}-\d{6}$/).parse(req.params.receiptNo);
+      const version = req.query.version === undefined ? undefined : z.coerce.number().int().positive().parse(req.query.version);
+      const [submission] = await db.select().from(carrierSubmissions).where(and(
+        eq(carrierSubmissions.id, submissionId),
+        eq(carrierSubmissions.portalUserId, req.portalUser.id),
+      )).limit(1);
+      if (!submission?.invoiceNumber || !submission.carrierId) return res.status(404).json({ message: "Funding receipt not found" });
+      const receipt = await getFundingReceipt(receiptNo, version);
+      if (!receipt) return res.status(404).json({ message: "Funding receipt not found" });
+      const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(and(
+        eq(invoices.id, receipt.invoiceId),
+        eq(invoices.invoiceNumber, submission.invoiceNumber),
+        eq(invoices.clientId, submission.carrierId),
+      )).limit(1);
+      if (!invoice) return res.status(404).json({ message: "Funding receipt not found" });
+      res.redirect(await getFundingReceiptDownloadUrl(receipt));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid funding receipt request" });
+      console.error("Portal funding receipt download error:", error);
+      res.status(500).json({ message: "Failed to download funding receipt" });
     }
   });
 

@@ -543,18 +543,7 @@ export async function triggerBrokerFollowUp(
     },
   });
 
-  // 8. Activity feed
-  try {
-    await storage.createActivity({
-      userId:      actorId,
-      type:        "broker_followup_triggered",
-      description: `Broker follow-up ${triggerType === "auto" ? "auto-triggered" : "manually triggered"} for invoice ${inv.invoiceNumber} — ${clientName}`,
-      entityType:  "invoice",
-      entityId:    invoiceId,
-    } as any);
-  } catch (_) { /* best-effort */ }
-
-  // 9. Send immediate email (best-effort) and capture SendGrid messageId
+  // 8. Send immediate email (best-effort) and capture SendGrid messageId
   if (cadence.sendImmediately && brokerEmail) {
     try {
       const { success, messageId } = await sendEmailTracked({

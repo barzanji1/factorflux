@@ -14,7 +14,9 @@
 - [Direct-message identity](direct-message-identity.md) — canonical DM keys must encode participant IDs unambiguously; delimiter joins can collide and expose private threads.
 - [Controlled Radix sliders](controlled-radix-sliders.md) — controlled sliders need local draft state during drag; committing against unchanged query data can make them nonfunctional.
 - [Invoice paperwork integrity](invoice-paperwork-integrity.md) — commit invoice rows atomically and durably retry failed S3 compensation; never leave partial paperwork.
+- [Invoice timeline source](invoice-timeline-source.md) — event_ledger is the sole invoice timeline source; format audit payloads server-side and never merge activity/history rows.
 - [Funding lifecycle integrity](funding-lifecycle-integrity.md) — payout, funded state, and audit writes are atomic; Fund and Hold must use compare-and-set transitions.
+- [Immutable funding receipts](immutable-funding-receipts.md) — issue receipts inside the funding transaction; serialize versions and durably retry failed S3 rollback cleanup.
 - [Publish-safe trigram indexes](publish-safe-trigram-indexes.md) — publish diff can corrupt deeply nested GIN expression indexes reconstructed from PostgreSQL catalogs.
 - [Chat notification cursors](chat-notification-cursors.md) — sound alerts require paginated message IDs plus a pre-list server watermark; unread deltas and client time lose or replay events.
 - [Carrier chat terminal states](carrier-chat-terminal-states.md) — expected 404/no-portal states must stop polling; repeated error refetches cause visible profile-message flicker.
