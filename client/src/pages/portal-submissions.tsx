@@ -18,7 +18,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton-rows";
 import { LoadTypeBadge } from "@/components/load-type";
 import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Win95Tabs as Tabs,
+  Win95TabsContent as TabsContent,
+  Win95TabsList as TabsList,
+  Win95TabsTrigger as TabsTrigger,
+} from "@/components/win95";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import CarrierChatThread from "@/components/carriers/CarrierChatThread";
 
@@ -318,12 +323,19 @@ export default function PortalSubmissionsPage() {
               </div>
             ) : <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
-                {canUsePortal && <TabsTrigger value="submissions">Submissions</TabsTrigger>}
+                {canUsePortal && <TabsTrigger value="submissions">
+                    <FileText className="h-4 w-4" />
+                    Submissions
+                  </TabsTrigger>}
                 {canUsePortal && <TabsTrigger value="registrations">
+                    <UserCheck className="h-4 w-4" />
                     Pending Registrations
                     {pendingCount > 0 && <Badge className="ml-2 h-5 min-w-5 justify-center bg-red-600 px-1 text-[10px] text-white">{pendingCount}</Badge>}
                   </TabsTrigger>}
-                {canUseChat && <TabsTrigger value="messages">Messages</TabsTrigger>}
+                {canUseChat && <TabsTrigger value="messages">
+                    <MessageCircle className="h-4 w-4" />
+                    Messages
+                  </TabsTrigger>}
               </TabsList>
 
               {canUsePortal && <TabsContent value="submissions">
