@@ -47,6 +47,10 @@ import {
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  win95TabsListClassName,
+  win95TabsTriggerClassName,
+} from "@/components/win95";
 
 interface AuthorityCheck {
   id: number;
@@ -626,31 +630,39 @@ export default function FmcsaAuthority() {
                       onChange={e => setSearch(e.target.value)}
                     />
                   </div>
-                  <div className="flex gap-1">
-                    {(["all", "broker", "debtor"] as const).map(t => (
-                      <Button
-                        key={t}
-                        size="sm"
-                        variant={filterType === t ? "default" : "outline"}
-                        onClick={() => setFilterType(t)}
-                        className="capitalize"
-                      >
-                        {t === "all" ? "All Types" : t === "broker" ? "Brokers" : "Debtors"}
-                      </Button>
-                    ))}
+                  <div className={win95TabsListClassName}>
+                    {(["all", "broker", "debtor"] as const).map(t => {
+                      const active = filterType === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          aria-pressed={active}
+                          data-state={active ? "active" : "inactive"}
+                          onClick={() => setFilterType(t)}
+                          className={win95TabsTriggerClassName}
+                        >
+                          {t === "all" ? "All Types" : t === "broker" ? "Brokers" : "Debtors"}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="flex gap-1">
-                    {(["all", "active", "inactive", "issues"] as const).map(s => (
-                      <Button
-                        key={s}
-                        size="sm"
-                        variant={filterStatus === s ? "default" : "outline"}
-                        onClick={() => setFilterStatus(s)}
-                        className="capitalize"
-                      >
-                        {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-                      </Button>
-                    ))}
+                  <div className={win95TabsListClassName}>
+                    {(["all", "active", "inactive", "issues"] as const).map(s => {
+                      const active = filterStatus === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={active}
+                          data-state={active ? "active" : "inactive"}
+                          onClick={() => setFilterStatus(s)}
+                          className={win95TabsTriggerClassName}
+                        >
+                          {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
