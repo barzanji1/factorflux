@@ -32,6 +32,10 @@ import { LOAD_TYPES, LOAD_TYPE_LABELS, type LoadType } from "@shared/load-types"
 import { LoadTypeBadge } from "@/components/load-type";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  win95TabsListClassName,
+  win95TabsTriggerClassName,
+} from "@/components/win95";
 
 type InvoicesResponse = {
   data: Invoice[];
@@ -265,7 +269,7 @@ export default function Invoices() {
                   </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="inline-flex flex-wrap items-center gap-1 border-2 border-[#808080] bg-[#d4d0c8] p-1">
+                      <div className={win95TabsListClassName}>
                         {(["all", ...LOAD_TYPES] as const).map((type) => {
                           const active = loadTypeFilter === type;
                           const label = type === "all" ? "All" : LOAD_TYPE_LABELS[type];
@@ -274,11 +278,9 @@ export default function Invoices() {
                               key={type}
                               type="button"
                               aria-pressed={active}
+                              data-state={active ? "active" : "inactive"}
                               onClick={() => { setLoadTypeFilter(type); setPage(1); }}
-                              className={cn(
-                                "px-3 py-1.5 text-xs font-semibold transition-colors",
-                                active ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700",
-                              )}
+                              className={win95TabsTriggerClassName}
                             >
                               {label}
                             </button>

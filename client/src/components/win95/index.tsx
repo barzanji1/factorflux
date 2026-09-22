@@ -125,6 +125,10 @@ Win95Button.displayName = "Win95Button";
 
 export const Win95Tabs = Tabs;
 export const Win95TabsContent = TabsContent;
+export const win95TabsListClassName =
+  "inline-flex h-auto w-fit flex-wrap items-center justify-start rounded-none border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-win95-canvas p-1 shadow-bevel-light";
+export const win95TabsTriggerClassName =
+  "flex items-center gap-2 rounded-none border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-win95-canvas px-4 py-1.5 text-sm font-medium text-[#2f2f2f] shadow-bevel-light focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=active]:border-b-white data-[state=active]:border-r-white data-[state=active]:border-l-[#808080] data-[state=active]:border-t-[#808080] data-[state=active]:bg-white data-[state=active]:text-win95-teal data-[state=active]:shadow-bevel-dark";
 export const Win95TabsList = React.forwardRef<
   React.ElementRef<typeof TabsList>,
   React.ComponentPropsWithoutRef<typeof TabsList>
@@ -132,7 +136,7 @@ export const Win95TabsList = React.forwardRef<
   <TabsList
     ref={ref}
     className={cn(
-      "h-auto w-fit flex-wrap justify-start rounded-none border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-win95-canvas p-1 shadow-bevel-light",
+      win95TabsListClassName,
       className,
     )}
     {...props}
@@ -146,7 +150,7 @@ export const Win95TabsTrigger = React.forwardRef<
   <TabsTrigger
     ref={ref}
     className={cn(
-      "flex items-center gap-2 rounded-none border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-win95-canvas px-4 py-1.5 text-sm font-medium text-[#2f2f2f] shadow-bevel-light focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=active]:border-b-white data-[state=active]:border-r-white data-[state=active]:border-l-[#808080] data-[state=active]:border-t-[#808080] data-[state=active]:bg-white data-[state=active]:text-win95-teal data-[state=active]:shadow-bevel-dark",
+      win95TabsTriggerClassName,
       className,
     )}
     {...props}
