@@ -8699,12 +8699,12 @@ Trucking Pros Financial Team
       const pageHeader = () => {
         let logoDrawn = false;
         const logoPaths = [
-          path.resolve(process.cwd(), "server/assets/tpf-logo.png"),
-          path.resolve(process.cwd(), "dist/tpf-logo.png"),
+          path.resolve(process.cwd(), "client/public/images/ff-logo-emboss.png"),
+          path.resolve(process.cwd(), "dist/public/images/ff-logo-emboss.png"),
         ];
         try {
           const logoPath = logoPaths.find(candidate => fs.existsSync(candidate));
-          if (logoPath) { doc.image(logoPath, left, 23, { fit: [190, 54] }); logoDrawn = true; }
+          if (logoPath) { doc.image(logoPath, left, 23, { fit: [54, 54] }); logoDrawn = true; }
         } catch { /* Bold wordmark below is the deliberate rendering fallback. */ }
         if (!logoDrawn) doc.font("Helvetica-Bold").fontSize(17).fillColor("#111").text("TRUCKING PROS FINANCIAL", left, 39);
         doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#111").text("Trucking Pros Financial LLC", left, 78);

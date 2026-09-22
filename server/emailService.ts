@@ -13,7 +13,26 @@ interface EmailParams {
     filename: string;
     type: string;
     disposition: string;
+    content_id?: string;
   }>;
+}
+
+const EMAIL_LOGO_CID = "factorflux-emboss-logo";
+const EMAIL_LOGO_MARKUP = `<div style="margin: 0 0 16px 0;"><img src="cid:${EMAIL_LOGO_CID}" alt="FactorFlux" width="48" style="display:block;width:48px;height:auto;border:0;" /></div>`;
+
+function emailLogoPath(): string | undefined {
+  const candidates = [
+    path.resolve(process.cwd(), "client/public/images/ff-logo-emboss.png"),
+    path.resolve(process.cwd(), "dist/public/images/ff-logo-emboss.png"),
+  ];
+  return candidates.find(candidate => fs.existsSync(candidate));
+}
+
+function insertEmailLogo(html: string): string {
+  const firstContainer = /<(div|table)\b[^>]*>/i;
+  return firstContainer.test(html)
+    ? html.replace(firstContainer, match => `${match}${EMAIL_LOGO_MARKUP}`)
+    : `${EMAIL_LOGO_MARKUP}${html}`;
 }
 
 /**
@@ -44,8 +63,23 @@ async function deliver(params: EmailParams): Promise<{ success: boolean; message
     };
     if (params.replyTo) msg.replyTo = params.replyTo;
 
-    if (params.html)        msg.html        = params.html;
-    if (params.attachments?.length) msg.attachments = params.attachments;
+    let attachments = params.attachments ? [...params.attachments] : [];
+    if (params.html) {
+      const logoPath = emailLogoPath();
+      if (logoPath) {
+        msg.html = insertEmailLogo(params.html);
+        attachments.push({
+          content: fs.readFileSync(logoPath).toString("base64"),
+          filename: "ff-logo-emboss.png",
+          type: "image/png",
+          disposition: "inline",
+          content_id: EMAIL_LOGO_CID,
+        });
+      } else {
+        msg.html = params.html;
+      }
+    }
+    if (attachments.length) msg.attachments = attachments;
 
     const [response] = await sgMail.send(msg as any);
 

@@ -71,8 +71,8 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
           <Link href="/portal/dashboard" className="flex items-center gap-2">
             <FactorFluxLogo
               showWordmark={false}
-              shine
-              markClassName="h-8 w-8"
+              markSrc="/images/ff-logo-emboss.png"
+              markClassName="h-9 w-9"
             />
             <span className="text-sm font-bold text-[#1a1a1a]">Carrier Portal</span>
             <span className="hidden text-xs text-[#444] sm:inline">— TPF</span>

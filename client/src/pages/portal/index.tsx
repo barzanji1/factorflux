@@ -7,7 +7,7 @@ export default function PortalLanding() {
   return (
     <div className="ff-portal-shell min-h-screen bg-[#d4d0c8] flex flex-col">
       <header className="px-6 py-4 flex items-center justify-between max-w-5xl mx-auto w-full">
-         <FactorFluxLogo />
+         <FactorFluxLogo markSrc="/images/ff-logo-emboss.png" markClassName="h-9 w-9" />
         <div className="flex items-center gap-2">
           <Link href="/portal/login">
             <Button variant="ghost" size="sm">

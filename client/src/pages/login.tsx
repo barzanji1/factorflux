@@ -64,7 +64,7 @@ export default function LoginPage() {
     <div className="ff-auth-page min-h-screen bg-[#d4d0c8] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex justify-center"><FactorFluxLogo /></div>
+          <div className="mx-auto mb-4 flex justify-center"><FactorFluxLogo markSrc="/images/ff-logo-emboss.png" markClassName="h-9 w-9" /></div>
           <p className="text-[#444] mt-2">Freight Factoring OS</p>
         </div>
 
