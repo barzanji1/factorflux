@@ -194,7 +194,7 @@ export default function AIAssistant() {
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messageThreadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -205,7 +205,9 @@ export default function AIAssistant() {
   }, [permissions, setLocation, toast]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const thread = messageThreadRef.current;
+    if (!thread) return;
+    thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   const appendEnvelope = (data: AssistantEnvelope) => {
@@ -280,7 +282,7 @@ export default function AIAssistant() {
   const userInitials = `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase() || "U";
 
   return (
-    <div className="ff-earl-page flex min-h-[100dvh] overflow-hidden bg-[#d4d0c8]">
+    <div className="ff-earl-page flex h-[100dvh] overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Earl" />
@@ -302,7 +304,7 @@ export default function AIAssistant() {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div ref={messageThreadRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
             {isEmpty ? (
               <div className="mx-auto flex h-full max-w-xl flex-col items-center justify-center gap-8 text-center">
                 <div className="flex flex-col items-center gap-3">
@@ -338,7 +340,6 @@ export default function AIAssistant() {
                     </div>
                   </div>
                 )}
-                <div ref={bottomRef} />
               </div>
             )}
           </div>
