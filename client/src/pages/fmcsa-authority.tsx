@@ -8,7 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Win95Tabs as Tabs,
+  Win95TabsContent as TabsContent,
+  Win95TabsList as TabsList,
+  Win95TabsTrigger as TabsTrigger,
+  win95TabsListClassName,
+  win95TabsTriggerClassName,
+} from "@/components/win95";
 import {
   Dialog,
   DialogContent,
@@ -47,10 +54,6 @@ import {
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  win95TabsListClassName,
-  win95TabsTriggerClassName,
-} from "@/components/win95";
 
 interface AuthorityCheck {
   id: number;
