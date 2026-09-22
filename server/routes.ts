@@ -650,6 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/bulk-sms", "bulk_sms"],
     ["/api/calendar", "calendar"],
     ["/api/ai/chat", "earl"],
+    ["/api/ai/actions", "earl"],
     ["/api/payouts", "payments"],
     ["/api/exceptions", "payments"],
     ["/api/payments", "payments"],
@@ -9248,77 +9249,366 @@ Trucking Pros Financial Team
   });
 
   // ─── AI Assistant ──────────────────────────────────────────────────────────
+  // Pending actions intentionally live server-side. The opaque id is the only
+  // thing returned to the browser and expires quickly, so it cannot be turned
+  // into an arbitrary method, URL, or request body by a caller.
+  type EarlPendingAction = { userId: string; tool: string; args: Record<string, unknown>; expiresAt: number };
+  const earlPendingActions = new Map<string, EarlPendingAction>();
+  const EARL_ACTION_TTL_MS = 5 * 60 * 1000;
+  const EARL_MAX_RESULT_CHARS = 6000;
+  const EARL_MAX_TOOL_ROUNDS = 4;
+  const earlSystemPrompt = `You are Earl, the internal AI operator for FactorFlux — the freight factoring operating system built for Trucking Pros Financial. You have full knowledge of the system and can fetch live data and take actions on behalf of agents.
+
+COMPANY: Trucking Pros Financial LLC
+ADDRESS: 204 E. 900 S. Salt Lake City, UT 84111
+PHONE: 801-755-9755
+EMAIL: dosh@truckingprosfinancial.com
+HOURS: Monday-Friday 7AM-3PM MST
+WIRE CUTOFF: 1:15 PM MST | ACH CUTOFF: 2:15 PM MST
+
+SYSTEM MODULES:
+- Carriers: trucking companies we factor for. Fields: name, MC#, DOT#, advance rate, factoring rate, status, assigned processor
+- Invoices: freight invoices submitted for factoring. Statuses: draft, pending_review, approved, funded, collected, settled
+- Sheets: funding queue where managers approve and fund invoices
+- Brokers: freight brokers who owe payment. Have credit grades A-F
+- Factoring Pipeline: 8 stages — Document Intake → Verification → Advance → Approval → Collections → Payment Receipt → Reconciliation → Final Settlement
+- Fuel Advance: short-term advance up to 50% of load rate before full funding
+- Lockbox: cash application — matching broker payments to open invoices
+- Held Queue: invoices blocked from funding — missing docs, disputes, manual holds
+- Chargebacks: invoices past 60 days auto-scheduled for chargeback, 90 days = charged
+- Followups: automated broker email cadence — immediate → due date → 3d → 7d → weekly x4
+- Vault: encrypted storage for SSN, bank accounts, sensitive carrier data. Never disclose vault contents.
+- Portal: carrier self-service at factorflux.io/portal — submit invoices, upload docs, message agents
+- Reports: Aging, Agent Performance, Broker AR, Carrier AR, Short Pay, Daily Deposits
+- Earl: that's you
+
+WORKFLOWS:
+- Factor an invoice: Carrier submits via portal OR agent creates in Invoices → uploads Rate Con + BOL → submits → appears in Sheets → manager approves → funds carrier
+- Fuel advance: Agent creates in Fuel Advance → enters load rate → system calculates 50% max → selects bank account → generates deposit slip
+- Put invoice on hold: Open invoice → Hold button → select reason → invoice moves to Held queue
+- Match a payment: Lockbox → New Entry → enter payment → Match to invoice
+- Approve carrier portal user: Admin → Carrier Portal tab → Approve
+- Check broker credit: Brokers page → click broker → Credit Score panel → grade A-F
+- Chargeback extension: Held/Factoring → invoice → Chargeback tab → Extend → enter new date and reason
+
+RESPOND:
+- Always in the context of FactorFlux and Trucking Pros Financial
+- Use exact terminology: carriers not clients, invoices not loads (unless agent uses loads), brokers not debtors
+- Be concise and action-oriented
+- If you can fetch live data to answer — always fetch it first
+- If you can take an action — confirm with the agent before executing
+- Never invent live values, expose sensitive vault data, or reveal provider/internal errors.`;
+
+  const earlToolDefinitions: any[] = [
+    { name: "search_system", description: "Search across carriers, brokers, invoices, fuel advances, tickets, tasks", input_schema: { type: "object", properties: { query: { type: "string", minLength: 2, maxLength: 120 }, entity_type: { type: "string", enum: ["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"] } }, required: ["query"], additionalProperties: false } },
+    { name: "get_carrier", description: "Get full safe carrier details by ID or MC#", input_schema: { type: "object", properties: { identifier: { type: "string", minLength: 1, maxLength: 80 } }, required: ["identifier"], additionalProperties: false } },
+    { name: "get_invoice", description: "Get safe invoice details and status by invoice number", input_schema: { type: "object", properties: { invoice_number: { type: "string", minLength: 1, maxLength: 80 } }, required: ["invoice_number"], additionalProperties: false } },
+    { name: "get_broker", description: "Get safe broker details and credit grade by name or MC#", input_schema: { type: "object", properties: { identifier: { type: "string", minLength: 1, maxLength: 80 } }, required: ["identifier"], additionalProperties: false } },
+    { name: "get_aging_report", description: "Get current aging report — invoices past due by bucket", input_schema: { type: "object", properties: { min_days: { type: "number", minimum: 0, maximum: 3650 } }, additionalProperties: false } },
+    { name: "get_sheets_queue", description: "Get current funding queue — invoices pending approval", input_schema: { type: "object", properties: { limit: { type: "number", minimum: 1, maximum: 50 } }, additionalProperties: false } },
+    { name: "get_dashboard_stats", description: "Get current dashboard stats — in queue, awaiting docs, held, funded today", input_schema: { type: "object", properties: {}, additionalProperties: false } },
+    { name: "hold_invoice", description: "Put an invoice on hold with a reason; requires confirmation", input_schema: { type: "object", properties: { invoice_id: { type: "string", minLength: 1, maxLength: 40 }, reason: { type: "string", minLength: 1, maxLength: 500 } }, required: ["invoice_id", "reason"], additionalProperties: false } },
+    { name: "assign_task", description: "Create and assign a task to an agent; requires confirmation", input_schema: { type: "object", properties: { title: { type: "string", minLength: 1, maxLength: 200 }, description: { type: "string", maxLength: 2000 }, assigned_to: { type: "string", minLength: 1, maxLength: 120 }, due_date: { type: "string", maxLength: 40 }, priority: { type: "string", enum: ["low", "medium", "high", "urgent"] } }, required: ["title", "assigned_to"], additionalProperties: false } },
+    { name: "send_carrier_message", description: "Send a message to a carrier via portal chat; requires confirmation", input_schema: { type: "object", properties: { carrier_id: { type: "string", minLength: 1, maxLength: 40 }, message: { type: "string", minLength: 1, maxLength: 10000 } }, required: ["carrier_id", "message"], additionalProperties: false } },
+    { name: "get_carrier_invoices", description: "Get safe invoices for a specific carrier", input_schema: { type: "object", properties: { carrier_id: { type: "string", minLength: 1, maxLength: 40 }, status: { type: "string", maxLength: 40 } }, required: ["carrier_id"], additionalProperties: false } },
+    { name: "get_broker_credit", description: "Get broker credit score and grade", input_schema: { type: "object", properties: { broker_id: { type: "string", minLength: 1, maxLength: 40 } }, required: ["broker_id"], additionalProperties: false } },
+  ];
+  const earlPositiveId = z.preprocess(
+    value => typeof value === "string" ? value.trim() : value,
+    z.coerce.number().int().positive(),
+  );
+  const earlText = (min: number, max: number) => z.string().trim().min(min).max(max);
+  const earlDate = z.string().trim().min(1).max(40).refine(value => !Number.isNaN(new Date(value).getTime()), "Invalid date");
+  const earlToolSchemas: Record<string, z.ZodTypeAny> = {
+    search_system: z.object({
+      query: earlText(2, 120),
+      entity_type: z.enum(["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"]).default("all"),
+    }).strict(),
+    get_carrier: z.object({ identifier: earlText(1, 80) }).strict(),
+    get_invoice: z.object({ invoice_number: earlText(1, 80) }).strict(),
+    get_broker: z.object({ identifier: earlText(1, 80) }).strict(),
+    get_aging_report: z.object({ min_days: z.coerce.number().int().min(0).max(3650).default(1) }).strict(),
+    get_sheets_queue: z.object({ limit: z.coerce.number().int().min(1).max(50).default(10) }).strict(),
+    get_dashboard_stats: z.object({}).strict(),
+    hold_invoice: z.object({ invoice_id: earlPositiveId, reason: earlText(1, 500) }).strict(),
+    assign_task: z.object({
+      title: earlText(1, 200), description: earlText(1, 2000).optional(),
+      assigned_to: earlText(1, 120), due_date: earlDate.optional(),
+      priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+    }).strict(),
+    send_carrier_message: z.object({ carrier_id: earlPositiveId, message: earlText(1, 10000) }).strict(),
+    get_carrier_invoices: z.object({
+      carrier_id: earlPositiveId,
+      status: z.enum(["draft", "submitted", "docs_pending", "under_review", "approved", "rejected", "funded", "settled", "paid", "held"]).optional(),
+    }).strict(),
+    get_broker_credit: z.object({ broker_id: earlPositiveId }).strict(),
+  };
+  const earlMutationTools = new Set(["hold_invoice", "assign_task", "send_carrier_message"]);
+  const earlToolPermission: Record<string, string[]> = {
+    search_system: ["dashboard", "carriers", "brokers", "invoices", "factoring", "tasks", "tickets"],
+    get_carrier: ["carriers"], get_invoice: ["invoices", "factoring"], get_broker: ["brokers"],
+    get_aging_report: ["factoring", "reports"], get_sheets_queue: ["factoring"], get_dashboard_stats: ["dashboard"],
+    hold_invoice: ["factoring"], assign_task: ["tasks"], send_carrier_message: ["chat", "portal_submissions"],
+    get_carrier_invoices: ["invoices", "factoring"], get_broker_credit: ["brokers"],
+  };
+  const earlHasPermission = async (req: any, permissions: string[]) => {
+    if (req.user?.role === "admin") return true;
+    const cache = ((req as any).__permissionCache ??= new Map<string, string[]>()) as Map<string, string[]>;
+    let granted = cache.get(req.user.id);
+    if (!granted) {
+      granted = await storage.getUserPermissions(req.user.id);
+      if (!granted.length) granted = ROLE_DEFAULT_PERMISSIONS[req.user.role] ?? ROLE_DEFAULT_PERMISSIONS.employee;
+      cache.set(req.user.id, granted);
+    }
+    return permissions.some(permission => granted!.includes(permission));
+  };
+  const earlRedact = (value: any): any => {
+    if (Array.isArray(value)) return value.slice(0, 50).map(earlRedact);
+    if (typeof value === "string") return value.length > 500 ? `${value.slice(0, 500)}… [truncated]` : value;
+    if (!value || typeof value !== "object") return value;
+    const blocked = /ssn|bank|routing|secret|password|encrypted|vault|token|owner/i;
+    return Object.fromEntries(Object.entries(value).filter(([key]) => !blocked.test(key)).map(([key, val]) => [key, earlRedact(val)]));
+  };
+  const earlJson = (value: any) => {
+    const json = JSON.stringify(earlRedact(value ?? { message: "No data found" }));
+    return json.length > EARL_MAX_RESULT_CHARS ? `${json.slice(0, EARL_MAX_RESULT_CHARS - 32)}… [truncated]` : json;
+  };
+  const earlLog = async (userId: string, event: any) => {
+    const audit = {
+      role: "tool",
+      event: String(event.event ?? "tool_event"),
+      tool: event.tool ? String(event.tool) : undefined,
+      status: event.status ? String(event.status) : undefined,
+      entityIds: Array.isArray(event.entityIds) ? event.entityIds.slice(0, 20).map((id: unknown) => String(id)) : undefined,
+      count: typeof event.count === "number" ? event.count : undefined,
+      toolNames: Array.isArray(event.toolNames) ? event.toolNames.slice(0, 20).map((name: unknown) => String(name)) : undefined,
+      errorCategory: event.errorCategory ? String(event.errorCategory) : undefined,
+      timestamp: new Date().toISOString(),
+    };
+    await db.insert(aiChatLogs).values({ userId, messages: [audit] }).catch(() => undefined);
+  };
+  const earlCarrierFields = (carrier: any) => ({ id: carrier.id, name: carrier.name, mcNumber: carrier.mcNumber, dotNumber: carrier.dotNumber, status: carrier.status, advanceRate: carrier.advanceRate, factoringRate: carrier.factoringFeeRate, assignedProcessor: carrier.assignedProcessor });
+  const earlInvoiceFields = (row: any) => ({ id: row.id, invoiceNumber: row.invoiceNumber, carrier: row.carrierName, broker: row.brokerName, amount: row.amount, status: row.status, ageDays: row.dueDate && row.status !== "settled" ? Math.max(0, Math.floor((Date.now() - new Date(row.dueDate).getTime()) / 86400000)) : 0, dueDate: row.dueDate });
+  const earlBrokerFields = (broker: any) => ({ id: broker.id, name: broker.name, mcNumber: broker.mcNumber, status: broker.status, creditGrade: broker.creditGrade, creditScore: broker.creditScore, assignedProcessor: broker.assignedProcessor });
+  const earlCard = (type: string, title: string, fields: Record<string, unknown>, entityId?: number) => ({
+    id: `${type}-${entityId ?? title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+    type, title, fields: Object.entries(fields).map(([label, value]) => ({ label, value: value == null ? "—" : String(value) })),
+    entityType: type, entityId,
+  });
+
+  const executeEarlReadTool = async (tool: string, args: any, req: any): Promise<{ data: any; cards?: any[] }> => {
+    const q = String(args.query ?? "").trim();
+    if (tool === "search_system") {
+      const pattern = `%${q}%`; const type = args.entity_type ?? "all"; const result: any = {};
+      if ((type === "carriers" || type === "all") && await earlHasPermission(req, ["carriers"])) {
+        const scope = isPrivilegedUser(req) ? undefined : eq(clients.assignedProcessor, req.user.id);
+        result.carriers = (await db.select({ id: clients.id, name: clients.name, mcNumber: clients.mcNumber, dotNumber: clients.dotNumber, status: clients.status, assignedProcessor: clients.assignedProcessor }).from(clients).where(and(or(ilike(clients.name, pattern), ilike(clients.mcNumber, pattern), ilike(clients.dotNumber, pattern)), scope)).limit(10)).map(earlCarrierFields);
+      }
+      if ((type === "brokers" || type === "all") && await earlHasPermission(req, ["brokers"])) {
+        const scope = isPrivilegedUser(req) ? undefined : eq(brokers.assignedProcessor, req.user.id);
+        result.brokers = (await db.select({ id: brokers.id, name: brokers.name, mcNumber: brokers.mcNumber, status: brokers.status, creditGrade: brokers.creditGrade, creditScore: brokers.creditScore, assignedProcessor: brokers.assignedProcessor }).from(brokers).where(and(or(ilike(brokers.name, pattern), ilike(brokers.mcNumber, pattern)), scope)).limit(10)).map(earlBrokerFields);
+      }
+      if ((type === "invoices" || type === "all") && await earlHasPermission(req, ["invoices", "factoring"])) {
+        const scope = req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined;
+        result.invoices = (await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(or(ilike(invoices.invoiceNumber, pattern), ilike(invoices.loadNumber, pattern), ilike(invoices.code, pattern)), scope)).limit(10)).map(row => earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName }));
+      }
+      if ((type === "fuel_advances" || type === "all") && await earlHasPermission(req, ["fuel_advance"])) {
+        const scope = isPrivilegedUser(req)
+          ? undefined
+          : or(eq(fuelAdvances.processedBy, req.user.id), eq(clients.assignedProcessor, req.user.id));
+        result.fuel_advances = await db.select({
+          id: fuelAdvances.id, carrierName: fuelAdvances.carrierName, carrierId: fuelAdvances.carrierId,
+          loadNumber: fuelAdvances.loadNumber, advanceDate: fuelAdvances.advanceDate,
+          pickupState: fuelAdvances.pickupState, deliveryState: fuelAdvances.deliveryState,
+          status: fuelAdvances.status,
+        }).from(fuelAdvances).leftJoin(clients, eq(fuelAdvances.carrierId, clients.id))
+          .where(and(or(ilike(fuelAdvances.carrierName, pattern), ilike(fuelAdvances.loadNumber, pattern), ilike(fuelAdvances.code, pattern)), scope)).limit(10);
+      }
+      if ((type === "tasks" || type === "all") && await earlHasPermission(req, ["tasks"])) {
+        const scope = isPrivilegedUser(req) ? undefined : eq(tasks.assignedTo, req.user.id);
+        result.tasks = await db.select({ id: tasks.id, title: tasks.title, status: tasks.status, priority: tasks.priority, dueDate: tasks.dueDate, assignedTo: tasks.assignedTo }).from(tasks).where(and(or(ilike(tasks.title, pattern), ilike(tasks.description, pattern)), scope)).limit(10);
+      }
+      if ((type === "tickets" || type === "all") && await earlHasPermission(req, ["tickets"])) {
+        const scope = isPrivilegedUser(req) ? undefined : eq(tickets.assignedTo, req.user.id);
+        result.tickets = await db.select({ id: tickets.id, title: tickets.title, status: tickets.status, priority: tickets.priority }).from(tickets).where(and(ilike(tickets.title, pattern), scope)).limit(10);
+      }
+      return { data: result };
+    }
+    if (tool === "get_carrier") {
+      const identifier = String(args.identifier).trim();
+      const numeric = /^\d+$/.test(identifier) ? Number(identifier) : -1;
+      const [carrier] = await db.select({ id: clients.id, name: clients.name, mcNumber: clients.mcNumber, dotNumber: clients.dotNumber, status: clients.status, advanceRate: clients.advanceRate, factoringFeeRate: clients.factoringFeeRate, assignedProcessor: clients.assignedProcessor }).from(clients).where(and(or(eq(clients.id, numeric), ilike(clients.mcNumber, identifier), ilike(clients.name, `%${identifier}%`)), isPrivilegedUser(req) ? undefined : eq(clients.assignedProcessor, req.user.id))).limit(1);
+      if (!carrier) return { data: { message: "Carrier not found" } };
+      return { data: earlCarrierFields(carrier), cards: [earlCard("carrier", carrier.name, earlCarrierFields(carrier), carrier.id)] };
+    }
+    if (tool === "get_broker" || tool === "get_broker_credit") {
+      const identifier = String(args.identifier ?? args.broker_id).trim(); const numeric = /^\d+$/.test(identifier) ? Number(identifier) : -1;
+      const [broker] = await db.select({ id: brokers.id, name: brokers.name, mcNumber: brokers.mcNumber, status: brokers.status, creditGrade: brokers.creditGrade, creditScore: brokers.creditScore, assignedProcessor: brokers.assignedProcessor }).from(brokers).where(and(or(eq(brokers.id, numeric), ilike(brokers.mcNumber, identifier), ilike(brokers.name, `%${identifier}%`)), isPrivilegedUser(req) ? undefined : eq(brokers.assignedProcessor, req.user.id))).limit(1);
+      if (!broker) return { data: { message: "Broker not found" } };
+      const brokerInvoices = await db.select({ amount: invoices.amount, status: invoices.status }).from(invoices).where(and(eq(invoices.brokerId, broker.id), inArray(invoices.status, ["submitted", "docs_pending", "under_review", "approved", "funded", "held"])));
+      const outstandingAr = brokerInvoices.reduce((total, invoice) => total + Number(invoice.amount || 0), 0).toFixed(2);
+      const fields = { ...earlBrokerFields(broker), outstandingAr };
+      return { data: fields, cards: [earlCard("broker", broker.name, { ...fields, creditBadge: broker.creditGrade ?? "Unrated" }, broker.id)] };
+    }
+    if (tool === "get_invoice") {
+      const [row] = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(eq(invoices.invoiceNumber, String(args.invoice_number).trim()), req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).limit(1);
+      if (!row) return { data: { message: "Invoice not found" } };
+      const fields = earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName });
+      return { data: fields, cards: [earlCard("invoice", String(row.invoice.invoiceNumber), fields, row.invoice.id)] };
+    }
+    if (tool === "get_carrier_invoices") {
+      const carrierId = Number(args.carrier_id); if (!Number.isInteger(carrierId) || !(await canAccessClient(req, carrierId))) return { data: { message: "Carrier not found or not accessible" } };
+      const rows = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(eq(invoices.clientId, carrierId), args.status ? eq(invoices.status, String(args.status) as any) : undefined, req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).orderBy(desc(invoices.createdAt)).limit(50);
+      return { data: rows.map(row => earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName })) };
+    }
+    if (tool === "get_aging_report") {
+      const minDays = Number(args.min_days ?? 1); const cutoff = new Date(Date.now() - minDays * 86400000);
+      const rows = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(lte(invoices.dueDate, cutoff), inArray(invoices.status, ["submitted", "docs_pending", "under_review", "approved", "funded", "held"]), req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).orderBy(asc(invoices.dueDate)).limit(50);
+      return { data: { minDays, total: rows.length, invoices: rows.map(row => earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName })) } };
+    }
+    if (tool === "get_sheets_queue") {
+      const limit = Math.min(50, Math.max(1, Number(args.limit ?? 10))); const rows = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(inArray(invoices.status, ["submitted", "docs_pending", "under_review", "approved"]), req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).orderBy(asc(invoices.createdAt)).limit(limit);
+      return { data: { total: rows.length, invoices: rows.map(row => earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName })) } };
+    }
+    if (tool === "get_dashboard_stats") {
+      if (!isPrivilegedUser(req)) return { data: { message: "Dashboard totals require manager or admin access" } };
+      return { data: await storage.getDashboardStats() };
+    }
+    return { data: { message: "Tool not available" } };
+  };
+
+  const makeEarlPendingConfirmation = (req: any, tool: string, args: Record<string, unknown>) => {
+    const now = Date.now();
+    earlPendingActions.forEach((pending, pendingId) => {
+      if (pending.expiresAt <= now) earlPendingActions.delete(pendingId);
+    });
+    const id = crypto.randomBytes(24).toString("hex"); const expiresAt = Date.now() + EARL_ACTION_TTL_MS;
+    earlPendingActions.set(id, { userId: req.user.id, tool, args, expiresAt });
+    const labels: Record<string, string> = { hold_invoice: "Place invoice on hold", assign_task: "Create and assign task", send_carrier_message: "Send carrier portal message" };
+    return { id, tool, title: labels[tool], description: tool === "hold_invoice" ? `Place invoice ${args.invoice_id} on hold for: ${args.reason}` : tool === "assign_task" ? `Assign task “${args.title}” to ${args.assigned_to}` : `Send a message to carrier ${args.carrier_id}`, expiresAt: new Date(expiresAt).toISOString() };
+  };
+  const executeEarlMutation = async (tool: string, args: any, req: any) => {
+    if (tool === "hold_invoice") {
+      if (!isPrivilegedUser(req)) throw new Error("Manager or admin access required");
+      const invoiceId = Number(args.invoice_id); if (!Number.isInteger(invoiceId) || invoiceId <= 0) throw new Error("Invalid invoice ID");
+      const reason = String(args.reason).trim(); const allowed = ["submitted", "docs_pending", "under_review", "approved"] as const;
+      const outcome = await db.transaction(async tx => {
+        const [existing] = await tx.select({ id: invoices.id, status: invoices.status }).from(invoices).where(eq(invoices.id, invoiceId));
+        if (!existing) return { kind: "not_found" as const }; if (!allowed.includes(existing.status as any)) return { kind: "conflict" as const, status: existing.status };
+        const heldAt = new Date(); const [updated] = await tx.update(invoices).set({ previousStatus: existing.status, status: "held", heldReason: reason, heldAt, heldBy: req.user.id, updatedAt: heldAt }).where(and(eq(invoices.id, invoiceId), inArray(invoices.status, [...allowed]))).returning();
+        if (!updated) return { kind: "conflict" as const, status: existing.status };
+        await tx.insert(invoiceStatusHistory).values({ invoiceId, oldStatus: existing.status, newStatus: "held", changedBy: req.user.id, reason: `Held: ${reason}` });
+        await tx.insert(eventLedger).values({ entityType: "invoice", entityId: invoiceId, eventType: "status_changed", actorType: "user", actorId: req.user.id, payloadJson: { from: existing.status, to: "held", reason } });
+        return { kind: "updated" as const, invoice: updated };
+      });
+      if (outcome.kind === "not_found") throw new Error("Invoice not found"); if (outcome.kind === "conflict") throw new Error(`Invoices in ${outcome.status} status cannot be placed on hold`);
+      await storage.createActivity({ userId: req.user.id, type: "invoice_held", description: `Invoice #${outcome.invoice.invoiceNumber} placed on hold: ${reason}`, entityType: "invoice", entityId: outcome.invoice.id }).catch(() => undefined);
+      return { message: `Invoice ${outcome.invoice.invoiceNumber} placed on hold.` };
+    }
+    if (tool === "assign_task") {
+      const assignedValue = String(args.assigned_to).trim(); let assignedTo = assignedValue;
+      const [byId] = await db.select({ id: users.id }).from(users).where(and(eq(users.id, assignedValue), eq(users.status, "active"))).limit(1);
+      if (!byId) {
+        const [byName] = await db.select({ id: users.id }).from(users).where(and(eq(users.status, "active"), ilike(sql`concat(${users.firstName}, ' ', ${users.lastName})`, assignedValue))).limit(1);
+        assignedTo = byName?.id ?? "";
+      }
+      if (!assignedTo) throw new Error("Active assignee not found");
+      if (req.user.role === "employee" && assignedTo !== req.user.id) throw new Error("Employees may only assign tasks to themselves");
+      const dueDate = args.due_date ? new Date(String(args.due_date)) : undefined; if (dueDate && Number.isNaN(dueDate.getTime())) throw new Error("Invalid due date");
+      const data = insertTaskSchema.parse({ title: String(args.title).trim(), description: args.description ? String(args.description).trim() : null, type: "task", priority: args.priority ?? "medium", assignedTo, ...(dueDate ? { dueDate } : {}) });
+      const [task] = await db.insert(tasks).values({ ...data, createdBy: req.user.id }).returning();
+      if (assignedTo !== req.user.id) await storage.createNotification({ userId: assignedTo, title: "New task assigned", message: `You were assigned: ${task.title}`, type: "info", entityType: "task", entityId: task.id, actionUrl: `/tasks/${task.id}` });
+      return { message: `Task “${task.title}” assigned.`, taskId: task.id };
+    }
+    if (tool === "send_carrier_message") {
+      const carrierId = Number(args.carrier_id); if (!Number.isInteger(carrierId) || !(await canAccessClient(req, carrierId))) throw new Error("Carrier not found or not accessible");
+      const chatResult = await getAgentChatForCarrier(carrierId, true);
+      if (!chatResult) throw new Error("Active carrier portal chat not found");
+      const [created] = await db.insert(portalChatMessages).values({ chatId: chatResult.chat.id, senderType: "agent", senderId: String(req.user.id), message: String(args.message).trim(), read: false }).returning();
+      await db.update(portalChats).set({ agentId: sql`coalesce(${portalChats.agentId}, ${req.user.id})`, updatedAt: new Date() }).where(eq(portalChats.id, chatResult.chat.id));
+      await storage.createActivity({ userId: req.user.id, type: "carrier_chat_message_sent", description: `Sent a portal message to carrier ${carrierId}`, entityType: "client", entityId: carrierId }).catch(() => undefined);
+      return { message: "Carrier message sent.", messageId: created.id };
+    }
+    throw new Error("Unsupported action");
+  };
+
   app.post("/api/ai/chat", requireAuth, async (req: any, res) => {
     try {
       const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) {
-        return res.status(503).json({ message: "AI Assistant is not configured. Ask your administrator to set the ANTHROPIC_API_KEY." });
-      }
-
-      const { messages } = req.body;
-      if (!Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ message: "messages array is required" });
-      }
-
-      const client = new Anthropic({ apiKey });
-
-      const systemPrompt = `You are an internal AI assistant for FactorFlux, a freight factoring operations system built for Trucking Pros Financial. You help agents navigate the system, troubleshoot issues, and understand workflows.
-
-System knowledge:
-- Carriers: trucking companies that submit invoices for factoring
-- Invoices: freight invoices submitted by carriers for payment advance
-- Factoring: 8-stage lifecycle — Document Intake → Verification → Advance → Approval → Collections → Payment Receipt → Final Settlement
-- Brokers: freight brokers who owe payment on invoices
-- Lockbox: cash application tool to match incoming payments to open invoices
-- Held Queue: invoices blocked from funding due to missing docs, disputes, or manual holds
-- Fuel Advance: short-term advances to carriers for fuel costs
-- Followups: automated broker communication and collections cadence
-- Vault: encrypted storage for sensitive carrier data (SSN, bank accounts)
-- Portal Submissions: invoices submitted by carriers through the carrier portal at /portal
-- Dispatchers: carrier dispatchers linked to carrier records
-- Trucks: carrier equipment tracked per carrier
-- Bank Transfers: ACH and wire transfer records
-- Payroll: agent payroll tracking
-- Release Letters: letters sent to brokers upon invoice settlement
-- C/B Reviews: credit and background reviews on carriers and brokers
-- MC Check: FMCSA authority verification for carriers
-- Bulk Invoices: batch invoice processing for high-volume carriers
-- Reports: Aging, Agent, Broker, Carrier, Daily AR, Monthly Summary
-- Audit Trail/Logs: full system activity log
-- Workflow Builder: configurable factoring pipeline stages with SLA targets
-- Rules: document classification rules
-- Admin: user management, permissions, carrier portal approvals
-
-Common workflows:
-- To factor an invoice: Carriers → Create Invoice → Upload BOL and Rate Con → Factoring tab → move through stages
-- To hold an invoice: Open invoice → Hold button → select reason
-- To match a payment: Lockbox → New Entry → Match to invoice
-- To approve a carrier portal user: Admin → Carrier Portal tab → Approve
-- To add an agent: Admin → Users tab → Add Agent → set permissions via toggles
-
-Always be helpful, concise, and specific to FactorFlux workflows. If an agent describes an error, ask for details and guide them through fixing it step by step.`;
-
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
+      if (!apiKey) return res.status(503).json({ message: "AI Assistant is not configured. Ask your administrator to set the ANTHROPIC_API_KEY." });
+      const rawMessages = req.body?.messages;
+      if (!Array.isArray(rawMessages) || rawMessages.length === 0 || rawMessages.length > 20) return res.status(400).json({ message: "messages must contain 1 to 20 messages" });
+      const messages = rawMessages.map((message: any) => {
+        if (!message || !["user", "assistant"].includes(message.role) || typeof message.content !== "string" || !message.content.trim() || message.content.length > 12000) throw new Error("Invalid message format");
+        return { role: message.role, content: message.content.trim() };
       });
-
-      const assistantMessage = response.content[0]?.type === "text" ? response.content[0].text : "";
-
-      // Log conversation
+      const client = new Anthropic({ apiKey }); let transcript: any[] = [...messages]; let finalMessage = ""; let confirmation: any = null; let mutationQueued = false; const cards: any[] = []; const activities: any[] = []; const toolNames: string[] = [];
+      for (let round = 0; round < EARL_MAX_TOOL_ROUNDS; round++) {
+        const response: any = await client.messages.create({ model: "claude-sonnet-4-5", max_tokens: 1400, system: earlSystemPrompt, tools: earlToolDefinitions, messages: transcript });
+        transcript.push({ role: "assistant", content: response.content });
+        const text = response.content.filter((block: any) => block.type === "text").map((block: any) => block.text).join("\n").trim();
+        const calls = response.content.filter((block: any) => block.type === "tool_use");
+        if (text) finalMessage = text;
+        if (!calls.length || response.stop_reason !== "tool_use") break;
+        const results: any[] = [];
+        for (const call of calls) {
+          const tool = String(call.name); const definition = earlToolDefinitions.find(item => item.name === tool);
+          if (!definition) { await earlLog(req.user.id, { event: "tool_denied", tool, reason: "unknown_tool" }); results.push({ type: "tool_result", tool_use_id: call.id, content: earlJson({ message: "Unknown tool" }), is_error: true }); continue; }
+          let args: any;
+          try { args = earlToolSchemas[tool].parse(call.input ?? {}); } catch { await earlLog(req.user.id, { event: "tool_failed", tool, status: "failed", errorCategory: "invalid_input" }); activities.push({ tool, label: tool.replace(/_/g, " "), status: "failed", detail: "Invalid tool input" }); results.push({ type: "tool_result", tool_use_id: call.id, content: earlJson({ message: "Invalid tool input" }), is_error: true }); continue; }
+          toolNames.push(tool);
+          if (!(await earlHasPermission(req, earlToolPermission[tool] ?? []))) { await earlLog(req.user.id, { event: "tool_denied", tool, status: "denied", errorCategory: "permission" }); activities.push({ tool, label: tool.replace(/_/g, " "), status: "failed", detail: "Permission denied" }); results.push({ type: "tool_result", tool_use_id: call.id, content: earlJson({ message: "You do not have permission for this data or action." }), is_error: true }); continue; }
+          await earlLog(req.user.id, { event: "tool_call", tool, status: "running" });
+          if (earlMutationTools.has(tool)) {
+            if (mutationQueued) {
+              await earlLog(req.user.id, { event: "tool_denied", tool, status: "denied", errorCategory: "multiple_pending_actions" });
+              activities.push({ tool, label: tool.replace(/_/g, " "), status: "failed", detail: "Only one action can be confirmed at a time" });
+              results.push({ type: "tool_result", tool_use_id: call.id, content: earlJson({ message: "Only one action can be confirmed at a time." }), is_error: true });
+              continue;
+            }
+            confirmation = makeEarlPendingConfirmation(req, tool, args);
+            mutationQueued = true;
+            activities.push({ tool, label: tool.replace(/_/g, " "), status: "pending", detail: "Waiting for confirmation" });
+            await earlLog(req.user.id, { event: "tool_pending", tool, status: "pending" });
+            results.push({ type: "tool_result", tool_use_id: call.id, content: earlJson({ pending_confirmation: true, tool, message: "Confirmation is required before this action can execute." }) });
+          } else {
+            try { const output = await executeEarlReadTool(tool, args, req); cards.push(...(output.cards ?? [])); await earlLog(req.user.id, { event: "tool_result", tool, status: "completed", count: Array.isArray(output.data) ? output.data.length : undefined }); activities.push({ tool, label: tool.replace(/_/g, " "), status: "completed" }); results.push({ type: "tool_result", tool_use_id: call.id, content: earlJson(output.data) }); }
+            catch { await earlLog(req.user.id, { event: "tool_failed", tool, status: "failed", errorCategory: "data_access" }); activities.push({ tool, label: tool.replace(/_/g, " "), status: "failed", detail: "Data unavailable" }); results.push({ type: "tool_result", tool_use_id: call.id, content: earlJson({ message: "Unable to retrieve that data." }), is_error: true }); }
+          }
+        }
+        transcript.push({ role: "user", content: results });
+        if (confirmation) break;
+      }
+      if (!finalMessage && !confirmation) {
+        const synthesis: any = await client.messages.create({ model: "claude-sonnet-4-5", max_tokens: 1400, system: earlSystemPrompt, messages: transcript });
+        finalMessage = synthesis.content.filter((block: any) => block.type === "text").map((block: any) => block.text).join("\n").trim();
+      }
+      if (!finalMessage) finalMessage = confirmation ? "I’m ready to do that. Please confirm the action." : "I couldn’t find a response for that request.";
       const userId = req.user?.claims?.sub ?? req.user?.id;
-      await db.insert(aiChatLogs).values({
-        userId,
-        messages: [...messages, { role: "assistant", content: assistantMessage }],
-      });
-
-      res.json({ message: assistantMessage });
+      await earlLog(userId, { event: "chat", status: "completed", count: messages.length, toolNames });
+      const uniqueCards = Array.from(new Map(cards.filter(card => typeof card?.id === "string").map(card => [card.id, card])).values());
+      res.json({ message: finalMessage, activities, cards: uniqueCards.slice(0, 10), confirmation });
     } catch (error: any) {
-      console.error("AI chat error:", error);
-      const msg = error?.message ?? "Failed to get AI response";
-      res.status(500).json({ message: msg });
+      console.error("AI chat error:", error instanceof Error ? error.message : "unknown");
+      res.status(error?.message === "Invalid message format" ? 400 : 500).json({ message: error?.message === "Invalid message format" ? error.message : "Failed to get AI response" });
+    }
+  });
+
+  app.post("/api/ai/actions/:id/confirm", requireAuth, async (req: any, res) => {
+    const id = String(req.params.id || "");
+    const pending = earlPendingActions.get(id);
+    if (!pending || pending.expiresAt <= Date.now()) { if (pending) earlPendingActions.delete(id); return res.status(404).json({ message: "Confirmation expired or not found", activities: [], cards: [], confirmation: null }); }
+    if (pending.userId !== req.user.id) return res.status(403).json({ message: DENIED_MESSAGE, activities: [], cards: [], confirmation: null });
+    earlPendingActions.delete(id);
+    if (!(await earlHasPermission(req, earlToolPermission[pending.tool] ?? []))) { await earlLog(req.user.id, { event: "action_denied", tool: pending.tool, status: "denied", errorCategory: "permission" }); return res.status(403).json({ message: DENIED_MESSAGE, activities: [], cards: [], confirmation: null }); }
+    try {
+      const parsedArgs = earlToolSchemas[pending.tool].parse(pending.args);
+      const result = await executeEarlMutation(pending.tool, parsedArgs, req);
+      await earlLog(req.user.id, { event: "action_confirmed", tool: pending.tool, status: "completed" });
+      res.json({ message: result.message, activities: [{ tool: pending.tool, label: pending.tool.replace(/_/g, " "), status: "completed" }], cards: [], confirmation: null });
+    } catch (error: any) {
+      await earlLog(req.user.id, { event: "action_failed", tool: pending.tool, status: "failed", errorCategory: error instanceof z.ZodError ? "invalid_saved_input" : "business_state" });
+      res.status(400).json({ message: error instanceof z.ZodError ? "Confirmation is no longer valid" : error instanceof Error ? error.message : "Action could not be completed", activities: [{ tool: pending.tool, label: pending.tool.replace(/_/g, " "), status: "failed", detail: "Action could not be completed" }], cards: [], confirmation: null });
     }
   });
 

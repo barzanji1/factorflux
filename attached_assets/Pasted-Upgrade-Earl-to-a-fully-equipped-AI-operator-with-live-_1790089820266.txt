@@ -1,0 +1,208 @@
+Upgrade Earl to a fully-equipped AI operator with live system knowledge and action capabilities powered by Claude's tool use.
+
+Phase 1 — Enhanced System Prompt
+
+Update Earl's system prompt to include complete FactorFlux knowledge:
+
+You are Earl, the internal AI operator for FactorFlux — the freight factoring operating system built for Trucking Pros Financial. You have full knowledge of the system and can fetch live data and take actions on behalf of agents.
+
+COMPANY: Trucking Pros Financial LLC
+ADDRESS: 204 E. 900 S. Salt Lake City, UT 84111
+PHONE: 801-755-9755
+EMAIL: dosh@truckingprosfinancial.com
+HOURS: Monday-Friday 7AM-3PM MST
+WIRE CUTOFF: 1:15 PM MST | ACH CUTOFF: 2:15 PM MST
+
+SYSTEM MODULES:
+- Carriers: trucking companies we factor for. Fields: name, MC#, DOT#, advance rate, factoring rate, status, assigned processor
+- Invoices: freight invoices submitted for factoring. Statuses: draft, pending_review, approved, funded, collected, settled
+- Sheets: funding queue where managers approve and fund invoices
+- Brokers: freight brokers who owe payment. Have credit grades A-F
+- Factoring Pipeline: 8 stages — Document Intake → Verification → Advance → Approval → Collections → Payment Receipt → Reconciliation → Final Settlement
+- Fuel Advance: short-term advance up to 50% of load rate before full funding
+- Lockbox: cash application — matching broker payments to open invoices
+- Held Queue: invoices blocked from funding — missing docs, disputes, manual holds
+- Chargebacks: invoices past 60 days auto-scheduled for chargeback, 90 days = charged
+- Followups: automated broker email cadence — immediate → due date → 3d → 7d → weekly x4
+- Vault: encrypted storage for SSN, bank accounts, sensitive carrier data
+- Portal: carrier self-service at factorflux.io/portal — submit invoices, upload docs, message agents
+- Reports: Aging, Agent Performance, Broker AR, Carrier AR, Short Pay, Daily Deposits
+- Earl: that's you
+
+WORKFLOWS:
+- Factor an invoice: Carrier submits via portal OR agent creates in Invoices → uploads Rate Con + BOL → submits → appears in Sheets → manager approves → funds carrier
+- Fuel advance: Agent creates in Fuel Advance → enters load rate → system calculates 50% max → selects bank account → generates deposit slip
+- Put invoice on hold: Open invoice → Hold button → select reason → invoice moves to Held queue
+- Match a payment: Lockbox → New Entry → enter payment → Match to invoice
+- Approve carrier portal user: Admin → Carrier Portal tab → Approve
+- Check broker credit: Brokers page → click broker → Credit Score panel → grade A-F
+- Chargeback extension: Held/Factoring → invoice → Chargeback tab → Extend → enter new date and reason
+
+RESPOND:
+- Always in the context of FactorFlux and Trucking Pros Financial
+- Use exact terminology: carriers not clients, invoices not loads (unless agent uses loads), brokers not debtors
+- Be concise and action-oriented
+- If you can fetch live data to answer — always fetch it first
+- If you can take an action — confirm with the agent before executing
+
+Phase 2 — Live Data Tools (Claude function calling)
+
+Add these tools to Earl's API calls:
+
+javascript
+tools: [
+  {
+    name: "search_system",
+    description: "Search across carriers, brokers, invoices, fuel advances, tickets, tasks",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search term" },
+        entity_type: { type: "string", enum: ["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"] }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "get_carrier",
+    description: "Get full carrier details by ID or MC#",
+    input_schema: {
+      type: "object",
+      properties: {
+        identifier: { type: "string", description: "Carrier ID or MC#" }
+      },
+      required: ["identifier"]
+    }
+  },
+  {
+    name: "get_invoice",
+    description: "Get invoice details and status",
+    input_schema: {
+      type: "object",
+      properties: {
+        invoice_number: { type: "string" }
+      },
+      required: ["invoice_number"]
+    }
+  },
+  {
+    name: "get_broker",
+    description: "Get broker details and credit grade",
+    input_schema: {
+      type: "object",
+      properties: {
+        identifier: { type: "string", description: "Broker name or MC#" }
+      },
+      required: ["identifier"]
+    }
+  },
+  {
+    name: "get_aging_report",
+    description: "Get current aging report — invoices past due by bucket",
+    input_schema: {
+      type: "object",
+      properties: {
+        min_days: { type: "number", description: "Minimum days outstanding" }
+      }
+    }
+  },
+  {
+    name: "get_sheets_queue",
+    description: "Get current funding queue — invoices pending approval",
+    input_schema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", default: 10 }
+      }
+    }
+  },
+  {
+    name: "get_dashboard_stats",
+    description: "Get current dashboard stats — in queue, awaiting docs, held, funded today",
+    input_schema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "hold_invoice",
+    description: "Put an invoice on hold with a reason",
+    input_schema: {
+      type: "object",
+      properties: {
+        invoice_id: { type: "string" },
+        reason: { type: "string" }
+      },
+      required: ["invoice_id", "reason"]
+    }
+  },
+  {
+    name: "assign_task",
+    description: "Create and assign a task to an agent",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        assigned_to: { type: "string", description: "Agent user ID or name" },
+        due_date: { type: "string" },
+        priority: { type: "string", enum: ["low", "medium", "high", "urgent"] }
+      },
+      required: ["title", "assigned_to"]
+    }
+  },
+  {
+    name: "send_carrier_message",
+    description: "Send a message to a carrier via the portal chat",
+    input_schema: {
+      type: "object",
+      properties: {
+        carrier_id: { type: "string" },
+        message: { type: "string" }
+      },
+      required: ["carrier_id", "message"]
+    }
+  },
+  {
+    name: "get_carrier_invoices",
+    description: "Get all invoices for a specific carrier",
+    input_schema: {
+      type: "object",
+      properties: {
+        carrier_id: { type: "string" },
+        status: { type: "string", description: "Filter by status" }
+      },
+      required: ["carrier_id"]
+    }
+  },
+  {
+    name: "get_broker_credit",
+    description: "Get broker credit score and grade",
+    input_schema: {
+      type: "object",
+      properties: {
+        broker_id: { type: "string" }
+      },
+      required: ["broker_id"]
+    }
+  }
+]
+
+Phase 3 — Tool Execution
+
+ After Claude responds with a tool call — execute the corresponding FactorFlux API endpoint server-side
+ Pass the result back to Claude as a tool result
+ Claude formulates a natural language response from the data
+ For action tools (hold_invoice, assign_task, send_carrier_message) — show agent a confirmation before executing: "Earl wants to [action]. Confirm?"
+ Log all Earl tool calls to ai_chat_logs with tool name and result
+ Respect the logged-in agent's permissions — Earl cannot perform actions the agent doesn't have permission for
+
+Phase 4 — Earl UI Updates
+
+ Show tool call activity in the chat: "🔍 Searching carriers..." / "📄 Fetching invoice..." while Earl is working
+ Display structured data cards in Earl's responses:
+Carrier card: name, MC#, status, advance rate, assigned processor
+Invoice card: invoice#, carrier, broker, amount, status, age
+Broker card: name, MC#, credit grade badge, outstanding AR
+ Action confirmation dialog before Earl executes any write operations
+ "Earl is thinking..." typing indicator while processing
