@@ -222,13 +222,18 @@ export default function AIAssistant() {
   useLayoutEffect(() => {
     const thread = messageThreadRef.current;
     if (!thread) return;
-    const latestMessage = messages[messages.length - 1];
-    if (latestMessage?.role === "assistant" && latestMessage.cards?.length) {
-      latestStructuredCardRef.current?.scrollIntoView({
+    const scrollTargetToTop = (target: HTMLElement) => {
+      const threadRect = thread.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      thread.scrollTo({
+        top: thread.scrollTop + targetRect.top - threadRect.top,
         behavior: "smooth",
-        block: "start",
-        inline: "nearest",
       });
+    };
+    const latestMessage = messages[messages.length - 1];
+    const latestStructuredCard = latestStructuredCardRef.current;
+    if (latestMessage?.role === "assistant" && latestMessage.cards?.length && latestStructuredCard) {
+      scrollTargetToTop(latestStructuredCard);
       return;
     }
     const latestAssistantMessage = latestAssistantMessageRef.current;
@@ -237,11 +242,7 @@ export default function AIAssistant() {
       && latestAssistantMessage
       && latestAssistantMessage.offsetHeight > thread.clientHeight
     ) {
-      latestAssistantMessage.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-        inline: "nearest",
-      });
+      scrollTargetToTop(latestAssistantMessage);
       return;
     }
     thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
@@ -304,6 +305,7 @@ export default function AIAssistant() {
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      e.stopPropagation();
       send();
     }
   }
@@ -341,7 +343,7 @@ export default function AIAssistant() {
             )}
           </div>
 
-          <div ref={messageThreadRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          <div ref={messageThreadRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-6 py-6">
             {isEmpty ? (
               <div className="mx-auto flex h-full max-w-xl flex-col items-center justify-center gap-8 text-center">
                 <div className="flex flex-col items-center gap-3">
