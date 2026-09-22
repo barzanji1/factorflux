@@ -112,7 +112,11 @@ function ActivityList({ activities }: { activities: Activity[] }) {
 function StructuredCard({ card }: { card: DataCard }) {
   const Icon = card.type === "carrier" ? Truck : card.type === "invoice" ? FileText : Landmark;
   return (
-    <article className="mt-3 rounded-lg border border-slate-300 bg-[#e9e6df] p-3" aria-label={`${card.type} details`}>
+    <article
+      data-earl-result-card
+      className="mt-3 scroll-mt-3 rounded-lg border border-slate-300 bg-[#e9e6df] p-3"
+      aria-label={`${card.type} details`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Icon className="h-4 w-4 flex-shrink-0 text-slate-600" aria-hidden="true" />
@@ -207,6 +211,13 @@ export default function AIAssistant() {
   useEffect(() => {
     const thread = messageThreadRef.current;
     if (!thread) return;
+    const latestMessage = messages[messages.length - 1];
+    if (latestMessage?.role === "assistant" && latestMessage.cards?.length) {
+      const cards = thread.querySelectorAll<HTMLElement>("[data-earl-result-card]");
+      const firstNewCard = cards.item(Math.max(0, cards.length - latestMessage.cards.length));
+      firstNewCard?.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      return;
+    }
     thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
