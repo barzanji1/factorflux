@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AuthorityCheck {
   id: number;
@@ -128,6 +129,45 @@ interface EntityHistory {
   entityId: number;
   entityName: string;
   checks: AuthorityCheck[];
+}
+
+interface FmcsaKeyStatus {
+  configured: boolean;
+  maskedKey: string | null;
+  source: "database" | "environment" | null;
+}
+
+interface FmcsaLookupResult {
+  identifierType: "MC" | "DOT";
+  identifier: string;
+  carrier: {
+    dotNumber?: string;
+    legalName?: string;
+    dbaName?: string;
+    allowedToOperate?: "Y" | "N";
+    operatingStatus?: string;
+    commonAuthorityStatus?: string;
+    contractAuthorityStatus?: string;
+    brokerAuthorityStatus?: string;
+    carrierOperation?: string;
+    safetyRating?: string;
+    bipdRequired?: string;
+    bipdInsuranceOnFile?: string;
+    cargoInsuranceRequired?: string;
+    cargoInsuranceOnFile?: string;
+    brokerBondStatus?: string;
+    bondAmount?: string;
+  };
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) return fallback;
+  try {
+    const parsed = JSON.parse(error.message);
+    return parsed?.message || fallback;
+  } catch {
+    return error.message || fallback;
+  }
 }
 
 function statusBadge(check: AuthorityCheck) {
@@ -217,6 +257,7 @@ function runStatusBadge(status: string) {
 
 export default function FmcsaAuthority() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "broker" | "debtor">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive" | "issues">("all");
@@ -224,6 +265,16 @@ export default function FmcsaAuthority() {
   const [resolveNotes, setResolveNotes] = useState("");
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [webKeyInput, setWebKeyInput] = useState("");
+  const [lookupInput, setLookupInput] = useState("");
+  const [lookupResult, setLookupResult] = useState<FmcsaLookupResult | null>(null);
+
+  const {
+    data: keyStatus,
+    isLoading: keyStatusLoading,
+    isError: keyStatusError,
+  } = useQuery<FmcsaKeyStatus>({
+    queryKey: ["/api/settings/fmcsa-key"],
+  });
 
   const { data: latestChecks = [], isLoading: checksLoading } = useQuery<AuthorityCheck[]>({
     queryKey: ["/api/authority-checks/latest"],
@@ -268,16 +319,49 @@ export default function FmcsaAuthority() {
   });
 
   const saveKeyMutation = useMutation({
-    mutationFn: (key: string) => apiRequest("POST", "/api/authority-checks/configure-key", { webKey: key }),
-    onSuccess: () => {
-      toast({ title: "FMCSA Web Key saved", description: "Daily checks are now enabled." });
+    mutationFn: async (key: string) => {
+      console.info("[MC Check] Saving FMCSA Web Key");
+      const response = await apiRequest("POST", "/api/settings/fmcsa-key", { webKey: key });
+      const data = await response.json() as FmcsaKeyStatus & { ok: boolean };
+      console.info("[MC Check] FMCSA Web Key save response", {
+        ok: data.ok,
+        configured: data.configured,
+        source: data.source,
+      });
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/settings/fmcsa-key"], data);
+      toast({ title: "FMCSA key saved successfully", className: "border-green-600 bg-green-50 text-green-900" });
       setWebKeyInput("");
     },
-    onError: () => toast({ title: "Failed to save key", variant: "destructive" }),
+    onError: (error) => {
+      const message = errorMessage(error, "Failed to save FMCSA Web Key");
+      console.error("[MC Check] FMCSA Web Key save failed", message);
+      toast({ title: "Failed to save FMCSA key", description: message, variant: "destructive" });
+    },
+  });
+
+  const lookupMutation = useMutation({
+    mutationFn: async (identifier: string) => {
+      const response = await apiRequest("POST", "/api/authority-checks/lookup", { identifier });
+      return response.json() as Promise<FmcsaLookupResult>;
+    },
+    onMutate: () => setLookupResult(null),
+    onSuccess: (data) => setLookupResult(data),
+    onError: (error) => {
+      setLookupResult(null);
+      toast({
+        title: "FMCSA lookup failed",
+        description: errorMessage(error, "Unable to complete the FMCSA lookup"),
+        variant: "destructive",
+      });
+    },
   });
 
   const openAlerts = alerts.filter(a => !a.resolvedAt);
-  const hasNoKey = latestChecks.some(c => c.checkStatus === "no_key");
+  const hasNoKey = keyStatus?.configured === false;
+  const canConfigureKey = user?.role === "admin";
 
   const filtered = latestChecks.filter(c => {
     if (filterType !== "all" && c.entityType !== filterType) return false;
@@ -348,47 +432,133 @@ export default function FmcsaAuthority() {
               </Button>
             </div>
 
-            {/* No-Key Warning Banner */}
-            {hasNoKey && (
-              <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700">
-                <CardContent className="flex items-start gap-3 py-4">
-                  <KeyRound className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-amber-800 dark:text-amber-300">
-                      FMCSA Web Key Required
-                    </p>
-                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
-                      Add your FMCSA developer web key to enable live authority lookups.
-                      Get one at{" "}
-                      <a
-                        href="https://www.fmcsa.dot.gov/developer/qcapi"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline font-medium"
-                      >
-                        fmcsa.dot.gov/developer/qcapi
-                      </a>
-                    </p>
-                    <div className="flex gap-2 mt-3">
-                      <Input
-                        placeholder="Paste your FMCSA web key…"
-                        value={webKeyInput}
-                        onChange={e => setWebKeyInput(e.target.value)}
-                        className="max-w-sm text-sm"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!webKeyInput.trim() || saveKeyMutation.isPending}
-                        onClick={() => saveKeyMutation.mutate(webKeyInput.trim())}
-                      >
-                        Save Key
-                      </Button>
+            {/* FMCSA key configuration */}
+            <Card className={cn((hasNoKey || keyStatusError) && "border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700")}>
+              <CardContent className="flex items-start gap-3 py-4">
+                <KeyRound className={cn("h-5 w-5 shrink-0 mt-0.5", hasNoKey || keyStatusError ? "text-amber-600" : "text-green-600")} />
+                <div className="flex-1 min-w-0">
+                  <p className={cn("font-semibold", hasNoKey || keyStatusError ? "text-amber-800 dark:text-amber-300" : "text-slate-900 dark:text-white")}>
+                    {hasNoKey ? "FMCSA Web Key Required" : "FMCSA Web Key"}
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                    {keyStatusError
+                      ? "FMCSA key status could not be loaded. Contact an administrator."
+                      : keyStatusLoading
+                        ? "Checking configuration…"
+                        : hasNoKey
+                      ? "Please configure your FMCSA Web Key above to use MC Check"
+                      : `Configured: ${keyStatus?.maskedKey ?? "Loading…"}`}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {canConfigureKey && (
+                      <>
+                        <Input
+                          type="password"
+                          autoComplete="off"
+                          placeholder={keyStatus?.configured ? "Enter a new key to replace the saved key" : "Paste your FMCSA Web Key…"}
+                          value={webKeyInput}
+                          onChange={e => setWebKeyInput(e.target.value)}
+                          className="max-w-sm text-sm"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!webKeyInput.trim() || saveKeyMutation.isPending}
+                          onClick={() => saveKeyMutation.mutate(webKeyInput.trim())}
+                        >
+                          {saveKeyMutation.isPending ? "Saving…" : "Save Key"}
+                        </Button>
+                      </>
+                    )}
+                    <a
+                      href="https://www.fmcsa.dot.gov/developer/qcapi"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="self-center text-xs font-medium text-slate-600 underline"
+                    >
+                      Get a key from FMCSA
+                    </a>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Live MC / DOT lookup */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">MC / DOT Lookup</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    placeholder="Enter MC# or DOT# (example: MC-123456)"
+                    value={lookupInput}
+                    onChange={e => setLookupInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && lookupInput.trim()) {
+                        e.preventDefault();
+                        lookupMutation.mutate(lookupInput.trim());
+                      }
+                    }}
+                    className="max-w-sm"
+                  />
+                  <Button
+                    onClick={() => lookupMutation.mutate(lookupInput.trim())}
+                    disabled={!lookupInput.trim() || lookupMutation.isPending}
+                    className="gap-2"
+                  >
+                    <Search className="h-4 w-4" />
+                    {lookupMutation.isPending ? "Searching…" : "Search FMCSA"}
+                  </Button>
+                </div>
+
+                {hasNoKey && (
+                  <p className="text-sm font-medium text-amber-700">
+                    Please configure your FMCSA Web Key above to use MC Check
+                  </p>
+                )}
+
+                {lookupResult && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">
+                          {lookupResult.carrier.legalName ?? "FMCSA Carrier"}
+                        </p>
+                        {lookupResult.carrier.dbaName && (
+                          <p className="text-sm text-slate-500">DBA {lookupResult.carrier.dbaName}</p>
+                        )}
+                        <p className="mt-1 text-xs font-mono text-slate-500">
+                          {lookupResult.identifierType}# {lookupResult.identifier}
+                          {lookupResult.carrier.dotNumber ? ` · DOT# ${lookupResult.carrier.dotNumber}` : ""}
+                        </p>
+                      </div>
+                      <Badge className={lookupResult.carrier.allowedToOperate === "Y"
+                        ? "bg-green-100 text-green-700 border-green-300"
+                        : lookupResult.carrier.allowedToOperate === "N"
+                          ? "bg-red-100 text-red-700 border-red-300"
+                          : "bg-slate-100 text-slate-700 border-slate-300"}>
+                        {lookupResult.carrier.allowedToOperate === "Y"
+                          ? "Authorized"
+                          : lookupResult.carrier.allowedToOperate === "N"
+                            ? "Not Authorized"
+                            : "Unknown"}
+                      </Badge>
+                    </div>
+                    <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                      <div><span className="text-slate-500">Operating status:</span><br />{lookupResult.carrier.operatingStatus ?? "Not reported"}</div>
+                      <div><span className="text-slate-500">Common authority:</span><br />{lookupResult.carrier.commonAuthorityStatus ?? "Not reported"}</div>
+                      <div><span className="text-slate-500">Broker authority:</span><br />{lookupResult.carrier.brokerAuthorityStatus ?? "Not reported"}</div>
+                      <div><span className="text-slate-500">Safety rating:</span><br />{lookupResult.carrier.safetyRating ?? "Not reported"}</div>
+                      <div><span className="text-slate-500">Carrier operation:</span><br />{lookupResult.carrier.carrierOperation ?? "Not reported"}</div>
+                      <div><span className="text-slate-500">BIPD insurance:</span><br />{lookupResult.carrier.bipdInsuranceOnFile ?? "Not reported"}</div>
+                      <div><span className="text-slate-500">Cargo insurance:</span><br />{lookupResult.carrier.cargoInsuranceOnFile ?? "Not reported"}</div>
+                      <div><span className="text-slate-500">Broker bond:</span><br />{lookupResult.carrier.brokerBondStatus ?? "Not reported"}</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                )}
+              </CardContent>
+            </Card>
 
             {/* Stat Cards */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">

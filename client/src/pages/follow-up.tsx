@@ -836,7 +836,7 @@ export default function FollowUpPage() {
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const { data: followUps = [], isLoading }  = useQuery<FollowUp[]>({ queryKey: ["/api/follow-ups"] });
-  const { data: clients = [] }               = useQuery({ queryKey: ["/api/clients", { all: true }] });
+  const { data: clients = [] }               = useQuery({ queryKey: ["/api/follow-up-clients"] });
   const { data: brokerFollowUps = [], isLoading: bfuLoading } = useQuery<BrokerFollowUp[]>({
     queryKey: ["/api/broker-follow-ups"],
   });
@@ -946,13 +946,13 @@ export default function FollowUpPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#d4d0c8] p-6">
+    <div className="flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Follow Ups" subtitle="Manage client follow-ups, pending tasks, and broker automations" />
 
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+        <main className="custom-scrollbar flex-1 overflow-auto">
+          <div className="mx-auto w-full max-w-7xl space-y-6 p-6 xl:p-8">
 
             {/* Header */}
             <div className="flex justify-between items-center">

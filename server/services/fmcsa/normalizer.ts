@@ -126,6 +126,7 @@ export function normalize(raw: unknown): FmcsaCarrier | null {
   if (!hasIdentity) return null;
 
   const { brokerBondStatus, bondAmount } = parseBrokerBond(c);
+  const safetyRating = obj(c.safetyRating);
 
   return {
     dotNumber: str(c.dotNumber ?? c.dot_number),
@@ -137,6 +138,8 @@ export function normalize(raw: unknown): FmcsaCarrier | null {
     contractAuthorityStatus: str(c.contractAuthorityStatus),
     brokerAuthorityStatus: str(c.brokerAuthorityStatus),
     carrierOperation: parseCarrierOperation(c.carrierOperation),
+    safetyRating: str(safetyRating?.rating ?? safetyRating?.safetyRating ?? c.safety_rating)
+      ?? (typeof c.safetyRating === "string" ? str(c.safetyRating) : undefined),
     // Insurance
     bipdRequired: str(c.bipdInsuranceRequired ?? c.bipdRequired),
     bipdInsuranceOnFile: str(c.bipdInsuranceOnFile),

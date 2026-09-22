@@ -25,6 +25,7 @@ export interface FmcsaCarrier {
   contractAuthorityStatus?: string;
   brokerAuthorityStatus?: string;
   carrierOperation?: string;
+  safetyRating?: string;
   // Insurance
   bipdRequired?: string;
   bipdInsuranceOnFile?: string;

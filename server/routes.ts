@@ -27,6 +27,11 @@ import {
 import { deleteClientMirror } from "./services/firestore-record";
 import { db } from "./db";
 import { LOAD_TYPES } from "@shared/load-types";
+import {
+  getFmcsaKeyStatus,
+  saveConfiguredFmcsaWebKey,
+} from "./services/fmcsa/settings";
+import { queryByDot, queryByMc } from "./services/fmcsa";
 
 import {
   insertClientSchema,
@@ -635,6 +640,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/broker-follow-up-reminders", "followups"],
     ["/api/broker-follow-up-templates", "followups"],
     ["/api/broker-follow-ups", "followups"],
+    ["/api/follow-up-clients", "followups"],
+    ["/api/follow-ups", "followups"],
     ["/api/portal-submissions", "portal_submissions"],
     ["/api/carrier-portal", "portal_submissions"],
     ["/api/bulk-invoices", "bulk_invoices"],
@@ -644,6 +651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/fuel-advances", "fuel_advance"],
     ["/api/cash-applications", "payments"],
     ["/api/credit-checks", "cb_reviews"],
+    ["/api/settings/fmcsa-key", "mc_check"],
     ["/api/authority-checks", "mc_check"],
     ["/api/authority-alerts", "mc_check"],
     ["/api/ach-settings", "payments"],
@@ -5284,6 +5292,20 @@ Trucking Pros Financial Team
     }
   });
 
+  app.get("/api/follow-up-clients", requireAuth, async (_req: any, res) => {
+    try {
+      const clients = await storage.getClients();
+      res.json(clients.map((client) => ({
+        id: client.id,
+        name: client.name,
+        email: client.email,
+      })));
+    } catch (error) {
+      console.error("Error fetching follow-up clients:", error);
+      res.status(500).json({ message: "Failed to fetch follow-up clients" });
+    }
+  });
+
   app.post("/api/follow-ups", requireAuth, async (req: any, res) => {
     try {
       const data = insertFollowUpSchema.parse(req.body);
@@ -7101,6 +7123,42 @@ Trucking Pros Financial Team
   });
 
   // ─── FMCSA Authority Checks ───────────────────────────────────────────────
+  app.get("/api/settings/fmcsa-key", requireAuth, async (_req, res) => {
+    try {
+      res.json(await getFmcsaKeyStatus());
+    } catch (e: any) {
+      console.error("[FMCSA Settings] Failed to load key status:", e?.message ?? e);
+      res.status(500).json({ message: "FMCSA key status is unavailable. Check server encryption and database configuration." });
+    }
+  });
+
+  const saveFmcsaKey = async (req: any, res: any) => {
+    console.info("[FMCSA Settings] Save requested", { userId: req.user.id });
+    try {
+      const { webKey } = req.body;
+      if (!webKey || typeof webKey !== "string" || webKey.trim().length < 8) {
+        console.warn("[FMCSA Settings] Save rejected: invalid key format");
+        return res.status(400).json({ message: "FMCSA Web Key must be at least 8 characters" });
+      }
+      await saveConfiguredFmcsaWebKey(webKey, req.user.id);
+      await storage.createActivity({
+        userId: req.user.id,
+        type: "fmcsa_key_configured",
+        description: "FMCSA API web key configured",
+        entityType: "user",
+        entityId: undefined,
+      });
+      const status = await getFmcsaKeyStatus();
+      console.info("[FMCSA Settings] Save succeeded", { userId: req.user.id, source: status.source });
+      res.json({ ok: true, ...status });
+    } catch (e: any) {
+      console.error("[FMCSA Settings] Save failed:", e?.message ?? e);
+      res.status(500).json({ message: "FMCSA key could not be saved. Check server encryption and database configuration." });
+    }
+  };
+
+  app.post("/api/settings/fmcsa-key", requireAdmin, saveFmcsaKey);
+
   app.get("/api/authority-checks/latest", requireAuth, async (_req, res) => {
     try {
       res.json(await storage.getLatestAuthorityChecks());
@@ -7131,24 +7189,41 @@ Trucking Pros Financial Team
     }
   });
 
-  app.post("/api/authority-checks/configure-key", requireAdmin, async (req: any, res) => {
+  app.post("/api/authority-checks/lookup", requireAuth, async (req, res) => {
     try {
-      const { webKey } = req.body;
-      if (!webKey || typeof webKey !== "string" || webKey.trim().length < 8) {
-        return res.status(400).json({ message: "Invalid web key" });
+      const identifier = typeof req.body?.identifier === "string" ? req.body.identifier.trim() : "";
+      if (!identifier) {
+        return res.status(400).json({ message: "Enter an MC# or DOT# to search" });
       }
-      // Store in process env for current session; persisting to env file is handled via Replit secrets
-      process.env.FMCSA_WEBKEY = webKey.trim();
-      await storage.createActivity({
-        userId: req.user.id,
-        type: "fmcsa_key_configured",
-        description: "FMCSA API web key configured",
-        entityType: "user",
-        entityId: undefined,
+      const digits = identifier.replace(/\D/g, "");
+      if (!digits) {
+        return res.status(400).json({ message: "Enter a valid MC# or DOT#" });
+      }
+      const isMc = /^MC(?:\s*#|\s*-\s*|\s*)/i.test(identifier);
+      const result = isMc ? await queryByMc(digits) : await queryByDot(digits);
+      if (result.status === "no_key") {
+        return res.status(400).json({ message: "Please configure your FMCSA Web Key above to use MC Check" });
+      }
+      if (result.status === "not_found") {
+        return res.status(404).json({ message: `No FMCSA carrier found for ${isMc ? "MC" : "DOT"}# ${digits}` });
+      }
+      if (result.status === "api_error" || !result.carrier) {
+        return res.status(502).json({ message: result.errorMessage || "FMCSA lookup failed" });
+      }
+      res.json({
+        identifierType: isMc ? "MC" : "DOT",
+        identifier: digits,
+        carrier: result.carrier,
       });
-      res.json({ ok: true });
-    } catch (e) { res.status(500).json({ message: "Failed to save key" }); }
+    } catch (e: any) {
+      const message = e?.message ?? "FMCSA lookup failed";
+      console.error("[FMCSA Lookup] Failed:", message);
+      res.status(500).json({ message });
+    }
   });
+
+  // Backward-compatible endpoint for existing clients.
+  app.post("/api/authority-checks/configure-key", requireAdmin, saveFmcsaKey);
 
   app.get("/api/authority-checks/integration-runs", requireAuth, async (req, res) => {
     try {

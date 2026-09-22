@@ -68,6 +68,14 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Encrypted application-level integration settings.
+export const integrationSettings = pgTable("integration_settings", {
+  key: varchar("key").primaryKey().notNull(),
+  encryptedValue: text("encrypted_value").notNull(),
+  updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Clients table
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),

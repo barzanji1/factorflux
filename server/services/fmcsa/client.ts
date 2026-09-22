@@ -13,12 +13,11 @@
  */
 
 import type { FmcsaQueryOptions } from "./types";
+import { getConfiguredFmcsaWebKey } from "./settings";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 interface FmcsaClientConfig {
-  /** FMCSA developer web key — loaded from FMCSA_WEBKEY */
-  webKey: string;
   /** Base URL — override with FMCSA_BASE_URL for testing */
   baseUrl: string;
   /** Default request timeout in ms */
@@ -27,9 +26,8 @@ interface FmcsaClientConfig {
   defaultMaxRetries: number;
 }
 
-function loadConfig(): Omit<FmcsaClientConfig, "webKey"> & { webKey: string | undefined } {
+function loadConfig(): FmcsaClientConfig {
   return {
-    webKey: process.env.FMCSA_WEBKEY,
     baseUrl:
       process.env.FMCSA_BASE_URL?.replace(/\/$/, "") ??
       "https://mobile.fmcsa.dot.gov/qc/services",
@@ -145,9 +143,8 @@ async function fetchWithRetry(
 export class FmcsaHttpClient {
   private readonly config = loadConfig();
 
-  /** Returns true when the web key is configured. */
-  get hasKey(): boolean {
-    return !!this.config.webKey;
+  async hasKey(): Promise<boolean> {
+    return !!(await getConfiguredFmcsaWebKey());
   }
 
   private resolveOptions(opts?: FmcsaQueryOptions): Required<FmcsaQueryOptions> {
@@ -163,7 +160,9 @@ export class FmcsaHttpClient {
    */
   async fetchByDot(dotNumber: string, opts?: FmcsaQueryOptions): Promise<FetchResult> {
     const resolved = this.resolveOptions(opts);
-    const { webKey, baseUrl } = this.config;
+    const webKey = await getConfiguredFmcsaWebKey();
+    if (!webKey) throw new Error("FMCSA Web Key is not configured");
+    const { baseUrl } = this.config;
 
     return fetchWithRetry(
       () => `${baseUrl}/carriers/${encodeURIComponent(dotNumber)}?webKey=${webKey}`,
@@ -180,7 +179,9 @@ export class FmcsaHttpClient {
    */
   async fetchByMc(mcNumber: string, opts?: FmcsaQueryOptions): Promise<FetchResult> {
     const resolved = this.resolveOptions(opts);
-    const { webKey, baseUrl } = this.config;
+    const webKey = await getConfiguredFmcsaWebKey();
+    if (!webKey) throw new Error("FMCSA Web Key is not configured");
+    const { baseUrl } = this.config;
     const mc = mcNumber.replace(/^MC-?/i, "").trim();
 
     return fetchWithRetry(
@@ -192,5 +193,5 @@ export class FmcsaHttpClient {
   }
 }
 
-/** Singleton client instance — config is lazily read from env at import time. */
+/** Singleton client instance; the persisted web key is resolved for every request. */
 export const fmcsaClient = new FmcsaHttpClient();

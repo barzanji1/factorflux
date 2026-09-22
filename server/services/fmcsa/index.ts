@@ -8,7 +8,8 @@
  * Database logic lives in authorityScheduler.ts — this module has none.
  *
  * Environment variables consumed (via client.ts):
- *   FMCSA_WEBKEY       — required for live lookups
+ *   FMCSA_WEBKEY       — optional environment fallback for live lookups
+ *   FMCSA_WEBKEY_KEY   — legacy environment fallback
  *   FMCSA_BASE_URL     — optional override (default: FMCSA SAFER production URL)
  *   FMCSA_TIMEOUT_MS   — per-request timeout (default: 15000)
  *   FMCSA_MAX_RETRIES  — max attempts per call (default: 3)
@@ -49,7 +50,7 @@ export async function queryByDot(
   dotNumber: string,
   opts?: FmcsaQueryOptions,
 ): Promise<FmcsaResult> {
-  if (!fmcsaClient.hasKey) return noKeyResult();
+  if (!(await fmcsaClient.hasKey())) return noKeyResult();
 
   let attempts = 0;
   try {
@@ -85,7 +86,7 @@ export async function queryByMc(
   mcNumber: string,
   opts?: FmcsaQueryOptions,
 ): Promise<FmcsaResult> {
-  if (!fmcsaClient.hasKey) return noKeyResult();
+  if (!(await fmcsaClient.hasKey())) return noKeyResult();
 
   let attempts = 0;
   try {
