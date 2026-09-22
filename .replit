@@ -46,3 +46,6 @@ integrations = ["javascript_sendgrid:1.0.0", "javascript_auth_all_persistance:1.
 
 [userenv.development]
 DEV_ADMIN_EMAIL = "dosh@truckingprosfinancial.com"
+
+[userenv.shared]
+SENDGRID_EVENT_WEBHOOK_PUBLIC_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvyWO5Mf0jOU2n5gvDXDp74Gsi4MXBNw3SxD154akk4q2fSNqjkwViU6GzKStgV8MY5Sqw86NpLJlAXFkgmv8mA==\"}"
