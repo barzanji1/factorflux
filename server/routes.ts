@@ -32,6 +32,7 @@ import {
   saveConfiguredFmcsaWebKey,
 } from "./services/fmcsa/settings";
 import { queryByDot, queryByMc } from "./services/fmcsa";
+import { createFmcsaHistoryHandler } from "./services/fmcsa/historyRoute";
 
 import {
   insertClientSchema,
@@ -652,6 +653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/cash-applications", "payments"],
     ["/api/credit-checks", "cb_reviews"],
     ["/api/settings/fmcsa-key", "mc_check"],
+    ["/api/fmcsa", "mc_check"],
     ["/api/authority-checks", "mc_check"],
     ["/api/authority-alerts", "mc_check"],
     ["/api/ach-settings", "payments"],
@@ -7132,6 +7134,16 @@ Trucking Pros Financial Team
     }
   });
 
+  app.get("/api/fmcsa/status", requireAuth, async (_req, res) => {
+    try {
+      const status = await getFmcsaKeyStatus();
+      res.json({ ...status, paused: !status.configured });
+    } catch (e: any) {
+      console.error("[FMCSA Status] Failed:", e?.message ?? e);
+      res.status(500).json({ message: "FMCSA status is unavailable" });
+    }
+  });
+
   const saveFmcsaKey = async (req: any, res: any) => {
     console.info("[FMCSA Settings] Save requested", { userId: req.user.id });
     try {
@@ -7178,6 +7190,14 @@ Trucking Pros Financial Team
       });
     } catch (e) { res.status(500).json({ message: "Failed to fetch history" }); }
   });
+
+  app.get(
+    "/api/fmcsa/entities/:id/history",
+    requireAuth,
+    createFmcsaHistoryHandler((entityType, entityId) =>
+      storage.getAuthorityCheckHistory(entityType, entityId),
+    ),
+  );
 
   app.post("/api/authority-checks/run", requireAdmin, async (req: any, res) => {
     try {

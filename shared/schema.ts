@@ -1416,9 +1416,13 @@ export const complianceIntegrationRuns = pgTable("compliance_integration_runs", 
   runType: varchar("run_type", { enum: ["scheduled", "manual"] }).notNull().default("scheduled"),
   triggeredBy: varchar("triggered_by").notNull().default("system"),
   status: varchar("status", {
-    enum: ["running", "completed", "failed"],
+    enum: ["running", "completed", "failed", "skipped"],
   }).notNull().default("running"),
+  reason: text("reason"),
+  detail: jsonb("detail"),
   startedAt: timestamp("started_at").defaultNow().notNull(),
+  heartbeatAt: timestamp("heartbeat_at").defaultNow().notNull(),
+  leaseToken: varchar("lease_token"),
   completedAt: timestamp("completed_at"),
   totalChecked: integer("total_checked").default(0),
   successCount: integer("success_count").default(0),
@@ -1474,8 +1478,13 @@ export const brokerAuthorityChecks = pgTable("broker_authority_checks", {
   rawResponse: jsonb("raw_response"),
   // Outcome of this check
   checkStatus: varchar("check_status", {
-    enum: ["success", "not_found", "api_error", "no_key"],
-  }).default("success").notNull(),
+    enum: ["ok", "error", "skipped"],
+  }).default("ok").notNull(),
+  authorityStatus: varchar("authority_status", {
+    enum: ["ACTIVE", "INACTIVE", "NOT_AUTHORIZED", "UNKNOWN"],
+  }),
+  checkError: text("check_error"),
+  // Legacy compatibility field. New code writes checkError as the canonical value.
   errorMessage: text("error_message"),
   checkedAt: timestamp("checked_at").defaultNow().notNull(),
   checkedBy: varchar("checked_by"),

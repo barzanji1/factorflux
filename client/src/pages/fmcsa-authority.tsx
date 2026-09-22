@@ -73,7 +73,9 @@ interface AuthorityCheck {
   // Change tracking
   changeSummary: string | null;
   integrationRunId: number | null;
-  checkStatus: "success" | "not_found" | "api_error" | "no_key";
+  checkStatus: "ok" | "error" | "skipped";
+  authorityStatus: "ACTIVE" | "INACTIVE" | "NOT_AUTHORIZED" | "UNKNOWN" | null;
+  checkError: string | null;
   errorMessage: string | null;
   checkedAt: string;
   checkedBy: string | null;
@@ -101,7 +103,8 @@ interface ComplianceIntegrationRun {
   id: number;
   runType: "scheduled" | "manual";
   triggeredBy: string;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "skipped";
+  reason: string | null;
   startedAt: string;
   completedAt: string | null;
   totalChecked: number | null;
@@ -115,6 +118,8 @@ interface ComplianceIntegrationRun {
 
 interface RunSummary {
   runId: number;
+  status: "completed" | "failed" | "skipped";
+  reason?: string;
   total: number;
   success: number;
   notFound: number;
@@ -171,40 +176,18 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 function statusBadge(check: AuthorityCheck) {
-  if (check.checkStatus === "no_key") {
-    return <Badge className="bg-slate-100 text-slate-600 border-slate-300">No API Key</Badge>;
-  }
-  if (check.checkStatus === "api_error") {
-    return <Badge className="bg-orange-100 text-orange-700 border-orange-300">API Error</Badge>;
-  }
-  if (check.checkStatus === "not_found") {
-    return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">Not Found</Badge>;
-  }
-
-  const active =
-    check.allowedToOperate !== false &&
-    ["active", "authorized"].some(
-      k =>
-        (check.commonAuthorityStatus ?? "").toLowerCase().includes(k) ||
-        (check.brokerAuthorityStatus ?? "").toLowerCase().includes(k)
-    );
-
-  if (active) {
-    return <Badge className="bg-green-100 text-green-700 border-green-300 font-semibold">Active</Badge>;
-  }
-
-  const inactive = ["inactive", "not authorized", "revoked"].some(
-    k =>
-      (check.commonAuthorityStatus ?? "").toLowerCase().includes(k) ||
-      (check.brokerAuthorityStatus ?? "").toLowerCase().includes(k) ||
-      check.allowedToOperate === false
+  const styles: Record<NonNullable<AuthorityCheck["authorityStatus"]>, string> = {
+    ACTIVE: "bg-green-100 text-green-700 border-green-300",
+    INACTIVE: "bg-red-100 text-red-700 border-red-300",
+    NOT_AUTHORIZED: "bg-red-100 text-red-800 border-red-400",
+    UNKNOWN: "bg-slate-100 text-slate-600 border-slate-300",
+  };
+  const value = check.authorityStatus ?? "UNKNOWN";
+  return (
+    <Badge className={cn("font-semibold", styles[value])}>
+      {value.replace("_", " ")}
+    </Badge>
   );
-
-  if (inactive) {
-    return <Badge className="bg-red-100 text-red-700 border-red-300 font-semibold">Inactive / Revoked</Badge>;
-  }
-
-  return <Badge className="bg-slate-100 text-slate-600">Unknown</Badge>;
 }
 
 function alertTypeBadge(type: string) {
@@ -267,13 +250,14 @@ export default function FmcsaAuthority() {
   const [webKeyInput, setWebKeyInput] = useState("");
   const [lookupInput, setLookupInput] = useState("");
   const [lookupResult, setLookupResult] = useState<FmcsaLookupResult | null>(null);
+  const [runResult, setRunResult] = useState<RunSummary | null>(null);
 
   const {
     data: keyStatus,
     isLoading: keyStatusLoading,
     isError: keyStatusError,
   } = useQuery<FmcsaKeyStatus>({
-    queryKey: ["/api/settings/fmcsa-key"],
+    queryKey: ["/api/fmcsa/status"],
   });
 
   const { data: latestChecks = [], isLoading: checksLoading } = useQuery<AuthorityCheck[]>({
@@ -288,20 +272,28 @@ export default function FmcsaAuthority() {
     queryKey: ["/api/authority-checks/integration-runs"],
   });
 
-  const { data: history } = useQuery<EntityHistory>({
-    queryKey: ["/api/authority-checks/history", expandedHistory],
+  const [historyEntityType, historyEntityId] = expandedHistory?.split("-") ?? [];
+  const {
+    data: history,
+    isError: historyError,
+    error: historyErrorValue,
+    isFetching: historyLoading,
+    refetch: refetchHistory,
+  } = useQuery<EntityHistory>({
+    queryKey: [`/api/fmcsa/entities/${historyEntityId}/history?entityType=${historyEntityType}`],
     enabled: !!expandedHistory,
   });
 
   const runMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/authority-checks/run").then(r => r.json()) as Promise<RunSummary>,
     onSuccess: async (data: RunSummary) => {
+      setRunResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/authority-checks/latest"] });
       queryClient.invalidateQueries({ queryKey: ["/api/authority-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/authority-checks/integration-runs"] });
       toast({
-        title: "Authority check complete",
-        description: `Run #${data.runId} — ${data.total} entities checked, ${data.alertsCreated} alert(s) created`,
+        title: data.status === "skipped" ? "Authority check skipped" : "Authority check complete",
+        description: data.reason ?? `Run #${data.runId} — ${data.success + data.apiError} entities checked, ${data.alertsCreated} alert(s) created`,
       });
     },
     onError: () => toast({ title: "Check failed", variant: "destructive" }),
@@ -332,6 +324,7 @@ export default function FmcsaAuthority() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["/api/settings/fmcsa-key"], data);
+      queryClient.setQueryData(["/api/fmcsa/status"], { ...data, paused: !data.configured });
       toast({ title: "FMCSA key saved successfully", className: "border-green-600 bg-green-50 text-green-900" });
       setWebKeyInput("");
     },
@@ -371,19 +364,16 @@ export default function FmcsaAuthority() {
       (c.dotNumber ?? "").toLowerCase().includes(search.toLowerCase())
     )) return false;
     if (filterStatus === "active") {
-      if (c.checkStatus !== "success") return false;
-      const ok = (c.commonAuthorityStatus ?? "").toLowerCase().includes("active") ||
-        (c.brokerAuthorityStatus ?? "").toLowerCase().includes("active");
-      return ok && c.allowedToOperate !== false;
+      return c.checkStatus === "ok" && c.authorityStatus === "ACTIVE";
     }
     if (filterStatus === "inactive") {
-      return ["inactive", "not authorized"].some(
-        k => (c.commonAuthorityStatus ?? "").toLowerCase().includes(k) ||
-          (c.brokerAuthorityStatus ?? "").toLowerCase().includes(k)
-      ) || c.allowedToOperate === false;
+      return c.checkStatus === "ok" &&
+        (c.authorityStatus === "INACTIVE" || c.authorityStatus === "NOT_AUTHORIZED");
     }
     if (filterStatus === "issues") {
-      return c.checkStatus === "not_found" || c.checkStatus === "api_error" || c.checkStatus === "no_key";
+      return c.checkStatus === "error" ||
+        c.authorityStatus === "INACTIVE" ||
+        c.authorityStatus === "NOT_AUTHORIZED";
     }
     return true;
   });
@@ -391,16 +381,16 @@ export default function FmcsaAuthority() {
   const stats = {
     total: latestChecks.length,
     active: latestChecks.filter(c =>
-      c.checkStatus === "success" &&
-      c.allowedToOperate !== false &&
-      ["active"].some(k => (c.commonAuthorityStatus ?? "").toLowerCase().includes(k))
+      c.checkStatus === "ok" && c.authorityStatus === "ACTIVE"
     ).length,
     inactive: latestChecks.filter(c =>
-      ["inactive", "not authorized"].some(
-        k => (c.commonAuthorityStatus ?? "").toLowerCase().includes(k)
-      ) || c.allowedToOperate === false
+      c.authorityStatus === "INACTIVE" || c.authorityStatus === "NOT_AUTHORIZED"
     ).length,
-    issues: latestChecks.filter(c => ["not_found", "api_error", "no_key"].includes(c.checkStatus)).length,
+    issues: latestChecks.filter(c =>
+      c.checkStatus === "error" ||
+      c.authorityStatus === "INACTIVE" ||
+      c.authorityStatus === "NOT_AUTHORIZED"
+    ).length,
     openAlerts: openAlerts.length,
   };
 
@@ -422,15 +412,42 @@ export default function FmcsaAuthority() {
                   Daily broker &amp; carrier authority monitoring via FMCSA SAFER
                 </p>
               </div>
-              <Button
-                onClick={() => runMutation.mutate()}
-                disabled={runMutation.isPending}
-                className="gap-2"
-              >
-                <RefreshCw className={cn("h-4 w-4", runMutation.isPending && "animate-spin")} />
-                {runMutation.isPending ? "Running…" : "Run Check Now"}
-              </Button>
+              {canConfigureKey && (
+                <Button
+                  onClick={() => runMutation.mutate()}
+                  disabled={runMutation.isPending}
+                  className="gap-2"
+                >
+                  <RefreshCw className={cn("h-4 w-4", runMutation.isPending && "animate-spin")} />
+                  {runMutation.isPending ? "Running…" : "Run now"}
+                </Button>
+              )}
             </div>
+
+            {hasNoKey && (
+              <div className="flex items-center gap-3 border-2 border-t-white border-l-white border-r-[#808080] border-b-[#808080] bg-[#fff4c2] px-4 py-3 text-[#5f4600] shadow-[2px_2px_0_rgba(128,128,128,0.35)]">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <p className="text-sm font-bold">
+                  FMCSA web key not configured — checks are paused. Add FMCSA_WEBKEY in secrets.
+                </p>
+              </div>
+            )}
+
+            {runResult && (
+              <div className={cn(
+                "border-2 border-t-white border-l-white border-r-[#808080] border-b-[#808080] px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.35)]",
+                runResult.status === "failed" ? "bg-red-50 text-red-900" :
+                  runResult.status === "skipped" ? "bg-amber-50 text-amber-900" :
+                    "bg-green-50 text-green-900",
+              )}>
+                <p className="text-sm font-bold">
+                  Run #{runResult.runId}: {runResult.status}
+                </p>
+                <p className="mt-1 text-xs">
+                  {runResult.reason ?? `${runResult.success} successful, ${runResult.apiError} errors, ${runResult.alertsCreated} alerts created.`}
+                </p>
+              </div>
+            )}
 
             {/* FMCSA key configuration */}
             <Card className={cn((hasNoKey || keyStatusError) && "border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700")}>
@@ -650,7 +667,13 @@ export default function FmcsaAuthority() {
                         <p className="text-sm">
                           {latestChecks.length === 0
                             ? 'No checks yet — click "Run Check Now" to start'
-                            : "No matches for the current filters"}
+                            : filterStatus === "issues"
+                              ? "No issues found — this filter shows request errors and inactive or unauthorized authority records."
+                              : filterStatus === "active"
+                                ? "No active FMCSA authority records match the current filters."
+                                : filterStatus === "inactive"
+                                  ? "No inactive or unauthorized FMCSA authority records match the current filters."
+                                  : "No matches for the current filters"}
                         </p>
                       </div>
                     ) : (
@@ -700,7 +723,16 @@ export default function FmcsaAuthority() {
                                       {!c.mcNumber && !c.dotNumber && <span className="text-slate-400">—</span>}
                                     </div>
                                   </TableCell>
-                                  <TableCell>{statusBadge(c)}</TableCell>
+                                  <TableCell>
+                                    <div className="space-y-1">
+                                      {statusBadge(c)}
+                                      {(c.checkStatus !== "ok" || c.checkError) && (c.checkError || c.errorMessage) && (
+                                        <p className="max-w-56 text-[10px] leading-tight text-slate-500">
+                                          {c.checkError || c.errorMessage}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </TableCell>
                                   <TableCell>
                                     <span className="text-xs text-slate-600 dark:text-slate-300">
                                       {c.operatingStatus ?? "—"}
@@ -730,10 +762,24 @@ export default function FmcsaAuthority() {
                                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                                         Check History — {c.entityName}
                                       </p>
-                                      {!history ? (
-                                        <p className="text-xs text-slate-400">Loading…</p>
+                                      {historyError ? (
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-xs text-red-600">
+                                            Failed to load history: {errorMessage(historyErrorValue, "Unknown error")}
+                                          </p>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-xs"
+                                            onClick={() => refetchHistory()}
+                                          >
+                                            Retry
+                                          </Button>
+                                        </div>
+                                      ) : !history ? (
+                                        <p className="text-xs text-slate-400">{historyLoading ? "Loading…" : "No checks recorded yet"}</p>
                                       ) : history.checks.length === 0 ? (
-                                        <p className="text-xs text-slate-400">No history found.</p>
+                                        <p className="text-xs text-slate-400">No checks recorded yet</p>
                                       ) : (
                                         <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                                           {history.checks.map(h => (

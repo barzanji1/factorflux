@@ -11,7 +11,7 @@
  *   FMCSA_WEBKEY       — optional environment fallback for live lookups
  *   FMCSA_WEBKEY_KEY   — legacy environment fallback
  *   FMCSA_BASE_URL     — optional override (default: FMCSA SAFER production URL)
- *   FMCSA_TIMEOUT_MS   — per-request timeout (default: 15000)
+ *   FMCSA_TIMEOUT_MS   — per-request timeout (default: 10000)
  *   FMCSA_MAX_RETRIES  — max attempts per call (default: 3)
  */
 

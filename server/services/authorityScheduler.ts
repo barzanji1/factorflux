@@ -8,6 +8,8 @@
  */
 
 import cron from "node-cron";
+import pLimit from "p-limit";
+import crypto from "node:crypto";
 import { db } from "../db";
 import {
   brokers,
@@ -16,11 +18,14 @@ import {
   brokerAuthorityAlerts,
   complianceIntegrationRuns,
 } from "../../shared/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { queryEntity } from "./fmcsa";
+import { getConfiguredFmcsaWebKey } from "./fmcsa/settings";
 
 export interface AuthorityCheckSummary {
   runId: number;
+  status: "completed" | "failed" | "skipped";
+  reason?: string;
   total: number;
   success: number;
   notFound: number;
@@ -28,6 +33,13 @@ export interface AuthorityCheckSummary {
   noKey: number;
   alertsCreated: number;
   errors: string[];
+  detail: Array<{
+    entityType: "broker" | "debtor";
+    entityId: number;
+    outcome: "ok" | "error" | "skipped";
+    authorityStatus: "ACTIVE" | "INACTIVE" | "NOT_AUTHORIZED" | "UNKNOWN" | null;
+    error?: string;
+  }>;
 }
 
 type StatusFields = {
@@ -60,6 +72,22 @@ function statusSummary(check: StatusFields): string {
     .join(" / ") || "UNKNOWN";
 }
 
+type AuthorityStatus = "ACTIVE" | "INACTIVE" | "NOT_AUTHORIZED" | "UNKNOWN";
+
+function deriveAuthorityStatus(check: StatusFields): AuthorityStatus {
+  const values = [
+    check.commonAuthorityStatus,
+    check.contractAuthorityStatus,
+    check.brokerAuthorityStatus,
+    check.operatingStatus,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  if (check.allowedToOperate === false || values.includes("not authorized")) return "NOT_AUTHORIZED";
+  if (values.includes("inactive") || values.includes("revoked")) return "INACTIVE";
+  if (check.allowedToOperate === true || values.includes("active") || values.includes("authorized")) return "ACTIVE";
+  return "UNKNOWN";
+}
+
 /** Generate a human-readable summary of what changed between two checks. */
 function buildChangeSummary(
   prev: StatusFields | null,
@@ -68,9 +96,8 @@ function buildChangeSummary(
   prevStatus: string | null,
 ): string {
   if (!prev) return "First check — no previous data.";
-  if (checkStatus === "not_found") return "Record no longer found in FMCSA SAFER.";
-  if (checkStatus === "api_error") return "API error — unable to retrieve data.";
-  if (checkStatus === "no_key") return "FMCSA web key not configured.";
+  if (checkStatus === "error") return "FMCSA request error — unable to retrieve current data.";
+  if (checkStatus === "skipped") return "FMCSA check skipped.";
 
   const changes: string[] = [];
 
@@ -124,9 +151,39 @@ async function checkOneEntity(
   mcNumber: string | null | undefined,
   triggeredBy = "system",
   integrationRunId?: number,
-): Promise<{ alertsCreated: number; checkStatus: string; error?: string }> {
-  const result = await queryEntity(dotNumber, mcNumber);
+  signal?: AbortSignal,
+  assertLease?: () => Promise<void>,
+): Promise<{
+  alertsCreated: number;
+  checkStatus: "ok" | "error" | "skipped";
+  notFound: boolean;
+  transportFailure: boolean;
+  error?: string;
+}> {
+  const result = await queryEntity(dotNumber, mcNumber, { signal });
+  if (signal?.aborted) throw new DOMException("FMCSA run aborted", "AbortError");
   const prev = await getLastCheck(entityType, entityId);
+  if (signal?.aborted) throw new DOMException("FMCSA run aborted", "AbortError");
+  const brokerMissing = entityType === "broker" && result.status === "not_found";
+  const checkStatus: "ok" | "error" | "skipped" =
+    result.status === "api_error" ? "error" :
+    result.status === "no_key" ? "skipped" :
+    result.status === "not_found" && entityType !== "broker" ? "error" :
+    "ok";
+  const checkError = brokerMissing
+    ? "not in QCMobile carrier dataset"
+    : result.errorMessage ?? (result.status === "not_found" ? "not in QCMobile carrier dataset" : null);
+  const authorityStatus = result.carrier
+    ? deriveAuthorityStatus({
+        commonAuthorityStatus: result.carrier.commonAuthorityStatus,
+        contractAuthorityStatus: result.carrier.contractAuthorityStatus,
+        brokerAuthorityStatus: result.carrier.brokerAuthorityStatus,
+        operatingStatus: result.carrier.operatingStatus,
+        allowedToOperate: result.carrier.allowedToOperate !== undefined
+          ? result.carrier.allowedToOperate === "Y"
+          : null,
+      })
+    : result.status === "no_key" ? null : "UNKNOWN";
 
   const checkPayload: typeof brokerAuthorityChecks.$inferInsert = {
     entityType,
@@ -140,8 +197,10 @@ async function checkOneEntity(
     mcNumber: mcNumber ?? null,
     dotNumber: dotNumber ?? null,
     // Check outcome
-    checkStatus: result.status,
-    errorMessage: result.errorMessage ?? null,
+    checkStatus,
+    authorityStatus,
+    checkError,
+    errorMessage: checkError,
     rawResponse: result.rawResponse ?? null,
     checkedBy: triggeredBy,
     // FMCSA identity
@@ -175,13 +234,23 @@ async function checkOneEntity(
         : null,
       bipdInsuranceOnFile: result.carrier?.bipdInsuranceOnFile,
       brokerBondStatus: result.carrier?.brokerBondStatus,
-    }, result.status, prev ? statusSummary(prev) : null),
+    }, checkStatus, prev ? statusSummary(prev) : null),
   };
 
+  if (signal?.aborted) throw new DOMException("FMCSA run aborted", "AbortError");
+  await assertLease?.();
   const [newCheck] = await db.insert(brokerAuthorityChecks).values(checkPayload).returning();
 
   let alertsCreated = 0;
-  if (!prev || prev.id === newCheck.id) return { alertsCreated, checkStatus: result.status };
+  if (!prev || prev.id === newCheck.id) {
+    return {
+      alertsCreated,
+      checkStatus,
+      notFound: result.status === "not_found",
+      transportFailure: result.status === "api_error",
+      error: checkError ?? undefined,
+    };
+  }
 
   const alerts: (typeof brokerAuthorityAlerts.$inferInsert)[] = [];
   const base = {
@@ -196,7 +265,7 @@ async function checkOneEntity(
   };
 
   // Authority became inactive / revoked
-  if (result.status === "success" && isRevoked(newCheck) && !isRevoked(prev)) {
+  if (checkStatus === "ok" && authorityStatus !== "UNKNOWN" && isRevoked(newCheck) && !isRevoked(prev)) {
     alerts.push({
       ...base,
       alertType: "became_inactive",
@@ -208,7 +277,7 @@ async function checkOneEntity(
   }
 
   // Record disappeared
-  if (result.status === "not_found" && prev.checkStatus === "success") {
+  if (result.status === "not_found" && entityType !== "broker" && prev.checkStatus === "ok") {
     alerts.push({
       ...base,
       alertType: "not_found",
@@ -221,7 +290,7 @@ async function checkOneEntity(
 
   // Insurance lapsed
   if (
-    result.status === "success" &&
+    checkStatus === "ok" &&
     prev.bipdInsuranceOnFile === "Y" &&
     newCheck.bipdInsuranceOnFile === "N"
   ) {
@@ -259,28 +328,80 @@ async function checkOneEntity(
   }
 
   if (alerts.length > 0) {
+    if (signal?.aborted) throw new DOMException("FMCSA run aborted", "AbortError");
+    await assertLease?.();
     await db.insert(brokerAuthorityAlerts).values(alerts);
     alertsCreated = alerts.length;
   }
 
-  return { alertsCreated, checkStatus: result.status };
+  return {
+    alertsCreated,
+    checkStatus,
+    notFound: result.status === "not_found",
+    transportFailure: result.status === "api_error",
+    error: checkError ?? undefined,
+  };
 }
 
 export async function runAllAuthorityChecks(
   triggeredBy = "system",
 ): Promise<AuthorityCheckSummary> {
-  // Create the integration run record (status = "running")
-  const [run] = await db
-    .insert(complianceIntegrationRuns)
-    .values({
-      runType: triggeredBy === "system" ? "scheduled" : "manual",
-      triggeredBy,
-      status: "running",
+  await db
+    .update(complianceIntegrationRuns)
+    .set({
+      status: "failed",
+      completedAt: new Date(),
+      reason: "Interrupted before completion",
     })
-    .returning();
+    .where(and(
+      eq(complianceIntegrationRuns.status, "running"),
+      sql`${complianceIntegrationRuns.heartbeatAt} < now() - interval '2 minutes'`,
+    ));
+
+  // Create the integration run record (status = "running")
+  let run: typeof complianceIntegrationRuns.$inferSelect;
+  const leaseToken = crypto.randomUUID();
+  try {
+    [run] = await db
+      .insert(complianceIntegrationRuns)
+      .values({
+        runType: triggeredBy === "system" ? "scheduled" : "manual",
+        triggeredBy,
+        status: "running",
+        heartbeatAt: new Date(),
+        leaseToken,
+      })
+      .returning();
+  } catch (error: any) {
+    if (error?.code !== "23505") throw error;
+    [run] = await db
+      .insert(complianceIntegrationRuns)
+      .values({
+        runType: triggeredBy === "system" ? "scheduled" : "manual",
+        triggeredBy,
+        status: "skipped",
+        completedAt: new Date(),
+        reason: "Another FMCSA authority check is already running",
+      })
+      .returning();
+    return {
+      runId: run.id,
+      status: "skipped",
+      reason: "Another FMCSA authority check is already running",
+      total: 0,
+      success: 0,
+      notFound: 0,
+      apiError: 0,
+      noKey: 0,
+      alertsCreated: 0,
+      errors: [],
+      detail: [],
+    };
+  }
 
   const summary: AuthorityCheckSummary = {
     runId: run.id,
+    status: "completed",
     total: 0,
     success: 0,
     notFound: 0,
@@ -288,9 +409,72 @@ export async function runAllAuthorityChecks(
     noKey: 0,
     alertsCreated: 0,
     errors: [],
+    detail: [],
   };
+  const runAbortController = new AbortController();
+  let abortReason: string | null = null;
+  const loseLease = (reason: string) => {
+    if (abortReason) return;
+    abortReason = reason;
+    runAbortController.abort();
+  };
+  const assertLease = async () => {
+    const [ownedRun] = await db
+      .select({ id: complianceIntegrationRuns.id })
+      .from(complianceIntegrationRuns)
+      .where(and(
+        eq(complianceIntegrationRuns.id, run.id),
+        eq(complianceIntegrationRuns.status, "running"),
+        eq(complianceIntegrationRuns.leaseToken, leaseToken),
+      ))
+      .limit(1);
+    if (!ownedRun) {
+      loseLease("FMCSA run lease was lost");
+      throw new Error("FMCSA run lease was lost");
+    }
+  };
+  const heartbeatTimer = setInterval(() => {
+    void db
+      .update(complianceIntegrationRuns)
+      .set({ heartbeatAt: new Date() })
+      .where(and(
+        eq(complianceIntegrationRuns.id, run.id),
+        eq(complianceIntegrationRuns.status, "running"),
+        eq(complianceIntegrationRuns.leaseToken, leaseToken),
+      ))
+      .returning({ id: complianceIntegrationRuns.id })
+      .then((rows) => {
+        if (rows.length === 0) loseLease("FMCSA run lease was lost");
+      })
+      .catch((error) => {
+        console.error(`[FMCSA] Run #${run.id} heartbeat failed:`, error);
+        loseLease("FMCSA run heartbeat failed");
+      });
+  }, 30_000);
 
   try {
+    const webKey = await getConfiguredFmcsaWebKey();
+    if (!webKey) {
+      const reason = "FMCSA_WEBKEY not configured";
+      summary.status = "skipped";
+      summary.reason = reason;
+      await db
+        .update(complianceIntegrationRuns)
+        .set({
+          status: "skipped",
+          reason,
+          completedAt: new Date(),
+          detail: [],
+        })
+        .where(and(
+          eq(complianceIntegrationRuns.id, run.id),
+          eq(complianceIntegrationRuns.status, "running"),
+          eq(complianceIntegrationRuns.leaseToken, leaseToken),
+        ));
+      console.warn(`[FMCSA] Run #${run.id} skipped — ${reason}`);
+      return summary;
+    }
+
     const allBrokers = await db.select().from(brokers).where(eq(brokers.status, "active"));
     const allDebtors = await db.select().from(debtors).where(eq(debtors.status, "active"));
 
@@ -323,9 +507,13 @@ export async function runAllAuthorityChecks(
 
     summary.total = tasks.length;
 
-    for (const task of tasks) {
+    const limit = pLimit(8);
+    let consecutiveFailures = 0;
+
+    await Promise.all(tasks.map(task => limit(async () => {
+      if (abortReason) return;
       try {
-        const { alertsCreated, checkStatus, error } = await checkOneEntity(
+        const { alertsCreated, checkStatus, notFound, transportFailure, error } = await checkOneEntity(
           task.entityType,
           task.id,
           task.name,
@@ -333,47 +521,96 @@ export async function runAllAuthorityChecks(
           task.mc,
           triggeredBy,
           run.id,
+          runAbortController.signal,
+          assertLease,
         );
         summary.alertsCreated += alertsCreated;
-        if (checkStatus === "success") summary.success++;
-        else if (checkStatus === "not_found") summary.notFound++;
-        else if (checkStatus === "no_key") summary.noKey++;
-        else summary.apiError++;
-        if (error) summary.errors.push(`${task.entityType}#${task.id}: ${error}`);
+        const latest = await getLastCheck(task.entityType, task.id);
+        if (notFound) summary.notFound++;
+        if (!transportFailure) {
+          consecutiveFailures = 0;
+        }
+        if (checkStatus === "ok") {
+          summary.success++;
+        } else if (checkStatus === "skipped") {
+          summary.noKey++;
+        } else {
+          summary.apiError++;
+          if (transportFailure) consecutiveFailures++;
+        }
+        if (error && checkStatus === "error") summary.errors.push(`${task.entityType}#${task.id}: ${error}`);
+        summary.detail.push({
+          entityType: task.entityType,
+          entityId: task.id,
+          outcome: checkStatus as "ok" | "error" | "skipped",
+          authorityStatus: latest?.authorityStatus ?? null,
+          ...(error ? { error } : {}),
+        });
+        if (consecutiveFailures >= 20) {
+          loseLease("Aborted after 20 consecutive FMCSA request failures");
+        }
       } catch (err) {
+        if (runAbortController.signal.aborted && abortReason) return;
+        const message = err instanceof Error ? err.message : String(err);
+        loseLease(`Internal FMCSA run failure: ${message}`);
         summary.apiError++;
-        summary.errors.push(
-          `${task.entityType}#${task.id}: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        summary.errors.push(`${task.entityType}#${task.id}: ${message}`);
+        summary.detail.push({
+          entityType: task.entityType,
+          entityId: task.id,
+          outcome: "error",
+          authorityStatus: null,
+          error: message,
+        });
       }
+    })));
+
+    if (abortReason) {
+      summary.status = "failed";
+      summary.reason = abortReason;
     }
 
-    // Mark run as completed
+    // Mark run complete (or failed after the consecutive-failure circuit breaker).
     await db
       .update(complianceIntegrationRuns)
       .set({
-        status: "completed",
+        status: summary.status,
+        reason: summary.reason ?? null,
         completedAt: new Date(),
-        totalChecked: summary.total,
+        totalChecked: summary.detail.length,
         successCount: summary.success,
         failureCount: summary.apiError,
         notFoundCount: summary.notFound,
         noKeyCount: summary.noKey,
         alertsCreated: summary.alertsCreated,
         errorLog: summary.errors.length > 0 ? summary.errors : null,
+        detail: summary.detail,
       })
-      .where(eq(complianceIntegrationRuns.id, run.id));
+      .where(and(
+        eq(complianceIntegrationRuns.id, run.id),
+        eq(complianceIntegrationRuns.status, "running"),
+        eq(complianceIntegrationRuns.leaseToken, leaseToken),
+      ));
   } catch (err) {
+    summary.status = "failed";
     // Mark run as failed
     await db
       .update(complianceIntegrationRuns)
       .set({
         status: "failed",
+        reason: err instanceof Error ? err.message : String(err),
         completedAt: new Date(),
         errorLog: [err instanceof Error ? err.message : String(err)],
+        detail: summary.detail,
       })
-      .where(eq(complianceIntegrationRuns.id, run.id));
+      .where(and(
+        eq(complianceIntegrationRuns.id, run.id),
+        eq(complianceIntegrationRuns.status, "running"),
+        eq(complianceIntegrationRuns.leaseToken, leaseToken),
+      ));
     throw err;
+  } finally {
+    clearInterval(heartbeatTimer);
   }
 
   console.log(`[FMCSA] Run #${run.id} complete — ${JSON.stringify(summary)}`);

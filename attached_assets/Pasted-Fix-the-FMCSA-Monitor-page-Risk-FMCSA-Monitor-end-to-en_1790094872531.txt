@@ -1,0 +1,17 @@
+Fix the FMCSA Monitor page (Risk > FMCSA Monitor) end to end. Stack: React/TS/Vite, TanStack Query v5, Express, Drizzle/Neon.
+
+BACKEND
+1. Schema: on the fmcsa_checks / entity table, separate job state from FMCSA data. Add check_status enum ('ok','error','skipped'), check_error text, and make authority_status nullable with only FMCSA-derived values (ACTIVE, INACTIVE, NOT_AUTHORIZED, UNKNOWN). Migrate: any row with authority_status='NO_API_KEY' -> authority_status=null, check_status='skipped', check_error='missing api key'. Write the Drizzle migration.
+2. Scheduler guard: at run start, if process.env.FMCSA_WEBKEY is unset, insert one run_history row with status='skipped', reason='FMCSA_WEBKEY not configured', and exit. Do NOT touch entity rows or last_checked.
+3. Fetch hardening: wrap QCMobile calls (GET https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/{mc}?webKey=KEY) with AbortController 10s timeout, p-limit concurrency 8, retry 3x with exponential backoff on 429/5xx/timeout, and abort the whole run if 20 consecutive failures. Only update last_checked when a request completed (ok or error). Log per-entity outcome to run_history detail.
+4. Brokers: if entity.type='broker' and QCMobile returns no carrier record, set check_status='ok', authority_status='UNKNOWN', check_error='not in QCMobile carrier dataset'. Do not mark inactive.
+5. GET /api/fmcsa/entities/:id/history must return { checks: [...] } and a proper 4xx/5xx JSON error body on failure; add a route test.
+
+FRONTEND
+6. Page-level banner (Win95 styled, matches existing theme) when GET /api/fmcsa/status reports no key: "FMCSA web key not configured — checks are paused. Add FMCSA_WEBKEY in secrets." Hide the per-row NO API KEY badge entirely.
+7. Authority Status column renders only FMCSA values with colored badges; a small secondary muted line shows check_error when check_status != 'ok'.
+8. Filters Active/Inactive/Issues: 'Issues' = check_status='error' OR authority_status in (INACTIVE, NOT_AUTHORIZED). Show an empty-state message explaining why when a filter returns 0 rows.
+9. History drawer: handle isError and empty array — show "Failed to load history: {message}" with a retry button, and "No checks recorded yet" for empty.
+10. Add a "Run now" button (admin only) that triggers the scheduler and shows the run_history result inline.
+
+Do not change unrelated pages. Report the migration SQL and any env vars needed.

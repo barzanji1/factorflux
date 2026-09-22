@@ -31,7 +31,7 @@ function loadConfig(): FmcsaClientConfig {
     baseUrl:
       process.env.FMCSA_BASE_URL?.replace(/\/$/, "") ??
       "https://mobile.fmcsa.dot.gov/qc/services",
-    defaultTimeoutMs: parseInt(process.env.FMCSA_TIMEOUT_MS ?? "15000", 10),
+    defaultTimeoutMs: parseInt(process.env.FMCSA_TIMEOUT_MS ?? "10000", 10),
     defaultMaxRetries: parseInt(process.env.FMCSA_MAX_RETRIES ?? "3", 10),
   };
 }
@@ -45,7 +45,7 @@ function isTransient(err: unknown): boolean {
     if (err.name === "TimeoutError" || err.name === "AbortError") return true;
     if (err.message.includes("fetch failed") || err.message.includes("ECONNRESET")) return true;
   }
-  if (err instanceof HttpError) return err.status >= 500;
+  if (err instanceof HttpError) return err.status === 429 || err.status >= 500;
   return false;
 }
 
@@ -84,11 +84,18 @@ function logGiveUp(ctx: Omit<LogContext, "attempt">): void {
 
 // ─── HTTP fetch with timeout ──────────────────────────────────────────────────
 
-async function fetchRaw(url: string, timeoutMs: number): Promise<unknown> {
-  const res = await fetch(url, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+async function fetchRaw(url: string, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (res.status === 404) return null; // Not found — valid empty result, do not retry
   if (!res.ok) throw new HttpError(res.status, res.statusText, url);
@@ -108,19 +115,26 @@ async function fetchWithRetry(
   urlFactory: () => string,
   method: string,
   identifier: string,
-  opts: Required<FmcsaQueryOptions>,
+  opts: Required<Pick<FmcsaQueryOptions, "timeoutMs" | "maxRetries">> & Pick<FmcsaQueryOptions, "signal">,
 ): Promise<FetchResult> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= opts.maxRetries; attempt++) {
+    if (opts.signal?.aborted) throw new DOMException("FMCSA run aborted", "AbortError");
     // Exponential back-off (skip on first attempt)
     if (attempt > 1) {
       const delay = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
-      await new Promise(r => setTimeout(r, delay));
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(resolve, delay);
+        opts.signal?.addEventListener("abort", () => {
+          clearTimeout(timeout);
+          reject(new DOMException("FMCSA run aborted", "AbortError"));
+        }, { once: true });
+      });
     }
 
     try {
-      const raw = await fetchRaw(urlFactory(), opts.timeoutMs);
+      const raw = await fetchRaw(urlFactory(), opts.timeoutMs, opts.signal);
       return { raw, attempts: attempt };
     } catch (err) {
       lastError = err;
@@ -128,6 +142,7 @@ async function fetchWithRetry(
 
       logFailure({ method, identifier, attempt, maxRetries: opts.maxRetries, error: errMsg });
 
+      if (opts.signal?.aborted) throw err;
       // Do not retry on definitive failures (4xx that aren't 404, etc.)
       if (!isTransient(err)) break;
     }
@@ -147,10 +162,13 @@ export class FmcsaHttpClient {
     return !!(await getConfiguredFmcsaWebKey());
   }
 
-  private resolveOptions(opts?: FmcsaQueryOptions): Required<FmcsaQueryOptions> {
+  private resolveOptions(
+    opts?: FmcsaQueryOptions,
+  ): Required<Pick<FmcsaQueryOptions, "timeoutMs" | "maxRetries">> & Pick<FmcsaQueryOptions, "signal"> {
     return {
       timeoutMs: opts?.timeoutMs ?? this.config.defaultTimeoutMs,
       maxRetries: opts?.maxRetries ?? this.config.defaultMaxRetries,
+      signal: opts?.signal,
     };
   }
 

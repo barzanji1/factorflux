@@ -6,10 +6,12 @@
 // ─── Query options ────────────────────────────────────────────────────────────
 
 export interface FmcsaQueryOptions {
-  /** Request timeout in milliseconds. Default: 15 000 */
+  /** Request timeout in milliseconds. Default: 10 000 */
   timeoutMs?: number;
   /** Maximum number of attempts (1 = no retry). Default: 3 */
   maxRetries?: number;
+  /** Optional run-level cancellation signal. */
+  signal?: AbortSignal;
 }
 
 // ─── Normalized carrier data ──────────────────────────────────────────────────
