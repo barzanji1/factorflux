@@ -23,6 +23,26 @@ type ChatThread = {
   messages: ChatMessage[];
 };
 
+const carrierMessagesKey = (carrierId: string | number | null | undefined) =>
+  ["carrier-messages", Number(carrierId)] as const;
+
+function normalizeMessage(message: any): ChatMessage {
+  return {
+    ...message,
+    message: message.message || "",
+    attachmentName: message.attachmentName || message.attachment?.name || null,
+    attachmentUrl: message.attachmentUrl || message.attachment?.viewUrl || null,
+  };
+}
+
+function sortMessages(messages: ChatMessage[]) {
+  return [...messages].sort((a, b) => {
+    const timeDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (timeDifference !== 0) return timeDifference;
+    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+  });
+}
+
 type CarrierChatError = Error & { status?: number };
 
 export interface CarrierChatThreadProps {
@@ -72,33 +92,33 @@ export default function CarrierChatThread({
   className,
 }: CarrierChatThreadProps) {
   const queryClient = useQueryClient();
+  const numericCarrierId = Number(carrierId);
+  const queryKey = carrierMessagesKey(numericCarrierId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
 
-  const threadQuery = useQuery<ChatThread>({
-    queryKey: ["/api/carrier-chat/thread", carrierId],
-    queryFn: async () => {
-      const response = await fetch(`/api/carrier-chat/${carrierId}`, { credentials: "include" });
+  const threadQuery = useQuery<ChatMessage[]>({
+    queryKey,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/carrier-chat/${numericCarrierId}`, {
+        credentials: "include",
+        signal,
+      });
       if (!response.ok) throw await getChatError(response, "Unable to load this conversation");
-      const result = await response.json();
-      return {
-        ...result,
-        messages: (Array.isArray(result.messages) ? result.messages : []).map((message: any) => ({
-          ...message,
-          message: message.message || "",
-          attachmentName: message.attachmentName || message.attachment?.name || null,
-          attachmentUrl: message.attachmentUrl || message.attachment?.viewUrl || null,
-        })),
-      };
+      const result = await response.json() as ChatThread;
+      return sortMessages((Array.isArray(result.messages) ? result.messages : []).map(normalizeMessage));
     },
-    refetchInterval: 5000,
+    refetchInterval: () =>
+      queryClient.isMutating({ mutationKey: ["send-carrier-message", numericCarrierId] }) ? false : 5000,
+    staleTime: 4000,
     retry: false,
+    enabled: !!numericCarrierId,
   });
-  const messages = threadQuery.data?.messages || [];
-  const name = threadQuery.data?.chat?.carrierName || carrierName || "Carrier";
-  const mc = threadQuery.data?.chat?.mcNumber || mcNumber;
+  const messages = threadQuery.data || [];
+  const name = carrierName || "Carrier";
+  const mc = mcNumber;
 
   // The thread GET marks carrier messages read. Keep every unread/list surface synchronized.
   useEffect(() => {
@@ -112,28 +132,59 @@ export default function CarrierChatThread({
   }, [messages.length, carrierId]);
 
   const sendMessage = useMutation({
-    mutationFn: async () => {
-      if (!draft.trim() && !attachment) throw new Error("Enter a message or choose an attachment");
+    mutationKey: ["send-carrier-message", numericCarrierId],
+    mutationFn: async ({ text, file }: { text: string; file: File | null; tempId: string; createdAt: string }) => {
       const form = new FormData();
-      form.append("message", draft.trim());
-      if (attachment) form.append("attachment", attachment);
-      const response = await fetch(`/api/carrier-chat/${carrierId}/messages`, {
+      form.append("message", text);
+      if (file) form.append("attachment", file);
+      const response = await fetch(`/api/carrier-chat/${numericCarrierId}/messages`, {
         method: "POST",
         credentials: "include",
         body: form,
       });
       if (!response.ok) throw await getChatError(response, "Unable to send message");
-      return response.json();
+      return normalizeMessage(await response.json());
     },
-    onSuccess: () => {
+    onMutate: async ({ text, file, tempId, createdAt }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<ChatMessage[]>(queryKey) || [];
+      queryClient.setQueryData<ChatMessage[]>(queryKey, sortMessages([
+        ...previous,
+        {
+          id: tempId,
+          senderType: "agent",
+          senderName: "TPF Agent",
+          message: text,
+          attachmentName: file?.name || null,
+          attachmentUrl: null,
+          createdAt,
+        },
+      ]));
+      return { previous, tempId };
+    },
+    onSuccess: (created, _variables, context) => {
+      queryClient.setQueryData<ChatMessage[]>(queryKey, (current = []) =>
+        sortMessages(current.map((message) => message.id === context?.tempId ? created : message)));
       setDraft("");
       setAttachment(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      queryClient.invalidateQueries({ queryKey: ["/api/carrier-chat/thread", carrierId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/carrier-chat"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/carrier-chat/unread-count"] });
     },
+    onError: (_error, _variables, context) => {
+      if (context) queryClient.setQueryData(queryKey, context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
   });
+
+  const submitMessage = () => {
+    const text = draft.trim();
+    if ((!text && !attachment) || sendMessage.isPending) return;
+    sendMessage.mutate({
+      text,
+      file: attachment,
+      tempId: `temp-${crypto.randomUUID()}`,
+      createdAt: new Date().toISOString(),
+    });
+  };
 
   const chooseAttachment = (file?: File) => {
     if (!file) return;
@@ -207,7 +258,7 @@ export default function CarrierChatThread({
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                if (!sendMessage.isPending) sendMessage.mutate();
+                submitMessage();
               }
             }}
             placeholder="Write a message…"
@@ -224,7 +275,7 @@ export default function CarrierChatThread({
           <Button type="button" variant="outline" size="icon" title="Attach PDF, JPEG, or PNG" onClick={() => fileInputRef.current?.click()}>
             <Paperclip className="h-4 w-4" />
           </Button>
-          <Button type="button" size="icon" disabled={sendMessage.isPending || (!draft.trim() && !attachment)} onClick={() => sendMessage.mutate()} title="Send message">
+          <Button type="button" size="icon" disabled={sendMessage.isPending || (!draft.trim() && !attachment)} onClick={submitMessage} title="Send message">
             <Send className="h-4 w-4" />
           </Button>
         </div>

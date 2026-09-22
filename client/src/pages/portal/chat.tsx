@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileImage, FileText, Loader2, MessageCircle, Paperclip, Send, X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PortalLayout from "@/components/layout/portal-layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface PortalUser {
   companyName: string;
+  carrierId?: number | null;
 }
 
 interface Agent {
@@ -82,8 +83,16 @@ function responseMessages(value: unknown): ChatMessage[] {
   })) as ChatMessage[];
 }
 
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { credentials: "include" });
+function sortMessages(messages: ChatMessage[]) {
+  return [...messages].sort((a, b) => {
+    const timeDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (timeDifference !== 0) return timeDifference;
+    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+  });
+}
+
+async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(url, { credentials: "include", signal });
   if (response.status === 401) {
     window.location.href = "/portal/login";
     throw new Error("Portal session expired");
@@ -93,27 +102,35 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export default function PortalChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
-  const [loadingMessages, setLoadingMessages] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const latestCreatedAtRef = useRef("");
-  const latestMessageIdRef = useRef(0);
-  const requestRef = useRef(0);
 
   const { data: me } = useQuery<PortalUser>({
     queryKey: ["/api/portal/me"],
     retry: false,
   });
+  const carrierId = Number(me?.carrierId);
+  const messagesQueryKey = ["carrier-messages", carrierId] as const;
   const { data: summary } = useQuery<ChatSummary>({
     queryKey: ["/api/portal/chat"],
     refetchInterval: 5000,
     retry: false,
   });
+  const messagesQuery = useQuery<ChatMessage[]>({
+    queryKey: messagesQueryKey,
+    queryFn: async ({ signal }) => sortMessages(responseMessages(
+      await getJson<unknown>("/api/portal/chat/messages", signal),
+    )),
+    enabled: !!carrierId,
+    refetchInterval: () =>
+      queryClient.isMutating({ mutationKey: ["send-carrier-message", carrierId] }) ? false : 5000,
+    staleTime: 4000,
+    retry: false,
+  });
+  const messages = messagesQuery.data || [];
 
   const agent = useMemo(() => {
     const summaryAgent = summary?.agent;
@@ -124,67 +141,16 @@ export default function PortalChat() {
     };
   }, [summary]);
 
-  const loadMessages = useCallback(async (initial = false) => {
-    const requestId = ++requestRef.current;
-    const since = initial ? "" : latestCreatedAtRef.current;
-    const url = since
-      ? `/api/portal/chat/messages?since=${encodeURIComponent(since)}&afterId=${latestMessageIdRef.current}`
-      : "/api/portal/chat/messages";
-
-    try {
-      const result = responseMessages(await getJson<unknown>(url));
-      if (requestId !== requestRef.current) return;
-      if (result.length) {
-        setMessages((current) => {
-          const byId = new Map<string, ChatMessage>();
-          [...current, ...result].forEach((message) => byId.set(String(message.id), message));
-          return Array.from(byId.values()).sort(
-            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-          );
-        });
-        for (const message of result) {
-          const messageTime = new Date(message.createdAt).getTime();
-          const latestTime = latestCreatedAtRef.current ? new Date(latestCreatedAtRef.current).getTime() : -1;
-          const messageId = Number(message.id);
-          if (messageTime > latestTime || (messageTime === latestTime && messageId > latestMessageIdRef.current)) {
-            latestCreatedAtRef.current = message.createdAt;
-            latestMessageIdRef.current = messageId;
-          }
-        }
-      }
-      setError("");
-    } catch (err) {
-      if (requestId === requestRef.current) {
-        setError(err instanceof Error ? err.message : "Unable to load messages");
-      }
-    } finally {
-      if (requestId === requestRef.current) setLoadingMessages(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadMessages(true);
-    const timer = window.setInterval(() => loadMessages(false), 5000);
-    return () => {
-      requestRef.current += 1;
-      window.clearInterval(timer);
-    };
-  }, [loadMessages]);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  const submitMessage = async () => {
-    const text = draft.trim();
-    if ((!text && !attachment) || sending) return;
-    setSending(true);
-    setError("");
-    const formData = new FormData();
-    formData.append("message", text);
-    if (attachment) formData.append("attachment", attachment);
-
-    try {
+  const sendMessage = useMutation({
+    mutationKey: ["send-carrier-message", carrierId],
+    mutationFn: async ({ text, file }: { text: string; file: File | null; tempId: string; createdAt: string }) => {
+      const formData = new FormData();
+      formData.append("message", text);
+      if (file) formData.append("attachment", file);
       const response = await fetch("/api/portal/chat/messages", {
         method: "POST",
         credentials: "include",
@@ -194,14 +160,50 @@ export default function PortalChat() {
         const body = await response.text();
         throw new Error(body || "Message could not be sent");
       }
+      const [created] = responseMessages([await response.json()]);
+      return { ...created, senderName: created.senderName || me?.companyName || "You" };
+    },
+    onMutate: async ({ text, file, tempId, createdAt }) => {
+      await queryClient.cancelQueries({ queryKey: messagesQueryKey });
+      const previous = queryClient.getQueryData<ChatMessage[]>(messagesQueryKey) || [];
+      queryClient.setQueryData<ChatMessage[]>(messagesQueryKey, sortMessages([
+        ...previous,
+        {
+          id: tempId,
+          senderType: "carrier",
+          senderName: me?.companyName || "You",
+          message: text,
+          attachmentName: file?.name || null,
+          attachmentUrl: null,
+          createdAt,
+        },
+      ]));
+      return { previous, tempId };
+    },
+    onSuccess: (created, _variables, context) => {
+      queryClient.setQueryData<ChatMessage[]>(messagesQueryKey, (current = []) =>
+        sortMessages(current.map((message) => message.id === context?.tempId ? created : message)));
       setDraft("");
       setAttachment(null);
-      await loadMessages(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Message could not be sent");
-    } finally {
-      setSending(false);
-    }
+    },
+    onError: (_error, _variables, context) => {
+      if (context) queryClient.setQueryData(messagesQueryKey, context.previous);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey });
+      queryClient.invalidateQueries({ queryKey: ["/api/portal/chat"] });
+    },
+  });
+
+  const submitMessage = () => {
+    const text = draft.trim();
+    if ((!text && !attachment) || sendMessage.isPending || !carrierId) return;
+    sendMessage.mutate({
+      text,
+      file: attachment,
+      tempId: `temp-${crypto.randomUUID()}`,
+      createdAt: new Date().toISOString(),
+    });
   };
 
   return (
@@ -226,7 +228,7 @@ export default function PortalChat() {
           </div>
 
           <CardContent className="flex-1 overflow-y-auto bg-slate-50/70 p-4 sm:p-6">
-            {loadingMessages && !messages.length ? (
+            {messagesQuery.isLoading && !messages.length ? (
               <div className="flex h-full items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-blue-500" /></div>
             ) : messages.length ? (
               <div className="space-y-4">
@@ -281,7 +283,11 @@ export default function PortalChat() {
                 ))}
               </div>
             )}
-            {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+            {(messagesQuery.error || sendMessage.error) && (
+              <p className="mb-2 text-xs text-red-600">
+                {((sendMessage.error || messagesQuery.error) as Error).message}
+              </p>
+            )}
             {attachment && (
               <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
                 {attachment.type.startsWith("image/") ? <FileImage className="h-4 w-4 text-blue-500" /> : <FileText className="h-4 w-4 text-blue-500" />}
@@ -318,8 +324,8 @@ export default function PortalChat() {
               <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} aria-label="Attach a PDF or image" className="h-9 w-9 shrink-0 text-slate-500 hover:text-blue-600">
                 <Paperclip className="h-4 w-4" />
               </Button>
-              <Button type="button" onClick={submitMessage} disabled={sending || (!draft.trim() && !attachment)} aria-label="Send message" className="h-9 w-9 shrink-0 rounded-lg bg-blue-600 p-0 hover:bg-blue-700">
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <Button type="button" onClick={submitMessage} disabled={sendMessage.isPending || (!draft.trim() && !attachment)} aria-label="Send message" className="h-9 w-9 shrink-0 rounded-lg bg-blue-600 p-0 hover:bg-blue-700">
+                {sendMessage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
             <p className="mt-1.5 px-1 text-[11px] text-slate-400">Enter to send · Shift + Enter for a new line</p>

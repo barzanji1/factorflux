@@ -10860,11 +10860,10 @@ RESPOND:
         ),
       )).orderBy(portalChatMessages.createdAt, portalChatMessages.id).limit(200);
     }
-    const newest = await db.select().from(portalChatMessages)
+    return db.select().from(portalChatMessages)
       .where(eq(portalChatMessages.chatId, chatId))
-      .orderBy(desc(portalChatMessages.createdAt), desc(portalChatMessages.id))
+      .orderBy(portalChatMessages.createdAt, portalChatMessages.id)
       .limit(200);
-    return newest.reverse();
   };
 
   const getPortalChat = async (portalUserId: number, create = true) => {
