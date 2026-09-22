@@ -21,11 +21,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+  Win95Tabs as Tabs,
+  Win95TabsContent as TabsContent,
+  Win95TabsList as TabsList,
+  Win95TabsTrigger as TabsTrigger,
+} from "@/components/win95";
 import {
   Accordion,
   AccordionContent,
@@ -950,20 +950,25 @@ export default function HelpPage() {
         </section>
 
         <Tabs defaultValue="guides" className="space-y-6">
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[20px] bg-slate-100 p-2 md:grid-cols-3 xl:grid-cols-5 dark:bg-slate-800">
-            <TabsTrigger value="guides" className="rounded-xl">
+          <TabsList>
+            <TabsTrigger value="guides">
+              <ClipboardCheck className="h-4 w-4" />
               Quick Start
             </TabsTrigger>
-            <TabsTrigger value="features" className="rounded-xl">
+            <TabsTrigger value="features">
+              <Package className="h-4 w-4" />
               Features
             </TabsTrigger>
-            <TabsTrigger value="faq" className="rounded-xl">
+            <TabsTrigger value="faq">
+              <HelpCircle className="h-4 w-4" />
               FAQ
             </TabsTrigger>
-            <TabsTrigger value="contact" className="rounded-xl">
+            <TabsTrigger value="contact">
+              <MessageCircle className="h-4 w-4" />
               Contact
             </TabsTrigger>
-            <TabsTrigger value="resources" className="rounded-xl">
+            <TabsTrigger value="resources">
+              <FileText className="h-4 w-4" />
               Resources
             </TabsTrigger>
           </TabsList>
