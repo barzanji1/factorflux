@@ -41,6 +41,11 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton-rows";
 import { cn } from "@/lib/utils";
+import {
+  Win95Tabs,
+  Win95TabsList,
+  Win95TabsTrigger,
+} from "@/components/win95";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface UserRecord {
@@ -704,23 +709,16 @@ export default function Admin() {
             </div>
 
             {/* ── Tab Navigation ── */}
-            <div className="ff-admin-tabs ff-admin-surface flex gap-1 p-1">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "ff-admin-tab flex flex-1 items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium",
-                    activeTab === tab.id
-                      ? "is-active"
-                      : ""
-                  )}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </button>
-              ))}
-            </div>
+            <Win95Tabs value={activeTab} onValueChange={value => setActiveTab(value as Tab)}>
+              <Win95TabsList>
+                {TABS.map((tab) => (
+                  <Win95TabsTrigger key={tab.id} value={tab.id}>
+                    <tab.icon className="h-4 w-4" />
+                    {tab.label}
+                  </Win95TabsTrigger>
+                ))}
+              </Win95TabsList>
+            </Win95Tabs>
 
             {/* ══════════════════════════════════════════════════════════════ */}
             {/* TAB: USERS                                                     */}
