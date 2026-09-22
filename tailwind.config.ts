@@ -6,11 +6,15 @@ export default {
   theme: {
     extend: {
       borderRadius: {
+        card: "12px",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
+        "win95-teal": "#27aab8",
+        "win95-canvas": "#d4d0c8",
+        "win95-header": "#2f2f2f",
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         card: {
@@ -61,6 +65,10 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+      },
+      boxShadow: {
+        "bevel-light": "2px 2px 0 #808080, -1px -1px 0 #ffffff",
+        "bevel-dark": "inset 1px 1px 0 rgba(0,0,0,0.32), inset -1px -1px 0 #ffffff",
       },
       keyframes: {
         "accordion-down": {

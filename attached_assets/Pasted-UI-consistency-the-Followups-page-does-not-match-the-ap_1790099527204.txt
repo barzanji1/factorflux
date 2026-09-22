@@ -1,0 +1,24 @@
+UI consistency: the Followups page does not match the app's Windows 95 theme. Use the Audit Trail page (Risk > Audit Trail) as the reference implementation — extract, don't redesign.
+
+Step 1 — theme layer. Create client/src/components/win95/ and move the Audit Trail patterns into reusable components:
+- PageShell: breadcrumb (e.g. "Risk > Audit Trail"), title + subtitle in the top header bar, global search, New dropdown, bell, user chip. Pages must not render a second H1/title in the body.
+- Win95Card: 12px border-radius, soft drop shadow, white bg (the Audit Trail stat cards and log card).
+- Win95StatCard: uppercase tracked label + large teal number.
+- Win95Input / Win95Select: embossed inset box style (Audit Trail's "Search events…", "All Dates", etc.).
+- Win95Button: raised bevel, pressed state, teal primary variant; used in card toolbars (Export CSV / Refresh).
+- Win95Tabs: the existing embossed tab strip (Followups' current tab strip is already correct — reuse it).
+- Win95Table: dark #2f2f2f header, uppercase tracked column labels, zebra rows, rounded top corners.
+- Win95Badge, Win95FilterChip (teal when selected).
+Add tokens to tailwind.config: teal #27aab8, canvas #d4d0c8, header #2f2f2f, bevel-light/bevel-dark box-shadows, rounded-card 12px.
+
+Step 2 — Followups page. Rebuild using only PageShell + win95 components. Specifically:
+- Remove the body H1 "Follow Up Tasks" + icon + repeated subtitle; title lives in PageShell only. Add breadcrumb "Recovery > Followups".
+- Move "Add Follow Up" into the list card's toolbar next to the filters (like Export CSV/Refresh on Audit Trail).
+- Stat cards → Win95StatCard (currently square with hard offset shadow).
+- Search / All Status / All Priority → Win95Input / Win95Select (currently flat underline inputs).
+- List card → Win95Card with Win95Table when rows exist; keep the empty state.
+Preserve all queries, mutations, filters, and actions exactly.
+
+Step 3 — report only (no changes): list every page importing shadcn Card/Button/Tabs/Input/Select/Table directly instead of the win95 wrappers, and every page missing PageShell. Include FMCSA Monitor (MC Check), whose search input and tab strip are off-theme.
+
+Do not change routes, data, or permissions. Show the diff for Steps 1–2.

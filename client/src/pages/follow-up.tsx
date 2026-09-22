@@ -1,16 +1,34 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PageShell,
+  Win95Badge as Badge,
+  Win95Button as Button,
+  Win95Card as Card,
+  Win95CardContent as CardContent,
+  Win95Input as Input,
+  Win95Select as Select,
+  Win95SelectContent as SelectContent,
+  Win95SelectItem as SelectItem,
+  Win95SelectTrigger as SelectTrigger,
+  Win95SelectValue as SelectValue,
+  Win95StatCard,
+  Win95Table,
+  Win95TableBody,
+  Win95TableCell,
+  Win95TableHead,
+  Win95TableHeader,
+  Win95TableRow,
+  Win95Tabs as Tabs,
+  Win95TabsContent as TabsContent,
+  Win95TabsList as TabsList,
+  Win95TabsTrigger as TabsTrigger,
+} from "@/components/win95";
 import {
   Clock, Plus, Search, Calendar, AlertCircle, CheckCircle, User, FileText,
   Mail, Zap, CheckCheck, RefreshCw, ChevronDown, ChevronUp, Ban, SkipForward,
@@ -23,8 +41,6 @@ import { z } from "zod";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -946,43 +962,24 @@ export default function FollowUpPage() {
   });
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#d4d0c8]">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Follow Ups" subtitle="Manage client follow-ups, pending tasks, and broker automations" />
+    <PageShell
+      title="Followups"
+      subtitle="Manage client follow-ups, tasks, and broker payment reminder cadences"
+      group="Recovery"
+    >
+      {deliverySummary && deliverySummary.total > 0 && (
+        <div className="ff-badge ff-badge-rejected gap-1.5">
+          ❌ {deliverySummary.total} delivery issue{deliverySummary.total !== 1 ? "s" : ""} —&nbsp;
+          {deliverySummary.bounced > 0 && `${deliverySummary.bounced} bounced`}
+          {deliverySummary.bounced > 0 && deliverySummary.failed > 0 && ", "}
+          {deliverySummary.failed > 0 && `${deliverySummary.failed} failed`}
+          {(deliverySummary.bounced > 0 || deliverySummary.failed > 0) && deliverySummary.spam > 0 && ", "}
+          {deliverySummary.spam > 0 && `${deliverySummary.spam} spam`}
+        </div>
+      )}
 
-        <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-7xl space-y-6 p-6 xl:p-8">
-
-            {/* Header */}
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <Clock className="h-8 w-8 text-blue-600" />
-                  Follow Up Tasks
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  Manage client follow-ups, tasks, and broker payment reminder cadences
-                </p>
-                {deliverySummary && deliverySummary.total > 0 && (
-                  <div className="ff-badge ff-badge-rejected mt-2 gap-1.5">
-                    ❌ {deliverySummary.total} delivery issue{deliverySummary.total !== 1 ? "s" : ""} —&nbsp;
-                    {deliverySummary.bounced > 0 && `${deliverySummary.bounced} bounced`}
-                    {deliverySummary.bounced > 0 && deliverySummary.failed > 0 && ", "}
-                    {deliverySummary.failed > 0 && `${deliverySummary.failed} failed`}
-                    {(deliverySummary.bounced > 0 || deliverySummary.failed > 0) && deliverySummary.spam > 0 && ", "}
-                    {deliverySummary.spam > 0 && `${deliverySummary.spam} spam`}
-                  </div>
-                )}
-              </div>
-              <Dialog open={isAddingFollowUp} onOpenChange={setIsAddingFollowUp}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Follow Up
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[500px]">
+      <Dialog open={isAddingFollowUp} onOpenChange={setIsAddingFollowUp}>
+        <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[500px]">
                   <DialogHeader>
                     <DialogTitle>Create Follow Up Task</DialogTitle>
                   </DialogHeader>
@@ -1045,24 +1042,14 @@ export default function FollowUpPage() {
                       </div>
                     </form>
                   </Form>
-                </DialogContent>
-              </Dialog>
-            </div>
+        </DialogContent>
+      </Dialog>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                { label: "Open Manual Tasks", value: followUps.filter(item => item.status !== "completed").length },
-                { label: "Unacknowledged Automations", value: pendingBfuCount },
-                { label: "Email Templates", value: templates.length },
-              ].map(stat => (
-                <Card key={stat.label} className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
-                  <CardContent className="p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
-                    <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Win95StatCard label="Open Manual Tasks" value={followUps.filter(item => item.status !== "completed").length} />
+        <Win95StatCard label="Unacknowledged Automations" value={pendingBfuCount} />
+        <Win95StatCard label="Email Templates" value={templates.length} />
+      </div>
 
             {/* Tabs */}
             <Tabs defaultValue="manual">
@@ -1095,10 +1082,10 @@ export default function FollowUpPage() {
               </TabsList>
 
               {/* ── Manual follow-ups ─────────────────────────────────────────── */}
-              <TabsContent value="manual" className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
-                <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+              <TabsContent value="manual">
+                <Card>
                   <CardContent className="p-4">
-                    <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center gap-2 flex-1 min-w-64">
                         <Search className="h-4 w-4 text-gray-400" />
                         <Input
@@ -1125,9 +1112,13 @@ export default function FollowUpPage() {
                           <SelectItem value="low">Low</SelectItem>
                         </SelectContent>
                       </Select>
+                      <Button primary className="flex items-center gap-2" onClick={() => setIsAddingFollowUp(true)}>
+                        <Plus className="h-4 w-4" />
+                        Add Follow Up
+                      </Button>
                     </div>
                   </CardContent>
-                </Card>
+
 
                 <div className="grid gap-4">
                   {isLoading ? (
@@ -1148,54 +1139,53 @@ export default function FollowUpPage() {
                       </CardContent>
                     </Card>
                   ) : (
-                    filteredFollowUps.map(followUp => (
-                        <Card key={followUp.id} className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] transition-shadow hover:bg-[#f0f0f0] hover:shadow-md">
-                        <CardContent className="p-6">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{followUp.title}</h3>
-                                <Badge className={`ff-badge ${getPriorityColor(followUp.priority)}`}>{followUp.priority}</Badge>
-                                <Badge className={`ff-badge ${getStatusColor(followUp.status)}`}>
-                                  <span className="flex items-center gap-1">
-                                    {getStatusIcon(followUp.status)}
-                                    {followUp.status.replace("-", " ")}
-                                  </span>
-                                </Badge>
+                    <Win95Table>
+                      <Win95TableHeader>
+                        <Win95TableRow>
+                          <Win95TableHead>Task</Win95TableHead>
+                          <Win95TableHead>Carrier</Win95TableHead>
+                          <Win95TableHead>Due Date</Win95TableHead>
+                          <Win95TableHead>Priority</Win95TableHead>
+                          <Win95TableHead>Status</Win95TableHead>
+                          <Win95TableHead className="text-right">Actions</Win95TableHead>
+                        </Win95TableRow>
+                      </Win95TableHeader>
+                      <Win95TableBody>
+                        {filteredFollowUps.map(followUp => (
+                          <Win95TableRow key={followUp.id}>
+                            <Win95TableCell>
+                              <p className="font-semibold text-slate-900">{followUp.title}</p>
+                              {followUp.description && <p className="mt-1 max-w-md text-xs text-slate-500">{followUp.description}</p>}
+                            </Win95TableCell>
+                            <Win95TableCell>{followUp.client?.name ?? "—"}</Win95TableCell>
+                            <Win95TableCell>{format(new Date(followUp.dueDate), "MMM dd, yyyy")}</Win95TableCell>
+                            <Win95TableCell>
+                              <Badge className={getPriorityColor(followUp.priority)}>{followUp.priority}</Badge>
+                            </Win95TableCell>
+                            <Win95TableCell>
+                              <Badge className={getStatusColor(followUp.status)}>
+                                <span className="flex items-center gap-1">{getStatusIcon(followUp.status)}{followUp.status.replace("-", " ")}</span>
+                              </Badge>
+                            </Win95TableCell>
+                            <Win95TableCell>
+                              <div className="flex justify-end gap-2">
+                                {followUp.status !== "completed" && (
+                                  <>
+                                    {followUp.status === "pending" && (
+                                      <Button size="sm" variant="outline" onClick={() => updateStatusMutation.mutate({ id: followUp.id, status: "in-progress" })}>Start</Button>
+                                    )}
+                                    <Button primary size="sm" onClick={() => updateStatusMutation.mutate({ id: followUp.id, status: "completed" })}>Complete</Button>
+                                  </>
+                                )}
                               </div>
-                              {followUp.description && (
-                                <p className="text-gray-600 dark:text-gray-400 mb-3">{followUp.description}</p>
-                              )}
-                              <div className="flex items-center gap-4 text-sm text-gray-500">
-                                <div className="flex items-center gap-1">
-                                  <User className="h-4 w-4" />{followUp.client?.name}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="h-4 w-4" />
-                                  Due: {format(new Date(followUp.dueDate), "MMM dd, yyyy")}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 ml-4">
-                              {followUp.status !== "completed" && (
-                                <>
-                                  {followUp.status === "pending" && (
-                                    <Button size="sm" variant="outline"
-                                      onClick={() => updateStatusMutation.mutate({ id: followUp.id, status: "in-progress" })}
-                                    >Start</Button>
-                                  )}
-                                  <Button size="sm"
-                                    onClick={() => updateStatusMutation.mutate({ id: followUp.id, status: "completed" })}
-                                  >Complete</Button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
+                            </Win95TableCell>
+                          </Win95TableRow>
+                        ))}
+                      </Win95TableBody>
+                    </Win95Table>
                   )}
                 </div>
+                </Card>
               </TabsContent>
 
               {/* ── Broker automations ────────────────────────────────────────── */}
@@ -1611,9 +1601,6 @@ export default function FollowUpPage() {
               </DialogContent>
             </Dialog>
 
-          </div>
-        </main>
-      </div>
-    </div>
+    </PageShell>
   );
 }

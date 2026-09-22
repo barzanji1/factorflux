@@ -61,7 +61,6 @@ import {
   brokerBranches,
   fuelAdvances,
   invoices,
-  invoiceStatusHistory,
   invoiceNotes,
   invoiceChargebackEvents,
   invoiceRefunds,
@@ -2505,20 +2504,18 @@ ${message}
         )).returning();
         if (!updated) return { kind: "conflict" as const, status: existing.status };
         const previousStatus = updated.previousStatus ?? existing.status;
-        await tx.insert(invoiceStatusHistory).values({
-          invoiceId,
-          oldStatus: previousStatus,
-          newStatus: "held",
-          changedBy: req.user.id,
-          reason: `Held: ${reason.trim()}`,
-        });
         await tx.insert(eventLedger).values({
           entityType: "invoice",
           entityId: invoiceId,
-          eventType: "status_changed",
+          eventType: "invoice_status_changed",
           actorType: "user",
           actorId: req.user.id,
-          payloadJson: { from: previousStatus, to: "held", reason: reason.trim() },
+          payloadJson: {
+            from: previousStatus,
+            to: "held",
+            reason: reason.trim(),
+            label: "Invoice placed on hold",
+          },
         });
         return { kind: "updated" as const, invoice: updated };
       });
@@ -2735,13 +2732,6 @@ ${message}
           status: "submitted",
           factoringStage: "verification",
         }).returning();
-        await tx.insert(invoiceStatusHistory).values({
-          invoiceId: invoice.id,
-          oldStatus: null,
-          newStatus: "submitted",
-          changedBy: req.user.id,
-          reason: "Invoice created",
-        });
         await tx.insert(eventLedger).values({
           entityType: "invoice",
           entityId: invoice.id,
@@ -9777,8 +9767,14 @@ RESPOND:
         if (!existing) return { kind: "not_found" as const }; if (!allowed.includes(existing.status as any)) return { kind: "conflict" as const, status: existing.status };
         const heldAt = new Date(); const [updated] = await tx.update(invoices).set({ previousStatus: existing.status, status: "held", heldReason: reason, heldAt, heldBy: req.user.id, updatedAt: heldAt }).where(and(eq(invoices.id, invoiceId), inArray(invoices.status, [...allowed]))).returning();
         if (!updated) return { kind: "conflict" as const, status: existing.status };
-        await tx.insert(invoiceStatusHistory).values({ invoiceId, oldStatus: existing.status, newStatus: "held", changedBy: req.user.id, reason: `Held: ${reason}` });
-        await tx.insert(eventLedger).values({ entityType: "invoice", entityId: invoiceId, eventType: "status_changed", actorType: "user", actorId: req.user.id, payloadJson: { from: existing.status, to: "held", reason } });
+        await tx.insert(eventLedger).values({
+          entityType: "invoice",
+          entityId: invoiceId,
+          eventType: "invoice_status_changed",
+          actorType: "user",
+          actorId: req.user.id,
+          payloadJson: { from: existing.status, to: "held", reason, label: "Invoice placed on hold" },
+        });
         return { kind: "updated" as const, invoice: updated };
       });
       if (outcome.kind === "not_found") throw new Error("Invoice not found"); if (outcome.kind === "conflict") throw new Error(`Invoices in ${outcome.status} status cannot be placed on hold`);
@@ -10114,13 +10110,6 @@ RESPOND:
             submittedAt: now,
             notes: `Bulk invoice batch #${createdBatch.id}; ticket ${item.ticketNumber}`,
           }).returning();
-          await tx.insert(invoiceStatusHistory).values({
-            invoiceId: createdInvoice.id,
-            oldStatus: null,
-            newStatus: "submitted",
-            changedBy: userId,
-            reason: `Created from bulk invoice batch #${createdBatch.id}`,
-          });
           const [createdItem] = await tx.insert(bulkInvoiceItems).values({
             batchId: createdBatch.id,
             carrierId: item.carrierId,

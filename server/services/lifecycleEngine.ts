@@ -15,7 +15,6 @@ import {
   payouts,
   paymentApplicationLines,
   exceptions,
-  invoiceStatusHistory,
   eventLedger,
   creditChecks,
   clients,
@@ -188,7 +187,7 @@ const guardHasReason: Guard = async ({ reason }) =>
 // SIDE EFFECTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Write status change + audit trail */
+/** Write one canonical structured status-change audit event. */
 function fxSetStatus(newStatus: string): SideEffect {
   return async ({ invoiceId, actorId, invoice, reason }) => {
     const statusUpdate: any = { status: newStatus as any, updatedAt: new Date() };
@@ -199,17 +198,22 @@ function fxSetStatus(newStatus: string): SideEffect {
       statusUpdate.approvedAt = new Date();
     }
     if (newStatus === "funded" && !invoice.fundedAt) statusUpdate.fundedAt = new Date();
-    await db.update(invoices)
-      .set(statusUpdate)
-      .where(eq(invoices.id, invoiceId));
-    await db.insert(invoiceStatusHistory).values({
-      invoiceId, oldStatus: invoice.status, newStatus, changedBy: actorId,
-      reason: reason ?? null,
-    });
-    await db.insert(eventLedger).values({
-      entityType: "invoice", entityId: invoiceId, eventType: "status_changed",
-      actorType: "user", actorId,
-      payloadJson: { from: invoice.status, to: newStatus, reason: reason ?? null },
+    await db.transaction(async tx => {
+      const [updated] = await tx.update(invoices)
+        .set(statusUpdate)
+        .where(and(eq(invoices.id, invoiceId), eq(invoices.status, invoice.status)))
+        .returning({ id: invoices.id });
+      if (!updated) throw new Error(`Invoice status changed before "${newStatus}" could be applied`);
+      await tx.insert(eventLedger).values({
+        entityType: "invoice", entityId: invoiceId, eventType: "invoice_status_changed",
+        actorType: "user", actorId,
+        payloadJson: {
+          from: invoice.status,
+          to: newStatus,
+          reason: reason ?? null,
+          label: newStatus === "approved" ? "Invoice approved" : `Invoice status changed to ${newStatus}`,
+        },
+      });
     });
   };
 }
@@ -239,16 +243,24 @@ const fxCheckDocsAutoDowngrade: SideEffect = async ({ invoiceId, actorId }) => {
   const docs = await db.select({ documentType: documents.documentType }).from(documents)
     .where(eq(documents.invoiceId, invoiceId));
   const types = new Set(docs.map(d => d.documentType));
-  if (!types.has("rate_confirmation") || !types.has("bill_of_lading")) {
-    await db.update(invoices).set({ status: "docs_pending", updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
-    await db.insert(invoiceStatusHistory).values({
-      invoiceId, oldStatus: "submitted", newStatus: "docs_pending", changedBy: actorId,
-      reason: "Auto-flagged: missing rate confirmation or bill of lading",
-    });
-    await db.insert(eventLedger).values({
-      entityType: "invoice", entityId: invoiceId, eventType: "auto_docs_pending",
-      actorType: "system", actorId,
-      payloadJson: { reason: "Missing rate_confirmation or bill_of_lading after submission" },
+  const hasBillOfLading = types.has("bill_of_lading") || types.has("bol");
+  if (!types.has("rate_confirmation") || !hasBillOfLading) {
+    await db.transaction(async tx => {
+      const [updated] = await tx.update(invoices)
+        .set({ status: "docs_pending", updatedAt: new Date() })
+        .where(and(eq(invoices.id, invoiceId), eq(invoices.status, "submitted")))
+        .returning({ id: invoices.id });
+      if (!updated) return;
+      await tx.insert(eventLedger).values({
+        entityType: "invoice", entityId: invoiceId, eventType: "invoice_status_changed",
+        actorType: "system", actorId,
+        payloadJson: {
+          from: "submitted",
+          to: "docs_pending",
+          reason: "Missing rate confirmation or bill of lading after submission",
+          label: "Documents pending",
+        },
+      });
     });
   }
 };
@@ -706,19 +718,18 @@ async function executeFundTransaction(
     }).where(and(eq(invoices.id, invoiceId), eq(invoices.status, "approved"))).returning();
     if (!updated) throw new Error("Invoice status could not be updated");
 
-    await tx.insert(invoiceStatusHistory).values({
-      invoiceId,
-      oldStatus: invoice.status,
-      newStatus: "funded",
-      changedBy: actorId,
-    });
     await tx.insert(eventLedger).values({
       entityType: "invoice",
       entityId: invoiceId,
-      eventType: "status_changed",
+      eventType: "invoice_status_changed",
       actorType: "user",
       actorId,
-      payloadJson: { from: invoice.status, to: "funded", reason: null },
+      payloadJson: {
+        from: invoice.status,
+        to: "funded",
+        reason: null,
+        label: "Invoice funded",
+      },
     });
     if (stageAdvances) {
       await tx.insert(eventLedger).values({
@@ -861,12 +872,13 @@ export async function performTransition(
   }
 
   // Execute side effects
-  for (const fx of def.sideEffects) {
+  for (let index = 0; index < def.sideEffects.length; index += 1) {
+    const fx = def.sideEffects[index];
     try { await fx(ctx); }
     catch (err) {
       console.error(`[lifecycle] side-effect error in ${transitionId}:`, err);
-      if (transitionId === "fund" && fx === fxCreatePayout) {
-        return { success: false, error: "Funding failed before the invoice status changed" };
+      if (index === 0) {
+        return { success: false, error: err instanceof Error ? err.message : "Invoice status transition failed" };
       }
     }
   }

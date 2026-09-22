@@ -25,7 +25,17 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
     inArray(invoices.status, ["funded", "settled", "paid"] as any[]),
   ));
   for (const invoice of missingFundingDates) {
-    const [fundingEvent] = await db.select({ createdAt: invoiceStatusHistory.createdAt })
+    const [ledgerFundingEvent] = await db.select({ createdAt: eventLedger.createdAt })
+      .from(eventLedger)
+      .where(and(
+        eq(eventLedger.entityType, "invoice"),
+        eq(eventLedger.entityId, invoice.id),
+        inArray(eventLedger.eventType, ["invoice_status_changed", "status_changed", "invoice.status_changed"]),
+        sql`${eventLedger.payloadJson}->>'to' = 'funded'`,
+      ))
+      .orderBy(asc(eventLedger.createdAt))
+      .limit(1);
+    const [legacyFundingEvent] = ledgerFundingEvent ? [] : await db.select({ createdAt: invoiceStatusHistory.createdAt })
       .from(invoiceStatusHistory)
       .where(and(
         eq(invoiceStatusHistory.invoiceId, invoice.id),
@@ -33,7 +43,7 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
       ))
       .orderBy(asc(invoiceStatusHistory.createdAt))
       .limit(1);
-    const fundedAt = fundingEvent?.createdAt ?? invoice.fallbackDate;
+    const fundedAt = ledgerFundingEvent?.createdAt ?? legacyFundingEvent?.createdAt ?? invoice.fallbackDate;
     if (fundedAt) {
       await db.update(invoices).set({ fundedAt }).where(and(
         eq(invoices.id, invoice.id),

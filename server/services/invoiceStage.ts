@@ -421,7 +421,7 @@ const withTimelineReason = (description: string, payload: Record<string, unknown
 
 const statusChangedFormat: TimelineEventFormat = {
   category: "status",
-  title: payload => `Status changed to ${timelineText(payload.to ?? payload.newStatus)}`,
+  title: payload => timelineText(payload.label, `Status changed to ${timelineText(payload.to ?? payload.newStatus)}`),
   description: payload => withTimelineReason(
     `Invoice status updated from ${timelineText(payload.from ?? payload.oldStatus)} → ${timelineText(payload.to ?? payload.newStatus)}`,
     payload,
@@ -429,6 +429,7 @@ const statusChangedFormat: TimelineEventFormat = {
 };
 
 const invoiceTimelineEventFormats: Record<string, TimelineEventFormat> = {
+  invoice_status_changed: statusChangedFormat,
   status_changed: statusChangedFormat,
   "invoice.status_changed": statusChangedFormat,
   "invoice.created": {

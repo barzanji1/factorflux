@@ -21,5 +21,6 @@
 - [Chat notification cursors](chat-notification-cursors.md) — sound alerts require paginated message IDs plus a pre-list server watermark; unread deltas and client time lose or replay events.
 - [Carrier chat terminal states](carrier-chat-terminal-states.md) — expected 404/no-portal states must stop polling; repeated error refetches cause visible profile-message flicker.
 - [Approved tactile navigation](approved-tactile-navigation.md) — preserve the strongly beveled stacked sidebar-button direction, while keeping labels crisp and high-contrast.
+- [Windows 95 page consistency](windows95-page-consistency.md) — use the shared Win95 shell and controls for internal pages; Audit Trail is the reference, not a redesign prompt.
 - [Broker credit recomputation](broker-credit-recomputation.md) — portfolio runs need bounded concurrency, while each broker must be serialized across processes to prevent stale scores.
 - [FMCSA run integrity](fmcsa-run-integrity.md) — missing keys skip whole runs; concurrent schedulers require heartbeat leases, ownership fencing, and transport-only circuit breaking.

@@ -1,23 +1,23 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  PageShell,
+  Win95Button as Button,
+  Win95Card as Card,
+  Win95CardContent as CardContent,
+  Win95Input as Input,
+  Win95Select as Select,
+  Win95SelectContent as SelectContent,
+  Win95SelectItem as SelectItem,
+  Win95SelectTrigger as SelectTrigger,
+  Win95SelectValue as SelectValue,
+  Win95StatCard,
+} from "@/components/win95";
 import {
   ClipboardList,
   Search,
   User,
   FileText,
-  ArrowRight,
   DollarSign,
   FileUp,
   Users,
@@ -43,20 +43,9 @@ type AuditEntry = {
   actorName?: string | null;
 };
 
-type StatusHistoryEntry = {
-  id: number;
-  invoiceId: number;
-  oldStatus: string | null;
-  newStatus: string;
-  changedBy: string | null;
-  reason: string | null;
-  createdAt: string;
-  changedByName?: string | null;
-};
-
 type UnifiedEntry = {
   id: string;
-  kind: "event" | "status";
+  kind: "event";
   title: string;
   detail: string;
   entityType: string;
@@ -122,6 +111,10 @@ function formatEventType(et: string) {
   return et.replace(/\./g, " → ").replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 }
 
+function isInvoiceStatusEvent(eventType: string) {
+  return ["invoice_status_changed", "status_changed", "invoice.status_changed"].includes(eventType);
+}
+
 type DetailRow = { label: string; value: unknown };
 
 function firstDetailValue(metadata: Record<string, unknown>, ...keys: string[]) {
@@ -162,14 +155,42 @@ function detailPresentation(entry: UnifiedEntry): { title: string; rows: DetailR
     };
   }
 
-  if (entry.kind === "status" || entry.entityType === "invoice") {
+  if (entry.entityType === "invoice" && isInvoiceStatusEvent(entry.actionType)) {
     return {
-      title: entry.kind === "status" || /status|stage/i.test(entry.actionType) ? "Status Change Details" : "Invoice Activity Details",
+      title: "Status Change Details",
       rows: [
         { label: "Invoice #", value: invoiceNumber },
         { label: "Previous Status", value: firstDetailValue(metadata, "previousStatus", "oldStatus", "from") },
         { label: "New Status", value: firstDetailValue(metadata, "newStatus", "status", "to") },
+        { label: "Reason", value: firstDetailValue(metadata, "reason") },
         { label: "Changed By", value: firstDetailValue(metadata, "changedByName", "changedBy") ?? entry.actorName },
+      ],
+    };
+  }
+
+  if (entry.entityType === "invoice" && entry.actionType === "invoice.updated"
+      && Object.prototype.hasOwnProperty.call(metadata, "assignedTo")) {
+    return {
+      title: "Assignment Details",
+      rows: [
+        { label: "Invoice #", value: invoiceNumber },
+        { label: "Assigned To", value: firstDetailValue(metadata, "assignedTo", "assignedToName") ?? "Unassigned" },
+        { label: "Changed By", value: entry.actorName },
+      ],
+    };
+  }
+
+  if (entry.entityType === "invoice" && entry.actionType.startsWith("chargeback_")) {
+    return {
+      title: "Chargeback Details",
+      rows: [
+        { label: "Invoice #", value: invoiceNumber },
+        { label: "Action", value: formatEventType(entry.actionType) },
+        { label: "Date", value: firstDetailValue(metadata, "extensionDate", "chargebackDate", "date") },
+        { label: "Amount", value: firstDetailValue(metadata, "amount") },
+        { label: "Method", value: firstDetailValue(metadata, "method") },
+        { label: "Reference #", value: firstDetailValue(metadata, "reference") },
+        { label: "Reason", value: firstDetailValue(metadata, "reason") },
       ],
     };
   }
@@ -250,11 +271,13 @@ function actionBadge(action: string): string {
   return "ff-badge-draft";
 }
 
-function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): UnifiedEntry[] {
+function toUnified(events: AuditEntry[]): UnifiedEntry[] {
   const fromEvents: UnifiedEntry[] = events.map(e => ({
     id: `ev-${e.id}`,
     kind: "event",
-    title: e.eventType === "broker_followup_triggered"
+    title: isInvoiceStatusEvent(e.eventType)
+      ? String((e.payloadJson as any)?.label ?? "Invoice Status Changed")
+      : e.eventType === "broker_followup_triggered"
       ? `Follow-Up Triggered — ${(e.payloadJson as any)?.invoiceNumber ?? `Invoice #${e.entityId}`}`
       : e.eventType === "broker_followup_updated"
       ? `Follow-Up Updated — Invoice #${e.entityId}`
@@ -271,7 +294,9 @@ function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): U
       : e.eventType === "broker_followup_delivery_unsubscribed"
       ? `Unsubscribed — Invoice #${e.entityId}`
       : formatEventType(e.eventType),
-    detail: e.eventType === "broker_followup_triggered"
+    detail: isInvoiceStatusEvent(e.eventType)
+      ? `Invoice #${e.entityId}: ${String((e.payloadJson as any)?.from ?? "new").replace(/_/g, " ")} → ${String((e.payloadJson as any)?.to ?? "unknown").replace(/_/g, " ")}${(e.payloadJson as any)?.reason ? `. Reason: ${(e.payloadJson as any).reason}` : ""}`
+      : e.eventType === "broker_followup_triggered"
       ? `${(e.payloadJson as any)?.clientName ?? ""} · ${(e.payloadJson as any)?.triggerType === "auto" ? "Auto-triggered on funding" : "Manually triggered"}`
       : e.eventType.startsWith("broker_followup_delivery_")
       ? `Reminder #${(e.payloadJson as any)?.reminderId ?? "?"} · ${(e.payloadJson as any)?.email ?? ""}`
@@ -289,23 +314,7 @@ function toUnified(events: AuditEntry[], statusHistory: StatusHistoryEntry[]): U
     color: EVENT_TYPE_COLOR[e.eventType] ?? ENTITY_COLOR[e.entityType] ?? "bg-slate-100 text-slate-600",
   }));
 
-  const fromStatus: UnifiedEntry[] = statusHistory.map(s => ({
-    id: `sh-${s.id}`,
-    kind: "status",
-    title: `Invoice Status Changed`,
-    detail: `Invoice #${s.invoiceId}: ${s.oldStatus ?? "new"} → ${s.newStatus}`,
-    entityType: "invoice",
-    entityId: s.invoiceId,
-    actorName: s.changedByName ?? s.changedBy ?? null,
-    actorType: "user",
-    actionType: s.newStatus,
-    metadata: { oldStatus: s.oldStatus, newStatus: s.newStatus, reason: s.reason },
-    createdAt: s.createdAt,
-    icon: ArrowRight,
-    color: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400",
-  }));
-
-  return [...fromEvents, ...fromStatus].sort(
+  return fromEvents.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
@@ -321,11 +330,7 @@ export default function AuditLog() {
   const { data: events = [], isLoading: eventsLoading, refetch } = useQuery<AuditEntry[]>({
     queryKey: ["/api/audit/events"],
   });
-  const { data: statusHistory = [], isLoading: histLoading } = useQuery<StatusHistoryEntry[]>({
-    queryKey: ["/api/audit/status-history"],
-  });
-
-  const unified = useMemo(() => toUnified(events, statusHistory), [events, statusHistory]);
+  const unified = useMemo(() => toUnified(events), [events]);
 
   const filtered = unified.filter(e => {
     if (filterEntity !== "all" && e.entityType !== filterEntity) return false;
@@ -347,15 +352,20 @@ export default function AuditLog() {
   const actionTypes = Array.from(new Set(unified.map(e => e.actionType))).sort();
   const users = Array.from(new Set(unified.map(e => e.actorName ?? e.actorType))).sort();
 
-  const isLoading = eventsLoading || histLoading;
+  const isLoading = eventsLoading;
 
   function exportCsv() {
     const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
-    const rows = filtered.map(e => [
+    const rows = filtered.map(e => {
+      const structuredDetails = detailPresentation(e).rows
+        .map(row => `${row.label}: ${formatDetailValue(row.value, row.label)}`)
+        .join("; ");
+      return [
       e.createdAt, formatEventType(e.actionType), e.entityType, e.entityId,
-      e.actorName ?? e.actorType, e.detail, JSON.stringify(e.metadata ?? {}),
-    ].map(escape).join(","));
-    const csv = ["Timestamp,Action,Entity Type,Entity ID,User,Details,Metadata", ...rows].join("\n");
+      e.actorName ?? e.actorType, e.detail, structuredDetails,
+    ].map(escape).join(",");
+    });
+    const csv = ["Timestamp,Action,Entity Type,Entity ID,User,Details,Structured Details", ...rows].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
@@ -365,12 +375,12 @@ export default function AuditLog() {
   }
 
   return (
-    <div className="ff-audit-page flex h-screen bg-[#d4d0c8]">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Audit Trail" subtitle="Complete event history — status changes, entity updates, and system actions" group="Risk" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
+    <PageShell
+      title="Audit Trail"
+      subtitle="Complete event history — status changes, entity updates, and system actions"
+      group="Risk"
+      className="ff-audit-page"
+    >
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -379,25 +389,18 @@ export default function AuditLog() {
                 { label: "Today", value: unified.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString()).length },
                 { label: "System Events", value: unified.filter(e => e.actorType === "system").length },
                 { label: "User Actions", value: unified.filter(e => e.actorType === "user").length },
-              ].map(s => (
-                <Card key={s.label} className="ff-dashboard-card ff-audit-surface border border-slate-200 bg-white dark:border-slate-800">
-                  <CardContent className="p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{s.value}</p>
-                  </CardContent>
-                </Card>
-              ))}
+              ].map(s => <Win95StatCard key={s.label} label={s.label} value={s.value} />)}
             </div>
 
             {/* Main Log */}
             <Card className="ff-table-container ff-audit-surface overflow-hidden border border-slate-200 bg-white dark:border-slate-800">
-              <CardHeader className="border-b border-slate-200/70 px-6 py-5 dark:border-slate-800">
+              <div className="border-b border-slate-200/70 px-6 py-5 dark:border-slate-800">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                     <ClipboardList className="h-5 w-5 text-slate-500" />
                     Event Logs
                     <span className="ff-badge ff-badge-draft ml-2">{filtered.length}</span>
-                  </CardTitle>
+                  </h2>
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -441,7 +444,7 @@ export default function AuditLog() {
                     </Button>
                   </div>
                 </div>
-              </CardHeader>
+              </div>
               <CardContent className="p-0">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-20">
@@ -510,9 +513,6 @@ export default function AuditLog() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </main>
-      </div>
-    </div>
+    </PageShell>
   );
 }

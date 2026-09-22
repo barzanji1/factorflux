@@ -55,7 +55,6 @@ import {
   type Document,
   type InsertDocument,
   type InvoiceStatusHistory,
-  type InsertInvoiceStatusHistory,
   type EventLedger,
   type InsertEventLedger,
   type Activity,
@@ -183,7 +182,6 @@ export interface IStorage {
 
   // Invoice history / event ledger
   getInvoiceStatusHistory(invoiceId: number): Promise<InvoiceStatusHistory[]>;
-  createInvoiceStatusHistory(entry: InsertInvoiceStatusHistory): Promise<InvoiceStatusHistory>;
   getEvents(entityType?: string, entityId?: number): Promise<EventLedger[]>;
   createEvent(entry: InsertEventLedger): Promise<EventLedger>;
 
@@ -587,78 +585,78 @@ export class DatabaseStorage implements IStorage {
   async holdInvoice(id: number, reason: string, heldBy: string, notes?: string): Promise<Invoice> {
     const existing = await this.getInvoice(id);
     if (!existing) throw new Error(`Invoice ${id} not found`);
-    const [updated] = await db
-      .update(invoices)
-      .set({
-        previousStatus: existing.status,
-        status: "held" as any,
-        heldReason: reason,
-        heldAt: new Date(),
-        heldBy,
-        heldNotes: notes ?? null,
-        updatedAt: new Date(),
-      })
-      .where(eq(invoices.id, id))
-      .returning();
-    await this.createInvoiceStatusHistory({
-      invoiceId: id,
-      oldStatus: existing.status,
-      newStatus: "held",
-      changedBy: heldBy,
-      reason: `Held: ${reason}`,
+    if (existing.status === "held") throw new Error(`Invoice ${id} is already on hold`);
+    return db.transaction(async tx => {
+      const [updated] = await tx
+        .update(invoices)
+        .set({
+          previousStatus: existing.status,
+          status: "held" as any,
+          heldReason: reason,
+          heldAt: new Date(),
+          heldBy,
+          heldNotes: notes ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(invoices.id, id), eq(invoices.status, existing.status)))
+        .returning();
+      if (!updated) throw new Error("Invoice status changed before it could be placed on hold");
+      await tx.insert(eventLedger).values({
+        entityType: "invoice",
+        entityId: id,
+        eventType: "invoice_status_changed",
+        actorType: "user",
+        actorId: heldBy,
+        payloadJson: {
+          from: existing.status,
+          to: "held",
+          reason,
+          label: "Invoice placed on hold",
+        },
+      });
+      return updated;
     });
-    return updated;
   }
 
   async releaseInvoice(id: number, releasedBy: string, releaseNote?: string): Promise<Invoice> {
     const existing = await this.getInvoice(id);
     if (!existing) throw new Error(`Invoice ${id} not found`);
+    if (existing.status !== "held") throw new Error(`Invoice ${id} is not on hold`);
     const restoreStatus = (existing.previousStatus as any) ?? "submitted";
-    const [updated] = await db
-      .update(invoices)
-      .set({
-        status: restoreStatus,
-        heldReason: null,
-        heldAt: null,
-        heldBy: null,
-        heldNotes: null,
-        previousStatus: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(invoices.id, id))
-      .returning();
-    await this.createInvoiceStatusHistory({
-      invoiceId: id,
-      oldStatus: "held",
-      newStatus: restoreStatus,
-      changedBy: releasedBy,
-      reason: releaseNote ? `Released: ${releaseNote}` : "Released from hold",
+    return db.transaction(async tx => {
+      const [updated] = await tx
+        .update(invoices)
+        .set({
+          status: restoreStatus,
+          heldReason: null,
+          heldAt: null,
+          heldBy: null,
+          heldNotes: null,
+          previousStatus: null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(invoices.id, id), eq(invoices.status, "held")))
+        .returning();
+      if (!updated) throw new Error("Invoice is no longer on hold");
+      await tx.insert(eventLedger).values({
+        entityType: "invoice",
+        entityId: id,
+        eventType: "invoice_status_changed",
+        actorType: "user",
+        actorId: releasedBy,
+        payloadJson: {
+          from: "held",
+          to: restoreStatus,
+          reason: releaseNote || "Released from hold",
+          label: "Invoice released from hold",
+        },
+      });
+      return updated;
     });
-    await this.createEvent({
-      entityType: "invoice",
-      entityId: id,
-      eventType: "status_changed",
-      actorType: "user",
-      actorId: releasedBy,
-      payloadJson: {
-        from: "held",
-        to: restoreStatus,
-        reason: releaseNote || "Released from hold",
-      },
-    });
-    return updated;
   }
 
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
     const [newInvoice] = await db.insert(invoices).values(invoice).returning();
-
-    await this.createInvoiceStatusHistory({
-      invoiceId: newInvoice.id,
-      oldStatus: null,
-      newStatus: newInvoice.status,
-      changedBy: newInvoice.submittedBy || null,
-      reason: "Invoice created",
-    });
 
     await this.createEvent({
       entityType: "invoice",
@@ -691,22 +689,10 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     if (invoice.status && invoice.status !== existing.status) {
-      await this.createInvoiceStatusHistory({
-        invoiceId: updatedInvoice.id,
-        oldStatus: existing.status,
-        newStatus: invoice.status,
-        changedBy:
-          updatedInvoice.approvedBy ||
-          updatedInvoice.submittedBy ||
-          updatedInvoice.assignedTo ||
-          null,
-        reason: "Invoice status updated",
-      });
-
       await this.createEvent({
         entityType: "invoice",
         entityId: updatedInvoice.id,
-        eventType: "status_changed",
+        eventType: "invoice_status_changed",
         actorType: "user",
         actorId:
           updatedInvoice.approvedBy ||
@@ -717,6 +703,7 @@ export class DatabaseStorage implements IStorage {
           from: existing.status,
           to: invoice.status,
           reason: null,
+          label: invoice.status === "approved" ? "Invoice approved" : `Invoice status changed to ${invoice.status}`,
         },
       });
     }
@@ -878,13 +865,6 @@ export class DatabaseStorage implements IStorage {
       .from(invoiceStatusHistory)
       .where(eq(invoiceStatusHistory.invoiceId, invoiceId))
       .orderBy(desc(invoiceStatusHistory.createdAt));
-  }
-
-  async createInvoiceStatusHistory(
-    entry: InsertInvoiceStatusHistory
-  ): Promise<InvoiceStatusHistory> {
-    const [newEntry] = await db.insert(invoiceStatusHistory).values(entry).returning();
-    return newEntry;
   }
 
   async getEvents(entityType?: string, entityId?: number): Promise<EventLedger[]> {
