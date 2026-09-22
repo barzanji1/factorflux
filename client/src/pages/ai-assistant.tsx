@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { useState, useRef, useEffect, type KeyboardEvent, type Ref } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
@@ -109,11 +109,12 @@ function ActivityList({ activities }: { activities: Activity[] }) {
   );
 }
 
-function StructuredCard({ card }: { card: DataCard }) {
+function StructuredCard({ card, cardRef }: { card: DataCard; cardRef?: Ref<HTMLElement> }) {
   const Icon = card.type === "carrier" ? Truck : card.type === "invoice" ? FileText : Landmark;
   return (
     <article
-      data-earl-result-card
+      ref={cardRef}
+      data-type="structured-card"
       className="mt-3 scroll-mt-3 rounded-lg border border-slate-300 bg-[#e9e6df] p-3"
       aria-label={`${card.type} details`}
     >
@@ -144,10 +145,12 @@ function MessageBubble({
   msg,
   userInitials,
   onReview,
+  structuredCardRef,
 }: {
   msg: Message;
   userInitials: string;
   onReview: (confirmation: Confirmation) => void;
+  structuredCardRef?: Ref<HTMLElement>;
 }) {
   const isUser = msg.role === "user";
   return (
@@ -169,7 +172,11 @@ function MessageBubble({
         <div className="whitespace-pre-wrap">{msg.content}</div>
         {!isUser && msg.activities && <ActivityList activities={msg.activities} />}
         {!isUser && msg.cards?.map((card, index) => (
-          <StructuredCard key={card.id || `${card.type}-${index}`} card={card} />
+          <StructuredCard
+            key={card.id || `${card.type}-${index}`}
+            card={card}
+            cardRef={index === 0 ? structuredCardRef : undefined}
+          />
         ))}
         {!isUser && msg.confirmation && (
           <div className="mt-3 border-t border-slate-300/70 pt-3">
@@ -199,6 +206,7 @@ export default function AIAssistant() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const messageThreadRef = useRef<HTMLDivElement>(null);
+  const latestStructuredCardRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -213,9 +221,11 @@ export default function AIAssistant() {
     if (!thread) return;
     const latestMessage = messages[messages.length - 1];
     if (latestMessage?.role === "assistant" && latestMessage.cards?.length) {
-      const cards = thread.querySelectorAll<HTMLElement>("[data-earl-result-card]");
-      const firstNewCard = cards.item(Math.max(0, cards.length - latestMessage.cards.length));
-      firstNewCard?.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      latestStructuredCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      });
       return;
     }
     thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
@@ -335,7 +345,15 @@ export default function AIAssistant() {
               </div>
             ) : (
               <div className="mx-auto max-w-2xl">
-                {messages.map((msg, i) => <MessageBubble key={i} msg={msg} userInitials={userInitials} onReview={setConfirmation} />)}
+                {messages.map((msg, i) => (
+                  <MessageBubble
+                    key={i}
+                    msg={msg}
+                    userInitials={userInitials}
+                    onReview={setConfirmation}
+                    structuredCardRef={i === messages.length - 1 ? latestStructuredCardRef : undefined}
+                  />
+                ))}
                 {chatMutation.isPending && (
                   <div className="mb-4 flex items-end gap-2">
                     <div className="ff-earl-avatar ff-earl-assistant-avatar flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full">
