@@ -110,11 +110,18 @@ export default function CarrierChatThread({
       const result = await response.json() as ChatThread;
       return sortMessages((Array.isArray(result.messages) ? result.messages : []).map(normalizeMessage));
     },
-    refetchInterval: () =>
-      queryClient.isMutating({ mutationKey: ["send-carrier-message", numericCarrierId] }) ? false : 5000,
+    refetchInterval: (query) => {
+      const error = query.state.error as CarrierChatError | null;
+      if (error?.status === 404) return false;
+      return queryClient.isMutating({
+        mutationKey: ["send-carrier-message", numericCarrierId],
+      }) ? false : 5000;
+    },
     staleTime: 4000,
     retry: false,
     enabled: !!numericCarrierId,
+    refetchOnMount: false,
+    refetchOnReconnect: (query) => (query.state.error as CarrierChatError | null)?.status !== 404,
   });
   const messages = threadQuery.data || [];
   const name = carrierName || "Carrier";
