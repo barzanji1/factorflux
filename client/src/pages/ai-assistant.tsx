@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent, type Ref } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, type KeyboardEvent, type Ref } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
@@ -146,15 +146,17 @@ function MessageBubble({
   userInitials,
   onReview,
   structuredCardRef,
+  messageRef,
 }: {
   msg: Message;
   userInitials: string;
   onReview: (confirmation: Confirmation) => void;
   structuredCardRef?: Ref<HTMLElement>;
+  messageRef?: Ref<HTMLDivElement>;
 }) {
   const isUser = msg.role === "user";
   return (
-    <div className={cn("mb-4 flex items-end gap-2", isUser ? "flex-row-reverse" : "flex-row")}>
+    <div ref={messageRef} className={cn("mb-4 flex items-end gap-2", isUser ? "flex-row-reverse" : "flex-row")}>
       <div className={cn(
         "ff-earl-avatar flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",
         isUser ? "ff-earl-user-avatar" : "ff-earl-assistant-avatar overflow-hidden",
@@ -207,6 +209,7 @@ export default function AIAssistant() {
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const messageThreadRef = useRef<HTMLDivElement>(null);
   const latestStructuredCardRef = useRef<HTMLElement>(null);
+  const latestAssistantMessageRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -216,12 +219,25 @@ export default function AIAssistant() {
     }
   }, [permissions, setLocation, toast]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const thread = messageThreadRef.current;
     if (!thread) return;
     const latestMessage = messages[messages.length - 1];
     if (latestMessage?.role === "assistant" && latestMessage.cards?.length) {
       latestStructuredCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      });
+      return;
+    }
+    const latestAssistantMessage = latestAssistantMessageRef.current;
+    if (
+      latestMessage?.role === "assistant"
+      && latestAssistantMessage
+      && latestAssistantMessage.offsetHeight > thread.clientHeight
+    ) {
+      latestAssistantMessage.scrollIntoView({
         behavior: "smooth",
         block: "start",
         inline: "nearest",
@@ -352,6 +368,7 @@ export default function AIAssistant() {
                     userInitials={userInitials}
                     onReview={setConfirmation}
                     structuredCardRef={i === messages.length - 1 ? latestStructuredCardRef : undefined}
+                    messageRef={i === messages.length - 1 && msg.role === "assistant" ? latestAssistantMessageRef : undefined}
                   />
                 ))}
                 {chatMutation.isPending && (
