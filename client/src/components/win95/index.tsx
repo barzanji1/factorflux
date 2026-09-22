@@ -129,7 +129,14 @@ export const Win95TabsList = React.forwardRef<
   React.ElementRef<typeof TabsList>,
   React.ComponentPropsWithoutRef<typeof TabsList>
 >(({ className, ...props }, ref) => (
-  <TabsList ref={ref} className={cn("rounded-sm bg-win95-canvas p-1 shadow-bevel-light", className)} {...props} />
+  <TabsList
+    ref={ref}
+    className={cn(
+      "h-auto w-fit flex-wrap justify-start rounded-none border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-win95-canvas p-1 shadow-bevel-light",
+      className,
+    )}
+    {...props}
+  />
 ));
 Win95TabsList.displayName = "Win95TabsList";
 export const Win95TabsTrigger = React.forwardRef<
@@ -139,7 +146,7 @@ export const Win95TabsTrigger = React.forwardRef<
   <TabsTrigger
     ref={ref}
     className={cn(
-      "rounded-sm border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white px-4 data-[state=active]:bg-white data-[state=active]:shadow-bevel-dark",
+      "flex items-center gap-2 rounded-none border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-win95-canvas px-4 py-1.5 text-sm font-medium text-[#2f2f2f] shadow-bevel-light focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=active]:border-b-white data-[state=active]:border-r-white data-[state=active]:border-l-[#808080] data-[state=active]:border-t-[#808080] data-[state=active]:bg-white data-[state=active]:text-win95-teal data-[state=active]:shadow-bevel-dark",
       className,
     )}
     {...props}

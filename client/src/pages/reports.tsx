@@ -31,6 +31,11 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
+import {
+  Win95Tabs,
+  Win95TabsList,
+  Win95TabsTrigger,
+} from "@/components/win95";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -973,26 +978,19 @@ export default function Reports() {
               </div>
             </div>
 
-            <div className="ff-reports-tabs ff-reports-surface flex gap-1 p-1 w-fit flex-wrap">
-              {TABS.map(tab => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      "ff-reports-tab flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold",
-                      activeTab === tab.id
-                        ? "is-active"
-                        : "",
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
+            <Win95Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabId)}>
+              <Win95TabsList>
+                {TABS.map(tab => {
+                  const Icon = tab.icon;
+                  return (
+                    <Win95TabsTrigger key={tab.id} value={tab.id}>
+                      <Icon className="h-4 w-4" />
+                      {tab.label}
+                    </Win95TabsTrigger>
+                  );
+                })}
+              </Win95TabsList>
+            </Win95Tabs>
 
             <div>
               {activeTab === "global"   && <GlobalReportsTab />}
