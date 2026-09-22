@@ -14,6 +14,10 @@ import { LoadTypeBadge } from "@/components/load-type";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  win95TabsListClassName,
+  win95TabsTriggerClassName,
+} from "@/components/win95";
 
 type QueueRow = {
   id: number;
@@ -239,7 +243,23 @@ export default function FundingQueue() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em]">Funding cutoff</p><p className="mt-1 text-sm">ACH <strong>2:15 PM MST</strong> · Wire <strong>1:15 PM MST</strong> <span className="text-xs opacity-70">(Denver time, daylight changes handled)</span></p></div><div className="flex gap-3 text-xs font-semibold">{cutoffs.map((item) => <span key={item.label} className="ff-dashboard-card ff-sheets-surface px-3 py-2">{item.label}: {cutoffText(item.difference)}</span>)}</div></div>
       </section>
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Manager workspace</p><h1 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">Sheets</h1><p className="mt-1 text-sm text-slate-500">Actionable pending-review and approved invoices.</p></div><div className="flex gap-2"><Button variant="outline" onClick={exportCsv} disabled={exporting}><Download className="mr-2 h-4 w-4" />{exporting ? "Exporting…" : "Export CSV"}</Button>{selectedRows.length > 0 && <Button onClick={() => openFunding(selectedRows)}>Fund Selected ({selectedRows.length})</Button>}</div></div>
-      <div className="flex flex-wrap gap-2">{[["all", "All"], ["otr_load", "OTR"], ["dump_truck_ticket", "Dump"], ["hotshot", "Hotshot"], ["other", "Other"]].map(([value, label]) => <button key={value} type="button" onClick={() => setTab(value)} className={`rounded-full border px-4 py-2 text-sm font-semibold ${tab === value ? "border-[#087d8d] bg-[#087d8d] text-white shadow-[1px_1px_0_#808080]" : "border-[#808080] bg-[#d4d0c8] text-[#444] shadow-[1px_1px_0_#808080]"}`}>{label}</button>)}</div>
+      <div className={win95TabsListClassName}>
+        {[["all", "All"], ["otr_load", "OTR"], ["dump_truck_ticket", "Dump"], ["hotshot", "Hotshot"], ["other", "Other"]].map(([value, label]) => {
+          const active = tab === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={active}
+              data-state={active ? "active" : "inactive"}
+              onClick={() => setTab(value)}
+              className={win95TabsTriggerClassName}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
       <section className="ff-card ff-sheets-surface grid gap-3 border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[hsl(var(--card))] md:grid-cols-3 lg:grid-cols-6">
         <div className="relative lg:col-span-2"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input aria-label="Search Sheets" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search load, invoice, carrier" className="pl-9" /></div>
         <select aria-label="Actionable status" value={status} onChange={(event) => setStatus(event.target.value)} className="ff-input border bg-background px-3 text-sm"><option value="actionable">Pending Review + Approved</option><option value="submitted,docs_pending,under_review">Pending Review</option><option value="approved">Approved</option></select>
