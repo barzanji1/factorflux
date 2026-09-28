@@ -875,19 +875,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextInvoiceNumber(): Promise<string> {
-    const rows = await db
-      .select({ n: invoices.invoiceNumber })
-      .from(invoices)
-      .orderBy(desc(invoices.id));
-
-    let maxSeq = 0;
-    for (const { n } of rows) {
-      if (!n) continue;
-      const match = n.replace(/\D/g, "");
-      const num = parseInt(match, 10);
-      if (!isNaN(num) && num > maxSeq) maxSeq = num;
-    }
-    return `INV${String(maxSeq + 1).padStart(3, "0")}`;
+    const result = await db.execute(sql`SELECT nextval('invoices_internal_number_seq'::regclass)::text AS sequence`);
+    const sequence = (result.rows[0] as { sequence?: string } | undefined)?.sequence;
+    if (!sequence) throw new Error("Internal invoice sequence did not return a number");
+    return `INV${sequence.padStart(3, "0")}`;
   }
 
   async clearActivities(): Promise<void> {

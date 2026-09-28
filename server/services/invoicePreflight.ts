@@ -130,12 +130,12 @@ export async function runInvoicePreflight(
   const exactMatches = input.invoiceNumber || input.loadNumber
     ? await dbClient.select({
       id: invoices.id,
-      invoiceNumber: invoices.invoiceNumber,
+      carrierInvoiceNumber: invoices.carrierInvoiceNumber,
       loadNumber: invoices.loadNumber,
     }).from(invoices).where(and(
       eq(invoices.clientId, input.carrierId),
       or(
-        input.invoiceNumber ? eq(invoices.invoiceNumber, input.invoiceNumber) : undefined,
+        input.invoiceNumber ? eq(invoices.carrierInvoiceNumber, input.invoiceNumber) : undefined,
         input.loadNumber ? eq(invoices.loadNumber, input.loadNumber) : undefined,
       ),
       excludeWhere,
@@ -145,14 +145,16 @@ export async function runInvoicePreflight(
   if (enabled(settings, "DUPLICATE_EXACT")) {
     for (const match of exactMatches) {
       const matchedOn = [
-        input.invoiceNumber && match.invoiceNumber === input.invoiceNumber ? `invoice ${match.invoiceNumber}` : null,
+        input.invoiceNumber && match.carrierInvoiceNumber === input.invoiceNumber
+          ? `carrier invoice number ${match.carrierInvoiceNumber}`
+          : null,
         input.loadNumber && match.loadNumber === input.loadNumber ? `load ${match.loadNumber}` : null,
       ].filter(Boolean).join(" and ");
       alerts.push({
         code: "DUPLICATE_EXACT",
         severity: "block",
         title: "Possible duplicate invoice",
-        message: `Invoice ${match.id} already uses ${matchedOn || "the supplied invoice or load number"}.`,
+        message: `Invoice ${match.id} already uses ${matchedOn || "the supplied carrier invoice or load number"}.`,
         link: `/invoices/${match.id}`,
       });
     }

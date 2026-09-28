@@ -160,7 +160,8 @@ export const loads = pgTable("loads", {
 // Invoices table
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
-  invoiceNumber: varchar("invoice_number").notNull(),
+  invoiceNumber: varchar("invoice_number").unique().notNull(),
+  carrierInvoiceNumber: varchar("carrier_invoice_number"),
   loadId: integer("load_id").references(() => loads.id, { onDelete: "set null" }),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   debtorId: integer("debtor_id").references(() => debtors.id),
@@ -241,9 +242,9 @@ export const invoices = pgTable("invoices", {
 }, (table) => [
   index("invoices_invoice_number_idx").on(table.invoiceNumber),
   index("invoices_client_id_idx").on(table.clientId),
-  uniqueIndex("invoices_client_invoice_number_unique")
-    .on(table.clientId, table.invoiceNumber)
-    .where(sql`${table.invoiceNumber} IS NOT NULL`),
+  uniqueIndex("invoices_client_carrier_invoice_number_unique")
+    .on(table.clientId, table.carrierInvoiceNumber)
+    .where(sql`${table.carrierInvoiceNumber} IS NOT NULL`),
   uniqueIndex("invoices_client_load_number_unique")
     .on(table.clientId, table.loadNumber)
     .where(sql`${table.loadNumber} IS NOT NULL`),

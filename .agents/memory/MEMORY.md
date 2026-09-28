@@ -7,6 +7,7 @@
 - [Two-role factoring workflow](two-role-factoring-workflow.md) — agents create/correct/submit only; managers review, reject, fund, collect, and settle.
 - [Carrier-broker AR aging](carrier-broker-ar-aging.md) — age funded receivables from funded date and exclude closed balances; short pay uses all applied cash.
 - [Bulk invoice uniqueness](bulk-invoice-uniqueness.md) — one broker/carrier/ticket/load identity may produce only one bulk receivable across all batches.
+- [Invoice number provenance](invoice-number-provenance.md) — internal INV numbers and carrier invoice references are separate; never infer legacy carrier references from ambiguous identifiers.
 - [Fuel advance compatibility](fuel-advance-compatibility.md) — preserve legacy fuel-advance reads/API fields while normalized workflow fields are adopted.
 - [External Neon verification](external-neon-verification.md) — database callbacks may target a different managed DB; verify app data through the configured Neon connection.
 - [Permission override semantics](permission-override-semantics.md) — one explicit permission row replaces all role defaults; never seed a single module permission for default-only users.

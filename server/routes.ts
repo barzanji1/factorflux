@@ -523,6 +523,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     serviceDate: input.serviceDate ?? input.invoiceDate ?? input.date ?? undefined,
     ...(input.excludeInvoiceId == null ? {} : { excludeInvoiceId: Number(input.excludeInvoiceId) }),
   } as any, dbClient);
+  const getNextInvoiceNumberInTransaction = async (tx: any) => {
+    const result = await tx.execute(sql`SELECT nextval('invoices_internal_number_seq'::regclass)::text AS sequence`);
+    const sequence = String(result.rows[0]?.sequence ?? "");
+    if (!/^\d+$/.test(sequence)) throw new Error("Failed to allocate an internal invoice number.");
+    return `INV${sequence.padStart(3, "0")}`;
+  };
   const getPortalSubmissionNearDuplicateAlerts = async (
     input: { carrierId: number; brokerId: number; amount: number },
     dbClient: any = db,
@@ -2710,7 +2716,7 @@ ${message}
       const { alerts } = await runPreflightForInvoice({
         carrierId: invoice.clientId,
         brokerId: invoice.brokerId,
-        invoiceNumber: invoice.invoiceNumber,
+        invoiceNumber: invoice.carrierInvoiceNumber,
         loadNumber: invoice.loadNumber,
         amount: Number(invoice.amount),
         serviceDate: invoice.invoiceDate,
@@ -2981,11 +2987,12 @@ ${message}
         return res.status(400).json({ message: "metadata must be a JSON object." });
       }
 
-      const suppliedInvoiceNumber = z.string().trim().min(1, "Invoice number cannot be blank").max(100, "Invoice number must be 100 characters or fewer")
-        .optional().parse(metadata.invoiceNumber);
-      const invoiceNumber = suppliedInvoiceNumber ?? await storage.getNextInvoiceNumber();
+      const suppliedCarrierInvoiceNumber = z.string().trim().min(1, "Invoice number cannot be blank").max(100, "Invoice number must be 100 characters or fewer")
+        .optional().parse(metadata.carrierInvoiceNumber ?? metadata.invoiceNumber);
+      const { invoiceNumber: _legacyInvoiceNumber, carrierInvoiceNumber: _carrierInvoiceNumber, ...invoiceMetadata } = metadata;
       const parsed = insertInvoiceSchema.extend({
         invoiceNumber: z.string().trim().min(1).max(100),
+        carrierInvoiceNumber: z.string().trim().max(100).nullable().optional(),
         loadType: z.enum(LOAD_TYPES),
         amount: z.coerce.number().positive("Amount must be greater than zero"),
         clientId: z.coerce.number().int().positive(),
@@ -2999,7 +3006,7 @@ ${message}
         instructionsSubject: z.string().trim().max(255).nullable().optional(),
         instructionsDetails: z.string().trim().max(10000).nullable().optional(),
         paymentType: z.enum(["ACH", "Wire"]).optional(),
-      }).parse({ ...metadata, invoiceNumber });
+      }).parse({ ...invoiceMetadata, invoiceNumber: "INV000", carrierInvoiceNumber: suppliedCarrierInvoiceNumber ?? null });
       const invoiceData = await resolveInvoiceBrokerBranch(parsed as any);
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
 
@@ -3033,7 +3040,7 @@ ${message}
       const preflightResult = await runPreflightForInvoice({
         carrierId: invoiceData.clientId,
         brokerId: invoiceData.brokerId,
-        invoiceNumber,
+        invoiceNumber: suppliedCarrierInvoiceNumber,
         loadNumber: invoiceData.loadNumber,
         amount: invoiceData.amount,
         serviceDate: invoiceServiceDate,
@@ -3079,10 +3086,11 @@ ${message}
       } = invoiceData as any;
       const committed = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(92734012)`);
+        const invoiceNumber = await getNextInvoiceNumberInTransaction(tx);
         const transactionalPreflight = await runPreflightForInvoice({
           carrierId: invoiceData.clientId,
           brokerId: invoiceData.brokerId,
-          invoiceNumber,
+          invoiceNumber: suppliedCarrierInvoiceNumber,
           loadNumber: invoiceData.loadNumber,
           amount: invoiceData.amount,
           serviceDate: invoiceServiceDate,
@@ -3152,14 +3160,15 @@ ${message}
 
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
-      const suppliedInvoiceNumber = z.string().trim().min(1, "Invoice number cannot be blank").max(100, "Invoice number must be 100 characters or fewer")
-        .optional().parse(req.body?.invoiceNumber);
-      const invoiceNumber = suppliedInvoiceNumber ?? await storage.getNextInvoiceNumber();
+      const suppliedCarrierInvoiceNumber = z.string().trim().min(1, "Invoice number cannot be blank").max(100, "Invoice number must be 100 characters or fewer")
+        .optional().parse(req.body?.carrierInvoiceNumber ?? req.body?.invoiceNumber);
+      const { invoiceNumber: _legacyInvoiceNumber, carrierInvoiceNumber: _carrierInvoiceNumber, ...invoiceBody } = req.body ?? {};
       const invoiceData = await resolveInvoiceBrokerBranch(
         insertInvoiceSchema.extend({
           invoiceNumber: z.string().trim().min(1).max(100),
+          carrierInvoiceNumber: z.string().trim().max(100).nullable().optional(),
           loadType: z.enum(LOAD_TYPES),
-        }).parse({ ...req.body, invoiceNumber }) as any,
+        }).parse({ ...invoiceBody, invoiceNumber: "INV000", carrierInvoiceNumber: suppliedCarrierInvoiceNumber ?? null }) as any,
       );
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
       if (!(await canAccessClient(req, invoiceData.clientId))) {
@@ -3171,7 +3180,7 @@ ${message}
       const preflightResult = await runPreflightForInvoice({
         carrierId: invoiceData.clientId,
         brokerId: invoiceData.brokerId,
-        invoiceNumber,
+        invoiceNumber: suppliedCarrierInvoiceNumber,
         loadNumber: invoiceData.loadNumber,
         amount: invoiceData.amount,
         serviceDate: invoiceServiceDate,
@@ -3186,10 +3195,11 @@ ${message}
       } = invoiceData as any;
       const invoice = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(92734012)`);
+        const invoiceNumber = await getNextInvoiceNumberInTransaction(tx);
         const transactionalPreflight = await runPreflightForInvoice({
           carrierId: invoiceData.clientId,
           brokerId: invoiceData.brokerId,
-          invoiceNumber,
+          invoiceNumber: suppliedCarrierInvoiceNumber,
           loadNumber: invoiceData.loadNumber,
           amount: invoiceData.amount,
           serviceDate: invoiceServiceDate,
@@ -3490,23 +3500,60 @@ ${message}
           message: `Lifecycle field "${attemptedLifecycleField}" cannot be changed through invoice updates; use the transition API`,
         });
       }
-      const invoiceData = insertInvoiceSchema.partial().parse(req.body);
+      // Older clients may still send the read-only internal invoice number.
+      // Ignore it rather than allowing it into the update payload.
+      const { invoiceNumber: _internalInvoiceNumber, ...editableInvoiceBody } = req.body ?? {};
+      const invoiceData = insertInvoiceSchema.partial().extend({
+        carrierInvoiceNumber: z.preprocess(
+          value => typeof value === "string" && value.trim() === "" ? null : value,
+          z.string().trim().max(100).nullable(),
+        ).optional(),
+      }).parse(editableInvoiceBody);
       const user = req.user;
       const currentInvoice = await storage.getInvoice(id);
       if (!currentInvoice) return res.status(404).json({ message: "Invoice not found" });
-      await resolveInvoiceBrokerBranch(invoiceData as any, currentInvoice);
+      const resolvedInvoiceData = await resolveInvoiceBrokerBranch(invoiceData as any, currentInvoice);
       if (user.role === "employee" && (currentInvoice.submittedBy !== user.id || !["draft", "rejected"].includes(currentInvoice.status))) {
         return res.status(403).json({ message: "Agents may edit only their own draft or correction-required invoices" });
       }
-      if (invoiceData.bankAccountId) {
-        const account = await storage.getVaultEntry(invoiceData.bankAccountId);
+      if (resolvedInvoiceData.bankAccountId) {
+        const account = await storage.getVaultEntry(resolvedInvoiceData.bankAccountId);
         if (!currentInvoice || !account || account.clientId !== currentInvoice.clientId || account.dataType !== "bank_account" || !account.isActive) {
           return res.status(400).json({ message: "The selected bank account is not available for this carrier" });
         }
       }
 
+      const nextCarrierId = resolvedInvoiceData.clientId ?? currentInvoice.clientId;
+      if (!(await canAccessClient(req, nextCarrierId))) {
+        return res.status(403).json({ message: "You may only update invoices for carriers assigned to you" });
+      }
+      const nextCarrierInvoiceNumber = resolvedInvoiceData.carrierInvoiceNumber !== undefined
+        ? resolvedInvoiceData.carrierInvoiceNumber
+        : currentInvoice.carrierInvoiceNumber;
+      const nextLoadNumber = resolvedInvoiceData.loadNumber !== undefined
+        ? resolvedInvoiceData.loadNumber
+        : currentInvoice.loadNumber;
+      const duplicateRelevantFieldChanged = nextCarrierId !== currentInvoice.clientId
+        || nextCarrierInvoiceNumber !== currentInvoice.carrierInvoiceNumber
+        || nextLoadNumber !== currentInvoice.loadNumber;
+      if (duplicateRelevantFieldChanged) {
+        const preflight = await runPreflightForInvoice({
+          carrierId: nextCarrierId,
+          brokerId: resolvedInvoiceData.brokerId ?? currentInvoice.brokerId,
+          invoiceNumber: nextCarrierInvoiceNumber,
+          loadNumber: nextLoadNumber,
+          amount: resolvedInvoiceData.amount ?? currentInvoice.amount,
+          serviceDate: resolvedInvoiceData.invoiceDate ?? currentInvoice.invoiceDate,
+          excludeInvoiceId: id,
+        });
+        const exactDuplicateAlerts = preflight.alerts.filter((alert: any) => alert.code === "DUPLICATE_EXACT");
+        if (exactDuplicateAlerts.length) {
+          return res.status(409).json({ message: "Carrier invoice number or load number is already in use.", alerts: exactDuplicateAlerts });
+        }
+      }
+
       const updatePayload: any = {
-        ...invoiceData,
+        ...resolvedInvoiceData,
         updatedAt: new Date(),
       };
 
@@ -3515,6 +3562,7 @@ ${message}
       res.json(withInvoiceDisplayStatus(invoice));
     } catch (error) {
       if ((error as any)?.status === 400) return res.status(400).json({ message: (error as Error).message });
+      if ((error as any)?.code === "23505") return res.status(409).json({ message: "Carrier invoice number or load number is already in use." });
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
       }
@@ -10140,17 +10188,8 @@ RESPOND:
           mc ? ilike(clients.mcNumber, mc) : undefined,
           req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
         ))
-        .limit(2);
+        .limit(1);
       if (!rows.length) return { data: { message: "Invoice not found" } };
-      if (rows.length > 1) {
-        return {
-          data: {
-            message: mc
-              ? `Multiple invoices match invoice number ${invoiceNumber} and carrier MC ${mc}. Use the invoice ID to identify the invoice.`
-              : `Multiple invoices use invoice number ${invoiceNumber}. Specify the carrier MC number or use the invoice ID to identify the invoice.`,
-          },
-        };
-      }
       const [row] = rows;
       const fields = earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName });
       return { data: fields, cards: [earlCard("invoice", String(row.invoice.invoiceNumber), fields, row.invoice.id)] };
@@ -10159,27 +10198,6 @@ RESPOND:
       const invoiceNo = args.invoice_no ? String(args.invoice_no).trim() : null;
       const mc = args.mc ? String(args.mc).trim() : null;
       const loadNo = args.load_no ? String(args.load_no).trim() : null;
-      if (invoiceNo) {
-        const matchingInvoices = await db.select({ id: invoices.id })
-          .from(invoices)
-          .innerJoin(clients, eq(invoices.clientId, clients.id))
-          .where(and(
-            eq(invoices.invoiceNumber, invoiceNo),
-            mc ? ilike(clients.mcNumber, mc) : undefined,
-            loadNo ? ilike(invoices.loadNumber, loadNo) : undefined,
-            req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
-          ))
-          .limit(2);
-        if (matchingInvoices.length > 1) {
-          return {
-            data: {
-              message: mc
-                ? `Multiple invoices match invoice number ${invoiceNo} and carrier MC ${mc}. Use the invoice ID to identify the invoice.`
-                : `Multiple invoices use invoice number ${invoiceNo}. Specify the carrier MC number or use the invoice ID to identify the invoice.`,
-            },
-          };
-        }
-      }
       const identity = invoiceNo
         ? eq(invoices.invoiceNumber, invoiceNo)
         : ilike(clients.mcNumber, mc!);
@@ -10549,19 +10567,12 @@ RESPOND:
         }
       }
 
-      const existingInvoiceNumbers = await db.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices);
-      const currentMaxSequence = existingInvoiceNumbers.reduce((max, row) => {
-        const numeric = parseInt((row.invoiceNumber || "").replace(/\D/g, ""), 10);
-        return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
-      }, 0);
       const bulkPreflightAlerts: any[][] = [];
       for (let index = 0; index < input.items.length; index += 1) {
         const item = input.items[index];
-        const invoiceNumber = `INV${String(currentMaxSequence + index + 1).padStart(3, "0")}`;
         const preflight = await runPreflightForInvoice({
           carrierId: item.carrierId,
           brokerId: input.brokerId,
-          invoiceNumber,
           loadNumber: item.loadNumber,
           amount: item.rate,
           serviceDate: reportDateStart,
@@ -10589,19 +10600,12 @@ RESPOND:
 
       const createdResult = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(92734012)`);
-        const lockedInvoiceNumbers = await tx.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices);
-        const maxSequence = lockedInvoiceNumbers.reduce((max, row) => {
-          const numeric = parseInt((row.invoiceNumber || "").replace(/\D/g, ""), 10);
-          return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
-        }, 0);
         const lockedAlerts: any[][] = [];
         for (let index = 0; index < input.items.length; index += 1) {
           const item = input.items[index];
-          const invoiceNumber = `INV${String(maxSequence + index + 1).padStart(3, "0")}`;
           const preflight = await runPreflightForInvoice({
             carrierId: item.carrierId,
             brokerId: input.brokerId,
-            invoiceNumber,
             loadNumber: item.loadNumber,
             amount: item.rate,
             serviceDate: reportDateStart,
@@ -10729,7 +10733,7 @@ RESPOND:
             normalizeBulkIdentity(item.ticketNumber),
             normalizeBulkIdentity(item.loadNumber),
           ].join("|")).digest("hex");
-          const invoiceNumber = `INV${String(maxSequence + index + 1).padStart(3, "0")}`;
+          const invoiceNumber = await getNextInvoiceNumberInTransaction(tx);
           const [createdInvoice] = await tx.insert(invoices).values({
             invoiceNumber,
             loadId: null,
@@ -12202,19 +12206,19 @@ RESPOND:
       const submissionInvoiceNumbers = subs.map(s => s.invoiceNumber).filter((value): value is string => Boolean(value));
       const receiptRows = submissionInvoiceNumbers.length
         ? await db.select({
-            invoiceNumber: invoices.invoiceNumber,
+            carrierInvoiceNumber: invoices.carrierInvoiceNumber,
             carrierId: invoices.clientId,
             receipt: fundingReceipts,
           }).from(fundingReceipts)
             .innerJoin(invoices, eq(fundingReceipts.invoiceId, invoices.id))
-            .where(inArray(invoices.invoiceNumber, submissionInvoiceNumbers))
+            .where(inArray(invoices.carrierInvoiceNumber, submissionInvoiceNumbers))
             .orderBy(desc(fundingReceipts.version))
         : [];
       const result = subs.map((s) => ({
         ...s,
         documents: docs.filter((d) => d.submissionId === s.id),
         receipts: receiptRows
-          .filter(row => row.invoiceNumber === s.invoiceNumber && row.carrierId === s.carrierId)
+          .filter(row => row.carrierInvoiceNumber === s.invoiceNumber && row.carrierId === s.carrierId)
           .map(row => ({
             receiptNo: row.receipt.receiptNo,
             version: row.receipt.version,
@@ -12377,12 +12381,12 @@ RESPOND:
             preflightAlerts: lockedPreflight.alerts,
           });
         }
-        const duplicateInvoice = await tx.select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber, loadNumber: invoices.loadNumber })
+        const duplicateInvoice = await tx.select({ id: invoices.id, carrierInvoiceNumber: invoices.carrierInvoiceNumber, loadNumber: invoices.loadNumber })
           .from(invoices)
           .where(and(
             eq(invoices.clientId, portalUser.carrierId!),
             or(
-              data.invoiceNumber ? eq(invoices.invoiceNumber, data.invoiceNumber) : undefined,
+              data.invoiceNumber ? eq(invoices.carrierInvoiceNumber, data.invoiceNumber) : undefined,
               eq(invoices.loadNumber, data.loadNumber),
             ),
           ))
@@ -12558,7 +12562,7 @@ RESPOND:
       if (!receipt) return res.status(404).json({ message: "Funding receipt not found" });
       const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(and(
         eq(invoices.id, receipt.invoiceId),
-        eq(invoices.invoiceNumber, submission.invoiceNumber),
+        eq(invoices.carrierInvoiceNumber, submission.invoiceNumber),
         eq(invoices.clientId, submission.carrierId),
       )).limit(1);
       if (!invoice) return res.status(404).json({ message: "Funding receipt not found" });
