@@ -160,7 +160,7 @@ export const loads = pgTable("loads", {
 // Invoices table
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
-  invoiceNumber: varchar("invoice_number").unique().notNull(),
+  invoiceNumber: varchar("invoice_number").notNull(),
   loadId: integer("load_id").references(() => loads.id, { onDelete: "set null" }),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   debtorId: integer("debtor_id").references(() => debtors.id),
@@ -1595,6 +1595,41 @@ export const insertBrokerAuthorityCheckSchema = createInsertSchema(brokerAuthori
 });
 export type BrokerAuthorityCheck = typeof brokerAuthorityChecks.$inferSelect;
 export type InsertBrokerAuthorityCheck = z.infer<typeof insertBrokerAuthorityCheckSchema>;
+
+// ─── FMCSA Carrier Authority Checks ──────────────────────────────────────────
+// Append-only: every check is a new row. Never overwrite old records.
+export const carrierAuthorityChecks = pgTable("carrier_authority_checks", {
+  id: serial("id").primaryKey(),
+  carrierId: integer("carrier_id").notNull().references(() => clients.id),
+  mcNumber: varchar("mc_number"),
+  dotNumber: varchar("dot_number"),
+  authorityStatus: varchar("authority_status", {
+    enum: ["ACTIVE", "INACTIVE", "NOT_AUTHORIZED", "UNKNOWN"],
+  }),
+  operatingStatus: varchar("operating_status"),
+  checkStatus: varchar("check_status", {
+    enum: ["ok", "error", "skipped"],
+  }).default("ok").notNull(),
+  checkError: text("check_error"),
+  checkedAt: timestamp("checked_at").defaultNow().notNull(),
+  checkedBy: varchar("checked_by"),
+  integrationRunId: integer("integration_run_id").references(() => complianceIntegrationRuns.id),
+  rawResponse: jsonb("raw_response"),
+}, (table) => ({
+  carrierIdx: index("cac_carrier_id_idx").on(table.carrierId),
+  mcIdx: index("cac_mc_number_idx").on(table.mcNumber),
+  dotIdx: index("cac_dot_number_idx").on(table.dotNumber),
+  authorityStatusIdx: index("cac_authority_status_idx").on(table.authorityStatus),
+  checkStatusIdx: index("cac_check_status_idx").on(table.checkStatus),
+  checkedAtIdx: index("cac_checked_at_idx").on(table.checkedAt),
+  integrationRunIdx: index("cac_integration_run_id_idx").on(table.integrationRunId),
+}));
+
+export const insertCarrierAuthorityCheckSchema = createInsertSchema(carrierAuthorityChecks).omit({
+  id: true, checkedAt: true,
+});
+export type CarrierAuthorityCheck = typeof carrierAuthorityChecks.$inferSelect;
+export type InsertCarrierAuthorityCheck = z.infer<typeof insertCarrierAuthorityCheckSchema>;
 
 // ─── FMCSA Authority Alerts ───────────────────────────────────────────────────
 export const brokerAuthorityAlerts = pgTable("broker_authority_alerts", {

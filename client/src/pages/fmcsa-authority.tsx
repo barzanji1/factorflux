@@ -57,7 +57,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface AuthorityCheck {
   id: number;
-  entityType: "broker" | "debtor";
+  entityType: "broker" | "debtor" | "carrier";
   entityId: number;
   entityName: string | null;
   mcNumber: string | null;
@@ -249,7 +249,7 @@ export default function FmcsaAuthority() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "broker" | "debtor">("all");
+  const [filterType, setFilterType] = useState<"all" | "broker" | "debtor" | "carrier">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive" | "issues">("all");
   const [resolveTarget, setResolveTarget] = useState<AuthorityAlert | null>(null);
   const [resolveNotes, setResolveNotes] = useState("");
@@ -280,6 +280,7 @@ export default function FmcsaAuthority() {
   });
 
   const [historyEntityType, historyEntityId] = expandedHistory?.split("-") ?? [];
+  const historyQueryKey = [`/api/fmcsa/entities/${historyEntityId}/history?entityType=${historyEntityType}`];
   const {
     data: history,
     isError: historyError,
@@ -287,7 +288,7 @@ export default function FmcsaAuthority() {
     isFetching: historyLoading,
     refetch: refetchHistory,
   } = useQuery<EntityHistory>({
-    queryKey: [`/api/fmcsa/entities/${historyEntityId}/history?entityType=${historyEntityType}`],
+    queryKey: historyQueryKey,
     enabled: !!expandedHistory,
   });
 
@@ -296,6 +297,7 @@ export default function FmcsaAuthority() {
     onSuccess: async (data: RunSummary) => {
       setRunResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/authority-checks/latest"] });
+      queryClient.invalidateQueries({ queryKey: historyQueryKey });
       queryClient.invalidateQueries({ queryKey: ["/api/authority-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/authority-checks/integration-runs"] });
       toast({
@@ -634,7 +636,7 @@ export default function FmcsaAuthority() {
                     />
                   </div>
                   <div className={win95TabsListClassName}>
-                    {(["all", "broker", "debtor"] as const).map(t => {
+                    {(["all", "broker", "debtor", "carrier"] as const).map(t => {
                       const active = filterType === t;
                       return (
                         <button
@@ -645,7 +647,7 @@ export default function FmcsaAuthority() {
                           onClick={() => setFilterType(t)}
                           className={win95TabsTriggerClassName}
                         >
-                          {t === "all" ? "All Types" : t === "broker" ? "Brokers" : "Debtors"}
+                          {t === "all" ? "All Types" : t === "broker" ? "Brokers" : t === "debtor" ? "Debtors" : "Carriers"}
                         </button>
                       );
                     })}
@@ -714,7 +716,9 @@ export default function FmcsaAuthority() {
                                   <TableCell>
                                     <div>
                                       <p className="font-medium text-slate-900 dark:text-white">
-                                        {c.entityName ?? "—"}
+                                        {c.entityType === "carrier" && c.entityName
+                                          ? <a href={`/carriers/${c.entityId}`} className="hover:underline">{c.entityName}</a>
+                                          : c.entityName ?? "—"}
                                       </p>
                                       {c.legalName && c.legalName !== c.entityName && (
                                         <p className="text-xs text-slate-400">{c.legalName}</p>
@@ -807,9 +811,22 @@ export default function FmcsaAuthority() {
                                                   {format(new Date(h.checkedAt), "MMM d, yyyy HH:mm")}
                                                 </span>
                                                 {statusBadge(h)}
-                                                <span className="text-slate-500">
-                                                  {h.commonAuthorityStatus ?? h.errorMessage ?? "—"}
-                                                </span>
+                                                {h.entityType === "carrier" ? (
+                                                  <>
+                                                    <span className="text-slate-500">
+                                                      {h.operatingStatus ?? "Operating status unavailable"}
+                                                    </span>
+                                                    {h.checkError && (
+                                                      <span className="text-red-600 dark:text-red-400">
+                                                        {h.checkError}
+                                                      </span>
+                                                    )}
+                                                  </>
+                                                ) : (
+                                                  <span className="text-slate-500">
+                                                    {h.commonAuthorityStatus ?? h.errorMessage ?? "—"}
+                                                  </span>
+                                                )}
                                                 {h.integrationRunId && (
                                                   <span className="text-slate-400 text-[10px]">Run #{h.integrationRunId}</span>
                                                 )}

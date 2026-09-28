@@ -2658,7 +2658,7 @@ ${message}
       const input = z.object({
         carrierId: z.coerce.number().int().positive(),
         brokerId: z.coerce.number().int().positive().optional(),
-        invoiceNumber: z.string().trim().optional(),
+        invoiceNumber: z.string().trim().max(100).optional(),
         loadNumber: z.string().trim().optional(),
         amount: z.coerce.number().nonnegative().optional(),
         serviceDate: z.union([z.string(), z.date()]).optional(),
@@ -2671,7 +2671,26 @@ ${message}
         return res.status(403).json({ message: "You may only preflight invoices for brokers assigned to you" });
       }
       const { alerts } = await runPreflightForInvoice(input);
-      res.json({ alerts });
+      const matchingInvoiceIds = alerts
+        .map((alert: any) => Number(alert.invoiceId ?? alert.link?.match(/^\/invoices\/(\d+)$/)?.[1]))
+        .filter((id: number) => Number.isInteger(id) && id > 0);
+      const matchingInvoices = matchingInvoiceIds.length
+        ? await db.select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
+          .from(invoices).where(and(
+            inArray(invoices.id, Array.from(new Set(matchingInvoiceIds))),
+            eq(invoices.clientId, input.carrierId),
+            req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
+          ))
+        : [];
+      const matchingInvoiceNumbers = new Map(matchingInvoices.map(invoice => [invoice.id, invoice.invoiceNumber] as const));
+      res.json({
+        alerts: alerts.map((alert: any) => {
+          const invoiceId = Number(alert.invoiceId ?? alert.link?.match(/^\/invoices\/(\d+)$/)?.[1]);
+          return matchingInvoiceNumbers.has(invoiceId)
+            ? { ...alert, invoiceId, invoiceNumber: matchingInvoiceNumbers.get(invoiceId) }
+            : alert;
+        }),
+      });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid preflight data", errors: error.errors });
       console.error("Invoice preflight failed:", error);
@@ -2962,8 +2981,11 @@ ${message}
         return res.status(400).json({ message: "metadata must be a JSON object." });
       }
 
-      const invoiceNumber = await storage.getNextInvoiceNumber();
+      const suppliedInvoiceNumber = z.string().trim().min(1, "Invoice number cannot be blank").max(100, "Invoice number must be 100 characters or fewer")
+        .optional().parse(metadata.invoiceNumber);
+      const invoiceNumber = suppliedInvoiceNumber ?? await storage.getNextInvoiceNumber();
       const parsed = insertInvoiceSchema.extend({
+        invoiceNumber: z.string().trim().min(1).max(100),
         loadType: z.enum(LOAD_TYPES),
         amount: z.coerce.number().positive("Amount must be greater than zero"),
         clientId: z.coerce.number().int().positive(),
@@ -3130,10 +3152,14 @@ ${message}
 
   app.post("/api/invoices", requireAuth, async (req: any, res) => {
     try {
-      // Always generate a unique invoice number server-side to prevent collisions
-      const invoiceNumber = await storage.getNextInvoiceNumber();
+      const suppliedInvoiceNumber = z.string().trim().min(1, "Invoice number cannot be blank").max(100, "Invoice number must be 100 characters or fewer")
+        .optional().parse(req.body?.invoiceNumber);
+      const invoiceNumber = suppliedInvoiceNumber ?? await storage.getNextInvoiceNumber();
       const invoiceData = await resolveInvoiceBrokerBranch(
-        insertInvoiceSchema.extend({ loadType: z.enum(LOAD_TYPES) }).parse({ ...req.body, invoiceNumber }) as any,
+        insertInvoiceSchema.extend({
+          invoiceNumber: z.string().trim().min(1).max(100),
+          loadType: z.enum(LOAD_TYPES),
+        }).parse({ ...req.body, invoiceNumber }) as any,
       );
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
       if (!(await canAccessClient(req, invoiceData.clientId))) {
@@ -9923,7 +9949,7 @@ RESPOND:
   const earlToolDefinitions: any[] = [
     { name: "search_system", description: "Search across carriers, brokers, invoices, fuel advances, tickets, tasks", input_schema: { type: "object", properties: { query: { type: "string", minLength: 2, maxLength: 120 }, entity_type: { type: "string", enum: ["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"] } }, required: ["query"], additionalProperties: false } },
     { name: "get_carrier", description: "Get full safe carrier details by ID or MC#", input_schema: { type: "object", properties: { identifier: { type: "string", minLength: 1, maxLength: 80 } }, required: ["identifier"], additionalProperties: false } },
-    { name: "get_invoice", description: "Get safe invoice details and status by invoice number", input_schema: { type: "object", properties: { invoice_number: { type: "string", minLength: 1, maxLength: 80 } }, required: ["invoice_number"], additionalProperties: false } },
+    { name: "get_invoice", description: "Get safe invoice details and status by invoice number, optionally narrowed by carrier MC number", input_schema: { type: "object", properties: { invoice_number: { type: "string", minLength: 1, maxLength: 80 }, mc: { type: "string", minLength: 1, maxLength: 80 } }, required: ["invoice_number"], additionalProperties: false } },
     { name: "preflight_invoice", description: "Read invoice preflight risk alerts before an invoice is created; this tool never creates an invoice", input_schema: { type: "object", properties: { carrier_id: { type: "string", minLength: 1, maxLength: 40 }, broker_id: { type: "string", minLength: 1, maxLength: 40 }, invoice_number: { type: "string", maxLength: 80 }, load_number: { type: "string", maxLength: 120 }, amount: { type: "number", minimum: 0 }, service_date: { type: "string", maxLength: 40 } }, required: ["carrier_id"], additionalProperties: false } },
     { name: "get_broker", description: "Get safe broker details and credit grade by name or MC#", input_schema: { type: "object", properties: { identifier: { type: "string", minLength: 1, maxLength: 80 } }, required: ["identifier"], additionalProperties: false } },
     { name: "get_aging_report", description: "Get current aging report — invoices past due by bucket", input_schema: { type: "object", properties: { min_days: { type: "number", minimum: 0, maximum: 3650 } }, additionalProperties: false } },
@@ -9948,7 +9974,7 @@ RESPOND:
       entity_type: z.enum(["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"]).default("all"),
     }).strict(),
     get_carrier: z.object({ identifier: earlText(1, 80) }).strict(),
-    get_invoice: z.object({ invoice_number: earlText(1, 80) }).strict(),
+    get_invoice: z.object({ invoice_number: earlText(1, 80), mc: earlText(1, 80).optional() }).strict(),
     preflight_invoice: z.object({
       carrier_id: earlPositiveId,
       broker_id: earlPositiveId.optional(),
@@ -10103,8 +10129,29 @@ RESPOND:
       return { data: fields, cards: [earlCard("broker", broker.name, { ...fields, creditBadge: broker.creditGrade ?? "Unrated" }, broker.id)] };
     }
     if (tool === "get_invoice") {
-      const [row] = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(eq(invoices.invoiceNumber, String(args.invoice_number).trim()), req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).limit(1);
-      if (!row) return { data: { message: "Invoice not found" } };
+      const invoiceNumber = String(args.invoice_number).trim();
+      const mc = args.mc ? String(args.mc).trim() : null;
+      const rows = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name })
+        .from(invoices)
+        .leftJoin(clients, eq(invoices.clientId, clients.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+        .where(and(
+          eq(invoices.invoiceNumber, invoiceNumber),
+          mc ? ilike(clients.mcNumber, mc) : undefined,
+          req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
+        ))
+        .limit(2);
+      if (!rows.length) return { data: { message: "Invoice not found" } };
+      if (rows.length > 1) {
+        return {
+          data: {
+            message: mc
+              ? `Multiple invoices match invoice number ${invoiceNumber} and carrier MC ${mc}. Use the invoice ID to identify the invoice.`
+              : `Multiple invoices use invoice number ${invoiceNumber}. Specify the carrier MC number or use the invoice ID to identify the invoice.`,
+          },
+        };
+      }
+      const [row] = rows;
       const fields = earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName });
       return { data: fields, cards: [earlCard("invoice", String(row.invoice.invoiceNumber), fields, row.invoice.id)] };
     }
@@ -10112,6 +10159,27 @@ RESPOND:
       const invoiceNo = args.invoice_no ? String(args.invoice_no).trim() : null;
       const mc = args.mc ? String(args.mc).trim() : null;
       const loadNo = args.load_no ? String(args.load_no).trim() : null;
+      if (invoiceNo) {
+        const matchingInvoices = await db.select({ id: invoices.id })
+          .from(invoices)
+          .innerJoin(clients, eq(invoices.clientId, clients.id))
+          .where(and(
+            eq(invoices.invoiceNumber, invoiceNo),
+            mc ? ilike(clients.mcNumber, mc) : undefined,
+            loadNo ? ilike(invoices.loadNumber, loadNo) : undefined,
+            req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
+          ))
+          .limit(2);
+        if (matchingInvoices.length > 1) {
+          return {
+            data: {
+              message: mc
+                ? `Multiple invoices match invoice number ${invoiceNo} and carrier MC ${mc}. Use the invoice ID to identify the invoice.`
+                : `Multiple invoices use invoice number ${invoiceNo}. Specify the carrier MC number or use the invoice ID to identify the invoice.`,
+            },
+          };
+        }
+      }
       const identity = invoiceNo
         ? eq(invoices.invoiceNumber, invoiceNo)
         : ilike(clients.mcNumber, mc!);
@@ -10126,6 +10194,7 @@ RESPOND:
         .innerJoin(clients, eq(invoices.clientId, clients.id))
         .where(and(
           identity,
+          invoiceNo && mc ? ilike(clients.mcNumber, mc) : undefined,
           loadNo ? ilike(invoices.loadNumber, loadNo) : undefined,
           req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
         ))

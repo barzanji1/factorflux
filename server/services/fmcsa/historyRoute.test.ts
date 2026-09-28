@@ -35,14 +35,29 @@ test("FMCSA history returns a JSON 400 for an invalid entity type", async () => 
   const recorder = responseRecorder();
   const handler = createFmcsaHistoryHandler(async () => []);
   await handler(
-    { params: { id: "42" }, query: { entityType: "carrier" } } as never,
+    { params: { id: "42" }, query: { entityType: "unknown" } } as never,
     recorder.res as never,
     (() => undefined) as never,
   );
   assert.deepEqual(recorder.result(), {
     statusCode: 400,
-    body: { message: "entityType must be broker or debtor" },
+    body: { message: "entityType must be broker, debtor, or carrier" },
   });
+});
+
+test("FMCSA history accepts carrier snapshots", async () => {
+  const recorder = responseRecorder();
+  const handler = createFmcsaHistoryHandler(async (type, id) => {
+    assert.equal(type, "carrier");
+    assert.equal(id, 42);
+    return [{ id: 9 }] as never;
+  });
+  await handler(
+    { params: { id: "42" }, query: { entityType: "carrier" } } as never,
+    recorder.res as never,
+    (() => undefined) as never,
+  );
+  assert.deepEqual(recorder.result(), { statusCode: 200, body: { checks: [{ id: 9 }] } });
 });
 
 test("FMCSA history returns a JSON 500 when storage fails", async () => {

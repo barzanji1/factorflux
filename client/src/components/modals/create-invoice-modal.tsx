@@ -47,7 +47,7 @@ type PreflightAlert = {
 };
 
 const EMPTY = {
-  loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
+  invoiceNumber: "", loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
   buyout: "", lumper: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
   driverId: "", driverName: "", instructionsSubject: "", instructionsDetails: "",
 };
@@ -330,7 +330,7 @@ export default function CreateInvoiceModal({
         body: JSON.stringify({
           carrierId: candidate.clientId ? Number(candidate.clientId) : undefined,
           brokerId: candidate.brokerId ? Number(candidate.brokerId) : undefined,
-          // Invoice numbers are assigned by the server when this form creates an invoice.
+          invoiceNumber: candidate.invoiceNumber.trim() || undefined,
           loadNumber: candidate.loadNumber.trim() || undefined,
           amount: candidate.amount ? Number(candidate.amount) : undefined,
           serviceDate: new Date().toISOString().slice(0, 10),
@@ -392,6 +392,7 @@ export default function CreateInvoiceModal({
   const mutation = useMutation({
     mutationFn: async () => {
       const metadata = {
+        invoiceNumber: values.invoiceNumber.trim() || undefined,
         loadNumber: values.loadNumber.trim(),
         clientId: Number(values.clientId),
         brokerId: Number(values.brokerId),
@@ -452,7 +453,8 @@ export default function CreateInvoiceModal({
     && !(alert.code === "DUPLICATE_NEAR" && isManager && overrideNearDuplicate));
   const hasUnacknowledgedAlert = preflightAlerts.some(alert => alert.severity === "ack"
     && !acknowledgements[alert.code]?.acknowledged);
-  const valid = values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId
+  const valid = values.invoiceNumber.trim().length <= 100
+    && values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId
     && values.lumper && Number(values.amount) > 0 && isLoadType(values.loadType)
     && paperwork.rateConfirmation && paperwork.billOfLading
     && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
@@ -480,6 +482,10 @@ export default function CreateInvoiceModal({
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="invoiceNumber">Invoice # <span className="text-xs font-normal text-slate-500">(optional)</span></Label>
+                <Input id="invoiceNumber" maxLength={100} value={values.invoiceNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, invoiceNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Carrier invoice number" />
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="loadNumber">Load # <span className="text-red-500">*</span></Label>
                 <Input id="loadNumber" required value={values.loadNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, loadNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Enter load number" />

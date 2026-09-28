@@ -14,8 +14,10 @@ import { db } from "../db";
 import {
   brokers,
   debtors,
+  clients,
   brokerAuthorityChecks,
   brokerAuthorityAlerts,
+  carrierAuthorityChecks,
   complianceIntegrationRuns,
 } from "../../shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -34,7 +36,7 @@ export interface AuthorityCheckSummary {
   alertsCreated: number;
   errors: string[];
   detail: Array<{
-    entityType: "broker" | "debtor";
+    entityType: "broker" | "debtor" | "carrier";
     entityId: number;
     outcome: "ok" | "error" | "skipped";
     authorityStatus: "ACTIVE" | "INACTIVE" | "NOT_AUTHORIZED" | "UNKNOWN" | null;
@@ -85,6 +87,42 @@ function deriveAuthorityStatus(check: StatusFields): AuthorityStatus {
   if (check.allowedToOperate === false || values.includes("not authorized")) return "NOT_AUTHORIZED";
   if (values.includes("inactive") || values.includes("revoked")) return "INACTIVE";
   if (check.allowedToOperate === true || values.includes("active") || values.includes("authorized")) return "ACTIVE";
+  return "UNKNOWN";
+}
+
+/** Carrier authority must not be inferred from broker-only authority fields. */
+export function deriveCarrierAuthorityStatus(check: StatusFields): AuthorityStatus {
+  const classify = (value?: string | null): AuthorityStatus => {
+    const normalized = value?.trim().toLowerCase();
+    if (!normalized) return "UNKNOWN";
+    if (/\bnot authorized\b|\bnot permitted\b|\brevoked\b/.test(normalized)) return "NOT_AUTHORIZED";
+    if (/\binactive\b|\bout of service\b/.test(normalized)) return "INACTIVE";
+    if (/\bactive\b|\bauthorized\b/.test(normalized)) return "ACTIVE";
+    return "UNKNOWN";
+  };
+
+  const operatingStatus = classify(check.operatingStatus);
+  const allowedToOperate = check.allowedToOperate === true
+    ? "ACTIVE"
+    : check.allowedToOperate === false ? "NOT_AUTHORIZED" : "UNKNOWN";
+
+  // These carrier-level indicators take precedence over authority-class fields.
+  if (operatingStatus !== "UNKNOWN" && allowedToOperate !== "UNKNOWN") {
+    return operatingStatus === allowedToOperate ? operatingStatus : "UNKNOWN";
+  }
+  if (operatingStatus !== "UNKNOWN") return operatingStatus;
+  if (allowedToOperate !== "UNKNOWN") return allowedToOperate;
+
+  const classStatuses = [
+    classify(check.commonAuthorityStatus),
+    classify(check.contractAuthorityStatus),
+  ].filter((status): status is Exclude<AuthorityStatus, "UNKNOWN"> => status !== "UNKNOWN");
+  const hasActiveClass = classStatuses.includes("ACTIVE");
+  const hasAdverseClass = classStatuses.some(status => status === "INACTIVE" || status === "NOT_AUTHORIZED");
+  if (hasActiveClass && hasAdverseClass) return "UNKNOWN";
+  if (classStatuses.includes("NOT_AUTHORIZED")) return "NOT_AUTHORIZED";
+  if (classStatuses.includes("INACTIVE")) return "INACTIVE";
+  if (hasActiveClass) return "ACTIVE";
   return "UNKNOWN";
 }
 
@@ -343,6 +381,84 @@ async function checkOneEntity(
   };
 }
 
+async function checkOneCarrier(
+  carrierId: number,
+  dotNumber: string | null | undefined,
+  mcNumber: string | null | undefined,
+  triggeredBy: string,
+  integrationRunId: number,
+  currentLeaseToken: string,
+  signal: AbortSignal,
+  assertLease: () => Promise<void>,
+): Promise<{
+  checkStatus: "ok" | "error" | "skipped";
+  notFound: boolean;
+  transportFailure: boolean;
+  authorityStatus: AuthorityStatus;
+  error?: string;
+}> {
+  const result = await queryEntity(dotNumber, mcNumber, { signal });
+  if (signal.aborted) throw new DOMException("FMCSA run aborted", "AbortError");
+
+  const checkStatus: "ok" | "error" | "skipped" =
+    result.status === "success" ? "ok" :
+    result.status === "no_key" ? "skipped" :
+    "error";
+  const error = result.status === "not_found"
+    ? result.errorMessage ?? "not in QCMobile carrier dataset"
+    : result.status === "api_error" ? result.errorMessage ?? "FMCSA request failed" :
+    result.status === "no_key" ? result.errorMessage ?? "FMCSA_WEBKEY is not configured" :
+    undefined;
+  const authorityStatus = result.status === "success" && result.carrier
+    ? deriveCarrierAuthorityStatus({
+        commonAuthorityStatus: result.carrier.commonAuthorityStatus,
+        contractAuthorityStatus: result.carrier.contractAuthorityStatus,
+        operatingStatus: result.carrier.operatingStatus,
+        allowedToOperate: result.carrier.allowedToOperate !== undefined
+          ? result.carrier.allowedToOperate === "Y"
+          : null,
+      })
+    : "UNKNOWN";
+
+  if (signal.aborted) throw new DOMException("FMCSA run aborted", "AbortError");
+  await db.transaction(async tx => {
+    const [ownedRun] = await tx
+      .select({ id: complianceIntegrationRuns.id })
+      .from(complianceIntegrationRuns)
+      .where(and(
+        eq(complianceIntegrationRuns.id, integrationRunId),
+        eq(complianceIntegrationRuns.status, "running"),
+        eq(complianceIntegrationRuns.leaseToken, currentLeaseToken),
+      ))
+      .for("update")
+      .limit(1);
+    if (!ownedRun) {
+      await assertLease();
+      throw new Error("FMCSA run lease was lost");
+    }
+    await tx.insert(carrierAuthorityChecks).values({
+      carrierId,
+      mcNumber: mcNumber ?? null,
+      dotNumber: dotNumber ?? null,
+      authorityStatus,
+      operatingStatus: result.carrier?.operatingStatus ?? null,
+      checkStatus,
+      checkError: error ?? null,
+      checkedBy: triggeredBy,
+      integrationRunId,
+      rawResponse: result.rawResponse ?? null,
+    });
+  });
+
+  return {
+    checkStatus,
+    notFound: result.status === "not_found",
+    transportFailure: result.status === "api_error",
+    authorityStatus,
+    error,
+  };
+}
+
 export async function runAllAuthorityChecks(
   triggeredBy = "system",
 ): Promise<AuthorityCheckSummary> {
@@ -477,9 +593,10 @@ export async function runAllAuthorityChecks(
 
     const allBrokers = await db.select().from(brokers).where(eq(brokers.status, "active"));
     const allDebtors = await db.select().from(debtors).where(eq(debtors.status, "active"));
+    const allCarriers = await db.select().from(clients).where(eq(clients.status, "active"));
 
     const tasks: Array<{
-      entityType: "broker" | "debtor";
+      entityType: "broker" | "debtor" | "carrier";
       id: number;
       name: string;
       dot: string | null | undefined;
@@ -503,6 +620,15 @@ export async function runAllAuthorityChecks(
           dot: d.dotNumber,
           mc: d.mcNumber,
         })),
+      ...allCarriers
+        .filter(c => c.dotNumber?.trim() || c.mcNumber?.trim())
+        .map(c => ({
+          entityType: "carrier" as const,
+          id: c.id,
+          name: c.name,
+          dot: c.dotNumber,
+          mc: c.mcNumber,
+        })),
     ];
 
     summary.total = tasks.length;
@@ -513,19 +639,43 @@ export async function runAllAuthorityChecks(
     await Promise.all(tasks.map(task => limit(async () => {
       if (abortReason) return;
       try {
-        const { alertsCreated, checkStatus, notFound, transportFailure, error } = await checkOneEntity(
-          task.entityType,
-          task.id,
-          task.name,
-          task.dot,
-          task.mc,
-          triggeredBy,
-          run.id,
-          runAbortController.signal,
-          assertLease,
-        );
+        let checkStatus: "ok" | "error" | "skipped";
+        let notFound: boolean;
+        let transportFailure: boolean;
+        let error: string | undefined;
+        let carrierAuthorityStatus: AuthorityStatus | null = null;
+        let alertsCreated = 0;
+        if (task.entityType === "carrier") {
+          const result = await checkOneCarrier(
+            task.id,
+            task.dot,
+            task.mc,
+            triggeredBy,
+            run.id,
+            leaseToken,
+            runAbortController.signal,
+            assertLease,
+          );
+          ({ checkStatus, notFound, transportFailure, error } = result);
+          carrierAuthorityStatus = result.authorityStatus;
+        } else {
+          const result = await checkOneEntity(
+            task.entityType,
+            task.id,
+            task.name,
+            task.dot,
+            task.mc,
+            triggeredBy,
+            run.id,
+            runAbortController.signal,
+            assertLease,
+          );
+          ({ checkStatus, notFound, transportFailure, error, alertsCreated } = result);
+        }
         summary.alertsCreated += alertsCreated;
-        const latest = await getLastCheck(task.entityType, task.id);
+        const latest = task.entityType === "carrier"
+          ? null
+          : await getLastCheck(task.entityType, task.id);
         if (notFound) summary.notFound++;
         if (!transportFailure) {
           consecutiveFailures = 0;
@@ -543,7 +693,9 @@ export async function runAllAuthorityChecks(
           entityType: task.entityType,
           entityId: task.id,
           outcome: checkStatus as "ok" | "error" | "skipped",
-          authorityStatus: latest?.authorityStatus ?? null,
+          authorityStatus: task.entityType === "carrier"
+            ? carrierAuthorityStatus
+            : latest?.authorityStatus ?? null,
           ...(error ? { error } : {}),
         });
         if (consecutiveFailures >= 20) {

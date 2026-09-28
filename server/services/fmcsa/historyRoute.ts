@@ -1,10 +1,8 @@
 import type { RequestHandler } from "express";
-import type { BrokerAuthorityCheck } from "@shared/schema";
-
 type GetHistory = (
-  entityType: "broker" | "debtor",
+  entityType: "broker" | "debtor" | "carrier",
   entityId: number,
-) => Promise<BrokerAuthorityCheck[]>;
+) => Promise<unknown[]>;
 
 export function createFmcsaHistoryHandler(getHistory: GetHistory): RequestHandler {
   return async (req, res) => {
@@ -14,8 +12,8 @@ export function createFmcsaHistoryHandler(getHistory: GetHistory): RequestHandle
     if (!Number.isInteger(entityId) || entityId <= 0) {
       return res.status(400).json({ message: "A valid entity id is required" });
     }
-    if (entityType !== "broker" && entityType !== "debtor") {
-      return res.status(400).json({ message: "entityType must be broker or debtor" });
+    if (entityType !== "broker" && entityType !== "debtor" && entityType !== "carrier") {
+      return res.status(400).json({ message: "entityType must be broker, debtor, or carrier" });
     }
 
     try {

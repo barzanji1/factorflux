@@ -26,9 +26,11 @@ import {
   exceptions,
   tasks,
   brokerAuthorityChecks,
+  carrierAuthorityChecks,
   brokerAuthorityAlerts,
   complianceIntegrationRuns,
   type BrokerAuthorityCheck,
+  type CarrierAuthorityCheck,
   type InsertBrokerAuthorityCheck,
   type BrokerAuthorityAlert,
   type InsertBrokerAuthorityAlert,
@@ -111,6 +113,39 @@ async function triggerBrokerCreditForInvoices(invoiceIds: number[]): Promise<voi
 }
 import { eq, desc, like, or, and, count, sql, inArray, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+
+type AuthorityCheckSnapshot = Omit<BrokerAuthorityCheck, "entityType"> & {
+  entityType: "broker" | "debtor" | "carrier";
+};
+
+function carrierAuthoritySnapshot(
+  row: CarrierAuthorityCheck,
+  entityName: string | null,
+): AuthorityCheckSnapshot {
+  return {
+    ...row,
+    entityType: "carrier",
+    entityId: row.carrierId,
+    entityName,
+    legalName: null,
+    dbaName: null,
+    commonAuthorityStatus: null,
+    contractAuthorityStatus: null,
+    brokerAuthorityStatus: null,
+    allowedToOperate: null,
+    carrierOperation: null,
+    bipdRequired: null,
+    bipdInsuranceOnFile: null,
+    cargoInsuranceRequired: null,
+    cargoInsuranceOnFile: null,
+    brokerBondStatus: null,
+    bondAmount: null,
+    changeSummary: null,
+    errorMessage: row.checkError,
+    brokerId: null,
+    debtorId: null,
+  } as AuthorityCheckSnapshot;
+}
 
 export interface IStorage {
   // User operations
@@ -1836,22 +1871,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ── FMCSA Authority Checks ────────────────────────────────────────────────────
-  async getLatestAuthorityChecks(): Promise<BrokerAuthorityCheck[]> {
+  async getLatestAuthorityChecks(): Promise<AuthorityCheckSnapshot[]> {
     // Return the most recent check per entity (entityType + entityId)
-    const rows = await db
-      .select()
-      .from(brokerAuthorityChecks)
-      .orderBy(desc(brokerAuthorityChecks.checkedAt));
+    const [rows, carrierRows] = await Promise.all([
+      db
+        .select()
+        .from(brokerAuthorityChecks)
+        .orderBy(desc(brokerAuthorityChecks.checkedAt)),
+      db
+        .select({ check: carrierAuthorityChecks, entityName: clients.name })
+        .from(carrierAuthorityChecks)
+        .leftJoin(clients, eq(carrierAuthorityChecks.carrierId, clients.id))
+        .orderBy(desc(carrierAuthorityChecks.checkedAt)),
+    ]);
 
-    const seen = new Map<string, BrokerAuthorityCheck>();
-    for (const row of rows) {
+    const snapshots: AuthorityCheckSnapshot[] = [
+      ...rows,
+      ...carrierRows.map(({ check, entityName }) => carrierAuthoritySnapshot(check, entityName)),
+    ];
+    snapshots.sort((a, b) => new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime());
+    const seen = new Map<string, AuthorityCheckSnapshot>();
+    for (const row of snapshots) {
       const key = `${row.entityType}-${row.entityId}`;
       if (!seen.has(key)) seen.set(key, row);
     }
     return Array.from(seen.values());
   }
 
-  async getAuthorityCheckHistory(entityType: string, entityId: number): Promise<BrokerAuthorityCheck[]> {
+  async getAuthorityCheckHistory(entityType: string, entityId: number): Promise<AuthorityCheckSnapshot[]> {
+    if (entityType === "carrier") {
+      const rows = await db
+        .select({ check: carrierAuthorityChecks, entityName: clients.name })
+        .from(carrierAuthorityChecks)
+        .leftJoin(clients, eq(carrierAuthorityChecks.carrierId, clients.id))
+        .where(eq(carrierAuthorityChecks.carrierId, entityId))
+        .orderBy(desc(carrierAuthorityChecks.checkedAt))
+        .limit(50);
+      return rows.map(({ check, entityName }) => carrierAuthoritySnapshot(check, entityName));
+    }
     return db
       .select()
       .from(brokerAuthorityChecks)

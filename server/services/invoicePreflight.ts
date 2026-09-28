@@ -15,6 +15,7 @@ import {
   brokerAuthorityChecks,
   brokers,
   carrierAlerts,
+  carrierAuthorityChecks,
   clients,
   invoicePreflightSettings,
   invoices,
@@ -383,14 +384,27 @@ export async function runInvoicePreflight(
   }
 
   if (enabled(settings, "AUTHORITY_INACTIVE")) {
-    // Carrier authority checks are not currently represented in the available
-    // FMCSA snapshot schema. Never infer inactive status from missing data.
-    alerts.push({
-      code: "AUTHORITY_INACTIVE",
-      severity: "info",
-      title: "Carrier authority status is unknown",
-      message: "Carrier authority could not be evaluated because no carrier MC Check snapshot is available.",
-    });
+    const [authority] = await dbClient.select().from(carrierAuthorityChecks)
+      .where(eq(carrierAuthorityChecks.carrierId, input.carrierId))
+      .orderBy(desc(carrierAuthorityChecks.checkedAt))
+      .limit(1);
+    const status = authority?.authorityStatus?.toUpperCase() ?? "UNKNOWN";
+    if (authority?.checkStatus === "ok" &&
+        (status === "INACTIVE" || status === "NOT_AUTHORIZED")) {
+      alerts.push({
+        code: "AUTHORITY_INACTIVE",
+        severity: "block",
+        title: "Carrier authority is inactive",
+        message: `The latest MC Check reports carrier authority as ${status}.`,
+      });
+    } else if (!authority || authority.checkStatus !== "ok" || status === "UNKNOWN") {
+      alerts.push({
+        code: "AUTHORITY_INACTIVE",
+        severity: "info",
+        title: "Carrier authority status is unknown",
+        message: "No successful MC Check authority status is available for this carrier.",
+      });
+    }
   }
 
   if (enabled(settings, "DOCS_EXPIRED")) {
