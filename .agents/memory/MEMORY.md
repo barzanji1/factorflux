@@ -24,3 +24,4 @@
 - [Windows 95 page consistency](windows95-page-consistency.md) — use the shared Win95 shell and controls for internal pages; Audit Trail is the reference, not a redesign prompt.
 - [Broker credit recomputation](broker-credit-recomputation.md) — portfolio runs need bounded concurrency, while each broker must be serialized across processes to prevent stale scores.
 - [FMCSA run integrity](fmcsa-run-integrity.md) — missing keys skip whole runs; concurrent schedulers require heartbeat leases, ownership fencing, and transport-only circuit breaking.
+- [Portal preflight audit](portal-preflight-audit.md) — portal submissions need submission-scoped acknowledgements and audit, not invoice/user foreign keys.

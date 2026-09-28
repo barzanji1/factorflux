@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
@@ -84,6 +84,44 @@ interface PayoutSettings {
   advanceRate: string;
   feeRate: string;
 }
+
+interface PreflightSettings {
+  rules: Record<string, boolean>;
+  dormantDays: number;
+  nearAmountTolerance: number;
+  nearServiceDateDays: number;
+}
+
+const DEFAULT_PREFLIGHT_SETTINGS: PreflightSettings = {
+  rules: {
+    DUPLICATE_EXACT: true,
+    DUPLICATE_NEAR: true,
+    CARRIER_DORMANT: true,
+    CARRIER_MANUAL_ALERT: true,
+    BROKER_MANUAL_ALERT: true,
+    BROKER_GRADE_LOW: true,
+    BROKER_CHARGEBACKS: true,
+    AUTHORITY_INACTIVE: true,
+    DOCS_EXPIRED: true,
+    CARRIER_OPEN_CHARGEBACK: true,
+  },
+  dormantDays: 45,
+  nearAmountTolerance: 1,
+  nearServiceDateDays: 3,
+};
+
+const PREFLIGHT_RULE_LABELS: Record<string, string> = {
+  DUPLICATE_EXACT: "Exact duplicate invoices",
+  DUPLICATE_NEAR: "Near-duplicate invoices",
+  CARRIER_DORMANT: "Dormant carrier",
+  CARRIER_MANUAL_ALERT: "Carrier manual alerts",
+  BROKER_MANUAL_ALERT: "Broker manual alerts",
+  BROKER_GRADE_LOW: "Low broker credit grade",
+  BROKER_CHARGEBACKS: "Open broker chargebacks",
+  AUTHORITY_INACTIVE: "Inactive authority",
+  DOCS_EXPIRED: "Expired or missing documents",
+  CARRIER_OPEN_CHARGEBACK: "Open carrier chargebacks",
+};
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 const addAgentSchema = z.object({
@@ -262,6 +300,7 @@ const ROLE_DEFAULTS: Record<string, string[]> = {
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [preflightDraft, setPreflightDraft] = useState<PreflightSettings>(DEFAULT_PREFLIGHT_SETTINGS);
 
   const { data: session } = useQuery<{ user: UserRecord }>({ queryKey: ["/api/auth/verify"] });
   const currentUser = session?.user;
@@ -308,6 +347,25 @@ export default function Admin() {
   const { data: settings } = useQuery<PayoutSettings>({
     queryKey: ["/api/payout-settings"],
   });
+  const { data: preflightSettings, isLoading: preflightSettingsLoading, error: preflightSettingsError } = useQuery<Partial<PreflightSettings>>({
+    queryKey: ["/api/invoices/preflight/settings"],
+    queryFn: async () => {
+      const response = await fetch("/api/invoices/preflight/settings", { credentials: "include" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Could not load invoice preflight settings");
+      return result;
+    },
+  });
+
+  useEffect(() => {
+    if (!preflightSettings) return;
+    setPreflightDraft({
+      rules: { ...DEFAULT_PREFLIGHT_SETTINGS.rules, ...(preflightSettings.rules || {}) },
+      dormantDays: preflightSettings.dormantDays ?? DEFAULT_PREFLIGHT_SETTINGS.dormantDays,
+      nearAmountTolerance: preflightSettings.nearAmountTolerance ?? DEFAULT_PREFLIGHT_SETTINGS.nearAmountTolerance,
+      nearServiceDateDays: preflightSettings.nearServiceDateDays ?? DEFAULT_PREFLIGHT_SETTINGS.nearServiceDateDays,
+    });
+  }, [preflightSettings]);
 
   const { data: docReqs = [], isLoading: docsLoading } = useQuery<DocRequirement[]>({
     queryKey: ["/api/admin/doc-requirements"],
@@ -553,6 +611,25 @@ export default function Admin() {
       toast({ title: "Rates saved", description: "New rates apply to future payouts." });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const preflightSettingsMutation = useMutation({
+    mutationFn: async (data: PreflightSettings) => {
+      const response = await fetch("/api/invoices/preflight/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Could not save invoice preflight settings");
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices/preflight/settings"] });
+      toast({ title: "Preflight settings saved" });
+    },
+    onError: (error: Error) => toast({ title: "Could not save preflight settings", description: error.message, variant: "destructive" }),
   });
 
   const notifyMutation = useMutation({
@@ -920,6 +997,52 @@ export default function Admin() {
                       <p className="font-semibold mb-1">Rate Change Notice</p>
                       <p>Changing rates only affects new payout records created after this change. All existing payouts retain their original rate snapshot for accurate record-keeping.</p>
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[24px] border border-[hsl(var(--border))]">
+                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                    <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" />Invoice Preflight Rules</CardTitle>
+                    <CardDescription>Configure risk checks shown before invoice creation. Blocking and acknowledgement requirements remain enforced by the invoice service.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5 p-6">
+                    {preflightSettingsError && <p role="alert" className="text-sm text-red-600">{(preflightSettingsError as Error).message}</p>}
+                    {preflightSettingsLoading ? <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Loading preflight settings…</div> : (
+                      <>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {Object.entries(PREFLIGHT_RULE_LABELS).map(([key, label]) => (
+                            <label key={key} className="flex items-center justify-between gap-3 border border-slate-200 p-3 dark:border-slate-700">
+                              <span className="text-sm font-medium">{label}</span>
+                              <Switch checked={preflightDraft.rules[key] ?? true} onCheckedChange={(checked) => setPreflightDraft((current) => ({ ...current, rules: { ...current.rules, [key]: checked } }))} aria-label={`Enable ${label}`} />
+                            </label>
+                          ))}
+                        </div>
+                        <Separator />
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="preflight-dormant-days">Dormant carrier threshold (days)</Label>
+                            <Input id="preflight-dormant-days" type="number" min="1" step="1" value={preflightDraft.dormantDays} onChange={(event) => setPreflightDraft((current) => ({ ...current, dormantDays: Number(event.target.value) }))} />
+                            <p className="text-xs text-slate-500">Flag carriers with no processed invoice beyond this age.</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="preflight-near-amount">Near-duplicate amount tolerance ($)</Label>
+                            <Input id="preflight-near-amount" type="number" min="0" step="0.01" value={preflightDraft.nearAmountTolerance} onChange={(event) => setPreflightDraft((current) => ({ ...current, nearAmountTolerance: Number(event.target.value) }))} />
+                            <p className="text-xs text-slate-500">Maximum amount difference for a possible duplicate.</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="preflight-near-days">Near-duplicate service-date window (days)</Label>
+                            <Input id="preflight-near-days" type="number" min="0" step="1" value={preflightDraft.nearServiceDateDays} onChange={(event) => setPreflightDraft((current) => ({ ...current, nearServiceDateDays: Number(event.target.value) }))} />
+                            <p className="text-xs text-slate-500">Maximum service-date difference for a possible duplicate.</p>
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button type="button" onClick={() => preflightSettingsMutation.mutate(preflightDraft)} disabled={preflightSettingsMutation.isPending || preflightSettingsLoading || preflightSettingsError != null || !Number.isFinite(preflightDraft.dormantDays) || !Number.isInteger(preflightDraft.dormantDays) || preflightDraft.dormantDays < 1 || !Number.isFinite(preflightDraft.nearAmountTolerance) || preflightDraft.nearAmountTolerance < 0 || !Number.isFinite(preflightDraft.nearServiceDateDays) || !Number.isInteger(preflightDraft.nearServiceDateDays) || preflightDraft.nearServiceDateDays < 0} className="gap-2">
+                            {preflightSettingsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings2 className="h-4 w-4" />}
+                            Save Preflight Settings
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>

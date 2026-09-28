@@ -1,0 +1,31 @@
+Add an invoice preflight alert system so agents see carrier/broker risk before creating an invoice, and cannot create duplicates.
+
+DATA
+1. Table carrier_alerts: id, carrier_id, severity ('block'|'ack'|'info'), title, message, active bool, created_by, created_at, expires_at nullable. Managers/admins can add these on the carrier profile (e.g. "AR HOLD on tickets older than 30 days"). Same table for brokers via entity_type + entity_id.
+2. Table invoice_alert_acks: id, invoice_id, alert_code, user_id, reason, acked_at.
+3. Unique indexes on invoices: (carrier_id, invoice_number) and (carrier_id, load_number) where not null. Migration: report existing violations, don't silently drop rows.
+
+PREFLIGHT SERVICE (server/services/invoicePreflight.ts)
+POST /api/invoices/preflight { carrierId, brokerId, invoiceNumber, loadNumber, amount, serviceDate } → { alerts: [{ code, severity, title, message, link? }] }. Rules, computed server-side:
+- DUPLICATE_EXACT (block): invoice_number or load_number already exists for this carrier.
+- DUPLICATE_NEAR (block, manager override allowed): same carrier + broker, amount within $1, service date within 3 days.
+- CARRIER_DORMANT (ack): no invoice processed in > 45 days (configurable in Factoring Settings); message includes last processed date and a link to run a credit report.
+- CARRIER_MANUAL_ALERT (severity from row): active carrier_alerts rows.
+- BROKER_MANUAL_ALERT (same).
+- BROKER_GRADE_LOW (ack): broker credit grade D or F.
+- BROKER_CHARGEBACKS (ack): broker has open chargebacks.
+- AUTHORITY_INACTIVE (block): MC Check shows carrier or broker authority inactive/not authorized; UNKNOWN → info.
+- DOCS_EXPIRED (ack): carrier insurance/required docs expired or missing per Doc Requirements.
+- CARRIER_OPEN_CHARGEBACK (ack): carrier has unresolved chargebacks.
+Rules should be togglable and thresholds editable in Admin > Factoring Settings.
+
+ENFORCEMENT
+4. POST /api/invoices (single, bulk, portal submission, Earl create_invoice tool) must re-run preflight server-side. Reject with 409 and the alert list if any block exists, or if any ack alert lacks a matching invoice_alert_acks entry in the request payload. Near-duplicate override requires manager role; log override to audit_log.
+5. Write one audit_log event invoice_preflight with all alerts shown and acks given.
+
+UI (invoice create form + Sheets)
+6. On carrier or broker select, call preflight and show alerts in a Win95-styled modal: block alerts in red with the form submit disabled; ack alerts each with a required checkbox and optional reason field; info as an inline banner. Re-run on invoice number / load number / amount blur to catch duplicates early, showing the matching invoice number and a link to it.
+7. Carrier profile: "Alerts" card to add/deactivate manual alerts (manager/admin only).
+8. Earl: when creating or discussing an invoice, surface preflight alerts in its reply and refuse to create if blocked.
+
+Do not change approve/fund flows. Show migration SQL and the diff.

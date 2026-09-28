@@ -18,6 +18,16 @@ interface PortalUser { id: number; status: string; carrierId?: number | null; ca
 interface Broker { id: number; name: string; }
 interface Branch { id: number; branchName: string; }
 interface BankAccount { id: number; bankName: string; accountType: string; nickname: string; lastFour: string; }
+interface PreflightAlert { code: string; severity: "block" | "ack" | "info"; title: string; message: string; link?: string; }
+
+function getPreflightAlerts(body: any): PreflightAlert[] {
+  if (!Array.isArray(body?.alerts)) return [];
+  return body.alerts.filter((alert: any) =>
+    alert && typeof alert.code === "string" &&
+    ["block", "ack", "info"].includes(alert.severity) &&
+    typeof alert.message === "string"
+  );
+}
 
 const schema = z.object({
   loadType: z.enum(["otr_load", "dump_truck_ticket", "hotshot", "other"]),
@@ -56,6 +66,12 @@ export default function PortalSubmit() {
   const [brokerQuery, setBrokerQuery] = useState("");
   const [brokerOpen, setBrokerOpen] = useState(false);
   const [selectedBroker, setSelectedBroker] = useState<Broker>();
+  const [preflightAlerts, setPreflightAlerts] = useState<PreflightAlert[]>([]);
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const [preflightError, setPreflightError] = useState("");
+  const [acknowledgements, setAcknowledgements] = useState<Record<string, { acknowledged: boolean; reason: string }>>({});
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const preflightRequest = useRef(0);
   const fileInputRefs = useRef<Record<DocType, HTMLInputElement | null>>({} as any);
 
   const { data: me } = useQuery<PortalUser>({ queryKey: ["/api/portal/me"], retry: false });
@@ -83,6 +99,8 @@ export default function PortalSubmit() {
   });
   const brokerId = form.watch("brokerId");
   const paymentType = form.watch("paymentType");
+  const blockingAlerts = preflightAlerts.filter(alert => alert.severity === "block");
+  const unacknowledgedAlerts = preflightAlerts.filter(alert => alert.severity === "ack" && !acknowledgements[alert.code]?.acknowledged);
   const { data: branches = [], isLoading: branchesLoading } = useQuery<Branch[]>({
     queryKey: ["/api/portal/brokers", brokerId, "branches"],
     queryFn: async () => {
@@ -105,6 +123,46 @@ export default function PortalSubmit() {
     if (branches.length === 1) form.setValue("branchId", branches[0].id, { shouldValidate: true });
   }, [branches, form]);
 
+  async function runPreflight(brokerIdOverride?: number) {
+    const data = form.getValues();
+    const selectedBrokerId = brokerIdOverride ?? data.brokerId;
+    if (!me?.carrierId || !selectedBrokerId) return;
+    const requestId = ++preflightRequest.current;
+    setPreflightLoading(true);
+    setPreflightError("");
+    const payload = {
+      carrierId: me.carrierId,
+      brokerId: selectedBrokerId,
+      invoiceNumber: data.invoiceNumber?.trim() || undefined,
+      loadNumber: data.loadNumber?.trim() || undefined,
+      amount: Number(data.amount) || undefined,
+      serviceDate: new Date().toISOString().slice(0, 10),
+    };
+    try {
+      const response = await fetch("/api/portal/submissions/preflight", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || "Unable to check invoice preflight.");
+      if (requestId !== preflightRequest.current) return;
+      const alerts = getPreflightAlerts(body);
+      setPreflightAlerts(alerts);
+      setAcknowledgements(current => Object.fromEntries(
+        Object.entries(current).filter(([code]) => alerts.some(alert => alert.code === code && alert.severity === "ack"))
+      ));
+      setPreflightOpen(alerts.length > 0);
+    } catch (error) {
+      if (requestId === preflightRequest.current) {
+        setPreflightError((error as Error).message || "Unable to check invoice preflight.");
+      }
+    } finally {
+      if (requestId === preflightRequest.current) setPreflightLoading(false);
+    }
+  }
+
   const mutation = useMutation({
     mutationFn: async (data: SubmitForm) => {
       const hasRateConfirmation = docs.some(doc => doc.type === "rate_confirmation");
@@ -112,13 +170,26 @@ export default function PortalSubmit() {
       if (!hasRateConfirmation || !hasBol) throw new Error("Rate Confirmation and Bill of Lading are required.");
       const fd = new FormData();
       Object.entries(data).forEach(([key, value]) => fd.append(key, value == null ? "" : String(value)));
+      fd.append("acknowledgements", JSON.stringify(
+        preflightAlerts.filter(alert => alert.severity === "ack" && acknowledgements[alert.code]?.acknowledged)
+          .map(alert => ({ code: alert.code, reason: acknowledgements[alert.code]?.reason || "" }))
+      ));
       docs.forEach(doc => {
         fd.append("documents", doc.file);
         fd.append("documentTypes", doc.type);
       });
       const response = await fetch("/api/portal/submissions", { method: "POST", credentials: "include", body: fd });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.message || "Submission failed");
+      if (!response.ok) {
+        if (response.status === 409) {
+          const alerts = getPreflightAlerts(body);
+          if (alerts.length) {
+            setPreflightAlerts(alerts);
+            setPreflightOpen(true);
+          }
+        }
+        throw new Error(body.message || (response.status === 409 ? "Invoice preflight requires your attention." : "Submission failed"));
+      }
       return body;
     },
     onSuccess: () => {
@@ -176,6 +247,16 @@ export default function PortalSubmit() {
             {documentError || (mutation.error as Error)?.message}
           </div>
         )}
+        {preflightError && (
+          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Preflight check unavailable: {preflightError}
+          </div>
+        )}
+        {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
+          <div key={alert.code} className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+            <strong>{alert.title}</strong> — {alert.message}
+          </div>
+        ))}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(data => mutation.mutate(data))} className="space-y-6">
@@ -190,10 +271,10 @@ export default function PortalSubmit() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField control={form.control} name="loadNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Load # *</FormLabel><FormControl><Input {...field} placeholder="LOAD-10042" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Load # *</FormLabel><FormControl><Input {...field} placeholder="LOAD-10042" onBlur={() => { field.onBlur(); void runPreflight(); }} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Invoice #</FormLabel><FormControl><Input {...field} placeholder="INV-001" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Invoice #</FormLabel><FormControl><Input {...field} placeholder="INV-001" onBlur={() => { field.onBlur(); void runPreflight(); }} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                 <FormField control={form.control} name="brokerId" render={() => (
@@ -219,6 +300,7 @@ export default function PortalSubmit() {
                             setBrokerSearch("");
                             form.setValue("brokerId", broker.id, { shouldValidate: true });
                             form.setValue("branchId", 0);
+                            void runPreflight(broker.id);
                           }}>{broker.name}</button>
                         )) : <p className="px-3 py-4 text-center text-xs text-slate-500">No active brokers found</p>}
                       </div>
@@ -248,7 +330,7 @@ export default function PortalSubmit() {
                   <FormItem><FormLabel>Driver *</FormLabel><FormControl><Input {...field} placeholder="Driver name" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="amount" render={({ field }) => (
-                  <FormItem><FormLabel>Invoice Amount *</FormLabel><FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Invoice Amount *</FormLabel><FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" onBlur={() => { field.onBlur(); void runPreflight(); }} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="paymentType" render={({ field }) => (
                   <FormItem>
@@ -316,12 +398,58 @@ export default function PortalSubmit() {
               </div>
             </section>
 
-            <Button type="submit" className="h-12 w-full bg-blue-600 text-base font-semibold hover:bg-blue-700" disabled={mutation.isPending || !accounts.length}>
+            <Button type="submit" className="h-12 w-full bg-blue-600 text-base font-semibold hover:bg-blue-700" disabled={mutation.isPending || !accounts.length || preflightLoading || !!preflightError || blockingAlerts.length > 0 || unacknowledgedAlerts.length > 0}>
               {mutation.isPending ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting…</> : "Submit Invoice"}
             </Button>
           </form>
         </Form>
       </div>
+      {preflightOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" role="presentation">
+          <div className="w-full max-w-xl border-2 border-white bg-[#c0c0c0] p-1 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="preflight-title">
+            <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">
+              <h2 id="preflight-title" className="font-bold">Invoice Preflight</h2>
+              <button type="button" aria-label="Close preflight alerts" className="border-2 border-t-white border-l-white border-b-[#404040] border-r-[#404040] bg-[#c0c0c0] px-2 font-bold text-black" onClick={() => setPreflightOpen(false)}>×</button>
+            </div>
+            <div className="max-h-[65vh] space-y-3 overflow-y-auto p-4">
+              {preflightAlerts.map(alert => (
+                <div key={alert.code} className={`border-2 bg-white p-3 ${alert.severity === "block" ? "border-red-700" : alert.severity === "ack" ? "border-amber-600" : "border-blue-700"}`}>
+                  <p className={`font-bold ${alert.severity === "block" ? "text-red-800" : alert.severity === "ack" ? "text-amber-800" : "text-blue-800"}`}>
+                    {alert.severity === "block" ? "BLOCK" : alert.severity === "ack" ? "ACKNOWLEDGMENT REQUIRED" : "INFORMATION"}: {alert.title}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-800">{alert.message}</p>
+                  {alert.link && <a href={alert.link} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm text-blue-700 underline">View details</a>}
+                  {alert.severity === "ack" && (
+                    <div className="mt-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={!!acknowledgements[alert.code]?.acknowledged} onChange={event => setAcknowledgements(current => ({
+                          ...current,
+                          [alert.code]: { acknowledged: event.target.checked, reason: current[alert.code]?.reason || "" },
+                        }))} />
+                        I acknowledge this alert
+                      </label>
+                      <Input
+                        value={acknowledgements[alert.code]?.reason || ""}
+                        onChange={event => setAcknowledgements(current => ({
+                          ...current,
+                          [alert.code]: { acknowledged: !!current[alert.code]?.acknowledged, reason: event.target.value },
+                        }))}
+                        placeholder="Optional reason"
+                        aria-label={`Reason for acknowledging ${alert.title}`}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {preflightLoading && <p className="text-sm">Checking invoice…</p>}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[#808080] p-3">
+              <Button type="button" variant="outline" className="border-2 border-t-white border-l-white border-b-[#404040] border-r-[#404040] bg-[#c0c0c0] text-black shadow-none hover:bg-[#d0d0d0]" onClick={() => setPreflightOpen(false)}>Close</Button>
+              <Button type="button" className="border-2 border-t-white border-l-white border-b-[#404040] border-r-[#404040] bg-[#c0c0c0] text-black shadow-none hover:bg-[#d0d0d0]" disabled={blockingAlerts.length > 0 || unacknowledgedAlerts.length > 0} onClick={() => setPreflightOpen(false)}>Continue</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </PortalLayout>
   );
 }

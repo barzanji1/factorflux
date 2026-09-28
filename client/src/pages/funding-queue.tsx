@@ -50,6 +50,33 @@ const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleDat
 const statusLabel = (row: QueueRow) => row.displayStatus || row.status;
 const SHEETS_REVIEW_STATUSES = ["submitted", "docs_pending", "under_review", "approved"];
 
+function SheetsPreflightAlerts({ invoiceId }: { invoiceId: number }) {
+  const { data, isLoading, isError } = useQuery<{
+    alerts: Array<{ code: string; severity: "block" | "ack" | "info"; title: string; message: string; link?: string }>;
+  }>({
+    queryKey: ["/api/invoices", invoiceId, "preflight"],
+    queryFn: async () => {
+      const response = await fetch(`/api/invoices/${invoiceId}/preflight`, { credentials: "include" });
+      if (!response.ok) throw new Error("Unable to check invoice alerts");
+      return response.json();
+    },
+  });
+  return (
+    <div className="mt-4 space-y-2" aria-label="Invoice preflight alerts">
+      <p className="text-xs font-bold uppercase text-slate-500">Preflight alerts</p>
+      {isLoading ? <p className="text-sm text-slate-500">Checking current risks…</p>
+        : isError ? <p role="alert" className="text-sm text-red-700">Unable to check current risks.</p>
+        : !data?.alerts.length ? <p className="text-sm text-slate-500">No current alerts.</p>
+        : data.alerts.map((alert, index) => (
+          <div key={`${alert.code}-${index}`} className={`border-2 p-2 text-sm ${alert.severity === "block" ? "border-red-700 bg-red-50 text-red-900" : alert.severity === "ack" ? "border-amber-700 bg-amber-50 text-amber-900" : "border-gray-600 bg-white text-gray-800"}`}>
+            <strong>{alert.title}</strong> — {alert.message}{" "}
+            {alert.link && <a href={alert.link} className="underline">View</a>}
+          </div>
+        ))}
+    </div>
+  );
+}
+
 function cutoffState() {
   const now = new Date();
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Denver", hour: "numeric", minute: "numeric", hour12: false }).formatToParts(now);
@@ -272,6 +299,11 @@ export default function FundingQueue() {
         {isLoading ? <div className="flex items-center justify-center gap-2 p-16 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Loading Sheets…</div> : isError ? <div className="p-16 text-center text-sm text-red-600">Unable to load Sheets. Check your filters and try again.</div> : !rows.length ? <div className="p-16 text-center"><FileText className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="font-semibold text-slate-700 dark:text-slate-200">No invoices match these filters</p><p className="mt-1 text-sm text-slate-500">New submissions will appear here when available.</p></div> :
             <div className="overflow-x-auto"><table className="ff-data-table min-w-[1550px]"><thead><tr><th className="w-10 pl-5"><Checkbox aria-label="Select all ready approved invoices" checked={actionableRows.length > 0 && selectedRows.length === actionableRows.length} onCheckedChange={() => setSelected(selectedRows.length === actionableRows.length ? new Set() : new Set(actionableRows.map((row) => row.id)))} /></th><th>Carrier</th><th>Broker</th><th>Branch</th><th>Load#</th><th>Code</th><th>Amount $</th><th>Load Type</th><th>Payment Type</th><th>Bank Account</th><th>Driver</th><th>Rate Con</th><th>BOL</th><th>Lumper</th><th>Submitted by</th><th>Date</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <Fragment key={row.id}><tr className="cursor-pointer" onClick={() => setExpanded(expanded === row.id ? null : row.id)}><td className="pl-5" onClick={(event) => event.stopPropagation()}><Checkbox disabled={row.status !== "approved" || !row.documentPresence.readyToFund || !row.bankAccount?.isActive} aria-label={`Select ${row.invoiceNumber}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row)} /></td><td className="font-semibold">{row.carrierName || "—"}</td><td>{row.brokerName || "—"}</td><td>{row.branchName || "—"}</td><td className="font-mono font-semibold">{row.loadNumber || row.invoiceNumber}</td><td>{row.code || "—"}</td><td className="font-semibold">{money(row.amount)}</td><td><LoadTypeBadge value={row.loadType} /></td><td>{row.paymentType || "—"}</td><td>{row.bankAccount ? `${row.bankAccount.bankName} ••••${row.bankAccount.lastFour}` : <span className="text-red-600">Missing</span>}</td><td>{row.driverName || "—"}</td><td className={row.documentPresence.rateConfirmation ? "text-emerald-700" : "text-red-600"}>{row.documentPresence.rateConfirmation ? "✓" : "✕"}</td><td className={row.documentPresence.billOfLading ? "text-emerald-700" : "text-red-600"}>{row.documentPresence.billOfLading ? "✓" : "✕"}</td><td className={row.documentPresence.lumper ? "text-emerald-700" : "text-slate-400"}>{row.documentPresence.lumper ? "✓" : "—"}</td><td>{row.submittedByName || "—"}</td><td>{dateLabel(row.submittedAt)}</td><td onClick={(event) => event.stopPropagation()}><div className="flex flex-wrap items-center gap-1"><FFBadge status={row.status} size="sm" />{row.status === "approved" ? <Button size="sm" disabled={!row.documentPresence.readyToFund || !row.bankAccount?.isActive} onClick={() => openFunding([row])}>Fund</Button> : <Button size="sm" disabled={!row.documentPresence.rateConfirmation || !row.documentPresence.billOfLading} onClick={() => approve(row)}>Approve</Button>}<Button size="sm" variant="outline" onClick={() => setReasonModal({ id: row.id, action: "hold" })}>Hold</Button>{row.status !== "approved" && <Button size="sm" variant="destructive" aria-label={`Reject ${row.invoiceNumber}`} onClick={() => setReasonModal({ id: row.id, action: "reject" })}><X className="h-4 w-4" /></Button>}</div></td></tr>{expanded === row.id && <tr key={`${row.id}-detail`}><td colSpan={17} className="bg-slate-50 p-5 dark:bg-slate-950"><div className="ff-card ff-sheets-surface grid gap-5 p-4 lg:grid-cols-3"><div><p className="text-xs font-bold uppercase text-slate-500">Invoice details</p><p className="mt-2 text-sm">Invoice <strong>{row.invoiceNumber}</strong> · Load {row.loadNumber || "—"} · Code {row.code || "—"}</p><p className="text-sm">Payment: {row.paymentType || "—"} · Status: {statusLabel(row)}</p>{row.instructionsSubject && <p className="mt-3 text-sm font-semibold">{row.instructionsSubject}</p>}{row.instructionsDetails && <p className="whitespace-pre-wrap text-sm text-slate-600">{row.instructionsDetails}</p>}</div><div><p className="text-xs font-bold uppercase text-slate-500">Payout preview</p><dl className="mt-2 grid grid-cols-2 gap-2 text-sm"><dt>Gross</dt><dd className="text-right font-semibold">{money(row.payoutPreview.grossAmount)}</dd><dt>Advance ({row.payoutPreview.advanceRate}%)</dt><dd className="text-right">{money(row.payoutPreview.advanceAmount)}</dd><dt>Fee ({row.payoutPreview.feeRate}%)</dt><dd className="text-right">{money(row.payoutPreview.feeAmount)}</dd><dt>Reserve</dt><dd className="text-right">{money(row.payoutPreview.reserveAmount)}</dd><dt className="font-semibold">Net funding</dt><dd className="text-right font-semibold">{money(row.payoutPreview.netFundingAmount)}</dd></dl></div><div><p className="text-xs font-bold uppercase text-slate-500">Documents</p><div className="mt-2 space-y-2">{[{ label: "Rate Con", types: ["rate_confirmation"] }, { label: "BOL", types: ["bill_of_lading", "bol"] }, { label: "Lumper", types: ["lumper_receipt", "receipt"] }].map(({ label, types }) => { const doc = row.documents.find((item) => types.includes(item.type)); return <div key={label} className="ff-sheets-surface flex items-center justify-between border bg-white p-2 text-sm"><span className={doc ? "text-emerald-700" : "text-red-600"}>{doc ? "✓" : "✕"} {label}</span>{doc && <span className="flex gap-2"><a className="text-blue-700 hover:underline" href={doc.viewPath} target="_blank" rel="noreferrer">View</a><a className="text-blue-700 hover:underline" href={doc.downloadPath} target="_blank" rel="noreferrer">Download</a></span>}</div>; })}</div></div></div><div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${row.id}`)}>Open invoice</Button></div></td></tr>}</Fragment>)}</tbody></table></div>}
       </section>
+      {expanded !== null && rows.some((row) => row.id === expanded) && (
+        <section className="ff-card ff-sheets-surface border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+          <SheetsPreflightAlerts key={expanded} invoiceId={expanded} />
+        </section>
+      )}
       <div className="flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between" aria-label="Sheets pagination">
         <span>{data?.total ?? 0} invoice{data?.total === 1 ? "" : "s"} · Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))}</span>
         <div className="flex gap-2">

@@ -39,6 +39,95 @@ function MiniTable({ columns, rows, empty }: { columns: string[]; rows: React.Re
   return <div className="overflow-x-auto border border-[#d0d9dc]"><table className="w-full text-left text-[11px]"><thead className="bg-[#f0f4f3] text-[9px] uppercase tracking-wider text-[#63767d]"><tr>{columns.map((column) => <th key={column} className="whitespace-nowrap px-2 py-2 font-bold">{column}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} className="border-t border-[#e1e6e7] odd:bg-[#fbfcfb] hover:bg-[#edf8f8]">{row.map((cell, cellIndex) => <td key={cellIndex} className="whitespace-nowrap px-2 py-2 text-[#334b54]">{cell}</td>)}</tr>)}</tbody></table></div>;
 }
 
+function CarrierAlerts({ carrierId, canManage }: { carrierId: number; canManage: boolean }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [severity, setSeverity] = useState<"block" | "ack" | "info">("ack");
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const queryKey = ["/api/preflight/alerts", "carrier", carrierId];
+  const { data, isLoading, error } = useQuery<any>({
+    queryKey,
+    enabled: Number.isFinite(carrierId),
+    queryFn: async () => {
+      const response = await fetch(`/api/preflight/alerts?entityType=carrier&entityId=${carrierId}`, { credentials: "include" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Could not load carrier alerts");
+      return result;
+    },
+  });
+  const alertRows = Array.isArray(data) ? data : Array.isArray(data?.alerts) ? data.alerts : [];
+  const alerts = alertRows.filter((alert: any) => String(alert.entityType ?? alert.entity_type ?? "carrier") === "carrier"
+    && Number(alert.entityId ?? alert.entity_id ?? carrierId) === carrierId);
+  const addAlert = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/preflight/alerts", {
+        entityType: "carrier",
+        entityId: carrierId,
+        severity,
+        title: title.trim(),
+        message: message.trim(),
+        ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      setTitle("");
+      setMessage("");
+      setExpiresAt("");
+      toast({ title: "Carrier alert added" });
+    },
+    onError: (cause: Error) => toast({ title: "Could not add alert", description: cause.message, variant: "destructive" }),
+  });
+  const deactivateAlert = useMutation({
+    mutationFn: (alertId: number) => apiRequest("PATCH", `/api/preflight/alerts/${alertId}`, { active: false }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast({ title: "Carrier alert deactivated" });
+    },
+    onError: (cause: Error) => toast({ title: "Could not deactivate alert", description: cause.message, variant: "destructive" }),
+  });
+  const severityStyle = (value: string) => value === "block"
+    ? "border-[#cf8f8f] bg-[#fff0ef] text-[#9f3030]"
+    : value === "ack"
+      ? "border-[#d7b46c] bg-[#fff8e8] text-[#946316]"
+      : "border-[#a8c9d0] bg-[#eef8fa] text-[#276372]";
+
+  return <ProfileSection title="Alerts" eyebrow="Invoice preflight risk">
+    <div className="space-y-3">
+      {isLoading ? <p className="text-[11px] text-[#718187]">Loading alerts…</p>
+        : error ? <p role="alert" className="text-[11px] text-[#a33131]">{(error as Error).message}</p>
+          : alerts.length ? <div className="space-y-2">
+            {alerts.map((alert: any) => <div key={alert.id} className={cn("border p-2.5", severityStyle(alert.severity || "info"), !alert.active && "opacity-60")}>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">{alert.severity || "info"}</span>
+                    {!alert.active && <span className="text-[9px] font-bold uppercase">Inactive</span>}
+                    <span className="text-[9px] text-[#718187]">{(alert.expiresAt ?? alert.expires_at) ? `Expires ${date(alert.expiresAt ?? alert.expires_at)}` : "No expiry"}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] font-bold">{alert.title}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[11px]">{alert.message}</p>
+                </div>
+                {canManage && alert.active && <Button variant="outline" size="sm" className="h-7 shrink-0 rounded-sm px-2 text-[10px]" disabled={deactivateAlert.isPending} onClick={() => deactivateAlert.mutate(Number(alert.id))}>Deactivate</Button>}
+              </div>
+            </div>)}
+          </div> : <EmptyState label="No carrier preflight alerts are recorded" />}
+      {canManage ? <form className="space-y-2 border-t border-[#d4dcde] pt-3" onSubmit={(event) => { event.preventDefault(); addAlert.mutate(); }}>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[#718187]">Add manual alert</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div><Label className="text-[10px]">Severity</Label><Select value={severity} onValueChange={(value) => setSeverity(value as "block" | "ack" | "info")}><SelectTrigger className="h-8 rounded-sm text-[11px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="block">Block</SelectItem><SelectItem value="ack">Acknowledgement</SelectItem><SelectItem value="info">Informational</SelectItem></SelectContent></Select></div>
+          <div><Label htmlFor={`alert-expiry-${carrierId}`} className="text-[10px]">Optional expiry</Label><Input id={`alert-expiry-${carrierId}`} type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="h-8 rounded-sm text-[11px]" /></div>
+        </div>
+        <div><Label htmlFor={`alert-title-${carrierId}`} className="text-[10px]">Title</Label><Input id={`alert-title-${carrierId}`} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required className="h-8 rounded-sm text-[11px]" placeholder="e.g. AR hold" /></div>
+        <div><Label htmlFor={`alert-message-${carrierId}`} className="text-[10px]">Message</Label><Textarea id={`alert-message-${carrierId}`} value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} required rows={3} className="rounded-sm text-[11px]" placeholder="Explain the risk and any required action." /></div>
+        <Button type="submit" size="sm" disabled={addAlert.isPending || !title.trim() || !message.trim()} className="h-8 rounded-sm bg-[#098b9f] text-[11px] text-white hover:bg-[#08798b]"><Plus className="mr-1 h-3.5 w-3.5" />Add alert</Button>
+      </form> : <p className="border-t border-[#d4dcde] pt-3 text-[10px] text-[#718187]">Only managers and administrators can add or deactivate alerts.</p>}
+    </div>
+  </ProfileSection>;
+}
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -239,6 +328,7 @@ export default function ClientDetail() {
             </div>
             <div className="space-y-3">
               <ProfileSection title="AR" eyebrow="Funding position"><div className="grid gap-x-5 sm:grid-cols-2"><ProfileField label="Paid" value={money(paid)} tone="accent" /><ProfileField label="Open invoice value (derived)" value={money(onboarding.ar || openBalance)} tone="danger" /><ProfileField label="Max limit" value={money(onboarding.maxLimit)} /><ProfileField label="Current limit" value={money(onboarding.currentLimit)} /><ProfileField label="AR over eligible days" value={pretty(onboarding.arOver90Days)} /><ProfileField label="Availability" value={onboarding.availability ? money(onboarding.availability) : undefined} /></div></ProfileSection>
+               <CarrierAlerts carrierId={clientId} canManage={isManager} />
               <ProfileSection title="Shorts & chargebacks"><div className="grid gap-x-5 sm:grid-cols-3"><ProfileField label="Carrier shorts" value={money(client.shorts)} tone="danger" /><ProfileField label="Advanced shorts" value={money(onboarding.advancedShorts)} tone="danger" /><ProfileField label="Pending chargebacks" value={money(onboarding.pendingChargebacks)} tone="danger" /></div></ProfileSection>
               <ProfileSection title="Cargo type" eyebrow="Default for new invoices">
                 <div className="space-y-3">

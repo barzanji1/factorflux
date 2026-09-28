@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, HttpError, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { displayLoadType, isLoadType } from "@shared/load-types";
 import { LoadTypeToggleGroup } from "@/components/load-type";
 
@@ -34,6 +35,16 @@ const PAPERWORK: Array<{ key: PaperworkKey; label: string; required?: boolean }>
   { key: "other", label: "Other" },
 ];
 const MAX_PDF_SIZE = 5 * 1024 * 1024;
+
+type PreflightAlert = {
+  code: string;
+  severity: "block" | "ack" | "info";
+  title: string;
+  message: string;
+  link?: string | null;
+  invoiceId?: number | string;
+  invoiceNumber?: string;
+};
 
 const EMPTY = {
   loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
@@ -226,7 +237,16 @@ export default function CreateInvoiceModal({
 }) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isManager = user?.role === "manager" || user?.role === "admin";
   const [values, setValues] = useState(EMPTY);
+  const [preflightAlerts, setPreflightAlerts] = useState<PreflightAlert[]>([]);
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightError, setPreflightError] = useState("");
+  const [acknowledgements, setAcknowledgements] = useState<Record<string, { acknowledged: boolean; reason: string }>>({});
+  const [overrideNearDuplicate, setOverrideNearDuplicate] = useState(false);
+  const preflightRequestId = useRef(0);
   const [selectedBroker, setSelectedBroker] = useState<Broker>();
   const [brokerSearch, setBrokerSearch] = useState("");
   const [brokerQuery, setBrokerQuery] = useState("");
@@ -288,6 +308,57 @@ export default function CreateInvoiceModal({
   const broker = selectedBroker ?? brokers.find(item => String(item.id) === values.brokerId);
   const drivers = driversData.filter(driver => driver.status === "active");
 
+  const invalidatePreflightAcknowledgements = () => {
+    preflightRequestId.current += 1;
+    setPreflightLoading(false);
+    setPreflightError("");
+    setAcknowledgements({});
+    setOverrideNearDuplicate(false);
+  };
+
+  const runPreflight = async (overrides: Partial<typeof values> = {}, openModal = true) => {
+    const candidate = { ...values, ...overrides };
+    if (!candidate.clientId && !candidate.brokerId) return;
+    const requestId = ++preflightRequestId.current;
+    setPreflightLoading(true);
+    setPreflightError("");
+    try {
+      const response = await fetch("/api/invoices/preflight", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          carrierId: candidate.clientId ? Number(candidate.clientId) : undefined,
+          brokerId: candidate.brokerId ? Number(candidate.brokerId) : undefined,
+          // Invoice numbers are assigned by the server when this form creates an invoice.
+          loadNumber: candidate.loadNumber.trim() || undefined,
+          amount: candidate.amount ? Number(candidate.amount) : undefined,
+          serviceDate: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || `Preflight failed (${response.status}).`);
+      if (requestId !== preflightRequestId.current) return;
+      const alerts: PreflightAlert[] = Array.isArray(payload.alerts) ? payload.alerts : [];
+      setPreflightAlerts(alerts);
+      setAcknowledgements(current => {
+        const next: typeof current = {};
+        alerts.filter(alert => alert.severity === "ack").forEach(alert => {
+          next[alert.code] = current[alert.code] ?? { acknowledged: false, reason: "" };
+        });
+        return next;
+      });
+      setOverrideNearDuplicate(false);
+      if (openModal && alerts.some(alert => alert.severity !== "info")) setPreflightOpen(true);
+    } catch (error) {
+      if (requestId !== preflightRequestId.current) return;
+      setPreflightError(error instanceof Error ? error.message : "Unable to check invoice alerts.");
+      if (openModal) setPreflightOpen(true);
+    } finally {
+      if (requestId === preflightRequestId.current) setPreflightLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (branches.length === 1 && values.branchId !== String(branches[0].id)) {
       setValues(v => ({ ...v, branchId: String(branches[0].id) }));
@@ -303,7 +374,14 @@ export default function CreateInvoiceModal({
         setSelectedBroker({ id: Number(initialValues.brokerId), name: initialValues.brokerName });
       }
     } else if (!open) {
+      preflightRequestId.current += 1;
+      setPreflightLoading(false);
       setValues(EMPTY);
+      setPreflightAlerts([]);
+      setPreflightOpen(false);
+      setPreflightError("");
+      setAcknowledgements({});
+      setOverrideNearDuplicate(false);
       setSelectedBroker(undefined);
       setBrokerSearch("");
       setBrokerOpen(false);
@@ -324,6 +402,10 @@ export default function CreateInvoiceModal({
         buyout: values.buyout === "" ? null : values.buyout === "yes",
         lumper: values.lumper === "" ? null : values.lumper === "yes",
         amount: values.amount,
+        acknowledgements: Object.entries(acknowledgements)
+          .filter(([, acknowledgement]) => acknowledgement.acknowledged)
+          .map(([code, acknowledgement]) => ({ code, reason: acknowledgement.reason.trim() || undefined })),
+        overrideNearDuplicate: isManager && overrideNearDuplicate,
         paymentType: values.paymentType,
         bankAccountId: values.bankAccountId ? Number(values.bankAccountId) : null,
         loadType: values.loadType,
@@ -343,12 +425,37 @@ export default function CreateInvoiceModal({
       onOpenChange(false);
       navigate("/invoices");
     },
-    onError: (error: Error) => toast({ title: "Unable to create invoice", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      let body: any;
+      try { body = JSON.parse(error.message); } catch { body = null; }
+      const status = error instanceof HttpError ? error.status : (error as Error & { status?: number }).status;
+      const alerts = Array.isArray(body) ? body : body?.alerts ?? body?.data?.alerts;
+      if (status === 409 && Array.isArray(alerts)) {
+        setPreflightAlerts(alerts);
+        setPreflightOpen(true);
+        setPreflightError("The server found invoice alerts that must be reviewed. Update your acknowledgements and try again.");
+        // A 409 means the submitted acknowledgements were not sufficient for
+        // this invoice; require explicit review of this server-returned list.
+        setAcknowledgements(Object.fromEntries(
+          alerts.filter((alert: PreflightAlert) => alert.severity === "ack")
+            .map((alert: PreflightAlert) => [alert.code, { acknowledged: false, reason: "" }]),
+        ));
+        setOverrideNearDuplicate(false);
+        return;
+      }
+      toast({ title: "Unable to create invoice", description: error.message, variant: "destructive" });
+    },
   });
 
+  const nearDuplicateAlert = preflightAlerts.some(alert => alert.code === "DUPLICATE_NEAR" && alert.severity === "block");
+  const hasUnresolvedBlock = preflightAlerts.some(alert => alert.severity === "block"
+    && !(alert.code === "DUPLICATE_NEAR" && isManager && overrideNearDuplicate));
+  const hasUnacknowledgedAlert = preflightAlerts.some(alert => alert.severity === "ack"
+    && !acknowledgements[alert.code]?.acknowledged);
   const valid = values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId
     && values.lumper && Number(values.amount) > 0 && isLoadType(values.loadType)
-    && paperwork.rateConfirmation && paperwork.billOfLading;
+    && paperwork.rateConfirmation && paperwork.billOfLading
+    && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
@@ -359,6 +466,12 @@ export default function CreateInvoiceModal({
         <div className="grid gap-5 p-6 lg:grid-cols-[240px_minmax(0,1fr)_240px]">
           <StatusPanel kind="broker" record={broker} />
           <form className="space-y-5" onSubmit={event => { event.preventDefault(); if (valid) mutation.mutate(); }}>
+            {preflightError && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{preflightError}</p>}
+            {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
+              <div key={alert.code} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
+              </div>
+            ))}
             <div className="space-y-2">
               <Label>Load Type <span className="text-red-500">*</span></Label>
               <LoadTypeToggleGroup
@@ -369,7 +482,7 @@ export default function CreateInvoiceModal({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="loadNumber">Load # <span className="text-red-500">*</span></Label>
-                <Input id="loadNumber" required value={values.loadNumber} onChange={e => setValues(v => ({ ...v, loadNumber: e.target.value }))} placeholder="Enter load number" />
+                <Input id="loadNumber" required value={values.loadNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, loadNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Enter load number" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="invoiceCode">Code</Label>
@@ -384,19 +497,24 @@ export default function CreateInvoiceModal({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="amount">Invoice Amount <span className="text-red-500">*</span></Label>
-                <Input id="amount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => setValues(v => ({ ...v, amount: e.target.value }))} placeholder="0.00" />
+                 <Input id="amount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, amount: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="0.00" />
               </div>
                <SearchSelect
                  label="Carrier"
                  required
                  items={carriers}
                  selected={carrier}
-                 onSelect={item => setValues(v => ({
-                   ...v,
-                   clientId: String(item.id),
-                    driverId: "",
-                   loadType: displayLoadType(item.cargoType),
-                 }))}
+                  onSelect={item => {
+                    const next = {
+                      ...values,
+                      clientId: String(item.id),
+                      driverId: "",
+                      loadType: displayLoadType(item.cargoType),
+                    };
+                     invalidatePreflightAcknowledgements();
+                    setValues(next);
+                    void runPreflight(next, true);
+                  }}
                  placeholder="Search carriers..."
                />
                <div className="relative space-y-1.5">
@@ -404,10 +522,10 @@ export default function CreateInvoiceModal({
                  <div className="relative">
                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                    <Input className="h-11 pl-9" value={brokerOpen ? brokerSearch : broker?.name ?? ""} placeholder="Search brokers..." onFocus={() => { setBrokerOpen(true); setBrokerSearch(""); }} onChange={event => { setBrokerSearch(event.target.value); setBrokerOpen(true); }} />
-                   {broker && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { setSelectedBroker(undefined); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
+                    {broker && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { invalidatePreflightAcknowledgements(); setSelectedBroker(undefined); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
                  </div>
                  {brokerOpen && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-950">
-                   {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { setSelectedBroker(item); setValues(v => ({ ...v, brokerId: String(item.id), branchId: "" })); setBrokerSearch(""); setBrokerOpen(false); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
+                     {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { setSelectedBroker(item); const next = { ...values, brokerId: String(item.id), branchId: "" }; invalidatePreflightAcknowledgements(); setValues(next); setBrokerSearch(""); setBrokerOpen(false); void runPreflight(next, true); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
                  </div>}
                </div>
                <div className="space-y-1.5">
@@ -482,8 +600,8 @@ export default function CreateInvoiceModal({
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="button" variant="outline" onClick={() => { setValues(EMPTY); setSelectedBroker(undefined); setBrokerSearch(""); setBrokerOpen(false); setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null }); }}>Reset</Button>
-              <Button type="submit" disabled={!valid || mutation.isPending} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
+              <Button type="button" variant="outline" onClick={() => { invalidatePreflightAcknowledgements(); setPreflightAlerts([]); setValues(EMPTY); setSelectedBroker(undefined); setBrokerSearch(""); setBrokerOpen(false); setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null }); }}>Reset</Button>
+              <Button type="submit" disabled={!valid || mutation.isPending || preflightLoading} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
                 {mutation.isPending ? "Creating..." : "Submit"}
               </Button>
             </div>
@@ -491,6 +609,56 @@ export default function CreateInvoiceModal({
           <StatusPanel kind="carrier" record={carrier} />
         </div>
       </DialogContent>
+      <Dialog open={preflightOpen} onOpenChange={setPreflightOpen}>
+        <DialogContent className="max-h-[80vh] max-w-xl overflow-y-auto rounded-none border-2 border-slate-600 bg-[#c0c0c0] p-1 shadow-[4px_4px_0_#404040]">
+          <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">
+            <DialogTitle className="text-sm font-bold">Invoice Preflight Alerts</DialogTitle>
+            <button type="button" onClick={() => setPreflightOpen(false)} aria-label="Close preflight alerts" className="border-2 border-white bg-[#c0c0c0] px-2 font-bold leading-5 text-black">×</button>
+          </div>
+          <DialogDescription className="sr-only">Review carrier and broker alerts before submitting this invoice.</DialogDescription>
+          <div className="space-y-3 bg-[#c0c0c0] p-4 text-sm">
+            {preflightLoading && <p className="border border-gray-500 bg-white px-3 py-2">Checking carrier and broker records…</p>}
+            {preflightError && <p role="alert" className="border border-red-700 bg-red-100 px-3 py-2 text-red-900">{preflightError}</p>}
+            {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
+              <div key={alert.code} className="border border-blue-700 bg-blue-100 px-3 py-2 text-blue-950">
+                <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
+              </div>
+            ))}
+            {preflightAlerts.filter(alert => alert.severity !== "info").map(alert => (
+              <section key={alert.code} className={cn("border-2 p-3", alert.severity === "block" ? "border-red-800 bg-red-100 text-red-950" : "border-[#777] bg-[#eee] text-black")}>
+                <strong className="block">{alert.severity === "block" ? "BLOCK — " : "ACKNOWLEDGEMENT REQUIRED — "}{alert.title}</strong>
+                <p className="mt-1">{alert.message}</p>
+                {(alert.link || alert.invoiceId) && (
+                  <a className="mt-2 inline-block font-bold text-blue-800 underline" href={alert.link || `/invoices/${alert.invoiceId}`} target={alert.link?.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+                    {alert.invoiceNumber ? `View invoice ${alert.invoiceNumber}` : "View matching invoice"}
+                  </a>
+                )}
+                {alert.severity === "ack" && (
+                  <div className="mt-3 border-t border-gray-400 pt-2">
+                    <label className="flex items-center gap-2 font-semibold">
+                      <input type="checkbox" checked={!!acknowledgements[alert.code]?.acknowledged} onChange={event => setAcknowledgements(current => ({ ...current, [alert.code]: { acknowledged: event.target.checked, reason: current[alert.code]?.reason ?? "" } }))} />
+                      I have reviewed and acknowledge this alert
+                    </label>
+                    <label className="mt-2 block text-xs">Reason (optional)
+                      <textarea value={acknowledgements[alert.code]?.reason ?? ""} onChange={event => setAcknowledgements(current => ({ ...current, [alert.code]: { acknowledged: !!current[alert.code]?.acknowledged, reason: event.target.value } }))} className="mt-1 min-h-16 w-full border border-gray-500 bg-white p-2 text-sm" />
+                    </label>
+                  </div>
+                )}
+              </section>
+            ))}
+            {nearDuplicateAlert && isManager && (
+              <label className="flex items-start gap-2 border-2 border-amber-700 bg-amber-100 p-3 text-amber-950">
+                <input type="checkbox" checked={overrideNearDuplicate} onChange={event => setOverrideNearDuplicate(event.target.checked)} />
+                <span><strong>Manager override:</strong> allow creation despite this near-duplicate alert.</span>
+              </label>
+            )}
+            {preflightAlerts.length === 0 && !preflightLoading && !preflightError && <p className="border border-gray-500 bg-white px-3 py-2">No active preflight alerts.</p>}
+            <div className="flex justify-end gap-2 border-t border-gray-500 pt-3">
+              <Button type="button" onClick={() => setPreflightOpen(false)} className="rounded-none border-2 border-white bg-[#c0c0c0] text-black shadow-[1px_1px_0_#333] hover:bg-[#d0d0d0]">Close</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

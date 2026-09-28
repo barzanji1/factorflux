@@ -241,11 +241,68 @@ export const invoices = pgTable("invoices", {
 }, (table) => [
   index("invoices_invoice_number_idx").on(table.invoiceNumber),
   index("invoices_client_id_idx").on(table.clientId),
+  uniqueIndex("invoices_client_invoice_number_unique")
+    .on(table.clientId, table.invoiceNumber)
+    .where(sql`${table.invoiceNumber} IS NOT NULL`),
+  uniqueIndex("invoices_client_load_number_unique")
+    .on(table.clientId, table.loadNumber)
+    .where(sql`${table.loadNumber} IS NOT NULL`),
   index("invoices_broker_id_idx").on(table.brokerId),
   index("invoices_branch_id_idx").on(table.branchId),
   index("invoices_driver_id_idx").on(table.driverId),
   index("invoices_created_at_idx").on(table.createdAt),
   index("invoices_submitted_by_created_at_idx").on(table.submittedBy, table.createdAt),
+]);
+
+// Carrier and broker profile alerts share one polymorphic table. Alerts are
+// retained when deactivated so the operational history remains auditable.
+export const carrierAlerts = pgTable("carrier_alerts", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type", { enum: ["carrier", "broker"] }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  severity: varchar("severity", { enum: ["block", "ack", "info"] }).notNull(),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+}, (table) => [
+  index("carrier_alerts_entity_active_idx").on(table.entityType, table.entityId, table.active),
+]);
+
+export const invoiceAlertAcks = pgTable("invoice_alert_acks", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  alertCode: varchar("alert_code").notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  reason: text("reason"),
+  ackedAt: timestamp("acked_at").defaultNow().notNull(),
+}, (table) => [
+  index("invoice_alert_acks_invoice_code_idx").on(table.invoiceId, table.alertCode),
+]);
+
+export const invoicePreflightSettings = pgTable("invoice_preflight_settings", {
+  id: integer("id").primaryKey().default(1),
+  rules: jsonb("rules").$type<Record<string, boolean>>().notNull().default({
+    DUPLICATE_EXACT: true,
+    DUPLICATE_NEAR: true,
+    CARRIER_DORMANT: true,
+    CARRIER_MANUAL_ALERT: true,
+    BROKER_MANUAL_ALERT: true,
+    BROKER_GRADE_LOW: true,
+    BROKER_CHARGEBACKS: true,
+    AUTHORITY_INACTIVE: true,
+    DOCS_EXPIRED: true,
+    CARRIER_OPEN_CHARGEBACK: true,
+  }),
+  dormantDays: integer("dormant_days").notNull().default(45),
+  nearAmountTolerance: decimal("near_amount_tolerance", { precision: 12, scale: 2 }).notNull().default("1.00"),
+  nearServiceDateDays: integer("near_service_date_days").notNull().default(3),
+  updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  check("invoice_preflight_settings_singleton_check", sql`${table.id} = 1`),
 ]);
 
 // Append-only notes keep invoice collection context separate from the mutable
@@ -2113,6 +2170,40 @@ export const insertCarrierSubmissionSchema = createInsertSchema(carrierSubmissio
 });
 export type CarrierSubmission = typeof carrierSubmissions.$inferSelect;
 export type InsertCarrierSubmission = z.infer<typeof insertCarrierSubmissionSchema>;
+
+// Portal acknowledgements and preflight snapshots are separate from internal
+// invoice acknowledgements because a portal submission is not an invoice yet.
+export const carrierSubmissionAlertAcks = pgTable("carrier_submission_alert_acks", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id")
+    .references(() => carrierSubmissions.id, { onDelete: "cascade" })
+    .notNull(),
+  portalUserId: integer("portal_user_id")
+    .references(() => carrierPortalUsers.id)
+    .notNull(),
+  alertCode: varchar("alert_code").notNull(),
+  reason: text("reason"),
+  ackedAt: timestamp("acked_at").defaultNow().notNull(),
+}, (table) => [
+  index("carrier_submission_alert_acks_submission_code_idx").on(table.submissionId, table.alertCode),
+  index("carrier_submission_alert_acks_portal_user_idx").on(table.portalUserId),
+]);
+
+export const carrierSubmissionPreflightEvents = pgTable("carrier_submission_preflight_events", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id")
+    .references(() => carrierSubmissions.id, { onDelete: "cascade" })
+    .notNull(),
+  eventType: varchar("event_type").default("invoice_preflight").notNull(),
+  alerts: jsonb("alerts").$type<Array<Record<string, unknown>>>().notNull(),
+  acknowledgements: jsonb("acknowledgements").$type<Array<Record<string, unknown>>>().notNull(),
+  portalUserId: integer("portal_user_id")
+    .references(() => carrierPortalUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("carrier_submission_preflight_events_submission_created_idx").on(table.submissionId, table.createdAt),
+  index("carrier_submission_preflight_events_portal_user_idx").on(table.portalUserId),
+]);
 
 // ─── Carrier Submission Documents ─────────────────────────────────────────────
 export const carrierSubmissionDocs = pgTable("carrier_submission_documents", {

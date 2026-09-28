@@ -16,7 +16,7 @@ import {
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
-import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull, ne } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { firestore } from "./firebase";
@@ -109,6 +109,8 @@ import {
   portalChats,
   portalChatMessages,
   carrierSubmissions,
+  carrierSubmissionAlertAcks,
+  carrierSubmissionPreflightEvents,
   carrierSubmissionDocs,
   writtenWarnings,
   chatChannels,
@@ -156,6 +158,7 @@ import {
   type IssuedFundingReceipt,
 } from "./services/fundingReceiptService";
 import { expandCalendarEvent } from "./services/calendarScheduler";
+import { runInvoicePreflight } from "./services/invoicePreflight";
 
 const escapeHtml = (value: unknown): string => String(value ?? "")
   .replace(/&/g, "&amp;")
@@ -511,6 +514,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const isPrivilegedUser = (req: any) => req.user?.role === "manager" || req.user?.role === "admin";
+  const runPreflightForInvoice = async (input: Record<string, any>, dbClient: any = db) => runInvoicePreflight({
+    carrierId: Number(input.carrierId ?? input.clientId),
+    brokerId: input.brokerId == null ? undefined : Number(input.brokerId),
+    invoiceNumber: input.invoiceNumber == null ? undefined : String(input.invoiceNumber),
+    loadNumber: input.loadNumber == null ? undefined : String(input.loadNumber),
+    amount: input.amount == null ? undefined : Number(input.amount),
+    serviceDate: input.serviceDate ?? input.invoiceDate ?? input.date ?? undefined,
+    ...(input.excludeInvoiceId == null ? {} : { excludeInvoiceId: Number(input.excludeInvoiceId) }),
+  } as any, dbClient);
+  const getPortalSubmissionNearDuplicateAlerts = async (
+    input: { carrierId: number; brokerId: number; amount: number },
+    dbClient: any = db,
+  ) => {
+    const settingsResult = await dbClient.execute(sql`SELECT rules, near_amount_tolerance, near_service_date_days FROM invoice_preflight_settings LIMIT 1`);
+    const settings: any = settingsResult.rows[0];
+    if (settings?.rules?.DUPLICATE_NEAR === false) return [];
+    const toleranceValue = Number(settings?.near_amount_tolerance ?? 1);
+    const tolerance = Number.isFinite(toleranceValue) ? toleranceValue : 1;
+    const windowDaysValue = Number(settings?.near_service_date_days ?? 3);
+    const windowDays = Number.isFinite(windowDaysValue) && windowDaysValue >= 0 ? windowDaysValue : 3;
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+    const candidates = await dbClient.select({
+      id: carrierSubmissions.id,
+      amount: carrierSubmissions.amount,
+      submittedAt: carrierSubmissions.submittedAt,
+      invoiceNumber: carrierSubmissions.invoiceNumber,
+      loadNumber: carrierSubmissions.loadNumber,
+    }).from(carrierSubmissions).where(and(
+      eq(carrierSubmissions.carrierId, input.carrierId),
+      eq(carrierSubmissions.brokerId, input.brokerId),
+      inArray(carrierSubmissions.status, ["submitted", "under_review", "approved", "funded"]),
+      gte(carrierSubmissions.submittedAt, windowStart),
+      lte(carrierSubmissions.submittedAt, now),
+    ));
+    return candidates
+      .filter((candidate: any) => Number.isFinite(Number(candidate.amount))
+        && Math.abs(Number(candidate.amount) - input.amount) <= tolerance)
+      .map((candidate: any) => ({
+        code: "DUPLICATE_NEAR",
+        severity: "block",
+        title: "Possible near-duplicate portal submission",
+        message: `Portal submission ${candidate.id} has the same carrier and broker, a similar amount, and was submitted within the last ${windowDays} days.`,
+        link: `/portal/submissions/${candidate.id}`,
+      }));
+  };
+
+  const getPreflightDecision = (alerts: any[], acknowledgements: any, user: any, overrideNearDuplicate: boolean) => {
+    const ackSchema = z.array(z.object({
+      code: z.string().trim().min(1).max(120),
+      reason: z.string().trim().max(2000).optional(),
+    }).strict()).max(100);
+    const parsedAcks = ackSchema.safeParse(acknowledgements ?? []);
+    if (!parsedAcks.success) {
+      return { accepted: false, acknowledgements: [], nearOverride: false, invalidAcknowledgements: true, missingAckCodes: [] as string[] };
+    }
+    const acks = parsedAcks.data;
+    const ackCodes = acks.map((ack) => ack.code);
+    const distinctAckCodes = new Set(ackCodes);
+    const requiredAckCodes = new Set(alerts.filter((alert: any) => alert.severity === "ack").map((alert: any) => String(alert.code)));
+    const invalidAckCodes = ackCodes.some((code) => !requiredAckCodes.has(code)) || distinctAckCodes.size !== ackCodes.length;
+    if (invalidAckCodes) {
+      return { accepted: false, acknowledgements: acks, nearOverride: false, invalidAcknowledgements: true, missingAckCodes: [] as string[] };
+    }
+    const nearOverride = overrideNearDuplicate && isPrivilegedUser({ user })
+      && alerts.some((alert: any) => alert.code === "DUPLICATE_NEAR" && alert.severity === "block");
+    const missingAckCodes = Array.from(requiredAckCodes).filter((code) => !distinctAckCodes.has(code));
+    const blocked = alerts.some((alert: any) =>
+      alert.severity === "block" && !(alert.code === "DUPLICATE_NEAR" && nearOverride),
+    );
+    return {
+      accepted: !blocked && missingAckCodes.length === 0,
+      acknowledgements: acks,
+      nearOverride,
+      invalidAcknowledgements: false,
+      missingAckCodes,
+    };
+  };
+
+  const recordInvoicePreflight = async (
+    invoiceId: number,
+    userId: string,
+    alerts: any[],
+    acknowledgements: any[],
+    nearOverride = false,
+    executor: any = db,
+  ) => {
+    for (const alert of alerts.filter((item: any) => item.severity === "ack")) {
+      const acknowledgement = acknowledgements.find((item: any) => String(item?.code) === String(alert.code));
+      if (!acknowledgement) continue;
+      await executor.execute(sql`
+        INSERT INTO invoice_alert_acks (invoice_id, alert_code, user_id, reason, acked_at)
+        VALUES (${invoiceId}, ${String(alert.code)}, ${userId}, ${acknowledgement.reason ? String(acknowledgement.reason) : null}, NOW())
+      `);
+    }
+    await executor.insert(eventLedger).values({
+      entityType: "invoice",
+      entityId: invoiceId,
+      eventType: "invoice_preflight",
+      actorType: "user",
+      actorId: userId,
+      payloadJson: { alerts, acknowledgements, nearDuplicateOverride: nearOverride },
+    });
+    if (nearOverride) {
+      await executor.insert(eventLedger).values({
+        entityType: "invoice",
+        entityId: invoiceId,
+        eventType: "invoice_preflight_near_duplicate_override",
+        actorType: "user",
+        actorId: userId,
+        payloadJson: { alerts: alerts.filter((alert: any) => alert.code === "DUPLICATE_NEAR") },
+      });
+    }
+  };
   const canAccessAssignedRecord = (req: any, assignedProcessor: string | null | undefined) =>
     isPrivilegedUser(req) || assignedProcessor === req.user?.id;
   const getAssignedProcessorUser = async (assignedProcessor: string | null | undefined) => {
@@ -2536,6 +2653,201 @@ ${message}
     } catch (e: any) { res.status(500).json({ message: e.message ?? "Failed to release invoice" }); }
   });
 
+  app.post("/api/invoices/preflight", requireAuth, async (req: any, res) => {
+    try {
+      const input = z.object({
+        carrierId: z.coerce.number().int().positive(),
+        brokerId: z.coerce.number().int().positive().optional(),
+        invoiceNumber: z.string().trim().optional(),
+        loadNumber: z.string().trim().optional(),
+        amount: z.coerce.number().nonnegative().optional(),
+        serviceDate: z.union([z.string(), z.date()]).optional(),
+        excludeInvoiceId: z.coerce.number().int().positive().optional(),
+      }).parse(req.body);
+      if (!(await canAccessClient(req, input.carrierId))) {
+        return res.status(403).json({ message: "You may only preflight invoices for carriers assigned to you" });
+      }
+      if (input.brokerId != null && !(await canAccessBroker(req, input.brokerId))) {
+        return res.status(403).json({ message: "You may only preflight invoices for brokers assigned to you" });
+      }
+      const { alerts } = await runPreflightForInvoice(input);
+      res.json({ alerts });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid preflight data", errors: error.errors });
+      console.error("Invoice preflight failed:", error);
+      res.status(500).json({ message: "Failed to run invoice preflight" });
+    }
+  });
+
+  app.get("/api/invoices/:id/preflight", requireAuth, async (req: any, res) => {
+    try {
+      const invoiceId = Number(req.params.id);
+      if (!Number.isInteger(invoiceId) || invoiceId < 1) return res.status(400).json({ message: "Invalid invoice id" });
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!await employeeCanAccessInvoice(req, invoiceId)) {
+        return res.status(403).json({ message: "You may only view your own submitted invoices" });
+      }
+      const { alerts } = await runPreflightForInvoice({
+        carrierId: invoice.clientId,
+        brokerId: invoice.brokerId,
+        invoiceNumber: invoice.invoiceNumber,
+        loadNumber: invoice.loadNumber,
+        amount: Number(invoice.amount),
+        serviceDate: invoice.invoiceDate,
+        excludeInvoiceId: invoice.id,
+      });
+      res.json({ alerts });
+    } catch (error) {
+      console.error("Invoice preflight review failed:", error);
+      res.status(500).json({ message: "Failed to review invoice preflight" });
+    }
+  });
+
+  app.get("/api/preflight/alerts", requireManagerOrAdmin, async (_req: any, res) => {
+    try {
+      const result = await db.execute(sql`SELECT * FROM carrier_alerts ORDER BY created_at DESC`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Failed to list preflight alerts:", error);
+      res.status(500).json({ message: "Failed to list preflight alerts" });
+    }
+  });
+
+  app.post("/api/preflight/alerts", requireManagerOrAdmin, async (req: any, res) => {
+    try {
+      const input = z.object({
+        entityType: z.enum(["carrier", "broker"]),
+        entityId: z.coerce.number().int().positive(),
+        severity: z.enum(["block", "ack", "info"]),
+        title: z.string().trim().min(1).max(255),
+        message: z.string().trim().min(1).max(10000),
+        active: z.boolean().optional(),
+        expiresAt: z.union([z.string().datetime(), z.null()]).optional(),
+      }).parse(req.body);
+      const result = await db.execute(sql`
+        INSERT INTO carrier_alerts (entity_type, entity_id, severity, title, message, active, created_by, expires_at)
+        VALUES (${input.entityType}, ${input.entityId}, ${input.severity}, ${input.title}, ${input.message}, ${input.active ?? true}, ${req.user.id}, ${input.expiresAt ? new Date(input.expiresAt) : null})
+        RETURNING *
+      `);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid alert data", errors: error.errors });
+      console.error("Failed to create preflight alert:", error);
+      res.status(500).json({ message: "Failed to create preflight alert" });
+    }
+  });
+
+  const patchPreflightAlert = async (req: any, res: any) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid alert id" });
+      const input = z.object({
+        severity: z.enum(["block", "ack", "info"]).optional(),
+        title: z.string().trim().min(1).max(255).optional(),
+        message: z.string().trim().min(1).max(10000).optional(),
+        active: z.boolean().optional(),
+        expiresAt: z.union([z.string().datetime(), z.null()]).optional(),
+      }).refine((value) => Object.keys(value).length > 0, "At least one field is required").parse(req.body);
+      const result = await db.execute(sql`
+        UPDATE carrier_alerts SET
+          severity = COALESCE(${input.severity ?? null}, severity),
+          title = COALESCE(${input.title ?? null}, title),
+          message = COALESCE(${input.message ?? null}, message),
+          active = COALESCE(${input.active ?? null}, active),
+          expires_at = CASE WHEN ${Object.prototype.hasOwnProperty.call(input, "expiresAt")} THEN ${input.expiresAt ? new Date(input.expiresAt) : null} ELSE expires_at END
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      if (!result.rows[0]) return res.status(404).json({ message: "Preflight alert not found" });
+      res.json(result.rows[0]);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid alert data", errors: error.errors });
+      console.error("Failed to update preflight alert:", error);
+      res.status(500).json({ message: "Failed to update preflight alert" });
+    }
+  };
+  app.patch("/api/preflight/alerts/:id", requireManagerOrAdmin, patchPreflightAlert);
+  app.patch("/api/preflight/alerts", requireManagerOrAdmin, (req: any, res: any, next: any) => {
+    req.params.id = String(req.body?.id ?? req.body?.alertId ?? "");
+    next();
+  }, patchPreflightAlert);
+
+  app.get("/api/invoices/preflight/settings", requireAuth, async (_req: any, res) => {
+    try {
+      const result = await db.execute(sql`SELECT rules, dormant_days, near_amount_tolerance, near_service_date_days FROM invoice_preflight_settings LIMIT 1`);
+      const row: any = result.rows[0];
+      res.json(row ? {
+        rules: row.rules,
+        dormantDays: Number(row.dormant_days),
+        nearAmountTolerance: Number(row.near_amount_tolerance),
+        nearServiceDateDays: Number(row.near_service_date_days),
+      } : {
+        rules: {
+          DUPLICATE_EXACT: true, DUPLICATE_NEAR: true, CARRIER_DORMANT: true,
+          CARRIER_MANUAL_ALERT: true, BROKER_MANUAL_ALERT: true, BROKER_GRADE_LOW: true,
+          BROKER_CHARGEBACKS: true, AUTHORITY_INACTIVE: true, DOCS_EXPIRED: true,
+          CARRIER_OPEN_CHARGEBACK: true,
+        },
+        dormantDays: 45,
+        nearAmountTolerance: 1,
+        nearServiceDateDays: 3,
+      });
+    } catch (error) {
+      console.error("Failed to load preflight settings:", error);
+      res.status(500).json({ message: "Failed to load preflight settings" });
+    }
+  });
+
+  app.patch("/api/invoices/preflight/settings", requireAdmin, async (req: any, res) => {
+    try {
+      const input = z.object({
+        rules: z.record(z.boolean()).optional(),
+        dormantDays: z.number().int().positive().optional(),
+        nearAmountTolerance: z.number().nonnegative().optional(),
+        nearServiceDateDays: z.number().int().nonnegative().optional(),
+      }).refine((value) => Object.keys(value).length > 0, "At least one setting is required").parse(req.body);
+      const currentResult = await db.execute(sql`SELECT rules, dormant_days, near_amount_tolerance, near_service_date_days FROM invoice_preflight_settings LIMIT 1`);
+      const current: any = currentResult.rows[0];
+      const allRules = {
+        DUPLICATE_EXACT: true,
+        DUPLICATE_NEAR: true,
+        CARRIER_DORMANT: true,
+        CARRIER_MANUAL_ALERT: true,
+        BROKER_MANUAL_ALERT: true,
+        BROKER_GRADE_LOW: true,
+        BROKER_CHARGEBACKS: true,
+        AUTHORITY_INACTIVE: true,
+        DOCS_EXPIRED: true,
+        CARRIER_OPEN_CHARGEBACK: true,
+      };
+      const settings = {
+        rules: { ...allRules, ...(current?.rules ?? {}), ...(input.rules ?? {}) },
+        dormantDays: input.dormantDays ?? Number(current?.dormant_days ?? 45),
+        nearAmountTolerance: input.nearAmountTolerance ?? Number(current?.near_amount_tolerance ?? 1),
+        nearServiceDateDays: input.nearServiceDateDays ?? Number(current?.near_service_date_days ?? 3),
+      };
+      const result = await db.execute(sql`
+        INSERT INTO invoice_preflight_settings (id, rules, dormant_days, near_amount_tolerance, near_service_date_days, updated_by, updated_at)
+        VALUES (1, ${JSON.stringify(settings.rules)}::jsonb, ${settings.dormantDays}, ${settings.nearAmountTolerance}, ${settings.nearServiceDateDays}, ${req.user.id}, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          rules = EXCLUDED.rules,
+          dormant_days = EXCLUDED.dormant_days,
+          near_amount_tolerance = EXCLUDED.near_amount_tolerance,
+          near_service_date_days = EXCLUDED.near_service_date_days,
+          updated_by = EXCLUDED.updated_by,
+          updated_at = NOW()
+        RETURNING rules, dormant_days, near_amount_tolerance, near_service_date_days
+      `);
+      const row: any = result.rows[0];
+      res.json({ rules: row.rules, dormantDays: Number(row.dormant_days), nearAmountTolerance: Number(row.near_amount_tolerance), nearServiceDateDays: Number(row.near_service_date_days) });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid preflight settings", errors: error.errors });
+      console.error("Failed to save preflight settings:", error);
+      res.status(500).json({ message: "Failed to save preflight settings" });
+    }
+  });
+
   app.get("/api/invoices", requireAuth, async (req: any, res) => {
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -2667,11 +2979,18 @@ ${message}
         paymentType: z.enum(["ACH", "Wire"]).optional(),
       }).parse({ ...metadata, invoiceNumber });
       const invoiceData = await resolveInvoiceBrokerBranch(parsed as any);
+      const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
 
       const [carrier] = await db.select({ id: clients.id, status: clients.status })
         .from(clients).where(eq(clients.id, invoiceData.clientId)).limit(1);
       if (!carrier) return res.status(400).json({ message: "Carrier not found." });
       if (carrier.status !== "active") return res.status(400).json({ message: "Carrier is not active." });
+      if (!(await canAccessClient(req, invoiceData.clientId))) {
+        return res.status(403).json({ message: "You may only create invoices for carriers assigned to you" });
+      }
+      if (invoiceData.brokerId != null && !(await canAccessBroker(req, invoiceData.brokerId))) {
+        return res.status(403).json({ message: "You may only create invoices for brokers assigned to you" });
+      }
 
       if (invoiceData.driverId != null) {
         const [driver] = await db.select({ id: drivers.id, carrierId: drivers.carrierId, status: drivers.status })
@@ -2686,6 +3005,20 @@ ${message}
           return res.status(400).json({ message: "The selected bank account is not available for this carrier." });
         }
       }
+
+      const acknowledgements = metadata.acknowledgements ?? [];
+      const nearOverride = metadata.overrideNearDuplicate === true;
+      const preflightResult = await runPreflightForInvoice({
+        carrierId: invoiceData.clientId,
+        brokerId: invoiceData.brokerId,
+        invoiceNumber,
+        loadNumber: invoiceData.loadNumber,
+        amount: invoiceData.amount,
+        serviceDate: invoiceServiceDate,
+      });
+      const preflightDecision = getPreflightDecision(preflightResult.alerts, acknowledgements, req.user, nearOverride);
+      if (preflightDecision.invalidAcknowledgements) return res.status(400).json({ message: "Acknowledgements must contain only unique alert codes requiring acknowledgement, with optional text reasons." });
+      if (!preflightDecision.accepted) return res.status(409).json({ message: "Invoice preflight requires attention", alerts: preflightResult.alerts });
 
       const paperwork: Array<{ field: string; type: "rate_confirmation" | "bill_of_lading" | "lumper_receipt" | "other" }> = [
         { field: "rateConfirmation", type: "rate_confirmation" },
@@ -2723,9 +3056,26 @@ ${message}
         ...draftData
       } = invoiceData as any;
       const committed = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(92734012)`);
+        const transactionalPreflight = await runPreflightForInvoice({
+          carrierId: invoiceData.clientId,
+          brokerId: invoiceData.brokerId,
+          invoiceNumber,
+          loadNumber: invoiceData.loadNumber,
+          amount: invoiceData.amount,
+          serviceDate: invoiceServiceDate,
+        }, tx);
+        const transactionalDecision = getPreflightDecision(transactionalPreflight.alerts, metadata.acknowledgements ?? [], req.user, metadata.overrideNearDuplicate === true);
+        if (transactionalDecision.invalidAcknowledgements || !transactionalDecision.accepted) {
+          throw Object.assign(new Error("Invoice preflight changed before creation; review the current alerts and try again."), {
+            status: 409,
+            preflightAlerts: transactionalPreflight.alerts,
+          });
+        }
         const [invoice] = await tx.insert(invoices).values({
           ...draftData,
           invoiceNumber,
+          invoiceDate: invoiceServiceDate,
           loadId: null,
           submittedBy: req.user.id,
           submittedAt: new Date(),
@@ -2749,6 +3099,7 @@ ${message}
         const documents = await tx.insert(documentsTable).values(
           uploadedDocuments.map((document) => ({ ...document, invoiceId: invoice.id })) as any,
         ).returning();
+        await recordInvoicePreflight(invoice.id, req.user.id, transactionalPreflight.alerts, transactionalDecision.acknowledgements, transactionalDecision.nearOverride, tx);
         return { invoice, documents };
       });
       transactionCommitted = true;
@@ -2768,8 +3119,10 @@ ${message}
       if (!transactionCommitted) {
         await Promise.all(uploadedKeys.map((key) => cleanupS3KeyWithRetry(key, "invoice intake compensation")));
       }
+      if ((error as any)?.status === 409) return res.status(409).json({ message: (error as Error).message, alerts: (error as any)?.preflightAlerts ?? [] });
       if ((error as any)?.status === 400) return res.status(400).json({ message: (error as Error).message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      if ((error as any)?.code === "23505") return res.status(409).json({ message: "Invoice number or load number has already been used.", alerts: [] });
       console.error("Error creating invoice with paperwork:", error);
       return res.status(500).json({ message: "Failed to create invoice with paperwork." });
     }
@@ -2782,27 +3135,81 @@ ${message}
       const invoiceData = await resolveInvoiceBrokerBranch(
         insertInvoiceSchema.extend({ loadType: z.enum(LOAD_TYPES) }).parse({ ...req.body, invoiceNumber }) as any,
       );
+      const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
+      if (!(await canAccessClient(req, invoiceData.clientId))) {
+        return res.status(403).json({ message: "You may only create invoices for carriers assigned to you" });
+      }
+      if (invoiceData.brokerId != null && !(await canAccessBroker(req, invoiceData.brokerId))) {
+        return res.status(403).json({ message: "You may only create invoices for brokers assigned to you" });
+      }
+      const preflightResult = await runPreflightForInvoice({
+        carrierId: invoiceData.clientId,
+        brokerId: invoiceData.brokerId,
+        invoiceNumber,
+        loadNumber: invoiceData.loadNumber,
+        amount: invoiceData.amount,
+        serviceDate: invoiceServiceDate,
+      });
+      const preflightDecision = getPreflightDecision(preflightResult.alerts, req.body?.acknowledgements, req.user, req.body?.overrideNearDuplicate === true);
+      if (preflightDecision.invalidAcknowledgements) return res.status(400).json({ message: "Acknowledgements must contain only unique alert codes requiring acknowledgement, with optional text reasons." });
+      if (!preflightDecision.accepted) return res.status(409).json({ message: "Invoice preflight requires attention", alerts: preflightResult.alerts });
       const {
         status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,
         fundedAt, heldReason, heldAt, heldBy, heldNotes, previousStatus,
         ...draftData
       } = invoiceData as any;
-      const invoice = await storage.createInvoice({
-        ...draftData,
-        invoiceNumber,
-        loadId: null,
-        submittedBy: req.user.id,
-        submittedAt: new Date(),
-        status: "submitted",
-        factoringStage: "verification",
+      const invoice = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(92734012)`);
+        const transactionalPreflight = await runPreflightForInvoice({
+          carrierId: invoiceData.clientId,
+          brokerId: invoiceData.brokerId,
+          invoiceNumber,
+          loadNumber: invoiceData.loadNumber,
+          amount: invoiceData.amount,
+          serviceDate: invoiceServiceDate,
+        }, tx);
+        const transactionalDecision = getPreflightDecision(transactionalPreflight.alerts, req.body?.acknowledgements, req.user, req.body?.overrideNearDuplicate === true);
+        if (transactionalDecision.invalidAcknowledgements || !transactionalDecision.accepted) {
+          throw Object.assign(new Error("Invoice preflight changed before creation; review the current alerts and try again."), {
+            status: 409,
+            preflightAlerts: transactionalPreflight.alerts,
+          });
+        }
+        const [createdInvoice] = await tx.insert(invoices).values({
+          ...draftData,
+          invoiceNumber,
+          invoiceDate: invoiceServiceDate,
+          loadId: null,
+          submittedBy: req.user.id,
+          submittedAt: new Date(),
+          status: "submitted",
+          factoringStage: "verification",
+        }).returning();
+        await tx.insert(eventLedger).values({
+          entityType: "invoice",
+          entityId: createdInvoice.id,
+          eventType: "invoice.created",
+          actorType: "user",
+          actorId: req.user.id,
+          payloadJson: {
+            invoiceNumber: createdInvoice.invoiceNumber,
+            status: createdInvoice.status,
+            clientId: createdInvoice.clientId,
+            debtorId: createdInvoice.debtorId,
+            amount: createdInvoice.amount,
+          },
+        });
+        await recordInvoicePreflight(createdInvoice.id, req.user.id, transactionalPreflight.alerts, transactionalDecision.acknowledgements, transactionalDecision.nearOverride, tx);
+        return createdInvoice;
       });
-
       res.status(201).json(withInvoiceDisplayStatus(invoice));
     } catch (error) {
+      if ((error as any)?.status === 409) return res.status(409).json({ message: (error as Error).message, alerts: (error as any)?.preflightAlerts ?? [] });
       if ((error as any)?.status === 400) return res.status(400).json({ message: (error as Error).message });
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
       }
+      if ((error as any)?.code === "23505") return res.status(409).json({ message: "Invoice number or load number has already been used.", alerts: [] });
       console.error("Error creating invoice:", error);
       res.status(500).json({ message: "Failed to create invoice" });
     }
@@ -9509,6 +9916,7 @@ RESPOND:
 - Use exact terminology: carriers not clients, invoices not loads (unless agent uses loads), brokers not debtors
 - Be concise and action-oriented
 - If you can fetch live data to answer — always fetch it first
+- When asked about creating or reviewing an invoice, call preflight_invoice when the carrier is known and surface its alerts; that tool is read-only and you cannot create invoices
 - If you can take an action — confirm with the agent before executing
 - Never invent live values, expose sensitive vault data, or reveal provider/internal errors.`;
 
@@ -9516,6 +9924,7 @@ RESPOND:
     { name: "search_system", description: "Search across carriers, brokers, invoices, fuel advances, tickets, tasks", input_schema: { type: "object", properties: { query: { type: "string", minLength: 2, maxLength: 120 }, entity_type: { type: "string", enum: ["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"] } }, required: ["query"], additionalProperties: false } },
     { name: "get_carrier", description: "Get full safe carrier details by ID or MC#", input_schema: { type: "object", properties: { identifier: { type: "string", minLength: 1, maxLength: 80 } }, required: ["identifier"], additionalProperties: false } },
     { name: "get_invoice", description: "Get safe invoice details and status by invoice number", input_schema: { type: "object", properties: { invoice_number: { type: "string", minLength: 1, maxLength: 80 } }, required: ["invoice_number"], additionalProperties: false } },
+    { name: "preflight_invoice", description: "Read invoice preflight risk alerts before an invoice is created; this tool never creates an invoice", input_schema: { type: "object", properties: { carrier_id: { type: "string", minLength: 1, maxLength: 40 }, broker_id: { type: "string", minLength: 1, maxLength: 40 }, invoice_number: { type: "string", maxLength: 80 }, load_number: { type: "string", maxLength: 120 }, amount: { type: "number", minimum: 0 }, service_date: { type: "string", maxLength: 40 } }, required: ["carrier_id"], additionalProperties: false } },
     { name: "get_broker", description: "Get safe broker details and credit grade by name or MC#", input_schema: { type: "object", properties: { identifier: { type: "string", minLength: 1, maxLength: 80 } }, required: ["identifier"], additionalProperties: false } },
     { name: "get_aging_report", description: "Get current aging report — invoices past due by bucket", input_schema: { type: "object", properties: { min_days: { type: "number", minimum: 0, maximum: 3650 } }, additionalProperties: false } },
     { name: "get_sheets_queue", description: "Get current funding queue — invoices pending approval", input_schema: { type: "object", properties: { limit: { type: "number", minimum: 1, maximum: 50 } }, additionalProperties: false } },
@@ -9540,6 +9949,14 @@ RESPOND:
     }).strict(),
     get_carrier: z.object({ identifier: earlText(1, 80) }).strict(),
     get_invoice: z.object({ invoice_number: earlText(1, 80) }).strict(),
+    preflight_invoice: z.object({
+      carrier_id: earlPositiveId,
+      broker_id: earlPositiveId.optional(),
+      invoice_number: earlText(1, 80).optional(),
+      load_number: earlText(1, 120).optional(),
+      amount: z.coerce.number().nonnegative().optional(),
+      service_date: earlDate.optional(),
+    }).strict(),
     get_broker: z.object({ identifier: earlText(1, 80) }).strict(),
     get_aging_report: z.object({ min_days: z.coerce.number().int().min(0).max(3650).default(1) }).strict(),
     get_sheets_queue: z.object({ limit: z.coerce.number().int().min(1).max(50).default(10) }).strict(),
@@ -9567,7 +9984,7 @@ RESPOND:
   const earlMutationTools = new Set(["hold_invoice", "assign_task", "send_carrier_message"]);
   const earlToolPermission: Record<string, string[]> = {
     search_system: ["dashboard", "carriers", "brokers", "invoices", "factoring", "tasks", "tickets"],
-    get_carrier: ["carriers"], get_invoice: ["invoices", "factoring"], get_broker: ["brokers"],
+    get_carrier: ["carriers"], get_invoice: ["invoices", "factoring"], preflight_invoice: ["invoices", "factoring"], get_broker: ["brokers"],
     get_aging_report: ["factoring", "reports"], get_sheets_queue: ["factoring"], get_dashboard_stats: ["dashboard"],
     hold_invoice: ["factoring"], assign_task: ["tasks"], send_carrier_message: ["chat", "portal_submissions"],
     get_carrier_invoices: ["invoices", "factoring"], get_broker_credit: ["brokers"],
@@ -9620,6 +10037,19 @@ RESPOND:
 
   const executeEarlReadTool = async (tool: string, args: any, req: any): Promise<{ data: any; cards?: any[] }> => {
     const q = String(args.query ?? "").trim();
+    if (tool === "preflight_invoice") {
+      const carrierId = Number(args.carrier_id);
+      if (!(await canAccessClient(req, carrierId))) return { data: { message: "Carrier not found or not accessible" } };
+      const { alerts } = await runPreflightForInvoice({
+        carrierId,
+        brokerId: args.broker_id == null ? undefined : Number(args.broker_id),
+        invoiceNumber: args.invoice_number,
+        loadNumber: args.load_number,
+        amount: args.amount,
+        serviceDate: args.service_date,
+      });
+      return { data: { alerts, blocked: alerts.some((alert: any) => alert.severity === "block"), note: "Read-only preflight; no invoice was created." } };
+    }
     if (tool === "search_system") {
       const pattern = `%${q}%`; const type = args.entity_type ?? "all"; const result: any = {};
       if ((type === "carriers" || type === "all") && await earlHasPermission(req, ["carriers"])) {
@@ -9897,6 +10327,8 @@ RESPOND:
     brokerId: z.coerce.number().int().positive(),
     reportDateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     reportDateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    acknowledgements: z.array(z.object({ code: z.string().trim().min(1).max(120), reason: z.string().trim().max(2000).optional() }).strict()).max(100).optional(),
+    overrideNearDuplicate: z.boolean().optional(),
     items: z.array(z.object({
       carrierId: z.coerce.number().int().positive(),
       ticketNumber: z.string().trim().min(1).max(120),
@@ -10039,9 +10471,150 @@ RESPOND:
       if (!broker) return res.status(400).json({ message: "Selected broker was not found" });
       const carrierRows = await db.select({ id: clients.id }).from(clients).where(inArray(clients.id, uniqueCarrierIds));
       if (carrierRows.length !== uniqueCarrierIds.length) return res.status(400).json({ message: "One or more selected carriers were not found" });
+      if (!(await canAccessBroker(req, input.brokerId))) {
+        return res.status(403).json({ message: "You may only create bulk invoices for brokers assigned to you" });
+      }
+      for (const carrierId of uniqueCarrierIds) {
+        if (!(await canAccessClient(req, carrierId))) {
+          return res.status(403).json({ message: "You may only create bulk invoices for carriers assigned to you" });
+        }
+      }
+
+      const existingInvoiceNumbers = await db.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices);
+      const currentMaxSequence = existingInvoiceNumbers.reduce((max, row) => {
+        const numeric = parseInt((row.invoiceNumber || "").replace(/\D/g, ""), 10);
+        return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
+      }, 0);
+      const bulkPreflightAlerts: any[][] = [];
+      for (let index = 0; index < input.items.length; index += 1) {
+        const item = input.items[index];
+        const invoiceNumber = `INV${String(currentMaxSequence + index + 1).padStart(3, "0")}`;
+        const preflight = await runPreflightForInvoice({
+          carrierId: item.carrierId,
+          brokerId: input.brokerId,
+          invoiceNumber,
+          loadNumber: item.loadNumber,
+          amount: item.rate,
+          serviceDate: reportDateStart,
+        });
+        bulkPreflightAlerts.push(preflight.alerts);
+      }
+      const allAckAlerts = bulkPreflightAlerts.flat().filter((alert: any) => alert.severity === "ack");
+      const ackValidation = getPreflightDecision(allAckAlerts, input.acknowledgements, req.user, false);
+      if (ackValidation.invalidAcknowledgements) {
+        return res.status(400).json({ message: "Acknowledgements must contain only unique alert codes requiring acknowledgement, with optional text reasons." });
+      }
+      const bulkPreflightResults: Array<{ alerts: any[]; decision: any }> = [];
+      const failedPreflightAlerts: any[] = [];
+      for (let index = 0; index < bulkPreflightAlerts.length; index += 1) {
+        const alerts = bulkPreflightAlerts[index];
+        const itemAckCodes = new Set(alerts.filter((alert: any) => alert.severity === "ack").map((alert: any) => alert.code));
+        const itemAcknowledgements = (input.acknowledgements ?? []).filter((ack: any) => itemAckCodes.has(ack.code));
+        const decision = getPreflightDecision(alerts, itemAcknowledgements, req.user, input.overrideNearDuplicate === true);
+        bulkPreflightResults.push({ alerts, decision });
+        if (!decision.accepted) failedPreflightAlerts.push(...alerts.map((alert: any) => ({ ...alert, itemIndex: index })));
+      }
+      if (failedPreflightAlerts.length) {
+        return res.status(409).json({ message: "Bulk invoice preflight requires attention", alerts: failedPreflightAlerts });
+      }
 
       const createdResult = await db.transaction(async (tx) => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(92734011)`);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(92734012)`);
+        const lockedInvoiceNumbers = await tx.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices);
+        const maxSequence = lockedInvoiceNumbers.reduce((max, row) => {
+          const numeric = parseInt((row.invoiceNumber || "").replace(/\D/g, ""), 10);
+          return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
+        }, 0);
+        const lockedAlerts: any[][] = [];
+        for (let index = 0; index < input.items.length; index += 1) {
+          const item = input.items[index];
+          const invoiceNumber = `INV${String(maxSequence + index + 1).padStart(3, "0")}`;
+          const preflight = await runPreflightForInvoice({
+            carrierId: item.carrierId,
+            brokerId: input.brokerId,
+            invoiceNumber,
+            loadNumber: item.loadNumber,
+            amount: item.rate,
+            serviceDate: reportDateStart,
+          }, tx);
+          lockedAlerts.push(preflight.alerts);
+        }
+        const settingsResult = await tx.execute(sql`SELECT rules, near_amount_tolerance FROM invoice_preflight_settings LIMIT 1`);
+        const preflightSettings: any = settingsResult.rows[0];
+        const nearDuplicatesEnabled = preflightSettings?.rules?.DUPLICATE_NEAR !== false;
+        const nearAmountTolerance = Number(preflightSettings?.near_amount_tolerance ?? 1);
+        const sameBatchAlerts = input.items.map(() => [] as any[]);
+        const normalizeLoadNumber = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+        for (let leftIndex = 0; leftIndex < input.items.length; leftIndex += 1) {
+          for (let rightIndex = leftIndex + 1; rightIndex < input.items.length; rightIndex += 1) {
+            const left = input.items[leftIndex];
+            const right = input.items[rightIndex];
+            if (left.carrierId !== right.carrierId) continue;
+            if (normalizeLoadNumber(left.loadNumber) === normalizeLoadNumber(right.loadNumber)) {
+              sameBatchAlerts[leftIndex].push({
+                code: "DUPLICATE_EXACT",
+                severity: "block",
+                title: "Duplicate load in this batch",
+                message: `Batch item ${rightIndex + 1} repeats load ${left.loadNumber}.`,
+                matchedItemIndex: rightIndex,
+              });
+              sameBatchAlerts[rightIndex].push({
+                code: "DUPLICATE_EXACT",
+                severity: "block",
+                title: "Duplicate load in this batch",
+                message: `Batch item ${leftIndex + 1} repeats load ${right.loadNumber}.`,
+                matchedItemIndex: leftIndex,
+              });
+            } else if (nearDuplicatesEnabled && Math.abs(left.rate - right.rate) <= nearAmountTolerance) {
+              sameBatchAlerts[leftIndex].push({
+                code: "DUPLICATE_NEAR",
+                severity: "block",
+                title: "Near-duplicate load in this batch",
+                message: `Batch item ${rightIndex + 1} has the same carrier, broker, report date, and a rate within $${nearAmountTolerance.toFixed(2)}.`,
+                matchedItemIndex: rightIndex,
+              });
+              sameBatchAlerts[rightIndex].push({
+                code: "DUPLICATE_NEAR",
+                severity: "block",
+                title: "Near-duplicate load in this batch",
+                message: `Batch item ${leftIndex + 1} has the same carrier, broker, report date, and a rate within $${nearAmountTolerance.toFixed(2)}.`,
+                matchedItemIndex: leftIndex,
+              });
+            }
+          }
+        }
+        for (let index = 0; index < lockedAlerts.length; index += 1) {
+          lockedAlerts[index].push(...sameBatchAlerts[index]);
+        }
+        const lockedAckValidation = getPreflightDecision(
+          lockedAlerts.flat().filter((alert: any) => alert.severity === "ack"),
+          input.acknowledgements,
+          req.user,
+          false,
+        );
+        if (lockedAckValidation.invalidAcknowledgements) {
+          throw Object.assign(new Error("Invoice preflight changed before creation; review the current alerts and try again."), {
+            status: 409,
+            preflightAlerts: lockedAlerts.flat(),
+          });
+        }
+        const lockedResults: Array<{ alerts: any[]; decision: any }> = [];
+        const lockedFailures: any[] = [];
+        for (let index = 0; index < lockedAlerts.length; index += 1) {
+          const alerts = lockedAlerts[index];
+          const itemAckCodes = new Set(alerts.filter((alert: any) => alert.severity === "ack").map((alert: any) => alert.code));
+          const itemAcknowledgements = (input.acknowledgements ?? []).filter((ack: any) => itemAckCodes.has(ack.code));
+          const decision = getPreflightDecision(alerts, itemAcknowledgements, req.user, input.overrideNearDuplicate === true);
+          lockedResults.push({ alerts, decision });
+          if (!decision.accepted) lockedFailures.push(...alerts.map((alert: any) => ({ ...alert, itemIndex: index })));
+        }
+        if (lockedFailures.length) {
+          throw Object.assign(new Error("Bulk invoice preflight requires attention."), {
+            status: 409,
+            preflightAlerts: lockedFailures,
+          });
+        }
+        bulkPreflightResults.splice(0, bulkPreflightResults.length, ...lockedResults);
 
         let [debtor] = await tx.select().from(debtors)
           .where(sql`lower(${debtors.name}) = lower(${broker.name})`)
@@ -10060,11 +10633,6 @@ RESPOND:
           }).returning();
         }
 
-        const existingNumbers = await tx.select({ invoiceNumber: invoices.invoiceNumber }).from(invoices);
-        const maxSequence = existingNumbers.reduce((max, row) => {
-          const numeric = parseInt((row.invoiceNumber || "").replace(/\D/g, ""), 10);
-          return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
-        }, 0);
         const now = new Date();
         const batchName = `${broker.name} ${input.reportDateStart} to ${input.reportDateEnd}`;
         const [createdBatch] = await tx.insert(bulkInvoiceBatches).values({
@@ -10097,11 +10665,12 @@ RESPOND:
             invoiceNumber,
             loadId: null,
             clientId: item.carrierId,
+            brokerId: broker.id,
             debtorId: debtor.id,
             loadNumber: item.loadNumber,
             amount: (Math.round(item.rate * 100) / 100).toFixed(2),
             currency: "USD",
-            invoiceDate: now,
+            invoiceDate: reportDateStart,
             loadType: "dump_truck_ticket",
             bolNumber: item.ticketNumber,
             status: "submitted",
@@ -10126,33 +10695,35 @@ RESPOND:
           }).returning();
           createdInvoices.push(createdInvoice);
           createdItems.push(createdItem);
+          const preflight = bulkPreflightResults[index];
+          await recordInvoicePreflight(createdInvoice.id, userId, preflight.alerts, preflight.decision.acknowledgements, preflight.decision.nearOverride, tx);
+          await tx.insert(eventLedger).values({
+            entityType: "invoice",
+            entityId: createdInvoice.id,
+            eventType: "invoice.created",
+            actorType: "user",
+            actorId: userId,
+            payloadJson: {
+              invoiceNumber: createdInvoice.invoiceNumber,
+              status: createdInvoice.status,
+              clientId: createdInvoice.clientId,
+              debtorId: createdInvoice.debtorId,
+              amount: createdInvoice.amount,
+              source: "bulk_invoice",
+              batchId: createdBatch.id,
+            },
+          });
         }
         return { batch: createdBatch, createdInvoices, items: createdItems };
       });
 
-      await Promise.all(createdResult.createdInvoices.map(invoice => storage.createEvent({
-        entityType: "invoice",
-        entityId: invoice.id,
-        eventType: "invoice.created",
-        actorType: "user",
-        actorId: userId,
-        payloadJson: {
-          invoiceNumber: invoice.invoiceNumber,
-          status: invoice.status,
-          clientId: invoice.clientId,
-          debtorId: invoice.debtorId,
-          amount: invoice.amount,
-          source: "bulk_invoice",
-          batchId: createdResult.batch.id,
-        },
-      }).catch((error: any) => console.warn("Bulk invoice event logging failed:", error?.message))));
       await storage.createActivity({
         userId,
         type: "invoice_created",
         description: `Created bulk invoice batch #${createdResult.batch.id} with ${createdResult.createdInvoices.length} invoices for ${broker.name}`,
         entityType: "bulk_invoice_batch",
         entityId: createdResult.batch.id,
-      });
+      }).catch((error: any) => console.warn("Bulk invoice activity logging failed:", error?.message));
 
       res.status(201).json({
         ...createdResult.batch,
@@ -10164,7 +10735,13 @@ RESPOND:
         createdInvoices: createdResult.createdInvoices.map(withInvoiceDisplayStatus),
       });
     } catch (error) {
+      if ((error as any)?.status === 409) {
+        return res.status(409).json({ message: (error as Error).message, alerts: (error as any)?.preflightAlerts ?? [] });
+      }
       if (error instanceof z.ZodError) {
+        if (error.errors.some((issue) => issue.message === "Duplicate carrier, ticket, and load combination")) {
+          return res.status(409).json({ message: "Duplicate carrier, ticket, and load combinations were submitted.", alerts: [] });
+        }
         return res.status(400).json({ message: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), errors: error.errors });
       }
       const duplicateConstraint = String((error as any)?.constraint || "");
@@ -10175,7 +10752,11 @@ RESPOND:
           message: isBusinessDuplicate
             ? "One or more carrier ticket/load combinations have already been invoiced."
             : "This exact bulk invoice batch was already submitted.",
+          alerts: [],
         });
+      }
+      if ((error as any)?.code === "23505") {
+        return res.status(409).json({ message: "One or more invoices already exist for the carrier/load combination.", alerts: [] });
       }
       console.error("Error creating bulk invoice batch:", error);
       const message = isBusinessDuplicate
@@ -11580,12 +12161,52 @@ RESPOND:
     }
   });
 
+  app.post("/api/portal/submissions/preflight", requirePortalAuth, async (req: any, res) => {
+    try {
+      const input = z.object({
+        brokerId: z.coerce.number().int().positive().optional(),
+        invoiceNumber: z.string().trim().optional(),
+        loadNumber: z.string().trim().optional(),
+        amount: z.coerce.number().nonnegative().optional(),
+        serviceDate: z.string().trim().optional(),
+      }).parse(req.body);
+      const [portalUser] = await db.select({ carrierId: carrierPortalUsers.carrierId })
+        .from(carrierPortalUsers)
+        .where(eq(carrierPortalUsers.id, req.portalUser.id))
+        .limit(1);
+      if (!portalUser?.carrierId) {
+        return res.status(409).json({ message: "Your account is not linked to a carrier profile" });
+      }
+      const { alerts } = await runPreflightForInvoice({
+        carrierId: portalUser.carrierId,
+        brokerId: input.brokerId,
+        invoiceNumber: input.invoiceNumber,
+        loadNumber: input.loadNumber,
+        amount: input.amount,
+        serviceDate: input.serviceDate ?? new Date(),
+      });
+      const nearDuplicateAlerts = input.brokerId != null && input.amount != null
+        ? await getPortalSubmissionNearDuplicateAlerts({
+          carrierId: portalUser.carrierId,
+          brokerId: input.brokerId,
+          amount: input.amount,
+        })
+        : [];
+      return res.json({ alerts: [...alerts, ...nearDuplicateAlerts] });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid preflight data", errors: error.errors });
+      console.error("Portal invoice preflight failed:", error);
+      return res.status(500).json({ message: "Failed to run invoice preflight" });
+    }
+  });
+
   app.post("/api/portal/submissions", requirePortalAuth, (req: any, res, next) => {
     portalUpload.array("documents", 10)(req, res, (err: any) => {
       if (err) return res.status(400).json({ message: err.message || "File upload error" });
       next();
     });
   }, async (req: any, res) => {
+    const uploadedPortalKeys: string[] = [];
     try {
       const submissionSchema = z.object({
         loadNumber: z.string().trim().min(1),
@@ -11601,6 +12222,7 @@ RESPOND:
         paymentType: z.enum(["ACH", "wire"]),
         instructionsSubject: z.string().trim().optional(),
         instructionsDetails: z.string().trim().optional(),
+        acknowledgements: z.union([z.string(), z.array(z.any())]).optional(),
       });
       const data = submissionSchema.parse(req.body);
       const files: Express.Multer.File[] = (req.files as Express.Multer.File[]) || [];
@@ -11622,34 +12244,37 @@ RESPOND:
       if (!broker) return res.status(400).json({ message: "Select an active broker" });
       if (!branch) return res.status(400).json({ message: "Select an active branch for this broker" });
       if (!bankAccount) return res.status(400).json({ message: "Select an active bank account from your profile" });
-      const [sub] = await db.insert(carrierSubmissions).values({
-        portalUserId: req.portalUser.id,
+      let acknowledgements: any[] = [];
+      try {
+        const rawAcks = data.acknowledgements;
+        acknowledgements = Array.isArray(rawAcks) ? rawAcks : rawAcks ? JSON.parse(rawAcks) : [];
+        if (!Array.isArray(acknowledgements)) throw new Error("Acknowledgements must be an array");
+      } catch {
+        return res.status(400).json({ message: "Acknowledgements must be a JSON array" });
+      }
+      const portalPreflight = await runPreflightForInvoice({
         carrierId: portalUser.carrierId,
+        brokerId: data.brokerId,
+        invoiceNumber: data.invoiceNumber,
         loadNumber: data.loadNumber,
-        invoiceNumber: data.invoiceNumber || null,
-        loadType: data.loadType as any,
-        brokerId: broker.id,
-        brokerName: broker.name,
-        branchId: branch.id,
-        branchName: branch.branchName,
-        code: data.code,
-        lumper: data.lumper === "yes",
-        driverName: data.driverName,
-        bankAccountId: bankAccount.id,
-        amount: String(data.amount),
-        paymentType: data.paymentType,
-        instructionsSubject: data.instructionsSubject || null,
-        instructionsDetails: data.instructionsDetails || null,
-        status: "submitted",
-      }).returning();
-
+        amount: data.amount,
+        serviceDate: new Date(),
+      });
+      const portalDecision = getPreflightDecision(portalPreflight.alerts, acknowledgements, req.portalUser, false);
+      if (portalDecision.invalidAcknowledgements) {
+        return res.status(400).json({ message: "Acknowledgements must contain only unique alert codes requiring acknowledgement, with optional text reasons." });
+      }
+      if (!portalDecision.accepted) {
+        return res.status(409).json({ message: "Submission preflight requires attention", alerts: portalPreflight.alerts });
+      }
+      const uploadedDocuments: Array<Record<string, any>> = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const dtype = (docTypes[i] || "other") as "rate_confirmation" | "bol" | "lumper_receipt" | "other";
         const portalFileUuid = crypto.randomUUID();
         const portalS3Key = await uploadToS3(file.buffer, `portal/${portalFileUuid}`, file.mimetype);
-        await db.insert(carrierSubmissionDocs).values({
-          submissionId: sub.id,
+        uploadedPortalKeys.push(portalS3Key);
+        uploadedDocuments.push({
           documentType: dtype,
           filename: portalFileUuid,
           originalName: file.originalname,
@@ -11658,23 +12283,132 @@ RESPOND:
           s3Key: portalS3Key,
         });
       }
-      const activeAgents = await db.select({ id: users.id }).from(users).where(and(
-        eq(users.status, "active"),
-        inArray(users.role, ["employee", "manager", "admin"]),
-      ));
-      const formattedAmount = Number(sub.amount || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
-      await Promise.all(activeAgents.map(agent => storage.createNotification({
-        userId: agent.id,
-        title: "New carrier submission",
-        message: `New carrier submission from ${portalUser.companyName} — ${formattedAmount}`,
-        type: "warning",
-        entityType: "carrier_submission",
-        entityId: sub.id,
-        actionUrl: "/portal-submissions",
-      })));
+      const sub = await db.transaction(async (tx) => {
+        // Serialize portal submissions with identical carrier/load keys so
+        // concurrent requests cannot both pass the preflight check.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(92734012)`);
+        const lockedPreflightBase = await runPreflightForInvoice({
+          carrierId: portalUser.carrierId,
+          brokerId: data.brokerId,
+          invoiceNumber: data.invoiceNumber,
+          loadNumber: data.loadNumber,
+          amount: data.amount,
+          serviceDate: new Date(),
+        }, tx);
+        const portalSubmissionNearAlerts = await getPortalSubmissionNearDuplicateAlerts({
+          carrierId: portalUser.carrierId!,
+          brokerId: data.brokerId,
+          amount: data.amount,
+        }, tx);
+        const lockedPreflight = { alerts: [...lockedPreflightBase.alerts, ...portalSubmissionNearAlerts] };
+        const lockedDecision = getPreflightDecision(lockedPreflight.alerts, acknowledgements, req.portalUser, false);
+        if (lockedDecision.invalidAcknowledgements || !lockedDecision.accepted) {
+          throw Object.assign(new Error("Submission preflight changed before creation; review the current alerts and try again."), {
+            status: 409,
+            preflightAlerts: lockedPreflight.alerts,
+          });
+        }
+        const duplicateInvoice = await tx.select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber, loadNumber: invoices.loadNumber })
+          .from(invoices)
+          .where(and(
+            eq(invoices.clientId, portalUser.carrierId!),
+            or(
+              data.invoiceNumber ? eq(invoices.invoiceNumber, data.invoiceNumber) : undefined,
+              eq(invoices.loadNumber, data.loadNumber),
+            ),
+          ))
+          .limit(1);
+        const duplicateSubmission = await tx.select({ id: carrierSubmissions.id, invoiceNumber: carrierSubmissions.invoiceNumber, loadNumber: carrierSubmissions.loadNumber })
+          .from(carrierSubmissions)
+          .where(and(
+            eq(carrierSubmissions.carrierId, portalUser.carrierId!),
+            ne(carrierSubmissions.status, "rejected"),
+            or(
+              data.invoiceNumber ? eq(carrierSubmissions.invoiceNumber, data.invoiceNumber) : undefined,
+              eq(carrierSubmissions.loadNumber, data.loadNumber),
+            ),
+          ))
+          .limit(1);
+        const duplicate = duplicateInvoice[0] ?? duplicateSubmission[0];
+        if (duplicate) {
+          throw Object.assign(new Error("This load or invoice number has already been submitted."), {
+            status: 409,
+            preflightAlerts: [{
+              code: "DUPLICATE_EXACT",
+              severity: "block",
+              title: "Possible duplicate invoice",
+              message: `An invoice or submission already uses load ${data.loadNumber}${data.invoiceNumber ? ` or invoice ${data.invoiceNumber}` : ""}.`,
+            }],
+          });
+        }
+        const [createdSubmission] = await tx.insert(carrierSubmissions).values({
+          portalUserId: req.portalUser.id,
+          carrierId: portalUser.carrierId,
+          loadNumber: data.loadNumber,
+          invoiceNumber: data.invoiceNumber || null,
+          loadType: data.loadType as any,
+          brokerId: broker.id,
+          brokerName: broker.name,
+          branchId: branch.id,
+          branchName: branch.branchName,
+          code: data.code,
+          lumper: data.lumper === "yes",
+          driverName: data.driverName,
+          bankAccountId: bankAccount.id,
+          amount: String(data.amount),
+          paymentType: data.paymentType,
+          instructionsSubject: data.instructionsSubject || null,
+          instructionsDetails: data.instructionsDetails || null,
+          status: "submitted",
+        }).returning();
+        if (uploadedDocuments.length) {
+          await tx.insert(carrierSubmissionDocs).values(
+            uploadedDocuments.map((document) => ({ ...document, submissionId: createdSubmission.id })) as any,
+          );
+        }
+        if (lockedDecision.acknowledgements.length) {
+          await tx.insert(carrierSubmissionAlertAcks).values(lockedDecision.acknowledgements.map((acknowledgement: any) => ({
+            submissionId: createdSubmission.id,
+            portalUserId: req.portalUser.id,
+            alertCode: acknowledgement.code,
+            reason: acknowledgement.reason || null,
+          })));
+        }
+        await tx.insert(carrierSubmissionPreflightEvents).values({
+          submissionId: createdSubmission.id,
+          eventType: "invoice_preflight",
+          alerts: lockedPreflight.alerts,
+          acknowledgements: lockedDecision.acknowledgements,
+          portalUserId: req.portalUser.id,
+        });
+        return createdSubmission;
+      });
+      try {
+        const activeAgents = await db.select({ id: users.id }).from(users).where(and(
+          eq(users.status, "active"),
+          inArray(users.role, ["employee", "manager", "admin"]),
+        ));
+        const formattedAmount = Number(sub.amount || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+        await Promise.all(activeAgents.map(agent => storage.createNotification({
+          userId: agent.id,
+          title: "New carrier submission",
+          message: `New carrier submission from ${portalUser.companyName} — ${formattedAmount}`,
+          type: "warning",
+          entityType: "carrier_submission",
+          entityId: sub.id,
+          actionUrl: "/portal-submissions",
+        }).catch((error: any) => console.warn("Portal submission notification failed:", error?.message))));
+      } catch (error: any) {
+        console.warn("Portal submission notification lookup failed:", error?.message);
+      }
       res.status(201).json(sub);
     } catch (error) {
+      await Promise.all(uploadedPortalKeys.map((key) => cleanupS3KeyWithRetry(key, "portal submission compensation")));
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid submission" });
+      if ((error as any)?.status === 409) {
+        return res.status(409).json({ message: (error as Error).message, alerts: (error as any)?.preflightAlerts ?? [] });
+      }
+      if ((error as any)?.code === "23505") return res.status(409).json({ message: "This load or invoice number has already been submitted.", alerts: [] });
       console.error("Portal submit error:", error);
       res.status(500).json({ message: "Submission failed" });
     }
