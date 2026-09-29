@@ -8355,18 +8355,6 @@ Trucking Pros Financial Team
   });
 
   // ── Demo seed ──────────────────────────────────────────────────────────────
-  app.post("/api/admin/seed-demo", requireAdmin, async (req: any, res) => {
-    try {
-      const { seedDemoData } = await import("./services/demoSeed");
-      const agentId = req.user?.id ?? "prod-1";
-      const result  = await seedDemoData(agentId);
-      res.json(result);
-    } catch (err: any) {
-      console.error("[Demo Seed] failed:", err?.message);
-      res.status(500).json({ message: "Seed failed", error: err?.message });
-    }
-  });
-
   app.get("/api/admin/seed-demo/status", requireAdmin, async (_req, res) => {
     try {
       const existing = await db
