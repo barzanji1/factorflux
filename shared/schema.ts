@@ -119,6 +119,26 @@ export const clients = pgTable("clients", {
 ]);
 
 // New addition for debtors table
+export const clientEmailLogs = pgTable("client_email_logs", {
+  id: serial("id").primaryKey(),
+  requestId: varchar("request_id").notNull().unique(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  agentId: varchar("agent_id").references(() => users.id, { onDelete: "set null" }),
+  agentName: varchar("agent_name").notNull(),
+  toEmail: varchar("to_email").notNull(),
+  fromEmail: varchar("from_email").notNull(),
+  replyTo: varchar("reply_to").notNull(),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  status: varchar("status", { enum: ["pending", "sending", "sent", "failed", "unconfirmed"] }).notNull().default("pending"),
+  providerMessageId: varchar("provider_message_id"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  sentAt: timestamp("sent_at"),
+}, table => [index("client_email_logs_client_created_idx").on(table.clientId, table.createdAt)]);
+export type ClientEmailLog = typeof clientEmailLogs.$inferSelect;
+
 export const debtors = pgTable("debtors", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
@@ -2348,7 +2368,7 @@ export const ALL_PERMISSIONS = [
   "brokers","cb_reviews","mc_check","held","logs","calendar","bulk_sms",
   "followups","reports",
   "payroll","expenses","vault","help","settings","rules","workflow_builder","admin",
-  "earl","chat","tickets",
+  "earl","chat","tickets","client_email",
 ] as const;
 export type PermissionKey = typeof ALL_PERMISSIONS[number];
 

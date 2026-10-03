@@ -22,6 +22,8 @@ import CarrierChatThread from "@/components/carriers/CarrierChatThread";
 import { LoadTypeBadge, LoadTypeToggleGroup } from "@/components/load-type";
 import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClientEmailComposer } from "@/components/client-email/client-email-composer";
+import { ClientEmailLog } from "@/components/client-email/client-email-log";
 import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
 const money = (value: unknown) => value === null || value === undefined || value === "" ? "Not recorded" : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -132,7 +134,7 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const clientId = Number(id);
-  const { user, permissions, isLoading: authLoading } = useAuth();
+  const { user, permissions, isLoading: authLoading, hasPermission } = useAuth();
   const isManager = user?.role === "admin" || user?.role === "manager";
   const canUseCarrierChat = !!user && (
     user.role === "admin"
@@ -154,6 +156,7 @@ export default function ClientDetail() {
   const [listEditing, setListEditing] = useState<any>(null);
   const [listForm, setListForm] = useState<any>({});
   const [profileTab, setProfileTab] = useState("profile");
+  const [clientEmailOpen, setClientEmailOpen] = useState(false);
 
   const { data: client, isLoading } = useQuery<any>({ queryKey: ["/api/clients", clientId], enabled: Number.isFinite(clientId), queryFn: async () => { const response = await fetch(`/api/clients/${clientId}`, { credentials: "include" }); if (!response.ok) throw new Error("Carrier not found"); return response.json(); } });
   const { data: invoices = [] } = useQuery<any[]>({ queryKey: ["/api/invoices", { all: true }] });
@@ -277,7 +280,7 @@ export default function ClientDetail() {
                   {clientDocs.length ? clientDocs.map((doc: any) => <DropdownMenuItem key={doc.id} asChild><a href={`/api/documents/${doc.id}/download`} target="_blank" rel="noreferrer"><FileText className="mr-2 h-3.5 w-3.5" />{doc.originalName || doc.filename}</a></DropdownMenuItem>) : <DropdownMenuItem disabled>No carrier documents on file</DropdownMenuItem>}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button size="sm" variant="outline" disabled title="Carrier email sending is unavailable because no safe send API is configured" aria-label="Send carrier email unavailable" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Mail className="h-3.5 w-3.5" />Send email</Button>
+              {hasPermission("client_email") && <Button size="sm" variant="outline" onClick={() => setClientEmailOpen(true)} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Mail className="h-3.5 w-3.5" />Email Client</Button>}
               <Button size="sm" variant="outline" disabled title="Carrier SMS sending is unavailable because no SMS API is configured" aria-label="Send carrier SMS unavailable" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Phone className="h-3.5 w-3.5" />Send SMS</Button>
               {canUseCarrierChat && <Button size="sm" variant="outline" onClick={() => setProfileTab("messages")} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><MessageCircle className="h-3.5 w-3.5" />Message Carrier</Button>}
               <Button size="sm" variant="outline" disabled={!fmcsaUrl} title={fmcsaUrl ? "Open official FMCSA SAFER company snapshot" : "DOT number required for FMCSA lookup"} aria-label={fmcsaUrl ? "Open carrier on FMCSA" : "Carrier on FMCSA unavailable"} onClick={() => fmcsaUrl && window.open(fmcsaUrl, "_blank", "noopener,noreferrer")} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">Carrier on FMCSA</Button>
@@ -287,6 +290,7 @@ export default function ClientDetail() {
            <Tabs value={profileTab} onValueChange={setProfileTab}>
              <TabsList>
                <TabsTrigger value="profile">Profile</TabsTrigger>
+               <TabsTrigger value="communications">Communications</TabsTrigger>
                {canUseCarrierChat && <TabsTrigger value="messages">Messages</TabsTrigger>}
              </TabsList>
              <TabsContent value="profile">
@@ -376,6 +380,13 @@ export default function ClientDetail() {
             </div>
             </div>
              </TabsContent>
+             <TabsContent value="communications" className="space-y-3">
+               {hasPermission("client_email") && <div className="flex flex-wrap items-center justify-between gap-3 border border-[#b7c6c1] bg-[#eaf1ee] px-3 py-3">
+                 <div><p className="text-xs font-bold text-[#304a52]">Send a message to {client.name}</p><p className="mt-0.5 text-[10px] text-[#687b78]">{client.email || "No email address recorded on this profile"}</p></div>
+                 <Button size="sm" onClick={() => setClientEmailOpen(true)} className="h-8 gap-1.5 rounded-sm bg-[#087f8e] px-3 text-[11px] text-white hover:bg-[#076c78]"><Mail className="h-3.5 w-3.5" />Email Client</Button>
+               </div>}
+               <ClientEmailLog clientId={clientId} />
+             </TabsContent>
              {canUseCarrierChat && <TabsContent value="messages" className="min-h-[520px]">
                <CarrierChatThread carrierId={clientId} carrierName={client.name} mcNumber={client.mcNumber} />
              </TabsContent>}
@@ -401,5 +412,6 @@ export default function ClientDetail() {
       </DialogContent>
     </Dialog>
     <InvoiceModal isOpen={invoiceOpen} onClose={() => setInvoiceOpen(false)} initialClient={client} onCreated={() => qc.invalidateQueries({ queryKey: ["/api/invoices"] })} />
+    <ClientEmailComposer open={clientEmailOpen} onOpenChange={setClientEmailOpen} initialClient={{ id: clientId, name: client.name, email: client.email || null }} />
   </div>;
 }

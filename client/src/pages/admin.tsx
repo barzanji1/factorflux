@@ -218,6 +218,7 @@ const PERMISSION_SECTIONS = [
       { key: "tasks",              label: "Tasks"              },
       { key: "bulk_invoices",      label: "Bulk Invoices"      },
       { key: "portal_submissions", label: "Portal Submissions" },
+      { key: "client_email",       label: "Client Email"       },
     ],
   },
   {

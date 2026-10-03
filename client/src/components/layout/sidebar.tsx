@@ -75,6 +75,7 @@ const navSections: NavSection[] = [
       { name: "Invoices",          href: "/invoices",           icon: FileText,        permission: "invoices"           },
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
+      { name: "Email Client",      href: "/client-email",       icon: MailOpen,        permission: "client_email"       },
       { name: "Tickets",           href: "/tickets",            icon: Ticket,          permission: "tickets"            },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
       { name: "Team Chat",         href: "/chat",               icon: MessageCircle,  permission: "chat"               },

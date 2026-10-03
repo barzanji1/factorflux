@@ -33,6 +33,7 @@ import {
 } from "./services/fmcsa/settings";
 import { queryByDot, queryByMc } from "./services/fmcsa";
 import { createFmcsaHistoryHandler } from "./services/fmcsa/historyRoute";
+import { ClientEmailError, clientEmailSchema, sendClientEmail } from "./services/clientEmail";
 import {
   ChatChannelNameConflict,
   createChatChannelSchema,
@@ -120,6 +121,7 @@ import {
   carrierSubmissionDocs,
   writtenWarnings,
   chatChannels,
+  clientEmailLogs,
   chatMembers,
   chatMessages,
   tickets,
@@ -820,6 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/invoices", "invoices"],
     ["/api/tasks", "tasks"],
     ["/api/debtors", "factoring"],
+    ["/api/client-email", "client_email"],
     ["/api/clients", "carriers"],
     ["/api/carriers", "carriers"],
     ["/api/brokers", "brokers"],
@@ -843,6 +846,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", (req: any, res: any, next: any) => {
     const pathname = String(req.originalUrl || "").split("?")[0];
     if (publicApiPath(pathname)) return next();
+    if (req.method === "GET" && /^\/api\/clients\/\d+\/email-log$/.test(pathname)) {
+      return requireAnyPermission(["carriers", "client_email"])(req, res, next);
+    }
     if (pathname === "/api/carrier-chat" || pathname.startsWith("/api/carrier-chat/")) {
       return requireAnyPermission(["chat", "portal_submissions"])(req, res, next);
     }
@@ -2177,6 +2183,51 @@ ${message}
   });
 
   // Clients
+  app.get("/api/client-email/clients", requireModulePermission("client_email"), async (req: any, res) => {
+    try {
+      const rows = await db.select({ id: clients.id, name: clients.name, email: clients.email }).from(clients)
+        .where(isPrivilegedUser(req) ? undefined : eq(clients.assignedProcessor, req.user.id)).orderBy(clients.name);
+      res.json(rows);
+    } catch {
+      res.status(500).json({ message: "Could not load accessible email clients" });
+    }
+  });
+
+  app.post("/api/client-email/send", requireModulePermission("client_email"), async (req: any, res) => {
+    try {
+      const input = clientEmailSchema.parse(req.body);
+      const client = await storage.getClient(input.clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!canAccessAssignedRecord(req, client.assignedProcessor)) {
+        return res.status(403).json({ message: "You can only email clients assigned to you" });
+      }
+      const agentName = `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || req.user.name || "Staff member";
+      const log = await sendClientEmail(input, client, { id: req.user.id, name: agentName });
+      res.status(201).json(log);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid email" });
+      if (error instanceof ClientEmailError) return res.status(error.statusCode).json({ message: error.message });
+      // Never send if the durable pre-send log could not be written.
+      res.status(503).json({ message: "The email could not be logged. Sending was not started; try again later." });
+    }
+  });
+
+  app.get("/api/clients/:id/email-log", requireAuth, async (req: any, res) => {
+    try {
+      const clientId = z.coerce.number().int().positive().parse(req.params.id);
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!canAccessAssignedRecord(req, client.assignedProcessor)) {
+        return res.status(403).json({ message: "You can only view communications for clients assigned to you" });
+      }
+      res.json(await db.select().from(clientEmailLogs).where(eq(clientEmailLogs.clientId, clientId))
+        .orderBy(desc(clientEmailLogs.createdAt), desc(clientEmailLogs.id)));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid client ID" });
+      res.status(500).json({ message: "Could not load client email history" });
+    }
+  });
+
   app.get("/api/clients", requireAuth, async (_req: any, res) => {
     try {
       const q = typeof _req.query.q === "string" ? _req.query.q.trim() : "";
