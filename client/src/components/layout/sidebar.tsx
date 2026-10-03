@@ -9,7 +9,7 @@ import {
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
-  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, Ticket,
+  RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, Ticket, MessageCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -77,6 +77,7 @@ const navSections: NavSection[] = [
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
       { name: "Tickets",           href: "/tickets",            icon: Ticket,          permission: "tickets"            },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
+      { name: "Team Chat",         href: "/chat",               icon: MessageCircle,  permission: "chat"               },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
       { name: "Portal Submissions",href: "/portal-submissions", icon: Globe,           permission: "portal_submissions" },
     ],

@@ -20,6 +20,7 @@
 - [Immutable funding receipts](immutable-funding-receipts.md) — issue receipts inside the funding transaction; serialize versions and durably retry failed S3 rollback cleanup.
 - [Publish-safe trigram indexes](publish-safe-trigram-indexes.md) — publish diff can corrupt deeply nested GIN expression indexes reconstructed from PostgreSQL catalogs.
 - [Chat notification cursors](chat-notification-cursors.md) — sound alerts require paginated message IDs plus a pre-list server watermark; unread deltas and client time lose or replay events.
+- [Team Chat placement](team-chat-placement.md) — sidebar navigation opens full-page chat; no bottom dock or floating launcher, and background sounds must remain.
 - [Carrier chat terminal states](carrier-chat-terminal-states.md) — expected 404/no-portal states must stop polling; repeated error refetches cause visible profile-message flicker.
 - [Approved tactile navigation](approved-tactile-navigation.md) — preserve the strongly beveled stacked sidebar-button direction, while keeping labels crisp and high-contrast.
 - [Windows 95 page consistency](windows95-page-consistency.md) — use the shared Win95 shell and controls for internal pages; Audit Trail is the reference, not a redesign prompt.

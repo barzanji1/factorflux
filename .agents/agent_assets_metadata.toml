@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "1-FItZQBEVOrQL_lpEmZn"
+uri = "file://attached_assets/generated_audio/team-chat-original-voice.mp3"
+type = "audio"
+title = "Original Team Chat message notification"
+description = "Text-to-speech audio: You've got a message."

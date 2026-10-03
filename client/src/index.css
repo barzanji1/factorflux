@@ -2304,3 +2304,185 @@ div:has(> table.ff-data-table) {
 .ff-auth-page a {
   color: #098b9f;
 }
+
+/* Team Chat font sizing stays contained inside its full-page workspace. */
+.ff-team-chat {
+  --chat-base-size: 15px;
+  font-size: var(--chat-base-size);
+  line-height: 1.45;
+}
+
+.ff-team-chat[data-chat-font-size="small"] { --chat-base-size: 12px; }
+.ff-team-chat[data-chat-font-size="medium"] { --chat-base-size: 15px; }
+.ff-team-chat[data-chat-font-size="large"] { --chat-base-size: 18px; }
+
+.ff-team-chat * { font-size: inherit !important; }
+
+.ff-team-chat .ff-team-chat-header {
+  min-height: 46px;
+  height: auto;
+  line-height: 1.2;
+}
+
+.ff-team-chat .ff-team-chat-title {
+  font-size: 0.96em !important;
+  white-space: nowrap;
+}
+
+.ff-team-chat .ff-team-chat-current-channel { font-size: 0.82em !important; }
+
+.ff-team-chat .ff-team-chat-size-select {
+  width: 7em;
+  height: 2.3em;
+  min-height: 32px;
+  padding: 0 5px;
+  border: 2px solid !important;
+  border-color: #fff #777 #777 #fff !important;
+  border-radius: 1px !important;
+  background: #f5f4ef;
+  color: #242424;
+  font-size: 0.85em !important;
+  line-height: 1.2;
+}
+
+.ff-team-chat .ff-team-chat-size-select:focus-visible {
+  outline: 2px solid #8de0e8;
+  outline-offset: 2px;
+}
+
+.ff-team-chat .ff-team-chat-preference-error {
+  font-size: 0.82em !important;
+  line-height: 1.35;
+}
+
+.ff-team-chat .ff-team-chat-channels button.ff-team-chat-channel {
+  height: auto;
+  min-height: 44px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.ff-team-chat .ff-team-chat-channel > span.min-w-0 {
+  font-size: 0.94em !important;
+  line-height: 1.3;
+}
+
+.ff-team-chat .ff-team-chat-avatar { font-size: 0.7em !important; }
+
+.ff-team-chat .ff-team-chat-unread {
+  font-size: 0.7em !important;
+  min-width: 1.5em;
+  min-height: 1.5em;
+}
+
+.ff-team-chat .ff-team-chat-thread header {
+  min-height: 42px;
+  height: auto;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.ff-team-chat .ff-team-chat-thread header h2 {
+  font-size: 0.98em !important;
+  line-height: 1.25;
+}
+
+.ff-team-chat .ff-team-chat-message {
+  font-size: var(--chat-base-size) !important;
+  line-height: 1.45;
+}
+
+.ff-team-chat .ff-team-chat-message-meta {
+  font-size: 0.78em !important;
+  line-height: 1.35;
+}
+
+.ff-team-chat .ff-team-chat-input {
+  height: auto;
+  min-height: 42px;
+  max-height: 8em;
+  padding: 8px 7px;
+  font-size: var(--chat-base-size) !important;
+  line-height: 1.35;
+  overflow-y: auto;
+}
+
+.ff-team-chat .ff-team-chat-icon-button,
+.ff-team-chat button[aria-label="Send message"] {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+}
+
+.ff-team-chat button[aria-label="Send message"] { font-size: var(--chat-base-size) !important; }
+.ff-team-chat [role="alert"] { overflow-wrap: anywhere; }
+
+.ff-team-chat .ff-team-chat-channels .text-\[10px\],
+.ff-team-chat .ff-team-chat-channels .text-xs,
+.ff-team-chat .ff-team-chat-thread .text-xs {
+  font-size: 0.82em !important;
+}
+
+.ff-team-chat .ff-team-chat-channels button span.block.text-sm {
+  font-size: 1em !important;
+}
+
+.ff-team-chat .ff-team-chat-channels button span.block.text-\[10px\] {
+  font-size: 0.75em !important;
+}
+
+@media (max-width: 480px) {
+  .ff-team-chat .ff-team-chat-size-select {
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+
+  .ff-team-chat .ff-team-chat-header {
+    gap: 5px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+
+/* Team Chat header controls remain legible without affecting shared selects. */
+.ff-team-chat .ff-team-chat-header {
+  row-gap: 6px;
+}
+.ff-team-chat .ff-team-chat-size-select,
+.ff-team-chat .ff-team-chat-sound-select {
+  min-height: 30px;
+  max-width: 100%;
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+  border-radius: 0;
+  background: #f7f6f1;
+  color: #1a1a1a;
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, .12);
+  padding: 3px 22px 3px 6px;
+  font: 600 12px/1.2 "DM Sans", "Segoe UI", Tahoma, sans-serif;
+}
+.ff-team-chat .ff-team-chat-size-select:focus-visible,
+.ff-team-chat .ff-team-chat-sound-select:focus-visible {
+  outline: 2px solid #dff5f6;
+  outline-offset: 2px;
+}
+.ff-team-chat .ff-team-chat-current-channel {
+  flex-basis: 110px;
+}
+@media (max-width: 480px) {
+  .ff-team-chat .ff-team-chat-current-channel {
+    display: none;
+  }
+  .ff-team-chat .ff-team-chat-header {
+    gap: 6px;
+  }
+  .ff-team-chat .ff-team-chat-size-select {
+    margin-left: auto;
+  }
+  .ff-team-chat .ff-team-chat-size-select,
+  .ff-team-chat .ff-team-chat-sound-select {
+    min-height: 32px;
+    font-size: 12px;
+  }
+}

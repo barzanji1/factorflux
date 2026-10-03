@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Switch, Route, Redirect, useLocation } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PermissionWatcher } from "@/components/PermissionWatcher";
 import { useTheme } from "@/hooks/useTheme";
@@ -70,11 +70,14 @@ import Expenses from "@/pages/expenses";
 import Tickets from "@/pages/tickets";
 import TicketDetail from "@/pages/ticket-detail";
 import PortalChat from "@/pages/portal/chat";
-import { TeamChatDock } from "@/pages/chat";
+import { TeamChatWorkspace } from "@/pages/chat";
 
 function Router() {
   useTheme(); // Initialize theme
   const [location, navigate] = useLocation();
+  const { user, permissions, permissionsLoaded, isLoading } = useAuth();
+  const chatPageActive = location === "/chat" && !!user && !isLoading &&
+    (user.role === "admin" || (permissionsLoaded && permissions.includes("chat")));
   const [accessDenied, setAccessDenied] = useState(false);
   useEffect(() => {
     const handleAccessDenied = () => setAccessDenied(true);
@@ -337,7 +340,8 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/chat">
-        <Redirect to="/" />
+        {/* The persistent workspace below supplies the page and background alerts. */}
+        <ProtectedRoute>{null}</ProtectedRoute>
       </Route>
       <Route path="/tickets">
         <ProtectedRoute><Tickets /></ProtectedRoute>
@@ -389,10 +393,10 @@ function Router() {
   return (
     <div className="ff-app-shell flex h-screen flex-col overflow-hidden">
       <PermissionWatcher />
-      <div className="min-h-0 flex-1 overflow-hidden [&>div]:!h-full">
+      <div className={chatPageActive ? "hidden" : "min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
         {routes}
       </div>
-      <TeamChatDock />
+      <TeamChatWorkspace />
     </div>
   );
 }

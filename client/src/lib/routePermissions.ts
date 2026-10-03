@@ -34,6 +34,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, string> = {
   "/calendar": "calendar",
   "/expenses": "expenses",
   "/tickets": "tickets",
+  "/chat": "chat",
 };
 
 export function pathToPermission(pathname: string): string | null {

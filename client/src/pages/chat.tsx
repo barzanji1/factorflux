@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data";
-import { AlertCircle, Bell, BellOff, Hash, Maximize2, MessageCircle, Minimize2, Minus, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X } from "lucide-react";
+import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useChatFontSize } from "@/hooks/useChatFontSize";
+import { useChatNotificationPreference } from "@/hooks/useChatNotificationPreference";
+import {
+  activateChatAudio,
+  playChatNotification,
+  preloadChatVoice,
+  stopChatNotificationSounds,
+} from "@/lib/chat-notification-sound";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import Sidebar from "@/components/layout/sidebar";
+import TopNav from "@/components/layout/top-nav";
 
 type Channel = {
   id: string | number;
@@ -123,62 +133,14 @@ async function getMessagesAfter(channelId: string | number, startingCursor: numb
 const initials = (name: string) => name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 const timeLabel = (date: string) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(date));
 
-let chatAudioContext: AudioContext | null = null;
-
-function getChatAudioContext() {
-  if (typeof window === "undefined") return null;
-  const AudioContextConstructor =
-    window.AudioContext ||
-    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextConstructor) return null;
-  chatAudioContext ??= new AudioContextConstructor();
-  return chatAudioContext;
-}
-
-function activateChatAudio() {
-  const context = getChatAudioContext();
-  if (context?.state === "suspended") void context.resume().catch(() => undefined);
-}
-
-function playChatNotificationTone() {
-  const context = getChatAudioContext();
-  if (!context) return;
-
-  const play = () => {
-    const now = context.currentTime;
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(620, now);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.035, now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.15);
-  };
-
-  if (context.state === "suspended") {
-    void context.resume().then(play).catch(() => undefined);
-  } else {
-    play();
-  }
-}
-
 type ChatPanelProps = {
-  docked?: boolean;
+  active: boolean;
 };
 
-function ChatPanel({ docked = false }: ChatPanelProps) {
+function ChatPanel({ active }: ChatPanelProps) {
   const { user } = useAuth();
-  const [open, setOpen] = useState(!docked);
-  const [closed, setClosed] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const soundStorageKey = `team-chat:sound:${user?.id ?? "anonymous"}`;
-  const [soundEnabled, setSoundEnabled] = useState(
-    () => window.localStorage.getItem(soundStorageKey) !== "muted"
-  );
+  const { fontSize, setFontSize, preferenceError } = useChatFontSize(user?.id);
+  const { notificationMode, setNotificationMode, notificationPreferenceError } = useChatNotificationPreference(user?.id);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [users, setUsers] = useState<ChatUser[]>([]);
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
@@ -194,8 +156,8 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const messageRequestRef = useRef(0);
   const selectedIdRef = useRef<string | number | null>(selectedId);
-  const openRef = useRef(open);
-  const soundEnabledRef = useRef(soundEnabled);
+  const activeRef = useRef(active);
+  const notificationModeRef = useRef(notificationMode);
   const currentUserIdRef = useRef(user?.id);
   const notificationCursorRef = useRef<Record<string, number>>({});
   const notificationGlobalCursorRef = useRef(0);
@@ -204,19 +166,21 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
   const channelLoadInFlightRef = useRef(false);
   const pendingToneQueueRef = useRef<Message[]>([]);
   const toneQueueTimerRef = useRef<number | null>(null);
+  const toneQueueRunningRef = useRef(false);
+  const toneQueueGenerationRef = useRef(0);
   const mountedRef = useRef(true);
   const hasInitializedSelectionRef = useRef(false);
   const lastReadMessageRef = useRef<Record<string, string>>({});
   selectedIdRef.current = selectedId;
-  openRef.current = open;
-  soundEnabledRef.current = soundEnabled;
+  activeRef.current = active;
+  notificationModeRef.current = notificationMode;
   currentUserIdRef.current = user?.id;
 
   const selected = channels.find((channel) => String(channel.id) === String(selectedId));
   const visibleChannels = channels;
 
   const isConversationActivelyViewed = useCallback((channelId: string | number) => (
-    openRef.current &&
+    activeRef.current &&
     String(selectedIdRef.current) === String(channelId) &&
     document.visibilityState === "visible" &&
     document.hasFocus()
@@ -228,36 +192,53 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
       toneQueueTimerRef.current = null;
     }
     pendingToneQueueRef.current = [];
+    toneQueueGenerationRef.current += 1;
+    toneQueueRunningRef.current = false;
+    stopChatNotificationSounds();
   }, []);
 
   const runToneQueue = useCallback(() => {
-    if (!mountedRef.current) return;
-    if (toneQueueTimerRef.current !== null) return;
+    if (!mountedRef.current || toneQueueRunningRef.current) return;
+    toneQueueRunningRef.current = true;
+    const generation = toneQueueGenerationRef.current;
 
-    const playNext = () => {
+    const playNext = async () => {
+      if (generation !== toneQueueGenerationRef.current) return;
       if (!mountedRef.current) {
         pendingToneQueueRef.current = [];
         toneQueueTimerRef.current = null;
+        toneQueueRunningRef.current = false;
         return;
       }
       const message = pendingToneQueueRef.current.shift();
       if (!message) {
         toneQueueTimerRef.current = null;
+        toneQueueRunningRef.current = false;
         return;
       }
+      const mode = notificationModeRef.current;
+      let spacing = 0;
       if (
-        soundEnabledRef.current &&
+        mode !== "muted" &&
         !isConversationActivelyViewed(message.channelId)
       ) {
-        playChatNotificationTone();
+        spacing = await playChatNotification(mode, () =>
+          mountedRef.current &&
+          generation === toneQueueGenerationRef.current &&
+          notificationModeRef.current === mode &&
+          String(message.senderId) !== String(currentUserIdRef.current) &&
+          !isConversationActivelyViewed(message.channelId),
+          (audioError) => setError(audioError),
+        );
       }
+      if (generation !== toneQueueGenerationRef.current) return;
       toneQueueTimerRef.current = window.setTimeout(() => {
         toneQueueTimerRef.current = null;
-        playNext();
-      }, 180);
+        void playNext();
+      }, Math.max(50, spacing));
     };
 
-    playNext();
+    void playNext();
   }, [isConversationActivelyViewed]);
 
   const scanForNewMessages = useCallback(async (
@@ -330,9 +311,11 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
         hasInitializedSelectionRef.current = true;
         const requestedId = window.sessionStorage.getItem("chat:open-channel");
         if (requestedId) {
-          window.sessionStorage.removeItem("chat:open-channel");
           const requestedChannel = result.find((channel) => String(channel.id) === requestedId);
-          if (requestedChannel) return requestedChannel.id;
+          if (requestedChannel) {
+            window.sessionStorage.removeItem("chat:open-channel");
+            return requestedChannel.id;
+          }
         }
         return result[0]?.id ?? null;
       });
@@ -346,7 +329,7 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
   }, [scanForNewMessages]);
 
   const loadMessages = useCallback(async (showLoading = false) => {
-    if (selectedId === null || (docked && (!open || closed))) return;
+    if (!activeRef.current || selectedId === null) return;
     const channelId = selectedId;
     const requestId = ++messageRequestRef.current;
     if (showLoading) setLoadingMessages(true);
@@ -372,10 +355,14 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
     } finally {
       if (requestId === messageRequestRef.current) setLoadingMessages(false);
     }
-  }, [selectedId, docked, open, closed, isConversationActivelyViewed]);
+  }, [active, selectedId, isConversationActivelyViewed]);
 
   useEffect(() => { loadChannels(); const timer = window.setInterval(loadChannels, 3000); return () => window.clearInterval(timer); }, [loadChannels]);
   useEffect(() => {
+    if (!active || selectedId === null) {
+      messageRequestRef.current += 1;
+      return;
+    }
     setMessages([]);
     loadMessages(true);
     const timer = window.setInterval(() => loadMessages(false), 3000);
@@ -383,17 +370,24 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
       messageRequestRef.current += 1;
       window.clearInterval(timer);
     };
-  }, [loadMessages]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length, selectedId]);
+  }, [active, selectedId, loadMessages]);
+  useEffect(() => {
+    if (active) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [active, messages.length, selectedId]);
   useEffect(() => {
     getJson<ChatUser[]>("/api/chat/users").then(setUsers).catch(() => undefined);
   }, []);
   useEffect(() => {
-    const enabled = window.localStorage.getItem(soundStorageKey) !== "muted";
-    setSoundEnabled(enabled);
-    soundEnabledRef.current = enabled;
-    if (!enabled) clearToneQueue();
-  }, [soundStorageKey, clearToneQueue]);
+    // Stop the previous mode immediately, including delayed audio loading.
+    clearToneQueue();
+    if (notificationMode !== "muted") activateChatAudio();
+    if (notificationMode !== "voice") return;
+    let cancelled = false;
+    void preloadChatVoice().catch(error => {
+      if (!cancelled) setError(error instanceof Error ? error.message : "Voice notification could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [notificationMode, clearToneQueue]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -402,7 +396,7 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
     };
   }, [clearToneQueue]);
   useEffect(() => {
-    if (!soundEnabled) return;
+    if (notificationMode === "muted") return;
     const activateOnce = () => activateChatAudio();
     window.addEventListener("pointerdown", activateOnce, { once: true, capture: true });
     window.addEventListener("keydown", activateOnce, { once: true, capture: true });
@@ -410,22 +404,29 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
       window.removeEventListener("pointerdown", activateOnce, { capture: true });
       window.removeEventListener("keydown", activateOnce, { capture: true });
     };
-  }, [soundEnabled]);
+  }, [notificationMode]);
   useEffect(() => {
-    if (!docked) return;
-    const openDock = (event: Event) => {
+    const openConversation = (event: Event) => {
       const channelId = (event as CustomEvent<{ channelId?: string | number }>).detail?.channelId;
       if (channelId !== undefined) {
         hasInitializedSelectionRef.current = true;
         window.sessionStorage.removeItem("chat:open-channel");
         setSelectedId(channelId);
       }
-      setOpen(true);
-      setClosed(false);
     };
-    window.addEventListener("team-chat:open", openDock);
-    return () => window.removeEventListener("team-chat:open", openDock);
-  }, [docked]);
+    window.addEventListener("team-chat:open", openConversation);
+    return () => window.removeEventListener("team-chat:open", openConversation);
+  }, []);
+  useEffect(() => {
+    if (!active) return;
+    const requestedId = window.sessionStorage.getItem("chat:open-channel");
+    if (!requestedId) return;
+    const requestedChannel = channels.find((channel) => String(channel.id) === requestedId);
+    if (!requestedChannel) return;
+    hasInitializedSelectionRef.current = true;
+    window.sessionStorage.removeItem("chat:open-channel");
+    setSelectedId(requestedChannel.id);
+  }, [active, channels]);
   useEffect(() => {
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       Notification.requestPermission().catch(() => undefined);
@@ -487,71 +488,46 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
     }
   };
 
-  const unreadTotal = channels.reduce((total, channel) => total + channel.unreadCount, 0);
-  const toggleSound = () => {
-    const nextEnabled = !soundEnabled;
-    setSoundEnabled(nextEnabled);
-    soundEnabledRef.current = nextEnabled;
-    window.localStorage.setItem(soundStorageKey, nextEnabled ? "on" : "muted");
-    if (nextEnabled) activateChatAudio();
-    else clearToneQueue();
-  };
-
-  if (docked && closed) {
-    return (
-      <div className="pointer-events-none fixed bottom-0 right-4 z-50">
-        <button type="button" onClick={() => { activateChatAudio(); setClosed(false); setOpen(false); }} aria-label="Open Team Chat" title="Open Team Chat" className="ff-team-chat-launcher pointer-events-auto relative flex h-12 w-12 items-center justify-center rounded-full text-white transition-transform hover:-translate-y-0.5">
-          <MessageCircle className="h-5 w-5" />
-          {unreadTotal > 0 && <span className="ff-team-chat-unread absolute -right-1 -top-1">{unreadTotal >= 10 ? "9+" : unreadTotal}</span>}
-        </button>
-       </div>
-    );
-  }
-
   return (
     <div
-      id={docked ? "team-chat-dock-panel" : undefined}
-      className={cn(
-        "ff-team-chat flex flex-col bg-[#d4d0c8]",
-        docked
-          ? cn(
-              "ff-team-chat-docked pointer-events-auto fixed bottom-0 right-4 z-50 transition-[width,height] duration-200",
-              open
-                ? expanded
-                  ? "h-[min(720px,calc(100dvh-1rem))] w-[calc(100vw-1rem)] md:min-w-[560px] md:w-[min(50vw,760px)]"
-                  : "h-[min(420px,100dvh)] w-[min(320px,calc(100vw-1rem))]"
-                : "h-12 w-[min(320px,calc(100vw-1rem))]"
-            )
-          : "h-full"
-      )}
+      className="ff-team-chat relative flex h-full min-h-0 min-w-0 flex-col bg-[#d4d0c8]"
+      data-chat-font-size={fontSize}
       aria-label="Team Chat"
     >
-      {docked && (
-        <header className="ff-team-chat-header flex h-12 w-full shrink-0 items-center px-1.5 text-white">
-          <button type="button" onClick={() => setOpen((value) => !value)} className="flex h-full min-w-0 flex-1 items-center gap-2 px-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-white" aria-label={open ? "Collapse Team Chat" : "Expand Team Chat"} aria-expanded={open}>
-            <MessageCircle className="h-4 w-4 shrink-0" />
-            <span className="text-[13px] font-bold">Team Chat</span>
-            {selected && <span className="min-w-0 truncate text-[11px] text-[#dff5f6]">— {selected.directName || selected.name}</span>}
-          </button>
-          <button type="button" onClick={toggleSound} className="ff-team-chat-header-button flex h-7 w-7 shrink-0 items-center justify-center text-white" aria-label={soundEnabled ? "Mute Team Chat sounds" : "Unmute Team Chat sounds"} aria-pressed={!soundEnabled} title={soundEnabled ? "Mute chat sounds" : "Unmute chat sounds"}>
-            {soundEnabled ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
-          </button>
-          {open && <button type="button" onClick={() => setExpanded((value) => !value)} className="ff-team-chat-header-button flex h-7 w-7 shrink-0 items-center justify-center text-white" aria-label={expanded ? "Restore compact Team Chat" : "Enlarge Team Chat"} aria-pressed={expanded} title={expanded ? "Restore compact size" : "Enlarge chat"}>
-            {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-          </button>}
-          <button type="button" onClick={() => setOpen((value) => !value)} className="ff-team-chat-header-button flex h-7 w-7 shrink-0 items-center justify-center text-white" aria-label={open ? "Collapse Team Chat" : "Expand Team Chat"} aria-expanded={open}>
-            <Minus className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => { setOpen(false); setClosed(true); setPickerOpen(false); setEmojiPickerOpen(false); }} className="ff-team-chat-header-button flex h-7 w-7 shrink-0 items-center justify-center text-white hover:bg-[#b54444]" aria-label="Close Team Chat" title="Close Team Chat">
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-      )}
-      {open && <div className={cn(
-        "flex min-h-0 w-full flex-1 overflow-hidden border-2 border-[#808080] bg-[#d4d0c8] shadow-[inset_1px_1px_#fff]",
-        docked && "flex-1"
-      )}>
-        <aside className={cn("ff-team-chat-channels flex shrink-0 flex-col transition-[width] duration-200", expanded ? "w-[190px]" : "w-[120px]")}>
+      <header className="ff-team-chat-header flex w-full shrink-0 flex-wrap items-center gap-2 border-2 border-[#808080] border-b-0 px-2 py-1 text-white shadow-[inset_1px_1px_#fff] sm:px-3">
+        <MessageCircle className="h-4 w-4 shrink-0" />
+        <span className="ff-team-chat-title shrink-0 font-bold">Team Chat</span>
+        {selected && <span className="ff-team-chat-current-channel min-w-0 flex-1 truncate text-[#dff5f6]">— {selected.directName || selected.name}</span>}
+        <label className="sr-only" htmlFor="team-chat-font-size">Chat text size</label>
+        <select
+          id="team-chat-font-size"
+          aria-label="Chat text size"
+          value={fontSize}
+          onChange={(event) => setFontSize(event.target.value as "small" | "medium" | "large")}
+          className="ff-team-chat-size-select shrink-0"
+        >
+          <option value="small">Small</option>
+          <option value="medium">Medium</option>
+          <option value="large">Large</option>
+        </select>
+        <label className="sr-only" htmlFor="team-chat-notification-sound">Chat notification sound</label>
+        <select
+          id="team-chat-notification-sound"
+          aria-label="Chat notification sound"
+          value={notificationMode}
+          onChange={(event) => setNotificationMode(event.target.value as "chime" | "voice" | "muted")}
+          title={'Voice plays the original AI-generated recording saying "You have got a message" (the actual clip says "You’ve got a message").'}
+          className="ff-team-chat-sound-select shrink-0"
+        >
+          <option value="chime">Chime</option>
+          <option value="voice">Voice</option>
+          <option value="muted">Mute</option>
+        </select>
+      </header>
+      {preferenceError && <div role="alert" className="ff-team-chat-preference-error flex shrink-0 items-start gap-2 border-x-2 border-[#808080] bg-[#fff3d6] px-2 py-1.5 text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{preferenceError}</span></div>}
+      {notificationPreferenceError && <div role="alert" className="ff-team-chat-preference-error flex shrink-0 items-start gap-2 border-x-2 border-[#808080] bg-[#fff3d6] px-2 py-1.5 text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notificationPreferenceError}</span></div>}
+      <div className="flex min-h-0 w-full flex-1 overflow-hidden border-2 border-[#808080] bg-[#d4d0c8] shadow-[inset_1px_1px_#fff]">
+        <aside className="ff-team-chat-channels flex w-[40%] min-w-[128px] shrink-0 flex-col md:w-[260px]">
           <div className="flex h-10 items-center justify-center border-b-2 border-[#808080] bg-[#dff5f6]">
             <button type="button" onClick={() => setPickerOpen(true)} title="New direct message" aria-label="New direct message" className="flex h-7 w-7 items-center justify-center rounded-sm bg-[#098b9f] text-white hover:bg-[#087c8d]"><Plus className="h-4 w-4" /></button>
           </div>
@@ -562,9 +538,9 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
               : visibleChannels.map((channel) => {
                 const isDirect = channel.type === "direct" || Boolean(channel.directName);
                 const label = isDirect ? channel.directName || channel.name : channel.name;
-                   return <button key={channel.id} onClick={() => setSelectedId(channel.id)} title={label} aria-label={label} className={cn("ff-team-chat-channel relative flex h-11 w-full items-center gap-2 text-left", expanded ? "justify-start px-2" : "justify-center", String(selectedId) === String(channel.id) && "ff-team-chat-channel-active")}>
+                    return <button key={channel.id} onClick={() => setSelectedId(channel.id)} title={label} aria-label={label} className={cn("ff-team-chat-channel relative flex h-11 w-full items-center justify-start gap-2 px-2 text-left", String(selectedId) === String(channel.id) && "ff-team-chat-channel-active")}>
                    <span className="ff-team-chat-avatar flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold">{isDirect ? initials(label) : <Hash className="h-4 w-4" />}</span>
-                    {expanded && <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#1a1a1a]">{label}</span>}
+                     <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#1a1a1a]">{label}</span>
                    {channel.unreadCount > 0 && <span className="ff-team-chat-unread absolute right-1 top-1" aria-label={`${channel.unreadCount} unread`}>{channel.unreadCount > 9 ? "9+" : channel.unreadCount}</span>}
                 </button>;
               })}
@@ -581,29 +557,51 @@ function ChatPanel({ docked = false }: ChatPanelProps) {
             {loadingMessages && !messages.length ? <div className="space-y-4">{[1, 2, 3].map((item) => <div key={item} className={cn("h-14 animate-pulse bg-[#d9d8d2]", item % 2 === 0 ? "ml-auto max-w-[60%]" : "max-w-[55%]")} />)}</div>
                : messages.length ? messages.map((message) => <div key={message.id} className={cn("mb-2 flex gap-1.5", String(message.senderId) === String(user?.id) ? "justify-end" : "justify-start")}>
                  <div className={cn("ff-team-chat-avatar flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[8px] font-bold", String(message.senderId) === String(user?.id) && "order-2")}>{initials(message.senderName)}</div>
-                  <div className={cn("max-w-[84%]", String(message.senderId) === String(user?.id) && "text-right")}><div className="mb-0.5 flex items-baseline gap-1 text-[8px] text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span></div><div className={cn("ff-team-chat-message inline-block whitespace-pre-wrap break-words px-2 py-1 text-[11px] leading-snug", String(message.senderId) === String(user?.id) ? "ff-team-chat-message-user" : "ff-team-chat-message-other")}>{renderMessageBody(message.body)}</div></div>
+                   <div className={cn("max-w-[84%]", String(message.senderId) === String(user?.id) && "text-right")}><div className="ff-team-chat-message-meta mb-0.5 flex items-baseline gap-1 text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span></div><div className={cn("ff-team-chat-message inline-block whitespace-pre-wrap break-words px-2 py-1 leading-snug", String(message.senderId) === String(user?.id) ? "ff-team-chat-message-user" : "ff-team-chat-message-other")}>{renderMessageBody(message.body)}</div></div>
               </div>) : <div className="flex h-full flex-col items-center justify-center text-center text-[#707371]"><MessageCircle className="mb-3 h-10 w-10 text-[#8bbfc1]" /><p className="font-semibold">No messages here yet</p><p className="mt-1 text-xs">Send the first note to this conversation.</p></div>}
             <div ref={bottomRef} />
           </div>
            <div className="border-t border-[#808080] bg-[#d4d0c8] p-1.5"><div className="relative flex items-center gap-1"><textarea ref={textareaRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitMessage(); } }} placeholder={`Message ${selected.directName || selected.name}...`} rows={1} className="ff-team-chat-input h-8 min-h-8 flex-1 resize-none overflow-hidden px-1.5 py-1 text-[11px] outline-none" /><div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="outline" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="ff-team-chat-icon-button h-8 w-8 p-0"><Smile className="h-4 w-4" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-xl border-2 border-[#808080] bg-white shadow-lg"><Picker data={emojiPickerData} onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="h-8 w-8 p-0"><Send className="h-3.5 w-3.5" /></Button></div></div>
         </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
-        </section>
-       </div>}
+         </section>
+        </div>
        {error && channels.length > 0 && <div className="absolute bottom-1 left-1 right-1 z-30 flex items-center gap-2 bg-[#fff3d6] px-1.5 py-1 text-[10px] text-[#8b4141]"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}<button onClick={() => setError("")} aria-label="Dismiss" className="ml-auto"><X className="h-3 w-3" /></button></div>}
       {pickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/30 p-4" onMouseDown={(event) => event.currentTarget === event.target && setPickerOpen(false)}><div className="w-full max-w-md border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">New conversation</p><h2 className="font-bold">Message a teammate</h2></div><button onClick={() => setPickerOpen(false)}><X className="h-4 w-4" /></button></div><div className="max-h-72 overflow-y-auto border-2 border-[#808080] bg-[#efeee9]">{users.length ? users.map((user) => <button key={user.id} onClick={() => startDirect(user.id)} className="flex w-full items-center gap-3 border-b border-[#c4c3bd] px-3 py-3 text-left last:border-0 hover:bg-[#dff5f6]"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#efc886] text-[10px] font-bold text-[#674c20]">{initials(user.name)}</span><span><span className="block text-sm font-semibold">{user.name}</span><span className="block text-[10px] uppercase text-[#777]">{user.role || "Team member"}</span></span></button>) : <p className="p-5 text-center text-xs text-[#666]">No teammates available.</p>}</div></div></div>}
     </div>
   );
 }
 
-export function TeamChatDock() {
-  const { user, permissions, isLoading } = useAuth();
-  const [location] = useLocation();
-  const canUseChat = !!user && (user.role === "admin" || (!isLoading && permissions.includes("chat")));
-  const isPortalRoute = location === "/portal" || location.startsWith("/portal/");
-  const isInternalRoute = location !== "/login" && !isPortalRoute;
-  return canUseChat && isInternalRoute ? <ChatPanel docked /> : null;
-}
+export function TeamChatWorkspace() {
+  const { user, permissions, permissionsLoaded, isLoading } = useAuth();
+  const [location, setLocation] = useLocation();
+  const canUseChat = !!user && !isLoading && (
+    user.role === "admin" ||
+    (permissionsLoaded && permissions.includes("chat"))
+  );
+  const isInternalRoute = location !== "/login" && location !== "/portal" && !location.startsWith("/portal/");
+  const active = location === "/chat";
 
-export default function Chat() {
-  return <ChatPanel />;
+  useEffect(() => {
+    if (!canUseChat || !isInternalRoute) return;
+    const openChat = () => setLocation("/chat");
+    window.addEventListener("team-chat:open", openChat);
+    return () => window.removeEventListener("team-chat:open", openChat);
+  }, [setLocation, canUseChat, isInternalRoute]);
+
+  if (!canUseChat || !isInternalRoute) return null;
+
+  return (
+    <div className={cn(
+      "h-full min-h-0",
+      active ? "flex min-w-0 flex-1" : "hidden"
+    )}>
+      {active && <Sidebar />}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {active && <TopNav title="Team Chat" subtitle="Conversations across your team" group="Workspace" />}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+          <ChatPanel active={active} />
+        </main>
+      </div>
+    </div>
+  );
 }
