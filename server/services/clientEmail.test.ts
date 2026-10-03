@@ -64,6 +64,7 @@ test("Resend payload fixes domain, monitored reply-to, recipient and retry idemp
   assert.equal(captured.connector, "resend");
   assert.equal(captured.path, "/emails");
   assert.equal(captured.body.from, CLIENT_EMAIL_FROM);
+  assert.equal(captured.body.from, "TruckingPros Financial <clients@truckingprosfinancial.com>");
   assert.equal(captured.body.reply_to, CLIENT_EMAIL_REPLY_TO);
   assert.deepEqual(captured.body.to, [client.email]);
   assert.equal(captured.headers["Idempotency-Key"], `client-email/${draft.requestId}`);

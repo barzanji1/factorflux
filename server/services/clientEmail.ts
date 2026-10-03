@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { clientEmailLogs, type ClientEmailLog } from "@shared/schema";
 
-export const CLIENT_EMAIL_FROM = "TruckingPros Financial <clients@tpfactoring.com>";
+export const CLIENT_EMAIL_FROM = "TruckingPros Financial <clients@truckingprosfinancial.com>";
 export const CLIENT_EMAIL_REPLY_TO = "dosh@truckingprosfinancial.com";
 export const clientEmailSchema = z.object({
   clientId: z.number().int().positive(),

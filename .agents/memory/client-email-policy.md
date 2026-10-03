@@ -9,6 +9,12 @@ Client email is send-only. Use a professional sender on the verified company dom
 
 **How to apply:** Keep send permission separate from client-profile read access, respect existing client assignments, and do not grant all agents send access automatically. Preserve existing system email behavior when extending the Resend client-email feature.
 
+The correct company email domain is truckingprosfinancial.com, not tpfactoring.com.
+
+**Why:** The user explicitly corrected the sender domain.
+
+**How to apply:** Use truckingprosfinancial.com for company email senders; keep historical email logs unchanged.
+
 The connected Resend key is send-only. Domain-list requests return `restricted_api_key` with HTTP 401; that scope error alone is not evidence of a disconnected or invalid sending credential.
 
 **Why:** Both the connected-service read and the application's connector SDK read returned this restriction after connection setup.

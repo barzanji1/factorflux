@@ -15,7 +15,7 @@ export interface EmailClient {
   email: string | null;
 }
 
-const FROM_LINE = "TruckingPros Financial <clients@tpfactoring.com>";
+const FROM_LINE = "TruckingPros Financial <clients@truckingprosfinancial.com>";
 const REPLY_TO = "dosh@truckingprosfinancial.com";
 const isValidEmail = (value?: string | null) => !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const getRequestId = () => crypto.randomUUID();
