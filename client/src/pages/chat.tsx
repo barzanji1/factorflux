@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data";
 import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X } from "lucide-react";
@@ -106,7 +106,16 @@ async function sendJson<T>(url: string, method: string, body?: unknown): Promise
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!response.ok) throw new Error(`${response.status}: Chat action failed`);
+  if (!response.ok) {
+    let message = "";
+    try {
+      const payload = await response.json() as { message?: unknown };
+      if (typeof payload.message === "string") message = payload.message;
+    } catch {
+      // Keep the status-based fallback for non-JSON error responses.
+    }
+    throw new Error(message || `${response.status}: Chat action failed`);
+  }
   return response.json();
 }
 
@@ -148,12 +157,17 @@ function ChatPanel({ active }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [channelDialogOpen, setChannelDialogOpen] = useState(false);
+  const [channelNameDraft, setChannelNameDraft] = useState("");
+  const [channelNameError, setChannelNameError] = useState("");
+  const [creatingChannel, setCreatingChannel] = useState(false);
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const channelNameInputRef = useRef<HTMLInputElement>(null);
   const messageRequestRef = useRef(0);
   const selectedIdRef = useRef<string | number | null>(selectedId);
   const activeRef = useRef(active);
@@ -171,12 +185,17 @@ function ChatPanel({ active }: ChatPanelProps) {
   const mountedRef = useRef(true);
   const hasInitializedSelectionRef = useRef(false);
   const lastReadMessageRef = useRef<Record<string, string>>({});
+  const channelLoadQueuedRef = useRef(false);
+  const loadChannelsRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const optimisticChannelsRef = useRef<Record<string, Channel>>({});
   selectedIdRef.current = selectedId;
   activeRef.current = active;
   notificationModeRef.current = notificationMode;
   currentUserIdRef.current = user?.id;
 
   const selected = channels.find((channel) => String(channel.id) === String(selectedId));
+  const selectedIsDirect = selected?.type === "direct" || Boolean(selected?.directName);
+  const selectedLabel = selected ? (selectedIsDirect ? selected.directName || selected.name : `#${selected.name}`) : "";
   const visibleChannels = channels;
 
   const isConversationActivelyViewed = useCallback((channelId: string | number) => (
@@ -298,12 +317,23 @@ function ChatPanel({ active }: ChatPanelProps) {
   }, [runToneQueue]);
 
   const loadChannels = useCallback(async () => {
-    if (channelLoadInFlightRef.current) return;
+    if (channelLoadInFlightRef.current) {
+      channelLoadQueuedRef.current = true;
+      return;
+    }
     channelLoadInFlightRef.current = true;
     try {
       const { channels: result, cursor: snapshotCursor } = await getChannelSnapshot();
       if (!mountedRef.current) return;
-      setChannels((current) => JSON.stringify(current) === JSON.stringify(result) ? current : result);
+      const receivedIds = new Set(result.map((channel) => String(channel.id)));
+      receivedIds.forEach((id) => { delete optimisticChannelsRef.current[id]; });
+      const mergedChannels = [
+        ...result,
+        ...Object.entries(optimisticChannelsRef.current)
+          .filter(([id]) => !receivedIds.has(id))
+          .map(([, channel]) => channel),
+      ];
+      setChannels((current) => JSON.stringify(current) === JSON.stringify(mergedChannels) ? current : mergedChannels);
       void scanForNewMessages(result, snapshotCursor);
       setSelectedId((current) => {
         if (hasInitializedSelectionRef.current) return current;
@@ -325,8 +355,13 @@ function ChatPanel({ active }: ChatPanelProps) {
     } finally {
       if (mountedRef.current) setLoadingChannels(false);
       channelLoadInFlightRef.current = false;
+      if (channelLoadQueuedRef.current) {
+        channelLoadQueuedRef.current = false;
+        window.setTimeout(() => { void loadChannelsRef.current(); }, 0);
+      }
     }
   }, [scanForNewMessages]);
+  loadChannelsRef.current = loadChannels;
 
   const loadMessages = useCallback(async (showLoading = false) => {
     if (!activeRef.current || selectedId === null) return;
@@ -444,6 +479,19 @@ function ChatPanel({ active }: ChatPanelProps) {
       document.removeEventListener("touchstart", closeOnOutsideClick);
     };
   }, [emojiPickerOpen]);
+  useEffect(() => {
+    if (!channelDialogOpen) return;
+    window.requestAnimationFrame(() => channelNameInputRef.current?.focus());
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !creatingChannel) {
+        setChannelDialogOpen(false);
+        setChannelNameDraft("");
+        setChannelNameError("");
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [channelDialogOpen, creatingChannel]);
 
   const insertEmoji = (emoji: EmojiSelection) => {
     const textarea = textareaRef.current;
@@ -488,6 +536,58 @@ function ChatPanel({ active }: ChatPanelProps) {
     }
   };
 
+  const normalizedChannelName = channelNameDraft
+    .trim()
+    .replace(/^#+/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+
+  const closeChannelDialog = () => {
+    if (creatingChannel) return;
+    setChannelDialogOpen(false);
+    setChannelNameDraft("");
+    setChannelNameError("");
+  };
+
+  const submitNewChannel = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = normalizedChannelName;
+    if (!name) {
+      setChannelNameError("Enter a channel name.");
+      return;
+    }
+    if (name.length > 50) {
+      setChannelNameError("Channel names must be 50 characters or fewer.");
+      return;
+    }
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) {
+      setChannelNameError("Use letters, numbers, hyphens, or underscores.");
+      return;
+    }
+
+    setChannelNameError("");
+    setCreatingChannel(true);
+    try {
+      const channel = await sendJson<Channel>("/api/chat/channels", "POST", { name });
+      hasInitializedSelectionRef.current = true;
+      optimisticChannelsRef.current[String(channel.id)] = channel;
+      setChannels((current) => current.some((item) => String(item.id) === String(channel.id))
+        ? current
+        : [...current, channel]);
+      setSelectedId(channel.id);
+      setChannelDialogOpen(false);
+      setChannelNameDraft("");
+      setChannelNameError("");
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/channels"] });
+      void loadChannels();
+    } catch (err) {
+      setChannelNameError(err instanceof Error ? err.message : "Channel could not be created.");
+    } finally {
+      setCreatingChannel(false);
+    }
+  };
+
   return (
     <div
       className="ff-team-chat relative flex h-full min-h-0 min-w-0 flex-col bg-[#d4d0c8]"
@@ -497,7 +597,7 @@ function ChatPanel({ active }: ChatPanelProps) {
       <header className="ff-team-chat-header flex w-full shrink-0 flex-wrap items-center gap-2 border-2 border-[#808080] border-b-0 px-2 py-1 text-white shadow-[inset_1px_1px_#fff] sm:px-3">
         <MessageCircle className="h-4 w-4 shrink-0" />
         <span className="ff-team-chat-title shrink-0 font-bold">Team Chat</span>
-        {selected && <span className="ff-team-chat-current-channel min-w-0 flex-1 truncate text-[#dff5f6]">— {selected.directName || selected.name}</span>}
+        {selected && <span className="ff-team-chat-current-channel min-w-0 flex-1 truncate text-[#dff5f6]">— {selectedLabel}</span>}
         <label className="sr-only" htmlFor="team-chat-font-size">Chat text size</label>
         <select
           id="team-chat-font-size"
@@ -528,8 +628,11 @@ function ChatPanel({ active }: ChatPanelProps) {
       {notificationPreferenceError && <div role="alert" className="ff-team-chat-preference-error flex shrink-0 items-start gap-2 border-x-2 border-[#808080] bg-[#fff3d6] px-2 py-1.5 text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notificationPreferenceError}</span></div>}
       <div className="flex min-h-0 w-full flex-1 overflow-hidden border-2 border-[#808080] bg-[#d4d0c8] shadow-[inset_1px_1px_#fff]">
         <aside className="ff-team-chat-channels flex w-[40%] min-w-[128px] shrink-0 flex-col md:w-[260px]">
-          <div className="flex h-10 items-center justify-center border-b-2 border-[#808080] bg-[#dff5f6]">
-            <button type="button" onClick={() => setPickerOpen(true)} title="New direct message" aria-label="New direct message" className="flex h-7 w-7 items-center justify-center rounded-sm bg-[#098b9f] text-white hover:bg-[#087c8d]"><Plus className="h-4 w-4" /></button>
+          <div className="flex h-10 items-center justify-between gap-1 border-b-2 border-[#808080] bg-[#dff5f6] px-1">
+            <button type="button" onClick={() => setPickerOpen(true)} title="New direct message" aria-label="New direct message" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-[#098b9f] text-white hover:bg-[#087c8d]"><Plus className="h-4 w-4" /></button>
+            <button type="button" onClick={() => { setChannelNameDraft(""); setChannelNameError(""); setChannelDialogOpen(true); }} className="flex h-7 min-w-0 items-center justify-center gap-1 rounded-sm border border-[#8bbfc1] bg-[#f7ffff] px-2 text-[10px] font-bold text-[#17626a] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]">
+              <Plus className="h-3 w-3 shrink-0" /><span className="truncate">New Channel</span>
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
             {loadingChannels ? <div className="space-y-2 p-1">{[1, 2, 3, 4].map((item) => <div key={item} className="h-12 animate-pulse bg-[#d4d0c8]" />)}</div>
@@ -537,7 +640,7 @@ function ChatPanel({ active }: ChatPanelProps) {
               : !visibleChannels.length ? <div className="p-3 text-center text-[10px] text-[#555]"><MessageCircle className="mx-auto mb-2 h-6 w-6 text-[#098b9f]" />No conversations</div>
               : visibleChannels.map((channel) => {
                 const isDirect = channel.type === "direct" || Boolean(channel.directName);
-                const label = isDirect ? channel.directName || channel.name : channel.name;
+                 const label = isDirect ? channel.directName || channel.name : `#${channel.name}`;
                     return <button key={channel.id} onClick={() => setSelectedId(channel.id)} title={label} aria-label={label} className={cn("ff-team-chat-channel relative flex h-11 w-full items-center justify-start gap-2 px-2 text-left", String(selectedId) === String(channel.id) && "ff-team-chat-channel-active")}>
                    <span className="ff-team-chat-avatar flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold">{isDirect ? initials(label) : <Hash className="h-4 w-4" />}</span>
                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#1a1a1a]">{label}</span>
@@ -550,7 +653,7 @@ function ChatPanel({ active }: ChatPanelProps) {
          <section className="ff-team-chat-thread flex min-w-0 flex-1 flex-col bg-white">
            {selected ? <><header className="flex h-9 shrink-0 items-center gap-2 border-b border-[#808080] bg-[#d4d0c8] px-2">
              <span className="flex h-6 w-6 items-center justify-center rounded-sm bg-[#8bbfc1] text-[#154c51]">{selected.type === "direct" || selected.directName ? <UserRound className="h-3 w-3" /> : <Hash className="h-3 w-3" />}</span>
-             <div className="min-w-0"><h2 className="truncate text-xs font-bold text-[#1a1a1a]">{selected.directName || selected.name}</h2></div>
+              <div className="min-w-0"><h2 className="truncate text-xs font-bold text-[#1a1a1a]">{selectedLabel}</h2></div>
              <MoreHorizontal className="ml-auto h-4 w-4 text-[#777]" />
           </header>
            <div className="flex-1 overflow-y-auto px-2 py-2">
@@ -566,7 +669,42 @@ function ChatPanel({ active }: ChatPanelProps) {
          </section>
         </div>
        {error && channels.length > 0 && <div className="absolute bottom-1 left-1 right-1 z-30 flex items-center gap-2 bg-[#fff3d6] px-1.5 py-1 text-[10px] text-[#8b4141]"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}<button onClick={() => setError("")} aria-label="Dismiss" className="ml-auto"><X className="h-3 w-3" /></button></div>}
-      {pickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/30 p-4" onMouseDown={(event) => event.currentTarget === event.target && setPickerOpen(false)}><div className="w-full max-w-md border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">New conversation</p><h2 className="font-bold">Message a teammate</h2></div><button onClick={() => setPickerOpen(false)}><X className="h-4 w-4" /></button></div><div className="max-h-72 overflow-y-auto border-2 border-[#808080] bg-[#efeee9]">{users.length ? users.map((user) => <button key={user.id} onClick={() => startDirect(user.id)} className="flex w-full items-center gap-3 border-b border-[#c4c3bd] px-3 py-3 text-left last:border-0 hover:bg-[#dff5f6]"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#efc886] text-[10px] font-bold text-[#674c20]">{initials(user.name)}</span><span><span className="block text-sm font-semibold">{user.name}</span><span className="block text-[10px] uppercase text-[#777]">{user.role || "Team member"}</span></span></button>) : <p className="p-5 text-center text-xs text-[#666]">No teammates available.</p>}</div></div></div>}
+        {channelDialogOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/35 p-4" onMouseDown={(event) => event.currentTarget === event.target && closeChannelDialog()}>
+          <section role="dialog" aria-modal="true" aria-labelledby="new-channel-title" aria-describedby="new-channel-help" className="w-full max-w-sm border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">Team space</p><h2 id="new-channel-title" className="text-base font-bold text-[#1a1a1a]">Create a channel</h2></div>
+              <button type="button" onClick={closeChannelDialog} disabled={creatingChannel} aria-label="Close create channel dialog" className="rounded-sm p-1 text-[#555] hover:bg-[#c0c0c0] disabled:opacity-50"><X className="h-4 w-4" /></button>
+            </div>
+            <form onSubmit={submitNewChannel}>
+              <label htmlFor="new-channel-name" className="mb-1 block text-xs font-semibold text-[#333]">Channel name</label>
+              <div className="flex items-center border-2 border-[#808080] bg-white px-2 focus-within:border-[#098b9f]">
+                <span aria-hidden="true" className="mr-1 text-sm font-bold text-[#098b9f]">#</span>
+                <input
+                  ref={channelNameInputRef}
+                  id="new-channel-name"
+                  name="name"
+                  type="text"
+                  autoComplete="off"
+                  maxLength={50}
+                  value={channelNameDraft}
+                  onChange={(event) => { setChannelNameDraft(event.target.value); setChannelNameError(""); }}
+                  aria-invalid={Boolean(channelNameError)}
+                  aria-describedby={channelNameError ? "new-channel-error" : "new-channel-help"}
+                  placeholder="project-updates"
+                  className="min-w-0 flex-1 bg-transparent py-2 text-sm text-[#1a1a1a] outline-none placeholder:text-[#999]"
+                />
+              </div>
+              <p id="new-channel-help" className="mt-2 text-[11px] leading-relaxed text-[#555]">Public channels are visible to all staff. Spaces become hyphens; names support letters, numbers, hyphens, and underscores (50 characters max).</p>
+              {channelNameError && <p id="new-channel-error" role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-[#8b3030]"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{channelNameError}</p>}
+              {channelNameDraft.trim() && <p className="mt-2 text-[10px] text-[#777]">Channel address: <span className="font-mono text-[#17626a]">#{normalizedChannelName}</span></p>}
+              <div className="mt-5 flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={closeChannelDialog} disabled={creatingChannel} className="h-8 rounded-sm px-3 text-xs">Cancel</Button>
+                <Button type="submit" disabled={creatingChannel} className="h-8 min-w-24 rounded-sm px-3 text-xs">{creatingChannel ? "Creating…" : "Create channel"}</Button>
+              </div>
+            </form>
+          </section>
+        </div>}
+        {pickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/30 p-4" onMouseDown={(event) => event.currentTarget === event.target && setPickerOpen(false)}><div className="w-full max-w-md border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">New conversation</p><h2 className="font-bold">Message a teammate</h2></div><button onClick={() => setPickerOpen(false)}><X className="h-4 w-4" /></button></div><div className="max-h-72 overflow-y-auto border-2 border-[#808080] bg-[#efeee9]">{users.length ? users.map((user) => <button key={user.id} onClick={() => startDirect(user.id)} className="flex w-full items-center gap-3 border-b border-[#c4c3bd] px-3 py-3 text-left last:border-0 hover:bg-[#dff5f6]"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#efc886] text-[10px] font-bold text-[#674c20]">{initials(user.name)}</span><span><span className="block text-sm font-semibold">{user.name}</span><span className="block text-[10px] uppercase text-[#777]">{user.role || "Team member"}</span></span></button>) : <p className="p-5 text-center text-xs text-[#666]">No teammates available.</p>}</div></div></div>}
     </div>
   );
 }

@@ -33,6 +33,12 @@ import {
 } from "./services/fmcsa/settings";
 import { queryByDot, queryByMc } from "./services/fmcsa";
 import { createFmcsaHistoryHandler } from "./services/fmcsa/historyRoute";
+import {
+  ChatChannelNameConflict,
+  createChatChannelSchema,
+  createPublicChatChannel,
+  ensureDefaultChatChannels,
+} from "./services/chatChannels";
 
 import {
   insertClientSchema,
@@ -5065,7 +5071,13 @@ ${message}
     body: z.string().trim().min(1, "Message body is required").max(10000),
   }).strict();
 
+  let defaultChatChannelsReady: Promise<void> | null = null;
   const ensurePublicChatMembership = async (userId: string) => {
+    defaultChatChannelsReady ??= ensureDefaultChatChannels().catch(error => {
+      defaultChatChannelsReady = null;
+      throw error;
+    });
+    await defaultChatChannelsReady;
     const publicChannels = await db.select({ id: chatChannels.id })
       .from(chatChannels).where(eq(chatChannels.type, "channel"));
     if (publicChannels.length) {
@@ -5140,6 +5152,22 @@ ${message}
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid request" });
       console.error("Error creating direct chat channel:", error);
       res.status(500).json({ message: "Failed to create direct channel" });
+    }
+  });
+
+  app.post("/api/chat/channels", chatPermission, async (req: any, res) => {
+    try {
+      const { name } = createChatChannelSchema.parse(req.body);
+      await ensurePublicChatMembership(req.user.id);
+      const channel = await createPublicChatChannel(name, req.user.id);
+      res.status(201).json(channel);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid channel name" });
+      if (error instanceof ChatChannelNameConflict || error?.code === "23505") {
+        return res.status(409).json({ message: "A channel with that name already exists." });
+      }
+      console.error("Error creating public chat channel:", error);
+      res.status(500).json({ message: "Failed to create channel" });
     }
   });
 

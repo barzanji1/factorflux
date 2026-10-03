@@ -46,7 +46,7 @@ END $$;
 --> statement-breakpoint
 INSERT INTO "chat_channels" ("name", "type")
 SELECT seed.name, 'channel'
-FROM (VALUES ('general'), ('funding'), ('collections'), ('operations')) AS seed(name)
+FROM (VALUES ('general'), ('operations')) AS seed(name)
 WHERE NOT EXISTS (
   SELECT 1 FROM "chat_channels" c
   WHERE c.type = 'channel' AND c.name = seed.name

@@ -29,17 +29,17 @@ export function activateChatAudio() {
 }
 
 export function stopChatNotificationSounds() {
-  for (const voice of playingVoices) {
+  playingVoices.forEach(voice => {
     try { voice.oscillator.stop(); } catch { /* Already ended. */ }
     voice.oscillator.disconnect();
     voice.gain.disconnect();
-  }
+  });
   playingVoices.clear();
-  for (const clip of playingClips) {
+  playingClips.forEach(clip => {
     try { clip.source.stop(); } catch { /* Already ended. */ }
     clip.source.disconnect();
     clip.gain.disconnect();
-  }
+  });
   playingClips.clear();
 }
 
