@@ -19,6 +19,7 @@ import {
 import { eq } from "drizzle-orm";
 import { getExtractionProvider } from "./ocr/registry";
 import { classifyDocumentAI } from "./aiClassifier";
+import { extractInvoiceNumber, extractLoadNumber, extractReferenceNumber, extractBolNumber, type FieldResult } from "./documentFieldDetectors";
 
 // Re-export PageResult so existing callers (e.g. document-review-dialog) keep working
 export type { PageResult } from "./ocr/types";
@@ -126,8 +127,6 @@ export function classifyDocument(text: string): ClassificationResult {
 }
 
 // ─── Field extraction helpers ─────────────────────────────────────────────────
-type FieldResult = { value: string; normalized: string; confidence: number } | null;
-
 function sourceSnippet(text: string, value: string): string {
   const idx = text.indexOf(value);
   if (idx < 0) return "";
@@ -145,27 +144,6 @@ function extractAmount(text: string): FieldResult {
   if (!amounts.length) return null;
   const max = Math.max(...amounts);
   return { value: `$${max.toFixed(2)}`, normalized: String(max), confidence: 0.78 };
-}
-
-function extractLoadNumber(text: string): FieldResult {
-  const m = text.match(
-    /(?:load\s*(?:no|number|num|#)?|order\s*(?:no|#)?)[:\s#]*([A-Z0-9]{4,15})/i,
-  );
-  return m ? { value: m[1], normalized: m[1].toUpperCase(), confidence: 0.82 } : null;
-}
-
-function extractInvoiceNumber(text: string): FieldResult {
-  const m = text.match(
-    /(?:invoice|inv)[:\s#]*([A-Z0-9-]{4,20})/i,
-  );
-  return m ? { value: m[1], normalized: m[1].toUpperCase(), confidence: 0.8 } : null;
-}
-
-function extractReferenceNumber(text: string): FieldResult {
-  const m = text.match(
-    /(?:reference|ref|confirmation|conf|po\s*(?:number|#)?)[:\s#]*([A-Z0-9-]{4,20})/i,
-  );
-  return m ? { value: m[1], normalized: m[1].toUpperCase(), confidence: 0.72 } : null;
 }
 
 function extractBrokerName(text: string): FieldResult {
@@ -229,11 +207,6 @@ function extractDeliveryDate(text: string): FieldResult {
 function extractDate(text: string): FieldResult {
   const m = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
   return m ? { value: m[1], normalized: parseDate(m[1]), confidence: 0.55 } : null;
-}
-
-function extractBolNumber(text: string): FieldResult {
-  const m = text.match(/(?:b\/l|bol|bill\s+of\s+lading)[:\s#]*([A-Z0-9-]{4,20})/i);
-  return m ? { value: m[1], normalized: m[1].toUpperCase(), confidence: 0.85 } : null;
 }
 
 function extractLumperAmount(text: string): FieldResult {

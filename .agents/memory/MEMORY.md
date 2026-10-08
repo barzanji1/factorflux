@@ -1,5 +1,6 @@
 - [Safe schema pushes](safe-schema-pushes.md) — drizzle push may propose unrelated destructive ID conversions; never approve truncation and apply additive changes explicitly.
 - [TypeScript target semantics](typescript-target-semantics.md) — target changes can affect Vite class-field output even with noEmit; audit defaults rather than assuming a type-only fix.
+- [OCR verification integrity](ocr-verification-integrity.md) — completed jobs can contain native fallback after OCR failure; require actual OCR provenance and document text.
 - [Direct invoice seeds](direct-invoice-seeds.md) — explicitly set load_id NULL when seeding invoices without load rows; its legacy default can generate invalid foreign keys.
 - [Vault entry IDs](vault-entry-ids.md) — client_vault requires a real serial default; without it encrypted inserts fail after encryption with a null primary key.
 - [Chargeback extensions](chargeback-extensions.md) — a future extension date must defer the automatic 90-day chargeback until that date arrives.
