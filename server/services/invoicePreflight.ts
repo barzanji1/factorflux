@@ -10,6 +10,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { db } from "../db";
+import { getInvoiceOcrAlerts } from "./invoiceOcrAlerts";
 import {
   brokerAuthorityAlerts,
   brokerAuthorityChecks,
@@ -122,6 +123,9 @@ export async function runInvoicePreflight(
 ): Promise<{ alerts: InvoicePreflightAlert[] }> {
   const settings = await readSettings(dbClient);
   const alerts: InvoicePreflightAlert[] = [];
+  if (input.excludeInvoiceId) {
+    alerts.push(...await getInvoiceOcrAlerts(input.excludeInvoiceId, dbClient));
+  }
   const now = new Date();
   const excludeWhere = input.excludeInvoiceId
     ? ne(invoices.id, input.excludeInvoiceId)

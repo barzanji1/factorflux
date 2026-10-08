@@ -2,7 +2,7 @@
  * documentExtraction.ts
  * ─────────────────────
  * Hybrid extraction pipeline backed by the OCR provider abstraction.
- * Provider is selected via EXTRACTION_PROVIDER env var (default: "hybrid").
+ * Provider is selected via OCR_PROVIDER (default: textract).
  * See server/services/ocr/registry.ts for available providers.
  *
  * Classification: rule-based multi-signal scoring over 7 document types.
@@ -18,6 +18,7 @@ import {
 } from "../../shared/schema";
 import { eq } from "drizzle-orm";
 import { getExtractionProvider } from "./ocr/registry";
+import { assertSuccessfulExtraction, type ExtractionProvider } from "./ocr/types";
 import { classifyDocumentAI } from "./aiClassifier";
 import { extractInvoiceNumber, extractLoadNumber, extractReferenceNumber, extractBolNumber, type FieldResult } from "./documentFieldDetectors";
 
@@ -246,11 +247,13 @@ export async function runExtractionJob(
   jobId:       number,
   filePath:    string,
   mimeType:    string,
+  dependencies: { database?: typeof db; provider?: ExtractionProvider } = {},
 ): Promise<void> {
-  const provider = getExtractionProvider();
+  const jobDb = dependencies.database ?? db;
 
   try {
-    await db
+    const provider = dependencies.provider ?? getExtractionProvider();
+    await jobDb
       .update(docExtractionJobs)
       .set({
         status:     "processing",
@@ -260,14 +263,18 @@ export async function runExtractionJob(
       .where(eq(docExtractionJobs.id, jobId));
 
     // ── Extraction via provider ────────────────────────────────────────────────
-    const extracted = await provider.extractText(filePath, mimeType);
+    const [document] = dependencies.provider ? [] : await jobDb.select({
+      documentType: documents.documentType,
+    }).from(documents).where(eq(documents.id, documentId)).limit(1);
+    const extracted = await provider.extractText(filePath, mimeType, document?.documentType ?? "other");
+    assertSuccessfulExtraction(extracted);
     const t = extracted.mainText || extracted.fullText;
 
     // ── Classification ────────────────────────────────────────────────────────
     const classification = classifyDocument(t);
 
     // ── Save extraction result ────────────────────────────────────────────────
-    await db.insert(docExtractionResults).values({
+    await jobDb.insert(docExtractionResults).values({
       documentId,
       jobId,
       fullText:         extracted.fullText,
@@ -279,6 +286,8 @@ export async function runExtractionJob(
         pageCount:      extracted.pageCount,
         pagesExtracted: extracted.pageTexts.length,
         providerKey:    extracted.providerKey,
+        fields:         extracted.fields ?? null,
+        providerRaw:    extracted.raw ?? null,
         classification: {
           docType:    classification.docType,
           confidence: classification.confidence,
@@ -309,7 +318,7 @@ export async function runExtractionJob(
         : classification.confidence;
 
     // ── Update document with candidate classification ─────────────────────────
-    await db
+    await jobDb
       .update(documents)
       .set({
         candidateDocumentType:      finalDocType as any,
@@ -336,6 +345,21 @@ export async function runExtractionJob(
     }> = [];
 
     const add = (name: string, res: FieldResult) => {
+      const structured: Record<string, string | number | null | undefined> = {
+        invoice_number: extracted.fields?.invoiceNumber,
+        load_number: extracted.fields?.loadNumber,
+        amount: extracted.fields?.amount,
+        broker_name: extracted.fields?.brokerName,
+        service_date: extracted.fields?.serviceDate,
+        bol_number: extracted.fields?.bolNumber,
+      };
+      const value = structured[name];
+      // Structured providers explicitly return null for unknown fields. Do not
+      // replace those unknowns with legacy max-amount/company-name guesses.
+      if (extracted.fields && name in structured && value == null) return;
+      if (value != null) {
+        res = { value: String(value), normalized: String(value), confidence: extracted.confidence };
+      }
       if (res) {
         candidates.push({
           documentId,
@@ -362,6 +386,7 @@ export async function runExtractionJob(
     add("delivery_date",     extractDeliveryDate(t));
     add("date",              extractDate(t));
     add("bol_number",        extractBolNumber(t));
+    add("service_date",      null);
     add("lumper_amount",     extractLumperAmount(t));
     add("pod_signature",     extractPodSignature(t));
 
@@ -376,29 +401,27 @@ export async function runExtractionJob(
     });
 
     if (candidates.length > 0) {
-      await db.insert(docFieldCandidates).values(candidates);
+      await jobDb.insert(docFieldCandidates).values(candidates);
     }
 
-    await db
+    await jobDb
       .update(docExtractionJobs)
-      .set({ status: "completed", completedAt: new Date() })
+      .set({ status: "completed", errorMessage: null, completedAt: new Date() })
       .where(eq(docExtractionJobs.id, jobId));
 
   } catch (err: any) {
     console.error(`[Extraction] job ${jobId} failed:`, err?.message);
-    await db
+    await jobDb
       .update(docExtractionJobs)
       .set({
         status:       "failed",
         errorMessage: String(err?.message ?? err),
         completedAt:  new Date(),
       })
-      .where(eq(docExtractionJobs.id, jobId))
-      .catch(() => {});
-    await db
+      .where(eq(docExtractionJobs.id, jobId));
+    await jobDb
       .update(documents)
       .set({ status: "failed" })
-      .where(eq(documents.id, documentId))
-      .catch(() => {});
+      .where(eq(documents.id, documentId));
   }
 }

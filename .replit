@@ -50,3 +50,5 @@ DEV_ADMIN_EMAIL = "dosh@truckingprosfinancial.com"
 [userenv.shared]
 EMAIL_FROM = "notifications@truckingprosfinancial.com"
 EMAIL_REPLY_TO = "dosh@truckingprosfinancial.com"
+OCR_AWS_REGION = "us-east-2"
+OCR_PROVIDER = "textract"

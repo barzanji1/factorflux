@@ -54,6 +54,7 @@ export class HybridProvider implements ExtractionProvider {
     );
 
     const ocr = await this.tesseract.extractText(filePath, mimeType);
+    if (!ocr.fullText.trim()) throw new Error("Tesseract OCR returned no document text");
     const bestText = ocr.fullText.trim().length > cleanText.length
       ? ocr.fullText
       : native.fullText;

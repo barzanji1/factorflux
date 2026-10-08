@@ -86,7 +86,7 @@ async function main() {
       // A "completed" queue row is NOT evidence of OCR success. Explicitly
       // reject native-only, low-confidence fallback, and empty OCR results.
       const genuineOcr = exitCode === 0 && finished?.status === "completed" &&
-        ["hybrid_ocr", "image_ocr"].includes(result?.extractionMethod ?? "") &&
+        ["textract_ocr", "hybrid_ocr", "image_ocr"].includes(result?.extractionMethod ?? "") &&
         Boolean(result?.fullText?.trim());
       anyOcrFailure ||= !genuineOcr;
       const field = (name: string) => genuineOcr ? fields.find(item => item.name === name)?.value ?? null : null;
@@ -96,13 +96,17 @@ async function main() {
         file: input, queued: true, attemptCount: finished?.attemptCount,
         configuredProvider: provider.key, jobProvider: finished?.parserName,
         ocrProviderAttempted: log.includes("[tesseract_ocr]") || provider.key === "tesseract_ocr"
-          ? "tesseract_ocr" : genuineOcr && provider.key === "hybrid_pdf_ocr" ? "tesseract_ocr" : null,
+          ? "tesseract_ocr" : provider.key === "textract" ? "textract"
+          : genuineOcr && provider.key === "hybrid_pdf_ocr" ? "tesseract_ocr" : null,
+        providerUsed: genuineOcr ? (result?.rawPayloadJson as { providerKey?: string })?.providerKey ?? provider.key : null,
         ocrStatus: genuineOcr ? "success" : "failed", queueStatus: finished?.status,
         extractionMethod: result?.extractionMethod ?? null,
         textLength: genuineOcr ? result!.fullText!.length : null,
         confidence: genuineOcr ? Number(result!.confidenceScore) : null,
+        pageCount: genuineOcr ? result!.pageCount : null,
         detectedInvoiceNumber: field("invoice_number"), detectedLoadNumber: field("load_number"),
         detectedAmount: field("amount"), detectedBrokerName: field("broker_name"),
+        detectedServiceDate: field("service_date"), detectedBolNumber: field("bol_number"),
         error: genuineOcr ? null : finished?.errorMessage || errors.join("; ") || "No successful OCR result returned",
         providerDiagnostics: errors,
       };

@@ -172,6 +172,7 @@ import {
 } from "./services/fundingReceiptService";
 import { expandCalendarEvent } from "./services/calendarScheduler";
 import { runInvoicePreflight } from "./services/invoicePreflight";
+import { getInvoiceOcrAlerts } from "./services/invoiceOcrAlerts";
 
 const escapeHtml = (value: unknown): string => String(value ?? "")
   .replace(/&/g, "&amp;")
@@ -1878,7 +1879,12 @@ ${message}
         );
         documents = documents.filter(document => !!document.invoiceId && ownedInvoices.has(document.invoiceId));
       }
-      res.json(documents);
+      const jobs = documents.length ? await db.selectDistinctOn([docExtractionJobs.documentId])
+        .from(docExtractionJobs)
+        .where(inArray(docExtractionJobs.documentId, documents.map(document => document.id)))
+        .orderBy(docExtractionJobs.documentId, desc(docExtractionJobs.id)) : [];
+      const latestJobs = new Map(jobs.map(job => [job.documentId, job]));
+      res.json(documents.map(document => ({ ...document, ocrJob: latestJobs.get(document.id) ?? null })));
     } catch (error) {
       console.error("Error fetching documents:", error);
       res.status(500).json({ message: "Failed to fetch documents" });
@@ -2783,6 +2789,20 @@ ${message}
     } catch (error) {
       console.error("Invoice preflight review failed:", error);
       res.status(500).json({ message: "Failed to review invoice preflight" });
+    }
+  });
+
+  app.get("/api/invoices/:id/ocr-alerts", requireAuth, async (req: any, res) => {
+    try {
+      const invoiceId = Number(req.params.id);
+      if (!Number.isInteger(invoiceId) || invoiceId < 1) return res.status(400).json({ message: "Invalid invoice id" });
+      if (!await storage.getInvoice(invoiceId)) return res.status(404).json({ message: "Invoice not found" });
+      if (!await employeeCanAccessInvoice(req, invoiceId)) {
+        return res.status(403).json({ message: "You may only view your own invoice documents" });
+      }
+      res.json({ alerts: await getInvoiceOcrAlerts(invoiceId) });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to load document OCR alerts" });
     }
   });
 
@@ -8375,10 +8395,11 @@ Trucking Pros Financial Team
       if (!docs.length) return res.status(404).json({ message: "Document not found" });
       const doc = docs[0];
 
-      const [job] = await db
-        .insert(docExtractionJobs)
-        .values({ documentId: docId, jobType: "pdf_text", status: "queued" })
-        .returning();
+      if (req.user.role === "employee" &&
+          (!doc.invoiceId || !await employeeCanAccessInvoice(req, doc.invoiceId))) {
+        return res.status(403).json({ message: "You may only retry your own invoice documents" });
+      }
+      if (doc.status !== "failed") return res.status(409).json({ message: "Only failed documents can be retried" });
 
       // For S3 docs: download to /tmp for OCR; for legacy docs: use uploads/ path
       let filePath = path.join("/tmp", doc.filename);
@@ -8390,6 +8411,17 @@ Trucking Pros Financial Team
           await downloadToTemp((doc as any).s3Key, filePath);
         }
       }
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Original document file is unavailable" });
+      const job = await db.transaction(async tx => {
+        const [claimed] = await tx.update(documentsTable).set({ status: "processing" })
+          .where(and(eq(documentsTable.id, docId), eq(documentsTable.status, "failed")))
+          .returning({ id: documentsTable.id });
+        if (!claimed) return null;
+        const [created] = await tx.insert(docExtractionJobs)
+          .values({ documentId: docId, jobType: "ocr", status: "queued" }).returning();
+        return created;
+      });
+      if (!job) return res.status(409).json({ message: "OCR retry already started" });
       jobQueue.enqueue({ jobId: job.id, documentId: docId, filePath, mimeType: doc.mimeType });
 
       res.json({ jobId: job.id, status: "queued" });

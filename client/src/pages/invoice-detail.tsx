@@ -521,6 +521,13 @@ export default function InvoiceDetail() {
     refetchOnMount: "always",
   });
 
+  const { data: preflight } = useQuery<{ alerts: { code: string; severity: string; title: string; message: string; link?: string }[] }>({
+    queryKey: ["/api/invoices", invoiceId, "ocr-alerts"],
+    queryFn: async () => (await apiRequest("GET", `/api/invoices/${invoiceId}/ocr-alerts`)).json(),
+    enabled: !isNaN(invoiceId),
+    refetchInterval: 5000,
+  });
+
   const { data: docStatus, isLoading: docStatusLoading } = useQuery<any>({
     queryKey: ["/api/invoices", invoiceId, "document-status"],
     queryFn: async () => {
@@ -746,6 +753,17 @@ export default function InvoiceDetail() {
               className="mb-5 -ml-2 gap-2 rounded-xl text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
               <ArrowLeft className="h-4 w-4" />Back to Invoices
             </Button>
+
+            {preflight?.alerts.filter(alert => alert.code === "DOCS_OCR_FAILED").map(alert => (
+              <div key={alert.code} role="status" data-testid="invoice-ocr-failed"
+                className="mb-4 border border-blue-300 bg-blue-50 p-3 text-blue-900">
+                <p className="flex items-center gap-2 font-semibold"><Info className="h-4 w-4" />
+                  {alert.title} <span className="text-xs">{alert.code} · Info</span>
+                </p>
+                <p className="mt-1 text-sm">{alert.message}</p>
+                <Button variant="link" onClick={() => navigate("/documents")}>Open Documents to retry</Button>
+              </div>
+            ))}
 
             {detailLoading ? (
               <div className="space-y-4">

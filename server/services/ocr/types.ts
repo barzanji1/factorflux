@@ -36,6 +36,8 @@ export interface ExtractionResult {
   pageCount:   number;
   /** Which provider produced this result */
   providerKey: string;
+  fields?: OcrFields;
+  raw?: unknown;
 }
 
 // ─── Provider contract ────────────────────────────────────────────────────────
@@ -57,8 +59,36 @@ export interface ExtractionProvider {
    *
    * @param filePath  Absolute path on disk
    * @param mimeType  MIME type of the uploaded file
-   * @returns         Normalised ExtractionResult — never throws; returns empty
-   *                  result with confidence=0 on hard failure
+   * @returns Normalised ExtractionResult. Failures must throw, never return
+   *          native-only or empty results as successful OCR.
    */
-  extractText(filePath: string, mimeType: string): Promise<ExtractionResult>;
+  extractText(filePath: string, mimeType: string, docType?: string): Promise<ExtractionResult>;
+}
+
+export interface OcrFields {
+  invoiceNumber: string | null;
+  loadNumber: string | null;
+  amount: number | null;
+  brokerName: string | null;
+  serviceDate: string | null;
+  bolNumber: string | null;
+}
+
+export interface OcrResult {
+  text: string;
+  confidence: number;
+  fields: OcrFields;
+  raw: unknown;
+}
+
+export interface OcrProvider {
+  readonly key: string;
+  extract(fileBuffer: Buffer, mimeType: string, docType: string): Promise<OcrResult>;
+}
+
+export function assertSuccessfulExtraction(result: ExtractionResult): void {
+  if (!result.fullText.trim() || result.method.endsWith("_error") ||
+      result.method === "native_pdf_low_confidence") {
+    throw new Error(`OCR returned no usable result (${result.providerKey}: ${result.method})`);
+  }
 }

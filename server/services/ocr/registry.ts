@@ -1,63 +1,71 @@
-/**
- * ocr/registry.ts
- * ──────────────────────────────────────────────────────────────────────────
- * Config-based provider factory.
- *
- * Set the EXTRACTION_PROVIDER environment variable to choose a backend:
- *
- *   EXTRACTION_PROVIDER=hybrid          (default) pdf-parse + Tesseract
- *   EXTRACTION_PROVIDER=native_pdf      native pdf-parse only (no OCR)
- *   EXTRACTION_PROVIDER=tesseract_ocr   Tesseract OCR only
- *
- * To add a new provider (e.g. Google Document AI):
- *   1. Create ocr/documentAiProvider.ts implementing ExtractionProvider
- *   2. Import it here and add an entry to PROVIDERS
- *   3. Set EXTRACTION_PROVIDER=google_document_ai in secrets
- */
+import { readFile } from "node:fs/promises";
+import type { ExtractionProvider, ExtractionResult, OcrProvider } from "./types";
+import { TextractProvider } from "./textractProvider";
+import { TesseractProvider } from "./tesseractProvider";
+import { NativePdfProvider } from "./nativePdfProvider";
+import { HybridProvider } from "./hybridProvider";
 
-import type { ExtractionProvider } from "./types";
-import { HybridProvider }     from "./hybridProvider";
-import { NativePdfProvider }  from "./nativePdfProvider";
-import { TesseractProvider }  from "./tesseractProvider";
-
-// ─── Registry ─────────────────────────────────────────────────────────────────
-
-const PROVIDERS: Record<string, () => ExtractionProvider> = {
-  hybrid:         () => new HybridProvider(),
-  native_pdf:     () => new NativePdfProvider(),
-  tesseract_ocr:  () => new TesseractProvider(),
+const PROVIDERS: Record<string, () => OcrProvider> = {
+  textract: () => new TextractProvider(),
 };
 
-// ─── Singleton ────────────────────────────────────────────────────────────────
-
-let _instance: ExtractionProvider | null = null;
-
-export function getExtractionProvider(): ExtractionProvider {
-  if (_instance) return _instance;
-
-  const key = (process.env.EXTRACTION_PROVIDER ?? "hybrid").toLowerCase();
-  const factory = PROVIDERS[key];
-
-  if (!factory) {
-    console.warn(
-      `[OCR Registry] Unknown EXTRACTION_PROVIDER="${key}", falling back to "hybrid". ` +
-      `Available: ${Object.keys(PROVIDERS).join(", ")}`,
-    );
-    _instance = new HybridProvider();
-  } else {
-    _instance = factory();
+export class OcrExtractionAdapter implements ExtractionProvider {
+  readonly key: string;
+  readonly displayName: string;
+  constructor(private readonly primary: OcrProvider, private readonly fallback: OcrProvider = new TesseractProvider()) {
+    this.key = primary.key;
+    this.displayName = `${primary.key} OCR`;
   }
-
-  console.log(`[OCR Registry] Provider loaded: ${_instance.displayName} (key=${_instance.key})`);
-  return _instance;
+  async extractText(filePath: string, mimeType: string, docType = "other"): Promise<ExtractionResult> {
+    const buffer = await readFile(filePath);
+    // Provider exceptions must fail the job. Never hide access, transport, or
+    // configuration errors behind an apparently completed fallback result.
+    let result = await this.primary.extract(buffer, mimeType, docType);
+    let usedProvider = this.primary.key;
+    // Tesseract is only a fallback for a successful but text-empty cloud result.
+    if (!result.text.trim()) {
+      result = await this.fallback.extract(buffer, mimeType, docType);
+      usedProvider = this.fallback.key;
+      result.raw = { primaryProvider: this.primary.key, fallbackReason: "empty_cloud_text", fallback: result.raw };
+    }
+    if (!result.text.trim()) throw new Error(`${usedProvider} OCR returned no usable text`);
+    const raw = result.raw as {
+      pageCount?: number;
+      pageResults?: { text: string; confidence: number }[];
+      pages?: { text: string; confidence: number }[];
+      fallback?: { pageCount?: number; pages?: { text: string; confidence: number }[] };
+    };
+    const pageCount = raw?.pageCount ?? (result.raw as { fallback?: { pageCount?: number } })?.fallback?.pageCount ?? 1;
+    const pages = raw.pageResults ?? raw.fallback?.pages ?? raw.pages ?? [{ text: result.text, confidence: result.confidence }];
+    return {
+      fullText: result.text, mainText: result.text.trim(), confidence: result.confidence,
+      fields: result.fields, raw: result.raw, providerKey: usedProvider,
+      method: usedProvider === "tesseract_ocr" ? "image_ocr" : "textract_ocr",
+      pageCount, pageTexts: pages.map((page, index) => ({
+        page: index + 1, text: page.text, confidence: page.confidence, method: usedProvider,
+      })),
+    };
+  }
 }
 
-/**
- * Reset the singleton — useful in tests or when the env var changes at
- * runtime (e.g. hot-reload in development).
- */
-export function resetExtractionProvider(): void {
-  _instance = null;
+let instance: ExtractionProvider | null = null;
+export function getExtractionProvider(): ExtractionProvider {
+  if (instance) return instance;
+  const key = process.env.OCR_PROVIDER?.trim().toLowerCase();
+  if (key) {
+    const factory = PROVIDERS[key];
+    if (!factory) throw new Error(`Unknown OCR_PROVIDER "${key}". Available: ${Object.keys(PROVIDERS).join(", ")}`);
+    instance = new OcrExtractionAdapter(factory());
+  } else {
+    // Compatibility for explicit legacy native extraction; new OCR selection
+    // always takes precedence and defaults to the selected cloud provider.
+    const legacy = process.env.EXTRACTION_PROVIDER;
+    instance = legacy === "native_pdf" ? new NativePdfProvider()
+      : legacy === "hybrid" ? new HybridProvider()
+      : new OcrExtractionAdapter(new TextractProvider());
+  }
+  console.log(`[OCR Registry] Provider loaded: ${instance.displayName} (key=${instance.key})`);
+  return instance;
 }
-
-export type { ExtractionProvider, ExtractionResult, PageResult } from "./types";
+export function resetExtractionProvider(): void { instance = null; }
+export type { ExtractionProvider, ExtractionResult, PageResult, OcrProvider, OcrResult, OcrFields } from "./types";

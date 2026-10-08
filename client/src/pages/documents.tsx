@@ -43,6 +43,7 @@ import type { Document } from "@shared/schema";
 
 // ─── Extended document type with AI fields ────────────────────────────────────
 interface AIDocument extends Omit<Document, "aiClassifiedAt"> {
+  ocrJob?: { id: number; status: string; errorMessage: string | null; parserName: string | null } | null;
   aiDocumentType:             string | null;
   aiClassificationConfidence: string | null;
   aiClassificationSignals:    string[] | null;
@@ -201,6 +202,15 @@ function DocumentRow({ doc, onView, onDownload }: {
   const confidence    = doc.classificationConfidence ? parseFloat(doc.classificationConfidence) : null;
   const source        = doc.classificationSource ?? "rules";
   const hasBreakdown  = !!(doc.allClassificationScores || (doc.aiClassificationSignals?.length));
+  const retryMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/load-documents/${doc.id}/retry-extraction`, {}),
+    onSuccess: () => {
+      toast({ title: "OCR retry queued", description: doc.originalName });
+      qc.invalidateQueries({ queryKey: ["/api/documents"] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+    },
+    onError: (error: Error) => toast({ title: "OCR retry failed", description: error.message, variant: "destructive" }),
+  });
 
   const reclassifyMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/load-documents/${doc.id}/ai-classify`, {}),
@@ -283,6 +293,19 @@ function DocumentRow({ doc, onView, onDownload }: {
           )}>
             {doc.status}
           </Badge>
+          {(doc.ocrJob?.status === "failed" || doc.status === "failed") && (
+            <div className="mt-2 max-w-[260px]" data-testid={`ocr-failed-${doc.id}`}>
+              <p className="text-xs text-red-700" role="status">
+                OCR failed: {doc.ocrJob?.errorMessage ?? "Extraction failed"}
+              </p>
+              <Button size="sm" variant="outline" className="mt-1 gap-1"
+                disabled={retryMutation.isPending || doc.status !== "failed"}
+                onClick={() => retryMutation.mutate()} data-testid={`ocr-retry-${doc.id}`}>
+                <RefreshCw className={cn("h-3 w-3", retryMutation.isPending && "animate-spin")} />
+                {retryMutation.isPending ? "Retrying…" : "Retry"}
+              </Button>
+            </div>
+          )}
         </td>
 
         {/* Uploaded */}
@@ -398,6 +421,7 @@ export default function Documents() {
 
   const { data: documents = [], isLoading } = useQuery<AIDocument[]>({
     queryKey: ["/api/documents"],
+    refetchInterval: 5000,
   });
 
   // ── Batch re-classify all docs that have no AI result yet ──────────────────
