@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { sendResendEmail } from "./resendTransport.js";
 
 interface EmailParams {
   to: string;
-  from: string;
-  replyTo?: string;
   subject: string;
   text?: string;
   html?: string;
@@ -37,31 +36,15 @@ function insertEmailLogo(html: string): string {
 
 /**
  * Core delivery function — used by both sendEmail() and sendEmailTracked().
- * Returns { success, messageId? } so callers can capture the SendGrid x-message-id.
- * Falls back to console-log when SENDGRID_API_KEY is absent (dev / test environments).
+ * Returns the Resend acceptance ID. Never reports success without provider acceptance.
  */
 async function deliver(params: EmailParams): Promise<{ success: boolean; messageId?: string }> {
-  const apiKey = process.env.SENDGRID_API_KEY;
-
-  if (!apiKey) {
-    console.warn(
-      "[email] No SENDGRID_API_KEY — message NOT sent (log-only mode).\n" +
-      `  To: ${params.to}\n  Subject: ${params.subject}`,
-    );
-    return { success: false };
-  }
-
   try {
-    const sgMail = (await import("@sendgrid/mail")).default;
-    sgMail.setApiKey(apiKey);
-
-    const msg: Record<string, unknown> = {
+    const msg: EmailParams = {
       to:      params.to,
-      from:    params.from,
       subject: params.subject,
       text:    params.text ?? (params.html ? "" : " "),
     };
-    if (params.replyTo) msg.replyTo = params.replyTo;
 
     let attachments = params.attachments ? [...params.attachments] : [];
     if (params.html) {
@@ -81,20 +64,16 @@ async function deliver(params: EmailParams): Promise<{ success: boolean; message
     }
     if (attachments.length) msg.attachments = attachments;
 
-    const [response] = await sgMail.send(msg as any);
-
-    const messageId =
-      (response.headers as Record<string, string>)?.["x-message-id"] ??
-      (response.headers as Record<string, string>)?.["X-Message-Id"];
+    const messageId = await sendResendEmail(msg);
 
     console.log(
-      `[email] ✓ delivered → ${params.to} | subject="${params.subject}" | msgId=${messageId ?? "none"}`,
+      `[email] accepted → ${params.to} | subject="${params.subject}" | msgId=${messageId}`,
     );
 
     return { success: true, messageId };
   } catch (err: any) {
-    const detail = err?.response?.body ?? err?.message ?? String(err);
-    console.error(`[email] ✗ SendGrid error → ${params.to} | subject="${params.subject}"`, detail);
+    const detail = err?.message ?? "Email delivery failed";
+    console.error(`[email] Resend error → ${params.to} | subject="${params.subject}"`, detail);
     return { success: false };
   }
 }
@@ -102,7 +81,7 @@ async function deliver(params: EmailParams): Promise<{ success: boolean; message
 /**
  * sendEmail — drop-in replacement for the old console-only stub.
  * All existing callers (carrier notifications, support messages, welcome emails)
- * now actually deliver via SendGrid.
+ * use the single Resend transport.
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   const { success } = await deliver(params);
@@ -110,8 +89,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 }
 
 /**
- * sendEmailTracked — same as sendEmail but also returns the SendGrid message ID
- * so the broker follow-up engine can store it for delivery-status webhook matching.
+ * sendEmailTracked — same as sendEmail but also returns the provider acceptance ID.
  */
 export async function sendEmailTracked(
   params: EmailParams,
@@ -168,7 +146,6 @@ export async function sendDesktopInstallers(recipientEmail: string): Promise<boo
 
     return sendEmail({
       to:          recipientEmail,
-      from:        'dosh@truckingprosfinancial.com',
       subject:     'FactorFlux Desktop Installers - Ready for Distribution',
       html,
       text:        'Your FactorFlux desktop installers are attached.\n\nBest regards,\nFactorFlux Development Team',

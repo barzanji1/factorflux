@@ -64,7 +64,7 @@ test("Resend payload fixes domain, monitored reply-to, recipient and retry idemp
   assert.equal(captured.connector, "resend");
   assert.equal(captured.path, "/emails");
   assert.equal(captured.body.from, CLIENT_EMAIL_FROM);
-  assert.equal(captured.body.from, "TruckingPros Financial <clients@truckingprosfinancial.com>");
+  assert.equal(captured.body.from, "TruckingPros Financial <notifications@truckingprosfinancial.com>");
   assert.equal(captured.body.reply_to, CLIENT_EMAIL_REPLY_TO);
   assert.deepEqual(captured.body.to, [client.email]);
   assert.equal(captured.headers["Idempotency-Key"], `client-email/${draft.requestId}`);
@@ -111,6 +111,22 @@ test("provider failure is logged, network ambiguity remains unconfirmed, retry k
   store.rows[1].status = "unconfirmed";
   store.rows[1].createdAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
   await assert.rejects(retry(draft, client, agent), /manual verification/);
+});
+
+test("sender changes block unresolved old drafts without rewriting history or resending", async () => {
+  const store = fakeStore();
+  const draft = input();
+  let sent = 0;
+  const service = createClientEmailService(store, async () => { sent++; return "provider-id"; });
+  await service(draft, client, agent);
+  store.rows[0].fromEmail = "Previous Sender <previous@resend.dev>";
+  store.rows[0].status = "unconfirmed";
+  await assert.rejects(service(draft, client, agent), /Sender settings changed/);
+  assert.equal(sent, 1);
+  assert.equal(store.rows[0].fromEmail, "Previous Sender <previous@resend.dev>");
+  store.rows[0].status = "sent";
+  assert.equal((await service(draft, client, agent)).status, "sent");
+  assert.equal(sent, 1);
 });
 
 test("missing recipient and pre-send log failures never call Resend; post-send failure is explicit", async () => {

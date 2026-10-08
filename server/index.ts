@@ -58,13 +58,7 @@ app.use(
   })
 );
 
-app.use(express.json({
-  verify: (req, _res, buffer) => {
-    if ((req as any).originalUrl.split("?")[0] === "/api/webhooks/sendgrid") {
-      (req as any).rawBody = Buffer.from(buffer);
-    }
-  },
-}));
+app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.use("/uploads", express.static(uploadsDir));

@@ -42,7 +42,7 @@ import TopNav from "@/components/layout/top-nav";
 import type { Document } from "@shared/schema";
 
 // ─── Extended document type with AI fields ────────────────────────────────────
-interface AIDocument extends Document {
+interface AIDocument extends Omit<Document, "aiClassifiedAt"> {
   aiDocumentType:             string | null;
   aiClassificationConfidence: string | null;
   aiClassificationSignals:    string[] | null;

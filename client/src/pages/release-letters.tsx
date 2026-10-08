@@ -282,7 +282,7 @@ export default function ReleaseLetters() {
     <div className="ff-release-letters-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav />
+        <TopNav title="Release Letters" />
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}
@@ -580,7 +580,7 @@ export default function ReleaseLetters() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This will send the letter via SendGrid. Confirm the recipient email address below.
+              This will send the letter via Resend. Confirm the recipient email address below.
             </p>
             <div>
               <label className="text-sm font-medium">Recipient Email</label>

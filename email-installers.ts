@@ -30,7 +30,7 @@ async function emailInstallers() {
       console.log('   • Troubleshooting information');
     } else {
       console.log('❌ Failed to send installers');
-      console.log('Check SendGrid configuration and API key');
+      console.log('Check the Resend connection and verified sending domain');
     }
   } catch (error) {
     console.error('❌ Error sending installers:', error);

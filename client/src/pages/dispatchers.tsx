@@ -93,7 +93,7 @@ export default function Dispatchers() {
   // ─── Mutations ─────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data: DispatcherFormData) =>
+    mutationFn: (data: Omit<DispatcherFormData, "email"> & { email?: string | null }) =>
       apiRequest("POST", "/api/dispatchers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dispatchers"] });
@@ -105,7 +105,7 @@ export default function Dispatchers() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<DispatcherFormData> }) =>
+    mutationFn: ({ id, data }: { id: number; data: Partial<Omit<DispatcherFormData, "email"> & { email?: string | null }> }) =>
       apiRequest("PATCH", `/api/dispatchers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dispatchers"] });
@@ -178,7 +178,7 @@ export default function Dispatchers() {
     <div className="ff-dispatchers-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav />
+        <TopNav title="Dispatchers" />
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}

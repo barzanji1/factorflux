@@ -15,8 +15,6 @@ export interface EmailClient {
   email: string | null;
 }
 
-const FROM_LINE = "TruckingPros Financial <clients@truckingprosfinancial.com>";
-const REPLY_TO = "dosh@truckingprosfinancial.com";
 const isValidEmail = (value?: string | null) => !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const getRequestId = () => crypto.randomUUID();
 
@@ -44,6 +42,18 @@ export function ClientEmailComposer({
   const requestId = useRef(getRequestId());
   const draftSignature = useRef("");
   const sendGuard = useRef(false);
+
+  const { data: emailConfig, error: configError, refetch: refetchConfig } = useQuery<{ from: string; replyTo: string }>({
+    queryKey: ["/api/client-email/config"],
+    enabled: open,
+    queryFn: async () => {
+      const response = await fetch("/api/client-email/config", { credentials: "include" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Could not load sender settings");
+      if (typeof result.from !== "string" || typeof result.replyTo !== "string") throw new Error("Sender settings response was invalid");
+      return result;
+    },
+  });
 
   const { data: clients = [], isLoading: clientsLoading, error: clientsError, refetch } = useQuery<EmailClient[]>({
     queryKey: ["/api/client-email/clients"],
@@ -91,6 +101,7 @@ export function ClientEmailComposer({
   };
   const sendMutation = useMutation({
     mutationFn: async () => {
+      if (!emailConfig || configError) throw new Error("Sender settings are unavailable. Reload them before sending.");
       if (!selectedClient || !isValidEmail(selectedClient.email)) throw new Error("This client needs a valid profile email before you can send.");
       const response = await fetch("/api/client-email/send", {
         method: "POST",
@@ -116,7 +127,7 @@ export function ClientEmailComposer({
       if (selectedClient) queryClient.invalidateQueries({ queryKey: ["/api/clients", selectedClient.id, "email-log"] });
     },
   });
-  const canSend = !!selectedClient && isValidEmail(selectedClient.email) && !!subject.trim() && !!body.trim() && !sendMutation.isPending;
+  const canSend = !!emailConfig && !configError && !!selectedClient && isValidEmail(selectedClient.email) && !!subject.trim() && !!body.trim() && !sendMutation.isPending;
 
   const applyTemplate = (value: string) => {
     setTemplate(value);
@@ -145,8 +156,9 @@ export function ClientEmailComposer({
           {isValidEmail(selectedClient.email) ? <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
           <span>{isValidEmail(selectedClient.email) ? <>To <strong>{selectedClient.email}</strong></> : <>No valid email is on this client profile. Sending is disabled; edit the client profile to add a valid email address.</>}</span>
         </div>}
-        <div className="space-y-1"><Label>From</Label><div className="border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{FROM_LINE}</div></div>
-        <div className="space-y-1"><Label>Reply-to</Label><div className="border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{REPLY_TO}</div></div>
+        <div className="space-y-1"><Label>From</Label><div className="break-all border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{emailConfig?.from ?? (configError ? "Sender unavailable" : "Loading sender settings…")}</div></div>
+        <div className="space-y-1"><Label>Reply-to</Label><div className="break-all border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{emailConfig?.replyTo ?? (configError ? "Reply-to unavailable" : "Loading sender settings…")}</div></div>
+        {configError && <div role="alert" className="flex items-center justify-between gap-2 border border-[#d2a6a0] bg-[#fff1ee] p-2 text-xs text-[#8d3f36]"><span>Sender settings could not be loaded. Sending is disabled.</span><Button variant="outline" size="sm" onClick={() => void refetchConfig()}>Retry</Button></div>}
         <div className="rounded-sm border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Replies are monitored outside this app. This is a send-only tool; there is no inbox reader here.</div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Label htmlFor="email-template">Optional template</Label>

@@ -119,7 +119,7 @@ interface BrokerFollowUpReminder {
   skipReason: string | null;
   subject: string;
   body: string;
-  sendgridMessageId: string | null;
+  providerMessageId: string | null;
   deliveryStatus: string | null;
   editedAt: string | null;
   editedBy: string | null;

@@ -1,105 +1,32 @@
-# FactorFlux Admin Email Setup Guide
+# Email setup
 
-## Current Status: Email Preparation Mode
+Resend is the only outbound email transport. System notifications, client emails,
+follow-up messages, release letters, receipts, and installer scripts all use
+`server/resendTransport.js`. Do not call a provider directly elsewhere.
 
-The admin panel email feature is currently set to **preparation mode** because SendGrid requires proper sender verification. Instead of failing to send emails, the system now:
+## Sender identity
 
-1. **Prepares professional email content** with FactorFlux access information
-2. **Copies the email to your clipboard** automatically
-3. **Logs the activity** for tracking purposes
-4. **Provides manual sending instructions**
+- `EMAIL_FROM=notifications@truckingprosfinancial.com`
+- `EMAIL_REPLY_TO=dosh@truckingprosfinancial.com`
 
-## How to Use the Admin Email Feature
+Both settings are validated centrally. Templates and callers cannot override
+From or Reply-To. The client composer reads the server's settings.
 
-### Step 1: Access Admin Panel
-- Navigate to **Admin** page (manager/admin role required)
-- Find the "Send FactorFlux Access" section
+## Provider connection
 
-### Step 2: Fill Out Client Information
-- **Client Email**: Required - the recipient's email address
-- **Client Name**: Optional - personalizes the email greeting
-- **Additional Message**: Optional - custom instructions or information
+Use the existing connected Resend integration. Its key must authorize the verified
+`truckingprosfinancial.com` domain. Do not put credentials in source or scripts.
+A send-only key cannot list domains; that restriction does not prove it is invalid.
 
-### Step 3: Prepare Email
-- Click "Prepare Email" button
-- Email content is automatically copied to your clipboard
-- Success message confirms the preparation
+## Delivery and failures
 
-### Step 4: Send Manually
-- Open your preferred email client (Gmail, Outlook, etc.)
-- Paste the prepared email content
-- Send to the client
+The wrapper returns a Resend acceptance ID, not proof of inbox delivery. Failures
+are explicit; there is no alternative transport or log-only success.
+Attachments and inline logo content IDs are forwarded to Resend.
+Client-email drafts retain their durable idempotency keys, log the actor/content
+before sending, and preserve unresolved delivery states for safe reconciliation.
 
-## Email Content Includes
-
-The prepared email contains:
-- **Professional greeting** with client name (if provided)
-- **Live web access link** to FactorFlux
-- **Desktop installer downloads** for Windows, Mac, and Linux
-- **Installation instructions** and setup guide
-- **Additional message** (if provided)
-- **Professional signature** from Trucking Pros Financial
-
-## Sample Email Output
-
-```
-To: client@company.com
-Subject: FactorFlux Access - John Smith
-
-Hello John,
-
-You now have access to FactorFlux, our freight factoring management system. You can access it in two ways:
-
-🌐 Web Access (Recommended):
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
-
-💻 Desktop Installers:
-• Windows: [download link] (5.7 MB)
-• Mac: [download link] (5.7 MB)  
-• Linux: [download link] (5.7 MB)
-• Setup Guide: [download link]
-
-[Installation instructions and additional content...]
-```
-
-## Activity Tracking
-
-All email preparations are logged in the system with:
-- Timestamp
-- Recipient email
-- Client name (if provided)
-- User who prepared the email
-
-View these logs in the **Activities** page.
-
-## Future Email Automation
-
-To enable automatic email sending, you would need to:
-
-1. **Set up SendGrid sender verification**
-   - Verify your sending domain
-   - Configure proper DNS records
-   - Update sender email in code
-
-2. **Alternative email services**
-   - Use company email server (SMTP)
-   - Integrate with Microsoft 365 or Google Workspace
-   - Use other email service providers
-
-## Benefits of Current Approach
-
-- **No email delivery failures** - guaranteed preparation
-- **Full control** over email sending timing
-- **Customizable content** before sending
-- **Works with any email provider**
-- **Professional appearance** maintained
-- **Activity tracking** for compliance
-
-## Download Links Always Available
-
-Clients can also access downloads directly:
-- **Web Portal**: `/api/downloads`
-- **Direct Downloads**: Individual platform links in admin panel
-- **Live Application**: Always accessible via web browser
-
-This approach ensures reliable client onboarding while maintaining professional standards.
+Follow-up reminders store new acceptance IDs in `provider_message_id`.
+Apply `migrations/0029_provider_message_id.sql` before running against a new database.
+Existing historical tracking data is retained. Delivery/bounce event ingestion
+requires a separately configured, verified Resend webhook; no webhook is added here.

@@ -109,7 +109,9 @@ export default function Trucks() {
   // ─── Mutations ─────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data: TruckFormData) => apiRequest("POST", "/api/trucks", data),
+    mutationFn: (data: Omit<TruckFormData, "vin" | "make" | "model" | "licensePlate" | "state" | "notes"> & {
+      [K in "vin" | "make" | "model" | "licensePlate" | "state" | "notes"]?: string | null;
+    }) => apiRequest("POST", "/api/trucks", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trucks"] });
       setDialogOpen(false);
@@ -120,7 +122,9 @@ export default function Trucks() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<TruckFormData> }) =>
+    mutationFn: ({ id, data }: { id: number; data: Partial<Omit<TruckFormData, "vin" | "make" | "model" | "licensePlate" | "state" | "notes"> & {
+      [K in "vin" | "make" | "model" | "licensePlate" | "state" | "notes"]?: string | null;
+    }> }) =>
       apiRequest("PATCH", `/api/trucks/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trucks"] });
@@ -212,7 +216,7 @@ export default function Trucks() {
     <div className="ff-trucks-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav />
+        <TopNav title="Trucks" />
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}

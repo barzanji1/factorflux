@@ -34,6 +34,7 @@ import {
 import { queryByDot, queryByMc } from "./services/fmcsa";
 import { createFmcsaHistoryHandler } from "./services/fmcsa/historyRoute";
 import { ClientEmailError, clientEmailSchema, sendClientEmail } from "./services/clientEmail";
+import { SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO } from "./emailConfig";
 import {
   ChatChannelNameConflict,
   createChatChannelSchema,
@@ -45,6 +46,7 @@ import {
   insertClientSchema,
   insertLoadSchema,
   insertInvoiceSchema,
+  insertFuelAdvanceSchema,
   insertFollowUpSchema,
   insertCollectionSchema,
   insertClientVaultSchema,
@@ -131,7 +133,6 @@ import {
   ROLE_DEFAULT_PERMISSIONS,
 } from "@shared/schema";
 import Anthropic from "@anthropic-ai/sdk";
-import { EventWebhook } from "@sendgrid/eventwebhook";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
 import { classifyDocumentAI } from "./services/aiClassifier";
@@ -764,8 +765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     || pathname === "/api/portal"
     || pathname.startsWith("/api/portal-chat/")
     || pathname.startsWith("/api/carrier/register")
-    || pathname.startsWith("/api/carrier-registration/")
-    || pathname === "/api/webhooks/sendgrid";
+    || pathname.startsWith("/api/carrier-registration/");
   const permissionGroups: Array<[string, string]> = [
     ["/api/firebase-test", "admin"],
     ["/api/firebase-clients", "carriers"],
@@ -1135,8 +1135,6 @@ ${message}
 
       const sent = await sendEmail({
         to: supportEmail,
-        from: "dosh@truckingprosfinancial.com",
-        replyTo: email,
         subject: `[FactorFlux Help] ${subject} — from ${name}`,
         text,
         html,
@@ -1214,8 +1212,6 @@ ${message}
 
       await sendEmail({
         to: "dosh@truckingprosfinancial.com",
-        from: "dosh@truckingprosfinancial.com",
-        replyTo: email,
         subject: `[FactorFlux Help] ${subject} — from ${name}`,
         text,
         html,
@@ -1539,14 +1535,12 @@ ${message}
 
         const sent = await sendEmail({
           to: client.email,
-          from: "dosh@truckingprosfinancial.com",
-          replyTo: "dosh@truckingprosfinancial.com",
           subject,
           text: body,
           html,
         });
         emailStatus = sent ? "sent" : "failed";
-        if (!sent) emailError = "SendGrid delivery failed";
+        if (!sent) emailError = "Resend did not confirm sending";
       } else {
         emailError = "Client has no email address on file";
       }
@@ -1657,8 +1651,6 @@ ${message}
       `;
       await sendEmail({
         to: email,
-        from: "dosh@truckingprosfinancial.com",
-        replyTo: "dosh@truckingprosfinancial.com",
         subject: "Your FactorFlux Account Has Been Created",
         text: `Welcome to FactorFlux!\n\nEmail: ${email}\nTemporary Password: ${password}\n\nPlease log in at ${req.protocol}://${req.get("host")}/login`,
         html: welcomeHtml,
@@ -2183,6 +2175,10 @@ ${message}
   });
 
   // Clients
+  app.get("/api/client-email/config", requireModulePermission("client_email"), (_req, res) => {
+    res.json({ from: SYSTEM_EMAIL_FROM, replyTo: SYSTEM_EMAIL_REPLY_TO });
+  });
+
   app.get("/api/client-email/clients", requireModulePermission("client_email"), async (req: any, res) => {
     try {
       const rows = await db.select({ id: clients.id, name: clients.name, email: clients.email }).from(clients)
@@ -2590,7 +2586,7 @@ ${message}
 
       if (load.clientId) {
         const client = await storage.getClient(load.clientId);
-        clientName = client?.companyName ?? null;
+        clientName = client?.name ?? null;
       }
 
       const allInvoices = await storage.getInvoices();
@@ -8447,96 +8443,6 @@ Trucking Pros Financial Team
     }
   });
 
-  const verifySendGridWebhook = (req: any, res: any, next: any) => {
-    const verificationKey = process.env.SENDGRID_EVENT_WEBHOOK_PUBLIC_KEY;
-    if (!verificationKey) {
-      console.error("[sendgrid-webhook] SENDGRID_EVENT_WEBHOOK_PUBLIC_KEY is not configured");
-      return res.status(503).json({ message: "Webhook verification is not configured" });
-    }
-    const signature = req.get("X-Twilio-Email-Event-Webhook-Signature");
-    const timestamp = req.get("X-Twilio-Email-Event-Webhook-Timestamp");
-    if (!signature || !timestamp || !Buffer.isBuffer(req.rawBody)) {
-      return res.status(401).json({ message: "Invalid webhook signature" });
-    }
-    try {
-      const verifier = new EventWebhook();
-      const publicKey = verifier.convertPublicKeyToECDSA(verificationKey);
-      if (!verifier.verifySignature(publicKey, req.rawBody, signature, timestamp)) {
-        return res.status(401).json({ message: "Invalid webhook signature" });
-      }
-      return next();
-    } catch (error) {
-      console.warn("[sendgrid-webhook] Signature verification failed:", error instanceof Error ? error.message : "unknown error");
-      return res.status(401).json({ message: "Invalid webhook signature" });
-    }
-  };
-
-  // ── SendGrid delivery webhook — externally reachable with signed payloads ──
-  app.post("/api/webhooks/sendgrid", verifySendGridWebhook, async (req: any, res) => {
-    try {
-      const events: any[] = Array.isArray(req.body) ? req.body : [];
-      let matched = 0;
-
-      for (const event of events) {
-        const sgMsgId: string | undefined = event.sg_message_id;
-        if (!sgMsgId) continue;
-
-        const evtMap: Record<string, string> = {
-          delivered:   "delivered",
-          bounce:      "bounced",
-          dropped:     "failed",
-          spamreport:  "spam",
-          unsubscribe: "unsubscribed",
-        };
-        const deliveryStatus = evtMap[event.event as string];
-        if (!deliveryStatus) continue;
-
-        // Find reminder whose stored sendgridMessageId is a prefix of the incoming sg_message_id
-        const [reminder] = await db
-          .select({
-            id:        brokerFollowUpReminders.id,
-            followUpId: brokerFollowUpReminders.followUpId,
-            invoiceId: brokerFollowUps.invoiceId,
-          })
-          .from(brokerFollowUpReminders)
-          .innerJoin(brokerFollowUps, eq(brokerFollowUpReminders.followUpId, brokerFollowUps.id))
-          .where(sql`${sgMsgId} LIKE ${brokerFollowUpReminders.sendgridMessageId} || '%'`)
-          .limit(1);
-
-        if (!reminder) continue;
-
-        await db
-          .update(brokerFollowUpReminders)
-          .set({ deliveryStatus, updatedAt: new Date() })
-          .where(eq(brokerFollowUpReminders.id, reminder.id));
-
-        // Write to event ledger
-        await db.insert(eventLedger).values({
-          entityType:  "invoice",
-          entityId:    reminder.invoiceId,
-          eventType:   `broker_followup_delivery_${deliveryStatus}`,
-          actorType:   "system",
-          actorId:     "sendgrid",
-          payloadJson: {
-            reminderId:     reminder.id,
-            followUpId:     reminder.followUpId,
-            sgMessageId:    sgMsgId,
-            deliveryStatus,
-            originalEvent:  event.event,
-            email:          event.email,
-          },
-        });
-
-        matched++;
-      }
-
-      res.status(200).json({ received: events.length, matched });
-    } catch (error: any) {
-      console.error("[sendgrid-webhook]", error?.message);
-      res.status(500).json({ message: "Webhook processing error" });
-    }
-  });
-
   // ── Bounce/failure summary for follow-up header ─────────────────────────────
   app.get("/api/broker-follow-up-reminders/delivery-summary", requireAuth, async (_req, res) => {
     try {
@@ -9995,7 +9901,7 @@ Trucking Pros Financial Team
         <p style="color:#6b7280;font-size:13px;">Sent via FactorFlux — Trucking Pros Financial</p>
       </div>`;
 
-      const sent = await sendEmail({ to: toEmail, from: "dosh@truckingprosfinancial.com", replyTo: "dosh@truckingprosfinancial.com", subject, html, text: letter.content });
+      const sent = await sendEmail({ to: toEmail, subject, html, text: letter.content });
       const [updated] = await db.update(releaseLetters)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(releaseLetters.id, id))
@@ -11610,8 +11516,6 @@ RESPOND:
         </div>`;
       sendEmail({
         to: user.email,
-        from: "dosh@truckingprosfinancial.com",
-        replyTo: "dosh@truckingprosfinancial.com",
         subject: "Carrier Portal — Registration Received (Pending Approval)",
         html: regHtml,
         text: `Hi ${companyName},\n\nThank you for registering. Your account is pending approval. We will notify you once approved.\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
@@ -12772,8 +12676,6 @@ RESPOND:
               </div>`;
             sendEmail({
               to: portalUser.email,
-              from: "dosh@truckingprosfinancial.com",
-              replyTo: "dosh@truckingprosfinancial.com",
               subject: `Carrier Portal — Submission ${statusLabels[status] ?? status}: Load #${existing.loadNumber}`,
               html: notifyHtml,
               text: `Hi ${portalUser.companyName},\n\n${statusMessages[status]?.replace(/<[^>]+>/g, "") ?? `Your submission (Load #${existing.loadNumber}) status updated to: ${status}`}\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
@@ -12889,8 +12791,6 @@ RESPOND:
         </div>`;
       const emailSent = await sendEmail({
         to: updated.email,
-        from: "dosh@truckingprosfinancial.com",
-        replyTo: "dosh@truckingprosfinancial.com",
         subject: "Carrier Portal — Account Approved",
         html: approvalHtml,
         text: `Hi ${updated.companyName},\n\nYour Trucking Pros Financial carrier account has been approved. You can now log in at https://factorflux.io/portal.\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,
@@ -12951,8 +12851,6 @@ RESPOND:
         </div>`;
       const emailSent = await sendEmail({
         to: updated.email,
-        from: "dosh@truckingprosfinancial.com",
-        replyTo: "dosh@truckingprosfinancial.com",
         subject: "Carrier Portal — Registration Update",
         html: rejectionHtml,
         text: `Hi ${updated.companyName},\n\nWe were unable to approve your carrier portal registration at this time.\n\nReason: ${reason}\n\nTrucking Pros Financial\nSupport@Truckingprosfinancial.com`,

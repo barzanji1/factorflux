@@ -276,7 +276,6 @@ export async function sendFundingReceiptEmail(
   const attachment = pdf ?? await downloadFromS3(receipt.s3Key);
   return sendEmailTracked({
     to: carrierEmail,
-    from: "dosh@truckingprosfinancial.com",
     subject: `Funding receipt for invoice ${invoiceNumber}`,
     text: `Attached is funding receipt ${receipt.receiptNo}, version ${receipt.version}, for invoice ${invoiceNumber}.`,
     attachments: [{

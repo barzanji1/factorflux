@@ -1,11 +1,12 @@
-import { ReplitConnectors } from "@replit/connectors-sdk";
+import { createResendTransport, sendResendEmail, ResendDeliveryError as ClientEmailError, type ResendProxy } from "../resendTransport.js";
 import { and, eq, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { clientEmailLogs, type ClientEmailLog } from "@shared/schema";
+import { SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO } from "../emailConfig";
 
-export const CLIENT_EMAIL_FROM = "TruckingPros Financial <clients@truckingprosfinancial.com>";
-export const CLIENT_EMAIL_REPLY_TO = "dosh@truckingprosfinancial.com";
+export const CLIENT_EMAIL_FROM = SYSTEM_EMAIL_FROM;
+export const CLIENT_EMAIL_REPLY_TO = SYSTEM_EMAIL_REPLY_TO;
 export const clientEmailSchema = z.object({
   clientId: z.number().int().positive(),
   requestId: z.string().uuid(),
@@ -15,47 +16,14 @@ export const clientEmailSchema = z.object({
 export type ClientEmailInput = z.infer<typeof clientEmailSchema>;
 type Draft = typeof clientEmailLogs.$inferInsert;
 
-export class ClientEmailError extends Error {
-  constructor(public statusCode: number, message: string, public uncertain = false) { super(message); }
-}
+export { ClientEmailError };
 
-type Proxy = (connector: string, path: string, options: {
-  method: string; headers: Record<string, string>; body: unknown;
-}) => Promise<Response>;
-const connectors = new ReplitConnectors();
-
-export function createResendSender(proxy: Proxy = connectors.proxy.bind(connectors)) {
-  return async (log: ClientEmailLog): Promise<string> => {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const response = await Promise.race([
-        proxy("resend", "/emails", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Idempotency-Key": `client-email/${log.requestId}` },
-          body: {
-            from: log.fromEmail, to: [log.toEmail], reply_to: log.replyTo,
-            subject: log.subject, text: log.body,
-          },
-        }),
-        new Promise<never>((_, reject) => {
-          timeout = setTimeout(() => reject(new ClientEmailError(503, "Email delivery could not be confirmed. Check Communications before starting a new email; retry only this unchanged draft.", true)), 30000);
-        }),
-      ]);
-      const payload = await response.json() as { id?: string; message?: string };
-      if (!response.ok) {
-        throw new ClientEmailError(response.status >= 500 ? 503 : 502,
-          `Resend did not confirm sending: ${payload.message || `provider error ${response.status}`}`,
-          response.status >= 500);
-      }
-      if (!payload.id) throw new ClientEmailError(503, "Resend returned no message ID. Delivery is unconfirmed; check Communications before starting a new email.", true);
-      return payload.id;
-    } catch (error) {
-      if (error instanceof ClientEmailError) throw error;
-      throw new ClientEmailError(503, "Email delivery could not be confirmed. Check Communications before starting a new email; retry only this unchanged draft.", true);
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
-  };
+export function createResendSender(proxy?: ResendProxy) {
+  const send = proxy ? createResendTransport(proxy) : sendResendEmail;
+  return (log: ClientEmailLog) => send({
+    to: log.toEmail, subject: log.subject, text: log.body,
+    idempotencyKey: `client-email/${log.requestId}`,
+  });
 }
 
 export interface ClientEmailStore {
@@ -104,6 +72,9 @@ export function createClientEmailService(store: ClientEmailStore, send: (log: Cl
       throw new ClientEmailError(409, "This send request belongs to a different email. Start a new draft before sending.");
     }
     if (log.status === "sent") return log;
+    if (log.fromEmail !== CLIENT_EMAIL_FROM || log.replyTo !== CLIENT_EMAIL_REPLY_TO) {
+      throw new ClientEmailError(409, "Sender settings changed since this draft was started. Verify the previous attempt in Communications before starting a new draft.");
+    }
     // Resend idempotency keys expire after 24 hours. Never retry an unresolved
     // request outside that window, since its original email may have been sent.
     if (Date.now() - log.createdAt.getTime() > 23 * 60 * 60 * 1000) {

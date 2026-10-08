@@ -468,8 +468,8 @@ function PipelinePreview({
                     {s.label}
                   </span>
                   <div className="flex items-center gap-1">
-                    {s.autoAdvance && <Zap className="h-2.5 w-2.5 text-violet-500" title="Auto-advance" />}
-                    {s.requiresApproval && <Shield className="h-2.5 w-2.5 text-blue-500" title="Requires approval" />}
+                    {s.autoAdvance && <Zap className="h-2.5 w-2.5 text-violet-500" aria-label="Auto-advance" />}
+                    {s.requiresApproval && <Shield className="h-2.5 w-2.5 text-blue-500" aria-label="Requires approval" />}
                   </div>
                   <span className="text-[9px] text-slate-400">{slaLabel(s.slaHours)}</span>
                 </div>
@@ -931,8 +931,8 @@ export default function WorkflowBuilder() {
                           {s.label}
                         </span>
                         <div className="flex shrink-0 items-center gap-1">
-                          {s.autoAdvance    && <Zap    className="h-3 w-3 text-violet-400" title="Auto-advance" />}
-                          {s.requiresApproval && <Shield className="h-3 w-3 text-blue-400"   title="Requires approval" />}
+                          {s.autoAdvance    && <Zap    className="h-3 w-3 text-violet-400" aria-label="Auto-advance" />}
+                          {s.requiresApproval && <Shield className="h-3 w-3 text-blue-400"   aria-label="Requires approval" />}
                           <span className="text-[10px] text-slate-400">{slaLabel(s.slaHours)}</span>
                           {!s.enabled && <EyeOff className="h-3 w-3 text-slate-300" />}
                         </div>

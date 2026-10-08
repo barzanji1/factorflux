@@ -38,25 +38,19 @@ export class NativePdfProvider implements ExtractionProvider {
     }
 
     try {
-      const pdfParse = (await import("pdf-parse")).default;
+      const { PDFParse } = await import("pdf-parse");
       const buffer   = fs.readFileSync(filePath);
-
-      const rawPages: string[] = [];
-      const data = await pdfParse(buffer, {
-        pagerender(pageData: any) {
-          return pageData.getTextContent().then((tc: any) => {
-            const pageText: string = tc.items
-              .map((i: any) => (typeof i.str === "string" ? i.str : ""))
-              .join(" ")
-              .trim();
-            rawPages.push(pageText);
-            return pageText;
-          });
-        },
-      });
+      const parser = new PDFParse({ data: buffer });
+      let data;
+      try {
+        data = await parser.getText();
+      } finally {
+        await parser.destroy();
+      }
+      const rawPages = data.pages.map(page => page.text);
 
       const fullText  = data.text ?? "";
-      const pageCount = data.numpages ?? Math.max(rawPages.length, 1);
+      const pageCount = data.total ?? Math.max(rawPages.length, 1);
       const sources   = rawPages.length > 0
         ? rawPages
         : splitByFormFeed(fullText, pageCount);

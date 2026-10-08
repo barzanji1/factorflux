@@ -413,10 +413,10 @@ export default function Admin() {
     queryKey: ["/api/carrier-portal/users"],
     enabled: activeTab === "portal",
   });
-  const { data: portalSubmissionCount } = useQuery<{ count: number }>({
+  const { data: portalSubmissionCount } = useQuery<unknown[], Error, { count: number }>({
     queryKey: ["/api/carrier-portal/submissions"],
     enabled: activeTab === "portal",
-    select: (data: any[]) => ({ count: data.length }),
+    select: (data) => ({ count: data.length }),
   });
   const approvePortalMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {

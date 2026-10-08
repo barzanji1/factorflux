@@ -361,8 +361,6 @@ Thank you for choosing Trucking Pros Financial.
 Trucking Pros Financial Team`;
 
     const result = await sendEmailTracked({
-      from: "dosh@truckingprosfinancial.com",
-      replyTo: "dosh@truckingprosfinancial.com",
       to: carrier.email,
       subject,
       text,

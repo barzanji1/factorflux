@@ -262,7 +262,7 @@ export default function Payroll() {
     <div className="ff-payroll-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav />
+        <TopNav title="Payroll" />
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}

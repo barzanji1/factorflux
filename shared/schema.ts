@@ -478,7 +478,7 @@ export const invoiceStatusHistory = pgTable("invoice_status_history", {
 export const eventLedger = pgTable("event_ledger", {
   id: serial("id").primaryKey(),
   entityType: varchar("entity_type", {
-    enum: ["client", "debtor", "invoice", "load", "document", "user"],
+    enum: ["client", "debtor", "invoice", "load", "document", "user", "system"],
   }).notNull(),
   entityId: integer("entity_id").notNull(),
   eventType: varchar("event_type").notNull(),
@@ -1876,7 +1876,7 @@ export const brokerFollowUpReminders = pgTable("broker_follow_up_reminders", {
   // stopReason values: invoice_paid | invoice_settled | exception_raised | cash_applied | agent_suppressed
   subject: varchar("subject").notNull(),
   body: text("body").notNull(),
-  sendgridMessageId: text("sendgrid_message_id"),
+  providerMessageId: text("provider_message_id"),
   deliveryStatus: varchar("delivery_status").default("pending"),
   editedAt: timestamp("edited_at"),
   editedBy: varchar("edited_by").references(() => users.id),

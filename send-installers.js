@@ -5,16 +5,7 @@
  * This creates an email with download links instead of attachments
  */
 
-import sgMail from '@sendgrid/mail';
-
-// Configure SendGrid
-const apiKey = process.env.SENDGRID_API_KEY;
-if (!apiKey) {
-  console.error('❌ SENDGRID_API_KEY environment variable is required');
-  process.exit(1);
-}
-
-sgMail.setApiKey(apiKey);
+import { sendResendEmail } from './server/resendTransport.js';
 
 async function sendInstallerLinks() {
   const recipientEmail = 'doshbarzanji@gmail.com';
@@ -22,7 +13,6 @@ async function sendInstallerLinks() {
   
   const emailContent = {
     to: recipientEmail,
-    from: 'doshbarzanji@gmail.com', // Must be verified sender in SendGrid
     subject: 'QuantumCore Desktop Installers - Enterprise Ready',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -133,7 +123,7 @@ QuantumCore Development Team
     console.log('📧 Sending QuantumCore installer links...');
     console.log(`📍 Recipient: ${recipientEmail}`);
     
-    await sgMail.send(emailContent);
+    await sendResendEmail(emailContent);
     
     console.log('✅ Email sent successfully!');
     console.log('📦 Email contains:');
@@ -144,10 +134,8 @@ QuantumCore Development Team
     console.log('\n🔗 Download Portal: ' + appUrl + '/api/downloads');
     
   } catch (error) {
-    console.error('❌ Error sending email:', error);
-    if (error.response) {
-      console.error('Response body:', error.response.body);
-    }
+    console.error('Error sending email:', error.message);
+    process.exitCode = 1;
   }
 }
 

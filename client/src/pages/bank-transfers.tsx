@@ -54,6 +54,9 @@ const formSchema = z.object({
 });
 
 type FormData = z.infer<typeof formSchema>;
+type TransferPayload = Omit<FormData, "bankAccountName" | "routingNumber" | "memo" | "transferDate"> & {
+  [K in "bankAccountName" | "routingNumber" | "memo" | "transferDate"]?: string | null;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -131,7 +134,7 @@ export default function BankTransfers() {
   // ─── Mutations ─────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest("POST", "/api/bank-transfers", data),
+    mutationFn: (data: TransferPayload) => apiRequest("POST", "/api/bank-transfers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-transfers"] });
       setDialogOpen(false);
@@ -227,7 +230,7 @@ export default function BankTransfers() {
     <div className="ff-bank-transfers-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav />
+        <TopNav title="Bank Transfers" />
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}

@@ -7,13 +7,19 @@ Client email is send-only. Use a professional sender on the verified company dom
 
 **Why:** The user explicitly requested send-only communication with replies handled in the monitored inbox.
 
-**How to apply:** Keep send permission separate from client-profile read access, respect existing client assignments, and do not grant all agents send access automatically. Preserve existing system email behavior when extending the Resend client-email feature.
+**How to apply:** Keep send permission separate from client-profile read access, respect existing client assignments, and do not grant all agents send access automatically.
 
 The correct company email domain is truckingprosfinancial.com, not tpfactoring.com.
 
 **Why:** The user explicitly corrected the sender domain.
 
 **How to apply:** Use truckingprosfinancial.com for company email senders; keep historical email logs unchanged.
+
+All system mail uses the notifications mailbox on the company domain, with Reply-To still directed to the monitored mailbox. Do not add per-feature sender overrides.
+
+**Why:** The user required one notifications sender everywhere, including environment settings, Resend, templates, and tests.
+
+**How to apply:** Use the shared identity for all outbound mail and standalone scripts. Keep existing logs unchanged and do not replay unresolved old drafts with a changed envelope.
 
 The connected Resend key is send-only. Domain-list requests return `restricted_api_key` with HTTP 401; that scope error alone is not evidence of a disconnected or invalid sending credential.
 

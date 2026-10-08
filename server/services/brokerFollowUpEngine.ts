@@ -543,12 +543,10 @@ export async function triggerBrokerFollowUp(
     },
   });
 
-  // 8. Send immediate email (best-effort) and capture SendGrid messageId
+  // 8. Send immediate email (best-effort) and capture the provider acceptance ID
   if (cadence.sendImmediately && brokerEmail) {
     try {
       const { success, messageId } = await sendEmailTracked({
-        from:    "dosh@truckingprosfinancial.com",
-        replyTo: "dosh@truckingprosfinancial.com",
           to:      brokerEmail,
         subject: immediateSubject,
         html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${immediateBody}</pre>`,
@@ -571,7 +569,7 @@ export async function triggerBrokerFollowUp(
             .set({
               status:            "sent",
               actualSendAt:      new Date(),
-              sendgridMessageId: messageId ?? null,
+              providerMessageId: messageId ?? null,
               deliveryStatus:    messageId ? "pending" : "sent",
               updatedAt:         new Date(),
             })
@@ -672,8 +670,6 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
 
         if (contact?.email) {
           const result = await sendEmailTracked({
-            from:    "dosh@truckingprosfinancial.com",
-            replyTo: "dosh@truckingprosfinancial.com",
             to:      contact.email,
             subject: r.subject,
             html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${r.body}</pre>`,
@@ -688,7 +684,7 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
       .set({
         status:            "sent",
         actualSendAt:      new Date(),
-        sendgridMessageId: messageId ?? null,
+        providerMessageId: messageId ?? null,
         deliveryStatus:    messageId ? "pending" : "sent",
         updatedAt:         new Date(),
       })
