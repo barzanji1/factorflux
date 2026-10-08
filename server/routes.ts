@@ -36,6 +36,10 @@ import { createFmcsaHistoryHandler } from "./services/fmcsa/historyRoute";
 import { ClientEmailError, clientEmailSchema, sendClientEmail } from "./services/clientEmail";
 import { SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO } from "./emailConfig";
 import {
+  assertChatMembership, chatMessageSelection, ChatMessageError,
+  createChatMessage, getChatThread, getMentionStaff,
+} from "./services/chatMessaging";
+import {
   ChatChannelNameConflict,
   createChatChannelSchema,
   createPublicChatChannel,
@@ -5114,9 +5118,6 @@ ${message}
   // ─── Internal agent chat ───────────────────────────────────────────────────
   const chatPermission = requireModulePermission("chat");
   const chatChannelIdSchema = z.coerce.number().int().positive();
-  const chatBodySchema = z.object({
-    body: z.string().trim().min(1, "Message body is required").max(10000),
-  }).strict();
 
   let defaultChatChannelsReady: Promise<void> | null = null;
   const ensurePublicChatMembership = async (userId: string) => {
@@ -5220,12 +5221,13 @@ ${message}
 
   app.get("/api/chat/users", chatPermission, async (req: any, res) => {
     try {
-      const people = await db.select({
-        id: users.id, name: sql<string>`trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, '')))`,
-        email: users.email, role: users.role,
-      }).from(users).where(and(eq(users.status, "active"), sql`${users.id} <> ${req.user.id}`));
-      res.json(people);
+      const channelId = req.query.channelId === undefined ? undefined : chatChannelIdSchema.parse(req.query.channelId);
+      if (channelId !== undefined) await assertChatMembership(db, channelId, req.user.id);
+      const people = await getMentionStaff(db, channelId);
+      res.json(channelId === undefined ? people.filter(person => person.id !== req.user.id) : people);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid channel ID" });
+      if (error instanceof ChatMessageError) return res.status(error.statusCode).json({ message: error.message });
       console.error("Error fetching chat users:", error);
       res.status(500).json({ message: "Failed to fetch chat users" });
     }
@@ -5271,12 +5273,8 @@ ${message}
         ? and(eq(chatMessages.channelId, channelId), gt(chatMessages.id, afterId))
         : after
           ? and(eq(chatMessages.channelId, channelId), gt(chatMessages.createdAt, after))
-          : eq(chatMessages.channelId, channelId);
-      const messages = await db.select({
-        id: chatMessages.id, channelId: chatMessages.channelId, senderId: chatMessages.senderId,
-        body: chatMessages.body, createdAt: chatMessages.createdAt, editedAt: chatMessages.editedAt,
-        senderName: sql<string>`trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, '')))`,
-      }).from(chatMessages).innerJoin(users, eq(users.id, chatMessages.senderId))
+          : and(eq(chatMessages.channelId, channelId), sql`${chatMessages.parentMessageId} IS NULL`);
+      const messages = await db.select(chatMessageSelection).from(chatMessages).innerJoin(users, eq(users.id, chatMessages.senderId))
         .where(messageFilter)
         .orderBy(...(afterId !== undefined
           ? [asc(chatMessages.id)]
@@ -5290,19 +5288,28 @@ ${message}
     }
   });
 
+  app.get("/api/chat/channels/:id/threads/:messageId", chatPermission, async (req: any, res) => {
+    try {
+      const channelId = chatChannelIdSchema.parse(req.params.id);
+      const rootId = chatChannelIdSchema.parse(req.params.messageId);
+      const afterId = z.coerce.number().int().nonnegative().safe().parse(req.query.afterId ?? 0);
+      res.json(await getChatThread(db, channelId, rootId, req.user.id, afterId));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid thread or pagination ID" });
+      if (error instanceof ChatMessageError) return res.status(error.statusCode).json({ message: error.message });
+      console.error("Error fetching chat thread:", error);
+      res.status(500).json({ message: "Failed to fetch chat thread" });
+    }
+  });
+
   app.post("/api/chat/channels/:id/messages", chatPermission, async (req: any, res) => {
     try {
       const channelId = chatChannelIdSchema.parse(req.params.id);
-      const { body } = chatBodySchema.parse(req.body);
-      const [membership] = await db.select().from(chatMembers)
-        .where(and(eq(chatMembers.channelId, channelId), eq(chatMembers.userId, req.user.id)));
-      if (!membership) return res.status(403).json({ message: "Chat channel access required" });
-      const [message] = await db.insert(chatMessages).values({ channelId, senderId: req.user.id, body }).returning();
-      await db.update(chatMembers).set({ lastReadAt: new Date() })
-        .where(and(eq(chatMembers.channelId, channelId), eq(chatMembers.userId, req.user.id)));
+      const message = await db.transaction(tx => createChatMessage(tx, channelId, req.user.id, req.body));
       res.status(201).json(message);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid message" });
+      if (error instanceof ChatMessageError) return res.status(error.statusCode).json({ message: error.message });
       console.error("Error sending chat message:", error);
       res.status(500).json({ message: "Failed to send chat message" });
     }

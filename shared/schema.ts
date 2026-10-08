@@ -12,6 +12,7 @@ import {
   primaryKey,
   uniqueIndex,
   check,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -42,6 +43,7 @@ export const users = pgTable("users", {
   department: varchar("department"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role", { enum: ["employee", "manager", "admin"] }).default("employee").notNull(),
+  isTestAccount: boolean("is_test_account").default(false).notNull(),
   // Personal settings
   bio: text("bio"),
   location: varchar("location"),
@@ -2342,15 +2344,20 @@ export const chatMembers = pgTable("chat_members", {
   index("chat_members_user_idx").on(table.userId),
 ]);
 
+export type ChatMention = { userId: string; handle: string; start: number; end: number };
+
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
   channelId: integer("channel_id").references(() => chatChannels.id, { onDelete: "cascade" }).notNull(),
   senderId: varchar("sender_id").references(() => users.id).notNull(),
   body: text("body").notNull(),
+  parentMessageId: integer("parent_message_id").references((): AnyPgColumn => chatMessages.id, { onDelete: "cascade" }),
+  mentions: jsonb("mentions").$type<ChatMention[]>().default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   editedAt: timestamp("edited_at"),
 }, (table) => [
   index("chat_messages_channel_created_idx").on(table.channelId, table.createdAt),
+  index("chat_messages_thread_idx").on(table.channelId, table.parentMessageId, table.id),
 ]);
 
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({

@@ -131,15 +131,23 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
     if (!previousIds || typeof window.Notification === "undefined" || window.Notification.permission !== "granted") return;
     notifications
       .filter(notification =>
-        ["carrier_submission", "portal_chat"].includes(notification.entityType || "")
+        ["carrier_submission", "portal_chat", "chat_mention"].includes(notification.entityType || "")
         && !previousIds.has(notification.id),
       )
       .forEach(item => {
-        const browserNotification = new window.Notification(item.message);
+        const browserNotification = item.entityType === "chat_mention"
+          ? new window.Notification(item.title, { body: item.message })
+          : new window.Notification(item.message);
         browserNotification.onclick = () => {
           window.focus();
           const actionUrl = normalizeCarrierChatUrl(item.actionUrl);
           setLocation(actionUrl || "/portal-submissions");
+          if (item.entityType === "chat_mention" && actionUrl) {
+            const params = new URL(actionUrl, window.location.origin).searchParams;
+            window.dispatchEvent(new CustomEvent("team-chat:open", { detail: {
+              channelId: params.get("channelId"), threadId: params.get("threadId"), messageId: params.get("messageId"),
+            } }));
+          }
           browserNotification.close();
         };
       });
@@ -219,6 +227,12 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
     const notificationUrl = (n as any).actionUrl;
     const url = normalizeCarrierChatUrl(notificationUrl);
     if (url) setLocation(url);
+    if (n.entityType === "chat_mention" && url) {
+      const params = new URL(url, window.location.origin).searchParams;
+      window.dispatchEvent(new CustomEvent("team-chat:open", { detail: {
+        channelId: params.get("channelId"), threadId: params.get("threadId"), messageId: params.get("messageId"),
+      } }));
+    }
   };
 
   const handleSearchItemClick = (item: SearchResultItem) => {
@@ -479,7 +493,8 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                           key={notification.id}
                           className={cn(
                             "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800",
-                            !notification.read && "bg-blue-50/50 dark:bg-blue-950/10"
+                            !notification.read && "bg-blue-50/50 dark:bg-blue-950/10",
+                            notification.entityType === "chat_mention" && "border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-950/20"
                           )}
                           onClick={() => handleNotificationClick(notification)}
                         >

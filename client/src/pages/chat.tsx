@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data";
-import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X } from "lucide-react";
+import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +17,9 @@ import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { MentionAutocomplete, type ChatUser } from "@/components/team-chat/MentionAutocomplete";
+import { MessageBody } from "@/components/team-chat/MessageBody";
+import { ThreadPanel, type ChatMessage } from "@/components/team-chat/ThreadPanel";
 
 type Channel = {
   id: string | number;
@@ -26,15 +29,7 @@ type Channel = {
   members?: unknown[];
   directName?: string;
 };
-type ChatUser = { id: string | number; name: string; role?: string };
-type Message = {
-  id: string | number;
-  channelId: string | number;
-  senderId: string | number;
-  senderName: string;
-  body: string;
-  createdAt: string;
-};
+type Message = ChatMessage;
 type EmojiSelection = { id?: string; native?: string };
 
 const tpfEmojiDefinitions = [
@@ -59,28 +54,6 @@ const emojiPickerData = {
     ...emojiData.emojis,
   },
 };
-
-const customEmojiSources: Record<string, { src: string; label: string }> = {
-  "tpf-logo": { src: "/emojis/tpf-logo.png", label: "TPF Logo" },
-  "ff-logo": { src: "/emojis/ff-logo.png", label: "FactorFlux Logo" },
-  tpf4life: { src: "/emojis/tpf4life.png", label: "TPF 4Life" },
-  "gm-tpf": { src: "/emojis/gm-tpf.png", label: "GM TPF" },
-  "tpf-truck": { src: "/emojis/tpf-truck.png", label: "TPF Truck" },
-  funded: { src: "/emojis/funded.png", label: "Funded" },
-  invoice: { src: "/emojis/invoice.png", label: "Invoice" },
-  approved: { src: "/emojis/approved.png", label: "Approved" },
-};
-
-const customEmojiPattern = /:(tpf-logo|ff-logo|tpf4life|gm-tpf|tpf-truck|funded|invoice|approved):/g;
-
-function renderMessageBody(body: string) {
-  return body.split(customEmojiPattern).map((part, index) => {
-    const emoji = customEmojiSources[part];
-    return emoji
-      ? <img key={`${part}-${index}`} src={emoji.src} alt={`:${part}:`} title={emoji.label} className="mx-0.5 inline-block h-6 w-6 align-middle object-contain" />
-      : part;
-  });
-}
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
@@ -152,9 +125,13 @@ function ChatPanel({ active }: ChatPanelProps) {
   const { notificationMode, setNotificationMode, notificationPreferenceError } = useChatNotificationPreference(user?.id);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [users, setUsers] = useState<ChatUser[]>([]);
+  const [mentionUsers, setMentionUsers] = useState<ChatUser[]>([]);
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
+  const draftsByChannelRef = useRef<Record<string, string>>({});
+  const [threadRootId, setThreadRootId] = useState<string | number | null>(null);
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
@@ -165,7 +142,7 @@ function ChatPanel({ active }: ChatPanelProps) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const channelNameInputRef = useRef<HTMLInputElement>(null);
   const messageRequestRef = useRef(0);
@@ -188,6 +165,7 @@ function ChatPanel({ active }: ChatPanelProps) {
   const channelLoadQueuedRef = useRef(false);
   const loadChannelsRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const optimisticChannelsRef = useRef<Record<string, Channel>>({});
+  const mentionDirectoryRequestRef = useRef(0);
   selectedIdRef.current = selectedId;
   activeRef.current = active;
   notificationModeRef.current = notificationMode;
@@ -197,6 +175,31 @@ function ChatPanel({ active }: ChatPanelProps) {
   const selectedIsDirect = selected?.type === "direct" || Boolean(selected?.directName);
   const selectedLabel = selected ? (selectedIsDirect ? selected.directName || selected.name : `#${selected.name}`) : "";
   const visibleChannels = channels;
+
+  const selectChannel = (channelId: string | number | null) => {
+    if (selectedIdRef.current !== null) draftsByChannelRef.current[String(selectedIdRef.current)] = draft;
+    setSelectedId(channelId);
+    selectedIdRef.current = channelId;
+    setDraft(channelId === null ? "" : draftsByChannelRef.current[String(channelId)] || "");
+    setThreadRootId(null);
+    setHighlightMessageId(null);
+  };
+
+  const refreshMentionUsers = useCallback(async (channelId: string | number) => {
+    const requestId = ++mentionDirectoryRequestRef.current;
+    try {
+      const directory = await getJson<ChatUser[]>(`/api/chat/users?channelId=${encodeURIComponent(String(channelId))}`);
+      if (
+        mountedRef.current &&
+        requestId === mentionDirectoryRequestRef.current &&
+        String(selectedIdRef.current) === String(channelId)
+      ) setMentionUsers(directory);
+    } catch {
+      if (requestId === mentionDirectoryRequestRef.current && String(selectedIdRef.current) === String(channelId)) {
+        setMentionUsers([]);
+      }
+    }
+  }, []);
 
   const isConversationActivelyViewed = useCallback((channelId: string | number) => (
     activeRef.current &&
@@ -236,17 +239,20 @@ function ChatPanel({ active }: ChatPanelProps) {
         return;
       }
       const mode = notificationModeRef.current;
+      const isMention = Boolean(message.mentions?.some(
+        (mention) => String(mention.userId) === String(currentUserIdRef.current)
+      ));
       let spacing = 0;
       if (
         mode !== "muted" &&
-        !isConversationActivelyViewed(message.channelId)
+        (isMention || !isConversationActivelyViewed(message.channelId))
       ) {
         spacing = await playChatNotification(mode, () =>
           mountedRef.current &&
           generation === toneQueueGenerationRef.current &&
           notificationModeRef.current === mode &&
           String(message.senderId) !== String(currentUserIdRef.current) &&
-          !isConversationActivelyViewed(message.channelId),
+          (isMention || !isConversationActivelyViewed(message.channelId)),
           (audioError) => setError(audioError),
         );
       }
@@ -284,18 +290,24 @@ function ChatPanel({ active }: ChatPanelProps) {
       if (!mountedRef.current) return;
 
       const messagesToNotify: Message[] = [];
+      let receivedMention = false;
       channelResults.forEach(({ channel, messages: channelMessages }) => {
         const channelKey = String(channel.id);
+        const cursorFloor = baselineReady
+          ? notificationCursorRef.current[channelKey] ?? startingGlobalCursor
+          : snapshotCursor;
         const latestCursor = channelMessages.reduce(
           (maximum, message) => Math.max(maximum, Number(message.id) || 0),
-          notificationCursorRef.current[channelKey] ?? startingGlobalCursor
+          cursorFloor
         );
         notificationCursorRef.current[channelKey] = latestCursor;
 
-        messagesToNotify.push(
-          ...(baselineReady ? channelMessages : [])
-            .filter((message) => String(message.senderId) !== String(currentUserIdRef.current))
-        );
+        const incoming = (baselineReady ? channelMessages : [])
+          .filter((message) => String(message.senderId) !== String(currentUserIdRef.current));
+        if (incoming.some((message) => message.mentions?.some(
+          (mention) => String(mention.userId) === String(currentUserIdRef.current)
+        ))) receivedMention = true;
+        messagesToNotify.push(...incoming);
       });
 
       notificationGlobalCursorRef.current = Math.max(
@@ -303,10 +315,18 @@ function ChatPanel({ active }: ChatPanelProps) {
         snapshotCursor
       );
       notificationBaselineReadyRef.current = true;
+      if (receivedMention) {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/unread-count"] });
+      }
       if (messagesToNotify.length) {
-        pendingToneQueueRef.current.push(
-          ...messagesToNotify.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0))
-        );
+        pendingToneQueueRef.current.push(...messagesToNotify);
+        pendingToneQueueRef.current.sort((a, b) => {
+            const aDirected = a.mentions?.some((mention) => String(mention.userId) === String(currentUserIdRef.current)) ? 1 : 0;
+            const bDirected = b.mentions?.some((mention) => String(mention.userId) === String(currentUserIdRef.current)) ? 1 : 0;
+            return bDirected - aDirected || (Number(a.id) || 0) - (Number(b.id) || 0);
+          });
         runToneQueue();
       }
     } catch {
@@ -339,6 +359,9 @@ function ChatPanel({ active }: ChatPanelProps) {
         if (hasInitializedSelectionRef.current) return current;
         if (!result.length) return null;
         hasInitializedSelectionRef.current = true;
+        const deepLinkChannelId = new URLSearchParams(window.location.search).get("channelId");
+        const deepLinkChannel = deepLinkChannelId && result.find((channel) => String(channel.id) === deepLinkChannelId);
+        if (deepLinkChannel) return deepLinkChannel.id;
         const requestedId = window.sessionStorage.getItem("chat:open-channel");
         if (requestedId) {
           const requestedChannel = result.find((channel) => String(channel.id) === requestedId);
@@ -413,6 +436,28 @@ function ChatPanel({ active }: ChatPanelProps) {
     getJson<ChatUser[]>("/api/chat/users").then(setUsers).catch(() => undefined);
   }, []);
   useEffect(() => {
+    setMentionUsers([]);
+    mentionDirectoryRequestRef.current += 1;
+    if (selectedId === null) return;
+    void refreshMentionUsers(selectedId);
+  }, [selectedId, refreshMentionUsers]);
+  useEffect(() => {
+    if (!active || selectedId === null) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("channelId") !== String(selectedId)) return;
+    const requestedThread = params.get("threadId");
+    const requestedMessage = params.get("messageId");
+    if (requestedThread) setThreadRootId(requestedThread);
+    if (requestedMessage) setHighlightMessageId(requestedMessage);
+  }, [active, selectedId]);
+  useEffect(() => {
+    if (!active || !highlightMessageId) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`chat-message-${highlightMessageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [active, highlightMessageId, messages, threadRootId]);
+  useEffect(() => {
     // Stop the previous mode immediately, including delayed audio loading.
     clearToneQueue();
     if (notificationMode !== "muted") activateChatAudio();
@@ -442,16 +487,22 @@ function ChatPanel({ active }: ChatPanelProps) {
   }, [notificationMode]);
   useEffect(() => {
     const openConversation = (event: Event) => {
-      const channelId = (event as CustomEvent<{ channelId?: string | number }>).detail?.channelId;
+      const detail = (event as CustomEvent<{ channelId?: string | number; threadId?: string | number; messageId?: string | number }>).detail;
+      const channelId = detail?.channelId;
       if (channelId !== undefined) {
+        if (selectedIdRef.current !== null) draftsByChannelRef.current[String(selectedIdRef.current)] = draft;
         hasInitializedSelectionRef.current = true;
         window.sessionStorage.removeItem("chat:open-channel");
         setSelectedId(channelId);
+        selectedIdRef.current = channelId;
+        setDraft(draftsByChannelRef.current[String(channelId)] || "");
+        setThreadRootId(detail.threadId ?? null);
+        setHighlightMessageId(detail.messageId === undefined ? null : String(detail.messageId));
       }
     };
     window.addEventListener("team-chat:open", openConversation);
     return () => window.removeEventListener("team-chat:open", openConversation);
-  }, []);
+  }, [draft]);
   useEffect(() => {
     if (!active) return;
     const requestedId = window.sessionStorage.getItem("chat:open-channel");
@@ -460,7 +511,7 @@ function ChatPanel({ active }: ChatPanelProps) {
     if (!requestedChannel) return;
     hasInitializedSelectionRef.current = true;
     window.sessionStorage.removeItem("chat:open-channel");
-    setSelectedId(requestedChannel.id);
+    selectChannel(requestedChannel.id);
   }, [active, channels]);
   useEffect(() => {
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
@@ -512,15 +563,18 @@ function ChatPanel({ active }: ChatPanelProps) {
   const submitMessage = async () => {
     const body = draft.trim();
     if (!body || selectedId === null) return;
+    const originalDraft = draft;
     const channelId = selectedId;
     setDraft("");
+    draftsByChannelRef.current[String(channelId)] = "";
     try {
       await sendJson(`/api/chat/channels/${channelId}/messages`, "POST", { body });
       if (String(selectedIdRef.current) === String(channelId)) await loadMessages();
     } catch (err) {
+      draftsByChannelRef.current[String(channelId)] = originalDraft;
       if (String(selectedIdRef.current) === String(channelId)) {
         setError(err instanceof Error ? err.message : "Message could not be sent");
-        setDraft(body);
+        setDraft(originalDraft);
       }
     }
   };
@@ -529,7 +583,7 @@ function ChatPanel({ active }: ChatPanelProps) {
     try {
       const channel = await sendJson<Channel>("/api/chat/channels/direct", "POST", { userId });
       await loadChannels();
-      setSelectedId(channel.id);
+      selectChannel(channel.id);
       setPickerOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start direct message");
@@ -575,7 +629,7 @@ function ChatPanel({ active }: ChatPanelProps) {
       setChannels((current) => current.some((item) => String(item.id) === String(channel.id))
         ? current
         : [...current, channel]);
-      setSelectedId(channel.id);
+      selectChannel(channel.id);
       setChannelDialogOpen(false);
       setChannelNameDraft("");
       setChannelNameError("");
@@ -641,7 +695,7 @@ function ChatPanel({ active }: ChatPanelProps) {
               : visibleChannels.map((channel) => {
                 const isDirect = channel.type === "direct" || Boolean(channel.directName);
                  const label = isDirect ? channel.directName || channel.name : `#${channel.name}`;
-                    return <button key={channel.id} onClick={() => setSelectedId(channel.id)} title={label} aria-label={label} className={cn("ff-team-chat-channel relative flex h-11 w-full items-center justify-start gap-2 px-2 text-left", String(selectedId) === String(channel.id) && "ff-team-chat-channel-active")}>
+                     return <button key={channel.id} onClick={() => selectChannel(channel.id)} title={label} aria-label={label} data-testid={`chat-channel-${channel.id}`} className={cn("ff-team-chat-channel relative flex h-11 w-full items-center justify-start gap-2 px-2 text-left", String(selectedId) === String(channel.id) && "ff-team-chat-channel-active")}>
                    <span className="ff-team-chat-avatar flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold">{isDirect ? initials(label) : <Hash className="h-4 w-4" />}</span>
                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#1a1a1a]">{label}</span>
                    {channel.unreadCount > 0 && <span className="ff-team-chat-unread absolute right-1 top-1" aria-label={`${channel.unreadCount} unread`}>{channel.unreadCount > 9 ? "9+" : channel.unreadCount}</span>}
@@ -650,22 +704,41 @@ function ChatPanel({ active }: ChatPanelProps) {
           </div>
         </aside>
 
-         <section className="ff-team-chat-thread flex min-w-0 flex-1 flex-col bg-white">
-           {selected ? <><header className="flex h-9 shrink-0 items-center gap-2 border-b border-[#808080] bg-[#d4d0c8] px-2">
+          <section className="ff-team-chat-thread relative flex min-w-0 flex-1 flex-col bg-white" data-testid="chat-conversation">
+            {selected ? <div className="flex min-h-0 min-w-0 flex-1">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <header className="flex h-9 shrink-0 items-center gap-2 border-b border-[#808080] bg-[#d4d0c8] px-2">
              <span className="flex h-6 w-6 items-center justify-center rounded-sm bg-[#8bbfc1] text-[#154c51]">{selected.type === "direct" || selected.directName ? <UserRound className="h-3 w-3" /> : <Hash className="h-3 w-3" />}</span>
               <div className="min-w-0"><h2 className="truncate text-xs font-bold text-[#1a1a1a]">{selectedLabel}</h2></div>
              <MoreHorizontal className="ml-auto h-4 w-4 text-[#777]" />
           </header>
            <div className="flex-1 overflow-y-auto px-2 py-2">
             {loadingMessages && !messages.length ? <div className="space-y-4">{[1, 2, 3].map((item) => <div key={item} className={cn("h-14 animate-pulse bg-[#d9d8d2]", item % 2 === 0 ? "ml-auto max-w-[60%]" : "max-w-[55%]")} />)}</div>
-               : messages.length ? messages.map((message) => <div key={message.id} className={cn("mb-2 flex gap-1.5", String(message.senderId) === String(user?.id) ? "justify-end" : "justify-start")}>
+                : messages.length ? messages.map((message) => <div key={message.id} id={`chat-message-${message.id}`} data-testid="chat-root-message" className={cn("mb-2 flex gap-1.5", String(message.senderId) === String(user?.id) ? "justify-end" : "justify-start", String(message.id) === highlightMessageId && "rounded-sm bg-[#fff0b8] p-1")}>
                  <div className={cn("ff-team-chat-avatar flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[8px] font-bold", String(message.senderId) === String(user?.id) && "order-2")}>{initials(message.senderName)}</div>
-                   <div className={cn("max-w-[84%]", String(message.senderId) === String(user?.id) && "text-right")}><div className="ff-team-chat-message-meta mb-0.5 flex items-baseline gap-1 text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span></div><div className={cn("ff-team-chat-message inline-block whitespace-pre-wrap break-words px-2 py-1 leading-snug", String(message.senderId) === String(user?.id) ? "ff-team-chat-message-user" : "ff-team-chat-message-other")}>{renderMessageBody(message.body)}</div></div>
+                    <div className={cn("max-w-[84%] min-w-0", String(message.senderId) === String(user?.id) && "text-right")}><div className="ff-team-chat-message-meta mb-0.5 flex flex-wrap items-baseline gap-1 text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span>{message.mentions?.some((mention) => String(mention.userId) === String(user?.id)) && <span className="rounded-sm border border-[#c99732] bg-[#fff0b8] px-1 font-bold text-[#684c08]">Mentioned you</span>}</div><div
+                      role="button" tabIndex={0} aria-label={`Open reply thread for ${message.senderName}'s message`}
+                      onClick={(event) => { if (!(event.target as HTMLElement).closest("a")) setThreadRootId(message.id); }}
+                      onKeyDown={(event) => {
+                        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                          event.preventDefault(); setThreadRootId(message.id);
+                        }
+                      }}
+                      className={cn("ff-team-chat-message inline-block max-w-full cursor-pointer whitespace-pre-wrap break-words px-2 py-1 leading-snug focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]", String(message.senderId) === String(user?.id) ? "ff-team-chat-message-user" : "ff-team-chat-message-other")}><MessageBody body={message.body} mentions={message.mentions} channelId={message.channelId} rootMessageId={message.id} /></div>
+                      <div className={cn("mt-1 flex items-center gap-2 text-[10px]", String(message.senderId) === String(user?.id) && "justify-end")}>
+                        <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-reply-${message.id}`} aria-label={`Reply to ${message.senderName}'s message`} className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 font-semibold text-[#17626a] hover:bg-[#dff5f6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]"><CornerDownRight className="h-3 w-3" />Reply</button>
+                        {message.replyCount > 0 && <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-replies-${message.id}`} className="inline-flex items-center gap-1 rounded-sm border border-[#9eb9b9] bg-[#e8f3f1] px-1.5 py-0.5 font-semibold text-[#17626a] hover:bg-[#d6eae7]">{message.replyCount} {message.replyCount === 1 ? "reply" : "replies"}</button>}
+                      </div>
+                    </div>
               </div>) : <div className="flex h-full flex-col items-center justify-center text-center text-[#707371]"><MessageCircle className="mb-3 h-10 w-10 text-[#8bbfc1]" /><p className="font-semibold">No messages here yet</p><p className="mt-1 text-xs">Send the first note to this conversation.</p></div>}
             <div ref={bottomRef} />
           </div>
-           <div className="border-t border-[#808080] bg-[#d4d0c8] p-1.5"><div className="relative flex items-center gap-1"><textarea ref={textareaRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitMessage(); } }} placeholder={`Message ${selected.directName || selected.name}...`} rows={1} className="ff-team-chat-input h-8 min-h-8 flex-1 resize-none overflow-hidden px-1.5 py-1 text-[11px] outline-none" /><div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="outline" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="ff-team-chat-icon-button h-8 w-8 p-0"><Smile className="h-4 w-4" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-xl border-2 border-[#808080] bg-white shadow-lg"><Picker data={emojiPickerData} onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="h-8 w-8 p-0"><Send className="h-3.5 w-3.5" /></Button></div></div>
-        </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
+            <div className="border-t border-[#808080] bg-[#d4d0c8] p-1.5"><div className="relative flex items-center gap-1">
+              <MentionAutocomplete value={draft} onChange={(value) => { setDraft(value); draftsByChannelRef.current[String(selected.id)] = value; }} users={mentionUsers} onDirectoryRefresh={() => { void refreshMentionUsers(selected.id); }} onSubmit={submitMessage} placeholder={`Message ${selected.directName || selected.name}...`} textareaRef={(node) => { textareaRef.current = node; }} data-testid="chat-message-composer" className="ff-team-chat-input h-8 min-h-8 flex-1 resize-none overflow-hidden px-1.5 py-1 text-[11px] outline-none" />
+              <div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="outline" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="ff-team-chat-icon-button h-8 w-8 p-0"><Smile className="h-4 w-4" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-xl border-2 border-[#808080] bg-white shadow-lg"><Picker data={emojiPickerData} onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="h-8 w-8 shrink-0 p-0"><Send className="h-3.5 w-3.5" /></Button></div></div>
+            </div>
+            {threadRootId !== null && <ThreadPanel channelId={selected.id} rootId={threadRootId} currentUserId={user?.id} active={active} onClose={() => setThreadRootId(null)} onChanged={() => { void loadMessages(); }} highlightedMessageId={highlightMessageId} />}
+            </div> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
          </section>
         </div>
        {error && channels.length > 0 && <div className="absolute bottom-1 left-1 right-1 z-30 flex items-center gap-2 bg-[#fff3d6] px-1.5 py-1 text-[10px] text-[#8b4141]"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}<button onClick={() => setError("")} aria-label="Dismiss" className="ml-auto"><X className="h-3 w-3" /></button></div>}
@@ -717,11 +790,14 @@ export function TeamChatWorkspace() {
     (permissionsLoaded && permissions.includes("chat"))
   );
   const isInternalRoute = location !== "/login" && location !== "/portal" && !location.startsWith("/portal/");
-  const active = location === "/chat";
+  const active = location.split("?")[0] === "/chat";
 
   useEffect(() => {
     if (!canUseChat || !isInternalRoute) return;
-    const openChat = () => setLocation("/chat");
+    const openChat = (event: Event) => {
+      const detail = (event as CustomEvent<{ messageId?: string | number }>).detail;
+      setLocation(detail?.messageId ? `${window.location.pathname}${window.location.search}` : "/chat");
+    };
     window.addEventListener("team-chat:open", openChat);
     return () => window.removeEventListener("team-chat:open", openChat);
   }, [setLocation, canUseChat, isInternalRoute]);
