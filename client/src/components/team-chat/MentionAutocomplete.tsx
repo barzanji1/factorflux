@@ -129,7 +129,7 @@ export function MentionAutocomplete({
         aria-controls={listboxId}
         aria-activedescendant={activeQuery && matches.length ? `${listboxId}-option-${activeIndex}` : undefined}
         data-testid={testId}
-        className={className}
+        className={`block w-full min-w-0 ${className || ""}`}
       />
       {activeQuery && matches.length > 0 && (
         <ul
