@@ -13,7 +13,7 @@ Verify OCR provenance and actual document text; never equate a completed extract
 
 The user selected AWS Textract with existing AWS credentials in `us-east-2`, rather than Claude vision. Do not silently change cloud providers to work around account access failures.
 
-**Why:** This was the user's explicit provider choice. Existing S3 access does not establish Textract subscription/service access; only a real AnalyzeExpense request verifies that.
+**Why:** This was the user's explicit provider choice. Existing S3 access does not establish Textract subscription/service access; only a real AnalyzeExpense request verifies that. Conversely, a rotated IAM user can successfully run Textract while lacking S3 upload permissions.
 
 **How to apply:** Report AWS account/service errors explicitly and keep OCR results unavailable until access works.
 
@@ -22,3 +22,11 @@ A thrown primary-provider error must fail the job with the original error stored
 **Why:** The user required provider exceptions to end in `failed`, never `completed`; automatic exception-to-fallback success would violate that requirement.
 
 **How to apply:** Preserve exception propagation across provider adapters. Show the latest failed attempt on Documents and as a nonblocking invoice info alert; historical failed attempts must not keep an alert after a successful retry.
+
+## Independent storage verification
+
+Generating a presigned URL is not proof of download authorization. Verify its HTTP response and returned bytes; signing alone happens locally.
+
+**Why:** After credential rotation, OCR can work independently of S3 permissions. If upload fails and the app has no known existing S3 object, there is no existing-object download result to claim.
+
+**How to apply:** Test upload, signed GET, and isolated-object cleanup separately. Report a blocked download test as unverified, not as success or an inferred GetObject denial. Never display signed URLs or credential values.
