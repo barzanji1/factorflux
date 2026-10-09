@@ -1,5 +1,5 @@
 // Real queued extraction, not a mocked provider. Run from the project root:
-// npx tsx scripts/verify-pilot-ocr.ts
+// OCR_PROVIDER=textract npx tsx scripts/verify-pilot-ocr.ts path/to/carrier-invoice.pdf
 // Isolated document/job rows are deleted after reporting; input files stay intact.
 import { spawn } from "node:child_process";
 import { statSync } from "node:fs";
@@ -49,19 +49,20 @@ async function worker() {
 }
 
 async function main() {
+  const inputs = process.argv.slice(2);
+  if (!inputs.length) {
+    throw new Error("Provide real carrier invoice PDF paths; W-9/ID samples are not pilot invoice verification inputs.");
+  }
   const provider = getExtractionProvider();
   const [author] = await db.select({ id: users.id }).from(users).limit(1);
   if (!author) throw new Error("An existing user is required for isolated verification documents");
   const reports: unknown[] = [];
   let anyOcrFailure = false;
-  for (const input of [
-    "uploads/a7a4b423fdd5abff1900a2f918dfb631.pdf",
-    "uploads/28cf8e0ebc4f1f00e6ac94d516fc6754.pdf",
-  ]) {
+  for (const input of inputs) {
     const filePath = path.resolve(input);
     const [doc] = await db.insert(documents).values({
       filename: path.basename(input), originalName: `Pilot OCR verification: ${path.basename(input)}`,
-      mimeType: "application/pdf", size: statSync(filePath).size, documentType: "other",
+      mimeType: "application/pdf", size: statSync(filePath).size, documentType: "invoice",
       uploadedBy: author.id, clientId: null, loadId: null, invoiceId: null, companyId: null,
     }).returning({ id: documents.id });
     try {

@@ -38,3 +38,9 @@ Pilot invoice-field verification must use a real carrier invoice from a pilot ar
 **Why:** The user explicitly clarified that the earlier samples were W-9/ID documents and requested an actual carrier invoice for verification of all six invoice fields.
 
 **How to apply:** Confirm the source document is an invoice before running the queued verification. If the pilot archive or invoice is unavailable, request it rather than reuse the unrelated documents or fabricate a sample.
+
+Successful OCR and high overall text confidence are not proof that every invoice field is correct.
+
+**Why:** A real pilot invoice produced near-perfect text confidence but an extra space inside the broker's name. Its P.O. reference and invoice date also were not explicitly labeled as a load number or service date.
+
+**How to apply:** Compare field results against the rendered document, report OCR discrepancies explicitly, and do not silently convert P.O. references into load IDs or invoice dates into service dates.
