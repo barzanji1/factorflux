@@ -30,3 +30,11 @@ Generating a presigned URL is not proof of download authorization. Verify its HT
 **Why:** After credential rotation, OCR can work independently of S3 permissions. If upload fails and the app has no known existing S3 object, there is no existing-object download result to claim.
 
 **How to apply:** Test upload, signed GET, and isolated-object cleanup separately. Report a blocked download test as unverified, not as success or an inferred GetObject denial. Never display signed URLs or credential values.
+
+## Pilot invoice acceptance
+
+Pilot invoice-field verification must use a real carrier invoice from a pilot archive, not the W-9/ID PDFs used for earlier provider-access checks.
+
+**Why:** The user explicitly clarified that the earlier samples were W-9/ID documents and requested an actual carrier invoice for verification of all six invoice fields.
+
+**How to apply:** Confirm the source document is an invoice before running the queued verification. If the pilot archive or invoice is unavailable, request it rather than reuse the unrelated documents or fabricate a sample.

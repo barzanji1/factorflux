@@ -109,9 +109,11 @@ async function main() {
   console.log(JSON.stringify({ bucket, resource, uploaded, signedDownloadVerified: downloaded,
     testObjectRemoved: cleaned, failures }));
   if (failures.length || !uploaded || !downloaded) process.exitCode = 1;
+  return downloaded;
 }
 const existingOnly = process.argv.includes("--existing-only");
-(existingOnly ? verifyExistingDownload() : main().then(verifyExistingDownload)).catch(async error => {
+(existingOnly ? verifyExistingDownload() : main().then(verified =>
+  verified ? pool.end() : verifyExistingDownload())).catch(async error => {
   console.error(error instanceof Error ? error.message : String(error));
   await pool.end().catch(() => {});
   process.exitCode = 1;
