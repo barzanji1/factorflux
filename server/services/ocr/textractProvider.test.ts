@@ -25,6 +25,7 @@ test("AnalyzeExpense maps all six fields without treating invoice vendor as brok
   assert.deepEqual(result.fields, {
     invoiceNumber: "INV-9001", loadNumber: "LD-777", amount: 1250,
     brokerName: "Broker Logistics", serviceDate: "2026-10-08", bolNumber: "BOL-111",
+    loadNumberSourceLabel: "Load ID", invoiceDate: null,
   });
 });
 test("Textract analyzes every rasterized page and merges fields", async () => {

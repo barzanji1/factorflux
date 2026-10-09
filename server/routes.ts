@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerOcrIntakeRoutes } from "./routes/ocrIntake";
 import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import multer from "multer";
@@ -1928,6 +1929,8 @@ ${message}
       res.status(500).json({ message: "Failed to update document type" });
     }
   });
+
+  registerOcrIntakeRoutes(app, requireAuth, handleUpload("file"), cleanupS3KeyWithRetry);
 
   app.post("/api/invoices/:id/documents", requireAuth, handleUpload("file"), async (req: any, res) => {
     try {

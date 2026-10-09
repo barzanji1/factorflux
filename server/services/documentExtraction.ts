@@ -20,6 +20,7 @@ import { eq } from "drizzle-orm";
 import { getExtractionProvider } from "./ocr/registry";
 import { assertSuccessfulExtraction, type ExtractionProvider } from "./ocr/types";
 import { classifyDocumentAI } from "./aiClassifier";
+import { findOcrBrokerMatch } from "./ocrBrokerMatching";
 import { extractInvoiceNumber, extractLoadNumber, extractReferenceNumber, extractBolNumber, type FieldResult } from "./documentFieldDetectors";
 
 // Re-export PageResult so existing callers (e.g. document-review-dialog) keep working
@@ -351,6 +352,8 @@ export async function runExtractionJob(
         amount: extracted.fields?.amount,
         broker_name: extracted.fields?.brokerName,
         service_date: extracted.fields?.serviceDate,
+        invoice_date: extracted.fields?.invoiceDate,
+        load_number_label: extracted.fields?.loadNumberSourceLabel,
         bol_number: extracted.fields?.bolNumber,
       };
       const value = structured[name];
@@ -387,8 +390,22 @@ export async function runExtractionJob(
     add("date",              extractDate(t));
     add("bol_number",        extractBolNumber(t));
     add("service_date",      null);
+    add("invoice_date",      null);
+    add("load_number_label", null);
     add("lumper_amount",     extractLumperAmount(t));
     add("pod_signature",     extractPodSignature(t));
+
+    const rawBrokerName = candidates.find(candidate => candidate.fieldName === "broker_name")?.fieldValue ?? null;
+    if (rawBrokerName) {
+      const match = await findOcrBrokerMatch(rawBrokerName, jobDb);
+      if (match.brokerId && match.confidence) {
+        for (const [name, value] of [["broker_id", String(match.brokerId)],
+          ["broker_match_confidence", match.confidence], ["broker_matched_name", match.matchedName!]]) {
+          candidates.push({ documentId, fieldName: name, fieldValue: value, normalizedValue: value,
+            confidenceScore: match.confidence === "high" ? "1" : "0.85", sourceSnippet: rawBrokerName });
+        }
+      }
+    }
 
     // Save classification as a field candidate too (for UI display)
     candidates.push({

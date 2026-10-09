@@ -43,4 +43,18 @@ Successful OCR and high overall text confidence are not proof that every invoice
 
 **Why:** A real pilot invoice produced near-perfect text confidence but an extra space inside the broker's name. Its P.O. reference and invoice date also were not explicitly labeled as a load number or service date.
 
-**How to apply:** Compare field results against the rendered document, report OCR discrepancies explicitly, and do not silently convert P.O. references into load IDs or invoice dates into service dates.
+**How to apply:** Compare field results against the rendered document and report OCR discrepancies explicitly. Invoice dates must not be silently converted into service dates.
+
+## Pilot reference semantics
+
+For pilot intake, the user explicitly authorized P.O. Number, PO #, Ref #, Reference, and Order # as load-number fallbacks only when an explicit Load label is absent. Preserve the originating label.
+
+**Why:** The real carrier pilot invoice's P.O. reference is its expected load identifier. This supersedes the earlier conservative refusal to map that reference, but not the prohibition against inventing a service date.
+
+**How to apply:** Prefer explicit Load values even on later pages. Never treat a postal PO Box address as a load reference. Keep invoice_date separate from an unknown service_date.
+
+Broker match ambiguity must remain conservative: more than one qualifying broker leaves the selection unset, even if one candidate is exact and another fuzzy.
+
+**Why:** The user's multiple-candidate rule is intended to prevent an incorrect broker association; aliases for the same broker do not count as separate brokers.
+
+**How to apply:** Preserve raw OCR broker text for review, require a Verify marker on medium-confidence selections, and never auto-create brokers.

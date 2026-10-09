@@ -108,6 +108,10 @@ async function main() {
         detectedInvoiceNumber: field("invoice_number"), detectedLoadNumber: field("load_number"),
         detectedAmount: field("amount"), detectedBrokerName: field("broker_name"),
         detectedServiceDate: field("service_date"), detectedBolNumber: field("bol_number"),
+        loadNumberSourceLabel: field("load_number_label"),
+        detectedInvoiceDate: field("invoice_date"),
+        matchedBrokerId: field("broker_id"), brokerMatchConfidence: field("broker_match_confidence"),
+        matchedBrokerName: field("broker_matched_name"),
         error: genuineOcr ? null : finished?.errorMessage || errors.join("; ") || "No successful OCR result returned",
         providerDiagnostics: errors,
       };

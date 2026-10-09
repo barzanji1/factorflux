@@ -36,7 +36,7 @@ for (const [label, detect] of labels) {
 
 test("original failing example returns the invoice identifier, not NUMBER", () => {
   assert.deepEqual(extractInvoiceNumber("Invoice Number: INV-9001"), {
-    value: "INV-9001", normalized: "INV-9001", confidence: 0.8,
+    value: "INV-9001", normalized: "INV-9001", confidence: 0.8, sourceLabel: "Invoice Number",
   });
 });
 
@@ -51,12 +51,14 @@ test("label matching is case-insensitive and does not match inside other words",
   assert.equal(extractInvoiceNumber("INV-9001"), null);
 });
 
-test("reference identifiers remain distinct from invoice and load numbers", () => {
-  for (const label of ["PRO #", "Ref #", "BOL #"]) {
+test("PRO and BOL identifiers remain distinct from invoice and load numbers", () => {
+  for (const label of ["PRO #", "BOL #"]) {
     assert.equal(extractLoadNumber(`${label} ABC-9`), null);
     assert.equal(extractInvoiceNumber(`${label} ABC-9`), null);
     assert.equal(extractReferenceNumber(`${label} ABC-9`)?.value, "ABC-9");
   }
+  assert.equal(extractLoadNumber("Ref # ABC-9")?.value, "ABC-9");
+  assert.equal(extractInvoiceNumber("Ref # ABC-9"), null);
 });
 
 test("BOL's separate field uses the same safe label/value handling", () => {

@@ -164,7 +164,7 @@ function SearchSelect<T extends { id: number; name: string }>({
 function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Carrier | Broker }) {
   const isCarrier = kind === "carrier";
   const brokerRecord = !isCarrier && record ? record as Broker : undefined;
-  const status = record?.status ?? "Not selected";
+  const status = record ? record.status ?? "Unknown" : "Not selected";
   const favorable = status === "active" || status === "approved";
   return (
     <aside className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/50">
@@ -227,6 +227,50 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
 }
 
 type InitialInvoiceValues = Partial<typeof EMPTY> & { brokerName?: string };
+type OcrFields = {
+  invoice_number?: string;
+  load_number?: string;
+  load_number_label?: string;
+  invoice_date?: string;
+  service_date?: string;
+  amount?: string;
+  broker_name?: string;
+  broker_id?: string;
+  broker_match_confidence?: "high" | "medium";
+  bol_number?: string;
+};
+type OcrBrokerMatch = {
+  brokerId: number | null;
+  confidence: "high" | "medium" | null;
+  rawName: string | null;
+  matchedName: string | null;
+  candidates: Array<{ id: number; name: string }>;
+};
+type OcrStatus = "idle" | "uploading" | "queued" | "processing" | "completed" | "failed";
+
+function ocrErrorMessage(payload: any, fallback: string) {
+  return typeof payload?.error === "string" && payload.error.trim()
+    ? payload.error
+    : typeof payload?.message === "string" && payload.message.trim() ? payload.message : fallback;
+}
+
+function waitForOcrPoll(signal: AbortSignal, delay = 1200) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Request cancelled", "AbortError"));
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay);
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      reject(new DOMException("Request cancelled", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 export default function CreateInvoiceModal({
   open, onOpenChange, initialValues,
@@ -254,6 +298,14 @@ export default function CreateInvoiceModal({
   const [paperwork, setPaperwork] = useState<Record<PaperworkKey, File | null>>({
     rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null,
   });
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const [ocrStatus, setOcrStatus] = useState<OcrStatus>("idle");
+  const [ocrError, setOcrError] = useState("");
+  const [ocrFields, setOcrFields] = useState<OcrFields | null>(null);
+  const [ocrBrokerMatch, setOcrBrokerMatch] = useState<OcrBrokerMatch | null>(null);
+  const ocrRequestId = useRef(0);
+  const ocrController = useRef<AbortController | null>(null);
+  const ocrSelectedBrokerId = useRef<string | null>(null);
   const { data: carriersData = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients", { all: true }], enabled: open });
   useEffect(() => {
     const timer = window.setTimeout(() => setBrokerQuery(brokerSearch.trim()), 250);
@@ -316,6 +368,103 @@ export default function CreateInvoiceModal({
     setOverrideNearDuplicate(false);
   };
 
+  const stopOcrRequest = () => {
+    ocrRequestId.current += 1;
+    ocrController.current?.abort();
+    ocrController.current = null;
+  };
+
+  const extractInvoiceFields = async (file: File) => {
+    stopOcrRequest();
+    const requestId = ocrRequestId.current;
+    const controller = new AbortController();
+    ocrController.current = controller;
+    setOcrFile(file);
+    setOcrStatus("uploading");
+    setOcrError("");
+    setOcrFields(null);
+    setOcrBrokerMatch(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const intakeResponse = await fetch("/api/invoices/ocr-intake", {
+        method: "POST",
+        credentials: "include",
+        body,
+        signal: controller.signal,
+      });
+      const intake = await intakeResponse.json().catch(() => ({}));
+      if (!intakeResponse.ok) throw new Error(ocrErrorMessage(intake, `Upload failed (${intakeResponse.status}).`));
+      if (requestId !== ocrRequestId.current) return;
+      if (typeof intake.documentId !== "number") throw new Error("The upload response did not include a document ID.");
+      setOcrStatus(intake.status === "queued" ? "queued" : "processing");
+
+      while (requestId === ocrRequestId.current) {
+        await waitForOcrPoll(controller.signal);
+        const pollResponse = await fetch(`/api/invoices/ocr-intake/${intake.documentId}`, {
+          method: "GET",
+          credentials: "include",
+          signal: controller.signal,
+        });
+        const result = await pollResponse.json().catch(() => ({}));
+        if (!pollResponse.ok) throw new Error(ocrErrorMessage(result, `Status check failed (${pollResponse.status}).`));
+        if (requestId !== ocrRequestId.current) return;
+        if (result.status === "failed") {
+          setOcrStatus("failed");
+          setOcrError(ocrErrorMessage(result, "Invoice field extraction failed. Try another PDF."));
+          return;
+        }
+        if (result.status === "completed") {
+          const fields: OcrFields = result.fields && typeof result.fields === "object" ? result.fields : {};
+          const match: OcrBrokerMatch = result.brokerMatch && typeof result.brokerMatch === "object"
+            ? {
+                brokerId: typeof result.brokerMatch.brokerId === "number" ? result.brokerMatch.brokerId : null,
+                confidence: result.brokerMatch.confidence === "high" || result.brokerMatch.confidence === "medium" ? result.brokerMatch.confidence : null,
+                rawName: typeof result.brokerMatch.rawName === "string" ? result.brokerMatch.rawName : null,
+                matchedName: typeof result.brokerMatch.matchedName === "string" ? result.brokerMatch.matchedName : null,
+                candidates: Array.isArray(result.brokerMatch.candidates) ? result.brokerMatch.candidates : [],
+              }
+            : { brokerId: null, confidence: null, rawName: null, matchedName: null, candidates: [] };
+          setOcrFields(fields);
+          setOcrBrokerMatch(match);
+          setValues(current => ({
+            ...current,
+            ...(fields.invoice_number?.trim() ? { carrierInvoiceNumber: fields.invoice_number } : {}),
+            ...(fields.load_number?.trim() ? { loadNumber: fields.load_number } : {}),
+            ...(fields.amount?.trim() ? { amount: fields.amount } : {}),
+            ...(match.brokerId != null ? { brokerId: String(match.brokerId), branchId: "" } : { brokerId: "", branchId: "" }),
+          }));
+          if (match.brokerId != null) {
+            ocrSelectedBrokerId.current = String(match.brokerId);
+            setSelectedBroker({
+              id: match.brokerId,
+              name: match.matchedName || match.candidates.find(candidate => candidate.id === match.brokerId)?.name || match.rawName || "Matched broker",
+            });
+          } else {
+            ocrSelectedBrokerId.current = null;
+            setSelectedBroker(undefined);
+          }
+          invalidatePreflightAcknowledgements();
+          setPreflightAlerts([]);
+          setPreflightOpen(false);
+          setOcrStatus("completed");
+          return;
+        }
+        if (result.status === "queued" || result.status === "processing") {
+          setOcrStatus(result.status);
+        } else {
+          throw new Error("The status service returned an unexpected response.");
+        }
+      }
+    } catch (error) {
+      if (requestId !== ocrRequestId.current || controller.signal.aborted) return;
+      setOcrStatus("failed");
+      setOcrError(error instanceof Error ? error.message : "Unable to extract invoice fields.");
+    } finally {
+      if (requestId === ocrRequestId.current) ocrController.current = null;
+    }
+  };
+
   const runPreflight = async (overrides: Partial<typeof values> = {}, openModal = true) => {
     const candidate = { ...values, ...overrides };
     if (!candidate.clientId && !candidate.brokerId) return;
@@ -360,12 +509,13 @@ export default function CreateInvoiceModal({
   };
 
   useEffect(() => {
+    if (ocrSelectedBrokerId.current === values.brokerId && values.brokerId && !values.branchId) return;
     if (branches.length === 1 && values.branchId !== String(branches[0].id)) {
       setValues(v => ({ ...v, branchId: String(branches[0].id) }));
     } else if (values.branchId && !branches.some(branch => String(branch.id) === values.branchId)) {
       setValues(v => ({ ...v, branchId: "" }));
     }
-  }, [branches, values.branchId]);
+  }, [branches, values.branchId, values.brokerId]);
 
   useEffect(() => {
     if (open && initialValues) {
@@ -374,6 +524,9 @@ export default function CreateInvoiceModal({
         setSelectedBroker({ id: Number(initialValues.brokerId), name: initialValues.brokerName });
       }
     } else if (!open) {
+      ocrRequestId.current += 1;
+      ocrController.current?.abort();
+      ocrController.current = null;
       preflightRequestId.current += 1;
       setPreflightLoading(false);
       setValues(EMPTY);
@@ -383,11 +536,26 @@ export default function CreateInvoiceModal({
       setAcknowledgements({});
       setOverrideNearDuplicate(false);
       setSelectedBroker(undefined);
+      ocrSelectedBrokerId.current = null;
       setBrokerSearch("");
       setBrokerOpen(false);
       setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
+      setOcrFile(null);
+      setOcrStatus("idle");
+      setOcrError("");
+      setOcrFields(null);
+      setOcrBrokerMatch(null);
     }
   }, [open, initialValues]);
+
+  useEffect(() => {
+    if (!open) return;
+    return () => {
+      ocrRequestId.current += 1;
+      ocrController.current?.abort();
+      ocrController.current = null;
+    };
+  }, [open]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -474,6 +642,83 @@ export default function CreateInvoiceModal({
                 <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
               </div>
             ))}
+            <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3" aria-labelledby="ocr-upload-heading">
+              <div>
+                <h3 id="ocr-upload-heading" className="text-sm font-semibold">Extract invoice fields</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Upload a PDF to prefill the invoice number, load, amount, and broker when recognized.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  id="invoice-ocr-pdf"
+                  data-testid="invoice-ocr-uploader"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  disabled={ocrStatus === "uploading" || ocrStatus === "queued" || ocrStatus === "processing"}
+                  aria-label="Extract invoice fields from a PDF"
+                  className="block max-w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-700 file:shadow-sm hover:file:bg-slate-100 disabled:opacity-50"
+                  onChange={event => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    if (!file) return;
+                    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+                      setOcrFile(file);
+                      setOcrStatus("failed");
+                      setOcrError("Choose a PDF file to extract invoice fields.");
+                      setOcrFields(null);
+                      setOcrBrokerMatch(null);
+                      return;
+                    }
+                    void extractInvoiceFields(file);
+                  }}
+                />
+                {ocrFile && <span className="max-w-full truncate text-xs text-slate-500">{ocrFile.name}</span>}
+              </div>
+              {ocrStatus !== "idle" && (
+                <p
+                  data-testid="invoice-ocr-status"
+                  role={ocrStatus === "failed" ? "alert" : "status"}
+                  aria-live="polite"
+                  className={cn("text-xs", ocrStatus === "failed" ? "text-red-700" : ocrStatus === "completed" ? "text-emerald-700" : "text-slate-600")}
+                >
+                    {ocrStatus === "uploading" ? "Uploading PDF…" : ocrStatus === "queued" ? "PDF received — extraction queued…" : ocrStatus === "processing" ? "Extracting invoice fields…" : ocrStatus === "completed" ? "Extraction complete. Review the prefilled values before submitting." : ocrError || "Extraction failed. Choose another PDF to try again."}
+                </p>
+              )}
+              {ocrStatus === "completed" && ocrFields && (
+                <div className="grid gap-x-4 gap-y-2 border-t border-slate-200 pt-2 text-xs sm:grid-cols-2">
+                  <p data-testid="invoice-ocr-load-source"><span className="font-medium text-slate-600">Load source label:</span> {ocrFields.load_number_label?.trim() || "Not found"}</p>
+                  <p data-testid="invoice-ocr-invoice-date"><span className="font-medium text-slate-600">Invoice date (extracted):</span> {ocrFields.invoice_date?.trim() || "Not found"}</p>
+                  <p><span className="font-medium text-slate-600">Extracted invoice number:</span> {ocrFields.invoice_number?.trim() || "Not found"}</p>
+                  <p><span className="font-medium text-slate-600">Extracted load number:</span> {ocrFields.load_number?.trim() || "Not found"}</p>
+                  <p><span className="font-medium text-slate-600">Extracted amount:</span> {ocrFields.amount?.trim() || "Not found"}</p>
+                  <p><span className="font-medium text-slate-600">Bill of lading:</span> {ocrFields.bol_number?.trim() || "Not found"}</p>
+                </div>
+              )}
+              {ocrStatus === "completed" && ocrBrokerMatch && (
+                <div className="space-y-1 border-t border-slate-200 pt-2 text-xs">
+                  <p data-testid="invoice-ocr-raw-broker">
+                    <span className="font-medium text-slate-600">Extracted broker name:</span>{" "}
+                    {ocrBrokerMatch.rawName?.trim() || ocrFields?.broker_name?.trim() || "Not found"}
+                  </p>
+                  {ocrBrokerMatch.brokerId != null ? (
+                    <p className={cn("font-medium", ocrBrokerMatch.confidence === "medium" ? "text-amber-800" : "text-emerald-800")}>
+                      {ocrBrokerMatch.confidence === "medium" ? (
+                        <span data-testid="invoice-ocr-verify-marker">Verify · Confirm this broker match against the extracted name.</span>
+                      ) : ocrBrokerMatch.confidence === "high" ? (
+                        <span>Normalized exact match · broker selected.</span>
+                      ) : (
+                        <span>Broker selected from extraction. Review the match before submitting.</span>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-amber-800">
+                      {ocrBrokerMatch.candidates.length > 1
+                        ? "Several broker matches were found. Select the correct broker manually; none has been selected."
+                        : "No broker match was found. Select a broker manually; automatic broker creation is not available."}
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
             <div className="space-y-2">
               <Label>Load Type <span className="text-red-500">*</span></Label>
               <LoadTypeToggleGroup
@@ -527,11 +772,11 @@ export default function CreateInvoiceModal({
                  <Label>Broker <span className="text-red-500">*</span></Label>
                  <div className="relative">
                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                   <Input className="h-11 pl-9" value={brokerOpen ? brokerSearch : broker?.name ?? ""} placeholder="Search brokers..." onFocus={() => { setBrokerOpen(true); setBrokerSearch(""); }} onChange={event => { setBrokerSearch(event.target.value); setBrokerOpen(true); }} />
-                    {broker && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { invalidatePreflightAcknowledgements(); setSelectedBroker(undefined); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
+                    <Input className="h-11 pl-9" value={brokerOpen ? brokerSearch : broker?.name ?? ""} placeholder="Search brokers..." onFocus={() => { setBrokerOpen(true); setBrokerSearch(""); }} onChange={event => { setBrokerSearch(event.target.value); setBrokerOpen(true); }} />
+                     {broker && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { invalidatePreflightAcknowledgements(); ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); setSelectedBroker(undefined); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
                  </div>
                  {brokerOpen && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-950">
-                     {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { setSelectedBroker(item); const next = { ...values, brokerId: String(item.id), branchId: "" }; invalidatePreflightAcknowledgements(); setValues(next); setBrokerSearch(""); setBrokerOpen(false); void runPreflight(next, true); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
+                      {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); setSelectedBroker(item); const next = { ...values, brokerId: String(item.id), branchId: "" }; invalidatePreflightAcknowledgements(); setValues(next); setBrokerSearch(""); setBrokerOpen(false); void runPreflight(next, true); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
                  </div>}
                </div>
                <div className="space-y-1.5">
@@ -606,7 +851,7 @@ export default function CreateInvoiceModal({
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="button" variant="outline" onClick={() => { invalidatePreflightAcknowledgements(); setPreflightAlerts([]); setValues(EMPTY); setSelectedBroker(undefined); setBrokerSearch(""); setBrokerOpen(false); setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null }); }}>Reset</Button>
+              <Button type="button" variant="outline" onClick={() => { stopOcrRequest(); ocrSelectedBrokerId.current = null; setOcrFile(null); setOcrStatus("idle"); setOcrError(""); setOcrFields(null); setOcrBrokerMatch(null); invalidatePreflightAcknowledgements(); setPreflightAlerts([]); setValues(EMPTY); setSelectedBroker(undefined); setBrokerSearch(""); setBrokerOpen(false); setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null }); }}>Reset</Button>
               <Button type="submit" disabled={!valid || mutation.isPending || preflightLoading} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
                 {mutation.isPending ? "Creating..." : "Submit"}
               </Button>

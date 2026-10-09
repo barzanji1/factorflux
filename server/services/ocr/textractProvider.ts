@@ -19,7 +19,24 @@ export function decodeExpense(response: AnalyzeExpenseCommandOutput, docType: st
     pattern.test(field.LabelDetection?.Text ?? ""))?.ValueDetection?.Text?.trim();
   const fields = fieldsFromText(text);
   fields.invoiceNumber = value("INVOICE_RECEIPT_ID") ?? fields.invoiceNumber;
-  fields.loadNumber = value("LOAD_NUMBER", "LOAD_ID") ?? labeled(/^load\s*(?:number|id|no\.?|#)?\s*:?\s*$/i) ?? fields.loadNumber;
+  const explicitLoad = summaries.find(field => field.ValueDetection?.Text?.trim() && (
+    ["LOAD_NUMBER", "LOAD_ID"].includes(field.Type?.Text ?? "") ||
+    /^load\s*(?:number|id|no\.?|#)?\s*:?\s*$/i.test(field.LabelDetection?.Text ?? "")));
+  const referenceLoad = summaries.find(field => field.ValueDetection?.Text?.trim() && (
+    ["PO_NUMBER", "REFERENCE_NUMBER", "ORDER_NUMBER", "ORDER_ID"].includes(field.Type?.Text ?? "") ||
+    /^(?:p\.?\s*o\.?|ref|reference|order)\s*(?:number|id|no\.?|#)?\s*:?\s*$/i.test(field.LabelDetection?.Text ?? "")));
+  const selectedLoad = explicitLoad?.ValueDetection?.Text?.trim() ? explicitLoad :
+    /^load\b/i.test(fields.loadNumberSourceLabel ?? "") ? null : referenceLoad;
+  if (selectedLoad?.ValueDetection?.Text?.trim()) {
+    const token = selectedLoad.ValueDetection.Text.trim().split(/\s/)[0];
+    if (/^[A-Z0-9-]+$/i.test(token) && !/^(?:number|no|id|ref|order|load|po)$/i.test(token)) {
+      fields.loadNumber = token.toUpperCase();
+      fields.loadNumberSourceLabel = selectedLoad.LabelDetection?.Text?.trim() ??
+        (selectedLoad === explicitLoad ? "Load Number" :
+          selectedLoad.Type?.Text === "PO_NUMBER" ? text.match(/\bp\.?\s*o\.?\s*(?:number|#)/i)?.[0] ?? "P.O. Number" :
+          selectedLoad.Type?.Text?.startsWith("ORDER") ? "Order #" : "Reference");
+    }
+  }
   fields.amount = parseAmount(value("TOTAL")) ?? fields.amount;
   // Vendor is the issuer, usually the carrier on invoices, NOT the broker.
   fields.brokerName = value("BROKER_NAME", "RECEIVER_NAME", "CUSTOMER_NAME") ?? fields.brokerName;
@@ -28,6 +45,8 @@ export function decodeExpense(response: AnalyzeExpenseCommandOutput, docType: st
   }
   fields.serviceDate = parseServiceDate(value("SERVICE_DATE", "DELIVERY_DATE") ??
     labeled(/^(?:service|delivery|pickup)\s*date\s*:?\s*$/i)) ?? fields.serviceDate;
+  fields.invoiceDate = parseServiceDate(value("INVOICE_RECEIPT_DATE", "INVOICE_DATE") ??
+    labeled(/^invoice\s*date\s*:?\s*$/i)) ?? fields.invoiceDate;
   fields.bolNumber = value("BOL_NUMBER") ?? labeled(/^(?:bol|b\/l|bill\s+of\s+lading)\s*(?:number|no\.?|#)?\s*:?\s*$/i) ?? fields.bolNumber;
   return {
     text, fields,

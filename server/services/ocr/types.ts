@@ -72,6 +72,9 @@ export interface OcrFields {
   brokerName: string | null;
   serviceDate: string | null;
   bolNumber: string | null;
+  /** Optional enrichment preserves compatibility with existing providers. */
+  loadNumberSourceLabel?: string | null;
+  invoiceDate?: string | null;
 }
 
 export interface OcrResult {
