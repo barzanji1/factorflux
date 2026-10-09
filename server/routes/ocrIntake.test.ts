@@ -6,6 +6,7 @@ import ts from "typescript";
 import express from "express";
 import multer from "multer";
 import { documents, docExtractionJobs, docFieldCandidates } from "../../shared/schema";
+import { IntakeError, mapIntakeDocuments } from "../services/ocrIntakeMapping";
 
 async function setup(t: { after: (fn: () => Promise<void>) => void }) {
   const state = {
@@ -54,6 +55,12 @@ async function setup(t: { after: (fn: () => Promise<void>) => void }) {
       if (name.endsWith("ocrBrokerMatching")) return { findOcrBrokerMatch: async (raw: unknown) => raw ? state.match : {
         brokerId: null, confidence: null, rawName: null, matchedName: null, candidates: [],
       } };
+      if (name.endsWith("ocrIntakeMapping")) return { IntakeError, mapIntakeDocuments };
+      if (name.endsWith("ocrIntakeSnapshot")) return { parseIntakeIds: (ids: number[]) => ids,
+        getIntakeSnapshot: async (_ids: number[], user: { id: string }) => {
+          if (user.id !== state.doc.uploadedBy) throw new IntakeError("Not your document", 403);
+          return { status: state.job.status, fields: state.fields, sources: {}, documents: [], alerts: [] };
+        } };
       throw new Error(`Unexpected import ${name}`);
     },
   });
@@ -87,7 +94,7 @@ test("OCR intake queues only valid PDFs and uses explicit NULL associations", as
   assert.equal(state.inserted.length, 2);
   const doc = state.inserted[0] as Record<string, unknown>;
   for (const key of ["clientId", "loadId", "invoiceId", "companyId"]) assert.equal(doc[key], null);
-  assert.equal(doc.documentType, "invoice");
+  assert.equal(doc.documentType, "other");
 });
 test("transaction failure compensates only the new S3 object and never queues", async t => {
   const { state, upload } = await setup(t);

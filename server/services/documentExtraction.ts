@@ -301,20 +301,21 @@ export async function runExtractionJob(
     });
 
     // ── AI classification (best-effort, won't block extraction) ──────────────
-    let aiResult: Awaited<ReturnType<typeof classifyDocumentAI>> | null = null;
+    const routed = extracted.raw as { classification?: Awaited<ReturnType<typeof classifyDocumentAI>>; docType?: string } | undefined;
+    let aiResult: Awaited<ReturnType<typeof classifyDocumentAI>> | null = routed?.classification ?? null;
     try {
-      aiResult = await classifyDocumentAI(t, classification);
+      if (!aiResult) aiResult = await classifyDocumentAI(t, classification);
     } catch (err: any) {
       console.warn(`[Extraction] AI classification failed for doc ${documentId}:`, err?.message);
     }
 
     // Prefer AI result when it has higher confidence
     const finalDocType =
-      aiResult && aiResult.confidence > classification.confidence
+      routed?.classification ? routed.classification.docType : aiResult && aiResult.confidence > classification.confidence
         ? aiResult.docType
         : classification.docType;
     const finalConfidence =
-      aiResult && aiResult.confidence > classification.confidence
+      routed?.classification ? routed.classification.confidence : aiResult && aiResult.confidence > classification.confidence
         ? aiResult.confidence
         : classification.confidence;
 
@@ -346,7 +347,7 @@ export async function runExtractionJob(
     }> = [];
 
     const add = (name: string, res: FieldResult) => {
-      const structured: Record<string, string | number | null | undefined> = {
+      const structured: Record<string, string | number | boolean | null | undefined> = {
         invoice_number: extracted.fields?.invoiceNumber,
         load_number: extracted.fields?.loadNumber,
         amount: extracted.fields?.amount,
@@ -355,13 +356,20 @@ export async function runExtractionJob(
         invoice_date: extracted.fields?.invoiceDate,
         load_number_label: extracted.fields?.loadNumberSourceLabel,
         bol_number: extracted.fields?.bolNumber,
+        rate: extracted.fields?.rate, pickup_date: extracted.fields?.pickupDate,
+        delivery_date: extracted.fields?.deliveryDate, origin: extracted.fields?.origin,
+        destination: extracted.fields?.destination, pod_signature: extracted.fields?.receiverSignature,
       };
       const value = structured[name];
       // Structured providers explicitly return null for unknown fields. Do not
       // replace those unknowns with legacy max-amount/company-name guesses.
       if (extracted.fields && name in structured && value == null) return;
       if (value != null) {
-        res = { value: String(value), normalized: String(value), confidence: extracted.confidence };
+        const key = ({ invoice_number: "invoiceNumber", load_number: "loadNumber", broker_name: "brokerName",
+          invoice_date: "invoiceDate", service_date: "serviceDate", pickup_date: "pickupDate",
+          delivery_date: "deliveryDate", bol_number: "bolNumber", pod_signature: "receiverSignature" } as Record<string, string>)[name] ?? name;
+        res = { value: String(value), normalized: String(value),
+          confidence: extracted.fields?.fieldConfidences?.[key] ?? extracted.confidence };
       }
       if (res) {
         candidates.push({
@@ -392,6 +400,9 @@ export async function runExtractionJob(
     add("service_date",      null);
     add("invoice_date",      null);
     add("load_number_label", null);
+    add("rate", null);
+    add("origin", null);
+    add("destination", null);
     add("lumper_amount",     extractLumperAmount(t));
     add("pod_signature",     extractPodSignature(t));
 

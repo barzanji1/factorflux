@@ -75,6 +75,13 @@ export interface OcrFields {
   /** Optional enrichment preserves compatibility with existing providers. */
   loadNumberSourceLabel?: string | null;
   invoiceDate?: string | null;
+  rate?: number | null;
+  pickupDate?: string | null;
+  deliveryDate?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  receiverSignature?: boolean | null;
+  fieldConfidences?: Record<string, number>;
 }
 
 export interface OcrResult {

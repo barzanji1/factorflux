@@ -86,7 +86,7 @@ export function brokerAliases(record: Record<string, unknown>): string[] {
   return result.map(alias => alias.trim()).filter(Boolean);
 }
 
-export async function findOcrBrokerMatch(rawName: string | null, database = db): Promise<BrokerMatch> {
+export async function findOcrBrokerMatch(rawName: string | null, database: Pick<typeof db, "execute"> = db): Promise<BrokerMatch> {
   if (!rawName?.trim()) return matchBrokerName(rawName, []);
   // JSON projection includes any existing DBA/alias columns, without adding or
   // assuming columns that the current broker schema does not contain.

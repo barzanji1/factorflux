@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { db, pool } from "../server/db";
 import { documents, users, docExtractionJobs, docExtractionResults, docFieldCandidates } from "../shared/schema";
 import { getExtractionProvider } from "../server/services/ocr/registry";
+import { getIntakeSnapshot } from "../server/services/ocrIntakeSnapshot";
 
 async function worker() {
   const jobId = Number(process.argv[3]), documentId = Number(process.argv[4]), filePath = process.argv[5];
@@ -36,7 +37,7 @@ async function worker() {
   }
   const { jobQueue } = await import("../server/services/jobQueue");
   jobQueue.enqueue({ jobId, documentId, filePath, mimeType: "application/pdf" });
-  const deadline = Date.now() + 120_000;
+   const deadline = Date.now() + 240_000;
   while (!fatal && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 400));
     const [job] = await db.select().from(docExtractionJobs).where(eq(docExtractionJobs.id, jobId));
@@ -45,11 +46,16 @@ async function worker() {
       process.exit(job.status === "completed" ? 0 : 1);
     }
   }
-  await fail(new Error("Queued OCR did not finish within 120 seconds"));
+   await fail(new Error("Queued OCR did not finish within 240 seconds"));
 }
 
 async function main() {
-  const inputs = process.argv.slice(2);
+  const fullLoad = process.argv.includes("--full-load");
+  const override = process.argv.find(arg => arg.startsWith("--doc-types="))?.slice("--doc-types=".length).split(",");
+  const inputs = process.argv.slice(2).filter(arg => arg !== "--full-load" && !arg.startsWith("--doc-types="));
+  if (override && (override.length !== inputs.length || override.some(type => !["invoice", "rate_confirmation", "bol", "pod"].includes(type)))) {
+    throw new Error("--doc-types must identify every input as invoice, rate_confirmation, bol, or pod; verification override only");
+  }
   if (!inputs.length) {
     throw new Error("Provide real carrier invoice PDF paths; W-9/ID samples are not pilot invoice verification inputs.");
   }
@@ -57,14 +63,17 @@ async function main() {
   const [author] = await db.select({ id: users.id }).from(users).limit(1);
   if (!author) throw new Error("An existing user is required for isolated verification documents");
   const reports: unknown[] = [];
+  const isolatedIds: number[] = [];
   let anyOcrFailure = false;
-  for (const input of inputs) {
+  try {
+  for (const [index, input] of inputs.entries()) {
     const filePath = path.resolve(input);
     const [doc] = await db.insert(documents).values({
       filename: path.basename(input), originalName: `Pilot OCR verification: ${path.basename(input)}`,
-      mimeType: "application/pdf", size: statSync(filePath).size, documentType: "invoice",
+      mimeType: "application/pdf", size: statSync(filePath).size, documentType: override?.[index] ?? (fullLoad ? "other" : "invoice"),
       uploadedBy: author.id, clientId: null, loadId: null, invoiceId: null, companyId: null,
     }).returning({ id: documents.id });
+    isolatedIds.push(doc.id);
     try {
       const [job] = await db.insert(docExtractionJobs).values({
         documentId: doc.id, jobType: "ocr", status: "queued",
@@ -73,7 +82,7 @@ async function main() {
       const exitCode = await new Promise<number | null>((resolve, reject) => {
         const child = spawn(process.execPath, ["--import", "tsx", fileURLToPath(import.meta.url),
           "--worker", String(job.id), String(doc.id), filePath], { stdio: ["ignore", "pipe", "pipe"] });
-        const timer = setTimeout(() => child.kill("SIGKILL"), 150_000);
+        const timer = setTimeout(() => child.kill("SIGKILL"), 270_000);
         child.stdout.on("data", data => { log += String(data); });
         child.stderr.on("data", data => { log += String(data); });
         child.once("error", error => { clearTimeout(timer); reject(error); });
@@ -112,6 +121,11 @@ async function main() {
         detectedInvoiceDate: field("invoice_date"),
         matchedBrokerId: field("broker_id"), brokerMatchConfidence: field("broker_match_confidence"),
         matchedBrokerName: field("broker_matched_name"),
+        structuredFields: (result?.rawPayloadJson as any)?.fields ?? null,
+        classification: (result?.rawPayloadJson as any)?.providerRaw?.classification ?? null,
+        operation: (result?.rawPayloadJson as any)?.providerRaw?.operation ?? null,
+        queryAnswers: ((result?.rawPayloadJson as any)?.providerRaw?.pages ?? []).map((page: any) => page.answers ?? null),
+        classificationMode: override ? "explicit_verification_override" : fullLoad ? "automatic_gpt4o_mini" : "explicit_invoice",
         error: genuineOcr ? null : finished?.errorMessage || errors.join("; ") || "No successful OCR result returned",
         providerDiagnostics: errors,
       };
@@ -120,8 +134,20 @@ async function main() {
     } finally {
       // Only this newly created document and its cascading audit children.
       // Never delete existing documents or files.
-      await db.delete(documents).where(eq(documents.id, doc.id));
+      if (!fullLoad) await db.delete(documents).where(eq(documents.id, doc.id));
     }
+  }
+  if (fullLoad) {
+    const snapshot = await getIntakeSnapshot(isolatedIds, { id: author.id, role: "admin" });
+    if (snapshot.missingTypes.length) anyOcrFailure = true;
+    console.log(JSON.stringify({ fullLoad: true, status: snapshot.status,
+      classificationMode: override ? "explicit_verification_override" : "automatic_gpt4o_mini",
+      missingTypes: snapshot.missingTypes, tolerance: snapshot.tolerance,
+      fields: snapshot.fields, sources: snapshot.sources, crossChecks: snapshot.alerts,
+      brokerMatch: snapshot.brokerMatch, documents: snapshot.documents }));
+  }
+  } finally {
+    for (const id of isolatedIds) await db.delete(documents).where(eq(documents.id, id));
   }
   console.log(JSON.stringify({ verificationComplete: true, allOcrSucceeded: !anyOcrFailure, isolatedRecordsCleaned: true, reports }));
   await pool.end();

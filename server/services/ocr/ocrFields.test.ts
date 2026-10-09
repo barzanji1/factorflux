@@ -24,6 +24,21 @@ test("postal PO Box addresses never become load identifiers", () => {
   assert.equal(extractLoadNumber("PO BOX 150523"), null);
   assert.equal(extractLoadNumber("PO BOX 150523\nP.O. Number 150611")?.normalized, "150611");
 });
+test("instruction prose on later pages never overrides a real load identifier", () => {
+  const result = mergeFields([
+    { ...fieldsFromText("Load #150611"), loadNumberSourceLabel: "Textract load-number query" },
+    fieldsFromText("You must report issues with this load\nIF an accident happens"),
+  ]);
+  assert.equal(result.loadNumber, "150611");
+});
+test("positive signature confidence is not inflated by an earlier confident negative answer", () => {
+  const result = mergeFields([
+    { ...fieldsFromText(""), receiverSignature: false, fieldConfidences: { receiverSignature: .99 } },
+    { ...fieldsFromText(""), receiverSignature: true, fieldConfidences: { receiverSignature: .8 } },
+  ]);
+  assert.equal(result.receiverSignature, true);
+  assert.equal(result.fieldConfidences?.receiverSignature, .8);
+});
 test("structured PO header and invoice date map without relying on adjacent OCR lines", () => {
   const result = decodeExpense({ $metadata: {}, ExpenseDocuments: [{
     Blocks: [{ BlockType: "LINE", Text: "P.O. Number\nShip\n150611", Confidence: 99 }],

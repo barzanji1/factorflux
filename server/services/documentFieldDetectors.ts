@@ -5,6 +5,7 @@ const LABEL_WORDS = new Set([
   "CONFIRMATION", "CONF", "PO", "BILL", "LADING", "NUMBER", "NUM", "NO", "ID",
   "DATE", "TOTAL", "AMOUNT", "BROKER", "CARRIER", "SHIPPER", "RATE", "DUE",
   "SHIP", "DESCRIPTION", "QUANTITY", "PRICE", "EACH", "SERVICE", "DELIVERY", "PICKUP",
+  "IF", "THE", "AND", "THIS", "THESE", "FOR", "IN", "AS", "TO", "OF",
 ]);
 
 function identifier(text: string, labels: string[], confidence: number): FieldResult {

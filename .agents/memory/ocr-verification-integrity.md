@@ -58,3 +58,23 @@ Broker match ambiguity must remain conservative: more than one qualifying broker
 **Why:** The user's multiple-candidate rule is intended to prevent an incorrect broker association; aliases for the same broker do not count as separate brokers.
 
 **How to apply:** Preserve raw OCR broker text for review, require a Verify marker on medium-confidence selections, and never auto-create brokers.
+
+## Multi-document pilot intake
+
+Use rate-confirmation fields for broker/load/rate/route/pickup dates; carrier invoice fields for carrier invoice reference/billed amount/invoice date; BOL fields for delivery date/BOL reference/receiver signature. Keep source documents and extraction confidence visible.
+
+**Why:** The user explicitly requested this precedence and document-based cross-checks before pilot intake.
+
+**How to apply:** Cross-check the documents server-side and enforce acknowledgements during creation. Do not auto-create brokers. Keep supplemental NOAs out of financial field mapping.
+
+Rate confirmations may label a human contact as “Broker.” Generic Textract queries can return that person, and load queries can miss a digit even when line OCR reads an explicit Load label correctly.
+
+**Why:** Real pilot verification returned a contact rather than the broker company, and misread a correctly labeled load number.
+
+**How to apply:** Ask company/section-specific queries and prefer reliable explicit Load labels over conflicting query answers. Parse weekdays attached to labeled date values. Never let instruction prose override a real identifier.
+
+Do not restart the application while an isolated CLI queue verification is running against the shared application database.
+
+**Why:** Startup recovery currently treats processing jobs as abandoned and can reclaim the CLI worker’s active job using an incorrect local path.
+
+**How to apply:** Restart first, run verification afterward, wait for worker completion, then remove only the verification records. Report explicit document-type overrides separately from successful automatic classification.

@@ -173,6 +173,9 @@ import {
 } from "./services/fundingReceiptService";
 import { expandCalendarEvent } from "./services/calendarScheduler";
 import { runInvoicePreflight } from "./services/invoicePreflight";
+import { getIntakeSnapshot, parseIntakeIds } from "./services/ocrIntakeSnapshot";
+import { IntakeError } from "./services/ocrIntakeMapping";
+import { reusableIntakePaperwork } from "./services/ocrIntakePaperwork";
 import { getInvoiceOcrAlerts } from "./services/invoiceOcrAlerts";
 
 const escapeHtml = (value: unknown): string => String(value ?? "")
@@ -254,6 +257,14 @@ function handleUpload(field: string) {
       return res.status(400).json({ message: err.message || "File upload rejected." });
     });
   };
+}
+function handleOcrIntakeUpload(req: any, res: any, next: any) {
+  multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 8 } })
+    .array("files", 8)(req, res, (error: any) => {
+      if (!error) return next();
+      res.status(400).json({ message: error.code === "LIMIT_FILE_SIZE" ?
+        "Each intake PDF must be 5MB or smaller." : "Upload up to eight PDFs using the files field." });
+    });
 }
 
 // Invoice intake uses one bounded memory-storage parser for all four paperwork
@@ -529,7 +540,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const isPrivilegedUser = (req: any) => req.user?.role === "manager" || req.user?.role === "admin";
-  const runPreflightForInvoice = async (input: Record<string, any>, dbClient: any = db) => runInvoicePreflight({
+  const runPreflightForInvoice = async (input: Record<string, any>, dbClient: any = db) => {
+    const result = await runInvoicePreflight({
     carrierId: Number(input.carrierId ?? input.clientId),
     brokerId: input.brokerId == null ? undefined : Number(input.brokerId),
     invoiceNumber: input.invoiceNumber == null ? undefined : String(input.invoiceNumber),
@@ -537,7 +549,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     amount: input.amount == null ? undefined : Number(input.amount),
     serviceDate: input.serviceDate ?? input.invoiceDate ?? input.date ?? undefined,
     ...(input.excludeInvoiceId == null ? {} : { excludeInvoiceId: Number(input.excludeInvoiceId) }),
-  } as any, dbClient);
+    } as any, dbClient);
+    const ids = parseIntakeIds(input.ocrDocumentIds);
+    if (ids.length) {
+      if (!input.ocrActor) throw new IntakeError("OCR intake requires an authenticated owner");
+      const snapshot = await getIntakeSnapshot(ids, input.ocrActor, dbClient);
+      if (snapshot.status !== "completed") throw new IntakeError(snapshot.error || "Wait for all intake documents to finish extraction", 409);
+      result.alerts.push(...snapshot.alerts);
+    }
+    return result;
+  };
   const getNextInvoiceNumberInTransaction = async (tx: any) => {
     const result = await tx.execute(sql`SELECT nextval('invoices_internal_number_seq'::regclass)::text AS sequence`);
     const sequence = String(result.rows[0]?.sequence ?? "");
@@ -1930,7 +1951,7 @@ ${message}
     }
   });
 
-  registerOcrIntakeRoutes(app, requireAuth, handleUpload("file"), cleanupS3KeyWithRetry);
+  registerOcrIntakeRoutes(app, requireAuth, handleOcrIntakeUpload, cleanupS3KeyWithRetry);
 
   app.post("/api/invoices/:id/documents", requireAuth, handleUpload("file"), async (req: any, res) => {
     try {
@@ -2735,6 +2756,7 @@ ${message}
         amount: z.coerce.number().nonnegative().optional(),
         serviceDate: z.union([z.string(), z.date()]).optional(),
         excludeInvoiceId: z.coerce.number().int().positive().optional(),
+        ocrDocumentIds: z.array(z.number().int().positive()).max(8).optional(),
       }).parse(req.body);
       if (!(await canAccessClient(req, input.carrierId))) {
         return res.status(403).json({ message: "You may only preflight invoices for carriers assigned to you" });
@@ -2742,7 +2764,7 @@ ${message}
       if (input.brokerId != null && !(await canAccessBroker(req, input.brokerId))) {
         return res.status(403).json({ message: "You may only preflight invoices for brokers assigned to you" });
       }
-      const { alerts } = await runPreflightForInvoice(input);
+      const { alerts } = await runPreflightForInvoice({ ...input, ocrActor: req.user });
       const matchingInvoiceIds = alerts
         .map((alert: any) => Number(alert.invoiceId ?? alert.link?.match(/^\/invoices\/(\d+)$/)?.[1]))
         .filter((id: number) => Number.isInteger(id) && id > 0);
@@ -2765,6 +2787,7 @@ ${message}
       });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid preflight data", errors: error.errors });
+      if (error instanceof IntakeError) return res.status(error.status).json({ message: error.message });
       console.error("Invoice preflight failed:", error);
       res.status(500).json({ message: "Failed to run invoice preflight" });
     }
@@ -3072,6 +3095,7 @@ ${message}
       const { invoiceNumber: _legacyInvoiceNumber, carrierInvoiceNumber: _carrierInvoiceNumber, ...invoiceMetadata } = metadata;
       const parsed = insertInvoiceSchema.extend({
         invoiceNumber: z.string().trim().min(1).max(100),
+        invoiceDate: z.preprocess(value => value == null || value === "" ? undefined : value, z.coerce.date().optional()),
         carrierInvoiceNumber: z.string().trim().max(100).nullable().optional(),
         loadType: z.enum(LOAD_TYPES),
         amount: z.coerce.number().positive("Amount must be greater than zero"),
@@ -3089,6 +3113,14 @@ ${message}
       }).parse({ ...invoiceMetadata, invoiceNumber: "INV000", carrierInvoiceNumber: suppliedCarrierInvoiceNumber ?? null });
       const invoiceData = await resolveInvoiceBrokerBranch(parsed as any);
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
+      const ocrDocumentIds = parseIntakeIds(metadata.ocrDocumentIds);
+      const intakeServiceDate = metadata.serviceDate == null ? undefined :
+        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(metadata.serviceDate);
+      const intakeSnapshot = ocrDocumentIds.length ? await getIntakeSnapshot(ocrDocumentIds, req.user) : null;
+      if (intakeSnapshot && intakeSnapshot.status !== "completed") {
+        throw new IntakeError(intakeSnapshot.error || "Wait for all intake documents to finish extraction", 409);
+      }
+      const reusedPaperwork = reusableIntakePaperwork(files, intakeSnapshot?.documents ?? []);
 
       const [carrier] = await db.select({ id: clients.id, status: clients.status })
         .from(clients).where(eq(clients.id, invoiceData.clientId)).limit(1);
@@ -3123,7 +3155,8 @@ ${message}
         invoiceNumber: suppliedCarrierInvoiceNumber,
         loadNumber: invoiceData.loadNumber,
         amount: invoiceData.amount,
-        serviceDate: invoiceServiceDate,
+        serviceDate: ocrDocumentIds.length ? intakeServiceDate : invoiceServiceDate,
+        ocrDocumentIds, ocrActor: req.user,
       });
       const preflightDecision = getPreflightDecision(preflightResult.alerts, acknowledgements, req.user, nearOverride);
       if (preflightDecision.invalidAcknowledgements) return res.status(400).json({ message: "Acknowledgements must contain only unique alert codes requiring acknowledgement, with optional text reasons." });
@@ -3140,6 +3173,7 @@ ${message}
       for (const { field, type } of paperwork) {
         const file = files[field]?.[0];
         if (!file) continue;
+        if (reusedPaperwork.has(field)) continue;
         const filename = `${type}-${crypto.randomUUID()}.pdf`;
         const s3Key = `invoices/intake/${intakeKeyPrefix}/paperwork/${filename}`;
         uploadedKeys.push(s3Key);
@@ -3173,7 +3207,8 @@ ${message}
           invoiceNumber: suppliedCarrierInvoiceNumber,
           loadNumber: invoiceData.loadNumber,
           amount: invoiceData.amount,
-          serviceDate: invoiceServiceDate,
+          serviceDate: ocrDocumentIds.length ? intakeServiceDate : invoiceServiceDate,
+          ocrDocumentIds, ocrActor: req.user,
         }, tx);
         const transactionalDecision = getPreflightDecision(transactionalPreflight.alerts, metadata.acknowledgements ?? [], req.user, metadata.overrideNearDuplicate === true);
         if (transactionalDecision.invalidAcknowledgements || !transactionalDecision.accepted) {
@@ -3206,9 +3241,17 @@ ${message}
             amount: invoice.amount,
           },
         });
-        const documents = await tx.insert(documentsTable).values(
+        const documents = uploadedDocuments.length ? await tx.insert(documentsTable).values(
           uploadedDocuments.map((document) => ({ ...document, invoiceId: invoice.id })) as any,
-        ).returning();
+        ).returning() : [];
+        if (ocrDocumentIds.length) {
+          const lockedSnapshot = await getIntakeSnapshot(ocrDocumentIds, req.user, tx);
+          if (lockedSnapshot.documents.some(doc => doc.invoiceId != null)) throw new IntakeError("Intake paperwork was already used by another invoice", 409);
+          const attached = await tx.update(documentsTable).set({ invoiceId: invoice.id, clientId: invoice.clientId })
+            .where(and(inArray(documentsTable.id, ocrDocumentIds), isNull(documentsTable.invoiceId))).returning();
+          if (attached.length !== ocrDocumentIds.length) throw new IntakeError("Intake paperwork changed before submission", 409);
+          documents.push(...attached);
+        }
         await recordInvoicePreflight(invoice.id, req.user.id, transactionalPreflight.alerts, transactionalDecision.acknowledgements, transactionalDecision.nearOverride, tx);
         return { invoice, documents };
       });
@@ -3231,6 +3274,7 @@ ${message}
       }
       if ((error as any)?.status === 409) return res.status(409).json({ message: (error as Error).message, alerts: (error as any)?.preflightAlerts ?? [] });
       if ((error as any)?.status === 400) return res.status(400).json({ message: (error as Error).message });
+      if (error instanceof IntakeError) return res.status(error.status).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
       if ((error as any)?.code === "23505") return res.status(409).json({ message: "Invoice number or load number has already been used.", alerts: [] });
       console.error("Error creating invoice with paperwork:", error);

@@ -50,6 +50,7 @@ const EMPTY = {
   carrierInvoiceNumber: "", loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
   buyout: "", lumper: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
   driverId: "", driverName: "", instructionsSubject: "", instructionsDetails: "",
+  invoiceDate: "", pickupDate: "", deliveryDate: "", rate: "", origin: "", destination: "", bolNumber: "",
 };
 
 function formatFileSize(bytes: number) {
@@ -227,17 +228,21 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
 }
 
 type InitialInvoiceValues = Partial<typeof EMPTY> & { brokerName?: string };
-type OcrFields = {
-  invoice_number?: string;
-  load_number?: string;
-  load_number_label?: string;
-  invoice_date?: string;
-  service_date?: string;
-  amount?: string;
-  broker_name?: string;
-  broker_id?: string;
-  broker_match_confidence?: "high" | "medium";
-  bol_number?: string;
+type OcrFields = Record<string, string>;
+type OcrDocType = "rate_confirmation" | "invoice" | "bol" | "pod" | "other";
+type OcrDocument = { documentId: number; filename: string; docType?: OcrDocType; status: string; error?: string | null; fields?: OcrFields; confidence?: number };
+type OcrSource = { documentId: number; filename: string; docType: OcrDocType; confidence: number };
+type OcrAlert = { code: string; severity: "block" | "ack" | "info"; title: string; message: string };
+type OcrAggregate = {
+  status: "queued" | "processing" | "completed" | "failed";
+  error?: string | null;
+  documents: OcrDocument[];
+  fields: OcrFields;
+  sources: Record<string, OcrSource>;
+  brokerMatch?: OcrBrokerMatch;
+  alerts: OcrAlert[];
+  missingTypes: string[];
+  tolerance: number;
 };
 type OcrBrokerMatch = {
   brokerId: number | null;
@@ -298,11 +303,18 @@ export default function CreateInvoiceModal({
   const [paperwork, setPaperwork] = useState<Record<PaperworkKey, File | null>>({
     rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null,
   });
-  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const ocrPaperworkRef = useRef<Partial<Record<PaperworkKey, File>>>({});
+  const [ocrFiles, setOcrFiles] = useState<File[]>([]);
+  const [ocrDocuments, setOcrDocuments] = useState<OcrDocument[]>([]);
   const [ocrStatus, setOcrStatus] = useState<OcrStatus>("idle");
   const [ocrError, setOcrError] = useState("");
   const [ocrFields, setOcrFields] = useState<OcrFields | null>(null);
+  const [ocrSources, setOcrSources] = useState<Record<string, OcrSource>>({});
+  const [ocrAlerts, setOcrAlerts] = useState<OcrAlert[]>([]);
+  const [ocrMissingTypes, setOcrMissingTypes] = useState<string[]>([]);
   const [ocrBrokerMatch, setOcrBrokerMatch] = useState<OcrBrokerMatch | null>(null);
+  const [ocrDragActive, setOcrDragActive] = useState(false);
+  const ocrInputRef = useRef<HTMLInputElement>(null);
   const ocrRequestId = useRef(0);
   const ocrController = useRef<AbortController | null>(null);
   const ocrSelectedBrokerId = useRef<string | null>(null);
@@ -359,6 +371,34 @@ export default function CreateInvoiceModal({
   const carrier = carriers.find(item => String(item.id) === values.clientId);
   const broker = selectedBroker ?? brokers.find(item => String(item.id) === values.brokerId);
   const drivers = driversData.filter(driver => driver.status === "active");
+  const renderOcrSource = (field: string) => {
+    const source = ocrSources[field];
+    if (!source) return null;
+    return (
+      <span data-testid={`invoice-ocr-source-${field}`} className="block text-[11px] font-normal text-slate-600">
+        Source: {source.filename} · {source.docType.replace(/_/g, " ")} · {Math.round(source.confidence <= 1 ? source.confidence * 100 : source.confidence)}% confidence
+      </span>
+    );
+  };
+
+  const stageOcrFiles = async (files: File[]) => {
+    if (!files.length) return;
+    stopOcrRequest();
+    const stagingId = ocrRequestId.current;
+    clearOcrPrefill();
+    setOcrFiles([]);
+    setOcrStatus("idle");
+    try {
+      await validateOcrFiles(files);
+      if (stagingId !== ocrRequestId.current) return;
+      setOcrFiles(files);
+      setOcrError("");
+    } catch (error) {
+      if (stagingId !== ocrRequestId.current) return;
+      setOcrError(error instanceof Error ? error.message : "Unable to read selected PDFs.");
+      setOcrStatus("failed");
+    }
+  };
 
   const invalidatePreflightAcknowledgements = () => {
     preflightRequestId.current += 1;
@@ -374,19 +414,61 @@ export default function CreateInvoiceModal({
     ocrController.current = null;
   };
 
-  const extractInvoiceFields = async (file: File) => {
+  const clearOcrPrefill = () => {
+    setOcrDocuments([]);
+    setOcrFields(null);
+    setOcrSources({});
+    setOcrAlerts([]);
+    setOcrMissingTypes([]);
+    setOcrBrokerMatch(null);
+    setValues(current => ({
+      ...current, carrierInvoiceNumber: "", loadNumber: "", amount: "", invoiceDate: "",
+      pickupDate: "", deliveryDate: "", rate: "", origin: "", destination: "", bolNumber: "",
+      brokerId: "", branchId: "",
+    }));
+    setSelectedBroker(undefined);
+    ocrSelectedBrokerId.current = null;
+    invalidatePreflightAcknowledgements();
+    setPreflightAlerts([]);
+    setPreflightOpen(false);
+    setPaperwork(current => {
+      const next = { ...current };
+      (Object.keys(ocrPaperworkRef.current) as PaperworkKey[]).forEach(key => {
+        if (next[key] === ocrPaperworkRef.current[key]) next[key] = null;
+      });
+      ocrPaperworkRef.current = {};
+      return next;
+    });
+  };
+
+  const validateOcrFiles = async (files: File[]) => {
+    if (files.length > 8) throw new Error("Choose no more than 8 PDF files.");
+    for (const file of files) {
+      if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        throw new Error(`${file.name} is not a PDF file.`);
+      }
+      if (file.size > MAX_PDF_SIZE) throw new Error(`${file.name} is larger than 5MB.`);
+      const bytes = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+      if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]) !== "%PDF-") {
+        throw new Error(`${file.name} is not a valid PDF.`);
+      }
+    }
+  };
+
+  const uploadOcrBatch = async (files: File[]) => {
+    if (!files.length) return;
     stopOcrRequest();
     const requestId = ocrRequestId.current;
     const controller = new AbortController();
     ocrController.current = controller;
-    setOcrFile(file);
+    setOcrFiles(files);
     setOcrStatus("uploading");
     setOcrError("");
-    setOcrFields(null);
-    setOcrBrokerMatch(null);
+    setOcrDocuments([]);
+    clearOcrPrefill();
     try {
       const body = new FormData();
-      body.append("file", file);
+      files.forEach(file => body.append("files", file));
       const intakeResponse = await fetch("/api/invoices/ocr-intake", {
         method: "POST",
         credentials: "include",
@@ -396,22 +478,32 @@ export default function CreateInvoiceModal({
       const intake = await intakeResponse.json().catch(() => ({}));
       if (!intakeResponse.ok) throw new Error(ocrErrorMessage(intake, `Upload failed (${intakeResponse.status}).`));
       if (requestId !== ocrRequestId.current) return;
-      if (typeof intake.documentId !== "number") throw new Error("The upload response did not include a document ID.");
+      if (!Array.isArray(intake.documents) || !intake.documents.length
+        || intake.documents.some((document: any) => typeof document.documentId !== "number")) {
+        throw new Error("The upload response did not include document IDs.");
+      }
+      const documentIds = intake.documents.map((document: any) => document.documentId as number);
+      setOcrDocuments(intake.documents.map((document: any) => ({
+        documentId: document.documentId, filename: document.filename, status: document.status || "queued",
+      })));
       setOcrStatus(intake.status === "queued" ? "queued" : "processing");
 
       while (requestId === ocrRequestId.current) {
         await waitForOcrPoll(controller.signal);
-        const pollResponse = await fetch(`/api/invoices/ocr-intake/${intake.documentId}`, {
+        const params = new URLSearchParams({ documentIds: documentIds.join(",") });
+        const pollResponse = await fetch(`/api/invoices/ocr-intake?${params.toString()}`, {
           method: "GET",
           credentials: "include",
           signal: controller.signal,
         });
-        const result = await pollResponse.json().catch(() => ({}));
+        const result: OcrAggregate = await pollResponse.json().catch(() => ({} as OcrAggregate));
         if (!pollResponse.ok) throw new Error(ocrErrorMessage(result, `Status check failed (${pollResponse.status}).`));
         if (requestId !== ocrRequestId.current) return;
+        if (Array.isArray(result.documents)) setOcrDocuments(result.documents);
         if (result.status === "failed") {
           setOcrStatus("failed");
-          setOcrError(ocrErrorMessage(result, "Invoice field extraction failed. Try another PDF."));
+          setOcrError(ocrErrorMessage(result, "Document extraction failed. Review the document rows and retry or reupload."));
+          setOcrAlerts(Array.isArray(result.alerts) ? result.alerts : []);
           return;
         }
         if (result.status === "completed") {
@@ -426,12 +518,30 @@ export default function CreateInvoiceModal({
               }
             : { brokerId: null, confidence: null, rawName: null, matchedName: null, candidates: [] };
           setOcrFields(fields);
+          const sources: Record<string, OcrSource> = result.sources && typeof result.sources === "object" ? result.sources : {};
+          setOcrSources(sources);
           setOcrBrokerMatch(match);
+          setOcrAlerts(Array.isArray(result.alerts) ? result.alerts : []);
+          setOcrMissingTypes(Array.isArray(result.missingTypes) ? result.missingTypes : []);
+          const asDate = (value?: string) => {
+            if (!value?.trim()) return "";
+            const raw = value.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            const parsed = new Date(raw);
+            return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+          };
           setValues(current => ({
             ...current,
             ...(fields.invoice_number?.trim() ? { carrierInvoiceNumber: fields.invoice_number } : {}),
             ...(fields.load_number?.trim() ? { loadNumber: fields.load_number } : {}),
             ...(fields.amount?.trim() ? { amount: fields.amount } : {}),
+            ...(fields.invoice_date ? { invoiceDate: asDate(fields.invoice_date) } : {}),
+            ...(fields.pickup_date ? { pickupDate: asDate(fields.pickup_date) } : {}),
+            ...(fields.delivery_date ? { deliveryDate: asDate(fields.delivery_date) } : {}),
+            ...(fields.rate?.trim() ? { rate: fields.rate } : {}),
+            ...(fields.origin?.trim() ? { origin: fields.origin } : {}),
+            ...(fields.destination?.trim() ? { destination: fields.destination } : {}),
+            ...(fields.bol_number?.trim() ? { bolNumber: fields.bol_number } : {}),
             ...(match.brokerId != null ? { brokerId: String(match.brokerId), branchId: "" } : { brokerId: "", branchId: "" }),
           }));
           if (match.brokerId != null) {
@@ -444,9 +554,32 @@ export default function CreateInvoiceModal({
             ocrSelectedBrokerId.current = null;
             setSelectedBroker(undefined);
           }
+          const returnedDocs: OcrDocument[] = Array.isArray(result.documents) ? result.documents : [];
+          const byType = (types: OcrDocType[]) => {
+            const document = returnedDocs.find(item => item.docType && types.includes(item.docType) && item.status === "completed");
+            return document ? files.find(file => file.name === document.filename) ?? null : null;
+          };
+          const matchedPaperwork = {
+            rateConfirmation: byType(["rate_confirmation"]),
+            billOfLading: byType(["bol", "pod"]),
+            other: byType(["invoice"]),
+          };
+          ocrPaperworkRef.current = Object.fromEntries(
+            Object.entries(matchedPaperwork).filter(([, file]) => file != null),
+          ) as Partial<Record<PaperworkKey, File>>;
+          setPaperwork(current => ({
+            ...current,
+            rateConfirmation: matchedPaperwork.rateConfirmation ?? current.rateConfirmation,
+            billOfLading: matchedPaperwork.billOfLading ?? current.billOfLading,
+            other: matchedPaperwork.other ?? current.other,
+          }));
           invalidatePreflightAcknowledgements();
-          setPreflightAlerts([]);
-          setPreflightOpen(false);
+          const crossAlerts: OcrAlert[] = Array.isArray(result.alerts) ? result.alerts : [];
+          setPreflightAlerts(crossAlerts.map(alert => ({ ...alert })));
+          setAcknowledgements(Object.fromEntries(crossAlerts
+            .filter(alert => alert.severity === "ack")
+            .map(alert => [alert.code, { acknowledged: false, reason: "" }])));
+          setPreflightOpen(crossAlerts.some(alert => alert.severity !== "info"));
           setOcrStatus("completed");
           return;
         }
@@ -459,7 +592,7 @@ export default function CreateInvoiceModal({
     } catch (error) {
       if (requestId !== ocrRequestId.current || controller.signal.aborted) return;
       setOcrStatus("failed");
-      setOcrError(error instanceof Error ? error.message : "Unable to extract invoice fields.");
+      setOcrError(error instanceof Error ? error.message : "Unable to extract document fields.");
     } finally {
       if (requestId === ocrRequestId.current) ocrController.current = null;
     }
@@ -482,7 +615,8 @@ export default function CreateInvoiceModal({
           invoiceNumber: candidate.carrierInvoiceNumber.trim() || undefined,
           loadNumber: candidate.loadNumber.trim() || undefined,
           amount: candidate.amount ? Number(candidate.amount) : undefined,
-          serviceDate: new Date().toISOString().slice(0, 10),
+           serviceDate: candidate.deliveryDate || candidate.pickupDate || undefined,
+           ocrDocumentIds: ocrDocuments.map(document => document.documentId),
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -540,10 +674,15 @@ export default function CreateInvoiceModal({
       setBrokerSearch("");
       setBrokerOpen(false);
       setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
-      setOcrFile(null);
+      ocrPaperworkRef.current = {};
+      setOcrFiles([]);
+      setOcrDocuments([]);
       setOcrStatus("idle");
       setOcrError("");
       setOcrFields(null);
+      setOcrSources({});
+      setOcrAlerts([]);
+      setOcrMissingTypes([]);
       setOcrBrokerMatch(null);
     }
   }, [open, initialValues]);
@@ -571,6 +710,15 @@ export default function CreateInvoiceModal({
         buyout: values.buyout === "" ? null : values.buyout === "yes",
         lumper: values.lumper === "" ? null : values.lumper === "yes",
         amount: values.amount,
+        invoiceDate: values.invoiceDate ? new Date(`${values.invoiceDate}T00:00:00.000Z`).toISOString() : null,
+        serviceDate: values.deliveryDate || values.pickupDate || null,
+        pickupDate: values.pickupDate || null,
+        deliveryDate: values.deliveryDate || null,
+        rate: values.rate || null,
+        origin: values.origin || null,
+        destination: values.destination || null,
+        bolNumber: values.bolNumber || null,
+        ocrDocumentIds: ocrDocuments.map(document => document.documentId),
         acknowledgements: Object.entries(acknowledgements)
           .filter(([, acknowledgement]) => acknowledgement.acknowledged)
           .map(([code, acknowledgement]) => ({ code, reason: acknowledgement.reason.trim() || undefined })),
@@ -642,81 +790,101 @@ export default function CreateInvoiceModal({
                 <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
               </div>
             ))}
-            <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3" aria-labelledby="ocr-upload-heading">
+            <section className="space-y-3 rounded-none border border-slate-400 bg-slate-100 p-3" aria-labelledby="ocr-upload-heading">
               <div>
-                <h3 id="ocr-upload-heading" className="text-sm font-semibold">Extract invoice fields</h3>
-                <p className="mt-0.5 text-xs text-slate-500">Upload a PDF to prefill the invoice number, load, amount, and broker when recognized.</p>
+                <h3 id="ocr-upload-heading" className="text-sm font-semibold">Staff intake · document set</h3>
+                <p className="mt-0.5 text-xs text-slate-600">Drop the rate confirmation, carrier invoice, and BOL/POD together. Up to 8 PDFs, 5MB each.</p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  id="invoice-ocr-pdf"
-                  data-testid="invoice-ocr-uploader"
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  disabled={ocrStatus === "uploading" || ocrStatus === "queued" || ocrStatus === "processing"}
-                  aria-label="Extract invoice fields from a PDF"
-                  className="block max-w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-700 file:shadow-sm hover:file:bg-slate-100 disabled:opacity-50"
-                  onChange={event => {
-                    const file = event.currentTarget.files?.[0];
-                    event.currentTarget.value = "";
-                    if (!file) return;
-                    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-                      setOcrFile(file);
-                      setOcrStatus("failed");
-                      setOcrError("Choose a PDF file to extract invoice fields.");
-                      setOcrFields(null);
-                      setOcrBrokerMatch(null);
-                      return;
-                    }
-                    void extractInvoiceFields(file);
-                  }}
-                />
-                {ocrFile && <span className="max-w-full truncate text-xs text-slate-500">{ocrFile.name}</span>}
+              <input
+                ref={ocrInputRef}
+                id="invoice-ocr-pdf"
+                data-testid="invoice-ocr-file-input"
+                type="file"
+                multiple
+                accept="application/pdf,.pdf"
+                className="hidden"
+                aria-label="Choose PDFs for invoice intake"
+                onChange={event => {
+                  const files = Array.from(event.currentTarget.files ?? []);
+                  event.currentTarget.value = "";
+                  void stageOcrFiles(files);
+                }}
+              />
+              <button
+                type="button"
+                data-testid="invoice-ocr-dropzone"
+                aria-label="Drop or choose invoice intake PDF documents"
+                onClick={() => ocrInputRef.current?.click()}
+                onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); ocrInputRef.current?.click(); } }}
+                onDragOver={event => { event.preventDefault(); setOcrDragActive(true); }}
+                onDragLeave={() => setOcrDragActive(false)}
+                onDrop={event => {
+                  event.preventDefault();
+                  setOcrDragActive(false);
+                  void stageOcrFiles(Array.from(event.dataTransfer.files));
+                }}
+                className={cn(
+                  "w-full border-2 border-t-white border-l-white border-r-[#555] border-b-[#555] bg-[#c0c0c0] px-4 py-5 text-left text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#000080]",
+                  ocrDragActive && "border-2 border-dashed border-[#000080] bg-[#d8d8d8]",
+                )}
+              >
+                <span className="block font-semibold">Drop PDF documents here</span>
+                <span className="mt-1 block text-xs">or choose files · rate con, invoice, BOL/POD, and supporting docs</span>
+              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" disabled={!ocrFiles.length || ["uploading", "queued", "processing"].includes(ocrStatus)} onClick={() => void uploadOcrBatch(ocrFiles)}>
+                  {ocrStatus === "failed" || ocrDocuments.some(document => document.status === "failed") ? "Retry / reupload set" : ocrStatus === "completed" ? "Process replacement set" : "Process document set"}
+                </Button>
+                {ocrFiles.length > 0 && <span className="text-xs text-slate-600">{ocrFiles.length} PDF{ocrFiles.length === 1 ? "" : "s"} staged</span>}
               </div>
+              {ocrFiles.map(file => {
+                const document = ocrDocuments.find(item => item.filename === file.name);
+                return (
+                  <div key={`${file.name}-${file.size}-${file.lastModified}`} data-testid={document ? `invoice-ocr-document-row-${document.documentId}` : "invoice-ocr-staged-row"} className="flex min-w-0 flex-wrap items-center gap-2 border border-[#777] bg-white px-2 py-1.5 text-xs">
+                    <span className="min-w-0 flex-1 truncate font-semibold">{file.name}</span>
+                    <span className="shrink-0 text-slate-600">{document?.docType?.replace(/_/g, " ") || (document ? document.status : formatFileSize(file.size))}</span>
+                    {document?.status && <span className={cn("shrink-0", document.status === "failed" ? "text-red-700" : "text-slate-600")}>{document.status}</span>}
+                    {document?.error && <span role="alert" className="basis-full text-red-700">{document.error}</span>}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${file.name}`}
+                      className="shrink-0 border border-[#777] px-1 text-black hover:bg-slate-100"
+                      onClick={() => {
+                        stopOcrRequest();
+                        clearOcrPrefill();
+                        setOcrFiles(current => current.filter(candidate => candidate !== file));
+                        setOcrStatus("idle");
+                        setOcrError("");
+                      }}
+                    ><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                );
+              })}
               {ocrStatus !== "idle" && (
-                <p
-                  data-testid="invoice-ocr-status"
-                  role={ocrStatus === "failed" ? "alert" : "status"}
-                  aria-live="polite"
-                  className={cn("text-xs", ocrStatus === "failed" ? "text-red-700" : ocrStatus === "completed" ? "text-emerald-700" : "text-slate-600")}
-                >
-                    {ocrStatus === "uploading" ? "Uploading PDF…" : ocrStatus === "queued" ? "PDF received — extraction queued…" : ocrStatus === "processing" ? "Extracting invoice fields…" : ocrStatus === "completed" ? "Extraction complete. Review the prefilled values before submitting." : ocrError || "Extraction failed. Choose another PDF to try again."}
+                <p data-testid="invoice-ocr-status" role={ocrStatus === "failed" ? "alert" : "status"} aria-live="polite" className={cn("text-xs", ocrStatus === "failed" ? "text-red-700" : ocrStatus === "completed" ? "text-emerald-800" : "text-slate-700")}>
+                  {ocrStatus === "uploading" ? "Uploading document set…" : ocrStatus === "queued" ? "Documents received — extraction queued…" : ocrStatus === "processing" ? "Classifying and extracting documents…" : ocrStatus === "completed" ? "Extraction complete. Review every field and source before submitting." : ocrError || "Extraction failed. Retry or reupload the document set."}
                 </p>
               )}
+              {ocrStatus === "failed" && ocrAlerts.map(alert => (
+                <div key={alert.code} data-testid="invoice-ocr-cross-check-alert" className="border border-red-700 bg-red-100 px-3 py-2 text-xs text-red-900">
+                  <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
+                </div>
+              ))}
               {ocrStatus === "completed" && ocrFields && (
-                <div className="grid gap-x-4 gap-y-2 border-t border-slate-200 pt-2 text-xs sm:grid-cols-2">
-                  <p data-testid="invoice-ocr-load-source"><span className="font-medium text-slate-600">Load source label:</span> {ocrFields.load_number_label?.trim() || "Not found"}</p>
-                  <p data-testid="invoice-ocr-invoice-date"><span className="font-medium text-slate-600">Invoice date (extracted):</span> {ocrFields.invoice_date?.trim() || "Not found"}</p>
-                  <p><span className="font-medium text-slate-600">Extracted invoice number:</span> {ocrFields.invoice_number?.trim() || "Not found"}</p>
-                  <p><span className="font-medium text-slate-600">Extracted load number:</span> {ocrFields.load_number?.trim() || "Not found"}</p>
-                  <p><span className="font-medium text-slate-600">Extracted amount:</span> {ocrFields.amount?.trim() || "Not found"}</p>
-                  <p><span className="font-medium text-slate-600">Bill of lading:</span> {ocrFields.bol_number?.trim() || "Not found"}</p>
-                </div>
-              )}
-              {ocrStatus === "completed" && ocrBrokerMatch && (
-                <div className="space-y-1 border-t border-slate-200 pt-2 text-xs">
-                  <p data-testid="invoice-ocr-raw-broker">
-                    <span className="font-medium text-slate-600">Extracted broker name:</span>{" "}
-                    {ocrBrokerMatch.rawName?.trim() || ocrFields?.broker_name?.trim() || "Not found"}
-                  </p>
-                  {ocrBrokerMatch.brokerId != null ? (
-                    <p className={cn("font-medium", ocrBrokerMatch.confidence === "medium" ? "text-amber-800" : "text-emerald-800")}>
-                      {ocrBrokerMatch.confidence === "medium" ? (
-                        <span data-testid="invoice-ocr-verify-marker">Verify · Confirm this broker match against the extracted name.</span>
-                      ) : ocrBrokerMatch.confidence === "high" ? (
-                        <span>Normalized exact match · broker selected.</span>
-                      ) : (
-                        <span>Broker selected from extraction. Review the match before submitting.</span>
-                      )}
-                    </p>
-                  ) : (
-                    <p className="text-amber-800">
-                      {ocrBrokerMatch.candidates.length > 1
-                        ? "Several broker matches were found. Select the correct broker manually; none has been selected."
-                        : "No broker match was found. Select a broker manually; automatic broker creation is not available."}
-                    </p>
-                  )}
-                </div>
+                <>
+                  {ocrMissingTypes.length > 0 && <p className="text-xs text-amber-800">Not included: {ocrMissingTypes.map(type => type.replace(/_/g, " ")).join(", ")}</p>}
+                  {ocrAlerts.map(alert => (
+                    <div key={alert.code} data-testid="invoice-ocr-cross-check-alert" className={cn("border px-3 py-2 text-xs", alert.severity === "block" ? "border-red-700 bg-red-100 text-red-900" : alert.severity === "ack" ? "border-amber-700 bg-amber-100 text-amber-950" : "border-blue-700 bg-blue-100 text-blue-950")}>
+                      <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
+                    </div>
+                  ))}
+                  <div className="grid gap-x-4 gap-y-1 border-t border-slate-400 pt-2 text-xs sm:grid-cols-2">
+                    {ocrDocuments.map(document => <p key={document.documentId}><strong>{document.filename}</strong> · {document.docType?.replace(/_/g, " ") || "Unclassified"} · {document.status}{document.error ? ` — ${document.error}` : ""}</p>)}
+                    {ocrBrokerMatch && <p data-testid="invoice-ocr-raw-broker"><span className="font-medium">Extracted broker name:</span> {ocrBrokerMatch.rawName?.trim() || ocrFields.broker_name?.trim() || "Not found"}{renderOcrSource("broker_name")}</p>}
+                    {ocrBrokerMatch?.brokerId != null && <p className={cn("font-medium", ocrBrokerMatch.confidence === "medium" ? "text-amber-800" : "text-emerald-800")}>{ocrBrokerMatch.confidence === "medium" ? <span data-testid="invoice-ocr-verify-marker">Verify · confirm against the extracted name.</span> : "Broker match selected."}</p>}
+                    <p data-testid="invoice-ocr-signature"><span className="font-medium">POD signature:</span> {ocrFields.pod_signature === "true" ? "Present" : ocrFields.pod_signature === "false" ? "Not detected" : "Not found"}{renderOcrSource("pod_signature")}</p>
+                  </div>
+                </>
               )}
             </section>
             <div className="space-y-2">
@@ -730,10 +898,47 @@ export default function CreateInvoiceModal({
               <div className="space-y-1.5">
                 <Label htmlFor="carrierInvoiceNumber">Carrier Invoice Number <span className="text-xs font-normal text-slate-500">(optional)</span></Label>
                 <Input id="carrierInvoiceNumber" maxLength={100} value={values.carrierInvoiceNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, carrierInvoiceNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Enter carrier's invoice number" />
+                {renderOcrSource("invoice_number")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="loadNumber">Load # <span className="text-red-500">*</span></Label>
                 <Input id="loadNumber" required value={values.loadNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, loadNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Enter load number" />
+                {renderOcrSource("load_number")}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="invoiceDate">Invoice Date</Label>
+                <Input id="invoiceDate" type="date" className="rounded-none" value={values.invoiceDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, invoiceDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                {renderOcrSource("invoice_date")}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rateAmount">Rate</Label>
+                <Input id="rateAmount" value={values.rate} onChange={e => setValues(v => ({ ...v, rate: e.target.value }))} placeholder="Rate confirmation amount" />
+                {renderOcrSource("rate")}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pickupDate">Pickup Date</Label>
+                <Input id="pickupDate" type="date" className="rounded-none" value={values.pickupDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, pickupDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                {renderOcrSource("pickup_date")}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="deliveryDate">Delivery Date</Label>
+                <Input id="deliveryDate" type="date" className="rounded-none" value={values.deliveryDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, deliveryDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                {renderOcrSource("delivery_date")}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="origin">Origin</Label>
+                <Input id="origin" value={values.origin} onChange={e => setValues(v => ({ ...v, origin: e.target.value }))} placeholder="Pickup city / state" />
+                {renderOcrSource("origin")}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="destination">Destination</Label>
+                <Input id="destination" value={values.destination} onChange={e => setValues(v => ({ ...v, destination: e.target.value }))} placeholder="Delivery city / state" />
+                {renderOcrSource("destination")}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bolNumber">BOL #</Label>
+                <Input id="bolNumber" value={values.bolNumber} onChange={e => setValues(v => ({ ...v, bolNumber: e.target.value }))} placeholder="Bill of lading number" />
+                {renderOcrSource("bol_number")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="invoiceCode">Code</Label>
@@ -749,6 +954,7 @@ export default function CreateInvoiceModal({
               <div className="space-y-1.5">
                 <Label htmlFor="amount">Invoice Amount <span className="text-red-500">*</span></Label>
                  <Input id="amount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, amount: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="0.00" />
+                 {renderOcrSource("amount")}
               </div>
                <SearchSelect
                  label="Carrier"
@@ -839,6 +1045,7 @@ export default function CreateInvoiceModal({
                     <Input value={values.instructionsSubject} onChange={e => setValues(v => ({ ...v, instructionsSubject: e.target.value }))} placeholder="Instructions Subject" />
                     <Textarea value={values.instructionsDetails} onChange={e => setValues(v => ({ ...v, instructionsDetails: e.target.value }))} placeholder="please be clear and specific" rows={3} className="sm:col-span-2" />
                   </div>
+                  {renderOcrSource("broker_name")}
                 </div>
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold">Paperwork Uploads</h3>
@@ -851,7 +1058,27 @@ export default function CreateInvoiceModal({
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="button" variant="outline" onClick={() => { stopOcrRequest(); ocrSelectedBrokerId.current = null; setOcrFile(null); setOcrStatus("idle"); setOcrError(""); setOcrFields(null); setOcrBrokerMatch(null); invalidatePreflightAcknowledgements(); setPreflightAlerts([]); setValues(EMPTY); setSelectedBroker(undefined); setBrokerSearch(""); setBrokerOpen(false); setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null }); }}>Reset</Button>
+              <Button type="button" variant="outline" onClick={() => {
+                stopOcrRequest();
+                ocrSelectedBrokerId.current = null;
+                setOcrFiles([]);
+                setOcrDocuments([]);
+                setOcrStatus("idle");
+                setOcrError("");
+                setOcrFields(null);
+                setOcrSources({});
+                setOcrAlerts([]);
+                setOcrMissingTypes([]);
+                setOcrBrokerMatch(null);
+                invalidatePreflightAcknowledgements();
+                setPreflightAlerts([]);
+                setValues(EMPTY);
+                setSelectedBroker(undefined);
+                setBrokerSearch("");
+                setBrokerOpen(false);
+                setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
+                ocrPaperworkRef.current = {};
+              }}>Reset</Button>
               <Button type="submit" disabled={!valid || mutation.isPending || preflightLoading} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
                 {mutation.isPending ? "Creating..." : "Submit"}
               </Button>

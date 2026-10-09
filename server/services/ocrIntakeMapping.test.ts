@@ -1,0 +1,65 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mapIntakeDocuments, intakeTolerance, type IntakeDocument } from "./ocrIntakeMapping";
+import { reusableIntakePaperwork } from "./ocrIntakePaperwork";
+import { createHash } from "node:crypto";
+const doc = (id: number, type: string, fields: Record<string, string>): IntakeDocument => ({
+  documentId: id, filename: `${type}.pdf`, docType: type, fields, fieldConfidences: { rate: .95 },
+  confidence: .9, status: "completed",
+});
+const rate = doc(1, "rate_confirmation", { broker_name: "Rate Broker", load_number: "150611", rate: "250",
+  pickup_date: "2026-09-23", delivery_date: "2026-09-24", origin: "Stoughton, MA", destination: "Natick, MA" });
+const invoice = doc(2, "invoice", { invoice_number: "9", broker_name: "Wrong Invoice Broker", load_number: "150611",
+  amount: "250", invoice_date: "2026-09-25" });
+const bol = doc(3, "bol", { delivery_date: "2026-09-25", bol_number: "BOL-55", pod_signature: "true" });
+test("rate, invoice and BOL field precedence preserves each document source and confidence", () => {
+  const result = mapIntakeDocuments([bol, invoice, rate], 0);
+  assert.equal(result.fields.broker_name, "Rate Broker");
+  assert.equal(result.fields.load_number, "150611");
+  assert.equal(result.fields.amount, "250");
+  assert.equal(result.fields.rate, "250");
+  assert.equal(result.fields.delivery_date, "2026-09-25");
+  assert.equal(result.sources.broker_name.documentId, 1);
+  assert.equal(result.sources.invoice_number.documentId, 2);
+  assert.equal(result.sources.delivery_date.documentId, 3);
+  assert.equal(result.sources.rate.confidence, .95);
+  assert.equal(result.fields.service_date, undefined);
+  assert.deepEqual(result.alerts, []);
+});
+test("all four cross-check codes fire with their required severities", () => {
+  const result = mapIntakeDocuments([rate, { ...invoice, fields: { ...invoice.fields, amount: "255", load_number: "OTHER" } },
+    { ...bol, fields: { ...bol.fields, delivery_date: "2026-09-26", pod_signature: "false" } }], 0);
+  assert.deepEqual(result.alerts.map(alert => [alert.code, alert.severity]),
+    [["RATE_MISMATCH", "ack"], ["LOAD_MISMATCH", "ack"], ["DELIVERY_AFTER_INVOICE", "ack"], ["NO_SIGNATURE", "info"]]);
+});
+test("rate tolerance is cent-exact and inclusive, default zero", () => {
+  assert.equal(intakeTolerance("0"), 0);
+  const changed = { ...invoice, fields: { ...invoice.fields, amount: "250.01" } };
+  assert.equal(mapIntakeDocuments([rate, changed, bol], 0).alerts[0].code, "RATE_MISMATCH");
+  assert.equal(mapIntakeDocuments([rate, changed, bol], .01).alerts.length, 0);
+  for (const bad of ["-1", "NaN", "abc", "", "1.001", "Infinity"]) assert.throws(() => intakeTolerance(bad));
+});
+test("missing dates are not inferred and duplicate document types are rejected", () => {
+  assert.throws(() => mapIntakeDocuments([rate, rate], 0), /Multiple rate_confirmation/);
+  const result = mapIntakeDocuments([invoice], 0);
+  assert.equal(result.fields.delivery_date, undefined);
+  assert.equal(result.fields.pickup_date, undefined);
+  assert.equal(result.fields.invoice_date, "2026-09-25");
+  assert.equal(result.alerts.length, 0);
+  assert.deepEqual(result.missingTypes, ["rate_confirmation", "bol"]);
+});
+test("failed documents never supply fields; signature words do not clear missing-signature alert", () => {
+  const result = mapIntakeDocuments([{ ...rate, status: "failed" }, invoice,
+    { ...bol, fields: { ...bol.fields, pod_signature: "signature" } }], 0);
+  assert.equal(result.sources.load_number.documentId, 2);
+  assert.equal(result.alerts[0].code, "NO_SIGNATURE");
+});
+test("paperwork reuse requires correct type and exact content hash; cannot steal associated documents", () => {
+  const buffer = Buffer.from("%PDF-fixture");
+  const source = { ...rate, contentHash: createHash("sha256").update(buffer).digest("hex") };
+  const files = { rateConfirmation: [{ buffer } as Express.Multer.File] };
+  assert.equal(reusableIntakePaperwork(files, [source]).get("rateConfirmation"), 1);
+  assert.equal(reusableIntakePaperwork(files, [{ ...source, contentHash: "other" }]).size, 0);
+  assert.equal(reusableIntakePaperwork(files, [{ ...source, docType: "invoice" }]).size, 0);
+  assert.throws(() => reusableIntakePaperwork(files, [{ ...source, invoiceId: 8 }]), /already attached/);
+});

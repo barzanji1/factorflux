@@ -35,19 +35,36 @@ export function fieldsFromText(text: string): OcrFields {
 export function mergeFields(fields: OcrFields[]): OcrFields {
   const result = fieldsFromText("");
   for (const page of fields) {
-    for (const key of Object.keys(result) as (keyof OcrFields)[]) {
+    for (const key of Object.keys(page) as (keyof OcrFields)[]) {
       if (key === "loadNumberSourceLabel") continue;
+      if (key === "fieldConfidences") {
+        continue;
+      }
+      if (key === "receiverSignature" && page[key] === true) {
+        const priorPositive = result.receiverSignature === true ? result.fieldConfidences?.receiverSignature ?? 0 : 0;
+        result.receiverSignature = true;
+        result.fieldConfidences = { ...result.fieldConfidences,
+          receiverSignature: Math.max(priorPositive,
+            page.fieldConfidences?.receiverSignature ?? 0) };
+        continue;
+      }
       if (result[key] == null && page[key] != null) {
         Object.assign(result, { [key]: page[key] });
+        if (page.fieldConfidences?.[key] != null) {
+          result.fieldConfidences = { ...result.fieldConfidences, [key]: page.fieldConfidences[key] };
+        }
         if (key === "loadNumber") result.loadNumberSourceLabel = page.loadNumberSourceLabel ?? null;
       }
     }
   }
   // A fallback reference on page one must not beat an explicit Load on page two.
-  const explicitLoad = fields.find(page => page.loadNumber && /^load\b/i.test(page.loadNumberSourceLabel ?? ""));
+  const explicitLoad = fields.find(page => page.loadNumber && /^load\s*(?:#|number\b|id\b|no\.?\b)/i.test(page.loadNumberSourceLabel ?? ""));
   if (explicitLoad) {
     result.loadNumber = explicitLoad.loadNumber;
     result.loadNumberSourceLabel = explicitLoad.loadNumberSourceLabel;
+    if (explicitLoad.fieldConfidences?.loadNumber != null) result.fieldConfidences = {
+      ...result.fieldConfidences, loadNumber: explicitLoad.fieldConfidences.loadNumber,
+    };
   }
   return result;
 }

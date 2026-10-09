@@ -7,50 +7,79 @@ import { documents, docExtractionJobs, docFieldCandidates } from "../../shared/s
 import { uploadToS3 } from "../services/s3Service";
 import { jobQueue } from "../services/jobQueue";
 import { findOcrBrokerMatch } from "../services/ocrBrokerMatching";
+import { getIntakeSnapshot, parseIntakeIds } from "../services/ocrIntakeSnapshot";
+import { IntakeError } from "../services/ocrIntakeMapping";
 
 export function registerOcrIntakeRoutes(
   app: Express, auth: RequestHandler, upload: RequestHandler,
   compensate: (key: string, reason: string) => Promise<boolean>,
 ) {
   app.post("/api/invoices/ocr-intake", auth, upload, async (req: any, res) => {
-    let key: string | null = null, tmpPath: string | null = null, committed = false;
+    const staged: { key: string; tmpPath: string }[] = [];
+    let committed = false;
     try {
-      const file = req.file;
-      if (!file || file.mimetype !== "application/pdf" ||
+      const files = (Array.isArray(req.files) ? req.files : req.file ? [req.file] : []) as Express.Multer.File[];
+      if (!files.length || files.length > 8 || files.some(file => file.mimetype !== "application/pdf" ||
         !file.buffer.subarray(0, 5).equals(Buffer.from("%PDF-")) ||
-        file.buffer.length > 5 * 1024 * 1024) {
-        return res.status(400).json({ message: "Upload a valid PDF invoice of 5MB or less." });
+        file.buffer.length > 5 * 1024 * 1024)) {
+        return res.status(400).json({ message: "Upload up to eight valid PDF documents, each 5MB or less." });
       }
-      const uuid = randomUUID(), filename = `invoice-ocr-${uuid}.pdf`;
-      key = await uploadToS3(file.buffer, `documents/${uuid}`, "application/pdf");
-      tmpPath = `/tmp/${filename}`;
-      await writeFile(tmpPath, file.buffer);
+      const prepared: { file: Express.Multer.File; filename: string; tmpPath: string; key: string }[] = [];
+      for (const file of files) {
+        const uuid = randomUUID(), filename = `invoice-ocr-${uuid}.pdf`, tmpPath = `/tmp/${filename}`;
+        const key = `documents/${uuid}`;
+        staged.push({ key, tmpPath });
+        await uploadToS3(file.buffer, key, "application/pdf");
+        await writeFile(tmpPath, file.buffer);
+        prepared.push({ file, filename, tmpPath, key });
+      }
       const created = await db.transaction(async tx => {
-        const [doc] = await tx.insert(documents).values({
+        const batch = [];
+        for (const { file, filename, tmpPath, key } of prepared) {
+          const [doc] = await tx.insert(documents).values({
           filename, originalName: String(file.originalname).replace(/[\\/]/g, "_").slice(0, 255),
           mimeType: "application/pdf", size: file.buffer.length, s3Key: key,
-          documentType: "invoice", sourceChannel: "manual", status: "processing",
+          documentType: "other", sourceChannel: "manual", status: "processing",
           uploadedBy: req.user.id, clientId: null, loadId: null, invoiceId: null, companyId: null,
         }).returning({ id: documents.id });
         const [job] = await tx.insert(docExtractionJobs).values({
           documentId: doc.id, jobType: "ocr", status: "queued",
         }).returning({ id: docExtractionJobs.id });
-        return { doc, job };
+          batch.push({ doc, job, tmpPath, filename: file.originalname });
+        }
+        return batch;
       });
       committed = true;
-      jobQueue.enqueue({ jobId: created.job.id, documentId: created.doc.id,
-        filePath: tmpPath, mimeType: "application/pdf" });
-      res.status(201).json({ documentId: created.doc.id, status: "queued" });
+      for (const item of created) jobQueue.enqueue({ jobId: item.job.id, documentId: item.doc.id,
+        filePath: item.tmpPath, mimeType: "application/pdf" });
+      res.status(201).json({ documentId: created[0].doc.id, status: "queued",
+        documents: created.map(item => ({ documentId: item.doc.id, filename: item.filename, status: "queued" })) });
     } catch (error) {
       if (!committed) {
-        if (key) await compensate(key, "invoice OCR intake compensation");
-        if (tmpPath) await unlink(tmpPath).catch(() => {});
+        for (const item of staged) {
+          await compensate(item.key, "invoice OCR intake compensation");
+          await unlink(item.tmpPath).catch(() => {});
+        }
       }
       console.error("[Invoice OCR intake]", error instanceof Error ? error.message : "Upload failed");
       res.status(500).json({ message: "Invoice OCR upload failed. Please retry." });
     }
   });
 
+  app.get("/api/invoices/ocr-intake", auth, async (req: any, res) => {
+    try {
+      const raw = String(req.query.documentIds ?? "").split(",");
+      if (!raw.length || raw.length > 8 || raw.some(id => !/^[1-9]\d*$/.test(id))) {
+        throw new IntakeError("Provide one to eight intake document IDs");
+      }
+      const snapshot = await getIntakeSnapshot(parseIntakeIds(raw.map(Number)), req.user);
+      res.json(snapshot);
+    } catch (error) {
+      res.status(error instanceof IntakeError ? error.status : 500).json({
+        message: error instanceof IntakeError ? error.message : "Failed to read intake results",
+      });
+    }
+  });
   app.get("/api/invoices/ocr-intake/:documentId", auth, async (req: any, res) => {
     try {
       const id = Number(req.params.documentId);

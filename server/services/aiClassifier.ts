@@ -237,8 +237,9 @@ async function callOpenAI(text: string): Promise<AIClassificationResult> {
   });
 
   if (!response.ok) {
-    const err = await response.text().catch(() => "");
-    throw new Error(`OpenAI API error ${response.status}: ${err.slice(0, 200)}`);
+    const error = await response.json().catch(() => ({})) as { error?: { code?: string; type?: string } };
+    const code = String(error.error?.code ?? error.error?.type ?? "request_failed").replace(/[^a-z0-9_]/gi, "").slice(0, 80);
+    throw new Error(`OpenAI classification failed (HTTP ${response.status}, code: ${code})`);
   }
 
   const data = await response.json() as any;
@@ -272,6 +273,7 @@ async function callOpenAI(text: string): Promise<AIClassificationResult> {
 export async function classifyDocumentAI(
   text: string,
   rulesResult?: ClassificationResult,
+  options: { requireAI?: boolean } = {},
 ): Promise<AIClassificationResult> {
   // Try OpenAI first
   if (process.env.OPENAI_API_KEY) {
@@ -282,9 +284,11 @@ export async function classifyDocumentAI(
       );
       return result;
     } catch (err: any) {
+      if (options.requireAI) throw err;
       console.warn("[aiClassifier] OpenAI failed, falling back to enhanced rules:", err?.message);
     }
   }
+  if (options.requireAI) throw new Error("OPENAI_API_KEY is not configured for GPT-4o-mini classification");
 
   // Enhanced rule-based fallback
   const { allScores, bestType, bestScore, signals } = computeAllScores(text);
