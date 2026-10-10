@@ -140,7 +140,7 @@ import {
 import Anthropic from "@anthropic-ai/sdk";
 import { triggerBrokerFollowUp, processScheduledReminders, suppressCadence, invalidateTemplateCache } from "./services/brokerFollowUpEngine";
 import { jobQueue } from "./services/jobQueue";
-import { classifyDocumentAI } from "./services/aiClassifier";
+import { classifyDocumentAI, reviewDocumentType } from "./services/aiClassifier";
 import { recalculateAllBrokerCredit, recalculateBrokerCredit, recalculateBrokerCreditSafe } from "./services/brokerCreditEngine";
 import {
   authenticateCurrentUser,
@@ -8184,36 +8184,31 @@ Trucking Pros Financial Team
         .orderBy(desc(docExtractionResults.createdAt))
         .limit(1);
 
-      const text = extractionRows[0]?.mainText || extractionRows[0]?.fullText;
+      const storedRaw = extractionRows[0]?.rawPayloadJson as { providerRaw?: { pageResults?: { text?: string }[] } } | undefined;
+      const text = storedRaw?.providerRaw?.pageResults?.[0]?.text || extractionRows[0]?.mainText || extractionRows[0]?.fullText;
       if (!text) return res.status(422).json({ message: "No extracted text available — run extraction first" });
 
       const aiResult = await classifyDocumentAI(text);
+      const reviewType = reviewDocumentType(aiResult.docType);
 
       // Persist AI result back to the document
       await db
         .update(documentsTable)
         .set({
-          aiDocumentType:             aiResult.docType,
+          aiDocumentType:             reviewType,
           aiClassificationConfidence: String(aiResult.confidence),
           aiClassificationSignals:    aiResult.signals,
           allClassificationScores:    aiResult.allScores,
           classificationSource:       aiResult.source as any,
           aiClassifiedAt:             new Date(),
           aiClassificationModel:      aiResult.model,
-          // Promote to candidate if AI is more confident
-          candidateDocumentType:
-            aiResult.confidence > parseFloat(docRows[0].classificationConfidence ?? "0")
-              ? (aiResult.docType as any)
-              : docRows[0].candidateDocumentType,
-          classificationConfidence:
-            aiResult.confidence > parseFloat(docRows[0].classificationConfidence ?? "0")
-              ? String(aiResult.confidence)
-              : docRows[0].classificationConfidence,
+          candidateDocumentType: reviewType as any,
+          classificationConfidence: String(aiResult.confidence),
         })
         .where(eq(documentsTable.id, docId));
 
       res.json({
-        docType:    aiResult.docType,
+        docType:    reviewType,
         confidence: aiResult.confidence,
         signals:    aiResult.signals,
         allScores:  aiResult.allScores,

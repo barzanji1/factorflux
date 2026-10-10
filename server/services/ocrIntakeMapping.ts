@@ -1,5 +1,6 @@
 import type { InvoicePreflightAlert } from "./invoicePreflight";
 import { normalizeIntakeType } from "./ocr/textractQueries";
+import { bolMismatchReasons } from "./ocrBolMismatch";
 
 export type IntakeDocument = {
   documentId: number; filename: string; docType: string; status: string; error?: string | null;
@@ -53,6 +54,11 @@ export function mapIntakeDocuments(documents: IntakeDocument[], tolerance = inta
   if (rateLoad && invoiceLoad && rateLoad.toUpperCase() !== invoiceLoad.toUpperCase()) {
     alert("LOAD_MISMATCH", "ack", "Load numbers differ",
       `${rateCon!.filename}: ${rateLoad}; ${invoice!.filename}: ${invoiceLoad}.`);
+  }
+  if (rateCon && bol) {
+    const reasons = bolMismatchReasons(rateCon.fields, bol.fields);
+    if (reasons.length) alert("BOL_MISMATCH", "ack", "BOL does not match rate confirmation",
+      `${rateCon.filename} vs ${bol.filename}: ${reasons.join("; ")}. Verify the paperwork and acknowledge before creating the invoice.`);
   }
   const delivery = bol?.fields.delivery_date, invoiceDate = invoice?.fields.invoice_date;
   if (delivery && invoiceDate && /^\d{4}-\d{2}-\d{2}$/.test(delivery) && /^\d{4}-\d{2}-\d{2}$/.test(invoiceDate) && delivery > invoiceDate) {

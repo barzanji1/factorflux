@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { runExtractionJob } from "./documentExtraction";
-import { docExtractionJobs, documents } from "../../shared/schema";
+import { docExtractionJobs, docFieldCandidates, documents } from "../../shared/schema";
 import type { ExtractionProvider } from "./ocr/types";
 
 for (const mode of ["throw", "empty", "native_fallback"] as const) {
@@ -37,3 +37,34 @@ for (const mode of ["throw", "empty", "native_fallback"] as const) {
     assert.equal(writes.find(write => write.table === documents)?.values.status, "failed");
   });
 }
+
+test("Claude API failure after successful OCR visibly fails the job and document, with no field candidates", async context => {
+  context.mock.method(globalThis, "fetch", async () => new Response(
+    JSON.stringify({ type: "error", error: { type: "rate_limit_error", message: "Fixture classifier error" } }),
+    { status: 429, headers: { "content-type": "application/json" } },
+  ));
+  const writes: { table: unknown; values: any }[] = [];
+  const database = {
+    update: (table: unknown) => ({
+      set: (values: any) => ({ where: async () => { writes.push({ table, values }); } }),
+    }),
+    insert: (table: unknown) => ({
+      values: async (values: any) => { writes.push({ table, values }); },
+    }),
+  };
+  const provider: ExtractionProvider = {
+    key: "textract", displayName: "Textract fixture",
+    extractText: async () => ({
+      fullText: "INVOICE #9\nAmount: 250", mainText: "INVOICE #9\nAmount: 250",
+      method: "textract_ocr", confidence: .99, pageTexts: ["INVOICE #9\nAmount: 250"],
+      pageCount: 1, providerKey: "textract",
+    }),
+  };
+  await runExtractionJob(101, 202, "/unused.pdf", "application/pdf", { database: database as never, provider });
+  const jobWrites = writes.filter(write => write.table === docExtractionJobs);
+  assert.equal(jobWrites.at(-1)?.values.status, "failed");
+  assert.match(jobWrites.at(-1)?.values.errorMessage, /Claude.*HTTP 429/);
+  assert.equal(writes.filter(write => write.table === documents).at(-1)?.values.status, "failed");
+  assert.ok(!jobWrites.some(write => write.values.status === "completed"));
+  assert.ok(!writes.some(write => write.table === docFieldCandidates));
+});

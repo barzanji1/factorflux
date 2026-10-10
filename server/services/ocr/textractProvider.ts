@@ -1,7 +1,7 @@
 import { AnalyzeExpenseCommand, AnalyzeDocumentCommand, DetectDocumentTextCommand, TextractClient, type AnalyzeExpenseCommandOutput } from "@aws-sdk/client-textract";
 import { createHash } from "node:crypto";
 import { classifyDocumentAI } from "../aiClassifier";
-import { decodeQueries, INTAKE_QUERIES, normalizeIntakeType } from "./textractQueries";
+import { BOL_QUERIES, decodeQueries, INTAKE_QUERIES, normalizeIntakeType } from "./textractQueries";
 import type { OcrProvider, OcrResult } from "./types";
 import { fieldsFromText, mergeFields, parseAmount, parseServiceDate } from "./ocrFields";
 import { renderPages } from "./renderPages";
@@ -97,8 +97,8 @@ export class TextractProvider implements OcrProvider {
       }
       const text = classificationTexts.join("\n\n");
       if (!text.trim()) throw new Error("Textract returned no text for intake classification");
-      classification = await this.classify(text, undefined, { requireAI: true });
-      if (classification.source !== "ai") throw new Error("GPT-4o-mini intake classification unavailable; refusing to guess document type");
+      classification = await this.classify(classificationTexts[0], undefined, { requireAI: true });
+      if (classification.source !== "ai") throw new Error("Claude intake classification unavailable; refusing to guess document type");
       type = normalizeIntakeType(classification.docType);
       if (!["invoice", "rate_confirmation", "bol", "pod"].includes(type)) {
         return { text, confidence: classificationConfidence.reduce((sum, value) => sum + value, 0) / classificationConfidence.length, fields: fieldsFromText(""),
@@ -117,7 +117,7 @@ export class TextractProvider implements OcrProvider {
       } else {
         const response = await this.client.send(new AnalyzeDocumentCommand({
           Document: { Bytes: page }, FeatureTypes: ["QUERIES", "SIGNATURES"],
-          QueriesConfig: { Queries: type === "rate_confirmation" ? INTAKE_QUERIES : INTAKE_QUERIES.slice(0, 9) },
+          QueriesConfig: { Queries: type === "rate_confirmation" ? INTAKE_QUERIES : BOL_QUERIES },
         }));
         results.push(decodeQueries(response, type));
       }

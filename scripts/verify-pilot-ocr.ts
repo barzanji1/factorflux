@@ -125,7 +125,7 @@ async function main() {
         classification: (result?.rawPayloadJson as any)?.providerRaw?.classification ?? null,
         operation: (result?.rawPayloadJson as any)?.providerRaw?.operation ?? null,
         queryAnswers: ((result?.rawPayloadJson as any)?.providerRaw?.pages ?? []).map((page: any) => page.answers ?? null),
-        classificationMode: override ? "explicit_verification_override" : fullLoad ? "automatic_gpt4o_mini" : "explicit_invoice",
+        classificationMode: override ? "explicit_verification_override" : fullLoad ? "automatic_claude_haiku" : "explicit_invoice",
         error: genuineOcr ? null : finished?.errorMessage || errors.join("; ") || "No successful OCR result returned",
         providerDiagnostics: errors,
       };
@@ -141,7 +141,7 @@ async function main() {
     const snapshot = await getIntakeSnapshot(isolatedIds, { id: author.id, role: "admin" });
     if (snapshot.missingTypes.length) anyOcrFailure = true;
     console.log(JSON.stringify({ fullLoad: true, status: snapshot.status,
-      classificationMode: override ? "explicit_verification_override" : "automatic_gpt4o_mini",
+      classificationMode: override ? "explicit_verification_override" : "automatic_claude_haiku",
       missingTypes: snapshot.missingTypes, tolerance: snapshot.tolerance,
       fields: snapshot.fields, sources: snapshot.sources, crossChecks: snapshot.alerts,
       brokerMatch: snapshot.brokerMatch, documents: snapshot.documents }));

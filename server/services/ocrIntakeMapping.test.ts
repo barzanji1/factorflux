@@ -54,6 +54,40 @@ test("failed documents never supply fields; signature words do not clear missing
   assert.equal(result.sources.load_number.documentId, 2);
   assert.equal(result.alerts[0].code, "NO_SIGNATURE");
 });
+test("BOL_MISMATCH combines route and visible shipment-reference differences into one ack alert", () => {
+  const wrongBol = { ...bol, fields: { ...bol.fields, origin: "Schenectady, NY", destination: "Franklin, GA",
+    load_number: "202615480", load_number_label: "Shipment ID" } };
+  const result = mapIntakeDocuments([rate, invoice, wrongBol], 0);
+  assert.equal(result.alerts.length, 1);
+  assert.equal(result.alerts[0].code, "BOL_MISMATCH");
+  assert.equal(result.alerts[0].severity, "ack");
+  for (const detail of ["origin", "destination", "150611", "202615480", "rate_confirmation.pdf", "bol.pdf"]) {
+    assert(result.alerts[0].message.includes(detail));
+  }
+});
+test("each BOL mismatch criterion independently requires acknowledgement", () => {
+  for (const changed of [
+    { origin: "Schenectady, NY" }, { destination: "Franklin, GA" },
+    { load_number: "202615480", load_number_label: "Load #" },
+  ]) {
+    const result = mapIntakeDocuments([rate, invoice, { ...bol, fields: { ...bol.fields, ...changed } }], 0);
+    assert.equal(result.alerts[0].code, "BOL_MISMATCH");
+    assert.equal(result.alerts[0].severity, "ack");
+  }
+});
+test("matching routes/references tolerate formatting; missing evidence and independent BOL numbers do not mismatch", () => {
+  const result = mapIntakeDocuments([rate, invoice, { ...bol, fields: { ...bol.fields,
+    origin: "stoughton, Massachusetts 02072", destination: "NATICK Massachusetts",
+    load_number: "*150611*", load_number_label: "Shipment ID" } }], 0);
+  assert.deepEqual(result.alerts, []);
+  for (const extra of [
+    { bol_number: "999999" },
+    { load_number: "999999", load_number_label: "Textract load-number query" },
+    { origin: "unknown", destination: "" },
+  ]) {
+    assert.deepEqual(mapIntakeDocuments([rate, invoice, { ...bol, fields: { ...bol.fields, ...extra } }], 0).alerts, []);
+  }
+});
 test("paperwork reuse requires correct type and exact content hash; cannot steal associated documents", () => {
   const buffer = Buffer.from("%PDF-fixture");
   const source = { ...rate, contentHash: createHash("sha256").update(buffer).digest("hex") };

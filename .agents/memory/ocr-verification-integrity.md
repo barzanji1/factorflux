@@ -67,6 +67,18 @@ Use rate-confirmation fields for broker/load/rate/route/pickup dates; carrier in
 
 **How to apply:** Cross-check the documents server-side and enforce acknowledgements during creation. Do not auto-create brokers. Keep supplemental NOAs out of financial field mapping.
 
+Include BOL-versus-rate-confirmation city/state and visibly labeled shipment/load references in an acknowledgement-required mismatch check.
+
+**Why:** The user explicitly requested this after a pilot BOL described a different shipment even though rate con and carrier invoice matched.
+
+**How to apply:** Normalize case, punctuation, ZIP suffixes and full US state names. Compare real load/shipment labels, not independent BOL numbers or unsupported query guesses. Log acknowledgement with actor/reason and alert evidence in the invoice ledger.
+
+BOL city/state queries may return entire company/street address blocks instead of cities.
+
+**Why:** Real Textract verification returned address blocks for shipper/consignee city-state questions.
+
+**How to apply:** Supplement with separate city/state queries, retain their confidence, and treat ambiguous street-address blocks as unknown rather than comparing them as city names.
+
 Rate confirmations may label a human contact as “Broker.” Generic Textract queries can return that person, and load queries can miss a digit even when line OCR reads an explicit Load label correctly.
 
 **Why:** Real pilot verification returned a contact rather than the broker company, and misread a correctly labeled load number.

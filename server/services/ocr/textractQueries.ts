@@ -1,6 +1,7 @@
 import type { AnalyzeDocumentCommandOutput, Block } from "@aws-sdk/client-textract";
 import type { OcrResult } from "./types";
 import { fieldsFromText, parseAmount, parseServiceDate } from "./ocrFields";
+import { normalizeCityState } from "../ocrBolMismatch";
 
 export const INTAKE_QUERIES = [
   { Text: "What is the broker name?", Alias: "brokerName" },
@@ -20,9 +21,18 @@ export const INTAKE_QUERIES = [
   { Text: "What city and state are in the Origin section?", Alias: "originSection" },
   { Text: "What city and state are in the Destination section?", Alias: "destinationSection" },
 ];
+export const BOL_QUERIES = [
+  ...INTAKE_QUERIES.slice(0, 9),
+  { Text: "What is the shipper's city and state?", Alias: "bolOrigin" },
+  { Text: "What is the consignee's city and state?", Alias: "bolDestination" },
+  { Text: "What is the shipper's city?", Alias: "bolOriginCity" },
+  { Text: "What is the shipper's state?", Alias: "bolOriginState" },
+  { Text: "What is the consignee's city?", Alias: "bolDestinationCity" },
+  { Text: "What is the consignee's state?", Alias: "bolDestinationState" },
+];
 
 export function normalizeIntakeType(type: string): string {
-  return ({ freight_invoice: "invoice", bill_of_lading: "bol", proof_of_delivery: "pod" } as Record<string, string>)[type] ?? type;
+  return ({ freight_invoice: "invoice", carrier_invoice: "invoice", bol_pod: "bol", bill_of_lading: "bol", proof_of_delivery: "pod" } as Record<string, string>)[type] ?? type;
 }
 
 export function queryDate(value: string | undefined): string | null {
@@ -81,6 +91,18 @@ export function decodeQueries(response: AnalyzeDocumentCommandOutput, docType = 
     ["deliveryDate", "destinationDate"], ["origin", "originSection"], ["destination", "destinationSection"]]) {
     if (answers[qualified]) { answers[field] = answers[qualified]; confidence[field] = confidence[qualified]; }
   }
+  const isBol = ["bol", "pod"].includes(normalizeIntakeType(docType));
+  if (isBol) for (const [field, qualified] of [["origin", "bolOrigin"], ["destination", "bolDestination"]]) {
+    if (answers[qualified]) { answers[field] = answers[qualified]; confidence[field] = confidence[qualified]; }
+    if (answers[`${qualified}City`] && answers[`${qualified}State`]) {
+      const city = answers[`${qualified}City`];
+      const combined = normalizeCityState(city) ? city : `${city}, ${answers[`${qualified}State`]}`;
+      if (normalizeCityState(combined)) {
+        answers[field] = combined;
+        confidence[field] = Math.min(confidence[`${qualified}City`] ?? 0, confidence[`${qualified}State`] ?? 0);
+      }
+    }
+  }
   const signature = receiverInk(blocks);
   const positiveAnswer = /^(?:yes|true|signed|present|detected)\b/i.test(answers.receiverSignature ?? "") &&
     (confidence.receiverSignature ?? 0) >= 0.8;
@@ -93,10 +115,21 @@ export function decodeQueries(response: AnalyzeDocumentCommandOutput, docType = 
     const line = lines.find(line => /\bload\b/i.test(line.Text ?? "") && line.Text?.includes(labeled.loadNumber!));
     if (line?.Confidence != null) confidence.loadNumber = line.Confidence / 100;
   }
+  // A BOL number is not a load reference. Only a visibly labeled load/shipment
+  // reference may drive BOL_MISMATCH, never an unsupported query answer.
+  const shipment = isBol ? text.match(/\b(shipment\s*(?:id|number|no\.?|reference|ref\.?|#))\s*[:#]?\s*\**([A-Z0-9][A-Z0-9-]*)(?=[*\s,;.]|$)/i) : null;
+  const shipmentValue = shipment && !/^(?:LOAD|NUMBER|ID|SHIPMENT|SHIPPING|DOC|DOCUMENT|ORIGIN|DESTINATION|DATE|SIGNATURE)$/i.test(shipment[2])
+    ? shipment[2] : null;
+  const visibleReference = labeledLoad ? labeled.loadNumber : shipmentValue;
+  const visibleLabel = labeledLoad ? labeled.loadNumberSourceLabel : shipmentValue ? shipment![1] : null;
+  if (isBol && visibleReference) {
+    const line = lines.find(line => line.Text?.includes(visibleReference));
+    if (line?.Confidence != null) confidence.loadNumber = line.Confidence / 100;
+  }
   const fields = {
     ...labeled, invoiceNumber: null, invoiceDate: null, brokerName: answers.brokerName ?? null,
-    loadNumber: labeledLoad ? labeled.loadNumber : cleanId(answers.loadNumber) ?? labeled.loadNumber,
-    loadNumberSourceLabel: labeledLoad ? labeled.loadNumberSourceLabel : answers.loadNumber ? "Textract load-number query" : labeled.loadNumberSourceLabel,
+    loadNumber: isBol ? visibleReference : labeledLoad ? labeled.loadNumber : cleanId(answers.loadNumber) ?? labeled.loadNumber,
+    loadNumberSourceLabel: isBol ? visibleLabel : labeledLoad ? labeled.loadNumberSourceLabel : answers.loadNumber ? "Textract load-number query" : labeled.loadNumberSourceLabel,
     amount: parseAmount(answers.rate), rate: parseAmount(answers.rate),
     serviceDate: null, pickupDate: queryDate(answers.pickupDate), deliveryDate: queryDate(answers.deliveryDate),
     origin: answers.origin ?? null, destination: answers.destination ?? null,

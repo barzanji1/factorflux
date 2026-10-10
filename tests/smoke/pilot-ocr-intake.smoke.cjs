@@ -66,7 +66,7 @@ let chrome, ws, mode = "medium", uploads = 0;
           { documentId: 502, filename: "0_INVOICE-LOAD-150611_1791563483824.pdf", docType: "invoice", status: "completed", confidence: .96 },
           { documentId: 503, filename: "0_BOL150611_1791585926693.pdf", docType: "bol", status: mode === "failed" ? "failed" : "completed", confidence: .95, error: mode === "failed" ? "Fixture provider error" : null },
         ],
-        alerts: mode === "mismatch" ? ["RATE_MISMATCH", "LOAD_MISMATCH", "DELIVERY_AFTER_INVOICE", "NO_SIGNATURE"].map(code => ({ code, severity: code === "NO_SIGNATURE" ? "info" : "ack", title: code, message: `${code} fixture cross-check` })) : [],
+        alerts: mode === "mismatch" ? ["RATE_MISMATCH", "LOAD_MISMATCH", "BOL_MISMATCH", "DELIVERY_AFTER_INVOICE", "NO_SIGNATURE"].map(code => ({ code, severity: code === "NO_SIGNATURE" ? "info" : "ack", title: code, message: `${code} fixture cross-check` })) : [],
         brokerMatch: { brokerId: selected ? 1342 : null, confidence: selected ? mode : null,
           matchedName: selected ? "TRANSJET CARGO LLC" : null, rawName: "TRANSJ ET CARGO LLC",
           candidates: mode === "ambiguous" ? [{ id: 1, name: "A" }, { id: 2, name: "B" }] : selected ? [{ id: 1342, name: "TRANSJET CARGO LLC" }] : [] },
@@ -141,12 +141,13 @@ let chrome, ws, mode = "medium", uploads = 0;
       assert.equal(await evaluate(brokerValue), mode === "high" ? "TRANSJET CARGO LLC" : "");
       if (mode !== "high") assert(await evaluate(`document.querySelector('[data-testid="invoice-ocr-raw-broker"]').textContent.includes('TRANSJ ET CARGO LLC')`));
       if (mode === "mismatch") {
-        assert.equal(await evaluate(`document.querySelectorAll('[data-testid="invoice-ocr-cross-check-alert"]').length`), 4);
+        assert.equal(await evaluate(`document.querySelectorAll('[data-testid="invoice-ocr-cross-check-alert"]').length`), 5);
+        assert(await evaluate(`document.body.innerText.includes('BOL_MISMATCH fixture cross-check')`));
         assert(await evaluate(`document.querySelector('[data-testid="invoice-ocr-signature"]').textContent.includes('Not detected')`));
       }
     }
   }
   assert.equal(uploads, 6);
-  console.log("PASS: three-document staging/classification, square Win95 drop zone, field sources, rate/invoice/BOL precedence, dates and location prefill, signature, all four cross-check alerts, exact/fuzzy/ambiguous/missing brokers and failed provider. Isolated API fixtures only.");
+  console.log("PASS: three-document staging/classification, square Win95 drop zone, field sources, rate/invoice/BOL precedence, dates and location prefill, signature, all five cross-check alerts including BOL_MISMATCH, exact/fuzzy/ambiguous/missing brokers and failed provider. Isolated API fixtures only.");
   ws.close(); chrome.kill("SIGTERM");
 })().catch(error => { console.error(error); ws?.close(); chrome?.kill("SIGTERM"); process.exitCode = 1; });

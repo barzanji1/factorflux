@@ -129,7 +129,7 @@ function SourceBadge({ source, model }: { source: string | null; model?: string 
             <Sparkles className="h-2.5 w-2.5" /> AI
           </Badge>
         </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">{model ?? "GPT-4o-mini"}</TooltipContent>
+        <TooltipContent side="top" className="text-xs">{model ?? "Claude Haiku"}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

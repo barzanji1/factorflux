@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { AnalyzeDocumentCommand, AnalyzeExpenseCommand, DetectDocumentTextCommand, type Block } from "@aws-sdk/client-textract";
-import { decodeQueries, INTAKE_QUERIES, queryDate } from "./textractQueries";
+import { BOL_QUERIES, decodeQueries, INTAKE_QUERIES, queryDate } from "./textractQueries";
 import { TextractProvider } from "./textractProvider";
 const answer = (alias: string, text: string, confidence = 95): Block[] => [
   { BlockType: "QUERY", Id: alias, Query: { Alias: alias }, Relationships: [{ Type: "ANSWER", Ids: [`${alias}-a`] }] },
@@ -34,6 +34,25 @@ test("receiver signature requires positive answer or located ink, not a printed 
   assert.equal(decodeQueries({ Blocks: [label, ink] }).fields.receiverSignature, true);
   assert.equal(decodeQueries({ Blocks: [label, { ...ink, Geometry: { BoundingBox: { Left: .2, Top: .35, Width: .1 } } }] }).fields.receiverSignature, false);
 });
+test("BOL retains visibly labeled shipment ID and shipper/consignee route, not unsupported query load guesses", () => {
+  const result = decodeQueries({ Blocks: [
+    { BlockType: "LINE", Text: "Shipment ID *202615480*", Confidence: 98 },
+    ...answer("loadNumber", "WRONG-GUESS"), ...answer("bolOrigin", "A full shipper address", 35),
+    ...answer("bolDestination", "A full consignee address", 23),
+    ...answer("bolOriginCity", "Schenectady"), ...answer("bolOriginState", "NY"),
+    ...answer("bolDestinationCity", "Franklin"), ...answer("bolDestinationState", "GA", 90),
+  ] }, "bol");
+  assert.equal(result.fields.loadNumber, "202615480");
+  assert.equal(result.fields.loadNumberSourceLabel, "Shipment ID");
+  assert.equal(result.fields.fieldConfidences?.loadNumber, .98);
+  assert.equal(result.fields.origin, "Schenectady, NY");
+  assert.equal(result.fields.destination, "Franklin, GA");
+  assert.equal(result.fields.fieldConfidences?.destination, .9);
+  const unknown = decodeQueries({ Blocks: [...answer("loadNumber", "150611"), ...answer("bolNumber", "12345")] }, "bol");
+  assert.equal(unknown.fields.loadNumber, null);
+  assert.equal(unknown.fields.bolNumber, "12345");
+  assert(BOL_QUERIES.length <= 15);
+});
 test("named and unambiguous day-first dates parse, invalid dates stay null", () => {
   assert.equal(queryDate("SEP-25-2026"), "2026-09-25");
   assert.equal(queryDate("09/23/2026 Wednesday"), "2026-09-23");
@@ -42,7 +61,7 @@ test("named and unambiguous day-first dates parse, invalid dates stay null", () 
   assert.equal(queryDate("31 February 2026"), null);
   assert.equal(queryDate("yesterday"), null);
 });
-for (const [classified, expected] of [["freight_invoice", AnalyzeExpenseCommand], ["rate_confirmation", AnalyzeDocumentCommand], ["bill_of_lading", AnalyzeDocumentCommand]]) {
+for (const [classified, expected] of [["freight_invoice", AnalyzeExpenseCommand], ["carrier_invoice", AnalyzeExpenseCommand], ["rate_confirmation", AnalyzeDocumentCommand], ["bill_of_lading", AnalyzeDocumentCommand], ["bol_pod", AnalyzeDocumentCommand]]) {
   test(`automatic ${classified} classification routes to ${expected.name}`, async () => {
     const calls: unknown[] = [];
     const provider = new TextractProvider({ send: async (command: unknown) => {
@@ -50,14 +69,26 @@ for (const [classified, expected] of [["freight_invoice", AnalyzeExpenseCommand]
       if (command instanceof AnalyzeExpenseCommand) return { ExpenseDocuments: [{ Blocks: [{ BlockType: "LINE", Text: "Invoice #9", Confidence: 98 }] }] };
       return { Blocks: [{ BlockType: "LINE", Text: "Load #150611", Confidence: 98 }] };
     } } as any, async () => [Buffer.from("page")], async () => ({
-      docType: classified, confidence: .99, signals: [], reasoning: "Fixture", allScores: {}, model: "gpt-4o-mini", source: "ai",
+      docType: classified, confidence: .99, signals: [], reasoning: "Fixture", allScores: {}, model: "claude-haiku-4-5", source: "ai",
     }));
     const result = await provider.extract(Buffer.from("file"), "application/pdf", "auto");
     assert(calls[0] instanceof DetectDocumentTextCommand);
     assert(calls[1] instanceof expected);
-    assert.equal((result.raw as any).classification.model, "gpt-4o-mini");
+    assert.equal((result.raw as any).classification.model, "claude-haiku-4-5");
   });
 }
+test("automatic classifier receives only first-page text, not later-page instructions", async () => {
+  let page = 0, input = "";
+  const provider = new TextractProvider({ send: async (command: unknown) => {
+    const text = command instanceof DetectDocumentTextCommand ? (++page === 1 ? "First-page rate con" : "Later-page invoice text") : "Rate con";
+    return { Blocks: [{ BlockType: "LINE", Text: text, Confidence: 98 }] };
+  } } as any, async () => [Buffer.from("p1"), Buffer.from("p2")], async text => {
+    input = text;
+    return { docType: "rate_confirmation", confidence: .99, signals: [], reasoning: "", allScores: {}, model: "claude-haiku-4-5", source: "ai" };
+  });
+  await provider.extract(Buffer.from("file"), "application/pdf", "auto");
+  assert.equal(input, "First-page rate con");
+});
 test("classifier failure propagates, never routes guessed documents to another operation", async () => {
   const calls: unknown[] = [];
   const provider = new TextractProvider({ send: async (command: unknown) => {

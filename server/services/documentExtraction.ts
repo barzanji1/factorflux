@@ -19,7 +19,7 @@ import {
 import { eq } from "drizzle-orm";
 import { getExtractionProvider } from "./ocr/registry";
 import { assertSuccessfulExtraction, type ExtractionProvider } from "./ocr/types";
-import { classifyDocumentAI } from "./aiClassifier";
+import { classifyDocumentAI, reviewDocumentType } from "./aiClassifier";
 import { findOcrBrokerMatch } from "./ocrBrokerMatching";
 import { extractInvoiceNumber, extractLoadNumber, extractReferenceNumber, extractBolNumber, type FieldResult } from "./documentFieldDetectors";
 
@@ -300,24 +300,12 @@ export async function runExtractionJob(
       pageCount:        extracted.pageCount,
     });
 
-    // ── AI classification (best-effort, won't block extraction) ──────────────
+    // AI errors must fail the enclosing extraction job, never select rules.
     const routed = extracted.raw as { classification?: Awaited<ReturnType<typeof classifyDocumentAI>>; docType?: string } | undefined;
-    let aiResult: Awaited<ReturnType<typeof classifyDocumentAI>> | null = routed?.classification ?? null;
-    try {
-      if (!aiResult) aiResult = await classifyDocumentAI(t, classification);
-    } catch (err: any) {
-      console.warn(`[Extraction] AI classification failed for doc ${documentId}:`, err?.message);
-    }
-
-    // Prefer AI result when it has higher confidence
-    const finalDocType =
-      routed?.classification ? routed.classification.docType : aiResult && aiResult.confidence > classification.confidence
-        ? aiResult.docType
-        : classification.docType;
-    const finalConfidence =
-      routed?.classification ? routed.classification.confidence : aiResult && aiResult.confidence > classification.confidence
-        ? aiResult.confidence
-        : classification.confidence;
+    const firstPage = (extracted.raw as { pageResults?: { text?: string }[] } | undefined)?.pageResults?.[0]?.text ?? t;
+    const aiResult = routed?.classification ?? await classifyDocumentAI(firstPage, classification);
+    const finalDocType = reviewDocumentType(aiResult.docType);
+    const finalConfidence = aiResult.confidence;
 
     // ── Update document with candidate classification ─────────────────────────
     await jobDb
@@ -325,13 +313,13 @@ export async function runExtractionJob(
       .set({
         candidateDocumentType:      finalDocType as any,
         classificationConfidence:   String(finalConfidence),
-        aiDocumentType:             aiResult?.docType ?? null,
-        aiClassificationConfidence: aiResult ? String(aiResult.confidence) : null,
-        aiClassificationSignals:    aiResult?.signals ?? null,
-        allClassificationScores:    aiResult?.allScores ?? null,
-        classificationSource:       (aiResult?.source ?? "rules") as any,
-        aiClassifiedAt:             aiResult ? new Date() : null,
-        aiClassificationModel:      aiResult?.model ?? null,
+        aiDocumentType:             finalDocType,
+        aiClassificationConfidence: String(aiResult.confidence),
+        aiClassificationSignals:    aiResult.signals,
+        allClassificationScores:    aiResult.allScores,
+        classificationSource:       aiResult.source as any,
+        aiClassifiedAt:             new Date(),
+        aiClassificationModel:      aiResult.model,
         status: "processed",
       })
       .where(eq(documents.id, documentId));
@@ -422,10 +410,10 @@ export async function runExtractionJob(
     candidates.push({
       documentId,
       fieldName:       "document_type",
-      fieldValue:      classification.docType.replace(/_/g, " "),
-      normalizedValue: classification.docType,
-      confidenceScore: String(classification.confidence),
-      sourceSnippet:   classification.signals.join(", "),
+      fieldValue:      finalDocType.replace(/_/g, " "),
+      normalizedValue: finalDocType,
+      confidenceScore: String(finalConfidence),
+      sourceSnippet:   aiResult.signals.join(", "),
     });
 
     if (candidates.length > 0) {
