@@ -144,6 +144,17 @@ let chrome, ws, mode = "medium", uploads = 0;
         assert.equal(await evaluate(`document.querySelectorAll('[data-testid="invoice-ocr-cross-check-alert"]').length`), 5);
         assert(await evaluate(`document.body.innerText.includes('BOL_MISMATCH fixture cross-check')`));
         assert(await evaluate(`document.querySelector('[data-testid="invoice-ocr-signature"]').textContent.includes('Not detected')`));
+        await until(`!!document.querySelector('button[aria-label="Close preflight alerts"]')`);
+        assert.equal(await evaluate(`(() => {
+          const dialog = document.querySelector('button[aria-label="Close preflight alerts"]').closest('[role="dialog"]');
+          return Array.from(dialog.querySelectorAll('button')).filter(button =>
+            button.getAttribute('aria-label') === 'Close preflight alerts' || button.querySelector('.sr-only')?.textContent === 'Close'
+          ).length;
+        })()`), 1, "Preflight must have exactly one title-bar X");
+        fs.writeFileSync("/tmp/preflight-single-close.jpg", Buffer.from((await cdp("Page.captureScreenshot", { format: "jpeg", quality: 75 })).data, "base64"));
+        await evaluate(`document.querySelector('button[aria-label="Close preflight alerts"]').click()`);
+        await until(`!document.querySelector('button[aria-label="Close preflight alerts"]')`);
+        assert(await evaluate(`!!document.querySelector('[data-testid="invoice-ocr-file-input"]')`), "Closing alerts leaves invoice form open");
       }
     }
   }

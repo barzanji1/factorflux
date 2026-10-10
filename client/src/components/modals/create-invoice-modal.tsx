@@ -1088,7 +1088,7 @@ export default function CreateInvoiceModal({
         </div>
       </DialogContent>
       <Dialog open={preflightOpen} onOpenChange={setPreflightOpen}>
-        <DialogContent className="max-h-[80vh] max-w-xl overflow-y-auto rounded-none border-2 border-slate-600 bg-[#c0c0c0] p-1 shadow-[4px_4px_0_#404040]">
+        <DialogContent showCloseButton={false} className="max-h-[80vh] max-w-xl overflow-y-auto rounded-none border-2 border-slate-600 bg-[#c0c0c0] p-1 shadow-[4px_4px_0_#404040]">
           <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">
             <DialogTitle className="text-sm font-bold">Invoice Preflight Alerts</DialogTitle>
             <button type="button" onClick={() => setPreflightOpen(false)} aria-label="Close preflight alerts" className="border-2 border-white bg-[#c0c0c0] px-2 font-bold leading-5 text-black">×</button>
