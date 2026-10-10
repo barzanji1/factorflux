@@ -810,6 +810,7 @@ export const brokers = pgTable("brokers", {
   website: text("website"),
   fmcsaUrl: text("fmcsa_url"),
   source: varchar("source"),
+  dataOrigin: varchar("data_origin"),
   paymentTerms: varchar("payment_terms", { enum: ["net15", "net30", "net45", "net60", "quickpay"] }).default("net30").notNull(),
   status: varchar("status", { enum: ["active", "inactive", "suspended"] }).default("active").notNull(),
   notes: text("notes"),

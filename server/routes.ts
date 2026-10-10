@@ -6899,6 +6899,14 @@ Trucking Pros Financial Team
   app.post("/api/brokers", requireAuth, async (req: any, res) => {
     try {
       const input = { ...req.body };
+      // Accept the database-style pilot tag as well as the API's camelCase.
+      if (Object.prototype.hasOwnProperty.call(input, "data_origin")) {
+        if (input.dataOrigin !== undefined && input.dataOrigin !== input.data_origin) {
+          return res.status(400).json({ message: "Conflicting data origin values" });
+        }
+        input.dataOrigin = input.data_origin;
+        delete input.data_origin;
+      }
       if (req.user.role === "employee") input.assignedProcessor = req.user.id;
       if (Object.prototype.hasOwnProperty.call(input, "assignedProcessor")) {
         input.assignedProcessor = await validateAssignedProcessor(input.assignedProcessor);
