@@ -54,7 +54,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
       address: "",
       contactPerson: "",
       taxId: "",
-      status: "active",
+      status: "new_client",
       advanceRate: "80.00",
       factoringFeeRate: "3.00",
     },
@@ -81,7 +81,7 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
         address: "",
         contactPerson: "",
         taxId: "",
-        status: "active",
+        status: "new_client",
         advanceRate: "80.00",
         factoringFeeRate: "3.00",
       });
@@ -216,13 +216,14 @@ export default function ClientModal({ isOpen, onClose, client }: ClientModalProp
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={(value) => field.onChange(value || "new_client")} value={field.value || "new_client"}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="new_client">New Client</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="inactive">Inactive</SelectItem>
                       </SelectContent>

@@ -797,7 +797,7 @@ export default function Brokers() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={(value) => field.onChange(value || "active")} value={field.value || "active"}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select status" />

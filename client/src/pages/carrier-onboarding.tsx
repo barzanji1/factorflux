@@ -48,7 +48,7 @@ const formSchema = z.object({
   email: z.string().trim().email("Enter a valid email").or(z.literal("")),
   phone: z.string().trim().min(7, "Phone is required"),
   address: z.string().trim().min(1, "Physical address is required"),
-  status: z.string(),
+  status: z.enum(["new_client", "active", "inactive"]).default("new_client"),
   language: z.string(),
   mcNumber: z.string(),
   advanceRate: z.string(),
@@ -60,9 +60,10 @@ type QueuedFile = { file: File; category: string; key: string };
 const pretty = (key: string) => key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 const initialOwners = () => [0, 1, 2].map(() => Object.fromEntries(ownerKeys.map((k) => [k, ""])));
 const defaults: CarrierForm = {
+  ...Object.fromEntries(sections.flatMap((s) => s.fields).map((f) => [f, ""])),
   name: "", email: "", phone: "", address: "", status: "new_client", language: "English",
   mcNumber: "", advanceRate: "80.00", factoringFeeRate: "3.00", mailingSameAsPhysical: false,
-  owners: initialOwners(), supportChecklist: {}, ...Object.fromEntries(sections.flatMap((s) => s.fields).map((f) => [f, ""])),
+  owners: initialOwners(), supportChecklist: {},
 };
 
 function Section({ title, children, defaultOpen = true }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
