@@ -213,8 +213,10 @@ async function calculateBrokerCredit(tx: any, brokerId: number) {
   return history;
 }
 
-export async function recalculateAllBrokerCredit() {
-  const all = await db.select({ id: brokers.id }).from(brokers);
+export async function recalculateAllBrokerCredit(options: { scheduled?: boolean } = {}) {
+  const all = await db.select({ id: brokers.id }).from(brokers).where(
+    options.scheduled ? sql`${brokers.dataOrigin} IS DISTINCT FROM ${"pilot"}` : undefined,
+  );
   return recalculateBrokerCreditBatch(all.map(broker => broker.id));
 }
 
@@ -262,7 +264,7 @@ export function startBrokerCreditScheduler(): void {
           [742_091_731],
         );
         if (!lockResult.rows[0]?.acquired) return;
-        await recalculateAllBrokerCredit();
+        await recalculateAllBrokerCredit({ scheduled: true });
       } catch (error) {
         console.error("[brokerCredit] scheduled recalculation failed:", error);
       } finally {

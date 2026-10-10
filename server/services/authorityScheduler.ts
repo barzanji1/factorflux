@@ -591,7 +591,10 @@ export async function runAllAuthorityChecks(
       return summary;
     }
 
-    const allBrokers = await db.select().from(brokers).where(eq(brokers.status, "active"));
+    const allBrokers = await db.select().from(brokers).where(and(
+      eq(brokers.status, "active"),
+      triggeredBy === "system" ? sql`${brokers.dataOrigin} IS DISTINCT FROM ${"pilot"}` : undefined,
+    ));
     const allDebtors = await db.select().from(debtors).where(eq(debtors.status, "active"));
     const allCarriers = await db.select().from(clients).where(eq(clients.status, "active"));
 
