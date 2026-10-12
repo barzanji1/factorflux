@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   invoices, brokers, clients, debtors, users, tasks, paymentApplicationLines,
@@ -14,6 +14,7 @@ type Event = typeof brokerConfirmationEvents.$inferInsert.event;
 export type ConfirmationActor = { kind: "system" | "agent" | "broker"; id: string };
 export type ConfirmationSettings = Pick<typeof brokerConfirmationSettings.$inferSelect, "maxReminders" | "reminderDays" | "publicBaseUrl">;
 const DAY = 86_400_000;
+export const INITIAL_CONFIRMATION_DELAY_MS = 2 * DAY;
 
 export class ConfirmationError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -42,7 +43,7 @@ export function confirmationAction(
 ): "initial" | "reminder" | "escalate" | null {
   if (invoice.status !== "funded" || !invoice.fundedAt ||
       ["confirmed", "disputed"].includes(invoice.brokerConfirmationStatus)) return null;
-  if (!invoice.confirmationSentAt) return invoice.fundedAt.getTime() < now.getTime() - DAY ? "initial" : null;
+  if (!invoice.confirmationSentAt) return invoice.fundedAt.getTime() < now.getTime() - INITIAL_CONFIRMATION_DELAY_MS ? "initial" : null;
   const elapsed = now.getTime() - invoice.confirmationSentAt.getTime();
   const count = invoice.confirmationRemindedCount;
   if (count < settings.maxReminders && elapsed >= settings.reminderDays[count] * DAY) return "reminder";
@@ -279,7 +280,9 @@ export function createBrokerConfirmationService({
     const at = now();
     const candidates = await store.select({ id: invoices.id }).from(invoices).where(and(
       eq(invoices.status, "funded"), inArray(invoices.brokerConfirmationStatus, ["pending", "sent"]),
-      isNotNull(invoices.fundedAt), lte(invoices.fundedAt, new Date(at.getTime() - DAY)),
+      isNotNull(invoices.fundedAt),
+      or(isNotNull(invoices.confirmationSentAt),
+        lt(invoices.fundedAt, new Date(at.getTime() - INITIAL_CONFIRMATION_DELAY_MS))),
       options.invoiceIds ? inArray(invoices.id, options.invoiceIds) : undefined,
     )).orderBy(asc(invoices.id));
     const result = { checked: candidates.length, processed: 0, errors: [] as Array<{ invoiceId: number; message: string }> };

@@ -1,754 +1,264 @@
 import { useMemo } from "react";
-import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
-import { Card } from "@/components/ui/card";
-import { FFBadge } from "@/components/ui/ff-badge";
-import { FFEmpty } from "@/components/ui/ff-empty";
-import TimeClock from "@/components/time-tracking/time-clock";
-import type { Invoice, Activity, Exception } from "@shared/schema";
-import { cn } from "@/lib/utils";
-import {
-  AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, Clock3,
-  FileText, DollarSign, ShieldAlert, FileX,
-  Upload, UserPlus, Activity as ActivityIcon,
-  TrendingUp, RotateCcw, ChevronRight,
-  CircleSlash, Banknote, Eye, Zap,
-} from "lucide-react";
+import { Win95Button } from "@/components/win95";
+import { apiRequest } from "@/lib/queryClient";
+import { AlertTriangle, ArrowUpRight, BriefcaseBusiness, Clock3, RefreshCw } from "lucide-react";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number | string) {
-  return `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
-}
-
-function getAgeDays(d: string | Date | null | undefined): number | null {
-  if (!d) return null;
-  return Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000);
-}
-
-function getAge(d: string | Date | null | undefined): string | null {
-  if (!d) return null;
-  const ms = Date.now() - new Date(d).getTime();
-  const h  = Math.floor(ms / 3_600_000);
-  if (h < 1)  return "< 1h";
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
-
-function timeAgo(d: string | Date | null | undefined): string {
-  if (!d) return "—";
-  const ms = Date.now() - new Date(d).getTime();
-  const m  = Math.floor(ms / 60_000);
-  if (m < 1)   return "just now";
-  if (m < 60)  return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24)  return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-const FUNDED_STATUSES = new Set(["paid", "funded"]);
-const QUEUE_STATUSES  = new Set(["submitted", "under_review", "approved"]);
-const DOC_STATUSES    = new Set(["docs_pending"]);
-const HOLD_STATUSES   = new Set(["rejected"]);
-
-// ─── Activity icon map ────────────────────────────────────────────────────────
-
-type ActivityConfig = { icon: typeof FileText; dot: string; label: string };
-
-const ACTIVITY_MAP: Record<string, ActivityConfig> = {
-  invoice_created:    { icon: FileText,      dot: "bg-blue-400",    label: "Invoice created"    },
-  invoice_approved:   { icon: CheckCircle2,  dot: "bg-emerald-400", label: "Invoice approved"   },
-  invoice_funded:     { icon: Banknote,      dot: "bg-emerald-400", label: "Invoice funded"     },
-  invoice_rejected:   { icon: CircleSlash,   dot: "bg-red-400",     label: "Invoice rejected"   },
-  document_uploaded:  { icon: Upload,        dot: "bg-blue-400",    label: "Document uploaded"  },
-  client_created:     { icon: UserPlus,      dot: "bg-amber-400",   label: "Carrier added"      },
-  exception_created:  { icon: AlertCircle,   dot: "bg-orange-400",  label: "Exception raised"   },
-  exception_resolved: { icon: CheckCircle2,  dot: "bg-emerald-400", label: "Exception resolved" },
-  activities_reset:   { icon: RotateCcw,     dot: "bg-slate-400",   label: "Activity reset"     },
+type QueueItem = {
+  id: number;
+  invoiceNumber: string;
+  carrierName: string;
+  brokerName: string;
+  status: string;
+  ageDays: number | null;
+  ageBasis: string;
+  actions: string[];
+  href: string;
+};
+type QueueGroup = { agentId: string | null; agentName: string; items: QueueItem[] };
+type FollowUp = {
+  id: string; source: string; title: string; carrierName: string | null; status: string;
+  priority: string; dueDate: string | null; href: string;
+};
+type Activity = { id: number; who: string; action: string; when: string | null; href: string | null };
+type Alert = { id: string; kind: string; title: string; detail: string; when: string | null; href: string };
+type DashboardData = {
+  generatedAt: string;
+  viewer: { id: string; role: string };
+  queueGroups: QueueGroup[];
+  followUps: FollowUp[];
+  activity: Activity[];
+  alerts: Alert[];
+  alertCounts: { fmcsa_failed: number; email_bounced: number; ocr_failed: number; unverified_carrier: number };
 };
 
-function activityConfig(type: string): ActivityConfig {
-  return ACTIVITY_MAP[type] ?? { icon: ActivityIcon, dot: "bg-slate-400", label: type };
+const countKinds = [
+  ["fmcsa_failed", "FMCSA checks failed"],
+  ["email_bounced", "Bounced email"],
+  ["ocr_failed", "OCR failures"],
+  ["unverified_carrier", "Unverified carriers"],
+] as const;
+
+function displayDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function dateSort(value: string | null) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+}
 
-function SectionHeader({
-  title, count, href, label = "View all",
-}: { title: string; count?: number; href?: string; label?: string }) {
-  const [, go] = useLocation();
+function SectionHeading({ number, title, count, id }: { number: string; title: string; count?: number; id: string }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-semibold text-slate-900 dark:text-white">{title}</span>
-        {count !== undefined && (
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            {count}
-          </span>
-        )}
-      </div>
-      {href && (
-        <button
-          type="button"
-          onClick={() => go(href)}
-          className="flex items-center gap-0.5 text-[11.5px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
-        >
-          {label}
-          <ChevronRight className="h-3 w-3" />
-        </button>
-      )}
+    <div className="flex items-center gap-2 border-b-2 border-[#808080] bg-[#d4d0c8] px-3 py-2">
+      <span aria-hidden="true" className="font-mono text-xs font-bold text-[#087c8d]">{number}</span>
+      <h2 id={id} className="text-sm font-bold text-[#202020]">{title}</h2>
+      {count !== undefined && <span className="ml-auto min-w-6 border border-[#808080] bg-white px-1.5 text-center font-mono text-xs">{count}</span>}
     </div>
   );
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+function EmptyRow({ children, columns }: { children: string; columns: number }) {
+  return <tr><td colSpan={columns} className="!py-8 text-center text-sm text-[#555]">{children}</td></tr>;
+}
+
+function QueueTable({ group, go }: { group: QueueGroup; go: (href: string) => void }) {
+  return (
+    <div className="min-w-[610px] border-2 border-[#808080] border-b-white border-r-white bg-white shadow-[inset_1px_1px_2px_rgba(0,0,0,0.15)]">
+      <div className="flex items-center justify-between border-b border-[#a0a0a0] bg-[#ece9e2] px-2.5 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <BriefcaseBusiness className="h-4 w-4 shrink-0 text-[#087c8d]" />
+          <h3 className="truncate text-xs font-bold text-[#222]">{group.agentName}</h3>
+        </div>
+        <span className="font-mono text-[11px] text-[#555]">{group.items.length} open</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="ff-data-table w-full min-w-[600px]" aria-label={`${group.agentName} invoice queue`} data-testid="queue-table">
+          <thead><tr><th>Invoice #</th><th>Carrier</th><th>Broker</th><th>Status</th><th>Age</th><th>Action needed</th></tr></thead>
+          <tbody>
+            {group.items.length === 0 ? <EmptyRow columns={6}>No invoices in this queue.</EmptyRow> : group.items.map(item => (
+              <tr
+                key={item.id}
+                role="link"
+                tabIndex={0}
+                aria-label={`Open invoice ${item.invoiceNumber}`}
+                data-testid="queue-row"
+                className="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#087c8d]"
+                onClick={() => go(item.href)}
+                onKeyDown={event => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    go(item.href);
+                  }
+                }}
+              >
+                <td className="font-mono font-semibold">
+                  <a href={item.href} className="text-[#087c8d] underline-offset-2 hover:underline" onClick={event => { event.preventDefault(); event.stopPropagation(); go(item.href); }}>
+                    {item.invoiceNumber}
+                  </a>
+                </td>
+                <td>{item.carrierName}</td>
+                <td>{item.brokerName}</td>
+                <td><span className="ff-badge ff-badge-pending">{item.status.replace(/_/g, " ")}</span></td>
+                <td className="whitespace-nowrap font-mono text-xs">
+                  <span>{item.ageDays === null ? "—" : `${item.ageDays}d`}</span>
+                  <span className="ml-1 text-[10px] text-[#666]">({item.ageBasis || "basis unavailable"})</span>
+                </td>
+                <td className="max-w-[220px]">
+                  {item.actions.length ? <span className="flex flex-wrap gap-1">{item.actions.map((action, index) => <span key={`${action}-${index}`} className="border border-[#a0a0a0] bg-[#ece9e2] px-1.5 py-0.5 text-[11px]">{action}</span>)}</span> : <span className="text-[#666]">No action listed</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Skeleton() {
+  return <div aria-label="Loading dashboard" className="space-y-4" data-testid="dashboard-loading">
+    {[1, 2, 3].map(row => <div key={row} className="h-24 animate-pulse border-2 border-[#a0a0a0] bg-[#dedbd3]" />)}
+  </div>;
+}
 
 export default function Dashboard() {
   const [, go] = useLocation();
-
-  // ── Queries ──────────────────────────────────────────────────────────────
-
-  const { data: invoicesData } = useQuery<Invoice[]>({ queryKey: ["/api/invoices", { all: true }] });
-  const { data: agingAlertsData } = useQuery<Array<{ invoiceId: number; alertType: "day_60" | "day_90" }>>({
-    queryKey: ["/api/invoices/aging-alerts", "pending"],
-    queryFn: async () => {
-      const response = await fetch("/api/invoices/aging-alerts?view=pending", { credentials: "include" });
-      if (!response.ok) throw new Error(`Failed to load aging alerts (${response.status})`);
-      return response.json();
-    },
+  const { user } = useAuth();
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<DashboardData>({
+    queryKey: ["/api/agent-dashboard", user?.id ?? "unauthenticated"],
+    queryFn: async () => (await apiRequest("GET", "/api/agent-dashboard")).json(),
+    retry: false,
+    enabled: !!user?.id,
   });
-  const { data: creditAlertsData } = useQuery<{ fCount: number; dCount: number; worst: Array<{ id: number; name: string; creditGrade: string | null; creditScore: number | null }> }>({
-    queryKey: ["/api/brokers/credit-alerts"],
-  });
-  const { data: chargebacksData } = useQuery<Array<{ chargebackStatus: "scheduled" | "extended" | "charged" }>>({
-    queryKey: ["/api/invoices/chargebacks"],
-  });
-  const { data: activitiesData } = useQuery<Activity[]>({ queryKey: ["/api/dashboard/recent-activities"] });
-  const { data: exceptionsData } = useQuery<Exception[]>({ queryKey: ["/api/exceptions"] });
-  const { data: stats } = useQuery<{
-    pendingInvoices: number;
-    processedToday: number;
-    totalRevenue: string;
-    activeClients: number;
-  }>({ queryKey: ["/api/dashboard/stats"] });
-  const { data: todayEvents } = useQuery<any[]>({ queryKey: ["/api/calendar/today"] });
-
-  // A stale locally cached session can briefly render this page while the API
-  // returns a 401 response object. Keep collection rendering safe until auth
-  // verification redirects the user to sign in.
-  const invoices = Array.isArray(invoicesData) ? invoicesData : [];
-  const agingAlerts = Array.isArray(agingAlertsData) ? agingAlertsData : [];
-  const chargebacks = Array.isArray(chargebacksData) ? chargebacksData : [];
-  const activities = Array.isArray(activitiesData) ? activitiesData : [];
-  const exceptions = Array.isArray(exceptionsData) ? exceptionsData : [];
-  const schedule = Array.isArray(todayEvents) ? todayEvents : [];
-
-  // ── Derived data ──────────────────────────────────────────────────────────
-
-  const queueItems = useMemo(
-    () => invoices
-      .filter(i => QUEUE_STATUSES.has(i.status))
-      .sort((a, b) => new Date(a.submittedAt ?? 0).getTime() - new Date(b.submittedAt ?? 0).getTime()),
-    [invoices]
-  );
-
-  const docsItems    = useMemo(() => invoices.filter(i => DOC_STATUSES.has(i.status)), [invoices]);
-  const heldItems    = useMemo(() => invoices.filter(i => HOLD_STATUSES.has(i.status)), [invoices]);
-  const fundedItems  = useMemo(
-    () => invoices
-      .filter(i => FUNDED_STATUSES.has(i.status))
-      .sort((a, b) => new Date(b.approvedAt ?? b.submittedAt ?? 0).getTime() - new Date(a.approvedAt ?? a.submittedAt ?? 0).getTime())
-      .slice(0, 8),
-    [invoices]
-  );
-  const openExceptions = useMemo(
-    () => exceptions.filter(e => e.status === "open" || e.status === "under_review"),
-    [exceptions]
-  );
-
-  const queueTotal = useMemo(
-    () => queueItems.reduce((s, i) => s + Number(i.amount ?? 0), 0),
-    [queueItems]
-  );
-  const fundedTotal = useMemo(
-    () => fundedItems.reduce((s, i) => s + Number(i.amount ?? 0), 0),
-    [fundedItems]
-  );
-
-  const approvedCount = useMemo(
-    () => queueItems.filter(i => i.status === "approved").length,
-    [queueItems]
-  );
-  const staleCount = useMemo(
-    () => queueItems.filter(i => (getAgeDays(i.submittedAt) ?? 0) >= 2).length,
-    [queueItems]
-  );
-
-  // ── Urgency tile config ───────────────────────────────────────────────────
-
-  type Level = "neutral" | "info" | "warn" | "critical" | "positive";
-
-  const tiles: {
-    label: string; value: number; sub: string;
-    href: string; level: Level; icon: typeof Clock3;
-    pulse?: boolean;
-  }[] = [
-    {
-      label: "In Queue",
-      value: queueItems.length,
-      sub: queueItems.length ? fmtShort(queueTotal) : "nothing pending",
-      href: "/factoring",
-      level: queueItems.length > 5 ? "warn" : queueItems.length > 0 ? "info" : "neutral",
-      icon: Clock3,
-    },
-    {
-      label: "Awaiting Docs",
-      value: docsItems.length,
-      sub: docsItems.length ? "need documentation" : "all clear",
-      href: "/documents",
-      level: docsItems.length > 0 ? "warn" : "neutral",
-      icon: FileX,
-      pulse: docsItems.length > 0,
-    },
-    {
-      label: "Held Loads",
-      value: heldItems.length,
-      sub: heldItems.length ? "blocked from funding" : "none blocked",
-      href: "/exceptions",
-      level: heldItems.length > 0 ? "critical" : "neutral",
-      icon: CircleSlash,
-      pulse: heldItems.length > 0,
-    },
-    {
-      label: "Open Exceptions",
-      value: openExceptions.length,
-      sub: openExceptions.length ? "need resolution" : "none open",
-      href: "/exceptions",
-      level: openExceptions.length > 0 ? "critical" : "neutral",
-      icon: AlertCircle,
-      pulse: openExceptions.length > 0,
-    },
-    {
-      label: "Aging Invoices",
-      value: new Set(agingAlerts.map(a => a.invoiceId)).size,
-      sub: `${new Set(agingAlerts.map(a => a.invoiceId)).size} at 60+ · ${new Set(agingAlerts.filter(a => a.alertType === "day_90").map(a => a.invoiceId)).size} at 90+`,
-      href: "/factoring#aging-alerts",
-      level: agingAlerts.some(a => a.alertType === "day_90") ? "critical" : agingAlerts.length ? "warn" : "neutral",
-      icon: Clock3,
-      pulse: agingAlerts.length > 0,
-    },
-    {
-      label: "Chargebacks",
-      value: chargebacks.length,
-      sub: `${chargebacks.filter(c => c.chargebackStatus === "scheduled").length} scheduled · ${chargebacks.filter(c => c.chargebackStatus === "extended").length} extended · ${chargebacks.filter(c => c.chargebackStatus === "charged").length} charged`,
-      href: "/factoring",
-      level: chargebacks.some(c => c.chargebackStatus === "charged") ? "critical" : chargebacks.length ? "warn" : "neutral",
-      icon: AlertTriangle,
-      pulse: chargebacks.some(c => c.chargebackStatus === "charged"),
-    },
-    {
-      label: "Funded Today",
-      value: stats?.processedToday ?? 0,
-      sub: stats?.processedToday ? "loads advanced" : "no activity yet",
-      href: "/factoring",
-      level: "positive",
-      icon: CheckCircle2,
-    },
-  ];
-
-  const levelStyles: Record<Level, { tile: string; num: string; icon: string; pulse: string }> = {
-    neutral:  {
-      tile: "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))] hover:border-slate-300",
-      num: "text-slate-800 dark:text-white", icon: "text-slate-400", pulse: "bg-slate-400",
-    },
-    info: {
-      tile: "border-blue-200/60 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-950/10 hover:bg-blue-50/70",
-      num: "text-blue-700 dark:text-blue-300", icon: "text-blue-400", pulse: "bg-blue-400",
-    },
-    warn: {
-      tile: "border-amber-200/60 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/10 hover:bg-amber-50/70",
-      num: "text-amber-700 dark:text-amber-300", icon: "text-amber-400", pulse: "bg-amber-400",
-    },
-    critical: {
-      tile: "border-red-200/60 bg-red-50/40 dark:border-red-900/40 dark:bg-red-950/10 hover:bg-red-50/70",
-      num: "text-red-700 dark:text-red-300", icon: "text-red-400", pulse: "bg-red-500",
-    },
-    positive: {
-      tile: "border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/10 hover:bg-emerald-50/70",
-      num: "text-emerald-700 dark:text-emerald-300", icon: "text-emerald-400", pulse: "bg-emerald-400",
-    },
-  };
-
-  // ── Exception severity label ──────────────────────────────────────────────
-
-  const sevClass = (s: string) => ({
-    low:      "ff-badge ff-badge-draft",
-    medium:   "ff-badge ff-badge-pending",
-    high:     "ff-badge ff-badge-overdue",
-    critical: "ff-badge ff-badge-rejected",
-  }[s] ?? "ff-badge ff-badge-draft");
-
-  // ─────────────────────────────────────────────────────────────────────────
+  const responseMatchesUser = !!user?.id && data?.viewer.id === user.id;
+  const dashboardData = responseMatchesUser ? data : undefined;
+  const identityMismatch = Boolean(data && user?.id && !responseMatchesUser);
+  const isManager = user?.role === "manager" || user?.role === "admin";
+  const visibleGroups = useMemo(() => {
+    if (!dashboardData || !user?.id) return [];
+    if (isManager) return dashboardData.queueGroups;
+    return dashboardData.queueGroups.filter(group => group.agentId === user.id);
+  }, [dashboardData, isManager, user?.id]);
+  const followUps = useMemo(() => [...(dashboardData?.followUps ?? [])].sort((a, b) => dateSort(a.dueDate) - dateSort(b.dueDate)), [dashboardData?.followUps]);
 
   return (
-    <AppShell
-      title="Dashboard"
-      subtitle={`${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · Freight Operations Center`}
-      group="Workspace"
-    >
-      {/* ── Critical alerts (shown only when blocking items exist) ────────── */}
-      {(heldItems.length > 0 || openExceptions.filter(e => (e as any).severity === "critical").length > 0) && (
-        <section className="mb-5 space-y-2">
-          {heldItems.length > 0 && (
-            <button
-              type="button"
-              onClick={() => go("/exceptions")}
-              className="flex w-full items-center gap-3 border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
-            >
-              <CircleSlash className="h-4 w-4 shrink-0 text-red-500" />
-              <span className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
-                <span className="font-bold">{heldItems.length} load{heldItems.length !== 1 ? "s" : ""}</span> blocked from funding — resolve holds to continue
-              </span>
-              <span className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-red-600 dark:text-red-400">
-                View exceptions <ArrowRight className="h-3 w-3" />
-              </span>
-            </button>
-          )}
-          {openExceptions.filter(e => (e as any).severity === "critical").length > 0 && (
-            <button
-              type="button"
-              onClick={() => go("/exceptions")}
-              className="flex w-full items-center gap-3 border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/10"
-            >
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-              <span className="text-[12.5px] font-medium text-red-800 dark:text-red-300">
-                <span className="font-bold">{openExceptions.filter(e => (e as any).severity === "critical").length} critical exception{openExceptions.filter(e => (e as any).severity === "critical").length !== 1 ? "s" : ""}</span> need immediate attention
-              </span>
-              <span className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-red-600 dark:text-red-400">
-                Resolve now <ArrowRight className="h-3 w-3" />
-              </span>
-            </button>
-          )}
-        </section>
-      )}
-
-      {/* ── Today at a Glance ─────────────────────────────────────────────── */}
-      <section className="mb-6">
-        <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500">
-          Today at a Glance
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {tiles.map(tile => {
-            const s = levelStyles[tile.level];
-            const Icon = tile.icon;
-            const showPulse = tile.pulse && tile.value > 0;
-            return (
-              <button
-                key={tile.label}
-                type="button"
-                onClick={() => go(tile.href)}
-                className={cn(
-                  "ff-dashboard-card group relative flex flex-col border p-4 text-left transition-all duration-150",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30",
-                  s.tile
-                )}
-              >
-                {showPulse && (
-                  <span className="absolute right-3 top-3 flex h-2 w-2">
-                    <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", s.pulse)} />
-                    <span className={cn("relative inline-flex h-2 w-2 rounded-full", s.pulse)} />
-                  </span>
-                )}
-                <div className="mb-3 flex items-start justify-between">
-                  <Icon className={cn("h-[15px] w-[15px]", s.icon)} />
-                  <ArrowRight className="h-3 w-3 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-600" />
-                </div>
-                <div className="text-4xl font-black leading-none tracking-tight text-[#27aab8]">
-                  {tile.value}
-                </div>
-                <div className="mt-1.5 text-[11.5px] font-semibold text-slate-600 dark:text-slate-300">
-                  {tile.label}
-                </div>
-                <div className="mt-0.5 text-[10.5px] text-slate-400 dark:text-slate-500">
-                  {tile.sub}
-                </div>
-              </button>
-            );
-          })}
+    <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace">
+      <div className="mx-auto max-w-[1680px] space-y-4 pb-8" data-testid="agent-dashboard">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#d4d0c8] px-3 py-2 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+          <p className="text-xs text-[#444]">{dashboardData?.generatedAt ? `Updated ${displayDate(dashboardData.generatedAt)}` : "Live work queue"}</p>
+          <Win95Button type="button" size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching} data-testid="dashboard-refresh" className="h-8 gap-1.5 px-2 text-xs">
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+          </Win95Button>
         </div>
-      </section>
 
-      {/* ── Action nudges (only when actionable items exist) ──────────────── */}
-      {(approvedCount > 0 || staleCount > 0) && (
-        <section className="mb-5 flex flex-wrap gap-2">
-          {approvedCount > 0 && (
-            <button
-              type="button"
-              onClick={() => go("/factoring")}
-              className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-[12px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
-            >
-              <Zap className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              {approvedCount} load{approvedCount !== 1 ? "s" : ""} approved — ready to fund
-              <ArrowRight className="h-3 w-3" />
-            </button>
-          )}
-          {staleCount > 0 && (
-            <button
-              type="button"
-              onClick={() => go("/factoring")}
-              className="flex items-center gap-2 border border-amber-200 bg-amber-50 px-3.5 py-2 text-[12px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
-            >
-              <Clock3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-              {staleCount} item{staleCount !== 1 ? "s" : ""} sitting 2+ days in queue
-              <ArrowRight className="h-3 w-3" />
-            </button>
-          )}
-        </section>
-      )}
-
-      {(creditAlertsData?.fCount ?? 0) + (creditAlertsData?.dCount ?? 0) > 0 && (
-        <Card className="mb-5 border-red-200 bg-red-50/50 p-4 dark:border-red-900/40 dark:bg-red-950/10">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-red-600" /><h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Broker Credit Alerts</h2></div>
-            <button type="button" onClick={() => go("/brokers")} className="flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:underline">View brokers <ArrowRight className="h-3 w-3" /></button>
+        {isLoading ? <Skeleton /> : isError ? (
+          <div className="border-2 border-[#808080] bg-[#ece9e2] p-5 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]" data-testid="dashboard-error">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-[#a12b20]" />
+              <div className="flex-1">
+                <h2 className="font-bold text-[#222]">Dashboard could not be loaded</h2>
+                <p className="mt-1 text-sm text-[#555]">{error instanceof Error ? error.message : "The work queue is temporarily unavailable."}</p>
+                <Win95Button type="button" primary onClick={() => refetch()} className="mt-4">Retry</Win95Button>
+              </div>
+            </div>
           </div>
-          <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">{creditAlertsData?.fCount ?? 0} F-grade and {creditAlertsData?.dCount ?? 0} D-grade broker{((creditAlertsData?.fCount ?? 0) + (creditAlertsData?.dCount ?? 0)) === 1 ? "" : "s"} require attention.</p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {(creditAlertsData?.worst ?? []).slice(0, 5).map(broker => (
-              <button key={broker.id} type="button" onClick={() => go(`/brokers/${broker.id}`)} className="flex items-center justify-between rounded-xl border border-red-100 bg-white px-3 py-2 text-left hover:border-red-300 dark:border-red-900/30 dark:bg-slate-900/50">
-                <span className="min-w-0 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{broker.name}</span>
-                <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">{broker.creditGrade ?? "—"} · {broker.creditScore ?? "—"}</span>
-              </button>
-            ))}
+        ) : identityMismatch ? (
+          <div className="border-2 border-[#808080] bg-[#ece9e2] p-5 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]" role="alert">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-[#a12b20]" />
+              <div className="flex-1">
+                <h2 className="font-bold text-[#222]">Dashboard session changed</h2>
+                <p className="mt-1 text-sm text-[#555]">This response does not match the signed-in staff account. No previous account data is shown.</p>
+                <Win95Button type="button" primary onClick={() => refetch()} className="mt-4">Refresh dashboard</Win95Button>
+              </div>
+            </div>
           </div>
-        </Card>
-      )}
-
-      {/* ── Main work area ────────────────────────────────────────────────── */}
-      <Card className="mb-5 p-4">
-        <SectionHeader title="Today's Schedule" count={schedule.length} href="/calendar" label="Open calendar" />
-        {schedule.length === 0 ? (
-          <p className="py-3 text-[12px] text-slate-400">Nothing scheduled for today.</p>
-        ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {schedule.slice(0, 4).map((event: any) => (
-              <button key={event.id} type="button" onClick={() => go("/calendar")}
-                className="rounded-[9px] border border-slate-200 bg-slate-50 p-2.5 text-left hover:border-[#27aab8] dark:border-slate-700 dark:bg-slate-800/40">
-                <div className="truncate text-[12px] font-semibold text-slate-800 dark:text-slate-200">{event.title}</div>
-                <div className="mt-1 text-[10.5px] text-slate-500">{event.startTime || event.start || "All day"}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
-
-        {/* ─ Funding Queue ─────────────────────────────────────────────── */}
-        <Card className="p-4 lg:col-span-2">
-          <SectionHeader
-            title="Funding Queue"
-            count={queueItems.length}
-            href="/factoring"
-          />
-
-          {queueItems.length === 0 ? (
-            <FFEmpty
-              context="funding"
-              size="sm"
-              actions={[
-                { label: "Go to Funding Queue", onClick: () => go("/factoring"), primary: true },
-                { label: "Upload Documents", onClick: () => go("/documents") },
-              ]}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="ff-data-table w-full">
-                <thead>
-                  <tr>
-                    <th>Invoice</th>
-                    <th>Load #</th>
-                    <th className="text-right">Amount</th>
-                    <th>Age</th>
-                    <th>Status</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {queueItems.slice(0, 10).map(inv => {
-                    const ageDays = getAgeDays(inv.submittedAt);
-                    const age = getAge(inv.submittedAt);
-                    const isUrgent = (ageDays ?? 0) >= 3;
-                    const isStale  = !isUrgent && (ageDays ?? 0) >= 2;
-                    const isReady  = inv.status === "approved";
-                    return (
-                      <tr
-                        key={inv.id}
-                        className={cn(
-                          isUrgent ? "ff-row-urgent" :
-                          isStale  ? "ff-row-stale"  :
-                          isReady  ? "ff-row-ready"  : ""
-                        )}
-                      >
-                        <td className="font-mono text-[12px] font-semibold text-slate-800 dark:text-slate-200">
-                          {inv.invoiceNumber}
-                        </td>
-                        <td className="text-slate-500 dark:text-slate-400">
-                          {inv.loadNumber ?? (inv.loadId ? `#${inv.loadId}` : "—")}
-                        </td>
-                        <td className="text-right font-semibold text-slate-900 dark:text-white">
-                          {fmt(inv.amount)}
-                        </td>
-                        <td>
-                          {age ? (
-                            <span className={cn(
-                              "text-[11px] font-semibold",
-                              isUrgent ? "text-red-600 dark:text-red-400" :
-                              isStale  ? "text-amber-600 dark:text-amber-400" :
-                              "text-slate-500 dark:text-slate-400"
-                            )}>
-                              {age}
-                            </span>
-                          ) : "—"}
-                        </td>
-                        <td>
-                          <FFBadge status={inv.status} size="sm" />
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            onClick={() => go(`/invoices/${inv.id}`)}
-                            className={cn(
-                              "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors",
-                              isReady
-                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400"
-                                : "bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400"
-                            )}
-                          >
-                            <Eye className="h-3 w-3" />
-                            {isReady ? "Fund" : "Review"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              {queueItems.length > 10 && (
-                <div className="border-t border-slate-100 pt-2.5 text-center dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => go("/factoring")}
-                    className="text-[11.5px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                  >
-                    {queueItems.length - 10} more in queue →
-                  </button>
+        ) : dashboardData ? <>
+          <section aria-labelledby="my-queue-heading" data-testid="section-queue">
+            <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+              <SectionHeading id="my-queue-heading" number="01" title="My Queue" count={visibleGroups.reduce((sum, group) => sum + group.items.length, 0)} />
+              {visibleGroups.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-[#555]">No queue items assigned to you.</p>
+              ) : (
+                <div className={`overflow-x-auto p-3 ${isManager ? "queue-groups-scroll" : ""}`} data-testid="queue-groups">
+                  <div className={isManager ? "flex min-w-max items-start gap-3" : "min-w-0"}>
+                    {visibleGroups.map(group => <QueueTable key={group.agentId ?? "unassigned"} group={group} go={go} />)}
+                  </div>
                 </div>
               )}
             </div>
-          )}
+          </section>
 
-          {/* Queue total */}
-          {queueItems.length > 0 && (
-            <div className="mt-3 flex items-center justify-between border border-slate-200 bg-slate-50 px-3 py-2 dark:bg-slate-800/40">
-              <div className="flex items-center gap-3 text-[11.5px] text-slate-500 dark:text-slate-400">
-                <span>Total in queue</span>
-                {approvedCount > 0 && (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-                    {approvedCount} approved
-                  </span>
-                )}
-                {staleCount > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10.5px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
-                    {staleCount} stale
-                  </span>
-                )}
+          <section aria-labelledby="followups-heading" data-testid="section-followups">
+            <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+              <SectionHeading id="followups-heading" number="02" title="My Follow-ups" count={followUps.length} />
+              <div className="overflow-x-auto">
+                <table className="ff-data-table w-full min-w-[680px]" data-testid="followups-table">
+                  <thead><tr><th>Follow-up</th><th>Carrier</th><th>Status</th><th>Priority</th><th>Due date</th><th>Source</th></tr></thead>
+                  <tbody>{followUps.length ? followUps.map(task => (
+                    <tr key={`${task.source}-${task.id}`} data-testid="followup-row">
+                      <td className="font-semibold"><a href={task.href} onClick={event => { event.preventDefault(); go(task.href); }} className="text-[#087c8d] underline-offset-2 hover:underline">{task.title}</a></td>
+                      <td>{task.carrierName ?? "—"}</td><td><span className="ff-badge ff-badge-pending">{task.status.replace(/_/g, " ")}</span></td>
+                      <td>{task.priority}</td>
+                      <td className="whitespace-nowrap font-mono text-xs">{task.dueDate ? displayDate(task.dueDate) : "No due date"}</td>
+                      <td>{task.source}</td>
+                    </tr>
+                  )) : <EmptyRow columns={6}>No follow-ups assigned to you.</EmptyRow>}</tbody>
+                </table>
               </div>
-              <span className="text-[13px] font-semibold text-slate-900 dark:text-white">{fmt(queueTotal)}</span>
             </div>
-          )}
-        </Card>
+          </section>
 
-        {/* ─ Recent Money Movement ────────────────────────────────────── */}
-        <Card className="p-4">
-          <SectionHeader title="Recent Funding" href="/factoring" />
-
-          {fundedItems.length === 0 ? (
-            <FFEmpty
-              context="payouts"
-              size="sm"
-              actions={[{ label: "View Funding Queue", onClick: () => go("/factoring"), primary: true }]}
-            />
-          ) : (
-            <div className="space-y-0.5">
-              {fundedItems.map(inv => (
-                <button
-                  key={inv.id}
-                  type="button"
-                  onClick={() => go(`/invoices/${inv.id}`)}
-                  className="group flex w-full items-center justify-between rounded-[9px] px-2.5 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-[11.5px] font-semibold text-slate-800 dark:text-slate-200 truncate">
-                        {inv.invoiceNumber}
-                      </span>
-                      <FFBadge status="funded" size="sm" />
-                    </div>
-                    <div className="text-[10.5px] text-slate-400 dark:text-slate-500 mt-0.5">
-                      {timeAgo(inv.approvedAt ?? inv.submittedAt)}
-                    </div>
-                  </div>
-                  <span className="ml-2 shrink-0 text-[12.5px] font-semibold text-emerald-700 dark:text-emerald-400">
-                    {fmt(inv.amount)}
-                  </span>
-                </button>
-              ))}
+          <section aria-labelledby="activity-heading" data-testid="section-activity">
+            <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+              <SectionHeading id="activity-heading" number="03" title="Team Activity" count={dashboardData.activity.length} />
+              <div className="overflow-x-auto">
+                <table className="ff-data-table w-full min-w-[560px]" data-testid="activity-table">
+                  <thead><tr><th>Who</th><th>Action</th><th>When</th><th>Record</th></tr></thead>
+                  <tbody>{dashboardData.activity.length ? dashboardData.activity.slice(0, 20).map(event => (
+                    <tr key={event.id} data-testid="activity-row">
+                      <td className="font-semibold">{event.who}</td><td>{event.action}</td><td className="whitespace-nowrap font-mono text-xs">{displayDate(event.when)}</td>
+                      <td>{event.href ? <a href={event.href} onClick={e => { e.preventDefault(); go(event.href!); }} className="inline-flex items-center gap-1 text-[#087c8d] underline-offset-2 hover:underline">Open <ArrowUpRight className="h-3 w-3" /></a> : "—"}</td>
+                    </tr>
+                  )) : <EmptyRow columns={4}>No recent team activity.</EmptyRow>}</tbody>
+                </table>
+              </div>
             </div>
-          )}
+          </section>
 
-          {fundedItems.length > 0 && (
-            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 dark:border-slate-800">
-              <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-semibold">
-                Total shown
-              </span>
-              <span className="text-[12.5px] font-bold text-emerald-700 dark:text-emerald-400">
-                {fmt(fundedTotal)}
-              </span>
+          <section aria-labelledby="alerts-heading" data-testid="section-alerts">
+            <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+              <SectionHeading id="alerts-heading" number="04" title="Alerts" count={dashboardData.alerts.length} />
+              <div className="grid grid-cols-2 gap-px border-b border-[#a0a0a0] bg-[#a0a0a0] sm:grid-cols-4">
+                {countKinds.map(([kind, label]) => <div key={kind} className="bg-[#f4f2ed] px-3 py-2">
+                  <p className="font-mono text-lg font-bold text-[#087c8d]">{dashboardData.alertCounts[kind]}</p><p className="text-[11px] text-[#555]">{label}</p>
+                </div>)}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="ff-data-table w-full min-w-[650px]" data-testid="alerts-table">
+                  <thead><tr><th>Kind</th><th>Alert</th><th>Detail</th><th>Time</th><th>Link</th></tr></thead>
+                  <tbody>{dashboardData.alerts.length ? dashboardData.alerts.map(alert => (
+                    <tr key={alert.id} data-testid="alert-row">
+                      <td><span className="ff-badge ff-badge-overdue">{alert.kind.replace(/_/g, " ")}</span></td>
+                      <td className="font-semibold">{alert.title}</td><td>{alert.detail}</td><td className="whitespace-nowrap font-mono text-xs">{displayDate(alert.when)}</td>
+                      <td><a href={alert.href} onClick={event => { event.preventDefault(); go(alert.href); }} className="inline-flex items-center gap-1 text-[#087c8d] underline-offset-2 hover:underline">Open <ArrowUpRight className="h-3 w-3" /></a></td>
+                    </tr>
+                  )) : <EmptyRow columns={5}>No active alerts. All clear.</EmptyRow>}</tbody>
+                </table>
+              </div>
             </div>
-          )}
-        </Card>
+          </section>
+          <p className="flex items-center gap-1.5 text-[11px] text-[#555]"><Clock3 className="h-3.5 w-3.5" /> Queue ages include their basis; follow-ups are ordered by due date.</p>
+        </> : null}
       </div>
-
-      {/* ── Bottom row ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-
-        {/* ─ Team Activity Feed ────────────────────────────────────────── */}
-        <Card className="p-4">
-          <SectionHeader title="Team Activity" count={activities.length} href="/audit-log" label="Full log" />
-
-          {activities.length === 0 ? (
-            <FFEmpty context="audit" size="sm" />
-          ) : (
-            <div className="space-y-0">
-              {activities.slice(0, 10).map((act, i) => {
-                const cfg = activityConfig(act.type);
-                const Icon = cfg.icon;
-                const isLast = i === Math.min(activities.length, 10) - 1;
-                return (
-                  <div key={act.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={cn("mt-2 h-2 w-2 shrink-0 rounded-full", cfg.dot)} />
-                      {!isLast && <div className="mt-1 w-px flex-1 bg-slate-100 dark:bg-slate-800" />}
-                    </div>
-
-                    <div className={cn("min-w-0 pb-3", isLast && "pb-0")}>
-                      <p className="text-[12.5px] leading-snug text-slate-700 dark:text-slate-300">
-                        {act.description}
-                      </p>
-                      <p className="mt-0.5 text-[10.5px] text-slate-400 dark:text-slate-500">
-                        {timeAgo((act as any).createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* ─ Exceptions + Time Clock ───────────────────────────────────── */}
-        <div className="space-y-5">
-
-          {/* Open Exceptions */}
-          <Card className="p-4">
-            <SectionHeader
-              title="Open Exceptions"
-              count={openExceptions.length}
-              href="/exceptions"
-            />
-
-            {openExceptions.length === 0 ? (
-              <FFEmpty context="exceptions" size="sm" />
-            ) : (
-              <div className="space-y-1.5">
-                {openExceptions.slice(0, 5).map(exc => (
-                  <button
-                    key={exc.id}
-                    type="button"
-                    onClick={() => go("/exceptions")}
-                    className="group flex w-full items-start justify-between gap-3 rounded-[9px] border border-transparent px-2.5 py-2.5 text-left transition-colors hover:border-slate-200 hover:bg-slate-50/80 dark:hover:border-slate-700 dark:hover:bg-slate-800/30"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12.5px] font-medium text-slate-800 dark:text-slate-200">
-                        {exc.title}
-                      </p>
-                      {exc.entityRef && (
-                        <p className="text-[10.5px] text-slate-400 dark:text-slate-500">
-                          Ref: {exc.entityRef}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <span className={sevClass(exc.severity)}>
-                        {exc.severity}
-                      </span>
-                      <ChevronRight className="h-3 w-3 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </div>
-                  </button>
-                ))}
-
-                {openExceptions.length > 5 && (
-                  <button
-                    type="button"
-                    onClick={() => go("/exceptions")}
-                    className="mt-1 w-full text-center text-[11.5px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                  >
-                    {openExceptions.length - 5} more exceptions →
-                  </button>
-                )}
-              </div>
-            )}
-          </Card>
-
-          {/* Time Clock */}
-          <TimeClock />
-        </div>
-      </div>
-
-      {/* ── Held loads alert bar (only shown when items exist) ────────────── */}
-      {heldItems.length > 0 && (
-        <div className="mt-5">
-          <button
-            type="button"
-            onClick={() => go("/exceptions")}
-            className="flex w-full items-center justify-between border border-red-200/60 bg-red-50/50 px-4 py-3 text-left transition-colors hover:bg-red-50 dark:border-red-900/40 dark:bg-red-950/10"
-          >
-            <div className="flex items-center gap-3">
-              <ShieldAlert className="h-4 w-4 text-red-500" />
-              <div>
-                <span className="text-[13px] font-semibold text-red-800 dark:text-red-300">
-                  {heldItems.length} load{heldItems.length !== 1 ? "s" : ""} currently held
-                </span>
-                <span className="ml-2 text-[12px] text-red-600/70 dark:text-red-400/70">
-                  — rejected or blocked from funding
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 text-[11.5px] font-medium text-red-600 dark:text-red-400">
-              View held loads <ChevronRight className="h-3 w-3" />
-            </div>
-          </button>
-        </div>
-      )}
+      <style>{`.queue-groups-scroll{overscroll-behavior-x:contain;scrollbar-width:thin}.queue-groups-scroll>div>div{width:min(720px,82vw);flex:0 0 min(720px,82vw)}@media(max-width:767px){.queue-groups-scroll>div>div{width:calc(100vw - 78px);flex-basis:calc(100vw - 78px)}}`}</style>
     </AppShell>
   );
 }

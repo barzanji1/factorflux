@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -91,6 +91,7 @@ export default function Tasks() {
   const [activeTab, setActiveTab] = useState("chargebacks");
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const handledTaskQuery = useRef<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -260,6 +261,20 @@ export default function Tasks() {
     });
     setIsTaskDialogOpen(true);
   };
+
+  const taskIdFromQuery = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("taskId");
+  useEffect(() => {
+    if (!taskIdFromQuery || isLoading || handledTaskQuery.current === taskIdFromQuery) return;
+    if (!/^\d+$/.test(taskIdFromQuery)) return;
+    if (isManager && scope !== "all") {
+      setScope("all");
+      return;
+    }
+    const task = tasks.find(item => item.id === Number(taskIdFromQuery));
+    if (!task) return;
+    handledTaskQuery.current = taskIdFromQuery;
+    openEditDialog(task);
+  }, [taskIdFromQuery, isLoading, tasks, isManager, scope]);
 
   const updateTaskStatus = (taskId: number, newStatus: string) => {
     updateTaskMutation.mutate({ id: taskId, updates: { status: newStatus as any } });
@@ -763,7 +778,7 @@ export default function Tasks() {
         </main>
 
         <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px]" data-testid="task-edit-dialog">
             <DialogHeader>
               <DialogTitle>{editingTask ? "Edit Task" : "Create New Task"}</DialogTitle>
               <DialogDescription>

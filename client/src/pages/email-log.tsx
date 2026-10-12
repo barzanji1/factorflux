@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -18,7 +19,7 @@ type EmailStatus = "sent" | "delivered" | "bounced" | "complained" | "failed";
 type EntityType = "invoice" | "carrier" | "broker" | "chargeback" | "followup";
 type EmailAttachment = { filename: string; s3_key: string | null; size: number };
 type EmailLogRow = {
-  id: string;
+  id: string | number;
   direction: "outbound";
   resendMessageId: string | null;
   fromAddress: string;
@@ -51,6 +52,7 @@ const PAGE_SIZE = 25;
 const ENTITY_TYPES: EntityType[] = ["invoice", "carrier", "broker", "chargeback", "followup"];
 const STATUSES: EmailStatus[] = ["sent", "delivered", "bounced", "complained", "failed"];
 const inputClass = "h-9 rounded-sm border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white px-2 text-xs text-[#222] shadow-[inset_1px_1px_2px_rgba(0,0,0,.16)] outline-none focus:ring-2 focus:ring-[#087f8c]/30";
+const emailIdKey = (id: string | number) => String(id);
 
 function dateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -71,6 +73,11 @@ function addressList(addresses: string[]) {
 }
 
 export default function EmailLog() {
+  const [, navigate] = useLocation();
+  const queryString = useSearch();
+  const queryEmailId = new URLSearchParams(queryString).get("emailId");
+  const requestedEmailId = queryEmailId && /^\d+$/.test(queryEmailId) ? queryEmailId : null;
+  const handledEmailQuery = useRef<string | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isManager = user?.role === "manager" || user?.role === "admin";
@@ -121,6 +128,12 @@ export default function EmailLog() {
     enabled: !!expandedId,
     retry: false,
   });
+  useEffect(() => {
+    if (!requestedEmailId || handledEmailQuery.current === requestedEmailId) return;
+    handledEmailQuery.current = requestedEmailId;
+    setExpandedId(requestedEmailId);
+    setActionMessage("");
+  }, [requestedEmailId]);
   const resend = useMutation({
     mutationFn: async (id: string): Promise<ResendResult> => {
       const response = await apiRequest("POST", `/api/email-log/${encodeURIComponent(id)}/resend`, {});
@@ -143,13 +156,31 @@ export default function EmailLog() {
   });
 
   const rows = listQuery.data?.rows ?? [];
+  const displayRows = useMemo(() => {
+    if (!requestedEmailId || !detailQuery.data || emailIdKey(detailQuery.data.id) !== requestedEmailId) return rows;
+    if (rows.some(row => emailIdKey(row.id) === requestedEmailId)) return rows;
+    return [detailQuery.data, ...rows];
+  }, [requestedEmailId, detailQuery.data, rows]);
   const total = listQuery.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const loading = listQuery.isLoading;
-  const toggleExpanded = (id: string) => {
-    setExpandedId(current => current === id ? null : id);
+  const toggleExpanded = (id: string | number) => {
+    const key = emailIdKey(id);
+    setExpandedId(current => current === key ? null : key);
     setActionMessage("");
     setActionTone("success");
+  };
+  const clearEmailFocus = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setFrom(monthAgo);
+    setTo(today);
+    setEntityType("");
+    setStatus("");
+    setAgentId("");
+    setSearch("");
+    setPage(1);
+    setExpandedId(null);
+    navigate("/email-log");
   };
   const resetPage = (setter: (value: string) => void, value: string) => {
     setter(value);
@@ -158,7 +189,7 @@ export default function EmailLog() {
   const retryResend = (row: EmailLogRow) => {
     if (!row.canResend || row.inProgress || !isManager) return;
     if (window.confirm(`Create a new resend for “${row.subject}”? This will send another email.`)) {
-      resend.mutate(row.id);
+      resend.mutate(emailIdKey(row.id));
     }
   };
 
@@ -171,6 +202,15 @@ export default function EmailLog() {
         </div>
       )}
 
+      {requestedEmailId && (
+        <div data-testid="email-focus-notice" className="flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#ece9e2] px-3 py-2 text-xs">
+          <span>{detailQuery.error ? `Email #${requestedEmailId} could not be loaded.` : detailQuery.isLoading ? `Loading email #${requestedEmailId}…` : `Email #${requestedEmailId} is expanded, including outside the current filters or page.`}</span>
+          <div className="flex items-center gap-3">
+            {detailQuery.error && <Button size="sm" variant="outline" onClick={() => detailQuery.refetch()}>Retry</Button>}
+            <a href="/email-log" onClick={clearEmailFocus} data-testid="email-log-show-all" className="font-semibold text-[#087f8c] underline underline-offset-2">Show all email</a>
+          </div>
+        </div>
+      )}
       <Card className="overflow-hidden rounded-sm border-2 border-[#808080] bg-[#f4f4f4] shadow-[2px_2px_0_#808080]">
         <div className="flex flex-wrap items-center gap-2 border-b-2 border-[#808080] bg-[#d4d0c8] px-3 py-2.5">
           <div className="flex h-7 w-7 items-center justify-center border-2 border-l-white border-t-white border-r-[#808080] border-b-[#808080] bg-[#e8e5dd]"><Mail className="h-4 w-4 text-[#087f8c]" /></div>
@@ -226,7 +266,7 @@ export default function EmailLog() {
               <p className="max-w-lg text-xs text-[#666]">{(listQuery.error as Error).message || "The service is temporarily unavailable."}</p>
               <Button size="sm" variant="outline" onClick={() => listQuery.refetch()}>Retry</Button>
             </div>
-          ) : rows.length === 0 ? (
+          ) : displayRows.length === 0 ? (
             <div data-testid="email-log-empty" className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-6 text-center">
               <div className="flex h-12 w-12 items-center justify-center border-2 border-[#808080] bg-[#e7e4dc] shadow-[inset_1px_1px_0_white]"><Mail className="h-5 w-5 text-[#777]" /></div>
               <p className="text-sm font-bold text-[#333]">No outbound messages in this view</p>
@@ -239,11 +279,11 @@ export default function EmailLog() {
                   <tr>{["Date", "Direction", "To", "Subject", "Entity", "Status", "Sent by"].map(label => <th key={label} className="border-b-2 border-[#888] px-3 py-2 font-bold">{label}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {rows.map(row => {
-                    const expanded = expandedId === row.id;
+                  {displayRows.map(row => {
+                    const expanded = expandedId === emailIdKey(row.id);
                     const detail = expanded ? detailQuery.data : null;
                     return <FragmentRow key={row.id}>
-                      <tr data-testid="email-log-row" aria-expanded={expanded} aria-label={`Email log: ${row.subject}`} tabIndex={0} role="button" onClick={() => toggleExpanded(row.id)} onKeyDown={event => {
+                      <tr data-testid="email-log-row" data-email-id={emailIdKey(row.id)} aria-expanded={expanded} aria-label={`Email log: ${row.subject}`} tabIndex={0} role="button" onClick={() => toggleExpanded(row.id)} onKeyDown={event => {
                         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggleExpanded(row.id); }
                       }} className={`cursor-pointer border-b border-[#d2cfc7] text-[#292929] hover:bg-[#e7f0ee] focus:bg-[#e7f0ee] focus:outline focus:outline-1 focus:outline-[#087f8c] ${expanded ? "bg-[#dce8e6]" : "bg-[#f7f6f2]"}`}>
                         <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[10px] tabular-nums">{prettyDate(row.createdAt)}</td>

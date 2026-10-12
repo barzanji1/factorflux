@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { MouseEvent } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -189,10 +191,11 @@ function AllScoresRow({ scores }: { scores: Record<string, number> }) {
 
 // ─── Document row ─────────────────────────────────────────────────────────────
 
-function DocumentRow({ doc, onView, onDownload }: {
+function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
   doc: AIDocument;
   onView: (id: number) => void;
   onDownload: (id: number) => void;
+  focusTargetId: number | null;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -224,7 +227,15 @@ function DocumentRow({ doc, onView, onDownload }: {
   return (
     <>
       {/* ── Main row ──────────────────────────────────────────────────────── */}
-      <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group">
+      <tr
+        id={`document-row-${doc.id}`}
+        data-testid={`document-row-${doc.id}`}
+        tabIndex={-1}
+        className={cn(
+          "border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group focus:outline focus:outline-2 focus:outline-[#087c8d]",
+          focusTargetId === doc.id && "bg-[#e5f1ef] outline outline-2 outline-[#087c8d] outline-offset-[-2px]",
+        )}
+      >
 
         {/* Expand toggle + filename */}
         <td className="px-4 py-3">
@@ -411,6 +422,12 @@ function DocumentRow({ doc, onView, onDownload }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Documents() {
+  const [, navigate] = useLocation();
+  const queryString = useSearch();
+  const queryDocumentId = new URLSearchParams(queryString).get("documentId");
+  const requestedDocumentId = queryDocumentId && /^\d+$/.test(queryDocumentId) ? Number(queryDocumentId) : null;
+  const handledFocusId = useRef<number | null>(null);
+  const pendingFocusId = useRef<number | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -489,6 +506,36 @@ export default function Documents() {
     return true;
   });
 
+  useEffect(() => {
+    if (requestedDocumentId === null || isLoading || handledFocusId.current === requestedDocumentId) return;
+    if (!documents.some(doc => doc.id === requestedDocumentId)) return;
+    handledFocusId.current = requestedDocumentId;
+    pendingFocusId.current = requestedDocumentId;
+    setSearch("");
+    setTypeFilter("all");
+    setSrcFilter("all");
+    setConfFilter("all");
+  }, [requestedDocumentId, documents, isLoading]);
+
+  useEffect(() => {
+    const id = pendingFocusId.current;
+    if (id === null || isLoading || !filtered.some(doc => doc.id === id)) return;
+    const row = document.getElementById(`document-row-${id}`);
+    if (!row) return;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    row.focus({ preventScroll: true });
+    pendingFocusId.current = null;
+  }, [filtered, isLoading]);
+
+  const clearDocumentFocus = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setSearch("");
+    setTypeFilter("all");
+    setSrcFilter("all");
+    setConfFilter("all");
+    navigate("/documents");
+  };
+
   return (
     <div className="flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
@@ -502,6 +549,12 @@ export default function Documents() {
 
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
+            {requestedDocumentId !== null && (
+              <div data-testid="document-focus-notice" className="flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#ece9e2] px-3 py-2 text-xs">
+                <span>Focused document #{requestedDocumentId}. If OCR failed, its existing Retry action is in view.</span>
+                <a href="/documents" onClick={clearDocumentFocus} data-testid="documents-show-all" className="font-semibold text-[#087c8d] underline underline-offset-2">Show all documents</a>
+              </div>
+            )}
 
             {/* ── Stats row ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -646,6 +699,7 @@ export default function Documents() {
                         doc={doc}
                         onView={handleView}
                         onDownload={handleDownload}
+                        focusTargetId={requestedDocumentId}
                       />
                     ))}
                   </tbody>

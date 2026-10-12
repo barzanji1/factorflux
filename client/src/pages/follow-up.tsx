@@ -1,4 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import type { MouseEvent } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -832,6 +834,11 @@ function NoteEditor({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function FollowUpPage() {
+  const [, navigate] = useLocation();
+  const queryString = useSearch();
+  const requestedFollowUpId = new URLSearchParams(queryString).get("followupId");
+  const pendingFocusId = useRef<number | null>(null);
+  const handledFocusId = useRef<number | null>(null);
   const [searchTerm, setSearchTerm]     = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -943,6 +950,35 @@ export default function FollowUpPage() {
       (statusFilter === "all"   || f.status === statusFilter) &&
       (priorityFilter === "all" || f.priority === priorityFilter);
   });
+
+  useEffect(() => {
+    if (!requestedFollowUpId || isLoading || !/^\d+$/.test(requestedFollowUpId)) return;
+    const id = Number(requestedFollowUpId);
+    if (handledFocusId.current === id || !(followUps as FollowUp[]).some(item => item.id === id)) return;
+    handledFocusId.current = id;
+    pendingFocusId.current = id;
+    setSearchTerm("");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+  }, [requestedFollowUpId, isLoading, followUps]);
+
+  useEffect(() => {
+    const id = pendingFocusId.current;
+    if (id === null || isLoading || !filteredFollowUps.some(item => item.id === id)) return;
+    const row = document.getElementById(`manual-followup-${id}`);
+    if (!row) return;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    row.focus({ preventScroll: true });
+    pendingFocusId.current = null;
+  }, [filteredFollowUps, isLoading]);
+
+  const clearFollowUpFocus = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setSearchTerm("");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    navigate("/follow-up");
+  };
 
   const filteredBfu = (brokerFollowUps as BrokerFollowUp[]).filter(b => {
     const q = bfuSearch.toLowerCase();
@@ -1092,6 +1128,12 @@ export default function FollowUpPage() {
 
               {/* ── Manual follow-ups ─────────────────────────────────────────── */}
               <TabsContent value="manual">
+                {requestedFollowUpId && /^\d+$/.test(requestedFollowUpId) && (
+                  <div data-testid="followup-focus-notice" className="mb-3 flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#ece9e2] px-3 py-2 text-xs">
+                    <span>Showing manual follow-up #{requestedFollowUpId} from your authorized task list.</span>
+                    <a href="/follow-up" onClick={clearFollowUpFocus} data-testid="followup-show-all" className="font-semibold text-[#087c8d] underline underline-offset-2">Show all follow-ups</a>
+                  </div>
+                )}
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-wrap items-center gap-4">
@@ -1161,7 +1203,13 @@ export default function FollowUpPage() {
                       </Win95TableHeader>
                       <Win95TableBody>
                         {filteredFollowUps.map(followUp => (
-                          <Win95TableRow key={followUp.id}>
+                          <Win95TableRow
+                            key={followUp.id}
+                            id={`manual-followup-${followUp.id}`}
+                            tabIndex={-1}
+                            data-testid={`manual-followup-row-${followUp.id}`}
+                            className={cn(followUp.id === Number(requestedFollowUpId) && "outline outline-2 outline-[#087c8d] outline-offset-[-2px]")}
+                          >
                             <Win95TableCell>
                               <p className="font-semibold text-slate-900">{followUp.title}</p>
                               {followUp.description && <p className="mt-1 max-w-md text-xs text-slate-500">{followUp.description}</p>}

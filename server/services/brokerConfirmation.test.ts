@@ -18,11 +18,13 @@ import { runInvoicePreflight } from "./invoicePreflight";
 const DAY = 86_400_000;
 const config = { maxReminders: 3, reminderDays: [3, 7, 14] as [number, number, number], publicBaseUrl: "https://factorflux.co" };
 const at = new Date("2026-10-12T18:00:00Z");
-const base = { status: "funded" as const, fundedAt: new Date(at.getTime() - DAY - 1), brokerConfirmationStatus: "pending" as const, confirmationSentAt: null, confirmationRemindedCount: 0 };
+const base = { status: "funded" as const, fundedAt: new Date(at.getTime() - 2 * DAY - 1), brokerConfirmationStatus: "pending" as const, confirmationSentAt: null, confirmationRemindedCount: 0 };
 
-test("confirmation waits over 24 hours and never changes the funding clock", () => {
+test("confirmation waits over 48 hours and never changes the funding clock", () => {
   assert.equal(confirmationAction(base, config, at), "initial");
-  assert.equal(confirmationAction({ ...base, fundedAt: new Date(at.getTime() - DAY) }, config, at), null);
+  for (const age of [DAY, 2 * DAY - 1, 2 * DAY]) {
+    assert.equal(confirmationAction({ ...base, fundedAt: new Date(at.getTime() - age) }, config, at), null);
+  }
   assert.equal(confirmationAction({ ...base, status: "approved" }, config, at), null);
   assert.equal(confirmationAction({ ...base, fundedAt: null }, config, at), null);
   for (const status of ["confirmed", "disputed"] as const) assert.equal(confirmationAction({ ...base, brokerConfirmationStatus: status }, config, at), null);
@@ -84,9 +86,36 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
     const newInvoice = async (label: string, overrides: Partial<typeof invoices.$inferInsert> = {}) =>
       (await tx.insert(invoices).values({ invoiceNumber: `CONF-${label}-${suffix}`, carrierInvoiceNumber: `CARRIER-${label}`,
         clientId: carrier.id, brokerId: broker.id, loadId: null, loadNumber: `LOAD-${label}`, amount: "1000.00",
-        status: "funded", fundedAt: new Date(clock.getTime() - 25 * 3_600_000), submittedBy: userId,
+        status: "funded", fundedAt: new Date(clock.getTime() - 49 * 3_600_000), submittedBy: userId,
         assignedTo: userId, assignedFollowupAgentId: userId, ...overrides }).returning())[0];
     const stored = async (id: number) => (await tx.select().from(invoices).where(eq(invoices.id, id)))[0];
+
+    await t.test("scheduled initial send excludes 24h and exactly 48h, and includes over 48h", async () => {
+      const young = await newInvoice("delay-24h", { fundedAt: new Date(clock.getTime() - DAY) });
+      const boundary = await newInvoice("delay-48h", { fundedAt: new Date(clock.getTime() - 2 * DAY) });
+      const due = await newInvoice("delay-over48h", { fundedAt: new Date(clock.getTime() - 2 * DAY - 1) });
+      const before = accepted.length;
+      const result = await service.runScheduled({ invoiceIds: [young.id, boundary.id, due.id] });
+      assert.equal(result.checked, 1); assert.equal(result.processed, 1); assert.deepEqual(result.errors, []);
+      assert.equal(accepted.length, before + 1);
+      assert.equal((await stored(young.id)).confirmationSentAt, null);
+      assert.equal((await stored(boundary.id)).confirmationSentAt, null);
+      assert.equal((await stored(due.id)).confirmationSentAt?.getTime(), clock.getTime());
+      assert.equal((await stored(due.id)).fundedAt?.getTime(), due.fundedAt?.getTime());
+    });
+    await t.test("a manually sent confirmation keeps its configured reminder cadence before 48h funding age", async () => {
+      const invoice = await newInvoice("early-manual", { fundedAt: new Date(clock) });
+      await service.sendForInvoice(invoice.id, { kind: "agent", id: userId });
+      const first = clock.getTime();
+      await tx.update(brokerConfirmationSettings).set({ reminderDays: [1, 7, 14] }).where(eq(brokerConfirmationSettings.id, 1));
+      clock = new Date(first + DAY);
+      const result = await service.runScheduled({ invoiceIds: [invoice.id] });
+      assert.equal(result.processed, 1); assert.deepEqual(result.errors, []);
+      const row = await stored(invoice.id);
+      assert.equal(row.confirmationRemindedCount, 1); assert.equal(row.confirmationSentAt?.getTime(), first);
+      await tx.update(brokerConfirmationSettings).set(config).where(eq(brokerConfirmationSettings.id, 1));
+      clock = new Date(first);
+    });
 
     await t.test("Email Log acceptance reconciliation updates confirmation without resending or changing funded age", async () => {
       const invoice = await newInvoice("email-log-retry");

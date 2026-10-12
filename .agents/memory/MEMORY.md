@@ -7,6 +7,7 @@
 - [Chargeback extensions](chargeback-extensions.md) — a future extension date must defer the automatic 90-day chargeback until that date arrives.
 - [Carrier onboarding secrets](carrier-onboarding-secrets.md) — SSNs and bank credentials are encrypted server-side, omitted from API responses, and preserved when blank on edit.
 - [Manager report scope](manager-report-scope.md) — until explicit teams exist, manager reporting scope is self plus active users created by that manager.
+- [Agent Dashboard policy](agent-dashboard-policy.md) — default work queue, not project management; managers see all queues, without broadening personnel-report permissions.
 - [Two-role factoring workflow](two-role-factoring-workflow.md) — agents create/correct/submit only; managers review, reject, fund, collect, and settle.
 - [Carrier-broker AR aging](carrier-broker-ar-aging.md) — age funded receivables from funded date and exclude closed balances; short pay uses all applied cash.
 - [Bulk invoice uniqueness](bulk-invoice-uniqueness.md) — one broker/carrier/ticket/load identity may produce only one bulk receivable across all batches.

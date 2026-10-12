@@ -8,3 +8,9 @@ This project’s application data uses its configured external Neon connection. 
 **Why:** A managed-database query reported that the configured development admin was absent while the running app’s Neon database contained the account.
 
 **How to apply:** For application-record verification, run a small project script through the existing database module and return only non-sensitive metadata. Never print connection strings, password hashes, or secret values.
+
+Legacy database constraints can be stricter than the current Drizzle insert types.
+
+**Why:** Rollback fixtures accepted by TypeScript were rejected by existing database NOT NULL constraints that the model did not declare.
+
+**How to apply:** Inspect actual required columns when seeding new fixture types and follow the existing validated create shape. Do not loosen database constraints merely to make fixtures pass.

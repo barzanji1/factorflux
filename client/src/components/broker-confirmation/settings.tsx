@@ -31,7 +31,7 @@ export default function BrokerConfirmationSettings() {
     <div className="space-y-4 p-4">
       {query.error && <div role="alert" className="flex items-center gap-2 bg-[#f9e1dd] p-2 text-sm text-[#8a3028]"><AlertCircle className="h-4 w-4" />{(query.error as Error).message}<Button size="sm" variant="outline" onClick={() => query.refetch()}>Retry</Button></div>}
       {query.data && <>
-        <p className="text-xs text-[#555]">Reminder cadence is for broker receipt follow-up only. It does not change invoice funding or payment workflows.</p>
+        <p className="text-xs text-[#555]">The automatic first email is sent after 48 hours from funding. Reminder days are measured from the first send; they do not change invoice funding or payment workflows.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-xs font-bold">Maximum reminders (0–3)
             <Input data-testid="confirmation-max-reminders" type="number" min={0} max={3} value={maxReminders} onChange={e => setMaxReminders(Number(e.target.value))} className="mt-1 h-9" />

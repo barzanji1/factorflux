@@ -14,3 +14,9 @@ Keep the existing Autoscale deployment for the broker confirmation rollout.
 **Why:** The user chose “Leave deployment unchanged” after being informed that Autoscale pauses background timers when idle and cannot guarantee 15-minute execution.
 
 **How to apply:** Retain startup catch-up. Do not switch to Reserved VM hosting or add an external scheduler for this feature without new approval.
+
+Automatic initial broker confirmation waits 48 hours after funding. Reminder cadence remains 3, 7, and 14 days after the first send, not after funding.
+
+**Why:** The user changed the initial delay from 24 to 48 hours while explicitly preserving the reminder cadence.
+
+**How to apply:** Keep automatic initial eligibility and the scheduled candidate query aligned. Do not apply the initial-delay gate to reminders for emails already sent manually.

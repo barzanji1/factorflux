@@ -71,7 +71,7 @@ const navSections: NavSection[] = [
   {
     title: "Workspace",
     items: [
-      { name: "Dashboard",         href: "/",                   icon: LayoutDashboard, permission: "dashboard"          },
+      { name: "Agent Dashboard",   href: "/",                   icon: LayoutDashboard, permission: "dashboard", staffVisible: true },
       { name: "Carriers",          href: "/clients",            icon: Users,           permission: "carriers"           },
       { name: "Invoices",          href: "/invoices",           icon: FileText,        permission: "invoices"           },
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },

@@ -22,6 +22,7 @@ import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte
 import { storage } from "./storage";
 import { registerBrokerConfirmationRoutes } from "./routes/brokerConfirmation";
 import { registerEmailLogRoutes } from "./routes/emailLog";
+import { registerAgentDashboardRoutes } from "./routes/agentDashboard";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
@@ -799,6 +800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     || pathname.startsWith("/api/carrier/register")
     || pathname.startsWith("/api/carrier-registration/");
   const permissionGroups: Array<[string, string]> = [
+    ["/api/agent-dashboard", "all_authenticated"],
     ["/api/email-log", "all_authenticated"],
     ["/api/confirmation-follow-ups", "followups"],
     ["/api/broker-confirmation-settings", "factoring"],
@@ -881,6 +883,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", (req: any, res: any, next: any) => {
     const pathname = String(req.originalUrl || "").split("?")[0];
     if (publicApiPath(pathname)) return next();
+    // The default staff workbench must not fail because its bell polls an old
+    // dashboard-module endpoint. These GET handlers always use req.user.id;
+    // mutation permissions and access to anyone else's notifications stay unchanged.
+    if (req.method === "GET" && ["/api/notifications", "/api/notifications/unread-count"].includes(pathname)) {
+      return requireAuth(req, res, next);
+    }
     if (req.method === "GET" && /^\/api\/clients\/\d+\/email-log$/.test(pathname)) {
       return requireAnyPermission(["carriers", "client_email"])(req, res, next);
     }
@@ -912,6 +920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   registerBrokerConfirmationRoutes(app, { requireAuth, requireManagerOrAdmin, canAccessInvoice: employeeCanAccessInvoice });
   registerEmailLogRoutes(app, { requireAuth, requireManagerOrAdmin });
+  registerAgentDashboardRoutes(app, requireAuth);
 
   app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {
     streamTestPdf(

@@ -1,5 +1,4 @@
 export const ROUTE_PERMISSION_MAP: Record<string, string> = {
-  "/": "dashboard",
   "/clients": "carriers",
   "/carriers": "carriers",
   "/invoices": "invoices",
