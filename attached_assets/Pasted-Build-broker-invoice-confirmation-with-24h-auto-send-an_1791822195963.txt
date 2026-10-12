@@ -1,0 +1,22 @@
+Build broker invoice confirmation with 24h auto-send and assigned agent follow-up.
+
+DATA
+1. Add to invoices: broker_confirmation_status enum ('pending'|'sent'|'confirmed'|'disputed'), broker_confirmed_at timestamp, broker_confirmation_token uuid (unique), confirmation_sent_at, confirmation_reminded_count int default 0, assigned_followup_agent_id FK users.
+2. Table broker_confirmation_events: id, invoice_id, event enum ('sent'|'opened'|'confirmed'|'disputed'|'reminder_sent'|'escalated'), actor (system|broker email|agent), notes, created_at.
+
+AUTOMATION
+3. Scheduled job runs every 15 min: find funded invoices where confirmation_sent_at is null and funded_at < now() - 24h. For each, send a confirmation email to the broker's primary contact via Resend from notifications@truckingprosfinancial.com. Email contains: invoice details (internal #, carrier invoice #, load #, amount, carrier name), and two buttons — "Confirm Receipt" linking to /api/broker-confirm/{token} and "Dispute" linking to /api/broker-dispute/{token}. Set status='sent', log the event. Do not send if broker has no email on file — flag it for manual follow-up instead.
+4. Confirm endpoint (GET, no auth): validates token, sets status='confirmed', broker_confirmed_at=now(), logs event, shows a simple branded "Thank you" page. Dispute endpoint: sets status='disputed', logs event with optional reason textarea, shows a page asking broker to contact TPF, and creates an urgent follow-up task for the assigned agent.
+5. Reminder cadence: if not confirmed after 3 days from first send, auto-send reminder #1. Reminder #2 at 7 days. Reminder #3 at 14 days. After reminder #3, escalate: create a high-priority follow-up task for the assigned agent and log escalated event. Max 3 reminders, configurable in Factoring Settings.
+6. Auto-assign: when an invoice is funded, assign the processor as the followup agent. Managers can reassign.
+
+AGING
+7. Aging starts at funded_at, not broker_confirmed_at. Broker confirmation is a de-risk flag, not a clock starter. Reports and aging calculations use funded_at. The Aging report should show a column for confirmation status (confirmed/pending/disputed) as a risk indicator, not a date filter.
+8. Unconfirmed after 14 days adds a BROKER_UNCONFIRMED info alert on that broker's future invoices through preflight.
+
+UI
+9. Invoice detail → Confirmation section: status badge, sent/confirmed timestamps, event log, manual "Resend" and "Mark confirmed" (phone confirmation, agent logs it) buttons.
+10. Followups page: confirmation follow-ups appear as a category alongside existing manual tasks and automations.
+11. Earl: can report confirmation status, can trigger manual resend, cannot mark confirmed.
+
+Win95 theme on all new UI. Do not change the fund flow. Show migration SQL and the diff.

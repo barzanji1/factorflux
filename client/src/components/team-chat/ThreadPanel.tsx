@@ -5,12 +5,14 @@ import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
 import { MentionAutocomplete, type ChatUser } from "./MentionAutocomplete";
 import { MessageBody, type MessageMention } from "./MessageBody";
+import { ChatAvatar } from "./ChatAvatar";
 
 export type ChatMessage = {
   id: string | number;
   channelId: string | number;
   senderId: string | number;
   senderName: string;
+  senderProfileImageUrl?: string | null;
   body: string;
   createdAt: string;
   parentMessageId: number | null;
@@ -39,7 +41,6 @@ async function postReply(channelId: string | number, body: string, parentMessage
 }
 
 const timeLabel = (date: string) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(date));
-const initials = (name: string) => name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 
 export function ThreadPanel({
   channelId, rootId, currentUserId, active, onClose, onChanged, highlightedMessageId,
@@ -203,14 +204,17 @@ export function ThreadPanel({
         {loading && !parent ? <div className="space-y-3" aria-label="Loading thread">{[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse bg-[#dfded8]" />)}</div>
           : error && !parent ? <div role="alert" className="p-3 text-xs text-[#8b3030]"><AlertCircle className="mb-2 h-4 w-4" />{error}<Button onClick={() => setRequestVersion((version) => version + 1)} variant="outline" className="mt-2 h-7 rounded-sm text-xs">Retry</Button></div>
             : parent && <>
-              <div className="mb-3 border-b border-[#c9c7c0] pb-3" data-testid="chat-thread-parent">
+              <div className="mb-3 flex gap-1.5 border-b border-[#c9c7c0] pb-3" data-testid="chat-thread-parent">
+                <ChatAvatar name={parent.senderName} profileImageUrl={parent.senderProfileImageUrl} />
+                <div className="min-w-0 flex-1">
                 <div className="mb-1 flex flex-wrap items-baseline gap-1 text-[10px] text-[#777]"><strong className="text-[#444]">{parent.senderName}</strong><span>{timeLabel(parent.createdAt)}</span>{parent.mentions?.some((mention) => String(mention.userId) === String(currentUserId)) && <span className="rounded-sm border border-[#c99732] bg-[#fff0b8] px-1 font-bold text-[#684c08]">Mentioned you</span>}<span className="ml-auto text-[#17626a]">Original message</span></div>
                 <div className="ff-team-chat-message ff-team-chat-message-other inline-block whitespace-pre-wrap break-words px-2 py-1 leading-snug text-xs"><MessageBody body={parent.body} mentions={parent.mentions} channelId={channelId} rootMessageId={rootId} /></div>
+                </div>
               </div>
               {replies.map((reply) => (
                 <article key={reply.id} id={`chat-message-${reply.id}`} data-testid="chat-thread-reply" className={cn("mb-3 flex gap-1.5", String(reply.id) === String(highlightedMessageId) && "rounded-sm bg-[#fff0b8] p-1")}>
                   <CornerDownRight className="mt-1 h-3 w-3 shrink-0 text-[#85837d]" />
-                  <span className="ff-team-chat-avatar flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[8px] font-bold">{initials(reply.senderName)}</span>
+                  <ChatAvatar name={reply.senderName} profileImageUrl={reply.senderProfileImageUrl} />
                   <div className="min-w-0 flex-1">
                     <div className="mb-0.5 flex flex-wrap items-baseline gap-1 text-[10px] text-[#777]"><strong className="text-[#444]">{reply.senderName}</strong><span>{timeLabel(reply.createdAt)}</span>{reply.mentions?.some((mention) => String(mention.userId) === String(currentUserId)) && <span className="rounded-sm border border-[#c99732] bg-[#fff0b8] px-1 font-bold text-[#684c08]">Mentioned you</span>}</div>
                     <div className="whitespace-pre-wrap break-words text-xs leading-snug"><MessageBody body={reply.body} mentions={reply.mentions} channelId={channelId} rootMessageId={rootId} /></div>

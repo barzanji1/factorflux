@@ -1,6 +1,6 @@
 ---
 name: Client email policy
-description: Send-only client communication, permission scope, and the connected Resend key's limitations.
+description: Outbound-mail identity, composer scope versus staff-wide log reads, and Resend connection limitations.
 ---
 
 Client email is send-only. Use a professional sender on the verified company domain, route replies to the designated monitored inbox, and keep outbound content and sender attribution on the client profile. Do not introduce Gmail ingestion or an in-app inbox as part of this feature.
@@ -26,3 +26,15 @@ The connected Resend key is send-only. Domain-list requests return `restricted_a
 **Why:** Both the connected-service read and the application's connector SDK read returned this restriction after connection setup.
 
 **How to apply:** Do not reconnect merely to fix unsupported metadata reads. Report domain-verification visibility limits honestly and distinguish provider acceptance from confirmed delivery.
+
+The system-wide outbound Email Log is readable by all authenticated staff, independently of client-profile and send permissions. Managers can retry failed messages; staff cannot edit or delete history.
+
+**Why:** The user explicitly requested a shared Communications log visible to all agents, not a client-assignment-scoped log.
+
+**How to apply:** Keep global log reads separate from composer permissions and existing entity access rules. Do not grant send, entity-edit, or log-edit privileges merely to enable log visibility.
+
+Retry original messages without exposing their full HTML in the shared log. Preserve the original envelope and delivery intent; a verified delivery must supersede an uncertain local send result.
+
+**Why:** The user requires preview-only history and manager retries. A lost acceptance response or the provider's expiring idempotency cache must not cause duplicate customer emails.
+
+**How to apply:** Keep retry bodies private and encrypted, maintain durable intent correlation, and never allow the read-only log to edit recipients or message content.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data";
-import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, UserRound, Users, X, CornerDownRight } from "lucide-react";
+import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, Users, X, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +20,7 @@ import TopNav from "@/components/layout/top-nav";
 import { MentionAutocomplete, type ChatUser } from "@/components/team-chat/MentionAutocomplete";
 import { MessageBody } from "@/components/team-chat/MessageBody";
 import { ThreadPanel, type ChatMessage } from "@/components/team-chat/ThreadPanel";
+import { ChatAvatar } from "@/components/team-chat/ChatAvatar";
 
 type Channel = {
   id: string | number;
@@ -28,6 +29,7 @@ type Channel = {
   unreadCount: number;
   members?: unknown[];
   directName?: string;
+  directProfileImageUrl?: string | null;
 };
 type Message = ChatMessage;
 type EmojiSelection = { id?: string; native?: string };
@@ -112,7 +114,6 @@ async function getMessagesAfter(channelId: string | number, startingCursor: numb
   }
 }
 
-const initials = (name: string) => name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 const timeLabel = (date: string) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(date));
 
 type ChatPanelProps = {
@@ -696,7 +697,7 @@ function ChatPanel({ active }: ChatPanelProps) {
                 const isDirect = channel.type === "direct" || Boolean(channel.directName);
                  const label = isDirect ? channel.directName || channel.name : `#${channel.name}`;
                      return <button key={channel.id} onClick={() => selectChannel(channel.id)} title={label} aria-label={label} data-testid={`chat-channel-${channel.id}`} className={cn("ff-team-chat-channel relative flex h-11 w-full items-center justify-start gap-2 px-2 text-left", String(selectedId) === String(channel.id) && "ff-team-chat-channel-active")}>
-                   <span className="ff-team-chat-avatar flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold">{isDirect ? initials(label) : <Hash className="h-4 w-4" />}</span>
+                   {isDirect ? <ChatAvatar name={label} profileImageUrl={channel.directProfileImageUrl} className="h-8 w-8 text-[10px]" /> : <span className="ff-team-chat-avatar flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold"><Hash className="h-4 w-4" /></span>}
                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#1a1a1a]">{label}</span>
                    {channel.unreadCount > 0 && <span className="ff-team-chat-unread absolute right-1 top-1" aria-label={`${channel.unreadCount} unread`}>{channel.unreadCount > 9 ? "9+" : channel.unreadCount}</span>}
                 </button>;
@@ -708,14 +709,14 @@ function ChatPanel({ active }: ChatPanelProps) {
             {selected ? <div className="flex min-h-0 min-w-0 flex-1">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <header className="flex h-9 shrink-0 items-center gap-2 border-b border-[#808080] bg-[#d4d0c8] px-2">
-             <span className="flex h-6 w-6 items-center justify-center rounded-sm bg-[#8bbfc1] text-[#154c51]">{selected.type === "direct" || selected.directName ? <UserRound className="h-3 w-3" /> : <Hash className="h-3 w-3" />}</span>
+             {selectedIsDirect ? <ChatAvatar name={selectedLabel} profileImageUrl={selected.directProfileImageUrl} /> : <span className="flex h-6 w-6 items-center justify-center rounded-sm bg-[#8bbfc1] text-[#154c51]"><Hash className="h-3 w-3" /></span>}
               <div className="min-w-0"><h2 className="truncate text-xs font-bold text-[#1a1a1a]">{selectedLabel}</h2></div>
              <MoreHorizontal className="ml-auto h-4 w-4 text-[#777]" />
           </header>
            <div className="flex-1 overflow-y-auto px-2 py-2">
             {loadingMessages && !messages.length ? <div className="space-y-4">{[1, 2, 3].map((item) => <div key={item} className={cn("h-14 animate-pulse bg-[#d9d8d2]", item % 2 === 0 ? "ml-auto max-w-[60%]" : "max-w-[55%]")} />)}</div>
                 : messages.length ? messages.map((message) => <div key={message.id} id={`chat-message-${message.id}`} data-testid="chat-root-message" className={cn("mb-2 flex gap-1.5", String(message.senderId) === String(user?.id) ? "justify-end" : "justify-start", String(message.id) === highlightMessageId && "rounded-sm bg-[#fff0b8] p-1")}>
-                 <div className={cn("ff-team-chat-avatar flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[8px] font-bold", String(message.senderId) === String(user?.id) && "order-2")}>{initials(message.senderName)}</div>
+                 <ChatAvatar name={message.senderName} profileImageUrl={message.senderProfileImageUrl} className={cn(String(message.senderId) === String(user?.id) && "order-2")} />
                     <div className={cn("max-w-[84%] min-w-0", String(message.senderId) === String(user?.id) && "text-right")}><div className="ff-team-chat-message-meta mb-0.5 flex flex-wrap items-baseline gap-1 text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span>{message.mentions?.some((mention) => String(mention.userId) === String(user?.id)) && <span className="rounded-sm border border-[#c99732] bg-[#fff0b8] px-1 font-bold text-[#684c08]">Mentioned you</span>}</div><div
                       role="button" tabIndex={0} aria-label={`Open reply thread for ${message.senderName}'s message`}
                       onClick={(event) => { if (!(event.target as HTMLElement).closest("a")) setThreadRootId(message.id); }}
@@ -777,7 +778,7 @@ function ChatPanel({ active }: ChatPanelProps) {
             </form>
           </section>
         </div>}
-        {pickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/30 p-4" onMouseDown={(event) => event.currentTarget === event.target && setPickerOpen(false)}><div className="w-full max-w-md border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">New conversation</p><h2 className="font-bold">Message a teammate</h2></div><button onClick={() => setPickerOpen(false)}><X className="h-4 w-4" /></button></div><div className="max-h-72 overflow-y-auto border-2 border-[#808080] bg-[#efeee9]">{users.length ? users.map((user) => <button key={user.id} onClick={() => startDirect(user.id)} className="flex w-full items-center gap-3 border-b border-[#c4c3bd] px-3 py-3 text-left last:border-0 hover:bg-[#dff5f6]"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#efc886] text-[10px] font-bold text-[#674c20]">{initials(user.name)}</span><span><span className="block text-sm font-semibold">{user.name}</span><span className="block text-[10px] uppercase text-[#777]">{user.role || "Team member"}</span></span></button>) : <p className="p-5 text-center text-xs text-[#666]">No teammates available.</p>}</div></div></div>}
+        {pickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/30 p-4" onMouseDown={(event) => event.currentTarget === event.target && setPickerOpen(false)}><div className="w-full max-w-md border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">New conversation</p><h2 className="font-bold">Message a teammate</h2></div><button onClick={() => setPickerOpen(false)}><X className="h-4 w-4" /></button></div><div className="max-h-72 overflow-y-auto border-2 border-[#808080] bg-[#efeee9]">{users.length ? users.map((user) => <button key={user.id} onClick={() => startDirect(user.id)} className="flex w-full items-center gap-3 border-b border-[#c4c3bd] px-3 py-3 text-left last:border-0 hover:bg-[#dff5f6]"><ChatAvatar name={user.name} profileImageUrl={user.profileImageUrl} className="h-8 w-8 text-[10px]" /><span><span className="block text-sm font-semibold">{user.name}</span><span className="block text-[10px] uppercase text-[#777]">{user.role || "Team member"}</span></span></button>) : <p className="p-5 text-center text-xs text-[#666]">No teammates available.</p>}</div></div></div>}
     </div>
   );
 }

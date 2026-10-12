@@ -13,6 +13,7 @@ import { startAuthorityScheduler } from "./services/authorityScheduler";
 import { recoverStuckOcrJobs } from "./services/jobQueue";
 import { ensureDevAdmin } from "./services/devAdminBootstrap";
 import { startBrokerCreditScheduler } from "./services/brokerCreditEngine";
+import { emailActorContext } from "./services/emailContext";
 
 const app = express();
 
@@ -58,14 +59,17 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ verify(req: any, _res, buffer) {
+  if (req.originalUrl.split("?")[0] === "/api/webhooks/resend") req.rawBody = Buffer.from(buffer);
+} }));
 app.use(express.urlencoded({ extended: false }));
+app.use(emailActorContext);
 
 app.use("/uploads", express.static(uploadsDir));
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const reqPath = req.path;
+  const reqPath = req.path.replace(/^(\/api\/broker-(?:confirm|dispute)\/)[^/]+$/, "$1[redacted]");
   let capturedJsonResponse: Record<string, any> | undefined;
 
   const originalResJson = res.json.bind(res);
@@ -81,7 +85,7 @@ app.use((req, res, next) => {
       let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
 
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      logLine += ` :: ${JSON.stringify(capturedJsonResponse, (key, value) => key === "brokerConfirmationToken" ? undefined : value)}`;
       }
 
       if (logLine.length > 200) {
@@ -137,6 +141,9 @@ export async function startServer(
 
   startAuthorityScheduler();
   startBrokerCreditScheduler();
+  import("./services/brokerConfirmationService")
+    .then(m => m.startBrokerConfirmationScheduler())
+    .catch(e => console.warn("[brokerConfirmation] startup error:", e?.message));
 
   // Recover any jobs that were stuck in "queued"/"processing" before the restart
   recoverStuckOcrJobs().catch(e =>

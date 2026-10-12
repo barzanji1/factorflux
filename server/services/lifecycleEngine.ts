@@ -20,7 +20,7 @@ import {
   clients,
   clientVault,
 } from "../../shared/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { advanceInvoiceStage, STAGE_META, type FactoringStage } from "./invoiceStage";
 import { guardDocsForReview, guardDocsForApproval } from "./docValidation";
 import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
@@ -362,6 +362,7 @@ Trucking Pros Financial Team`;
 
     const result = await sendEmailTracked({
       to: carrier.email,
+      emailLog: { entityType: "invoice", entityId: invoiceId, templateName: "funding_confirmation", sentByUserId: actorId },
       subject,
       text,
     });
@@ -711,6 +712,8 @@ async function executeFundTransaction(
     const [updated] = await tx.update(invoices).set({
       status: "funded",
       fundedAt: invoice.fundedAt ?? new Date(),
+      // Processor attribution only; the funding CAS, payout and ledger stay unchanged.
+      assignedFollowupAgentId: sql<string | null>`coalesce(${invoices.assignedFollowupAgentId}, ${invoices.assignedTo}, ${invoices.submittedBy}, (select ${clients.assignedProcessor} from ${clients} where ${clients.id} = ${invoice.clientId}))`,
       factoringStage: stageAdvances ? "approval" : invoice.factoringStage,
       updatedAt: new Date(),
     }).where(and(eq(invoices.id, invoiceId), eq(invoices.status, "approved"))).returning();

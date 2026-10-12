@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { resolveEmailConfig } from "../shared/email-config.js";
 
@@ -18,14 +18,15 @@ export class ResendDeliveryError extends Error {
 
 // The sole outbound email transport. Callers cannot override sender identity.
 // A caller with a durable draft supplies its existing idempotency key.
-export function createResendTransport(proxy = connectors.proxy.bind(connectors), timeoutMs = 30000) {
+export function createResendTransport(proxy = connectors.proxy.bind(connectors), timeoutMs = 30000, injectedRecorder) {
   return async function send(params) {
     const body = {
       from: SYSTEM_EMAIL_FROM,
-      to: [params.to],
+      to: Array.isArray(params.to) ? params.to : [params.to],
       reply_to: SYSTEM_EMAIL_REPLY_TO,
       subject: params.subject,
     };
+    if (params.cc?.length) body.cc = params.cc;
     if (params.text !== undefined) body.text = params.text;
     if (params.html !== undefined) body.html = params.html;
     if (params.attachments?.length) {
@@ -36,14 +37,29 @@ export function createResendTransport(proxy = connectors.proxy.bind(connectors),
         ...(attachment.content_id ? { content_id: attachment.content_id } : {}),
       }));
     }
+    const key = params.idempotencyKey ?? `system-email/${randomUUID()}`;
+    // Stable across retries, and body-specific: a webhook can reconcile a lost
+    // acceptance response without matching by recipient or exposing a draft key.
+    const correlationKey = createHash("sha256").update(key).update(".").update(JSON.stringify(body)).digest("hex");
+    body.tags = [{ name: "email_log_key", value: correlationKey }];
+    // Fail closed: no provider request is made unless its durable log exists.
+    const recorder = injectedRecorder ?? (await import("./services/emailLogService.js")).emailLogRecorder;
+    const attemptId = await recorder.begin(params, body, key);
     let timeout;
+    let providerAccepted = false;
     try {
+      const previousId = await recorder.previousAcceptance?.(key, correlationKey);
+      if (previousId) {
+        providerAccepted = true;
+        await recorder.accepted(attemptId, previousId);
+        return previousId;
+      }
       const response = await Promise.race([
         proxy("resend", "/emails", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Idempotency-Key": params.idempotencyKey ?? `system-email/${randomUUID()}`,
+            "Idempotency-Key": key,
           },
           body,
         }),
@@ -61,11 +77,16 @@ export function createResendTransport(proxy = connectors.proxy.bind(connectors),
       if (typeof payload?.id !== "string" || !payload.id) {
         throw new ResendDeliveryError(503, "Resend returned no message ID. Delivery is unconfirmed; check the previous attempt before starting a new email.", true);
       }
+      providerAccepted = true;
+      await recorder.accepted(attemptId, payload.id);
       return payload.id;
     } catch (error) {
-      if (error instanceof ResendDeliveryError) throw error;
-      throw new ResendDeliveryError(503,
-        "Email delivery could not be confirmed. Check the previous attempt before starting a new email; retry only the unchanged draft.", true);
+      const failure = error instanceof ResendDeliveryError ? error : new ResendDeliveryError(503,
+        providerAccepted ? "Resend accepted the email, but recording acceptance failed. Retry only the unchanged message to reconcile." :
+          "Email delivery could not be confirmed. Check the previous attempt before starting a new email; retry only the unchanged draft.", true);
+      try { await recorder.failed(attemptId, { message: failure.message, uncertain: failure.uncertain }); }
+      catch { throw new ResendDeliveryError(503, "The email attempt exists, but its delivery state could not be recorded. Check Email Log before retrying.", true); }
+      throw failure;
     } finally {
       if (timeout) clearTimeout(timeout);
     }

@@ -11,6 +11,8 @@ import {
 } from "./clientEmail";
 
 after(async () => { await pool.end(); });
+const logRecorder = { async begin() { return 1; }, async accepted() {}, async failed() {} };
+const isolatedSender = (proxy: Parameters<typeof createResendSender>[0]) => createResendSender(proxy, logRecorder);
 const client = { id: 123, email: "delivered@resend.dev" };
 const agent = { id: "fixture-agent", name: "Test Agent" };
 const input = () => ({ clientId: client.id, requestId: randomUUID(), subject: "Document request", body: "Please send the requested documents." });
@@ -55,7 +57,7 @@ test("schema rejects recipient/sender/actor spoofing, blank content and multilin
 test("Resend payload fixes domain, monitored reply-to, recipient and retry idempotency", async () => {
   let captured: any;
   const store = fakeStore();
-  const sender = createResendSender(async (connector, path, options) => {
+  const sender = isolatedSender(async (connector, path, options) => {
     captured = { connector, path, ...options };
     return new Response(JSON.stringify({ id: "provider-fixture" }), { status: 200 });
   });
@@ -95,12 +97,12 @@ test("duplicate/concurrent requests send once and cannot reuse another agent's e
 
 test("provider failure is logged, network ambiguity remains unconfirmed, retry keeps its identity", async () => {
   const store = fakeStore();
-  const failed = createClientEmailService(store, createResendSender(async () =>
+  const failed = createClientEmailService(store, isolatedSender(async () =>
     new Response(JSON.stringify({ message: "Domain is not verified" }), { status: 403 })));
   await assert.rejects(failed(input(), client, agent), /Domain is not verified/);
   assert.equal(store.rows[0].status, "failed");
   const draft = input();
-  const uncertain = createClientEmailService(store, createResendSender(async () => { throw new Error("Network interruption"); }));
+  const uncertain = createClientEmailService(store, isolatedSender(async () => { throw new Error("Network interruption"); }));
   await assert.rejects(uncertain(draft, client, agent), /could not be confirmed/);
   assert.equal(store.rows[1].status, "unconfirmed");
   const retry = createClientEmailService(store, async () => "reconciled-id");

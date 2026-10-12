@@ -26,7 +26,9 @@
 - [Team Chat placement](team-chat-placement.md) — sidebar navigation opens full-page chat; no bottom dock or floating launcher, and background sounds must remain.
 - [Team Chat channel policy](team-chat-channel-policy.md) — only general/operations by default; custom channels are shared; never remove history without the user's archive/delete decision.
 - [Chat verification](chat-verification.md) — real-staff-only autocomplete; isolate test alerts and use actual pointer events for message/menu interaction checks.
-- [Client email policy](client-email-policy.md) — send-only, monitored external replies, permission/assignment scope; Resend's send-only key cannot list domains.
+- [Chat profile avatars](chat-profile-avatars.md) — reuse existing staff profile photos across all chat views; shared initials fallback, no separate chat upload.
+- [Broker receipt confirmation](broker-receipt-confirmation.md) — broker links must open a page, not change receipt status; the user approved explicit button submissions.
+- [Client email policy](client-email-policy.md) — shared sender and monitored replies; global log reads are staff-wide, while composing stays permission/assignment-scoped.
 - [Carrier chat terminal states](carrier-chat-terminal-states.md) — expected 404/no-portal states must stop polling; repeated error refetches cause visible profile-message flicker.
 - [Approved tactile navigation](approved-tactile-navigation.md) — preserve the strongly beveled stacked sidebar-button direction, while keeping labels crisp and high-contrast.
 - [Windows 95 page consistency](windows95-page-consistency.md) — use the shared Win95 shell and controls for internal pages; Audit Trail is the reference, not a redesign prompt.

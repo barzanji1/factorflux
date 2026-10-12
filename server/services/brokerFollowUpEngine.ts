@@ -548,6 +548,7 @@ export async function triggerBrokerFollowUp(
     try {
       const { success, messageId } = await sendEmailTracked({
           to:      brokerEmail,
+        emailLog: { entityType: "followup", entityId: record.id, templateName: "broker_followup", followupImmediate: true },
         subject: immediateSubject,
         html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${immediateBody}</pre>`,
       });
@@ -671,6 +672,8 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
         if (contact?.email) {
           const result = await sendEmailTracked({
             to:      contact.email,
+            emailLog: { entityType: "followup", entityId: r.followUpId, templateName: "broker_followup",
+              followupReminderId: r.reminderId, sentByUserId: null },
             subject: r.subject,
             html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${r.body}</pre>`,
           });

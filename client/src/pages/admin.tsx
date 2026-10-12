@@ -46,6 +46,7 @@ import {
   Win95TabsList,
   Win95TabsTrigger,
 } from "@/components/win95";
+import BrokerConfirmationSettings from "@/components/broker-confirmation/settings";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface UserRecord {
@@ -1046,6 +1047,7 @@ export default function Admin() {
                     )}
                   </CardContent>
                 </Card>
+                <BrokerConfirmationSettings />
               </div>
             )}
 

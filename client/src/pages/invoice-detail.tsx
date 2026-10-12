@@ -30,6 +30,7 @@ import {
 import DocumentIntakeZone from "@/components/documents/document-intake-zone";
 import DocumentReviewDialog from "@/components/documents/document-review-dialog";
 import { LoadTypeBadge } from "@/components/load-type";
+import BrokerConfirmationPanel from "@/components/broker-confirmation/invoice-panel";
 
 // ─── Stage constants ───────────────────────────────────────────────────────────
 
@@ -883,6 +884,9 @@ export default function InvoiceDetail() {
                     </div>
 
                      <TabsContent value="broker" className="p-6">
+                       <div className="mb-5">
+                         <BrokerConfirmationPanel invoiceId={invoiceId} isManager={isManager} />
+                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker profile</p>

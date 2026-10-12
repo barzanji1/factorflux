@@ -56,6 +56,7 @@ const DEFAULT_RULES: Record<string, boolean> = {
   BROKER_MANUAL_ALERT: true,
   BROKER_GRADE_LOW: true,
   BROKER_CHARGEBACKS: true,
+  BROKER_UNCONFIRMED: true,
   AUTHORITY_INACTIVE: true,
   DOCS_EXPIRED: true,
   CARRIER_OPEN_CHARGEBACK: true,
@@ -302,6 +303,24 @@ export async function runInvoicePreflight(
       creditGrade: brokers.creditGrade,
     }).from(brokers).where(eq(brokers.id, input.brokerId)).limit(1);
     if (!broker) throw new Error(`Broker ${input.brokerId} was not found.`);
+
+    if (enabled(settings, "BROKER_UNCONFIRMED")) {
+      const [unconfirmed] = await dbClient.select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
+        .from(invoices).where(and(
+          eq(invoices.brokerId, input.brokerId),
+          inArray(invoices.status, ["funded", "held"]),
+          inArray(invoices.brokerConfirmationStatus, ["pending", "sent", "disputed"]),
+          sql`${invoices.fundedAt} is not null`,
+          sql`coalesce(${invoices.confirmationSentAt}, ${invoices.fundedAt}) <= ${new Date(now.getTime() - 14 * 86_400_000)}`,
+          excludeWhere,
+        )).limit(1);
+      if (unconfirmed) alerts.push({
+        code: "BROKER_UNCONFIRMED", severity: "info",
+        title: "Broker has an unconfirmed funded invoice",
+        message: `Receipt of ${unconfirmed.invoiceNumber} has not been confirmed after 14 days. This is a risk indicator; aging still starts at the funded date.`,
+        link: `/invoices/${unconfirmed.id}`,
+      });
+    }
 
     if (enabled(settings, "BROKER_GRADE_LOW") &&
         (broker.creditGrade === "D" || broker.creditGrade === "F")) {

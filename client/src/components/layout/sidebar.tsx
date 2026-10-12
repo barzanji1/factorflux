@@ -23,6 +23,7 @@ type NavItem = {
   icon: LucideIcon;
   permission: string;
   role?: "manager";
+  staffVisible?: boolean;
 };
 
 type NavSection = {
@@ -75,12 +76,18 @@ const navSections: NavSection[] = [
       { name: "Invoices",          href: "/invoices",           icon: FileText,        permission: "invoices"           },
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
-      { name: "Email Client",      href: "/client-email",       icon: MailOpen,        permission: "client_email"       },
       { name: "Tickets",           href: "/tickets",            icon: Ticket,          permission: "tickets"            },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
       { name: "Team Chat",         href: "/chat",               icon: MessageCircle,  permission: "chat"               },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
       { name: "Portal Submissions",href: "/portal-submissions", icon: Globe,           permission: "portal_submissions" },
+    ],
+  },
+  {
+    title: "Communications",
+    items: [
+      { name: "Email Log", href: "/email-log", icon: MailOpen, permission: "email_log", staffVisible: true },
+      { name: "Email Client", href: "/client-email", icon: MailOpen, permission: "client_email" },
     ],
   },
   {
@@ -220,6 +227,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
       .map(s => ({
         ...s,
         items: s.items.filter(i => {
+          if (i.staffVisible) return !!authUser;
           // Admins always see everything
           if (isAdmin) return true;
           if (i.permission === "chat" && !permissions.includes("chat")) return false;
@@ -233,7 +241,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         }),
       }))
       .filter(s => s.items.length > 0),
-     [userRole, isAdmin, permissions, permissionsLoaded, canUsePortalSubmissions, canUseCarrierChat]
+     [userRole, isAdmin, permissions, permissionsLoaded, canUsePortalSubmissions, canUseCarrierChat, authUser]
   );
 
   useLayoutEffect(() => {

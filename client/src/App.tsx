@@ -72,6 +72,7 @@ import TicketDetail from "@/pages/ticket-detail";
 import PortalChat from "@/pages/portal/chat";
 import { TeamChatWorkspace } from "@/pages/chat";
 import ClientEmailPage from "@/pages/client-email";
+import EmailLog from "@/pages/email-log";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -113,6 +114,11 @@ function Router() {
       <Route path="/client-email">
         <ProtectedRoute>
           <ClientEmailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/email-log">
+        <ProtectedRoute>
+          <EmailLog />
         </ProtectedRoute>
       </Route>
       <Route path="/invoices">

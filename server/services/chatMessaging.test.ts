@@ -47,7 +47,7 @@ test("real database: root-only stream, grouped replies, bell alerts, private sco
   let rootId = 0;
   await assert.rejects(db.transaction(async tx => {
     await tx.insert(users).values([
-      { id: ids[0], firstName: "MentionAlpha", role: "employee", status: "active" },
+      { id: ids[0], firstName: "MentionAlpha", role: "employee", status: "active", profileImageUrl: "/uploads/chat-avatar-fixture.png" },
       { id: ids[1], firstName: "MentionBeta", role: "employee", status: "active" },
       { id: ids[2], firstName: "MentionOutside", role: "employee", status: "active" },
       { id: ids[3], firstName: "RealLooking", role: "employee", status: "active", isTestAccount: true },
@@ -61,6 +61,7 @@ test("real database: root-only stream, grouped replies, bell alerts, private sco
       { channelId: direct.id, userId: ids[0] }, { channelId: direct.id, userId: ids[1] },
     ]);
     const directory = await getMentionStaff(tx);
+    assert.equal(directory.find(person => person.id === ids[0])?.profileImageUrl, "/uploads/chat-avatar-fixture.png");
     assert(!directory.some(p => [ids[3], ids[4]].includes(p.id)));
     const beta = directory.find(p => p.id === ids[1])!;
     const outside = directory.find(p => p.id === ids[2])!;
@@ -85,10 +86,19 @@ test("real database: root-only stream, grouped replies, bell alerts, private sco
     assert(alerts[0].actionUrl?.includes(`threadId=${root.id}&messageId=${reply.id}`));
     const small = await getChatThread(tx, channel.id, root.id, ids[0]);
     assert.equal(small.parent.replyCount, 2);
+    assert.equal(small.parent.senderProfileImageUrl, "/uploads/chat-avatar-fixture.png");
+    assert.equal(small.replies[0].senderProfileImageUrl, "/uploads/chat-avatar-fixture.png");
+    assert.equal(small.replies[1].senderProfileImageUrl, null);
     assert.deepEqual(small.replies.map(row => row.id), [reply.id, nested.id]);
     const privateRoot = await createChatMessage(tx, direct.id, ids[0], { body: `Outside @${outside.handle}` });
     assert.equal(privateRoot.mentions.length, 0, "never notify an outsider about a private conversation");
     const privateDirectory = await getMentionStaff(tx, direct.id);
+    assert.equal(privateDirectory.find(person => person.id === ids[0])?.profileImageUrl, "/uploads/chat-avatar-fixture.png");
+    const privateThread = await getChatThread(tx, direct.id, privateRoot.id, ids[1]);
+    assert.equal(privateThread.parent.senderProfileImageUrl, "/uploads/chat-avatar-fixture.png");
+    await tx.update(users).set({ profileImageUrl: "/uploads/chat-avatar-updated.png" }).where(eq(users.id, ids[0]));
+    assert.equal((await getChatThread(tx, channel.id, root.id, ids[1])).parent.senderProfileImageUrl, "/uploads/chat-avatar-updated.png",
+      "Historical messages use the current staff profile, not a separate chat snapshot");
     assert(privateDirectory.every(p => ids.slice(0, 2).includes(p.id)));
     await assert.rejects(createChatMessage(tx, channel.id, ids[0], { body: "Cross channel", parentMessageId: privateRoot.id }), { statusCode: 404 });
     await assert.rejects(getChatThread(tx, direct.id, privateRoot.id, ids[2]), { statusCode: 403 });

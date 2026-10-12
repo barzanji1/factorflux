@@ -12,6 +12,8 @@ import {
   primaryKey,
   uniqueIndex,
   check,
+  pgEnum,
+  uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -141,6 +143,65 @@ export const clientEmailLogs = pgTable("client_email_logs", {
 }, table => [index("client_email_logs_client_created_idx").on(table.clientId, table.createdAt)]);
 export type ClientEmailLog = typeof clientEmailLogs.$inferSelect;
 
+export const emailLogDirection = pgEnum("email_log_direction", ["outbound"]);
+export const emailLogStatus = pgEnum("email_log_status", ["sent", "delivered", "bounced", "complained", "failed"]);
+export type EmailLogAttachment = { filename: string; s3_key: string | null; size: number };
+export const emailLog = pgTable("email_log", {
+  id: serial("id").primaryKey(),
+  direction: emailLogDirection("direction").notNull().default("outbound"),
+  resendMessageId: varchar("resend_message_id"),
+  fromAddress: varchar("from_address").notNull(),
+  toAddresses: text("to_addresses").array().notNull(),
+  ccAddresses: text("cc_addresses").array().notNull().default([]),
+  subject: text("subject").notNull(),
+  bodyPreview: varchar("body_preview", { length: 200 }).notNull(),
+  templateName: varchar("template_name"),
+  entityType: varchar("entity_type", { enum: ["invoice", "carrier", "broker", "chargeback", "followup"] }),
+  entityId: varchar("entity_id"),
+  attachments: jsonb("attachments").$type<EmailLogAttachment[]>().notNull().default([]),
+  status: emailLogStatus("status").notNull().default("failed"),
+  statusUpdatedAt: timestamp("status_updated_at").notNull().defaultNow(),
+  error: text("error"),
+  // Preserve attribution after account deletion; null exclusively means system.
+  sentByUserId: varchar("sent_by_user_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, table => [
+  index("email_log_created_idx").on(table.createdAt, table.id),
+  index("email_log_provider_idx").on(table.resendMessageId),
+  index("email_log_entity_idx").on(table.entityType, table.entityId),
+  index("email_log_sender_idx").on(table.sentByUserId),
+]);
+export const emailLogEvents = pgTable("email_log_events", {
+  id: serial("id").primaryKey(),
+  emailLogId: integer("email_log_id").references(() => emailLog.id),
+  resendMessageId: varchar("resend_message_id"),
+  providerEventId: varchar("provider_event_id").unique(),
+  type: varchar("type").notNull(),
+  status: emailLogStatus("status"),
+  notes: text("notes"),
+  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+}, table => [
+  index("email_log_events_log_idx").on(table.emailLogId, table.occurredAt),
+  index("email_log_events_provider_idx").on(table.resendMessageId),
+]);
+// Private encrypted delivery payloads; never returned by the Email Log APIs.
+export const emailRetryPayloads = pgTable("email_retry_payloads", {
+  emailLogId: integer("email_log_id").primaryKey().references(() => emailLog.id),
+  encryptedPayload: text("encrypted_payload"),
+  idempotencyKey: varchar("idempotency_key").notNull(),
+  correlationKey: varchar("correlation_key", { length: 64 }),
+  deliveryContext: jsonb("delivery_context").$type<{
+    templateName?: string; entityId?: string | number; entityType?: string; sentByUserId?: string | null;
+    confirmationReminder?: number | null; followupReminderId?: number; followupImmediate?: boolean;
+  }>(),
+  state: varchar("state", { enum: ["sending", "failed", "accepted"] }).notNull(),
+  uncertain: boolean("uncertain").notNull().default(true),
+  lockUntil: timestamp("lock_until"),
+  retryOfId: integer("retry_of_id").references(() => emailLog.id),
+  resolvedById: integer("resolved_by_id").references(() => emailLog.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, table => [index("email_retry_correlation_idx").on(table.correlationKey)]);
+
 export const debtors = pgTable("debtors", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
@@ -178,6 +239,9 @@ export const loads = pgTable("loads", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const brokerConfirmationStatus = pgEnum("broker_confirmation_status", ["pending", "sent", "confirmed", "disputed"]);
+export const brokerConfirmationEventType = pgEnum("broker_confirmation_event_type", ["sent", "opened", "confirmed", "disputed", "reminder_sent", "escalated"]);
 
 // Invoices table
 export const invoices = pgTable("invoices", {
@@ -249,6 +313,12 @@ export const invoices = pgTable("invoices", {
   approvedBy: varchar("approved_by").references(() => users.id),
   approvedAt: timestamp("approved_at"),
   fundedAt: timestamp("funded_at"),
+  brokerConfirmationStatus: brokerConfirmationStatus("broker_confirmation_status").default("pending").notNull(),
+  brokerConfirmedAt: timestamp("broker_confirmed_at"),
+  brokerConfirmationToken: uuid("broker_confirmation_token").defaultRandom().unique().notNull(),
+  confirmationSentAt: timestamp("confirmation_sent_at"),
+  confirmationRemindedCount: integer("confirmation_reminded_count").default(0).notNull(),
+  assignedFollowupAgentId: varchar("assigned_followup_agent_id").references(() => users.id, { onDelete: "set null" }),
   chargebackDate: timestamp("chargeback_date"),
   chargebackStatus: varchar("chargeback_status", {
     enum: ["none", "scheduled", "extended", "charged"],
@@ -746,9 +816,32 @@ export const tasks = pgTable("tasks", {
   progress: integer("progress").default(0).notNull(),
   progressUpdatedAt: timestamp("progress_updated_at"),
   progressUpdatedBy: varchar("progress_updated_by").references(() => users.id, { onDelete: "set null" }),
+  confirmationInvoiceId: integer("confirmation_invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
+  confirmationKind: varchar("confirmation_kind", { enum: ["missing_email", "disputed", "escalated"] }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, table => [
+  uniqueIndex("tasks_confirmation_invoice_kind_unique").on(table.confirmationInvoiceId, table.confirmationKind),
+]);
+
+export const brokerConfirmationEvents = pgTable("broker_confirmation_events", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  event: brokerConfirmationEventType("event").notNull(),
+  actor: varchar("actor").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, table => [index("broker_confirmation_events_invoice_idx").on(table.invoiceId, table.createdAt)]);
+
+export const brokerConfirmationSettings = pgTable("broker_confirmation_settings", {
+  id: integer("id").primaryKey().default(1),
+  maxReminders: integer("max_reminders").default(3).notNull(),
+  reminderDays: jsonb("reminder_days").$type<[number, number, number]>().default([3, 7, 14]).notNull(),
+  publicBaseUrl: varchar("public_base_url").notNull(),
+  updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, table => [check("broker_confirmation_settings_singleton", sql`${table.id} = 1`),
+  check("broker_confirmation_max_reminders_check", sql`${table.maxReminders} between 0 and 3`)]);
 
 // Calendar appointments and reminders. Recurring events remain a single row;
 // API consumers receive their materialized occurrences for the requested range.
@@ -1075,7 +1168,11 @@ export const fuelAdvancesRelations = relations(fuelAdvances, ({ one }) => ({
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLoadSchema = createInsertSchema(loads).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true, createdAt: true, updatedAt: true,
+  brokerConfirmationStatus: true, brokerConfirmedAt: true, brokerConfirmationToken: true,
+  confirmationSentAt: true, confirmationRemindedCount: true, assignedFollowupAgentId: true,
+});
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
 export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
 export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({
@@ -1155,6 +1252,8 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   progressUpdatedAt: true,
   progressUpdatedBy: true,
   createdBy: true,
+  confirmationInvoiceId: true,
+  confirmationKind: true,
 }).extend({
   progress: z.coerce.number().int().min(0).max(100).optional(),
 });

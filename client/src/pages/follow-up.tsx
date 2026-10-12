@@ -42,6 +42,7 @@ import { format, formatDistanceToNow, isPast } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import ConfirmationFollowUpQueue from "@/components/broker-confirmation/follow-up-queue";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1072,6 +1073,10 @@ export default function FollowUpPage() {
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="confirmation" className="flex items-center gap-2" data-testid="confirmation-followups-tab">
+                  <CheckCircle className="h-4 w-4" />
+                  Receipt Confirmation
+                </TabsTrigger>
                 <TabsTrigger value="templates" className="flex items-center gap-2">
                   <LayoutTemplate className="h-4 w-4" />
                   Templates
@@ -1080,6 +1085,10 @@ export default function FollowUpPage() {
                   </span>
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="confirmation">
+                <ConfirmationFollowUpQueue />
+              </TabsContent>
 
               {/* ── Manual follow-ups ─────────────────────────────────────────── */}
               <TabsContent value="manual">

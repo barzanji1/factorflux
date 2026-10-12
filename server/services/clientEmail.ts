@@ -1,4 +1,4 @@
-import { createResendTransport, sendResendEmail, ResendDeliveryError as ClientEmailError, type ResendProxy } from "../resendTransport.js";
+import { createResendTransport, sendResendEmail, ResendDeliveryError as ClientEmailError, type ResendProxy, type EmailLogRecorder } from "../resendTransport.js";
 import { and, eq, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
@@ -18,11 +18,12 @@ type Draft = typeof clientEmailLogs.$inferInsert;
 
 export { ClientEmailError };
 
-export function createResendSender(proxy?: ResendProxy) {
-  const send = proxy ? createResendTransport(proxy) : sendResendEmail;
+export function createResendSender(proxy?: ResendProxy, recorder?: EmailLogRecorder) {
+  const send = proxy ? createResendTransport(proxy, 30000, recorder) : sendResendEmail;
   return (log: ClientEmailLog) => send({
     to: log.toEmail, subject: log.subject, text: log.body,
     idempotencyKey: `client-email/${log.requestId}`,
+    emailLog: { sentByUserId: log.agentId, entityType: "carrier", entityId: log.clientId, templateName: "client_email" },
   });
 }
 

@@ -36,6 +36,8 @@ import {
   Win95TabsList,
   Win95TabsTrigger,
 } from "@/components/win95";
+import { Link } from "wouter";
+import { ConfirmationStatusBadge, type ConfirmationStatus } from "@/components/broker-confirmation/confirmation-status";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -127,6 +129,11 @@ function SkeletonRows({ cols, rows = 4 }: { cols: number; rows?: number }) {
 // ─── Aging ────────────────────────────────────────────────────────────────────
 
 type AgingBuckets = Record<string, { count: number; total: number; carriers: Record<string, number>; brokers: Record<string, number> }>;
+type ConfirmationAgingRow = {
+  invoiceId: number; invoiceNumber: string; carrier: string; broker: string;
+  amount: number; outstanding: number; ageDays: number; fundedAt: string;
+  confirmationStatus: ConfirmationStatus;
+};
 
 const BUCKET_CFG = {
   "0-30":  { bar: "bg-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400", text: "text-emerald-700 dark:text-emerald-400" },
@@ -138,6 +145,13 @@ const BUCKETS = ["0-30", "31-60", "61-90", "90+"] as const;
 
 function AgingTab() {
   const { data, isLoading } = useQuery<AgingBuckets>({ queryKey: ["/api/reports/aging"] });
+  const confirmationAging = useQuery<ConfirmationAgingRow[]>({
+    queryKey: ["/api/reports/confirmation-aging"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/reports/confirmation-aging");
+      return response.json();
+    },
+  });
   const grandTotal = data ? BUCKETS.reduce((s, b) => s + (data[b]?.total ?? 0), 0) : 0;
 
   const csvRows = useMemo(() => {
@@ -150,7 +164,7 @@ function AgingTab() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding invoices grouped by days past due</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding funded invoices grouped by days since funding</p>
         <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("aging_report.csv", csvRows)}>
           <Download className="h-3.5 w-3.5" /> Export CSV
         </Button>
@@ -223,6 +237,31 @@ function AgingTab() {
           })}
         </>
       )}
+      <Card data-testid="confirmation-aging-table" className="overflow-hidden border-2 border-[#808080] border-r-[#404040] border-b-[#404040]">
+        <CardHeader className="border-b border-slate-200 pb-3">
+          <CardTitle className="text-sm">Funded balances · receipt confirmation</CardTitle>
+          <p className="text-xs text-slate-500">Positive outstanding balances with broker receipt status. This indicator is independent of aging date filters.</p>
+        </CardHeader>
+        {confirmationAging.isLoading ? <div className="space-y-2 p-4">{[1, 2, 3].map(n => <div key={n} className="h-8 animate-pulse bg-slate-100" />)}</div>
+          : confirmationAging.error ? <div role="alert" className="p-4 text-sm text-red-700">{(confirmationAging.error as Error).message}<Button size="sm" variant="outline" className="ml-2" onClick={() => confirmationAging.refetch()}>Retry</Button></div>
+          : <div className="overflow-x-auto">
+            <table className="ff-data-table w-full text-sm">
+              <thead><tr className="border-b border-slate-200 bg-slate-50">
+                {["Invoice", "Carrier", "Broker", "Amount", "Outstanding", "Age", "Funded", "Confirmation status"].map(label => <th key={label} className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</th>)}
+              </tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {!confirmationAging.data?.length ? <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">No positive funded balances require confirmation reporting.</td></tr>
+                  : confirmationAging.data.map(row => <tr key={row.invoiceId} data-testid="confirmation-aging-row">
+                    <td className="px-3 py-2 font-semibold"><Link href={`/invoices/${row.invoiceId}`} className="text-[#087f8c] underline">{row.invoiceNumber}</Link></td>
+                    <td className="px-3 py-2">{row.carrier}</td><td className="px-3 py-2">{row.broker}</td>
+                    <td className="px-3 py-2 tabular-nums">{fmt(Number(row.amount))}</td><td className="px-3 py-2 tabular-nums">{fmt(Number(row.outstanding))}</td>
+                    <td className="px-3 py-2 tabular-nums">{row.ageDays}d</td><td className="px-3 py-2 whitespace-nowrap">{row.fundedAt ? format(new Date(row.fundedAt), "MMM d, yyyy") : "—"}</td>
+                    <td className="px-3 py-2"><ConfirmationStatusBadge status={row.confirmationStatus} /></td>
+                  </tr>)}
+              </tbody>
+            </table>
+          </div>}
+      </Card>
     </div>
   );
 }

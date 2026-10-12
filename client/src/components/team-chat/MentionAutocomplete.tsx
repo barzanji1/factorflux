@@ -1,4 +1,5 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ChatAvatar } from "./ChatAvatar";
 
 export type ChatUser = {
   id: string | number;
@@ -6,6 +7,7 @@ export type ChatUser = {
   email?: string;
   role?: string;
   handle: string;
+  profileImageUrl?: string | null;
 };
 
 type MentionAutocompleteProps = {
@@ -148,9 +150,7 @@ export function MentionAutocomplete({
               onClick={() => choose(user)}
                 className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs ${index === activeIndex ? "bg-[#dff5f6]" : "hover:bg-[#e5e3dc]"}`}
             >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#8bbfc1] text-[9px] font-bold text-[#154c51]">
-                  {user.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}
-                </span>
+                <ChatAvatar name={user.name} profileImageUrl={user.profileImageUrl} className="h-7 w-7 text-[9px]" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold text-[#222]">{user.name}</span>
                   <span className="block truncate font-mono text-[10px] text-[#17626a]">@{cleanHandle(user.handle)}</span>

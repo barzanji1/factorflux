@@ -1,9 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { sendResendEmail } from "./resendTransport.js";
+import { sendResendEmail, type ResendEmailParams } from "./resendTransport.js";
 
 interface EmailParams {
-  to: string;
+  to: string | string[];
+  cc?: string[];
+  emailLog?: ResendEmailParams["emailLog"];
+  idempotencyKey?: string;
   subject: string;
   text?: string;
   html?: string;
@@ -13,6 +16,7 @@ interface EmailParams {
     type: string;
     disposition: string;
     content_id?: string;
+    s3Key?: string;
   }>;
 }
 
@@ -42,6 +46,9 @@ async function deliver(params: EmailParams): Promise<{ success: boolean; message
   try {
     const msg: EmailParams = {
       to:      params.to,
+      cc: params.cc,
+      emailLog: params.emailLog,
+      idempotencyKey: params.idempotencyKey,
       subject: params.subject,
       text:    params.text ?? (params.html ? "" : " "),
     };

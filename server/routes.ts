@@ -20,6 +20,9 @@ import { z } from "zod";
 import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull, ne } from "drizzle-orm";
 
 import { storage } from "./storage";
+import { registerBrokerConfirmationRoutes } from "./routes/brokerConfirmation";
+import { registerEmailLogRoutes } from "./routes/emailLog";
+import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
   upsertClientMirror,
@@ -517,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const employeeCanAccessInvoice = async (req: any, invoiceId: number) => {
     if (req.user?.role !== "employee") return true;
     const invoice = await storage.getInvoice(invoiceId);
-    return !!invoice && invoice.submittedBy === req.user.id;
+    return !!invoice && (invoice.submittedBy === req.user.id || invoice.assignedFollowupAgentId === req.user.id);
   };
 
   const employeeCanAccessDocument = async (req: any, documentId: number) => {
@@ -785,7 +788,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // only checked authentication. Public authentication and carrier/portal
   // callbacks are intentionally excluded before this protected API boundary.
   const publicApiPath = (pathname: string) =>
-    pathname === "/api/auth/login"
+    /^\/api\/broker-(?:confirm|dispute)\/[^/]+$/.test(pathname)
+    || pathname === "/api/webhooks/resend"
+    || pathname === "/api/auth/login"
     || pathname === "/api/auth/logout"
     || pathname === "/api/auth/verify"
     || pathname.startsWith("/api/portal/")
@@ -794,6 +799,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     || pathname.startsWith("/api/carrier/register")
     || pathname.startsWith("/api/carrier-registration/");
   const permissionGroups: Array<[string, string]> = [
+    ["/api/email-log", "all_authenticated"],
+    ["/api/confirmation-follow-ups", "followups"],
+    ["/api/broker-confirmation-settings", "factoring"],
     ["/api/firebase-test", "admin"],
     ["/api/firebase-clients", "carriers"],
     ["/api/version-check", "settings"],
@@ -884,13 +892,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (pathname === "/api/invoices" || pathname.startsWith("/api/invoices/")) {
       const factoringOnly = /^\/api\/invoices\/(?:funding(?:\/|$)|[^/]+\/(?:transition|available-transitions|approve|override-approve|extend-chargeback|hold|release|chargeback\/refunds)|aging-alerts(?:\/|$)|chargebacks(?:\/|$))/.test(pathname);
       if (factoringOnly) return requirePermission("factoring")(req, res, next);
+      if (/^\/api\/invoices\/[^/]+\/broker-confirmation(?:\/|$)/.test(pathname)) {
+        return requireAnyPermission(["invoices", "factoring"])(req, res, next);
+      }
       if (req.method === "GET" && /^\/api\/invoices(?:\/[^/]+\/detail)?$/.test(pathname)) {
         return requireAnyPermission(["invoices", "factoring"])(req, res, next);
       }
     }
     const group = permissionGroups.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+    if (group?.[1] === "all_authenticated") return requireAuth(req, res, next);
     return (group ? requirePermission(group[1]) : requireAuth)(req, res, next);
   });
+
+  // Bearer confirmation tokens never appear in invoice JSON or Earl payloads.
+  const previousJsonReplacer = app.get("json replacer");
+  app.set("json replacer", function(this: unknown, key: string, value: unknown) {
+    if (key === "brokerConfirmationToken") return undefined;
+    return typeof previousJsonReplacer === "function" ? previousJsonReplacer.call(this, key, value) : value;
+  });
+  registerBrokerConfirmationRoutes(app, { requireAuth, requireManagerOrAdmin, canAccessInvoice: employeeCanAccessInvoice });
+  registerEmailLogRoutes(app, { requireAuth, requireManagerOrAdmin });
 
   app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {
     streamTestPdf(
@@ -1562,6 +1583,7 @@ ${message}
 
         const sent = await sendEmail({
           to: client.email,
+          emailLog: { entityType: "carrier", entityId: client.id, templateName: "carrier_notice" },
           subject,
           text: body,
           html,
@@ -5215,6 +5237,7 @@ ${message}
       const result = await Promise.all(channels.map(async ({ chat_channels: channel, chat_members: membership }) => {
         const members = await db.select({
           id: users.id, name: sql<string>`trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, '')))`,
+          profileImageUrl: users.profileImageUrl,
         }).from(chatMembers).innerJoin(users, eq(users.id, chatMembers.userId))
           .where(eq(chatMembers.channelId, channel.id));
         const unread = await db.select({ count: count() }).from(chatMessages)
@@ -5225,6 +5248,7 @@ ${message}
           id: channel.id, name: channel.name, type: channel.type,
           unreadCount: Number(unread[0]?.count ?? 0), members,
           directName: directOther?.name || null,
+          directProfileImageUrl: directOther?.profileImageUrl || null,
         };
       }));
       res.setHeader("X-Chat-Message-Cursor", String(messageSnapshot?.cursor ?? 0));
@@ -8652,6 +8676,7 @@ Trucking Pros Financial Team
     const allInvoices = await db.select({
       id: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount, status: invoices.status,
       fundedAt: invoices.fundedAt, invoiceDate: invoices.invoiceDate, createdAt: invoices.createdAt,
+      brokerConfirmationStatus: invoices.brokerConfirmationStatus,
       clientId: invoices.clientId, carrier: clients.name, brokerId: invoices.brokerId, debtorId: invoices.debtorId,
       broker: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
       debtorMcNumber: sql<string | null>`coalesce(${brokers.mcNumber}, ${debtors.mcNumber})`,
@@ -8694,10 +8719,10 @@ Trucking Pros Financial Team
       shortPayExceptionStates.set(item.invoiceId, states);
     });
     const invoiceReport = (predicate: (invoice: typeof allInvoices[number], outstanding: number, age: number) => boolean, chargebacks = false): GlobalReport => {
-      const now = Date.now();
+      const now = new Date();
       const rows = allInvoices.map(invoice => {
         const outstanding = Math.max(0, Number(invoice.amount) - (settled.get(invoice.id) || 0));
-        const ageDays = invoice.fundedAt ? Math.max(0, Math.floor((now - invoice.fundedAt.getTime()) / 86400000)) : 0;
+        const ageDays = invoice.fundedAt ? fundedAgeDays(invoice.fundedAt, now) : 0;
         return { invoice, outstanding, ageDays };
       }).filter(({ invoice, outstanding, ageDays }) => predicate(invoice, outstanding, ageDays))
         .map(({ invoice, outstanding, ageDays }) => ({
@@ -8705,9 +8730,11 @@ Trucking Pros Financial Team
           carrier: invoice.carrier || `Carrier #${invoice.clientId}`,
           broker: invoice.broker || "Unassigned", amount: Number(invoice.amount), fundedDate: reportDate(invoice.fundedAt),
           ageDays, status: invoice.status, outstanding: +outstanding.toFixed(2),
+          confirmationStatus: invoice.brokerConfirmationStatus,
           ...(chargebacks ? { chargebackStatus: invoice.chargebackStatus } : {}),
         })).sort((a, b) => Number(b.ageDays) - Number(a.ageDays));
-      const columns = chargebacks ? [...globalColumns.invoice, { key: "chargebackStatus", label: "Chargeback Status" }] : globalColumns.invoice;
+      const riskColumns = [...globalColumns.invoice, { key: "confirmationStatus", label: "Broker Confirmation" }];
+      const columns = chargebacks ? [...riskColumns, { key: "chargebackStatus", label: "Chargeback Status" }] : riskColumns;
       return { title, columns, rows, summary: { count: rows.length, totalAmount: +rows.reduce((sum, row) => sum + Number(row.outstanding), 0).toFixed(2) } };
     };
     const agingThreshold = /^aging-(1|45|60|90|100)$/.exec(reportId);
@@ -9536,33 +9563,11 @@ Trucking Pros Financial Team
   });
 
   // Aging Report
-  app.get("/api/reports/aging", requireAuth, async (_req, res) => {
+  app.get("/api/reports/aging", requireAuth, async (req: any, res) => {
     try {
-      const allInvoices = await db
-        .select({
-          id: invoices.id,
-          invoiceNumber: invoices.invoiceNumber,
-          amount: invoices.amount,
-          status: invoices.status,
-          invoiceDate: invoices.invoiceDate,
-          dueDate: invoices.dueDate,
-          createdAt: invoices.createdAt,
-          clientId: invoices.clientId,
-           brokerId: invoices.brokerId,
-          debtorId: invoices.debtorId,
-          clientName: clients.name,
-           debtorName: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`,
-        })
-        .from(invoices)
-        .leftJoin(clients, eq(invoices.clientId, clients.id))
-         .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
-        .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
-        .where(notInArray(invoices.status, ["paid", "settled", "funded", "rejected"] as any[]));
-
-      const now = Date.now();
+      const allInvoices = await getConfirmationAgingRows(await getConfirmationInvoiceScope(req.user));
       const bucket = (inv: typeof allInvoices[0]) => {
-        const base = inv.dueDate ?? inv.invoiceDate ?? inv.createdAt ?? new Date();
-        const days = Math.floor((now - new Date(base).getTime()) / 86400000);
+        const days = inv.ageDays;
         if (days <= 30) return "0-30";
         if (days <= 60) return "31-60";
         if (days <= 90) return "61-90";
@@ -9578,11 +9583,11 @@ Trucking Pros Financial Team
 
       for (const inv of allInvoices) {
         const b = bucket(inv);
-        const amt = parseFloat(String(inv.amount));
+        const amt = inv.outstanding;
         buckets[b].count++;
         buckets[b].total += amt;
-        const carrier = inv.clientName ?? `Carrier #${inv.clientId}`;
-        const broker = inv.debtorName ?? ((inv.brokerId ?? inv.debtorId) ? `Broker #${inv.brokerId ?? inv.debtorId}` : "Unknown");
+        const carrier = inv.carrier ?? "Unknown carrier";
+        const broker = inv.broker ?? "Unknown broker";
         buckets[b].carriers[carrier] = (buckets[b].carriers[carrier] ?? 0) + amt;
         buckets[b].brokers[broker] = (buckets[b].brokers[broker] ?? 0) + amt;
       }
@@ -9990,7 +9995,8 @@ Trucking Pros Financial Team
         <p style="color:#6b7280;font-size:13px;">Sent via FactorFlux — Trucking Pros Financial</p>
       </div>`;
 
-      const sent = await sendEmail({ to: toEmail, subject, html, text: letter.content });
+      const sent = await sendEmail({ to: toEmail, subject, html, text: letter.content,
+        emailLog: { entityType: "broker", entityId: letter.brokerId ?? undefined, templateName: "release_letter" } });
       const [updated] = await db.update(releaseLetters)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(releaseLetters.id, id))
@@ -10054,9 +10060,11 @@ RESPOND:
 - If you can fetch live data to answer — always fetch it first
 - When asked about creating or reviewing an invoice, call preflight_invoice when the carrier is known and surface its alerts; that tool is read-only and you cannot create invoices
 - If you can take an action — confirm with the agent before executing
+- Broker confirmation is a risk indicator, not an aging clock. Report it using get_invoice. You may resend_broker_confirmation after agent approval, but you must never mark receipt confirmed; phone confirmations are recorded by a human agent in the invoice section.
 - Never invent live values, expose sensitive vault data, or reveal provider/internal errors.`;
 
   const earlToolDefinitions: any[] = [
+    { name: "resend_broker_confirmation", description: "Resend a funded invoice receipt confirmation to its broker; requires agent approval. Cannot mark receipt confirmed.", input_schema: { type: "object", properties: { invoice_id: { type: "string", minLength: 1, maxLength: 40 } }, required: ["invoice_id"], additionalProperties: false } },
     { name: "search_system", description: "Search across carriers, brokers, invoices, fuel advances, tickets, tasks", input_schema: { type: "object", properties: { query: { type: "string", minLength: 2, maxLength: 120 }, entity_type: { type: "string", enum: ["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"] } }, required: ["query"], additionalProperties: false } },
     { name: "get_carrier", description: "Get full safe carrier details by ID or MC#", input_schema: { type: "object", properties: { identifier: { type: "string", minLength: 1, maxLength: 80 } }, required: ["identifier"], additionalProperties: false } },
     { name: "get_invoice", description: "Get safe invoice details and status by invoice number, optionally narrowed by carrier MC number", input_schema: { type: "object", properties: { invoice_number: { type: "string", minLength: 1, maxLength: 80 }, mc: { type: "string", minLength: 1, maxLength: 80 } }, required: ["invoice_number"], additionalProperties: false } },
@@ -10079,6 +10087,7 @@ RESPOND:
   const earlText = (min: number, max: number) => z.string().trim().min(min).max(max);
   const earlDate = z.string().trim().min(1).max(40).refine(value => !Number.isNaN(new Date(value).getTime()), "Invalid date");
   const earlToolSchemas: Record<string, z.ZodTypeAny> = {
+    resend_broker_confirmation: z.object({ invoice_id: earlPositiveId }).strict(),
     search_system: z.object({
       query: earlText(2, 120),
       entity_type: z.enum(["carriers", "brokers", "invoices", "fuel_advances", "tickets", "tasks", "all"]).default("all"),
@@ -10117,8 +10126,9 @@ RESPOND:
       message: "Provide invoice_no or mc",
     }),
   };
-  const earlMutationTools = new Set(["hold_invoice", "assign_task", "send_carrier_message"]);
+  const earlMutationTools = new Set(["hold_invoice", "assign_task", "send_carrier_message", "resend_broker_confirmation"]);
   const earlToolPermission: Record<string, string[]> = {
+    resend_broker_confirmation: ["invoices", "factoring"],
     search_system: ["dashboard", "carriers", "brokers", "invoices", "factoring", "tasks", "tickets"],
     get_carrier: ["carriers"], get_invoice: ["invoices", "factoring"], preflight_invoice: ["invoices", "factoring"], get_broker: ["brokers"],
     get_aging_report: ["factoring", "reports"], get_sheets_queue: ["factoring"], get_dashboard_stats: ["dashboard"],
@@ -10163,7 +10173,14 @@ RESPOND:
     await db.insert(aiChatLogs).values({ userId, messages: [audit] }).catch(() => undefined);
   };
   const earlCarrierFields = (carrier: any) => ({ id: carrier.id, name: carrier.name, mcNumber: carrier.mcNumber, dotNumber: carrier.dotNumber, status: carrier.status, advanceRate: carrier.advanceRate, factoringRate: carrier.factoringFeeRate, assignedProcessor: carrier.assignedProcessor });
-  const earlInvoiceFields = (row: any) => ({ id: row.id, invoiceNumber: row.invoiceNumber, carrier: row.carrierName, broker: row.brokerName, amount: row.amount, status: row.status, ageDays: row.dueDate && row.status !== "settled" ? Math.max(0, Math.floor((Date.now() - new Date(row.dueDate).getTime()) / 86400000)) : 0, dueDate: row.dueDate });
+  const earlInvoiceFields = (row: any) => ({
+    id: row.id, invoiceNumber: row.invoiceNumber, carrier: row.carrierName, broker: row.brokerName,
+    amount: row.amount, status: row.status,
+    ageDays: row.fundedAt ? fundedAgeDays(new Date(row.fundedAt)) : 0, fundedAt: row.fundedAt, dueDate: row.dueDate,
+    confirmationStatus: row.brokerConfirmationStatus, confirmationSentAt: row.confirmationSentAt,
+    brokerConfirmedAt: row.brokerConfirmedAt, confirmationRemindedCount: row.confirmationRemindedCount,
+    assignedFollowupAgentId: row.assignedFollowupAgentId,
+  });
   const earlBrokerFields = (broker: any) => ({ id: broker.id, name: broker.name, mcNumber: broker.mcNumber, status: broker.status, creditGrade: broker.creditGrade, creditScore: broker.creditScore, assignedProcessor: broker.assignedProcessor });
   const earlCard = (type: string, title: string, fields: Record<string, unknown>, entityId?: number) => ({
     id: `${type}-${entityId ?? title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
@@ -10248,7 +10265,7 @@ RESPOND:
         .where(and(
           eq(invoices.invoiceNumber, invoiceNumber),
           mc ? ilike(clients.mcNumber, mc) : undefined,
-          req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined,
+          req.user.role === "employee" ? or(eq(invoices.submittedBy, req.user.id), eq(invoices.assignedFollowupAgentId, req.user.id)) : undefined,
         ))
         .limit(1);
       if (!rows.length) return { data: { message: "Invoice not found" } };
@@ -10311,9 +10328,9 @@ RESPOND:
       return { data: rows.map(row => earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName })) };
     }
     if (tool === "get_aging_report") {
-      const minDays = Number(args.min_days ?? 1); const cutoff = new Date(Date.now() - minDays * 86400000);
-      const rows = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(lte(invoices.dueDate, cutoff), inArray(invoices.status, ["submitted", "docs_pending", "under_review", "approved", "funded", "held"]), req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).orderBy(asc(invoices.dueDate)).limit(50);
-      return { data: { minDays, total: rows.length, invoices: rows.map(row => earlInvoiceFields({ ...row.invoice, carrierName: row.carrierName, brokerName: row.brokerName })) } };
+      const minDays = Number(args.min_days ?? 1);
+      const rows = (await getConfirmationAgingRows(await getConfirmationInvoiceScope(req.user))).filter(row => row.ageDays >= minDays);
+      return { data: { minDays, total: rows.length, invoices: rows.slice(0, 50) } };
     }
     if (tool === "get_sheets_queue") {
       const limit = Math.min(50, Math.max(1, Number(args.limit ?? 10))); const rows = await db.select({ invoice: invoices, carrierName: clients.name, brokerName: brokers.name }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(and(inArray(invoices.status, ["submitted", "docs_pending", "under_review", "approved"]), req.user.role === "employee" ? eq(invoices.submittedBy, req.user.id) : undefined)).orderBy(asc(invoices.createdAt)).limit(limit);
@@ -10333,10 +10350,15 @@ RESPOND:
     });
     const id = crypto.randomBytes(24).toString("hex"); const expiresAt = Date.now() + EARL_ACTION_TTL_MS;
     earlPendingActions.set(id, { userId: req.user.id, tool, args, expiresAt });
-    const labels: Record<string, string> = { hold_invoice: "Place invoice on hold", assign_task: "Create and assign task", send_carrier_message: "Send carrier portal message" };
-    return { id, tool, title: labels[tool], description: tool === "hold_invoice" ? `Place invoice ${args.invoice_id} on hold for: ${args.reason}` : tool === "assign_task" ? `Assign task “${args.title}” to ${args.assigned_to}` : `Send a message to carrier ${args.carrier_id}`, expiresAt: new Date(expiresAt).toISOString() };
+    const labels: Record<string, string> = { hold_invoice: "Place invoice on hold", assign_task: "Create and assign task", send_carrier_message: "Send carrier portal message", resend_broker_confirmation: "Resend broker confirmation" };
+    return { id, tool, title: labels[tool], description: tool === "resend_broker_confirmation" ? `Resend broker receipt confirmation for invoice ${args.invoice_id}` : tool === "hold_invoice" ? `Place invoice ${args.invoice_id} on hold for: ${args.reason}` : tool === "assign_task" ? `Assign task “${args.title}” to ${args.assigned_to}` : `Send a message to carrier ${args.carrier_id}`, expiresAt: new Date(expiresAt).toISOString() };
   };
   const executeEarlMutation = async (tool: string, args: any, req: any) => {
+    if (tool === "resend_broker_confirmation") {
+      const invoiceId = Number(args.invoice_id);
+      if (!await employeeCanAccessInvoice(req, invoiceId)) throw new Error("Invoice not accessible.");
+      return brokerConfirmationService.sendForInvoice(invoiceId, { kind: "agent", id: req.user.id });
+    }
     if (tool === "hold_invoice") {
       if (!isPrivilegedUser(req)) throw new Error("Manager or admin access required");
       const invoiceId = Number(args.invoice_id); if (!Number.isInteger(invoiceId) || invoiceId <= 0) throw new Error("Invalid invoice ID");

@@ -20,8 +20,9 @@ export class ChatMessageError extends Error {
 type StaffRecord = {
   id: string; firstName: string | null; lastName: string | null; email: string | null;
   role: string; status: string | null; isTestAccount: boolean;
+  profileImageUrl?: string | null;
 };
-export type MentionStaff = { id: string; name: string; email: string | null; role: string; handle: string };
+export type MentionStaff = { id: string; name: string; email: string | null; role: string; handle: string; profileImageUrl?: string | null };
 
 export function isRealActiveStaff(person: StaffRecord) {
   if (person.status !== "active" || person.isTestAccount ||
@@ -47,6 +48,7 @@ export function staffWithHandles(people: StaffRecord[]): MentionStaff[] {
     id: person.id,
     name: [person.firstName, person.lastName].filter(Boolean).join(" ") || person.email?.split("@")[0] || "Staff",
     email: person.email, role: person.role,
+    profileImageUrl: person.profileImageUrl ?? null,
     handle: frequencies.get(bases[index]) === 1
       ? bases[index]
       : `${bases[index]}.${createHash("sha256").update(person.id).digest("hex")}`,
@@ -63,6 +65,7 @@ export async function getMentionStaff(database: Database = db, channelId?: numbe
   const rows = await database.select({
     id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email,
     role: users.role, status: users.status, isTestAccount: users.isTestAccount,
+    profileImageUrl: users.profileImageUrl,
   }).from(users).where(eq(users.status, "active"));
   const permissions = await database.select({
     userId: userPermissions.userId, permission: userPermissions.permission, granted: userPermissions.granted,
@@ -102,6 +105,7 @@ export const chatMessageSelection = {
   body: chatMessages.body, createdAt: chatMessages.createdAt, editedAt: chatMessages.editedAt,
   parentMessageId: chatMessages.parentMessageId, mentions: chatMessages.mentions,
   senderName: sql<string>`coalesce(nullif(trim(concat(coalesce(${users.firstName}, ''), ' ', coalesce(${users.lastName}, ''))), ''), 'Staff')`,
+  senderProfileImageUrl: users.profileImageUrl,
   replyCount: sql<number>`(SELECT count(*)::int FROM chat_messages reply
     WHERE reply.channel_id = ${chatMessages.channelId} AND reply.parent_message_id = ${chatMessages.id})`,
 };
