@@ -37,3 +37,4 @@
 - [FMCSA run integrity](fmcsa-run-integrity.md) — missing keys skip whole runs; concurrent schedulers require heartbeat leases, ownership fencing, and transport-only circuit breaking.
 - [Carrier FMCSA status](carrier-fmcsa-status.md) — only reliable carrier-level adverse evidence blocks invoices; conflicting authority classes and failed lookups remain unknown.
 - [Portal preflight audit](portal-preflight-audit.md) — portal submissions need submission-scoped acknowledgements and audit, not invoice/user foreign keys.
+- [Invoice intake freshness](invoice-intake-freshness.md) — refresh broker/carrier details and related choices on modal open or selection; never treat cached intake data as current.

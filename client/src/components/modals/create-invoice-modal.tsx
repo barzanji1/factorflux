@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Building2, CheckCircle2, Search, ShieldAlert, Truck, Upload, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ import { apiRequest, HttpError, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useInvoiceEntityQuery } from "@/hooks/use-invoice-entity-query";
 import { displayLoadType, isLoadType } from "@shared/load-types";
 import { LoadTypeToggleGroup } from "@/components/load-type";
 
@@ -296,7 +297,6 @@ export default function CreateInvoiceModal({
   const [acknowledgements, setAcknowledgements] = useState<Record<string, { acknowledged: boolean; reason: string }>>({});
   const [overrideNearDuplicate, setOverrideNearDuplicate] = useState(false);
   const preflightRequestId = useRef(0);
-  const [selectedBroker, setSelectedBroker] = useState<Broker>();
   const [brokerSearch, setBrokerSearch] = useState("");
   const [brokerQuery, setBrokerQuery] = useState("");
   const [brokerOpen, setBrokerOpen] = useState(false);
@@ -318,12 +318,12 @@ export default function CreateInvoiceModal({
   const ocrRequestId = useRef(0);
   const ocrController = useRef<AbortController | null>(null);
   const ocrSelectedBrokerId = useRef<string | null>(null);
-  const { data: carriersData = [] } = useQuery<Carrier[]>({ queryKey: ["/api/clients", { all: true }], enabled: open });
+  const { data: carriersData = [] } = useInvoiceEntityQuery<Carrier[]>({ queryKey: ["/api/clients", { all: true }], enabled: open });
   useEffect(() => {
     const timer = window.setTimeout(() => setBrokerQuery(brokerSearch.trim()), 250);
     return () => window.clearTimeout(timer);
   }, [brokerSearch]);
-  const { data: brokersResponse } = useQuery<{ data?: Broker[] } | Broker[]>({
+  const { data: brokersResponse } = useInvoiceEntityQuery<{ data?: Broker[] } | Broker[]>({
     queryKey: ["/api/brokers", brokerQuery, "active", 8],
     queryFn: async () => {
       const params = new URLSearchParams({ status: "active", limit: "8" });
@@ -334,7 +334,15 @@ export default function CreateInvoiceModal({
     },
     enabled: open,
   });
-  const { data: branchesData = [], isLoading: branchesLoading, isError: branchesError } = useQuery<any[]>({
+  const { data: brokerDetails, isFetching: brokerLoading, isError: brokerError } = useInvoiceEntityQuery<Broker>({
+    queryKey: ["/api/brokers", values.brokerId],
+    enabled: open && !!values.brokerId,
+  });
+  const { data: carrierDetails, isFetching: carrierLoading, isError: carrierError } = useInvoiceEntityQuery<Carrier>({
+    queryKey: ["/api/clients", values.clientId],
+    enabled: open && !!values.clientId,
+  });
+  const { data: branchesData = [], isFetching: branchesLoading, isError: branchesError } = useInvoiceEntityQuery<any[]>({
     queryKey: ["/api/brokers", values.brokerId, "branches"],
     queryFn: async () => {
       const response = await fetch(`/api/brokers/${values.brokerId}/branches`, { credentials: "include" });
@@ -344,7 +352,7 @@ export default function CreateInvoiceModal({
     },
     enabled: open && !!values.brokerId,
   });
-  const { data: bankAccountsData = [] } = useQuery<Array<{
+  const { data: bankAccountsData = [], isFetching: bankAccountsLoading, isError: bankAccountsError } = useInvoiceEntityQuery<Array<{
     id: number; bankName?: string | null; accountType?: string | null; lastFour?: string | null;
   }>>({
     queryKey: ["/api/carriers", values.clientId, "bank-accounts"],
@@ -355,7 +363,7 @@ export default function CreateInvoiceModal({
     },
     enabled: open && !!values.clientId && values.paymentType === "ACH",
   });
-  const { data: driversData = [] } = useQuery<Driver[]>({
+  const { data: driversData = [], isFetching: driversLoading, isError: driversError } = useInvoiceEntityQuery<Driver[]>({
     queryKey: ["/api/drivers", values.clientId],
     queryFn: async () => {
       const response = await fetch(`/api/drivers?carrierId=${values.clientId}`, { credentials: "include" });
@@ -368,8 +376,10 @@ export default function CreateInvoiceModal({
   const brokers = (Array.isArray(brokersResponse) ? brokersResponse : brokersResponse?.data ?? []).filter(item => item.status === "active");
   const branches = (Array.isArray(branchesData) ? branchesData : []).filter(branch => branch.status === "active");
   const bankAccounts = Array.isArray(bankAccountsData) ? bankAccountsData : [];
-  const carrier = carriers.find(item => String(item.id) === values.clientId);
-  const broker = selectedBroker ?? brokers.find(item => String(item.id) === values.brokerId);
+  const carrier = carrierDetails;
+  const broker = brokerDetails;
+  const entityDataLoading = brokerLoading || carrierLoading || branchesLoading || bankAccountsLoading || driversLoading;
+  const entityDataError = brokerError || carrierError || branchesError || bankAccountsError || driversError;
   const drivers = driversData.filter(driver => driver.status === "active");
   const renderOcrSource = (field: string) => {
     const source = ocrSources[field];
@@ -426,7 +436,6 @@ export default function CreateInvoiceModal({
       pickupDate: "", deliveryDate: "", rate: "", origin: "", destination: "", bolNumber: "",
       brokerId: "", branchId: "",
     }));
-    setSelectedBroker(undefined);
     ocrSelectedBrokerId.current = null;
     invalidatePreflightAcknowledgements();
     setPreflightAlerts([]);
@@ -546,13 +555,8 @@ export default function CreateInvoiceModal({
           }));
           if (match.brokerId != null) {
             ocrSelectedBrokerId.current = String(match.brokerId);
-            setSelectedBroker({
-              id: match.brokerId,
-              name: match.matchedName || match.candidates.find(candidate => candidate.id === match.brokerId)?.name || match.rawName || "Matched broker",
-            });
           } else {
             ocrSelectedBrokerId.current = null;
-            setSelectedBroker(undefined);
           }
           const returnedDocs: OcrDocument[] = Array.isArray(result.documents) ? result.documents : [];
           const byType = (types: OcrDocType[]) => {
@@ -643,20 +647,18 @@ export default function CreateInvoiceModal({
   };
 
   useEffect(() => {
+    if (!open || branchesLoading || branchesError) return;
     if (ocrSelectedBrokerId.current === values.brokerId && values.brokerId && !values.branchId) return;
     if (branches.length === 1 && values.branchId !== String(branches[0].id)) {
       setValues(v => ({ ...v, branchId: String(branches[0].id) }));
     } else if (values.branchId && !branches.some(branch => String(branch.id) === values.branchId)) {
       setValues(v => ({ ...v, branchId: "" }));
     }
-  }, [branches, values.branchId, values.brokerId]);
+  }, [open, branchesLoading, branchesError, branches, values.branchId, values.brokerId]);
 
   useEffect(() => {
     if (open && initialValues) {
       setValues({ ...EMPTY, ...initialValues });
-      if (initialValues.brokerId && initialValues.brokerName) {
-        setSelectedBroker({ id: Number(initialValues.brokerId), name: initialValues.brokerName });
-      }
     } else if (!open) {
       ocrRequestId.current += 1;
       ocrController.current?.abort();
@@ -669,7 +671,6 @@ export default function CreateInvoiceModal({
       setPreflightError("");
       setAcknowledgements({});
       setOverrideNearDuplicate(false);
-      setSelectedBroker(undefined);
       ocrSelectedBrokerId.current = null;
       setBrokerSearch("");
       setBrokerOpen(false);
@@ -962,6 +963,11 @@ export default function CreateInvoiceModal({
                  items={carriers}
                  selected={carrier}
                   onSelect={item => {
+                    for (const queryKey of [
+                      ["/api/clients", String(item.id)],
+                      ["/api/carriers", String(item.id), "bank-accounts"],
+                      ["/api/drivers", String(item.id)],
+                    ]) void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
                     const next = {
                       ...values,
                       clientId: String(item.id),
@@ -978,16 +984,16 @@ export default function CreateInvoiceModal({
                  <Label>Broker <span className="text-red-500">*</span></Label>
                  <div className="relative">
                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input className="h-11 pl-9" value={brokerOpen ? brokerSearch : broker?.name ?? ""} placeholder="Search brokers..." onFocus={() => { setBrokerOpen(true); setBrokerSearch(""); }} onChange={event => { setBrokerSearch(event.target.value); setBrokerOpen(true); }} />
-                     {broker && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { invalidatePreflightAcknowledgements(); ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); setSelectedBroker(undefined); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
+                    <Input className="h-11 pl-9" value={brokerOpen ? brokerSearch : broker?.name ?? ""} placeholder={brokerLoading ? "Loading broker..." : "Search brokers..."} onFocus={() => { setBrokerOpen(true); setBrokerSearch(""); }} onChange={event => { setBrokerSearch(event.target.value); setBrokerOpen(true); }} />
+                     {values.brokerId && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { invalidatePreflightAcknowledgements(); ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
                  </div>
                  {brokerOpen && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-950">
-                      {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); setSelectedBroker(item); const next = { ...values, brokerId: String(item.id), branchId: "" }; invalidatePreflightAcknowledgements(); setValues(next); setBrokerSearch(""); setBrokerOpen(false); void runPreflight(next, true); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
+                      {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { void queryClient.invalidateQueries({ queryKey: ["/api/brokers", String(item.id)] }, { cancelRefetch: false }); ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); const next = { ...values, brokerId: String(item.id), branchId: "" }; invalidatePreflightAcknowledgements(); setValues(next); setBrokerSearch(""); setBrokerOpen(false); void runPreflight(next, true); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
                  </div>}
                </div>
                <div className="space-y-1.5">
                  <Label>Driver</Label>
-                 <Select disabled={!values.clientId} value={values.driverId} onValueChange={driverId => setValues(v => ({ ...v, driverId, driverName: "" }))}>
+                 <Select disabled={!values.clientId || driversLoading || driversError} value={values.driverId} onValueChange={driverId => setValues(v => ({ ...v, driverId, driverName: "" }))}>
                    <SelectTrigger><SelectValue placeholder={!values.clientId ? "Select a carrier first" : "Select a driver (optional)"} /></SelectTrigger>
                    <SelectContent>{drivers.map(driver => <SelectItem key={driver.id} value={String(driver.id)}>{driver.firstName} {driver.lastName}</SelectItem>)}</SelectContent>
                  </Select>
@@ -1022,7 +1028,7 @@ export default function CreateInvoiceModal({
               {values.paymentType === "ACH" && (
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Bank Account Credentials</Label>
-                  <Select value={values.bankAccountId} onValueChange={bankAccountId => setValues(v => ({ ...v, bankAccountId }))}>
+                  <Select disabled={!values.clientId || bankAccountsLoading || bankAccountsError} value={values.bankAccountId} onValueChange={bankAccountId => setValues(v => ({ ...v, bankAccountId }))}>
                     <SelectTrigger><SelectValue placeholder={values.clientId ? "Select carrier bank account" : "Select a carrier first"} /></SelectTrigger>
                     <SelectContent>
                       {bankAccounts.map(account => (
@@ -1073,13 +1079,14 @@ export default function CreateInvoiceModal({
                 invalidatePreflightAcknowledgements();
                 setPreflightAlerts([]);
                 setValues(EMPTY);
-                setSelectedBroker(undefined);
                 setBrokerSearch("");
                 setBrokerOpen(false);
                 setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
                 ocrPaperworkRef.current = {};
               }}>Reset</Button>
-              <Button type="submit" disabled={!valid || mutation.isPending || preflightLoading} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
+              {entityDataLoading && <p role="status" className="text-sm">Refreshing broker and carrier data…</p>}
+              {entityDataError && <p role="alert" className="text-sm text-red-700">Unable to refresh broker or carrier data. Reselect the record or reopen the form to retry.</p>}
+              <Button type="submit" disabled={!valid || mutation.isPending || preflightLoading || entityDataLoading || entityDataError} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
                 {mutation.isPending ? "Creating..." : "Submit"}
               </Button>
             </div>
