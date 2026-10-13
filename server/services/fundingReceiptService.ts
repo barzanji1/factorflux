@@ -51,8 +51,8 @@ export interface IssuedFundingReceipt {
 
 const money = (value: string | number) => Number(value).toFixed(2);
 const logoCandidates = [
-  path.resolve(process.cwd(), "client/public/images/ff-logo-emboss.png"),
-  path.resolve(process.cwd(), "dist/public/images/ff-logo-emboss.png"),
+  path.resolve(process.cwd(), "client/public/images/tpf-logo.png"),
+  path.resolve(process.cwd(), "dist/public/images/tpf-logo.png"),
   path.resolve(process.cwd(), "server/assets/tpf-logo.png"),
   path.resolve(process.cwd(), "dist/tpf-logo.png"),
 ];
@@ -132,7 +132,8 @@ export function buildFundingReceiptPdf(
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
     const logoPath = logoCandidates.find(candidate => fs.existsSync(candidate));
-    if (logoPath) doc.image(logoPath, 48, 38, { fit: [135, 58] });
+    if (logoPath) doc.image(logoPath, 48, 38, { fit: [58, 58] });
+    doc.font("Helvetica-Bold").fontSize(16).text("Trucking Pros Financial", 122, 55, { width: 420 });
     doc.font("Helvetica-Bold").fontSize(22).text("Funding Receipt", 48, 115);
     doc.font("Helvetica").fontSize(10).fillColor("#555")
       .text(`Receipt ${receipt.receiptNo} · Version ${receipt.version}`, 48, 145);
@@ -164,7 +165,7 @@ export function buildFundingReceiptPdf(
       y += 24;
     }
     doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-      .text("This receipt is an immutable funding record. A later payment reference creates a new receipt version.", 48, 730, { width: 516 });
+      .text("Trucking Pros Financial · Immutable funding record. New payment references create a new receipt version.", 48, 730, { width: 516 });
     doc.end();
   });
 }

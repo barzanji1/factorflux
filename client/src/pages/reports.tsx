@@ -64,7 +64,7 @@ function exportCsv(filename: string, rows: Record<string, unknown>[]) {
   const blob = new Blob([lines.join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
+  a.href = url; a.download = `Trucking_Pros_Financial_${filename}`; a.click();
   URL.revokeObjectURL(url);
 }
 

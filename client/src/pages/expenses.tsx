@@ -46,7 +46,7 @@ function exportCsv(items: Expense[]) {
   const csv = [fields, ...items.map((e) => fields.map((f) => String(e[f] ?? "").replaceAll('"', '""')))]
     .map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = `expenses-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  a.download = `Trucking_Pros_Financial_expenses-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
 }
 
 export default function Expenses() {

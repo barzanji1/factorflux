@@ -7,7 +7,7 @@ import { resolveEmailConfig } from "./email-config.js";
 test("default mail identity uses notifications with the monitored Reply-To", () => {
   assert.deepEqual(resolveEmailConfig(), {
     fromAddress: "notifications@truckingprosfinancial.com",
-    from: "TruckingPros Financial <notifications@truckingprosfinancial.com>",
+    from: "Trucking Pros Financial <notifications@truckingprosfinancial.com>",
     replyTo: "dosh@truckingprosfinancial.com",
   });
 });
@@ -17,7 +17,7 @@ test("environment sender settings are used instead of a separate hardcoded envel
     EMAIL_FROM: " notifications+test@truckingprosfinancial.com ",
     EMAIL_REPLY_TO: "dosh@truckingprosfinancial.com",
   });
-  assert.equal(config.from, "TruckingPros Financial <notifications+test@truckingprosfinancial.com>");
+  assert.equal(config.from, "Trucking Pros Financial <notifications+test@truckingprosfinancial.com>");
   assert.equal(config.replyTo, "dosh@truckingprosfinancial.com");
 });
 

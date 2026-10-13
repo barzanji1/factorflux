@@ -13,12 +13,40 @@ logical_id = "14785dae-b144-403a-9956-a9f01a00961d"
 id = "Y_s3PTbnHU53grl3Zj4-z"
 uri = "file://generated-artifacts/email-branding/index.html"
 type = "html"
-title = "Trucking Pros Financial email previews"
-description = "Seven self-contained mobile-friendly sample emails. All seven test emails were delivered; actual Gmail mobile rendering has not been verified."
+title = "TPF email template previews"
+description = "Seven email examples using the supplied TPF mark. These previews were generated locally; no new test emails were sent."
 logical_id = "e96f5060-05ba-41d5-b0e3-b667b83e1dd5"
-content_hash = "sha256:c18bf93610ddf3385ae2ff23c386c3f193bbf51ff10bba3e9786ea96b5349083"
-size = 89238
-mtime_ms = 1791907285216
-storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/e96f5060-05ba-41d5-b0e3-b667b83e1dd5/b002e936-9e7b-4fa7-a332-a5090352e124"
-storage_version_token = "1791907623995642"
+content_hash = "sha256:8e5097e06d19f64e8f4db3524862f1c1b58d6dd804e6303b8de1ad4b8a38fc66"
+size = 64801
+mtime_ms = 1791908998671
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/e96f5060-05ba-41d5-b0e3-b667b83e1dd5/0624b251-609d-4aca-b3a9-adaeaf34c434"
+storage_version_token = "1791909857677870"
 content_type = "text/html"
+
+[[outputs]]
+id = "NJtgmlS0BuaIsqEbvEMV7"
+uri = "file://generated-artifacts/customer-branding-audit.html"
+type = "html"
+title = "TPF branding audit"
+description = "Customer-facing FF logo references, replacements, intentional internal references, verification, and changed-file list."
+logical_id = "4cdc0d0e-6dca-4257-854d-25036bd32d5f"
+content_hash = "sha256:ca6f809399eadec7127dc448938bc176b4da802dfb4cbd73ff669f4c5a4d1278"
+size = 16447
+mtime_ms = 1791909648805
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/4cdc0d0e-6dca-4257-854d-25036bd32d5f/03524674-e1ae-4379-a895-ca9d72e82cca"
+storage_version_token = "1791909856309998"
+content_type = "text/html"
+
+[[outputs]]
+id = "qaCKuodeHaMdqNDOByhQt"
+uri = "file://generated-artifacts/customer-branding/funding-receipt.pdf"
+type = "pdf"
+title = "TPF funding receipt preview"
+description = "Synthetic one-page output from the actual receipt renderer. No real invoice was funded or stored receipt changed."
+logical_id = "3ecd672e-5d1c-4938-9110-715d6e76036a"
+content_hash = "sha256:fb980c80d2ea7e6e1f9d0fb2e02f1b897562609a7b4ed811d873ac578eba7adc"
+size = 13624
+mtime_ms = 1791909787273
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/3ecd672e-5d1c-4938-9110-715d6e76036a/311f7dc2-bfbd-4817-88d6-8fdfdadae3ac"
+storage_version_token = "1791909856993600"
+content_type = "application/pdf"

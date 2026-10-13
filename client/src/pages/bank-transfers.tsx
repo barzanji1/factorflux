@@ -98,7 +98,7 @@ function exportCSV(rows: BankTransfer[], carrierMap: Record<number, string>) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `bank-transfers-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `Trucking_Pros_Financial_bank-transfers-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

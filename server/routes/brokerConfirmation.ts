@@ -34,7 +34,7 @@ export const confirmationSettingsSchema = z.object({
 }).strict();
 
 function page(title: string, content: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} — Trucking Pros Financial</title><style>body{background:#c0c0c0;color:#111;font:16px Arial,sans-serif;margin:0;padding:32px 12px}main{max-width:620px;margin:auto;padding:4px;border:3px outset #ddd;background:#c0c0c0}header{padding:12px;color:white;background:#000080;font-weight:bold}.body{padding:20px}h1{font-size:24px}table{width:100%;border:2px inset #ddd;background:white;margin:16px 0}th,td{text-align:left;padding:8px;overflow-wrap:anywhere}button,a.button{font:inherit;display:inline-block;border:3px outset #ddd;background:#c0c0c0;color:#111;padding:10px 20px;cursor:pointer;text-decoration:none}textarea{box-sizing:border-box;width:100%;min-height:100px;border:2px inset #ddd;font:inherit;margin:8px 0 16px}button:active{border-style:inset}.muted{font-size:14px;color:#444}</style></head><body><main><header>Trucking Pros Financial — Broker Invoice Confirmation</header><div class="body"><h1>${escape(title)}</h1>${content}</div></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" href="/images/tpf-logo.png"><title>${escape(title)} — Trucking Pros Financial</title><style>body{background:#c0c0c0;color:#111;font:16px Arial,sans-serif;margin:0;padding:32px 12px}main{max-width:620px;margin:auto;padding:4px;border:3px outset #ddd;background:#c0c0c0}header{padding:12px;color:white;background:#000080;font-weight:bold}.body{padding:20px}h1{font-size:24px}table{width:100%;border:2px inset #ddd;background:white;margin:16px 0}th,td{text-align:left;padding:8px;overflow-wrap:anywhere}button,a.button{font:inherit;display:inline-block;border:3px outset #ddd;background:#c0c0c0;color:#111;padding:10px 20px;cursor:pointer;text-decoration:none}textarea{box-sizing:border-box;width:100%;min-height:100px;border:2px inset #ddd;font:inherit;margin:8px 0 16px}button:active{border-style:inset}.muted{font-size:14px;color:#444}</style></head><body><main><header><img src="/images/tpf-logo-white.png" alt="Trucking Pros Financial" width="40" height="40" style="vertical-align:middle;margin-right:12px">Trucking Pros Financial — Broker Invoice Confirmation</header><div class="body"><h1>${escape(title)}</h1>${content}</div></main></body></html>`;
 }
 
 function publicHeaders(res: any) {
@@ -43,7 +43,7 @@ function publicHeaders(res: any) {
     "Referrer-Policy": "no-referrer",
     "X-Robots-Tag": "noindex, nofollow",
     "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   });
 }
 

@@ -251,7 +251,7 @@ export default function FundingQueue() {
     const csvValue = (value: unknown) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
     const values = allRows.map((row) => [row.carrierName, row.brokerName, row.branchName, row.loadNumber, row.code, row.amount, row.loadType, row.paymentType, row.bankAccount ? `${row.bankAccount.bankName} ending ${row.bankAccount.lastFour}` : "", row.driverName, row.documentPresence.rateConfirmation ? "Yes" : "No", row.documentPresence.billOfLading ? "Yes" : "No", row.documentPresence.lumper ? "Yes" : "No", row.submittedByName, dateLabel(row.submittedAt)]);
     const blob = new Blob([[fields, ...values].map((line) => line.map(csvValue).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `sheets-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(link.href);
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Trucking_Pros_Financial_sheets-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(link.href);
     } catch (error) {
       toast({ title: "Export failed", description: error instanceof Error ? error.message : "Unable to export Sheets", variant: "destructive" });
     } finally {

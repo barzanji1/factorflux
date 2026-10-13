@@ -9,7 +9,7 @@ export function resolveEmailConfig(env = {}) {
   const replyTo = z.string().trim().email().parse(env.EMAIL_REPLY_TO ?? DEFAULT_EMAIL_REPLY_TO);
   return {
     fromAddress,
-    from: `TruckingPros Financial <${fromAddress}>`,
+    from: `Trucking Pros Financial <${fromAddress}>`,
     replyTo,
   };
 }

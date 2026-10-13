@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { LogOut, FileText, LayoutDashboard, PlusCircle, UserRound, MessageCircle } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
+import { TpfLogo } from "@/components/brand/tpf-logo";
 import { cn } from "@/lib/utils";
 
 interface PortalUser {
@@ -69,12 +69,12 @@ export default function PortalLayout({ children }: PortalLayoutProps) {
       <header className="sticky top-0 z-40 border-b-2 border-[#808080] bg-[#c0c0c0]">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/portal/dashboard" className="flex items-center gap-2">
-            <FactorFluxLogo
+            <TpfLogo
               showWordmark={false}
-              markSrc="/images/ff-logo-emboss.png"
+              markSrc="/images/tpf-logo.png"
               markClassName="h-9 w-9"
             />
-            <span className="text-sm font-bold text-[#1a1a1a]">Carrier Portal</span>
+            <span className="text-sm font-bold text-[#1a1a1a]">Trucking Pros Financial</span>
             <span className="hidden text-xs text-[#444] sm:inline">— TPF</span>
           </Link>
 

@@ -87,7 +87,7 @@ export function wrapEmail(subject, bodyHtml) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" ${EMAIL_BRAND_MARKER} style="border-collapse:collapse">
 <tr><td bgcolor="#27aab8" style="background:#27aab8;padding:20px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width:600px;margin:auto"><tr>
-<td width="64" style="vertical-align:middle"><img src="cid:${EMAIL_LOGO_CID}" width="48" height="47" alt="FF" style="display:block;width:48px;height:47px;border:0"></td>
+<td width="64" style="vertical-align:middle"><img src="cid:${EMAIL_LOGO_CID}" width="48" height="47" alt="Trucking Pros Financial" style="display:block;width:48px;height:47px;border:0"></td>
 <td style="color:#ffffff;font:700 21px Arial,Helvetica,sans-serif;vertical-align:middle">Trucking Pros Financial</td>
 </tr></table></td></tr>
 <tr><td bgcolor="#ffffff" style="background:#ffffff;padding:28px 16px">
@@ -107,10 +107,12 @@ ${bodyFragment(bodyHtml)}
 
 export function prepareBrandedEmail(params) {
   if (params.html?.includes(EMAIL_BRAND_MARKER) && params.attachments?.some(attachment => attachment.content_id === EMAIL_LOGO_CID)) return params;
-  const candidates = ["client/public/images/ff-logo-emboss-white.png", "dist/public/images/ff-logo-emboss-white.png"];
+  const candidates = ["client/public/images/tpf-logo-white.png", "dist/public/images/tpf-logo-white.png"];
   const logo = candidates.map(candidate => path.resolve(process.cwd(), candidate)).find(candidate => fs.existsSync(candidate));
-  if (!logo) throw new Error("The branded email logo is missing");
   const attachments = (params.attachments ?? []).filter(attachment => attachment.content_id !== "factorflux-emboss-logo" && attachment.content_id !== EMAIL_LOGO_CID);
-  attachments.push({ content: fs.readFileSync(logo).toString("base64"), filename: "ff-logo-emboss-white.png", type: "image/png", disposition: "inline", content_id: EMAIL_LOGO_CID });
-  return { ...params, html: wrapEmail(params.subject, params.html || textToEmailBody(params.text)), attachments };
+  if (logo) attachments.push({ content: fs.readFileSync(logo).toString("base64"), filename: "tpf-logo-white.png", type: "image/png", disposition: "inline", content_id: EMAIL_LOGO_CID });
+  const brandText = value => String(value ?? "").replace(/\bFactorFlux\b(?!\.io\b)/g, "Trucking Pros Financial");
+  let html = wrapEmail(brandText(params.subject), brandText(params.html || textToEmailBody(params.text)));
+  if (!logo) html = html.replace(/<td width="64"[\s\S]*?<\/td>/, "");
+  return { ...params, subject: brandText(params.subject), text: params.text === undefined ? undefined : brandText(params.text), html, attachments };
 }

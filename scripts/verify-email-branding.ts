@@ -32,7 +32,7 @@ async function main() {
       const result = await sendEmailTracked({
         to: "dosh@truckingprosfinancial.com", subject, text, html,
         emailLog: { templateName: `branding_test_${kind}`, sentByUserId: null },
-        idempotencyKey: `email-branding-test/${kind}/2026-10-13`,
+        idempotencyKey: `email-branding-test/tpf-logo/${kind}/2026-10-13`,
       });
       console.log(JSON.stringify({ kind, success: result.success, messageId: result.messageId ?? null }));
       if (!result.success) throw new Error(`Test delivery failed for ${kind}; inspect Email Log before retrying.`);

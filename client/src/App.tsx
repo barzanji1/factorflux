@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
+import { CustomerBrandHead } from "@/components/brand/customer-brand-head";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -419,6 +420,7 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
+          <CustomerBrandHead />
           <Router />
         </TooltipProvider>
       </AuthProvider>

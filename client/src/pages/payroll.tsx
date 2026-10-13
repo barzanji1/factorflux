@@ -114,7 +114,7 @@ function exportCSV(entries: PayrollEntry[], userMap: Record<string, string>) {
   const csv = [header, ...body].map((r) => r.join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = `payroll-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `Trucking_Pros_Financial_payroll-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
 }
 

@@ -31,6 +31,7 @@
 - [Chat profile avatars](chat-profile-avatars.md) — reuse existing staff profile photos across all chat views; shared initials fallback, no separate chat upload.
 - [Broker receipt confirmation](broker-receipt-confirmation.md) — broker links must open a page, not change receipt status; the user approved explicit button submissions.
 - [Client email policy](client-email-policy.md) — shared sender and monitored replies; global log reads are staff-wide, while composing stays permission/assignment-scoped.
+- [Customer branding boundary](customer-branding-boundary.md) — all customer-facing outputs use TPF; FactorFlux is internal-only, and the portal URL stays unchanged.
 - [Carrier chat terminal states](carrier-chat-terminal-states.md) — expected 404/no-portal states must stop polling; repeated error refetches cause visible profile-message flicker.
 - [Approved tactile navigation](approved-tactile-navigation.md) — preserve the strongly beveled stacked sidebar-button direction, while keeping labels crisp and high-contrast.
 - [Windows 95 page consistency](windows95-page-consistency.md) — use the shared Win95 shell and controls for internal pages; Audit Trail is the reference, not a redesign prompt.
