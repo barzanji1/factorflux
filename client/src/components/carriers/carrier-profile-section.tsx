@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { CompressionInfo } from "@/components/documents/compression-info";
 import { FileText, Plus, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -69,7 +70,7 @@ export function DocumentList({ title, docs, categories, onUpload, onDownload }: 
                 {onUpload && (
                   <label className="cursor-pointer text-[#087d8d] hover:text-[#075e6a]" title={`Upload another ${category}`}>
                     <UploadCloud className="h-4 w-4" />
-                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUpload(category, file); event.currentTarget.value = ""; }} />
+                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.heic,.heif" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUpload(category, file); event.currentTarget.value = ""; }} />
                   </label>
                 )}
               </div>
@@ -78,6 +79,7 @@ export function DocumentList({ title, docs, categories, onUpload, onDownload }: 
                   {matches.map((doc) => (
                     <div key={doc.id} className="flex items-center justify-between gap-2">
                       <span className="min-w-0 truncate text-[9px] text-[#667a80]">{doc.originalName || doc.filename}</span>
+                      <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
                       {onDownload && <Button type="button" variant="ghost" size="sm" onClick={() => onDownload(doc)} className="h-6 shrink-0 px-1.5 text-[10px] text-[#087d8d]">Download</Button>}
                     </div>
                   ))}

@@ -21,12 +21,19 @@ interface DocumentUploadProps {
   documentType?: string;
 }
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 135 * 1024 * 1024;
 const ALLOWED_FILE_TYPES  = [
   "application/pdf",
   "image/jpeg",
   "image/jpg",
   "image/png",
+  "image/tiff",
+  "image/heic",
+  "image/heif",
+  "application/msword",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 
 export default function DocumentUpload({
@@ -56,7 +63,7 @@ export default function DocumentUpload({
         errorMessage = "Please log in again to upload documents";
         setTimeout(() => { window.location.href = "/login"; }, 2000);
       } else if (error.message.includes("413") || error.message.includes("too large")) {
-        errorMessage = "File is too large — maximum size is 10 MB";
+        errorMessage = "File is too large — maximum upload size is 135 MB";
       } else if (error.message.includes("Only PDF")) {
         errorMessage = "Only PDF, JPEG, JPG, and PNG files are allowed";
       }
@@ -78,7 +85,7 @@ export default function DocumentUpload({
         if (file.size > MAX_FILE_SIZE_BYTES) {
           toast({
             title: "File too large",
-            description: `${file.name} exceeds the 10 MB limit.`,
+            description: `${file.name} exceeds the 135 MB upload limit.`,
             variant: "destructive",
           });
           return;
@@ -203,7 +210,7 @@ export default function DocumentUpload({
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">or click to browse</p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {["PDF", "JPG", "PNG", "10 MB max"].map((tag) => (
+            {["PDF", "JPG", "PNG", "135 MB max", "Auto-compress"].map((tag) => (
               <span key={tag} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 {tag}
               </span>

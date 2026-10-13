@@ -252,7 +252,8 @@ export function createBrokerConfirmationService({
     const previewMailDisabled = send === sendEmailTracked && process.env.NODE_ENV !== "production";
     return { ...safe, emailOnFile: !!email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
       canResend: !previewMailDisabled && !!fundedAt && !["confirmed", "disputed"].includes(row.status),
-      deliveryNotice: previewMailDisabled ? "Broker confirmation mail is disabled in Preview. Publish first so the email links reach the updated public confirmation pages." : null,
+      deliveryNotice: previewMailDisabled ? "Broker confirmation mail is disabled in Preview. Publish first so the email links reach the updated public confirmation pages."
+        : !fundedAt ? "Fund this invoice before sending a broker receipt request." : null,
       canMarkConfirmed: !!fundedAt && row.status !== "confirmed", events };
   }
 

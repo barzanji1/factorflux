@@ -20,3 +20,9 @@ Automatic initial broker confirmation waits 48 hours after funding. Reminder cad
 **Why:** The user changed the initial delay from 24 to 48 hours while explicitly preserving the reminder cadence.
 
 **How to apply:** Keep automatic initial eligibility and the scheduled candidate query aligned. Do not apply the initial-delay gate to reminders for emails already sent manually.
+
+Label an unsent broker confirmation action “Send”; use “Resend” only after a send is recorded. Determine availability separately from that label.
+
+**Why:** The user explicitly requested “Send” for the Pending / Not sent state, rather than “Resend unavailable.” Lack of a previous send is not itself a reason to prohibit the first send.
+
+**How to apply:** Use the recorded send timestamp for the label and preserve the existing Preview, funding, and terminal-state sending restrictions.

@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton-rows";
 import { LoadTypeBadge } from "@/components/load-type";
 import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
+import { CompressionInfo } from "@/components/documents/compression-info";
 import {
   Win95Tabs as Tabs,
   Win95TabsContent as TabsContent,
@@ -27,7 +28,7 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import CarrierChatThread from "@/components/carriers/CarrierChatThread";
 
-interface Doc { id: number; documentType: string; originalName: string; mimeType?: string; size?: number; }
+interface Doc { id: number; documentType: string; originalName: string; mimeType?: string; size?: number; originalSize?: number; compressedSize?: number; }
 interface Submission {
   id: number; portalUserId: number; companyName?: string;
   invoiceNumber?: string; loadNumber?: string; brokerName?: string;
@@ -670,7 +671,7 @@ export default function PortalSubmissionsPage() {
                     {detail.documents.map((doc) => (
                       <div key={doc.id} className="ff-portal-submission-surface flex items-center gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2">
                         <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                        <span className="text-sm flex-1 truncate">{doc.originalName}</span>
+                        <div className="min-w-0 flex-1"><span className="text-sm truncate">{doc.originalName}</span><CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} /></div>
                         <Badge variant="outline" className="text-[10px] px-1.5">{DOC_LABEL[doc.documentType] || doc.documentType}</Badge>
                         <a href={`/api/portal/submissions/${detail.id}/documents/${doc.id}/view`} target="_blank" rel="noreferrer"
                           className="p-1 text-slate-400 hover:text-blue-600" title="View">

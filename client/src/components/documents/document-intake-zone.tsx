@@ -51,8 +51,11 @@ interface UploadedFile {
   finalDocumentType?: string | null;
 }
 
-const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/tiff"];
-const MAX_SIZE      = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/tiff",
+  "image/heic", "image/heif", "application/msword", "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"];
+const MAX_SIZE      = 135 * 1024 * 1024; // Upload safety cap, not compression threshold.
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   rate_confirmation: "Rate Con",
@@ -222,11 +225,11 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
 
       incoming.forEach((file) => {
         if (!ALLOWED_TYPES.includes(file.type)) {
-          rejected.push(`${file.name} — unsupported type (use PDF, JPG, PNG)`);
+          rejected.push(`${file.name} — unsupported document type`);
           return;
         }
         if (file.size > MAX_SIZE) {
-          rejected.push(`${file.name} — exceeds 10 MB limit`);
+          rejected.push(`${file.name} — exceeds 135 MB upload limit`);
           return;
         }
         uploadFile(file, documentType);
@@ -300,7 +303,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+          accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.heic,.heif,.doc,.docx,.xls,.xlsx"
           className="hidden"
           onChange={handleInputChange}
         />

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { CompressionInfo } from "@/components/documents/compression-info";
 import { Loader2, FileText, ChevronDown, ChevronUp, Download, Eye, ReceiptText } from "lucide-react";
 import PortalLayout from "@/components/layout/portal-layout";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface PortalUser { id: number; status: string; }
-interface Doc { id: number; documentType: string; originalName: string; size?: number; mimeType?: string; }
+interface Doc { id: number; documentType: string; originalName: string; size?: number; mimeType?: string; originalSize?: number; compressedSize?: number; }
 interface FundingReceipt { receiptNo: string; version: number; fundedAt?: string | null; createdAt?: string | null; paymentReference?: string | null; }
 interface Submission {
   id: number; invoiceNumber?: string; loadNumber?: string; brokerName?: string;
@@ -119,7 +120,7 @@ export default function PortalSubmissions() {
                           {s.documents.map((doc) => (
                             <div key={doc.id} className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2">
                               <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                              <span className="text-sm text-slate-700 flex-1 truncate">{doc.originalName}</span>
+                              <div className="min-w-0 flex-1"><span className="text-sm text-slate-700 truncate">{doc.originalName}</span><CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} /></div>
                               <Badge variant="outline" className="text-[10px] px-1.5">{DOC_LABEL[doc.documentType] || doc.documentType}</Badge>
                               <a
                                 href={`/api/portal/submissions/${s.id}/documents/${doc.id}/view`}

@@ -8,7 +8,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const user = { id: "ocr-ui-fixture", role: "admin", firstName: "OCR", lastName: "Fixture" };
 let ws, chrome, failRetry = true, retryCalls = 0, status = "failed";
 const doc = () => ({
-  id: 101, originalName: "OCR fixture.pdf", filename: "fixture.pdf", size: 1000,
+  id: 101, originalName: "OCR fixture.pdf", filename: "fixture.pdf", size: Math.round(4.1 * 1024 * 1024),
+  originalSize: Math.round(8.2 * 1024 * 1024), compressedSize: Math.round(4.1 * 1024 * 1024),
   invoiceId: 901, documentType: "invoice", status, uploadedBy: user.id,
   createdAt: "2026-10-08T12:00:00Z",
   ocrJob: { id: 202, status: status === "failed" ? "failed" : "queued",
@@ -99,6 +100,7 @@ const doc = () => ({
   const base = `https://${process.env.REPLIT_DEV_DOMAIN}`;
   await cdp("Page.navigate", { url: `${base}/documents` });
   await until(`document.querySelector('[data-testid="ocr-failed-101"]')?.textContent.includes('Textract fixture failure')`);
+  assert.equal(await evaluate(`document.querySelector('[data-testid="document-compression-info"]').textContent.trim()`), "Compressed from 8.2 MB → 4.1 MB");
   assert.equal(await evaluate(`document.querySelector('[data-testid="ocr-retry-101"]').disabled`), false);
   await click('[data-testid="ocr-retry-101"]');
   await until(`document.body.innerText.includes('Fixture retry rejected')`);

@@ -42,6 +42,8 @@ import { apiRequest } from "@/lib/queryClient";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import type { Document } from "@shared/schema";
+import { CompressionInfo } from "@/components/documents/compression-info";
+import { documentClassification, documentClassificationLabel } from "@shared/document-display";
 
 // ─── Extended document type with AI fields ────────────────────────────────────
 interface AIDocument extends Omit<Document, "aiClassifiedAt"> {
@@ -95,7 +97,7 @@ const BAR_COLORS: Record<string, string> = {
 
 function typeLabel(v: string | null | undefined) {
   if (!v) return "Unclassified";
-  return DOC_TYPE_LABELS[v] ?? v.replace(/_/g, " ");
+  return documentClassificationLabel(v);
 }
 
 function fileSize(bytes: number) {
@@ -201,7 +203,7 @@ function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
 
-  const displayType   = doc.finalDocumentType || doc.candidateDocumentType;
+  const displayType   = documentClassification(doc);
   const confidence    = doc.classificationConfidence ? parseFloat(doc.classificationConfidence) : null;
   const source        = doc.classificationSource ?? "rules";
   const hasBreakdown  = !!(doc.allClassificationScores || (doc.aiClassificationSignals?.length));
@@ -262,6 +264,7 @@ function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
                 {fileSize(doc.size)} · {doc.invoiceId ? `Invoice #${doc.invoiceId}` : doc.loadId ? `Load #${doc.loadId}` : "No link"}
               </p>
+              <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
             </div>
           </div>
         </td>
@@ -351,6 +354,7 @@ function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
                   <Button
                     variant="ghost" size="sm"
                     className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
+                    data-testid={`document-view-${doc.id}`}
                     onClick={() => onView(doc.id)}
                   >
                     <Eye className="h-3.5 w-3.5" />
@@ -456,14 +460,8 @@ export default function Documents() {
   });
 
   // ── View / Download ────────────────────────────────────────────────────────
-  const handleView = async (id: number) => {
-    try {
-      const r = await fetch(`/api/documents/${id}/view`, { credentials: "include" });
-      if (!r.ok) throw new Error();
-      window.open(URL.createObjectURL(await r.blob()), "_blank");
-    } catch {
-      toast({ title: "Error", description: "Could not open document.", variant: "destructive" });
-    }
+  const handleView = (id: number) => {
+    window.open(`/api/documents/${id}/view`, "_blank", "noopener,noreferrer");
   };
 
   const handleDownload = async (id: number) => {
@@ -493,7 +491,7 @@ export default function Documents() {
 
   // ── Filtered docs ──────────────────────────────────────────────────────────
   const filtered = documents.filter(doc => {
-    const displayType = doc.finalDocumentType || doc.candidateDocumentType;
+    const displayType = documentClassification(doc);
     const conf        = doc.classificationConfidence ? parseFloat(doc.classificationConfidence) : null;
     const src         = doc.classificationSource ?? "rules";
 

@@ -28,6 +28,7 @@ const writeCalls = [];
 let activeUser = manager;
 let taskStatus = "todo";
 let previewFixture = false;
+let firstSendFixture = false;
 
 function fixture(path, method, request) {
   const body = request.postData ? (() => { try { return JSON.parse(request.postData); } catch { return {}; } })() : {};
@@ -56,6 +57,12 @@ function fixture(path, method, request) {
       result.canResend = false;
       result.canMarkConfirmed = true;
     }
+    if (firstSendFixture) {
+      result.status = "pending";
+      result.sentAt = null;
+      result.remindedCount = 0;
+      result.events = [];
+    }
     return { result };
   }
   if (path === `/api/invoices/${invoiceId}/broker-confirmation/resend` && method === "POST") {
@@ -80,7 +87,7 @@ function fixture(path, method, request) {
     confirmation.events.push({ id: confirmation.events.length + 1, event: body.agentId ? "assignment_changed" : "assignment_cleared", actor: activeUser.name, notes: null, createdAt: new Date().toISOString() });
     return { result: { message: "Assignment updated" } };
   }
-  if (path === "/api/agents") return { result: [{ id: "mgr-17", name: "Morgan Pike" }, { id: "agent-9", name: "Maria Jensen" }] };
+  if (path === `/api/invoices/${invoiceId}/broker-confirmation/agents`) return { result: [{ id: "mgr-17", name: "Morgan Pike" }, { id: "agent-9", name: "Maria Jensen" }] };
   if (path === "/api/confirmation-follow-ups") return { result: [{ ...followUpTask, status: taskStatus }] };
   if (path === `/api/confirmation-follow-ups/${followUpTask.id}` && method === "PATCH") {
     taskStatus = body.status;
@@ -243,6 +250,12 @@ let chrome, ws;
   await click(`Array.from(document.querySelectorAll('[role="tab"]')).find(e=>e.textContent.includes("Broker"))`);
   await until(`document.querySelector('[data-testid="confirmation-delivery-notice"]')!==null`);
   assert.equal(await evaluate(`document.querySelector('[data-testid="confirmation-resend"]').disabled`), true, "preview resend action is disabled");
+  assert.equal(await evaluate(`document.querySelector('[data-testid="confirmation-resend"]').textContent.trim()`), "Resend");
+  firstSendFixture = true;
+  await click(`document.querySelector('[data-testid="confirmation-retry"]')`);
+  await until(`document.querySelector('[data-testid="broker-confirmation-panel"]').textContent.includes("Not sent")`);
+  assert.equal(await evaluate(`document.querySelector('[data-testid="confirmation-resend"]').textContent.trim()`), "Send", "first send must not say Resend");
+  assert.equal(await evaluate(`document.querySelector('[data-testid="confirmation-resend"]').disabled`), true, "first send also retains preview restriction");
   assert(await evaluate(`document.querySelector('[data-testid="confirmation-delivery-notice"]').innerText.includes("disabled in Preview")`), "preview delivery notice explains disabled resend");
 
   // A distinct operations category in Followups, with an actual status mutation.

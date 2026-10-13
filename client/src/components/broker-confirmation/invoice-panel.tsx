@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { confirmationRequest } from "./api";
 import { Win95Button as Button, Win95Card as Card } from "@/components/win95";
 import { ConfirmationStatusBadge, type ConfirmationStatus } from "./confirmation-status";
 import { AlertTriangle, CheckCircle2, Clock3, Mail, RefreshCw, UserRound } from "lucide-react";
@@ -20,25 +20,25 @@ export default function BrokerConfirmationPanel({ invoiceId, isManager }: { invo
   const queryKey = ["/api/invoices", invoiceId, "broker-confirmation"];
   const query = useQuery<Confirmation>({
     queryKey,
-    queryFn: async () => (await apiRequest("GET", `/api/invoices/${invoiceId}/broker-confirmation`)).json(),
+    queryFn: () => confirmationRequest<Confirmation>("GET", `/api/invoices/${invoiceId}/broker-confirmation`),
     enabled: Number.isFinite(invoiceId),
   });
   const agents = useQuery<Agent[]>({
-    queryKey: ["/api/agents"],
-    queryFn: async () => (await apiRequest("GET", "/api/agents")).json(),
+    queryKey: ["/api/invoices", invoiceId, "broker-confirmation", "agents"],
+    queryFn: () => confirmationRequest<Agent[]>("GET", `/api/invoices/${invoiceId}/broker-confirmation/agents`),
     enabled: isManager && !!query.data?.canReassign,
   });
   const refresh = () => qc.invalidateQueries({ queryKey });
   const resend = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/invoices/${invoiceId}/broker-confirmation/resend`, {}),
+    mutationFn: () => confirmationRequest("POST", `/api/invoices/${invoiceId}/broker-confirmation/resend`, {}),
     onSuccess: refresh,
   });
   const markConfirmed = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/invoices/${invoiceId}/broker-confirmation/mark-confirmed`, { notes: notes.trim() }),
+    mutationFn: () => confirmationRequest("POST", `/api/invoices/${invoiceId}/broker-confirmation/mark-confirmed`, { notes: notes.trim() }),
     onSuccess: () => { setNotes(""); refresh(); },
   });
   const assign = useMutation({
-    mutationFn: () => apiRequest("PATCH", `/api/invoices/${invoiceId}/broker-confirmation/assignment`, { agentId: agentId ?? query.data?.assignedAgentId ?? "" }),
+    mutationFn: () => confirmationRequest("PATCH", `/api/invoices/${invoiceId}/broker-confirmation/assignment`, { agentId: agentId ?? query.data?.assignedAgentId ?? "" }),
     onSuccess: () => { setAgentId(null); refresh(); },
   });
   const error = [query.error, resend.error, markConfirmed.error, assign.error, agents.error].find(Boolean) as Error | undefined;
@@ -94,7 +94,7 @@ export default function BrokerConfirmationPanel({ invoiceId, isManager }: { invo
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] text-[#666]">{notes.trim().length}/2000 · minimum 3 characters</span>
                 <div className="flex gap-2">
-                  <Button data-testid="confirmation-resend" size="sm" disabled={!query.data.canResend || resend.isPending} title={!query.data.canResend ? query.data.deliveryNotice || "Resending is not available for this confirmation." : undefined} onClick={() => resend.mutate()}><Mail className="mr-1 h-3.5 w-3.5" />{resend.isPending ? "Sending…" : query.data.canResend ? "Send / resend email" : "Resend unavailable"}</Button>
+                  <Button data-testid="confirmation-resend" size="sm" disabled={!query.data.canResend || resend.isPending} title={!query.data.canResend ? query.data.deliveryNotice || "Sending is not available for this confirmation status." : undefined} onClick={() => resend.mutate()}><Mail className="mr-1 h-3.5 w-3.5" />{resend.isPending ? "Sending…" : query.data.sentAt ? "Resend" : "Send"}</Button>
                   {query.data.canMarkConfirmed && <Button data-testid="confirmation-mark-confirmed" primary size="sm" disabled={markConfirmed.isPending || notes.trim().length < 3 || notes.trim().length > 2000} onClick={() => markConfirmed.mutate()}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{markConfirmed.isPending ? "Recording…" : "Mark confirmed"}</Button>}
                 </div>
               </div>

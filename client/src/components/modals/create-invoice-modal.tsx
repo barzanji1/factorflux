@@ -35,7 +35,7 @@ const PAPERWORK: Array<{ key: PaperworkKey; label: string; required?: boolean }>
   { key: "lumperReceipt", label: "Lumper Receipt" },
   { key: "other", label: "Other" },
 ];
-const MAX_PDF_SIZE = 5 * 1024 * 1024;
+const MAX_PDF_SIZE = 135 * 1024 * 1024;
 
 type PreflightAlert = {
   code: string;
@@ -72,7 +72,7 @@ function PaperworkDropzone({
       return;
     }
     if (candidate.size > MAX_PDF_SIZE) {
-      onInvalid(`${label} must be 5MB or smaller.`);
+      onInvalid(`${label} must be 135MB or smaller.`);
       return;
     }
     try {
@@ -456,7 +456,7 @@ export default function CreateInvoiceModal({
       if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
         throw new Error(`${file.name} is not a PDF file.`);
       }
-      if (file.size > MAX_PDF_SIZE) throw new Error(`${file.name} is larger than 5MB.`);
+      if (file.size > MAX_PDF_SIZE) throw new Error(`${file.name} is larger than 135MB.`);
       const bytes = new Uint8Array(await file.slice(0, 5).arrayBuffer());
       if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]) !== "%PDF-") {
         throw new Error(`${file.name} is not a valid PDF.`);
@@ -794,7 +794,7 @@ export default function CreateInvoiceModal({
             <section className="space-y-3 rounded-none border border-slate-400 bg-slate-100 p-3" aria-labelledby="ocr-upload-heading">
               <div>
                 <h3 id="ocr-upload-heading" className="text-sm font-semibold">Staff intake · document set</h3>
-                <p className="mt-0.5 text-xs text-slate-600">Drop the rate confirmation, carrier invoice, and BOL/POD together. Up to 8 PDFs, 5MB each.</p>
+                <p className="mt-0.5 text-xs text-slate-600">Drop the rate confirmation, carrier invoice, and BOL/POD together. Up to 8 PDFs, 135MB each. Large PDFs are compressed automatically.</p>
               </div>
               <input
                 ref={ocrInputRef}
@@ -1055,7 +1055,7 @@ export default function CreateInvoiceModal({
                 </div>
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold">Paperwork Uploads</h3>
-                   <p className="mt-1 text-xs font-medium text-red-600">Please upload only PDF files under 5MB</p>
+                   <p className="mt-1 text-xs font-medium text-red-600">PDF files only. Large files are compressed automatically before storage (135MB upload limit).</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {PAPERWORK.map(({ key, label, required }) => <PaperworkDropzone key={key} label={label} required={required} file={paperwork[key]} onFile={file => setPaperwork(current => ({ ...current, [key]: file }))} onRemove={() => setPaperwork(current => ({ ...current, [key]: null }))} onInvalid={message => toast({ title: "Invalid paperwork", description: message, variant: "destructive" })} />)}
                   </div>

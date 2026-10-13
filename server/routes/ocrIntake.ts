@@ -1,10 +1,11 @@
 import type { Express, RequestHandler } from "express";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { writeFile, unlink } from "node:fs/promises";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { documents, docExtractionJobs, docFieldCandidates } from "../../shared/schema";
-import { uploadToS3 } from "../services/s3Service";
+import { uploadDocumentToS3 } from "../services/s3Service";
+import { documentSizeMetadata } from "../services/documentCompression";
 import { jobQueue } from "../services/jobQueue";
 import { findOcrBrokerMatch } from "../services/ocrBrokerMatching";
 import { getIntakeSnapshot, parseIntakeIds } from "../services/ocrIntakeSnapshot";
@@ -20,40 +21,68 @@ export function registerOcrIntakeRoutes(
     try {
       const files = (Array.isArray(req.files) ? req.files : req.file ? [req.file] : []) as Express.Multer.File[];
       if (!files.length || files.length > 8 || files.some(file => file.mimetype !== "application/pdf" ||
-        !file.buffer.subarray(0, 5).equals(Buffer.from("%PDF-")) ||
-        file.buffer.length > 5 * 1024 * 1024)) {
-        return res.status(400).json({ message: "Upload up to eight valid PDF documents, each 5MB or less." });
+        !file.buffer.subarray(0, 5).equals(Buffer.from("%PDF-")))) {
+        return res.status(400).json({ message: "Upload up to eight valid PDF documents." });
       }
-      const prepared: { file: Express.Multer.File; filename: string; tmpPath: string; key: string }[] = [];
+      const prepared: { file: Express.Multer.File; filename: string; tmpPath: string; key: string; sourceSha256: string }[] = [];
       for (const file of files) {
+        const sourceSha256 = createHash("sha256").update(file.buffer).digest("hex");
         const uuid = randomUUID(), filename = `invoice-ocr-${uuid}.pdf`, tmpPath = `/tmp/${filename}`;
         const key = `documents/${uuid}`;
         staged.push({ key, tmpPath });
-        await uploadToS3(file.buffer, key, "application/pdf");
+        await uploadDocumentToS3(file, key);
         await writeFile(tmpPath, file.buffer);
-        prepared.push({ file, filename, tmpPath, key });
+        prepared.push({ file, filename, tmpPath, key, sourceSha256 });
       }
       const created = await db.transaction(async tx => {
-        const batch = [];
-        for (const { file, filename, tmpPath, key } of prepared) {
+        // Serialize pending-document identity checks across processes and retries.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"invoice-intake:" + req.user.id}))`);
+        const batch: Array<{ doc: { id: number }; job: { id: number }; tmpPath: string;
+          filename: string; needsQueue: boolean; duplicateKey: string | null; status: string }> = [];
+        for (const { file, filename, tmpPath, key, sourceSha256 } of prepared) {
+          const [existing] = await tx.select().from(documents).where(and(
+            eq(documents.uploadedBy, req.user.id), eq(documents.sourceSha256, sourceSha256),
+            isNull(documents.invoiceId), isNull(documents.loadId),
+          )).orderBy(desc(documents.id)).limit(1);
+          if (existing) {
+            let [job] = await tx.select().from(docExtractionJobs).where(eq(docExtractionJobs.documentId, existing.id))
+              .orderBy(desc(docExtractionJobs.id)).limit(1);
+            const needsQueue = !job || job.status === "failed";
+            if (needsQueue) [job] = await tx.insert(docExtractionJobs).values({
+              documentId: existing.id, jobType: "ocr", status: "queued",
+            }).returning();
+            if (!batch.some(item => item.doc.id === existing.id)) batch.push({
+              doc: existing, job, tmpPath, filename: existing.originalName, needsQueue,
+              duplicateKey: key, status: needsQueue ? "queued" : job.status,
+            });
+            else batch.push({ doc: existing, job, tmpPath, filename: existing.originalName, needsQueue: false, duplicateKey: key, status: job.status });
+            continue;
+          }
           const [doc] = await tx.insert(documents).values({
           filename, originalName: String(file.originalname).replace(/[\\/]/g, "_").slice(0, 255),
           mimeType: "application/pdf", size: file.buffer.length, s3Key: key,
+          ...documentSizeMetadata(file),
+          sourceSha256,
           documentType: "other", sourceChannel: "manual", status: "processing",
           uploadedBy: req.user.id, clientId: null, loadId: null, invoiceId: null, companyId: null,
         }).returning({ id: documents.id });
         const [job] = await tx.insert(docExtractionJobs).values({
           documentId: doc.id, jobType: "ocr", status: "queued",
         }).returning({ id: docExtractionJobs.id });
-          batch.push({ doc, job, tmpPath, filename: file.originalname });
+          batch.push({ doc, job, tmpPath, filename: file.originalname, needsQueue: true, duplicateKey: null, status: "queued" });
         }
         return batch;
       });
       committed = true;
-      for (const item of created) jobQueue.enqueue({ jobId: item.job.id, documentId: item.doc.id,
-        filePath: item.tmpPath, mimeType: "application/pdf" });
+      for (const item of created) {
+        if (item.duplicateKey) await compensate(item.duplicateKey, "reused pending invoice OCR document");
+        if (item.needsQueue) jobQueue.enqueue({ jobId: item.job.id, documentId: item.doc.id,
+          filePath: item.tmpPath, mimeType: "application/pdf" });
+        else await unlink(item.tmpPath).catch(() => {});
+      }
+      const unique = created.filter((item, i) => created.findIndex(other => other.doc.id === item.doc.id) === i);
       res.status(201).json({ documentId: created[0].doc.id, status: "queued",
-        documents: created.map(item => ({ documentId: item.doc.id, filename: item.filename, status: "queued" })) });
+        documents: unique.map(item => ({ documentId: item.doc.id, filename: item.filename, status: item.status })) });
     } catch (error) {
       if (!committed) {
         for (const item of staged) {

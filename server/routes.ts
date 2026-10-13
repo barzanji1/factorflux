@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { encryptVault, decryptVault } from "./services/vaultCrypto";
 import {
   uploadToS3,
+  uploadDocumentToS3,
   getSignedViewUrl,
   getSignedDownloadUrl,
   deleteFromS3,
@@ -181,6 +182,7 @@ import { getIntakeSnapshot, parseIntakeIds } from "./services/ocrIntakeSnapshot"
 import { IntakeError } from "./services/ocrIntakeMapping";
 import { reusableIntakePaperwork } from "./services/ocrIntakePaperwork";
 import { getInvoiceOcrAlerts } from "./services/invoiceOcrAlerts";
+import { DOCUMENT_UPLOAD_LIMIT, documentSizeMetadata } from "./services/documentCompression";
 
 const escapeHtml = (value: unknown): string => String(value ?? "")
   .replace(/&/g, "&amp;")
@@ -192,10 +194,10 @@ const escapeHtml = (value: unknown): string => String(value ?? "")
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: DOCUMENT_UPLOAD_LIMIT,
   },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf|tiff|tif/;
+    const allowedTypes = /jpeg|jpg|png|pdf|tiff|tif|heic|heif|docx?|xlsx?|msword|officedocument|ms-excel/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
@@ -203,15 +205,15 @@ const upload = multer({
       return cb(null, true);
     }
 
-    cb(new Error("Only PDF, JPEG, JPG, PNG, and TIFF files are allowed"));
+    cb(new Error("Only PDF, image, Word, and Excel documents are allowed"));
   },
 });
 const carrierUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: Math.ceil(134.22 * 1024 * 1024) },
   fileFilter: (_req, file, cb) => {
-    const allowedExtensions = new Set([".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff"]);
-    const allowedMimeTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/tiff"]);
+    const allowedExtensions = new Set([".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".heic", ".heif"]);
+    const allowedMimeTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/tiff", "image/heic", "image/heif"]);
     if (allowedExtensions.has(path.extname(file.originalname).toLowerCase()) && allowedMimeTypes.has(file.mimetype.toLowerCase())) {
       return cb(null, true);
     }
@@ -220,7 +222,7 @@ const carrierUpload = multer({
 });
 const rateConUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: DOCUMENT_UPLOAD_LIMIT },
   fileFilter: (_req, file, cb) => {
     if (path.extname(file.originalname).toLowerCase() === ".pdf" && file.mimetype.toLowerCase() === "application/pdf") {
       return cb(null, true);
@@ -238,7 +240,9 @@ const hasAllowedCarrierDocumentSignature = (file: Express.Multer.File) => {
     bytes.subarray(0, 4).equals(Buffer.from([0x49, 0x49, 0x2a, 0x00]))
     || bytes.subarray(0, 4).equals(Buffer.from([0x4d, 0x4d, 0x00, 0x2a]))
   );
-  return isPdf || isJpeg || isPng || isTiff;
+  const isHeif = bytes.length >= 12 && bytes.subarray(4, 8).toString("ascii") === "ftyp"
+    && ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(bytes.subarray(8, 12).toString("ascii"));
+  return isPdf || isJpeg || isPng || isTiff || isHeif;
 };
 
 function handleCarrierUpload(req: any, res: any, next: any) {
@@ -256,18 +260,18 @@ function handleUpload(field: string) {
     upload.single(field)(req, res, (err: any) => {
       if (!err) return next();
       if (err.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ message: "File too large. Maximum size is 10MB." });
+        return res.status(400).json({ message: "File too large. Maximum upload size is 135MB." });
       }
       return res.status(400).json({ message: err.message || "File upload rejected." });
     });
   };
 }
 function handleOcrIntakeUpload(req: any, res: any, next: any) {
-  multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 8 } })
+  multer({ storage: multer.memoryStorage(), limits: { fileSize: DOCUMENT_UPLOAD_LIMIT, files: 8 } })
     .array("files", 8)(req, res, (error: any) => {
       if (!error) return next();
       res.status(400).json({ message: error.code === "LIMIT_FILE_SIZE" ?
-        "Each intake PDF must be 5MB or smaller." : "Upload up to eight PDFs using the files field." });
+        "Each intake PDF must be 135MB or smaller." : "Upload up to eight PDFs using the files field." });
     });
 }
 
@@ -277,7 +281,7 @@ function handleOcrIntakeUpload(req: any, res: any, next: any) {
 function handleInvoicePaperworkUpload(req: any, res: any, next: any) {
   const paperworkUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024, files: 4 },
+    limits: { fileSize: DOCUMENT_UPLOAD_LIMIT, files: 4 },
     fileFilter: (_req, file, cb) => {
       const isPdf = file.mimetype.toLowerCase() === "application/pdf"
         && path.extname(file.originalname).toLowerCase() === ".pdf";
@@ -294,7 +298,7 @@ function handleInvoicePaperworkUpload(req: any, res: any, next: any) {
   paperworkUpload(req, res, (err: any) => {
     if (!err) return next();
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ message: "Each paperwork file must be 5MB or smaller." });
+      return res.status(400).json({ message: "Each paperwork file must be 135MB or smaller." });
     }
     return res.status(400).json({ message: err.message || "Invoice paperwork upload rejected." });
   });
@@ -1995,9 +1999,9 @@ ${message}
       }
 
       const { documentType, sourceChannel } = req.body;
-      const processedOriginalName = sanitizeOriginalName(req.file.originalname);
       const fileUuid = crypto.randomUUID();
-      const s3Key = await uploadToS3(req.file.buffer, `documents/${fileUuid}`, req.file.mimetype);
+      const s3Key = await uploadDocumentToS3(req.file, `documents/${fileUuid}`);
+      const processedOriginalName = sanitizeOriginalName(req.file.originalname);
       // Write to /tmp for OCR pipeline (ephemeral, not uploads/)
       const tmpPath = path.join("/tmp", fileUuid);
       fs.writeFileSync(tmpPath, req.file.buffer);
@@ -2007,6 +2011,7 @@ ${message}
         originalName: processedOriginalName,
         mimeType: req.file.mimetype,
         size: req.file.size,
+        ...documentSizeMetadata(req.file),
         s3Key,
         documentType: (documentType as any) || "other",
         loadId: null,
@@ -2066,10 +2071,10 @@ ${message}
         return res.status(403).json({ message: "Documents can only be changed on your own draft or correction-required invoices" });
       }
 
+      const fileUuid = crypto.randomUUID();
+      const s3Key = await uploadDocumentToS3(req.file, `documents/${fileUuid}`);
       const processedMimeType = req.file.mimetype;
       const processedOriginalName = sanitizeOriginalName(req.file.originalname);
-      const fileUuid = crypto.randomUUID();
-      const s3Key = await uploadToS3(req.file.buffer, `documents/${fileUuid}`, processedMimeType);
       // Write to /tmp for OCR pipeline (ephemeral, not uploads/)
       const tmpPath = path.join("/tmp", fileUuid);
       fs.writeFileSync(tmpPath, req.file.buffer);
@@ -2079,6 +2084,7 @@ ${message}
         originalName: processedOriginalName,
         mimeType: processedMimeType,
         size: req.file.size,
+        ...documentSizeMetadata(req.file),
         s3Key,
         documentType: documentType || "other",
         loadId: loadId && loadId !== "undefined" ? parseInt(loadId, 10) : null,
@@ -2378,16 +2384,12 @@ ${message}
       if (!exists) return res.status(404).json({ message: "Carrier not found" });
       const documentCategory = String(req.body.documentCategory || "").trim();
       if (!documentCategory) return res.status(400).json({ message: "Document category is required" });
-      const lower = documentCategory.toLowerCase();
-      const limit = lower.includes("logo") || lower.includes("envelope") ? 2 * 1024 * 1024
-        : lower.includes("driver license") || lower.includes("void check") ? 5 * 1024 * 1024
-        : Math.ceil(134.22 * 1024 * 1024);
-      if (req.file.size > limit) return res.status(400).json({ message: `File exceeds the ${Math.round(limit / 1024 / 1024)}MB limit for this category` });
       const fileUuid = crypto.randomUUID();
-      const s3Key = await uploadToS3(req.file.buffer, `clients/${clientId}/${fileUuid}`, req.file.mimetype);
+      const s3Key = await uploadDocumentToS3(req.file, `clients/${clientId}/${fileUuid}`);
       const document = await storage.createDocument({
         filename: fileUuid, originalName: sanitizeOriginalName(req.file.originalname),
         mimeType: req.file.mimetype, size: req.file.size, s3Key,
+        ...documentSizeMetadata(req.file),
         documentType: "carrier_setup", clientId, loadId: null, invoiceId: null,
         documentCategory, uploadedBy: req.user.id, sourceChannel: "manual", status: "processed",
       } as any);
@@ -3103,7 +3105,6 @@ ${message}
       for (const file of allFiles) {
         const isPdf = file.mimetype.toLowerCase() === "application/pdf"
           && path.extname(file.originalname).toLowerCase() === ".pdf"
-          && file.size <= 5 * 1024 * 1024
           && file.buffer.length >= 5
           && file.buffer.subarray(0, 5).toString("ascii") === "%PDF-";
         if (!isPdf) {
@@ -3208,12 +3209,13 @@ ${message}
         const filename = `${type}-${crypto.randomUUID()}.pdf`;
         const s3Key = `invoices/intake/${intakeKeyPrefix}/paperwork/${filename}`;
         uploadedKeys.push(s3Key);
-        await uploadToS3(file.buffer, s3Key, "application/pdf");
+        await uploadDocumentToS3(file, s3Key);
         uploadedDocuments.push({
           filename,
           originalName: sanitizeOriginalName(file.originalname),
           mimeType: "application/pdf",
           size: file.size,
+          ...documentSizeMetadata(file),
           s3Key,
           documentType: type,
           finalDocumentType: type,
@@ -3295,6 +3297,8 @@ ${message}
           finalDocumentType: document.finalDocumentType,
           originalName: document.originalName,
           size: document.size,
+          originalSize: document.originalSize,
+          compressedSize: document.compressedSize,
         })),
       });
     } catch (error) {
@@ -3496,6 +3500,8 @@ ${message}
           finalDocumentType: documentsTable.finalDocumentType,
           originalName: documentsTable.originalName,
           size: documentsTable.size,
+          originalSize: documentsTable.originalSize,
+          compressedSize: documentsTable.compressedSize,
         }).from(documentsTable).where(inArray(documentsTable.invoiceId, ids))
         : [];
       const byInvoice = new Map<number, typeof docs>();
@@ -3564,6 +3570,8 @@ ${message}
             type: document.finalDocumentType || document.documentType,
             originalName: document.originalName,
             size: document.size,
+            originalSize: document.originalSize,
+            compressedSize: document.compressedSize,
             viewPath: `/api/documents/${document.id}/view`,
             downloadPath: `/api/documents/${document.id}/download`,
           })),
@@ -4999,7 +5007,7 @@ ${message}
       createdId = expense.id;
       if (req.file) {
         const key = `expenses/${req.user.id}/${expense.id}/${crypto.randomUUID()}-${sanitizeOriginalName(req.file.originalname)}`;
-        await uploadToS3(req.file.buffer, key, req.file.mimetype);
+        await uploadDocumentToS3(req.file, key);
         uploadedKey = key;
         [expense] = await db.update(expenses).set({ receiptKey: key, receiptName: sanitizeOriginalName(req.file.originalname), receiptMimeType: req.file.mimetype, receiptSize: req.file.size }).where(eq(expenses.id, expense.id)).returning();
       }
@@ -5080,7 +5088,7 @@ ${message}
       if (!["draft", "rejected"].includes(expense.status)) return res.status(409).json({ message: "Receipts can only be uploaded to draft or rejected expenses" });
       if (!req.file || !hasAllowedCarrierDocumentSignature(req.file)) return res.status(400).json({ message: "Invalid receipt file" });
       const key = `expenses/${req.user.id}/${id}/${crypto.randomUUID()}-${sanitizeOriginalName(req.file.originalname)}`;
-      await uploadToS3(req.file.buffer, key, req.file.mimetype);
+      await uploadDocumentToS3(req.file, key);
       uploadedKey = key;
       const [updated] = await db.update(expenses).set({ receiptKey: key, receiptName: sanitizeOriginalName(req.file.originalname), receiptMimeType: req.file.mimetype, receiptSize: req.file.size, updatedAt: new Date() }).where(eq(expenses.id, id)).returning();
       uploadedKey = undefined;
@@ -7150,7 +7158,7 @@ Trucking Pros Financial Team
       };
       if (req.file) {
         if (req.file.buffer.subarray(0, 5).toString("ascii") !== "%PDF-") return res.status(400).json({ message: "Uploaded rate confirmation is not a valid PDF" });
-        uploadedKey = await uploadToS3(req.file.buffer, `fuel-advances/pending/${crypto.randomUUID()}.pdf`, "application/pdf");
+        uploadedKey = await uploadDocumentToS3(req.file, `fuel-advances/pending/${crypto.randomUUID()}.pdf`);
         fuelAdvanceData.rateConS3Key = uploadedKey;
         fuelAdvanceData.rateConName = sanitizeOriginalName(req.file.originalname);
         fuelAdvanceData.rateConType = "application/pdf";
@@ -7254,7 +7262,7 @@ Trucking Pros Financial Team
       const [existing] = await db.select({ key: fuelAdvances.rateConS3Key }).from(fuelAdvances)
         .where(eq(fuelAdvances.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "Fuel advance not found" });
-      const key = await uploadToS3(req.file.buffer, `fuel-advances/${id}/rate-con-${crypto.randomUUID()}.pdf`, "application/pdf");
+      const key = await uploadDocumentToS3(req.file, `fuel-advances/${id}/rate-con-${crypto.randomUUID()}.pdf`);
       let row;
       try {
         [row] = await db.update(fuelAdvances).set({
@@ -8096,11 +8104,17 @@ Trucking Pros Financial Team
         return res.status(400).json({ message: "Select a valid document type" });
       }
 
+      const filename = crypto.randomUUID();
+      const s3Key = await uploadDocumentToS3(req.file, `documents/${filename}`);
+      const filePath = path.join("/tmp", filename);
+      fs.writeFileSync(filePath, req.file.buffer);
       const docData: any = {
-        filename:     req.file.filename,
+        filename,
+        s3Key,
         originalName: sanitizeOriginalName(req.file.originalname),
         mimeType:     req.file.mimetype,
         size:         req.file.size,
+        ...documentSizeMetadata(req.file),
         documentType,
         finalDocumentType: documentType,
         uploadedBy:   req.user.id,
@@ -8118,7 +8132,6 @@ Trucking Pros Financial Team
         .values({ documentId: doc.id, jobType: "pdf_text", status: "queued" })
         .returning();
 
-      const filePath = path.join("uploads", req.file.filename);
       jobQueue.enqueue({ jobId: job.id, documentId: doc.id, filePath, mimeType: req.file.mimetype });
 
       await storage.createActivity({
@@ -11495,12 +11508,12 @@ RESPOND:
 
   const portalUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: DOCUMENT_UPLOAD_LIMIT },
     fileFilter: (_req, file, cb) => {
       if (path.extname(file.originalname).toLowerCase() === ".pdf" && file.mimetype === "application/pdf") {
         return cb(null, true);
       }
-      cb(new Error("Only PDF files up to 5MB are allowed"));
+      cb(new Error("Only PDF files up to 135MB are allowed"));
     },
   });
   const portalChatUpload = multer({
@@ -11930,7 +11943,7 @@ RESPOND:
       }
       let attachmentS3Key: string | null = null;
       if (file) {
-        attachmentS3Key = await uploadToS3(file.buffer, `portal-chat/${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`, file.mimetype);
+        attachmentS3Key = await uploadDocumentToS3(file, `portal-chat/${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
       }
       const [created] = await db.insert(portalChatMessages).values({
         chatId: result.chat.id,
@@ -12119,7 +12132,7 @@ RESPOND:
       }
       let attachmentS3Key: string | null = null;
       if (file) {
-        attachmentS3Key = await uploadToS3(file.buffer, `portal-chat/${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`, file.mimetype);
+        attachmentS3Key = await uploadDocumentToS3(file, `portal-chat/${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
       }
       const [created] = await db.insert(portalChatMessages).values({
         chatId: result.chat.id,
@@ -12436,7 +12449,7 @@ RESPOND:
         const file = files[i];
         const dtype = (docTypes[i] || "other") as "rate_confirmation" | "bol" | "lumper_receipt" | "other";
         const portalFileUuid = crypto.randomUUID();
-        const portalS3Key = await uploadToS3(file.buffer, `portal/${portalFileUuid}`, file.mimetype);
+        const portalS3Key = await uploadDocumentToS3(file, `portal/${portalFileUuid}`);
         uploadedPortalKeys.push(portalS3Key);
         uploadedDocuments.push({
           documentType: dtype,
@@ -12444,6 +12457,7 @@ RESPOND:
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,
+          ...documentSizeMetadata(file),
           s3Key: portalS3Key,
         });
       }

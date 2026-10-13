@@ -2,6 +2,8 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
+import { CompressionInfo } from "@/components/documents/compression-info";
+import { documentClassification, documentClassificationLabel } from "@shared/document-display";
 import TopNav from "@/components/layout/top-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1356,7 +1358,7 @@ export default function InvoiceDetail() {
                           ].map(({ type, label, aliases }) => {
                             const rule = docStatus?.rules?.find((r: any) => aliases.includes(r.documentType));
                             const doc = detail.documents?.find((d: any) =>
-                              aliases.includes(d.documentType) || aliases.includes(d.finalDocumentType)
+                              aliases.includes(documentClassification(d))
                             );
                             const present = !!rule?.present || !!doc;
                             const uploading = uploadingDocumentType === type;
@@ -1403,7 +1405,7 @@ export default function InvoiceDetail() {
                                     {present && doc && !uploading && (
                                       <div className="flex items-center gap-1">
                                         <button type="button" title={`View ${label}`}
-                                           onClick={(event) => { event.stopPropagation(); setPreviewDocument(doc); }}
+                                           onClick={(event) => { event.stopPropagation(); window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer"); }}
                                           className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-100">
                                           <Eye className="h-4 w-4" />
                                         </button>
@@ -1478,15 +1480,16 @@ export default function InvoiceDetail() {
                                      <FileText className="h-5 w-5 shrink-0 text-red-500" />
                                     <div>
                                       <p className="text-sm font-medium text-slate-800 dark:text-white">{doc.originalName}</p>
-                                       <p className="text-xs text-slate-400">{doc.documentType.replace(/_/g, " ")} · {(doc.size / 1024).toFixed(1)} KB · {fmtDate(doc.createdAt)}</p>
+                                       <p className="text-xs text-slate-400">{documentClassificationLabel(documentClassification(doc))} · {(doc.size / 1024).toFixed(1)} KB · {fmtDate(doc.createdAt)}</p>
+                                       <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
                                        <p className="text-[11px] text-slate-500">{doc.uploadedByUser ? `${doc.uploadedByUser.firstName || ""} ${doc.uploadedByUser.lastName || ""}`.trim() || doc.uploadedByUser.email : "Uploader unavailable"}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                      <Button variant="outline" size="sm" className="h-8 rounded-lg px-2 text-[11px]" onClick={() => setPreviewDocument(doc)}><Eye className="mr-1 h-3 w-3" />View</Button>
+                                      <Button data-testid={`invoice-document-view-${doc.id}`} variant="outline" size="sm" className="h-8 rounded-lg px-2 text-[11px]" onClick={() => window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer")}><Eye className="mr-1 h-3 w-3" />View</Button>
                                       <a href={`/api/documents/${doc.id}/download`} className="inline-flex h-8 items-center gap-1 rounded-lg border px-2 text-[11px]"><Download className="h-3 w-3" />Download</a>
                                     <Select
-                                      value={doc.documentType || "other"}
+                                      value={documentClassification(doc)}
                                       onValueChange={(documentType) =>
                                         documentTypeMutation.mutate({ documentId: doc.id, documentType })
                                       }
@@ -1500,6 +1503,10 @@ export default function InvoiceDetail() {
                                         <SelectItem value="bill_of_lading">Bill of Lading (BOL)</SelectItem>
                                         <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
                                         <SelectItem value="commercial_invoice">Commercial Invoice</SelectItem>
+                                        <SelectItem value="freight_invoice">Freight Invoice</SelectItem>
+                                        <SelectItem value="invoice">Invoice</SelectItem>
+                                        <SelectItem value="bol">Bill of Lading</SelectItem>
+                                        <SelectItem value="proof_of_delivery">Proof of Delivery</SelectItem>
                                         <SelectItem value="pod">Proof of Delivery (POD)</SelectItem>
                                         <SelectItem value="noa">Notice of Assignment (NOA)</SelectItem>
                                         <SelectItem value="release_letter">Release Letter</SelectItem>

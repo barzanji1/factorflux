@@ -447,6 +447,9 @@ export const documents = pgTable("documents", {
   originalName: varchar("original_name").notNull(),
   mimeType: varchar("mime_type").notNull(),
   size: integer("size").notNull(),
+  sourceSha256: varchar("source_sha256", { length: 64 }),
+  originalSize: integer("original_size"),
+  compressedSize: integer("compressed_size"),
   storageKey: varchar("storage_key"),
   s3Key: text("s3_key"),
   documentType: varchar("document_type", {
@@ -2372,6 +2375,8 @@ export const carrierSubmissionDocs = pgTable("carrier_submission_documents", {
   originalName: varchar("original_name").notNull(),
   mimeType: varchar("mime_type"),
   size: integer("size"),
+  originalSize: integer("original_size"),
+  compressedSize: integer("compressed_size"),
   s3Key: text("s3_key"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });

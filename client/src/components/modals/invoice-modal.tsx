@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { CompressionInfo } from "@/components/documents/compression-info";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -221,7 +222,7 @@ function PremiumUploadTile({
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</p>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              {hint} · PDF, JPG, PNG · Max 10 MB
+              {hint} · PDF, JPG, PNG · Max 135 MB; large files auto-compressed
             </p>
           </div>
         </div>
@@ -626,6 +627,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                                 <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
                                   {doc.documentType?.replace(/_/g, " ")} &middot; {(doc.size / 1024).toFixed(0)} KB
                                 </p>
+                                <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
                               </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">

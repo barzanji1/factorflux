@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { createHash } from "node:crypto";
 import ts from "typescript";
 import express from "express";
 import multer from "multer";
@@ -19,6 +20,7 @@ async function setup(t: { after: (fn: () => Promise<void>) => void }) {
     match: { brokerId: 42 as number | null, confidence: "medium" as string | null,
       rawName: "Raw Broker LLC", matchedName: "Existing Broker", candidates: [{ id: 42, name: "Existing Broker" }] },
     uploads: [] as string[], cleanup: [] as string[], queued: [] as unknown[], inserted: [] as unknown[],
+    pendingDoc: null as any, pendingJob: null as any,
   };
   const database = {
     select: () => {
@@ -33,9 +35,22 @@ async function setup(t: { after: (fn: () => Promise<void>) => void }) {
     },
     transaction: async (fn: (tx: unknown) => unknown) => {
       if (state.failTransaction) throw new Error("Fixture insert failure");
-      return fn({ insert: (table: unknown) => ({ values: (data: unknown) => {
+      return fn({ execute: async () => {}, select: () => {
+        let table: unknown;
+        const chain = {
+          from: (value: unknown) => { table = value; return chain; },
+          where: () => chain, orderBy: () => chain,
+          limit: async () => {
+            const value = table === documents ? state.pendingDoc : state.pendingJob;
+            return value ? [value] : [];
+          },
+        };
+        return chain;
+      }, insert: (table: unknown) => ({ values: (data: unknown) => {
         state.inserted.push(data);
-        return { returning: async () => [{ id: table === documents ? 1 : 2 }] };
+        const row = { ...(data as object), id: table === documents ? 1 : 2 };
+        if (table === documents) state.pendingDoc = row; else state.pendingJob = row;
+        return { returning: async () => [row] };
       } }) });
     },
   };
@@ -47,10 +62,11 @@ async function setup(t: { after: (fn: () => Promise<void>) => void }) {
     require: (name: string) => {
       if (name === "../db") return { db: database };
       if (name === "../../shared/schema") return { documents, docExtractionJobs, docFieldCandidates };
-      if (name === "drizzle-orm") return { eq() {}, desc() {}, asc() {} };
-      if (name === "node:crypto") return { randomUUID: () => "fixture-key" };
+      if (name === "drizzle-orm") return { eq() {}, desc() {}, asc() {}, and() {}, isNull() {}, sql() {} };
+      if (name === "node:crypto") return { randomUUID: () => "fixture-key", createHash };
       if (name === "node:fs/promises") return { writeFile: async () => {}, unlink: async () => {} };
-      if (name.endsWith("s3Service")) return { uploadToS3: async (_buffer: unknown, key: string) => { state.uploads.push(key); return key; } };
+      if (name.endsWith("s3Service")) return { uploadDocumentToS3: async (_file: unknown, key: string) => { state.uploads.push(key); return key; } };
+      if (name.endsWith("documentCompression")) return { documentSizeMetadata: (file: any) => ({ originalSize: file.size, compressedSize: file.size }) };
       if (name.endsWith("jobQueue")) return { jobQueue: { enqueue: (job: unknown) => state.queued.push(job) } };
       if (name.endsWith("ocrBrokerMatching")) return { findOcrBrokerMatch: async (raw: unknown) => raw ? state.match : {
         brokerId: null, confidence: null, rawName: null, matchedName: null, candidates: [],
@@ -102,6 +118,25 @@ test("transaction failure compensates only the new S3 object and never queues", 
   assert.equal((await upload()).status, 500);
   assert.deepEqual(state.cleanup, ["documents/fixture-key"]);
   assert.equal(state.queued.length, 0);
+});
+test("upload retry reuses its pending document and job, removes the redundant S3 copy", async t => {
+  const { state, upload } = await setup(t);
+  const first = await (await upload()).json();
+  const second = await (await upload()).json();
+  assert.equal(first.documents[0].documentId, second.documents[0].documentId);
+  assert.equal(state.inserted.length, 2, "one document and one job, not another document");
+  assert.equal(state.queued.length, 1);
+  assert.equal(state.pendingDoc.uploadedBy, "owner");
+  assert.equal(state.pendingDoc.sourceSha256.length, 64);
+  assert.equal(state.cleanup.length, 1);
+});
+test("reupload of failed OCR retries a job on the same document", async t => {
+  const { state, upload } = await setup(t);
+  await upload();
+  state.pendingJob.status = "failed";
+  await upload();
+  assert.equal(state.inserted.length, 3, "one document and two attempts");
+  assert.equal(state.queued.length, 2);
 });
 test("OCR status requires authentication and document ownership", async t => {
   const { base } = await setup(t);

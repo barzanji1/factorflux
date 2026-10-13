@@ -53,7 +53,7 @@ const DOC_TYPES: { key: DocType; label: string; required: boolean }[] = [
   { key: "lumper_receipt", label: "Lumper Receipt", required: false },
   { key: "other", label: "Other", required: false },
 ];
-const MAX_PDF_SIZE = 5 * 1024 * 1024;
+const MAX_PDF_SIZE = 135 * 1024 * 1024;
 interface DocFile { type: DocType; file: File; }
 
 export default function PortalSubmit() {
@@ -205,7 +205,7 @@ export default function PortalSubmit() {
       return;
     }
     if (file.size > MAX_PDF_SIZE) {
-      setDocumentError(`${file.name} is larger than 5MB.`);
+      setDocumentError(`${file.name} is larger than 135MB.`);
       return;
     }
     const signature = new Uint8Array(await file.slice(0, 5).arrayBuffer());
@@ -370,7 +370,7 @@ export default function PortalSubmit() {
             </section>
 
             <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-              <div><h2 className="font-semibold text-slate-800">Documents</h2><p className="text-xs text-slate-500">PDF files only, maximum 5MB each.</p></div>
+              <div><h2 className="font-semibold text-slate-800">Documents</h2><p className="text-xs text-slate-500">PDF files only, maximum 135MB each. Large files are compressed automatically.</p></div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {DOC_TYPES.map(item => {
                   const doc = docs.find(current => current.type === item.key);

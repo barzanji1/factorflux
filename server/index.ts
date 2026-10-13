@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 
 import { registerRoutes } from "./routes";
+import { apiNotFound } from "./apiNotFound";
 import { setupVite } from "./vite";
 import { serveStatic } from "./static";
 import { log } from "./log";
@@ -104,6 +105,7 @@ export async function startServer(
 ) {
   await ensureDevAdmin();
   const server = await registerRoutes(app);
+  app.use("/api", apiNotFound);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err?.status || err?.statusCode || 500;

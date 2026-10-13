@@ -5,6 +5,7 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { prepareDocument } from "./documentCompression";
 
 const BUCKET = process.env.AWS_S3_BUCKET;
 const REGION = process.env.AWS_REGION || "us-east-2";
@@ -50,6 +51,12 @@ export async function getSignedViewUrl(key: string): Promise<string> {
     }),
     { expiresIn: 3600 }
   );
+}
+
+// All user-uploaded business documents use this entry point before S3 PUT.
+export async function uploadDocumentToS3(file: Express.Multer.File, key: string): Promise<string> {
+  await prepareDocument(file);
+  return uploadToS3(file.buffer, key, file.mimetype);
 }
 
 export async function getSignedDownloadUrl(

@@ -53,7 +53,7 @@ export async function getIntakeSnapshot(ids: number[], user: { id: string; role:
     extracted.push({ documentId: row.id, filename: row.originalName, status: job?.status ?? "queued",
       error: job?.errorMessage, docType: normalizeIntakeType(raw?.docType ?? row.aiDocumentType ?? row.candidateDocumentType ?? row.documentType),
       fields, fieldConfidences: confidence, confidence: Number(result?.confidenceScore ?? 0),
-      contentHash: raw?.fileSha256 ?? null, invoiceId: row.invoiceId, classification: raw?.classification ?? null });
+      contentHash: row.sourceSha256 ?? raw?.fileSha256 ?? null, invoiceId: row.invoiceId, classification: raw?.classification ?? null });
   }
   const mapped = mapIntakeDocuments(extracted);
   const match = await findOcrBrokerMatch(mapped.fields.broker_name ?? null, client);

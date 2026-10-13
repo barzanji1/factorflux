@@ -181,10 +181,13 @@ export async function getInvoiceDetail(invoiceId: number) {
   const documentUploaderMap = new Map(documentUploaders.map(user => [user.id, user]));
   const documentsWithMetadata = docs.map(doc => ({
     id: doc.id, originalName: doc.originalName, mimeType: doc.mimeType, size: doc.size,
+    originalSize: doc.originalSize, compressedSize: doc.compressedSize,
     documentType: doc.documentType, finalDocumentType: doc.finalDocumentType,
+    candidateDocumentType: doc.candidateDocumentType, aiDocumentType: doc.aiDocumentType,
     status: doc.status, sourceChannel: doc.sourceChannel, uploadedBy: doc.uploadedBy,
     createdAt: doc.createdAt,
     uploader: doc.uploadedBy ? documentUploaderMap.get(doc.uploadedBy) ?? null : null,
+    uploadedByUser: doc.uploadedBy ? documentUploaderMap.get(doc.uploadedBy) ?? null : null,
     viewUrl: `/api/documents/${doc.id}/view`,
     downloadUrl: `/api/documents/${doc.id}/download`,
   }));
