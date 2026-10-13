@@ -36,6 +36,7 @@ import {
 import { eq, and, lte, inArray, ne } from "drizzle-orm";
 import { storage } from "../storage";
 import { sendEmailTracked } from "../emailService";
+import { paymentInstructions, configuredPaymentBody, textToEmailBody, emailDisplayName } from "../emailTemplate.js";
 
 // ─── Default cadence ──────────────────────────────────────────────────────────
 
@@ -49,10 +50,6 @@ export const DEFAULT_CADENCE: CadenceConfig = {
 
 // ─── Placeholder rendering ────────────────────────────────────────────────────
 
-const PAYMENT_INSTRUCTIONS =
-  "ACH to: Trucking Pros Financial — Routing: 021000021 · Account: 1234567890\n" +
-  "Or mail check to: 1234 Factoring Lane, Suite 100, Dallas TX 75201";
-
 export interface TemplateVars {
   brokerName:          string;
   invoiceNumber:       string;
@@ -65,7 +62,7 @@ export interface TemplateVars {
 
 export function renderTemplate(text: string, vars: TemplateVars): string {
   return text
-    .replace(/\{\{brokerName\}\}/g,          vars.brokerName)
+    .replace(/\{\{brokerName\}\}/g,          emailDisplayName(vars.brokerName))
     .replace(/\{\{invoiceNumber\}\}/g,        vars.invoiceNumber)
     .replace(/\{\{loadNumber\}\}/g,           vars.loadNumber)
     .replace(/\{\{amountDue\}\}/g,            vars.amountDue)
@@ -167,7 +164,7 @@ function fallbackBody(
     "Dear Broker / Debtor,",
     "",
     `This is a payment follow-up (${reminderTypeLabel(type)}) from Trucking Pros Financial`,
-    `regarding invoice ${invoiceNumber} for carrier ${clientName}.`,
+    `regarding invoice ${invoiceNumber} for carrier ${emailDisplayName(clientName)}.`,
     "",
     `  Load #:           ${loadNumber ?? "N/A"}`,
     `  Invoice Amount:   ${amtFmt}`,
@@ -204,7 +201,7 @@ async function resolveSubjectBody(
       loadNumber:          loadNumber ?? "N/A",
       amountDue:           `$${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
       dueDate:             dueDate ? dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "N/A",
-      paymentInstructions: PAYMENT_INSTRUCTIONS,
+      paymentInstructions: paymentInstructions(),
       contactName:         "Collections Team",
     };
     return {
@@ -550,7 +547,8 @@ export async function triggerBrokerFollowUp(
           to:      brokerEmail,
         emailLog: { entityType: "followup", entityId: record.id, templateName: "broker_followup", followupImmediate: true },
         subject: immediateSubject,
-        html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${immediateBody}</pre>`,
+        text: configuredPaymentBody(immediateBody),
+        html: textToEmailBody(configuredPaymentBody(immediateBody)),
       });
       if (success) {
         await db.update(brokerFollowUps)
@@ -675,7 +673,8 @@ export async function processScheduledReminders(): Promise<{ sent: number; skipp
             emailLog: { entityType: "followup", entityId: r.followUpId, templateName: "broker_followup",
               followupReminderId: r.reminderId, sentByUserId: null },
             subject: r.subject,
-            html:    `<pre style="font-family:sans-serif;white-space:pre-wrap">${r.body}</pre>`,
+            text: configuredPaymentBody(r.body),
+            html: textToEmailBody(configuredPaymentBody(r.body)),
           });
           emailSent = result.success;
           messageId  = result.messageId;

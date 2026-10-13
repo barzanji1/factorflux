@@ -5,6 +5,7 @@ import {
   brokerConfirmationEvents, brokerConfirmationSettings, eventLedger,
 } from "../../shared/schema";
 import { sendEmailTracked } from "../emailService";
+import { emailDetailsTable, emailDisplayName } from "../emailTemplate.js";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = typeof db | Tx;
@@ -140,10 +141,10 @@ export function createBrokerConfirmationService({
       const details = [
         ["Internal invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"],
         ["Load", invoice.loadNumber || "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`],
-        ["Carrier", row.carrierName || "Not provided"],
+        ["Carrier", emailDisplayName(row.carrierName) || "Not provided"],
       ];
       const text = `Trucking Pros Financial\n${details.map(([label, value]) => `${label}: ${value}`).join("\n")}\nConfirm Receipt: ${confirmationUrl}\nDispute: ${disputeUrl}\nOpening a link does not confirm receipt. Please use the button on the page.`;
-      const html = `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;border:2px solid #808080;padding:24px"><h2>Trucking Pros Financial</h2><h3>${escapeConfirmationHtml(subject)}</h3><p>Please confirm that you received this invoice, or report a dispute.</p><table>${details.map(([label, value]) => `<tr><th style="text-align:left;padding:6px">${escapeConfirmationHtml(label)}</th><td style="padding:6px">${escapeConfirmationHtml(value)}</td></tr>`).join("")}</table><p style="margin-top:24px"><a href="${escapeConfirmationHtml(confirmationUrl)}" style="padding:12px;background:#098b9f;color:white;text-decoration:none">Confirm Receipt</a> <a href="${escapeConfirmationHtml(disputeUrl)}" style="padding:12px;background:#c0c0c0;color:black;text-decoration:none">Dispute</a></p><p>Opening a link does not record confirmation. Use the confirmation button on the page.</p></div>`;
+      const html = `<p>Please confirm that you received this invoice, or report a dispute.</p>${emailDetailsTable(details as Array<[string, string]>)}<p style="margin-top:24px"><a href="${escapeConfirmationHtml(confirmationUrl)}" style="display:inline-block;padding:12px;background:#27aab8;color:white;text-decoration:none">Confirm Receipt</a> <a href="${escapeConfirmationHtml(disputeUrl)}" style="display:inline-block;padding:12px;color:#176873;text-decoration:underline">Dispute</a></p><p>Opening a link does not record confirmation. Use the confirmation button on the page.</p>`;
       const [acceptedSends] = await tx.select({ count: sql<string>`count(*)` }).from(brokerConfirmationEvents)
         .where(and(eq(brokerConfirmationEvents.invoiceId, id), inArray(brokerConfirmationEvents.event, ["sent", "reminder_sent"])));
       // Failed/uncertain manual attempts must reuse a key; only committed acceptance advances it.

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, HttpError, queryClient } from "@/lib/queryClient";
@@ -52,6 +53,7 @@ const EMPTY = {
   buyout: "", lumper: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
   driverId: "", driverName: "", instructionsSubject: "", instructionsDetails: "",
   invoiceDate: "", pickupDate: "", deliveryDate: "", rate: "", origin: "", destination: "", bolNumber: "",
+  holdForManagerReview: false, holdReason: "",
 };
 
 function formatFileSize(bytes: number) {
@@ -710,6 +712,8 @@ export default function CreateInvoiceModal({
         code: values.code.trim() || null,
         buyout: values.buyout === "" ? null : values.buyout === "yes",
         lumper: values.lumper === "" ? null : values.lumper === "yes",
+        holdForManagerReview: values.holdForManagerReview,
+        holdReason: values.holdForManagerReview ? values.holdReason.trim() || null : null,
         amount: values.amount,
         invoiceDate: values.invoiceDate ? new Date(`${values.invoiceDate}T00:00:00.000Z`).toISOString() : null,
         serviceDate: values.deliveryDate || values.pickupDate || null,
@@ -739,7 +743,8 @@ export default function CreateInvoiceModal({
     },
     onSuccess: invoice => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Invoice created", description: "The invoice is now pending review." });
+      queryClient.invalidateQueries({ queryKey: ["/api/held"] });
+      toast({ title: "Invoice created", description: invoice.status === "held" ? "The invoice is on hold for manager review." : "The invoice is now pending review." });
       onOpenChange(false);
       navigate("/invoices");
     },
@@ -772,7 +777,7 @@ export default function CreateInvoiceModal({
     && !acknowledgements[alert.code]?.acknowledged);
   const valid = values.carrierInvoiceNumber.trim().length <= 100
     && values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId
-    && values.lumper && Number(values.amount) > 0 && isLoadType(values.loadType)
+    && Number(values.amount) > 0 && isLoadType(values.loadType)
     && paperwork.rateConfirmation && paperwork.billOfLading
     && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
   return (
@@ -780,7 +785,7 @@ export default function CreateInvoiceModal({
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
         <DialogHeader className="border-b px-6 py-5">
           <DialogTitle className="text-xl">Create Invoice</DialogTitle>
-          <DialogDescription>Enter the load details. The invoice will immediately enter Pending Review.</DialogDescription>
+          <DialogDescription>Enter the load details. The invoice enters Pending Review unless held for manager review.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-5 p-6 lg:grid-cols-[240px_minmax(0,1fr)_240px]">
           <StatusPanel kind="broker" record={broker} />
@@ -946,10 +951,10 @@ export default function CreateInvoiceModal({
                 <Input id="invoiceCode" value={values.code} onChange={e => setValues(v => ({ ...v, code: e.target.value }))} placeholder="CA TO UT" />
               </div>
               <div className="space-y-1.5">
-                <Label>Lumper <span className="text-red-500">*</span></Label>
-                <Select value={values.lumper} onValueChange={lumper => setValues(v => ({ ...v, lumper }))}>
+                <Label>Lumper</Label>
+                <Select value={values.lumper} onValueChange={lumper => setValues(v => ({ ...v, lumper: lumper === "unspecified" ? "" : lumper }))}>
                   <SelectTrigger><SelectValue placeholder="Select Yes or No" /></SelectTrigger>
-                  <SelectContent><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem></SelectContent>
+                  <SelectContent><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem><SelectItem value="unspecified">Not specified</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
@@ -1024,6 +1029,21 @@ export default function CreateInvoiceModal({
                   <SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent>
                 </Select>
                  <p className="text-xs font-medium text-red-600">Wire (same day funding) cutoff time is at 13:00:00 MT</p>
+              </div>
+              <div className="space-y-3 border-2 border-t-white border-l-white border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] p-3 sm:col-span-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="holdForManagerReview" checked={values.holdForManagerReview}
+                    onCheckedChange={checked => setValues(v => ({ ...v, holdForManagerReview: checked === true }))}
+                    className="rounded-none border-2 border-t-[#808080] border-l-[#808080] border-r-white border-b-white" />
+                  <Label htmlFor="holdForManagerReview">Hold for manager review</Label>
+                </div>
+                {values.holdForManagerReview && <div className="space-y-1">
+                  <Label htmlFor="holdReason">Hold reason (optional)</Label>
+                  <Textarea id="holdReason" maxLength={10000} value={values.holdReason}
+                    onChange={event => setValues(v => ({ ...v, holdReason: event.target.value }))}
+                    placeholder="Amount exceeds threshold, missing NOA, verify rate con…"
+                    className="rounded-none border-2 border-t-[#808080] border-l-[#808080] border-r-white border-b-white bg-white" />
+                </div>}
               </div>
               {values.paymentType === "ACH" && (
                 <div className="space-y-1.5 sm:col-span-2">

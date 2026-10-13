@@ -1,4 +1,5 @@
 import { refreshInvoiceDocumentRequirements } from "./services/invoiceDocumentWorkflow";
+import { releaseHeldInvoice } from "./services/invoiceCreationHold";
 import {
   users,
   clients,
@@ -655,40 +656,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async releaseInvoice(id: number, releasedBy: string, releaseNote?: string): Promise<Invoice> {
-    const existing = await this.getInvoice(id);
-    if (!existing) throw new Error(`Invoice ${id} not found`);
-    if (existing.status !== "held") throw new Error(`Invoice ${id} is not on hold`);
-    const restoreStatus = (existing.previousStatus as any) ?? "submitted";
-    return db.transaction(async tx => {
-      const [updated] = await tx
-        .update(invoices)
-        .set({
-          status: restoreStatus,
-          heldReason: null,
-          heldAt: null,
-          heldBy: null,
-          heldNotes: null,
-          previousStatus: null,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(invoices.id, id), eq(invoices.status, "held")))
-        .returning();
-      if (!updated) throw new Error("Invoice is no longer on hold");
-      await tx.insert(eventLedger).values({
-        entityType: "invoice",
-        entityId: id,
-        eventType: "invoice_status_changed",
-        actorType: "user",
-        actorId: releasedBy,
-        payloadJson: {
-          from: "held",
-          to: restoreStatus,
-          reason: releaseNote || "Released from hold",
-          label: "Invoice released from hold",
-        },
-      });
-      return updated;
-    });
+    return releaseHeldInvoice(id, releasedBy, releaseNote);
   }
 
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {

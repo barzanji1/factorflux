@@ -14,6 +14,7 @@ import {
 } from "../../shared/schema";
 import { uploadToS3, deleteFromS3Strict, downloadFromS3, getSignedDownloadUrl } from "./s3Service";
 import { sendEmailTracked } from "../emailService";
+import { emailDetailsTable } from "../emailTemplate.js";
 
 export type FundingReceiptTx = {
   execute: (...args: any[]) => any;
@@ -279,6 +280,9 @@ export async function sendFundingReceiptEmail(
     emailLog: { entityType: "invoice", entityId: receipt.invoiceId, templateName: "funding_receipt" },
     subject: `Funding receipt for invoice ${invoiceNumber}`,
     text: `Attached is funding receipt ${receipt.receiptNo}, version ${receipt.version}, for invoice ${invoiceNumber}.`,
+    html: `<p>Your funding receipt is attached.</p>${emailDetailsTable([
+      ["Invoice #", invoiceNumber], ["Receipt #", receipt.receiptNo], ["Version", String(receipt.version)],
+    ])}`,
     attachments: [{
       content: attachment.toString("base64"),
       filename: `${receipt.receiptNo}-v${receipt.version}.pdf`,

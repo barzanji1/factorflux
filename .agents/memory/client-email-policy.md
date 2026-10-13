@@ -38,3 +38,9 @@ Retry original messages without exposing their full HTML in the shared log. Pres
 **Why:** The user requires preview-only history and manager retries. A lost acceptance response or the provider's expiring idempotency cache must not cause duplicate customer emails.
 
 **How to apply:** Keep retry bodies private and encrypted, maintain durable intent correlation, and never allow the read-only log to edit recipients or message content.
+
+All new outbound emails share one modern, mobile-readable company template. Win95 styling is for the app, not emails. Payment instructions must use configured company values or be omitted; never send seeded banking placeholders.
+
+**Why:** The user explicitly requested consistent branding across all outbound email types and removal of fake payment details.
+
+**How to apply:** Apply branding at the single transport, including text-only and direct sends. Preserve immutable historical retries, but refuse unsafe placeholder instructions. Corporate bank routing numbers alone are not proof of fake details.

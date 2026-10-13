@@ -168,6 +168,8 @@ import {
 } from "./services/lifecycleEngine";
 import { getDocumentCompleteness, checklistType } from "./services/docValidation";
 import { refreshInvoiceDocumentRequirements } from "./services/invoiceDocumentWorkflow";
+import { creationHoldFields, recordCreationHold } from "./services/invoiceCreationHold";
+import { optionalLumperSchema } from "../shared/invoice-creation-options";
 import { documentClassification } from "../shared/document-display";
 import {
   compensateFundingReceiptUpload,
@@ -3141,12 +3143,13 @@ ${message}
         driverName: z.string().trim().max(255).nullable().optional(),
         bankAccountId: z.coerce.number().int().positive().nullable().optional(),
         code: z.string().trim().max(255).nullable().optional(),
-        lumper: z.coerce.boolean().nullable().optional(),
+        lumper: optionalLumperSchema,
         instructionsSubject: z.string().trim().max(255).nullable().optional(),
         instructionsDetails: z.string().trim().max(10000).nullable().optional(),
         paymentType: z.enum(["ACH", "Wire"]).optional(),
       }).parse({ ...invoiceMetadata, invoiceNumber: "INV000", carrierInvoiceNumber: suppliedCarrierInvoiceNumber ?? null });
       const invoiceData = await resolveInvoiceBrokerBranch(parsed as any);
+      const initialHold = creationHoldFields(metadata, req.user.id);
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
       const ocrDocumentIds = parseIntakeIds(metadata.ocrDocumentIds);
       const intakeServiceDate = metadata.serviceDate == null ? undefined :
@@ -3262,7 +3265,9 @@ ${message}
           submittedAt: new Date(),
           status: "submitted",
           factoringStage: "verification",
+          ...initialHold,
         }).returning();
+        await recordCreationHold(tx, invoice, req.user);
         await tx.insert(eventLedger).values({
           entityType: "invoice",
           entityId: invoice.id,
@@ -3335,8 +3340,10 @@ ${message}
           invoiceNumber: z.string().trim().min(1).max(100),
           carrierInvoiceNumber: z.string().trim().max(100).nullable().optional(),
           loadType: z.enum(LOAD_TYPES),
+          lumper: optionalLumperSchema,
         }).parse({ ...invoiceBody, invoiceNumber: "INV000", carrierInvoiceNumber: suppliedCarrierInvoiceNumber ?? null }) as any,
       );
+      const initialHold = creationHoldFields(req.body, req.user.id);
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
       if (!(await canAccessClient(req, invoiceData.clientId))) {
         return res.status(403).json({ message: "You may only create invoices for carriers assigned to you" });
@@ -3387,7 +3394,9 @@ ${message}
           submittedAt: new Date(),
           status: "submitted",
           factoringStage: "verification",
+          ...initialHold,
         }).returning();
+        await recordCreationHold(tx, createdInvoice, req.user);
         await tx.insert(eventLedger).values({
           entityType: "invoice",
           entityId: createdInvoice.id,

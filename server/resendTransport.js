@@ -1,6 +1,7 @@
 import { randomUUID, createHash } from "node:crypto";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { resolveEmailConfig } from "../shared/email-config.js";
+import { prepareBrandedEmail, hasUnsafePaymentInstructions } from "./emailTemplate.js";
 
 const config = resolveEmailConfig(process.env);
 export const SYSTEM_EMAIL_FROM = config.from;
@@ -20,6 +21,16 @@ export class ResendDeliveryError extends Error {
 // A caller with a durable draft supplies its existing idempotency key.
 export function createResendTransport(proxy = connectors.proxy.bind(connectors), timeoutMs = 30000, injectedRecorder) {
   return async function send(params) {
+    const key = params.idempotencyKey ?? `system-email/${randomUUID()}`;
+    const recorder = injectedRecorder ?? (await import("./services/emailLogService.js")).emailLogRecorder;
+    const original = await recorder.originalPayload?.(key);
+    // Historical retry content is immutable. New drafts always receive branding.
+    if (original && !original.html?.includes('data-tpf-email="1"') &&
+      original.subject === params.subject && original.html === params.html && original.text === params.text) {
+      params = { ...params, html: original.html, text: original.text, attachments: original.attachments };
+    } else {
+      params = prepareBrandedEmail(params);
+    }
     const body = {
       from: SYSTEM_EMAIL_FROM,
       to: Array.isArray(params.to) ? params.to : [params.to],
@@ -37,17 +48,18 @@ export function createResendTransport(proxy = connectors.proxy.bind(connectors),
         ...(attachment.content_id ? { content_id: attachment.content_id } : {}),
       }));
     }
-    const key = params.idempotencyKey ?? `system-email/${randomUUID()}`;
     // Stable across retries, and body-specific: a webhook can reconcile a lost
     // acceptance response without matching by recipient or exposing a draft key.
     const correlationKey = createHash("sha256").update(key).update(".").update(JSON.stringify(body)).digest("hex");
     body.tags = [{ name: "email_log_key", value: correlationKey }];
     // Fail closed: no provider request is made unless its durable log exists.
-    const recorder = injectedRecorder ?? (await import("./services/emailLogService.js")).emailLogRecorder;
     const attemptId = await recorder.begin(params, body, key);
     let timeout;
     let providerAccepted = false;
     try {
+      if (hasUnsafePaymentInstructions(params.html) || hasUnsafePaymentInstructions(params.text)) {
+        throw new ResendDeliveryError(400, "Email contains retired placeholder payment instructions. Regenerate it using configured company payment details.", false);
+      }
       const previousId = await recorder.previousAcceptance?.(key, correlationKey);
       if (previousId) {
         providerAccepted = true;

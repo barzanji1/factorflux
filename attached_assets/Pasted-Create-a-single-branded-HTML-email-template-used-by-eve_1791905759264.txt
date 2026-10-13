@@ -1,0 +1,15 @@
+Create a single branded HTML email template used by every outbound email (carrier notifications, broker follow-ups, funding receipts, confirmation requests, doc requests, chargeback notices — all of them).
+
+Template structure:
+- Header: full-width teal #27aab8 bar with the FF embossed logo (white version) left-aligned and "Trucking Pros Financial" in white text right of it. Keep it clean — no gradients, no stock imagery.
+- Body: white background, dark text, content area max-width 600px centered. Use the system font stack (Arial/Helvetica). Invoice details in a clean table with light gray borders, not a bullet list. Key values (amounts, invoice #, load #) in bold.
+- Footer: light gray #f5f5f5 background. Company info: Trucking Pros Financial, dosh@truckingprosfinancial.com, 385-495-4962. Small text: "This is an automated message from Trucking Pros Financial." No unsubscribe link needed for transactional email.
+- Responsive: single column, readable on mobile (the screenshots show mobile — this matters).
+
+Implementation:
+1. Build the template as a shared function: wrapEmail(subject, bodyHtml) → full HTML string with the header/footer baked in. Every send path calls this before passing to Resend.
+2. Refactor each email type (carrier advance notification, broker payment follow-up, broker confirmation request, funding receipt, doc request, chargeback notice, missing docs alert) to produce only the body content block, which wrapEmail wraps.
+3. The carrier email should NOT say "Hi TEST PILOT CHARGEBACK CARRIER LLC" in all caps — use proper case (title case the carrier name, or store a display name). Same for broker emails.
+4. The broker email shows placeholder payment instructions (routing 021000021, account 1234567890, address 1234 Factoring Lane Dallas TX). Replace with real values from a config or env vars (COMPANY_ROUTING, COMPANY_ACCOUNT, COMPANY_ADDRESS) — or hide the payment instructions section entirely until configured. Do not ship fake banking details in production emails.
+
+Win95 theme does NOT apply to emails — emails should look modern and professional. Show the diff and send a test of each email type to verify rendering in Gmail on mobile.

@@ -25,6 +25,7 @@ import { advanceInvoiceStage, STAGE_META, type FactoringStage } from "./invoiceS
 import { guardDocsForReview, guardDocsForApproval, getDocumentCompleteness, getInvoiceDocumentTypes } from "./docValidation";
 import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
 import { sendEmailTracked } from "../emailService";
+import { emailDisplayName, textToEmailBody } from "../emailTemplate.js";
 import {
   compensateFundingReceiptUpload,
   issueInitialFundingReceipt,
@@ -328,7 +329,7 @@ const fxSendFundingConfirmation: SideEffect = async ({ invoiceId, actorId }) => 
       ? "Same day if processed before 1:15 PM MST"
       : "Next business day";
     const subject = `Invoice ${inv.invoiceNumber} Funded — Your Advance is on the Way`;
-    const text = `Hi ${carrier.name},
+    const text = `Hi ${emailDisplayName(carrier.name)},
 
 Great news! Your invoice has been processed and your advance payment is on its way.
 
@@ -360,6 +361,7 @@ Trucking Pros Financial Team`;
       emailLog: { entityType: "invoice", entityId: invoiceId, templateName: "funding_confirmation", sentByUserId: actorId },
       subject,
       text,
+      html: textToEmailBody(text),
     });
     await db.insert(eventLedger).values({
       entityType: "invoice", entityId: invoiceId,

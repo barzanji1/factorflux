@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
+import { prepareBrandedEmail, EMAIL_LOGO_CID } from "./emailTemplate.js";
 import {
   createResendTransport, ResendDeliveryError,
   SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO, type ResendProxy, type EmailLogRecorder,
@@ -26,25 +27,25 @@ test("sole transport fixes sender identity, normalizes attachments, and returns 
     ...message, from: "spoof@example.com", replyTo: "spoof@example.com",
     html: '<img src="cid:logo">', attachments: [attachment, logo], idempotencyKey: "test/stable",
   };
+  const branded = prepareBrandedEmail(attempt);
+  const brandedAttachments = branded.attachments!.map(item => ({
+    content: item.content, filename: item.filename, content_type: item.type,
+    ...(item.content_id ? { content_id: item.content_id } : {}),
+  }));
   assert.equal(await send(attempt), "test-provider-id");
   assert.equal(captured?.connector, "resend");
   assert.equal(captured?.path, "/emails");
   assert.equal(captured?.options.headers["Idempotency-Key"], "test/stable");
   assert.deepEqual(captured?.options.body, {
     from: SYSTEM_EMAIL_FROM, to: [message.to], reply_to: SYSTEM_EMAIL_REPLY_TO,
-    subject: message.subject, text: message.text, html: attempt.html,
-    attachments: [
-      { content: attachment.content, filename: attachment.filename, content_type: attachment.type },
-      { content: logo.content, filename: logo.filename, content_type: logo.type, content_id: "logo" },
-    ],
+    subject: message.subject, text: message.text, html: branded.html,
+    attachments: brandedAttachments,
     tags: [{ name: "email_log_key", value: createHash("sha256").update("test/stable.").update(JSON.stringify({
       from: SYSTEM_EMAIL_FROM, to: [message.to], reply_to: SYSTEM_EMAIL_REPLY_TO, subject: message.subject,
-      text: message.text, html: attempt.html, attachments: [
-        { content: attachment.content, filename: attachment.filename, content_type: attachment.type },
-        { content: logo.content, filename: logo.filename, content_type: logo.type, content_id: "logo" },
-      ],
+      text: message.text, html: branded.html, attachments: brandedAttachments,
     })).digest("hex") }],
   });
+  assert.equal(branded.attachments!.filter(item => item.content_id === EMAIL_LOGO_CID).length, 1);
 });
 
 test("durable draft keys are preserved and independent system sends get distinct keys", async () => {

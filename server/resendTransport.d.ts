@@ -35,6 +35,7 @@ export type ResendProxy = (connector: string, path: string, options: {
   method: string; headers: Record<string, string>; body: unknown;
 }) => Promise<Response>;
 export interface EmailLogRecorder {
+  originalPayload?(key: string): Promise<ResendEmailParams | undefined>;
   begin(params: ResendEmailParams, body: { from: string; reply_to: string; to: string[]; cc?: string[]; tags: { name: string; value: string }[] }, key: string): Promise<number>;
   previousAcceptance?(key: string, correlationKey: string): Promise<string | null>;
   accepted(id: number, messageId: string): Promise<void>;

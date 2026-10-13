@@ -3,9 +3,11 @@ const { spawn } = require("node:child_process");
 const WebSocket = require("ws");
 const assert = require("node:assert/strict");
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const creationHold = process.argv.includes("--creation-hold");
+const created = [];
 let chrome, ws, revision = 1, fail = false, delay = 0;
 const calls = [];
-const user = { id: "refresh-fixture", role: "admin", firstName: "Refresh", lastName: "Fixture" };
+const user = { id: "refresh-fixture", role: creationHold ? "employee" : "admin", firstName: "Refresh", lastName: "Fixture" };
 (async () => {
   chrome = spawn("chromium", ["--headless", "--no-sandbox", "--disable-gpu", "--ignore-certificate-errors",
     "--remote-debugging-port=9238", "--user-data-dir=/tmp/ff-invoice-refresh-browser", "about:blank"], { stdio: "ignore" });
@@ -40,6 +42,7 @@ const user = { id: "refresh-fixture", role: "admin", firstName: "Refresh", lastN
     if (entityRequest && fail) { status = 500; body = { message: "Refresh failed" }; }
     else if (url.pathname === "/api/auth/verify") body = { user, ...user };
     else if (url.pathname === "/api/auth/user") body = user;
+    else if (url.pathname === "/api/auth/permissions") body = { permissions: ["dashboard", "invoices", "carriers", "brokers", "documents", "loads", "factoring"] };
     else if (url.pathname === "/api/user/permissions") body = { permissions: ["dashboard", "invoices", "carriers", "brokers", "documents", "loads", "admin"].map(module => ({ module, canView: true, canCreate: true, canEdit: true, canDelete: true })) };
     else if (url.pathname === "/api/clients") body = [{ id: 702, name: "REFRESH CARRIER", status: "active", notes: "LIST SNAPSHOT" }];
     else if (url.pathname === "/api/brokers") body = { data: [{ id: 701, name: "REFRESH BROKER", status: "active", notes: "LIST SNAPSHOT" }] };
@@ -49,6 +52,15 @@ const user = { id: "refresh-fixture", role: "admin", firstName: "Refresh", lastN
     else if (url.pathname === "/api/carriers/702/bank-accounts") body = [{ id: 720 + r, bankName: `BANK CURRENT ${r}`, lastFour: "1234" }];
     else if (url.pathname === "/api/drivers") body = [{ id: 730 + r, carrierId: 702, firstName: `DRIVER${r}`, lastName: "CURRENT", status: "active" }];
     else if (url.pathname === "/api/invoices/preflight") body = { alerts: [] };
+    else if (url.pathname === "/api/invoices/with-documents") {
+      const multipart = request.postData;
+      assert(multipart, "Creation request includes multipart metadata");
+      const match = multipart.match(/\r\n\r\n(\{[^\r\n]+\})\r\n/);
+      assert(match, "Invoice metadata found in multipart payload");
+      const metadata = JSON.parse(match[1]);
+      created.push(metadata);
+      body = { id: 741, invoiceNumber: "INV-FIXTURE", status: metadata.holdForManagerReview ? "held" : "submitted" };
+    }
     else if (url.pathname === "/api/invoices") body = { data: [], total: 0 };
     await cdp("Fetch.fulfillRequest", { requestId, responseCode: status,
       responseHeaders: [{ name: "Content-Type", value: "application/json" }],
@@ -93,6 +105,47 @@ const user = { id: "refresh-fixture", role: "admin", firstName: "Refresh", lastN
   await select("brokers", "REFRESH BROKER");
   await select("carriers", "REFRESH CARRIER");
   await ready(1);
+  if (creationHold) {
+    const setInput = async (id, value) => evaluate(`(()=>{const e=document.getElementById(${JSON.stringify(id)});Object.getOwnPropertyDescriptor(e.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,"value").set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event("input",{bubbles:true}));})()`);
+    const fill = async () => {
+      await setInput("loadNumber", "HOLD-FIXTURE");
+      await setInput("amount", "125");
+      await evaluate(`(()=>{
+        const inputs=Array.from(document.querySelectorAll('input[type="file"]:not([multiple])'));
+        if(inputs.length<2)throw new Error("Paperwork inputs missing");
+        for(let i=0;i<2;i++){const dt=new DataTransfer();dt.items.add(new File(["%PDF-1.4\\nfixture"],"fixture-"+i+".pdf",{type:"application/pdf"}));inputs[i].files=dt.files;inputs[i].dispatchEvent(new Event("change",{bubbles:true}));}
+      })()`);
+      await until(`!(${button("Submit")}).disabled`);
+    };
+    assert(await evaluate(`!!document.querySelector('#holdForManagerReview')`), "employee sees hold option");
+    assert.equal(await evaluate(`document.querySelector('#holdForManagerReview').getAttribute("aria-checked")`), "false");
+    await fill();
+    await click(button("Submit"));
+    await until(`!document.querySelector('#holdForManagerReview')`);
+    assert.equal(created.length, 1);
+    assert.equal(created[0].lumper, null, "empty lumper submits");
+    assert.equal(created[0].holdForManagerReview, false);
+    for (const reason of ["Verify rate con", ""]) {
+      await click(button("Create Invoice"));
+      await select("brokers", "REFRESH BROKER");
+      await select("carriers", "REFRESH CARRIER");
+      await ready(1);
+      assert.equal(await evaluate(`document.querySelector('#holdForManagerReview').getAttribute("aria-checked")`), "false", "hold resets on reopen");
+      await click(`document.querySelector('#holdForManagerReview')`);
+      await until(`!!document.querySelector('#holdReason')`);
+      await setInput("holdReason", reason);
+      await fill();
+      await click(button("Submit"));
+      await until(`!document.querySelector('#holdForManagerReview')`);
+      const metadata = created.at(-1);
+      assert.equal(metadata.holdForManagerReview, true);
+      assert.equal(metadata.holdReason, reason || null);
+      assert.equal(metadata.lumper, null);
+    }
+    assert.equal(created.length, 3);
+    console.log("PASS: employee hold control, empty lumper submission, hold reason payload, optional empty reason, and modal state reset; all writes intercepted.");
+    return;
+  }
   revision = 2; delay = 500;
   await select("brokers", "REFRESH BROKER");
   await until("document.body.innerText.includes('Refreshing broker and carrier data')");

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow, format, differenceInDays } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -171,12 +172,16 @@ function ReleaseDialog({
 
 export default function HeldQueue() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canRelease = user?.role === "manager" || user?.role === "admin";
   const [search, setSearch] = useState("");
   const [reasonFilter, setReasonFilter] = useState("all");
   const [releaseTarget, setReleaseTarget] = useState<HeldInvoice | null>(null);
 
   const { data: held = [], isLoading } = useQuery<HeldInvoice[]>({
     queryKey: ["/api/held"],
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -358,6 +363,7 @@ export default function HeldQueue() {
                           <td className="px-4 py-3">
                             <Button
                               size="sm"
+                              disabled={!canRelease}
                               className="h-7 text-[11px] gap-1"
                               onClick={() => setReleaseTarget(inv)}
                             >

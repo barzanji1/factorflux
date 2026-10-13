@@ -117,6 +117,11 @@ export function createEmailLogRecorder({
         throw new EmailLogError(503, "Email attachment storage failed; the failed attempt was logged.");
       }
     },
+    async originalPayload(key) {
+      const [row] = await store.select({ encryptedPayload: emailRetryPayloads.encryptedPayload })
+        .from(emailRetryPayloads).where(eq(emailRetryPayloads.idempotencyKey, key)).limit(1);
+      return row?.encryptedPayload ? decryptEmailPayload(row.encryptedPayload) : undefined;
+    },
     async accepted(id, messageId) {
       await store.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'email-log/' + messageId}, 0))`);

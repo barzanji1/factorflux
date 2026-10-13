@@ -7,3 +7,18 @@ uri = "file://attached_assets/generated_audio/team-chat-original-voice.mp3"
 type = "audio"
 title = "Original Team Chat message notification"
 description = "Text-to-speech audio: You've got a message."
+logical_id = "14785dae-b144-403a-9956-a9f01a00961d"
+
+[[outputs]]
+id = "Y_s3PTbnHU53grl3Zj4-z"
+uri = "file://generated-artifacts/email-branding/index.html"
+type = "html"
+title = "Trucking Pros Financial email previews"
+description = "Seven self-contained mobile-friendly sample emails. All seven test emails were delivered; actual Gmail mobile rendering has not been verified."
+logical_id = "e96f5060-05ba-41d5-b0e3-b667b83e1dd5"
+content_hash = "sha256:c18bf93610ddf3385ae2ff23c386c3f193bbf51ff10bba3e9786ea96b5349083"
+size = 89238
+mtime_ms = 1791907285216
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/e96f5060-05ba-41d5-b0e3-b667b83e1dd5/b002e936-9e7b-4fa7-a332-a5090352e124"
+storage_version_token = "1791907623995642"
+content_type = "text/html"

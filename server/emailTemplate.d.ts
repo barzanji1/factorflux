@@ -1,0 +1,12 @@
+import type { ResendEmailParams } from "./resendTransport.js";
+export const EMAIL_BRAND_MARKER: string;
+export const EMAIL_LOGO_CID: string;
+export function escapeEmailHtml(value: unknown): string;
+export function emailDisplayName(value: string | null | undefined): string;
+export function emailDetailsTable(rows: ReadonlyArray<readonly [string, string]>): string;
+export function paymentInstructions(config?: Record<string, string | undefined>): string;
+export function configuredPaymentBody(text: string, config?: Record<string, string | undefined>): string;
+export function hasUnsafePaymentInstructions(content?: string): boolean;
+export function textToEmailBody(text?: string): string;
+export function wrapEmail(subject: string, bodyHtml: string): string;
+export function prepareBrandedEmail<T extends ResendEmailParams>(params: T): T & ResendEmailParams;

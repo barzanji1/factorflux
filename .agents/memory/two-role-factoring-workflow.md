@@ -12,3 +12,9 @@ Agents may create and correct their own invoices, manage documents only before s
 Document completion may automatically queue a pending invoice for review, but must never approve it. Keep Override & Approve confined to the review stage rather than introducing a document-pending fast-track.
 
 **Why:** The user explicitly said the approval error for `docs_pending` is correct because review must not be skipped; hiding the unavailable override preserves the existing manager review boundary.
+
+Any agent may flag an invoice for manager review by creating it on hold, with an optional reason. This does not grant agents permission to release held invoices or place existing invoices on hold.
+
+**Why:** The user wants agents to flag uncertain paperwork or amounts during intake, while managers remain responsible for release and review.
+
+**How to apply:** Creation holds notify active managers/admins. Manager release of intake holds uses current document readiness; preserve the existing release behavior for holds placed after approval.
