@@ -1,3 +1,4 @@
+import { refreshInvoiceDocumentRequirements } from "./services/invoiceDocumentWorkflow";
 import {
   users,
   clients,
@@ -833,6 +834,7 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
+    if (newDocument.invoiceId) await refreshInvoiceDocumentRequirements(newDocument.invoiceId);
     return newDocument;
   }
 
@@ -843,6 +845,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(documents.id, id))
       .returning();
 
+    if (updatedDocument?.invoiceId) await refreshInvoiceDocumentRequirements(updatedDocument.invoiceId);
     return updatedDocument;
   }
 

@@ -466,6 +466,8 @@ export default function InvoiceDetail() {
       return r.json();
     },
     enabled: !isNaN(invoiceId),
+    refetchInterval: query => query.state.data?.status === "docs_pending" ? 2000 : false,
+    refetchOnMount: "always",
   });
   const canonicalBroker = detail?.broker ?? detail?.debtor;
   const canAgentCorrect = !isManager && ["draft", "rejected"].includes(String(detail?.status ?? ""));
@@ -540,7 +542,16 @@ export default function InvoiceDetail() {
     },
     enabled: !isNaN(invoiceId),
     refetchOnMount: "always",
+    refetchInterval: detail?.status === "docs_pending" ? 2000 : false,
   });
+
+  useEffect(() => {
+    if (!detail?.status) return;
+    setOverrideOpen(false);
+    void qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
+    void qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "available-transitions"] });
+    void qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "timeline"] });
+  }, [qc, invoiceId, detail?.status]);
 
   const { data: debtors = [] } = useQuery<any[]>({ queryKey: ["/api/debtors"], enabled: editOpen });
   const { data: brokers = [] } = useQuery<any[]>({
@@ -970,7 +981,7 @@ export default function InvoiceDetail() {
                                 <ShieldCheck className="h-3.5 w-3.5" />Override Applied
                               </Badge>
                             ) : <span />}
-                            {isAdmin && !docStatus.overrideApplied && detail.status !== "approved" && (
+                            {isAdmin && !docStatus.overrideApplied && detail.status === "under_review" && (
                               <Button variant="outline" className="gap-2 border-violet-300 text-violet-700" onClick={() => setOverrideOpen(true)}>
                                 <ShieldCheck className="h-4 w-4" />Override & Approve
                               </Button>
@@ -1436,8 +1447,8 @@ export default function InvoiceDetail() {
                         </div>
                         {docStatus && <div className={cn("flex flex-wrap items-center justify-between gap-3 rounded-[3px] border-2 px-3 py-2 text-xs", docStatus.canApprove ? "border-[#6aa36a] bg-[#e8f5e8] text-[#166534]" : "border-[#c99a42] bg-[#fff8df] text-[#7a5100]")}>
                           <span className="font-bold">Document readiness: {docStatus.completenessPercent ?? 0}%</span>
-                          {!docStatus.canApprove && <span>Missing: {(docStatus.missingForApproval || docStatus.missingForReview || []).join(", ") || "Review required"}</span>}
-                          {isAdmin && !docStatus.overrideApplied && detail.status !== "approved" && <Button size="sm" variant="outline" className="h-7 rounded-[2px] text-[11px]" onClick={() => setOverrideOpen(true)}><ShieldCheck className="mr-1 h-3 w-3" />Override & Approve</Button>}
+                          {!docStatus.canApprove && <span>Missing: {[...(docStatus.missingForReview ?? []), ...(docStatus.missingForApproval ?? [])].join(", ") || "Review required"}</span>}
+                          {isAdmin && !docStatus.overrideApplied && detail.status === "under_review" && <Button size="sm" variant="outline" className="h-7 rounded-[2px] text-[11px]" onClick={() => setOverrideOpen(true)}><ShieldCheck className="mr-1 h-3 w-3" />Override & Approve</Button>}
                         </div>}
                          {previewDocument && (
                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900 dark:border-slate-700">

@@ -16,7 +16,8 @@ import {
   docFieldCandidates,
   documents,
 } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { refreshInvoiceDocumentRequirements } from "./invoiceDocumentWorkflow";
 import { getExtractionProvider } from "./ocr/registry";
 import { assertSuccessfulExtraction, type ExtractionProvider } from "./ocr/types";
 import { classifyDocumentAI, reviewDocumentType } from "./aiClassifier";
@@ -317,7 +318,7 @@ export async function runExtractionJob(
         aiClassificationConfidence: String(aiResult.confidence),
         aiClassificationSignals:    aiResult.signals,
         allClassificationScores:    aiResult.allScores,
-        classificationSource:       aiResult.source as any,
+        classificationSource:       sql`CASE WHEN ${documents.classificationSource} = 'agent' THEN 'agent' ELSE ${aiResult.source} END`,
         aiClassifiedAt:             new Date(),
         aiClassificationModel:      aiResult.model,
         status: "processed",
@@ -419,6 +420,10 @@ export async function runExtractionJob(
     if (candidates.length > 0) {
       await jobDb.insert(docFieldCandidates).values(candidates);
     }
+
+    const [linkedDocument] = await jobDb.select({ invoiceId: documents.invoiceId })
+      .from(documents).where(eq(documents.id, documentId)).limit(1);
+    if (linkedDocument?.invoiceId) await refreshInvoiceDocumentRequirements(linkedDocument.invoiceId, jobDb);
 
     await jobDb
       .update(docExtractionJobs)

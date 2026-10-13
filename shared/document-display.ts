@@ -3,10 +3,14 @@ export type DocumentClassification = {
   candidateDocumentType?: string | null;
   aiDocumentType?: string | null;
   documentType?: string | null;
+  classificationSource?: string | null;
 };
 
 export function documentClassification(doc: DocumentClassification): string {
-  return doc.finalDocumentType || doc.candidateDocumentType || doc.aiDocumentType || doc.documentType || "other";
+  // A human correction is authoritative (including an explicit "Other").
+  // Otherwise AI results must not be hidden by an upload-time placeholder.
+  if (doc.classificationSource === "agent") return doc.finalDocumentType || doc.documentType || "other";
+  return doc.aiDocumentType || doc.candidateDocumentType || doc.finalDocumentType || doc.documentType || "other";
 }
 
 export function documentClassificationLabel(type: string): string {

@@ -13,6 +13,7 @@ import {
   documents,
 } from "../../shared/schema";
 import { eq, asc, desc } from "drizzle-orm";
+import { documentClassification } from "../../shared/document-display";
 import type {
   DocumentRule,
   InvoiceDocReview,
@@ -41,34 +42,39 @@ export interface DocCompleteness {
   reviews: InvoiceDocReview[];
 }
 
-function checklistType(type: string): string {
+export function checklistType(type: string): string {
   if (type === "bill_of_lading") return "bol";
-  if (type === "invoice") return "commercial_invoice";
+  if (["invoice", "carrier_invoice", "freight_invoice"].includes(type)) return "commercial_invoice";
+  if (type === "bol_pod") return "bol";
   if (type === "proof_of_delivery") return "pod";
   return type;
 }
 
 // ─── Core function ────────────────────────────────────────────────────────────
 
-export async function getDocumentCompleteness(invoiceId: number): Promise<DocCompleteness> {
+export async function getDocumentCompleteness(invoiceId: number, executor: Pick<typeof db, "select"> = db): Promise<DocCompleteness> {
   const [rules, docs, reviews] = await Promise.all([
-    db.select().from(documentRules)
+    executor.select().from(documentRules)
       .where(eq(documentRules.active, true))
       .orderBy(asc(documentRules.sortOrder)),
-    db.select({
+    executor.select({
       id: documents.id,
       documentType: documents.documentType,
+      finalDocumentType: documents.finalDocumentType,
+      candidateDocumentType: documents.candidateDocumentType,
+      aiDocumentType: documents.aiDocumentType,
+      classificationSource: documents.classificationSource,
       originalName: documents.originalName,
       status: documents.status,
       createdAt: documents.createdAt,
     }).from(documents).where(eq(documents.invoiceId, invoiceId)),
-    db.select().from(invoiceDocReviews)
+    executor.select().from(invoiceDocReviews)
       .where(eq(invoiceDocReviews.invoiceId, invoiceId))
       .orderBy(desc(invoiceDocReviews.createdAt)),
   ]);
 
   const docsByType = new Map<string, (typeof docs)[number]>(
-    docs.map(d => [checklistType(d.documentType as string), d]),
+    docs.map(d => [checklistType(documentClassification(d)), d]),
   );
 
   const ruleStatuses: DocRuleStatus[] = rules.map(rule => ({
@@ -101,20 +107,23 @@ export async function getDocumentCompleteness(invoiceId: number): Promise<DocCom
   };
 }
 
+export async function getInvoiceDocumentTypes(invoiceId: number): Promise<Set<string>> {
+  const docs = await db.select({
+    documentType: documents.documentType,
+    finalDocumentType: documents.finalDocumentType,
+    candidateDocumentType: documents.candidateDocumentType,
+    aiDocumentType: documents.aiDocumentType,
+    classificationSource: documents.classificationSource,
+  }).from(documents).where(eq(documents.invoiceId, invoiceId));
+  return new Set(docs.map(doc => checklistType(documentClassification(doc))));
+}
+
 // ─── Guards (called by lifecycle engine) ─────────────────────────────────────
 
 type Ctx = { invoiceId: number };
 
 export async function guardDocsForReview(ctx: Ctx): Promise<{ code: string; message: string; severity: "error" | "warning" } | null> {
-  const rules = await db.select().from(documentRules)
-    .where(eq(documentRules.active, true));
-  const reviewRules = rules.filter(r => r.required && r.requiredForStage === "start_review");
-  if (!reviewRules.length) return null;
-
-  const docs = await db.select({ documentType: documents.documentType }).from(documents)
-    .where(eq(documents.invoiceId, ctx.invoiceId));
-  const types = new Set<string>(docs.map(d => checklistType(d.documentType as string)));
-  const missing = reviewRules.filter(r => !types.has(checklistType(r.documentType))).map(r => r.label);
+  const { missingForReview: missing } = await getDocumentCompleteness(ctx.invoiceId);
 
   return missing.length === 0 ? null : {
     code: "missing_review_docs",
@@ -124,15 +133,8 @@ export async function guardDocsForReview(ctx: Ctx): Promise<{ code: string; mess
 }
 
 export async function guardDocsForApproval(ctx: Ctx): Promise<{ code: string; message: string; severity: "error" | "warning" } | null> {
-  const rules = await db.select().from(documentRules)
-    .where(eq(documentRules.active, true));
-  const approveRules = rules.filter(r => r.required && r.requiredForStage === "approve");
-  if (!approveRules.length) return null;
-
-  const docs = await db.select({ documentType: documents.documentType }).from(documents)
-    .where(eq(documents.invoiceId, ctx.invoiceId));
-  const types = new Set<string>(docs.map(d => checklistType(d.documentType as string)));
-  const missing = approveRules.filter(r => !types.has(checklistType(r.documentType))).map(r => r.label);
+  const completeness = await getDocumentCompleteness(ctx.invoiceId);
+  const missing = [...completeness.missingForReview, ...completeness.missingForApproval];
 
   return missing.length === 0 ? null : {
     code: "missing_approval_docs",

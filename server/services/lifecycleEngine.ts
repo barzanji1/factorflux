@@ -22,7 +22,7 @@ import {
 } from "../../shared/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { advanceInvoiceStage, STAGE_META, type FactoringStage } from "./invoiceStage";
-import { guardDocsForReview, guardDocsForApproval } from "./docValidation";
+import { guardDocsForReview, guardDocsForApproval, getDocumentCompleteness, getInvoiceDocumentTypes } from "./docValidation";
 import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
 import { sendEmailTracked } from "../emailService";
 import {
@@ -123,9 +123,7 @@ const guardHasApprovalDocs: Guard = (ctx) => guardDocsForApproval(ctx);
 
 /** Funding is never permitted without the two core freight documents. */
 const guardHasFundingDocs: Guard = async ({ invoiceId }) => {
-  const docs = await db.select({ documentType: documents.documentType }).from(documents)
-    .where(eq(documents.invoiceId, invoiceId));
-  const types = new Set(docs.map((document) => document.documentType));
+  const types = await getInvoiceDocumentTypes(invoiceId);
   const missing = [
     !types.has("rate_confirmation") ? "rate confirmation" : null,
     !(types.has("bill_of_lading") || types.has("bol")) ? "bill of lading" : null,
@@ -240,11 +238,8 @@ function fxNotify(title: (ctx: Ctx) => string, msg: (ctx: Ctx) => string): SideE
 
 /** Auto-downgrade to docs_pending if required docs are missing after submission */
 const fxCheckDocsAutoDowngrade: SideEffect = async ({ invoiceId, actorId }) => {
-  const docs = await db.select({ documentType: documents.documentType }).from(documents)
-    .where(eq(documents.invoiceId, invoiceId));
-  const types = new Set(docs.map(d => d.documentType));
-  const hasBillOfLading = types.has("bill_of_lading") || types.has("bol");
-  if (!types.has("rate_confirmation") || !hasBillOfLading) {
+  const completeness = await getDocumentCompleteness(invoiceId);
+  if (!completeness.canStartReview) {
     await db.transaction(async tx => {
       const [updated] = await tx.update(invoices)
         .set({ status: "docs_pending", updatedAt: new Date() })

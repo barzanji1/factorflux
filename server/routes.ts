@@ -166,7 +166,9 @@ import {
   performTransition,
   getInvoiceDisplayStatus,
 } from "./services/lifecycleEngine";
-import { getDocumentCompleteness } from "./services/docValidation";
+import { getDocumentCompleteness, checklistType } from "./services/docValidation";
+import { refreshInvoiceDocumentRequirements } from "./services/invoiceDocumentWorkflow";
+import { documentClassification } from "../shared/document-display";
 import {
   compensateFundingReceiptUpload,
   getFundingReceipt,
@@ -1977,6 +1979,7 @@ ${message}
       const document = await storage.updateDocument(id, {
         documentType: req.body.documentType,
         finalDocumentType: req.body.documentType,
+        classificationSource: "agent",
       } as any);
       if (!document) return res.status(404).json({ message: "Document not found" });
       res.json(document);
@@ -3289,6 +3292,11 @@ ${message}
         return { invoice, documents };
       });
       transactionCommitted = true;
+      const readiness = await refreshInvoiceDocumentRequirements(committed.invoice.id);
+      if (readiness.advanced) {
+        committed.invoice.status = "under_review";
+        committed.invoice.factoringStage = "verification";
+      }
       return res.status(201).json({
         ...withInvoiceDisplayStatus(committed.invoice),
         documents: committed.documents.map((document) => ({
@@ -3498,6 +3506,9 @@ ${message}
           invoiceId: documentsTable.invoiceId,
           documentType: documentsTable.documentType,
           finalDocumentType: documentsTable.finalDocumentType,
+          candidateDocumentType: documentsTable.candidateDocumentType,
+          aiDocumentType: documentsTable.aiDocumentType,
+          classificationSource: documentsTable.classificationSource,
           originalName: documentsTable.originalName,
           size: documentsTable.size,
           originalSize: documentsTable.originalSize,
@@ -3529,9 +3540,7 @@ ${message}
       res.json({
         rows: queue.map(({ invoice, carrierName, advanceRate, factoringFeeRate, brokerName, branchNameJoined, driverName, submittedByName }) => {
         const invoiceDocs = byInvoice.get(invoice.id) ?? [];
-        const types = new Set(invoiceDocs.flatMap((document) =>
-          [document.documentType, document.finalDocumentType].filter(Boolean),
-        ));
+        const types = new Set(invoiceDocs.map(document => checklistType(documentClassification(document))));
         const rateConfirmationPresent = types.has("rate_confirmation");
         const billOfLadingPresent = types.has("bill_of_lading") || types.has("bol");
         const lumperPresent = types.has("lumper_receipt") || types.has("receipt");
@@ -3567,7 +3576,7 @@ ${message}
           },
           documents: invoiceDocs.map((document) => ({
             id: document.id,
-            type: document.finalDocumentType || document.documentType,
+            type: documentClassification(document),
             originalName: document.originalName,
             size: document.size,
             originalSize: document.originalSize,
@@ -8261,6 +8270,10 @@ Trucking Pros Financial Team
         })
         .where(eq(documentsTable.id, docId));
 
+      const [linkedDocument] = await db.select({ invoiceId: documentsTable.invoiceId })
+        .from(documentsTable).where(eq(documentsTable.id, docId)).limit(1);
+      if (linkedDocument?.invoiceId) await refreshInvoiceDocumentRequirements(linkedDocument.invoiceId);
+
       res.json({
         docType:    reviewType,
         confidence: aiResult.confidence,
@@ -8380,10 +8393,10 @@ Trucking Pros Financial Team
 
       // When confirming: update documents.documentType so lifecycle guards work
       if (reviewStatus === "confirmed") {
-        const effectiveType = (doc.finalDocumentType ?? doc.candidateDocumentType ?? "other") as any;
-        await db.update(documentsTable)
-          .set({ documentType: effectiveType })
-          .where(eq(documentsTable.id, docId));
+        const effectiveType = documentClassification(doc) as any;
+        await storage.updateDocument(docId, {
+          documentType: effectiveType, finalDocumentType: effectiveType, classificationSource: "agent",
+        });
       }
 
       const [review] = await db
@@ -8408,7 +8421,7 @@ Trucking Pros Financial Team
 
       // Workflow integration — emit event + check completeness when confirming
       if (reviewStatus === "confirmed" && doc.invoiceId) {
-        const effectiveType = doc.finalDocumentType ?? doc.candidateDocumentType ?? "other";
+        const effectiveType = documentClassification(doc);
         const completeness = await getDocumentCompleteness(doc.invoiceId);
         await db.insert(eventLedger).values({
           entityType:  "invoice",
@@ -8449,16 +8462,18 @@ Trucking Pros Financial Team
 
       const [updated] = await db
         .update(documentsTable)
-        .set({ finalDocumentType: finalDocumentType as any })
+        .set({ finalDocumentType: finalDocumentType as any, classificationSource: "agent" })
         .where(eq(documentsTable.id, docId))
         .returning({
           id: documentsTable.id,
+          invoiceId: documentsTable.invoiceId,
           candidateDocumentType: documentsTable.candidateDocumentType,
           finalDocumentType: documentsTable.finalDocumentType,
           classificationConfidence: documentsTable.classificationConfidence,
         });
 
       if (!updated) return res.status(404).json({ message: "Document not found" });
+      if (updated.invoiceId) await refreshInvoiceDocumentRequirements(updated.invoiceId);
 
       await storage.createActivity({
         userId:      req.user.id,
