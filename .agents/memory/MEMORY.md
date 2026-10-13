@@ -18,6 +18,7 @@
 - [API authorization coverage](api-authorization-coverage.md) — inventory every concrete API prefix; alternate aliases and signed provider callbacks must not fall through generic auth.
 - [Direct-message identity](direct-message-identity.md) — canonical DM keys must encode participant IDs unambiguously; delimiter joins can collide and expose private threads.
 - [Controlled Radix sliders](controlled-radix-sliders.md) — controlled sliders need local draft state during drag; committing against unchanged query data can make them nonfunctional.
+- [Dev-overlay verification](dev-overlay-verification.md) — distinguish development-overlay click blockers from app exceptions; normal-looking screenshots can miss an intercepting overlay.
 - [Invoice paperwork integrity](invoice-paperwork-integrity.md) — commit invoice rows atomically and durably retry failed S3 compensation; never leave partial paperwork.
 - [Invoice timeline source](invoice-timeline-source.md) — event_ledger is the sole invoice timeline source; format audit payloads server-side and never merge activity/history rows.
 - [Funding lifecycle integrity](funding-lifecycle-integrity.md) — payout, funded state, and audit writes are atomic; Fund and Hold must use compare-and-set transitions.
@@ -38,5 +39,6 @@
 - [Carrier FMCSA status](carrier-fmcsa-status.md) — only reliable carrier-level adverse evidence blocks invoices; conflicting authority classes and failed lookups remain unknown.
 - [Portal preflight audit](portal-preflight-audit.md) — portal submissions need submission-scoped acknowledgements and audit, not invoice/user foreign keys.
 - [Invoice intake freshness](invoice-intake-freshness.md) — refresh broker/carrier details and related choices on modal open or selection; never treat cached intake data as current.
+- [Agent Performance freshness](agent-performance-freshness.md) — employee/date changes and revisits require fresh snapshots and a full control reset, not only detail-dialog keys.
 - [Document compression](document-compression.md) — persist only compressed uploads; portal document rows need size provenance too; HEIC requires a separate system decoder.
 - [Document identity and viewing](document-identity-viewing.md) — dedupe pending uploads by original bytes and owner; distinguish browser CORS failures from S3 authorization.

@@ -13,7 +13,7 @@ import TopNav from "@/components/layout/top-nav";
 import { useSavedViews, type SavedView } from "@/hooks/use-saved-views";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { brokerFormSchema, type BrokerFormData } from "@/components/brokers/broker-form-schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,26 +36,6 @@ import {
   ArrowUpDown,
   ShieldAlert,
 } from "lucide-react";
-
-// Broker form schema
-const brokerFormSchema = z.object({
-  name: z.string().min(1, "Broker name is required"),
-  contactPerson: z.string().min(1, "Contact person is required"),
-  email: z.string().email("Valid email is required"),
-  phone: z.string().min(10, "Valid phone number is required"),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  zipCode: z.string().optional(),
-  mcNumber: z.string().optional(),
-  dotNumber: z.string().optional(),
-  creditLimit: z.number().min(0).optional(),
-  paymentTerms: z.enum(["net15", "net30", "net45", "net60", "quickpay"]).default("net30"),
-  status: z.enum(["active", "inactive", "suspended"]).default("active"),
-  notes: z.string().optional(),
-});
-
-type BrokerFormData = z.infer<typeof brokerFormSchema>;
 
 interface Broker {
   id: number;

@@ -30,6 +30,8 @@ import {
   RefreshCw, Award,
 } from "lucide-react";
 import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
+import BrokerEditDialog from "@/components/brokers/broker-edit-dialog";
+import type { Broker } from "@shared/schema";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -160,6 +162,8 @@ export default function BrokerDetail() {
   const qc = useQueryClient();
 
   const [statusDialog, setStatusDialog] = useState(false);
+  const [editingBroker, setEditingBroker] = useState<Broker | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
   const [newStatus, setNewStatus] = useState<"active" | "inactive" | "suspended">("inactive");
   const [noteText, setNoteText] = useState("");
   const [branchDialog, setBranchDialog] = useState(false);
@@ -169,7 +173,7 @@ export default function BrokerDetail() {
     phone: "", email: "", contactName: "", status: "active" as "active" | "inactive",
   });
 
-  const { data: broker, isLoading } = useQuery<any>({
+  const { data: broker, isLoading, refetch: refetchBroker } = useQuery<any>({
     queryKey: ["/api/brokers", brokerId],
     queryFn: async () => {
       const r = await fetch(`/api/brokers/${brokerId}`, { credentials: "include" });
@@ -225,6 +229,18 @@ export default function BrokerDetail() {
   });
 
   const isAdmin = user?.role === "admin" || user?.role === "manager";
+  const openEditBroker = async () => {
+    setLoadingEdit(true);
+    try {
+      const result = await refetchBroker({ throwOnError: true });
+      if (!result.data || result.data.id !== brokerId) throw new Error("Broker information is unavailable.");
+      setEditingBroker(result.data);
+    } catch (error) {
+      toast({ title: "Unable to open broker editor", description: error instanceof Error ? error.message : "Failed to load broker.", variant: "destructive" });
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
 
   const branchPayload = () => ({
     branchName: branchForm.branchName.trim(),
@@ -338,9 +354,11 @@ export default function BrokerDetail() {
                     variant="outline"
                     size="sm"
                     className="w-full justify-start gap-2 rounded-2xl border-slate-200 text-xs dark:border-slate-700"
-                    onClick={() => window.location.href = `/brokers?edit=${brokerId}`}
+                    data-testid="broker-profile-edit"
+                    disabled={loadingEdit || !broker}
+                    onClick={openEditBroker}
                   >
-                    <Edit2 className="h-3.5 w-3.5" />Edit Broker
+                    <Edit2 className="h-3.5 w-3.5" />{loadingEdit ? "Loading…" : "Edit Broker"}
                   </Button>
                    <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned Processor</p>
@@ -558,6 +576,9 @@ export default function BrokerDetail() {
       </div>
 
       {/* Status change confirm dialog */}
+      {editingBroker?.id === brokerId && (
+        <BrokerEditDialog broker={editingBroker} onClose={() => setEditingBroker(null)} />
+      )}
       <Dialog open={statusDialog} onOpenChange={setStatusDialog}>
         <DialogContent className="max-w-sm rounded-3xl border-slate-200 dark:border-slate-800">
           <DialogHeader>

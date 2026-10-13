@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode } from "react";
+import { useState, useMemo, useRef, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -642,6 +642,20 @@ type PerformanceRow = {
   invoices?: Array<Record<string, unknown>>;
 };
 type Warning = { id: number; userId: string; agentName?: string; firstName?: string; lastName?: string; reason: string; severity: string; createdAt: string; acknowledgedAt?: string | null };
+type WarningDraft = { userId: string; severity: string; reason: string };
+const emptyWarningDraft = (): WarningDraft => ({ userId: "", severity: "verbal", reason: "" });
+
+// Honor TanStack cancellation so old agent/date requests cannot complete into
+// a new view. HTTP failures must not be interpreted as successful report rows.
+async function fetchPerformanceJson<T>(url: string, signal: AbortSignal): Promise<T> {
+  const response = await fetch(url, { credentials: "include", signal });
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error(`${response.status}: Expected JSON from ${url.split("?")[0]}`);
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(`${response.status}: ${data.message || "Unable to load report"}`);
+  return data as T;
+}
 type ArRow = {
   carrierId?: number; brokerId?: number; id?: number; carrierName?: string; brokerName?: string;
   totalInvoices?: number; invoiceCount?: number; totalFundedAmount?: number; totalFunded?: number;
@@ -677,34 +691,148 @@ function InvoiceDrilldown({ open, onOpenChange, title, invoices }: { open: boole
 }
 
 function AgentPerformanceTab() {
+  const [filters, setFilters] = useState(() => ({
+    start: format(subMonths(new Date(), 3), "yyyy-MM-dd"),
+    end: format(new Date(), "yyyy-MM-dd"), agentId: "all", revision: 0,
+  }));
+  const { start, end, agentId, revision } = filters;
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
-  const [end, setEnd] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [agentId, setAgentId] = useState("all");
-  const [selected, setSelected] = useState<PerformanceRow | null>(null);
+  const contextKey = JSON.stringify([user?.id, user?.role, agentId, start, end, revision]);
+  const activeContext = useRef(contextKey);
+  activeContext.current = contextKey;
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [warningOpen, setWarningOpen] = useState(false);
-  const [warningForm, setWarningForm] = useState({ userId: "", severity: "verbal", reason: "" });
+  const [warningForm, setWarningForm] = useState<WarningDraft>(emptyWarningDraft);
+  const [warningSession, setWarningSession] = useState(0);
+  const [pendingAcknowledgements, setPendingAcknowledgements] = useState<Set<number>>(() => new Set());
+  const activeWarningSession = useRef(warningSession);
+  activeWarningSession.current = warningSession;
   const manager = user?.role === "manager" || user?.role === "admin";
-  const params = `startDate=${start}&endDate=${end}${agentId !== "all" ? `&userId=${agentId}` : ""}`;
-  const query = useQuery<PerformanceRow[] | PerformanceRow>({ queryKey: ["/api/reports/agent-performance", start, end, agentId], queryFn: () => fetch(`/api/reports/agent-performance?${params}`, { credentials: "include" }).then(r => r.json()) });
-  const agentOptionsQuery = useQuery<PerformanceRow[]>({ queryKey: ["/api/reports/agent-performance", start, end, "options"], queryFn: () => fetch(`/api/reports/agent-performance?startDate=${start}&endDate=${end}`, { credentials: "include" }).then(r => r.json()) });
-  const warningQuery = useQuery<Warning[]>({ queryKey: ["/api/warnings"], queryFn: () => fetch("/api/warnings", { credentials: "include" }).then(r => r.json()) });
-  const rows = Array.isArray(query.data) ? query.data : query.data ? [query.data] : [];
-  const warnings = warningQuery.data ?? [];
-  const createWarning = useMutation({ mutationFn: () => apiRequest("POST", "/api/warnings", warningForm), onSuccess: () => { setWarningOpen(false); setWarningForm({ userId: "", severity: "verbal", reason: "" }); queryClient.invalidateQueries({ queryKey: ["/api/warnings"] }); } });
-  const acknowledge = useMutation({ mutationFn: (id: number) => apiRequest("PATCH", `/api/warnings/${id}/acknowledge`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/warnings"] }) });
+  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+    && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  const rangeError = !validDate(start) || !validDate(end) ? "Choose a valid From and Through date."
+    : start > end ? "From date must be on or before Through date." : null;
+  const enabled = !!user?.id && !rangeError;
+  const params = new URLSearchParams({ startDate: start, endDate: end });
+  if (agentId !== "all") params.set("userId", agentId);
+  const performancePrefix = ["/api/reports/agent-performance", user?.id, user?.role] as const;
+  const warningPrefix = ["/api/warnings", user?.id, user?.role] as const;
+  const freshness = { enabled, staleTime: 0, gcTime: 0, refetchOnMount: "always" as const, placeholderData: undefined };
+  const query = useQuery<PerformanceRow[] | PerformanceRow>({
+    ...freshness, queryKey: [...performancePrefix, start, end, agentId, revision],
+    queryFn: ({ signal }) => fetchPerformanceJson(`/api/reports/agent-performance?${params}`, signal),
+  });
+  const agentOptionsQuery = useQuery<PerformanceRow[]>({
+    ...freshness, queryKey: [...performancePrefix, start, end, "options", revision],
+    queryFn: ({ signal }) => fetchPerformanceJson(`/api/reports/agent-performance?${new URLSearchParams({ startDate: start, endDate: end })}`, signal),
+  });
+  const warningQuery = useQuery<Warning[]>({
+    ...freshness, queryKey: [...warningPrefix, start, end, agentId, revision],
+    // Warnings are personnel history, not period metrics; filter by employee
+    // without discarding historical warnings outside the performance period.
+    queryFn: ({ signal }) => fetchPerformanceJson(`/api/warnings${agentId === "all" ? "" : `?${new URLSearchParams({ userId: agentId })}`}`, signal),
+  });
+  const reportReady = enabled && query.isSuccess && !query.isFetching;
+  const optionsReady = enabled && agentOptionsQuery.isSuccess && !agentOptionsQuery.isFetching;
+  const agentOptions = optionsReady && Array.isArray(agentOptionsQuery.data) ? agentOptionsQuery.data : [];
+  const rows = reportReady ? (Array.isArray(query.data) ? query.data : query.data ? [query.data] : []) : [];
+  const selected = rows.find(row => String(row.userId ?? row.id) === selectedAgentId) ?? null;
+  const warnings = enabled && warningQuery.isSuccess && !warningQuery.isFetching ? warningQuery.data : [];
+  const clearWarning = () => { setWarningOpen(false); setWarningForm(emptyWarningDraft()); };
+  const createWarning = useMutation({
+    mutationFn: ({ draft }: { draft: WarningDraft; context: string; session: number }) => apiRequest("POST", "/api/warnings", draft),
+    onSuccess: (_response, variables) => {
+      // A save initiated under A must not close/erase a newer draft under B.
+      if (variables.context === activeContext.current && variables.session === activeWarningSession.current) clearWarning();
+      void queryClient.invalidateQueries({ queryKey: ["/api/warnings"] });
+    },
+  });
+  const acknowledge = useMutation({
+    mutationFn: ({ id }: { id: number; context: string }) => apiRequest("PATCH", `/api/warnings/${id}/acknowledge`),
+    onMutate: ({ id, context }) => {
+      if (context === activeContext.current) setPendingAcknowledgements(previous => new Set(previous).add(id));
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/warnings"] }),
+    onSettled: (_response, _error, { id, context }) => {
+      if (context === activeContext.current) setPendingAcknowledgements(previous => { const next = new Set(previous); next.delete(id); return next; });
+    },
+  });
+  const resetDetail = () => {
+    setSelectedAgentId(null);
+    setAgentMenuOpen(false);
+    clearWarning();
+    createWarning.reset();
+    acknowledge.reset();
+    setPendingAcknowledgements(new Set());
+    activeWarningSession.current += 1;
+    setWarningSession(activeWarningSession.current);
+  };
+  const changeFilters = (patch: Partial<Pick<typeof filters, "agentId" | "start" | "end">>) => {
+    const current = filtersRef.current;
+    if (Object.entries(patch).every(([name, value]) => current[name as keyof typeof filters] === value)) return;
+    const next = { ...current, ...patch, revision: current.revision + 1 };
+    filtersRef.current = next;
+    activeContext.current = JSON.stringify([user?.id, user?.role, next.agentId, next.start, next.end, next.revision]);
+    resetDetail();
+    // Mark both old and previously visited contexts stale without starting a
+    // redundant fetch for the context we are leaving. New revision keys fetch fresh.
+    for (const prefix of [performancePrefix, warningPrefix]) {
+      void queryClient.cancelQueries({ queryKey: prefix });
+      void queryClient.invalidateQueries({ queryKey: prefix, refetchType: "none" });
+    }
+    setFilters(next);
+  };
+  const onAgentChange = (id: string) => changeFilters({ agentId: id });
   const csv = rows.map(r => ({ agent: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "—", role: r.role ?? "", invoices: r.invoicesProcessed ?? r.invoiceCount ?? 0, volume_funded: r.fundedVolume ?? r.totalVolumeFunded ?? r.totalFunded ?? 0, avg_days_to_fund: r.averageDaysToFund ?? r.avgDaysToFund ?? "", reviews: Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0), hours: r.hoursWorked ?? r.clockHoursWorked ?? 0 }));
-  return <div className="space-y-4">
-    <ReportToolbar start={start} end={end} onDates={(s, e) => { setStart(s); setEnd(e); }}>
-      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Employee</label><Select value={agentId} onValueChange={setAgentId}><SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Agents</SelectItem>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div>
-      <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("agent_performance.csv", csv)}><Download className="h-3.5 w-3.5" /> CSV</Button>
-      {manager && <Button size="sm" className="h-8 gap-1.5" onClick={() => setWarningOpen(true)}><AlertTriangle className="h-3.5 w-3.5" /> Issue warning</Button>}
-    </ReportToolbar>
-    <Card className="overflow-hidden border border-slate-200 dark:border-slate-700"><div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[850px] text-sm"><thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Agent","Role","Invoices","Volume funded","Avg days","Reviews","Hours"].map(h => <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>)}</tr></thead><tbody className="divide-y">{query.isLoading ? <SkeletonRows cols={7} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelected(r)} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20"><td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td><td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td><td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td><td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td><td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td><td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td><td className="px-4 py-3 tabular-nums">{r.clockHoursWorked ?? "—"}</td></tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">No agents found for this period.</td></tr>}</tbody></table></div></Card>
-    <Card className="border border-slate-200 dark:border-slate-700"><CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings</CardTitle><span className="text-xs text-slate-500">{warnings.length} recorded</span></CardHeader><CardContent className="space-y-2 p-3">{warnings.length ? warnings.map(w => <div key={w.id} className="ff-card ff-reports-surface flex flex-wrap items-center justify-between gap-3 px-4 py-3"><div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><span className={`ff-badge ${w.severity === "final" ? "ff-badge-rejected" : w.severity === "written" ? "ff-badge-pending" : "ff-badge-draft"} uppercase`}>{w.severity}</span></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div><div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <span className="ff-badge ff-badge-funded gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</span> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" onClick={() => acknowledge.mutate(w.id)}>Acknowledge</Button> : <span className="ff-badge ff-badge-pending">Pending</span>}</div></div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">No written warnings in scope.</div>}</CardContent></Card>
-    <InvoiceDrilldown open={!!selected} onOpenChange={v => !v && setSelected(null)} title={selected ? `${selected.firstName ?? ""} ${selected.lastName ?? ""} · invoice detail` : "Invoice detail"} invoices={selected?.invoices} />
-    <Dialog open={warningOpen} onOpenChange={setWarningOpen}><DialogContent className="ff-reports-surface"><DialogHeader><DialogTitle>Issue written warning</DialogTitle><DialogDescription>Record a performance issue for an agent. The agent will be able to acknowledge it.</DialogDescription></DialogHeader><div className="space-y-4"><div><label className="text-xs font-semibold">Agent</label><Select value={warningForm.userId} onValueChange={v => setWarningForm(f => ({ ...f, userId: v }))}><SelectTrigger className="mt-1"><SelectValue placeholder="Select agent" /></SelectTrigger><SelectContent>{rows.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div><div><label className="text-xs font-semibold">Severity</label><Select value={warningForm.severity} onValueChange={v => setWarningForm(f => ({ ...f, severity: v }))}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verbal">Verbal</SelectItem><SelectItem value="written">Written</SelectItem><SelectItem value="final">Final</SelectItem></SelectContent></Select></div><div><label className="text-xs font-semibold">Reason</label><Textarea value={warningForm.reason} onChange={e => setWarningForm(f => ({ ...f, reason: e.target.value }))} className="mt-1 min-h-24 w-full p-2 text-sm" placeholder="Describe the issue and expected correction." /></div></div><DialogFooter><Button variant="outline" onClick={() => setWarningOpen(false)}>Cancel</Button><Button disabled={!warningForm.userId || !warningForm.reason || createWarning.isPending} onClick={() => createWarning.mutate()}>Save warning</Button></DialogFooter></DialogContent></Dialog>
+  return <div className="space-y-4" data-testid="agent-performance-detail" data-agent-id={agentId} data-context={contextKey}>
+    <div className="ff-card ff-reports-surface flex flex-wrap items-end gap-2 p-3">
+      {/* Reset browser-owned calendar state on external input changes, not on
+          each keystroke in that input, which would lose focus during date entry. */}
+      <div key={JSON.stringify([user?.id, user?.role, agentId, end, "from"])}><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">From</label><Input aria-label="From date" data-testid="performance-from-date" type="date" value={start} onChange={e => changeFilters({ start: e.target.value })} className="h-8 w-36 text-xs" /></div>
+      <span className="mb-2 text-xs text-slate-400">to</span>
+      <div key={JSON.stringify([user?.id, user?.role, agentId, start, "through"])}><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Through</label><Input aria-label="Through date" data-testid="performance-through-date" type="date" value={end} onChange={e => changeFilters({ end: e.target.value })} className="h-8 w-36 text-xs" /></div>
+      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Employee</label><Select value={agentId} open={agentMenuOpen} onOpenChange={setAgentMenuOpen} onValueChange={onAgentChange}><SelectTrigger data-testid="performance-agent-select" disabled={!optionsReady} className="h-8 w-48 text-xs"><SelectValue key={contextKey}>{optionsReady ? (agentId === "all" ? "All Agents" : (() => { const agent = agentOptions.find(r => String(r.userId ?? r.id) === agentId); return agent ? `${agent.firstName ?? ""} ${agent.lastName ?? ""}`.trim() || agent.email : "Employee unavailable"; })()) : "Refreshing agents…"}</SelectValue></SelectTrigger><SelectContent key={contextKey}><SelectItem value="all">All Agents</SelectItem>{agentOptions.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div>
+      <Button data-testid="performance-csv" disabled={!reportReady || !rows.length} size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("agent_performance.csv", csv)}><Download className="h-3.5 w-3.5" /> CSV</Button>
+      {manager && <Button data-testid="performance-issue-warning" disabled={!reportReady || !optionsReady} size="sm" className="h-8 gap-1.5" onClick={() => { setWarningForm(emptyWarningDraft()); createWarning.reset(); activeWarningSession.current += 1; setWarningSession(activeWarningSession.current); setWarningOpen(true); }}><AlertTriangle className="h-3.5 w-3.5" /> Issue warning</Button>}
+    </div>
+    {(rangeError || query.error || agentOptionsQuery.error || warningQuery.error) && <p role="alert" className="text-sm text-red-700">{rangeError || (query.error || agentOptionsQuery.error || warningQuery.error)?.message}</p>}
+    <Card key={contextKey} className="overflow-hidden border border-slate-200 dark:border-slate-700">
+      <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[850px] text-sm">
+        <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Agent","Role","Invoices","Volume funded","Avg days","Reviews","Hours"].map(h => <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>)}</tr></thead>
+        <tbody className="divide-y">{enabled && query.isFetching ? <SkeletonRows cols={7} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelectedAgentId(String(r.userId ?? r.id))} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20">
+          <td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td><td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td>
+          <td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td><td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.fundedVolume ?? r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td>
+          <td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td>
+          <td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td><td className="px-4 py-3 tabular-nums">{r.hoursWorked ?? r.clockHoursWorked ?? "—"}</td>
+        </tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">{rangeError ? "Choose a valid date range to load the report." : query.error ? "Report unavailable." : "No agents found for this period."}</td></tr>}</tbody>
+      </table></div>
+    </Card>
+    <Card key={`warnings:${contextKey}`} data-testid="performance-warnings" className="border border-slate-200 dark:border-slate-700">
+      <CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings · history</CardTitle><span className="text-xs text-slate-500">{enabled && warningQuery.isFetching ? "Refreshing…" : `${warnings.length} recorded`}</span></CardHeader>
+      <CardContent className="space-y-2 p-3">{enabled && warningQuery.isFetching ? <div>Loading warnings…</div> : warnings.length ? warnings.map(w => <div key={w.id} className="ff-card ff-reports-surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><span className={`ff-badge ${w.severity === "final" ? "ff-badge-rejected" : w.severity === "written" ? "ff-badge-pending" : "ff-badge-draft"} uppercase`}>{w.severity}</span></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div>
+        <div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <span className="ff-badge ff-badge-funded gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</span> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" disabled={pendingAcknowledgements.has(w.id)} onClick={() => acknowledge.mutate({ id: w.id, context: contextKey })}>Acknowledge</Button> : <span className="ff-badge ff-badge-pending">Pending</span>}</div>
+      </div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">{rangeError ? "Choose a valid date range." : warningQuery.error ? "Warnings unavailable." : "No written warnings in scope."}</div>}
+      {acknowledge.error && acknowledge.variables?.context === contextKey && <p role="alert" className="text-sm text-red-700">{acknowledge.error.message}</p>}</CardContent>
+    </Card>
+    <InvoiceDrilldown key={JSON.stringify([contextKey, selectedAgentId])} open={!!selected} onOpenChange={v => !v && setSelectedAgentId(null)} title={selected ? `${selected.firstName ?? ""} ${selected.lastName ?? ""} · invoice detail` : "Invoice detail"} invoices={selected?.invoices} />
+    <Dialog key={JSON.stringify([contextKey, warningSession])} open={warningOpen} onOpenChange={open => { if (!open) { clearWarning(); createWarning.reset(); } }}>
+      <DialogContent data-testid="performance-warning-dialog" className="ff-reports-surface">
+        <DialogHeader><DialogTitle>Issue written warning</DialogTitle><DialogDescription>Record a performance issue for an agent. The agent will be able to acknowledge it.</DialogDescription></DialogHeader>
+        <div className="space-y-4">
+          <div><label className="text-xs font-semibold">Agent</label><Select value={warningForm.userId} onValueChange={v => setWarningForm(f => ({ ...f, userId: v }))}><SelectTrigger data-testid="performance-warning-agent" className="mt-1"><SelectValue placeholder="Select agent" /></SelectTrigger><SelectContent>{agentOptions.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div>
+          <div><label className="text-xs font-semibold">Severity</label><Select value={warningForm.severity} onValueChange={v => setWarningForm(f => ({ ...f, severity: v }))}><SelectTrigger data-testid="performance-warning-severity" className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verbal">Verbal</SelectItem><SelectItem value="written">Written</SelectItem><SelectItem value="final">Final</SelectItem></SelectContent></Select></div>
+          <div><label className="text-xs font-semibold">Reason</label><Textarea data-testid="performance-warning-reason" value={warningForm.reason} onChange={e => setWarningForm(f => ({ ...f, reason: e.target.value }))} className="mt-1 min-h-24 w-full p-2 text-sm" placeholder="Describe the issue and expected correction." /></div>
+          {createWarning.error && createWarning.variables?.context === contextKey && createWarning.variables.session === warningSession && <p role="alert" className="text-sm text-red-700">{createWarning.error.message}</p>}
+        </div>
+        <DialogFooter><Button data-testid="performance-warning-cancel" variant="outline" onClick={() => { clearWarning(); createWarning.reset(); }}>Cancel</Button><Button data-testid="performance-warning-save" disabled={!warningForm.userId || !warningForm.reason.trim() || createWarning.isPending} onClick={() => createWarning.mutate({ draft: { ...warningForm }, context: contextKey, session: warningSession })}>Save warning</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>;
 }
 
@@ -769,7 +897,7 @@ function CarrierArTab() {
   const [report, setReport] = useState<CarrierBrokerReportDef | null>(null);
   const [agingPdfDays, setAgingPdfDays] = useState("1");
   const { data: carriersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients", { all: true }] });
-  const { data: brokersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/debtors"] });
+  const { data: brokersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/brokers", { all: true }] });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
   const brokers = Array.isArray(brokersData) ? brokersData : [];
 
