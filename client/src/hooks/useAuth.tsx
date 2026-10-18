@@ -1,4 +1,5 @@
-import React, { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import React, { createContext, ReactNode, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "wouter";
 import { queryClient } from "../lib/queryClient";
 
 interface User {
@@ -20,6 +21,9 @@ interface AuthContextType {
   permissions: string[];
   permissionsLoaded: boolean;
   permissionsLoading: boolean;
+  permissionsReadyForRoute: boolean;
+  permissionsError: string | null;
+  refreshPermissions: () => Promise<void>;
   hasPermission: (key: string) => boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -29,23 +33,52 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 async function fetchPermissions(): Promise<string[]> {
-  try {
-    const res = await fetch("/api/auth/permissions", { credentials: "include" });
-    if (res.ok) {
-      const data = await res.json();
-      return data.permissions ?? [];
-    }
-  } catch {}
-  return [];
+  const res = await fetch("/api/auth/permissions", { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error("Unable to refresh access permissions. Please retry.");
+  const data = await res.json();
+  if (!Array.isArray(data.permissions) || data.permissions.some((key: unknown) => typeof key !== "string")) {
+    throw new Error("The server returned invalid permissions. Please retry.");
+  }
+  return data.permissions;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [permissionsError, setPermissionsError] = useState<string | null>(null);
+  const [permissionLocation, setPermissionLocation] = useState<string | null>(null);
+  const activeUser = useRef<string | undefined>();
+  activeUser.current = user?.id;
+  const locationRef = useRef(location);
+  locationRef.current = location;
+  const refreshSequence = useRef(0);
+
+  const refreshPermissions = useCallback(async () => {
+    const userId = user?.id;
+    if (!userId) return;
+    const sequence = ++refreshSequence.current;
+    const path = locationRef.current;
+    setPermissionsLoading(true);
+    setPermissionsError(null);
+    try {
+      const next = await fetchPermissions();
+      if (activeUser.current !== userId || sequence !== refreshSequence.current) return;
+      setPermissions(next);
+      setPermissionsLoaded(true);
+      setPermissionLocation(path);
+    } catch (error) {
+      if (activeUser.current !== userId || sequence !== refreshSequence.current) return;
+      setPermissionsError(error instanceof Error ? error.message : "Unable to refresh permissions.");
+      setPermissionLocation(path);
+    } finally {
+      if (activeUser.current === userId && sequence === refreshSequence.current) setPermissionsLoading(false);
+    }
+  }, [user?.id]);
 
   const hasPermission = (key: string): boolean => {
     if (user?.role === "admin") return true;
@@ -86,6 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const perms = await fetchPermissions();
           setPermissions(perms);
           setPermissionsLoaded(true);
+          setPermissionLocation(locationRef.current);
+          setPermissionsError(null);
         }
       } else {
         console.log("No valid auth data in localStorage");
@@ -129,6 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const perms = await fetchPermissions();
         setPermissions(perms);
         setPermissionsLoaded(true);
+        setPermissionLocation(locationRef.current);
+        setPermissionsError(null);
+        setPermissionsLoading(false);
 
         return true;
       }
@@ -140,9 +178,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    ++refreshSequence.current;
+    activeUser.current = undefined;
     setUser(null);
     setIsAuthenticated(false);
     setPermissions([]);
+    setPermissionLocation(null);
+    setPermissionsError(null);
     localStorage.removeItem("isAuthenticated");
     localStorage.removeItem("user");
     fetch("/api/auth/logout", { method: "POST" }).catch(console.error);
@@ -152,15 +194,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
-  // Poll permissions every 60 seconds while authenticated
+  // Revalidate before a newly navigated route makes an access decision.
+  // The synchronous path comparison below also blocks the first render,
+  // before this effect has had a chance to run.
+  useEffect(() => {
+    if (isAuthenticated && !isLoading && permissionLocation !== location) void refreshPermissions();
+  }, [location, permissionLocation, isAuthenticated, isLoading, refreshPermissions]);
+
+  // Next-navigation refresh works across devices; focus and cross-tab signals
+  // additionally refresh an already-open agent page without waiting for polling.
   useEffect(() => {
     if (!isAuthenticated) return;
-    const interval = setInterval(async () => {
-      const perms = await fetchPermissions();
-      setPermissions(perms);
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
+    const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("factorflux-permissions") : null;
+    const updated = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId: string }>).detail;
+      channel?.postMessage(detail);
+      if (detail?.userId === user?.id) void refreshPermissions();
+    };
+    if (channel) channel.onmessage = event => {
+      if (event.data?.userId === user?.id) void refreshPermissions();
+    };
+    const focus = () => { void refreshPermissions(); };
+    const visible = () => { if (document.visibilityState === "visible") focus(); };
+    window.addEventListener("factorflux:permissions-changed", updated);
+    window.addEventListener("focus", focus);
+    document.addEventListener("visibilitychange", visible);
+    const interval = setInterval(focus, 60000);
+    return () => {
+      clearInterval(interval);
+      channel?.close();
+      window.removeEventListener("factorflux:permissions-changed", updated);
+      window.removeEventListener("focus", focus);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [isAuthenticated, user?.id, refreshPermissions]);
 
   return (
     <AuthContext.Provider
@@ -170,7 +237,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         permissions,
         permissionsLoaded,
-        permissionsLoading,
+        permissionsLoading: permissionsLoading || (isAuthenticated && permissionLocation !== location),
+        permissionsReadyForRoute: permissionLocation === location,
+        permissionsError,
+        refreshPermissions,
         hasPermission,
         login,
         logout,

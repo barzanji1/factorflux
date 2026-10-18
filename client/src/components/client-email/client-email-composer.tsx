@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface EmailClient {
   id: number;
@@ -35,6 +36,7 @@ export function ClientEmailComposer({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [clientId, setClientId] = useState(initialClient ? String(initialClient.id) : "");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -56,7 +58,7 @@ export function ClientEmailComposer({
   });
 
   const { data: clients = [], isLoading: clientsLoading, error: clientsError, refetch } = useQuery<EmailClient[]>({
-    queryKey: ["/api/client-email/clients"],
+    queryKey: ["/api/client-email/clients", user?.id],
     enabled: open && !initialClient,
     queryFn: async () => {
       const response = await fetch("/api/client-email/clients", { credentials: "include" });
@@ -149,7 +151,7 @@ export function ClientEmailComposer({
           : <div className="space-y-1"><Label htmlFor="client-email-recipient">Client</Label>
             {clientsLoading ? <div className="h-10 animate-pulse border border-[#c4cfcc] bg-[#dce4e1]" />
               : clientsError ? <div role="alert" className="flex items-center justify-between border border-[#d2a6a0] bg-[#fff1ee] p-2 text-xs text-[#8d3f36]"><span>Client list could not be loaded.</span><Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button></div>
-                 : clients.length === 0 ? <p className="border bg-white p-3 text-sm">No accessible clients. Ask a manager to assign a client to you.</p>
+                  : clients.length === 0 ? <div className="border border-[#c4cfcc] bg-[#f4f7f5] p-3 text-sm text-[#596d70]">{user?.role === "employee" ? <><p className="font-semibold text-[#334c50]">No clients assigned to you</p><p className="mt-1">Ask an administrator to assign a client before sending email.</p></> : "No clients available for email."}</div>
                  : <Select value={clientId} onValueChange={changeClient} disabled={sendMutation.isPending}><SelectTrigger id="client-email-recipient" className="rounded-sm bg-white"><SelectValue placeholder="Choose a client…" /></SelectTrigger><SelectContent>{clients.map((client) => <SelectItem key={client.id} value={String(client.id)}>{client.name}</SelectItem>)}</SelectContent></Select>}
           </div>}
         {selectedClient && <div className={`flex items-start gap-2 border p-2.5 text-xs ${isValidEmail(selectedClient.email) ? "border-[#b7cfca] bg-[#f1f7f4] text-[#345c54]" : "border-[#d6b076] bg-[#fff8e9] text-[#805f26]"}`}>

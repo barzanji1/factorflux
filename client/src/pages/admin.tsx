@@ -47,6 +47,8 @@ import {
   Win95TabsTrigger,
 } from "@/components/win95";
 import BrokerConfirmationSettings from "@/components/broker-confirmation/settings";
+import { ALL_PERMISSIONS } from "@shared/schema";
+import { getPermissionCatalog, getRolePresetPermissions } from "@/lib/adminPermissions";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface UserRecord {
@@ -207,96 +209,7 @@ const TABS = [
 ] as const;
 type Tab = typeof TABS[number]["id"];
 
-// ─── Permission Sections ──────────────────────────────────────────────────────
-const PERMISSION_SECTIONS = [
-  {
-    label: "Workspace",
-    items: [
-      { key: "dashboard",          label: "Dashboard"          },
-      { key: "carriers",           label: "Carriers"           },
-      { key: "invoices",           label: "Invoices"           },
-      { key: "documents",          label: "Documents"          },
-      { key: "tasks",              label: "Tasks"              },
-      { key: "bulk_invoices",      label: "Bulk Invoices"      },
-      { key: "portal_submissions", label: "Portal Submissions" },
-      { key: "client_email",       label: "Client Email"       },
-    ],
-  },
-  {
-    label: "Funding",
-    items: [
-      { key: "factoring",      label: "Factoring"      },
-      { key: "payments",       label: "Payments"       },
-      { key: "lockbox",        label: "Lockbox"        },
-      { key: "fuel_advance",   label: "Fuel Advance"   },
-      { key: "bank_transfers", label: "Bank Transfers" },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { key: "dispatchers",     label: "Dispatchers"     },
-      { key: "trucks",          label: "Trucks"          },
-      { key: "release_letters", label: "Release Letters" },
-    ],
-  },
-  {
-    label: "Risk",
-    items: [
-      { key: "brokers",    label: "Brokers"     },
-      { key: "cb_reviews", label: "C/B Reviews" },
-      { key: "mc_check",   label: "MC Check"    },
-      { key: "held",       label: "Held"        },
-      { key: "logs",       label: "Audit Logs"  },
-    ],
-  },
-  {
-    label: "Recovery",
-    items: [
-      { key: "followups", label: "Followups" },
-      { key: "reports",   label: "Reports"   },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      { key: "payroll",          label: "Payroll"          },
-      { key: "vault",            label: "Vault"            },
-      { key: "help",             label: "Help"             },
-      { key: "settings",         label: "Settings"         },
-      { key: "rules",            label: "Doc Rules"        },
-      { key: "workflow_builder", label: "Workflow Builder" },
-      { key: "admin",            label: "Admin Panel"      },
-    ],
-  },
-  {
-    label: "Workspace",
-    items: [
-      { key: "earl", label: "Earl (AI Assistant)" },
-    ],
-  },
-];
-
-const ROLE_DEFAULTS: Record<string, string[]> = {
-  admin: [
-    "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
-    "factoring","payments","lockbox","fuel_advance","bank_transfers",
-    "dispatchers","trucks","release_letters",
-    "brokers","cb_reviews","mc_check","held","logs",
-    "followups","reports",
-    "payroll","vault","help","settings","rules","workflow_builder","admin",
-    "earl",
-  ],
-  manager: [
-    "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",
-    "factoring","payments","lockbox","fuel_advance","bank_transfers",
-    "dispatchers","trucks","release_letters",
-    "brokers","cb_reviews","mc_check","held","logs",
-    "followups","reports",
-    "payroll","vault","help","settings","rules","workflow_builder",
-  ],
-  employee: ["dashboard","carriers","invoices","documents","tasks","fuel_advance","vault","help","settings"],
-};
+const PERMISSION_CATALOG = getPermissionCatalog(ALL_PERMISSIONS);
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Admin() {
@@ -569,8 +482,9 @@ export default function Admin() {
       if (!res.ok) throw new Error(json.message || "Failed to save permissions");
       return json;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users", permTarget?.id, "permissions"] });
+      window.dispatchEvent(new CustomEvent("factorflux:permissions-changed", { detail: { userId: variables.id } }));
       toast({ title: "Permissions saved", description: `Updated access for ${permTarget?.firstName} ${permTarget?.lastName}` });
       setPermTarget(null);
     },
@@ -582,7 +496,7 @@ export default function Admin() {
   };
 
   // Sync permToggles when permData loads
-  const allKeys = PERMISSION_SECTIONS.flatMap(s => s.items.map(i => i.key));
+  const allKeys = [...ALL_PERMISSIONS];
   const resolvedToggles: Record<string, boolean> = permData
     ? Object.fromEntries(allKeys.map(k => [k, permData.permissions.includes(k)]))
     : Object.fromEntries(allKeys.map(k => [k, false]));
@@ -590,7 +504,7 @@ export default function Admin() {
   const activeToggles = permLoading ? resolvedToggles : (Object.keys(permToggles).length > 0 ? permToggles : resolvedToggles);
 
   const applyRoleDefaults = (role: string) => {
-    const defaults = ROLE_DEFAULTS[role] ?? ROLE_DEFAULTS.employee;
+    const defaults = getRolePresetPermissions(role, ALL_PERMISSIONS);
     setPermToggles(Object.fromEntries(allKeys.map(k => [k, defaults.includes(k)])));
   };
 
@@ -1740,8 +1654,8 @@ export default function Admin() {
               </div>
 
               {/* Permission sections */}
-              {PERMISSION_SECTIONS.map((section) => (
-                 <div key={section.label} className="ff-admin-permission-section ff-admin-surface">
+              {PERMISSION_CATALOG.map((section) => (
+                 <div key={section.id} className="ff-admin-permission-section ff-admin-surface">
                    <div className="ff-admin-section-header mb-2 flex items-center gap-2 px-3 py-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{section.label}</p>
                     <div className="flex-1 border-t border-slate-100 dark:border-slate-800" />

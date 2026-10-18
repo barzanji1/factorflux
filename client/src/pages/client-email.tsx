@@ -13,7 +13,7 @@ export default function ClientEmailPage() {
   const canSend = hasPermission("client_email");
   const [composerOpen, setComposerOpen] = useState(false);
   const { data: clients = [], isLoading, error, refetch } = useQuery<EmailClient[]>({
-    queryKey: ["/api/client-email/clients"],
+    queryKey: ["/api/client-email/clients", user?.id],
     enabled: canSend,
     queryFn: async () => {
       const response = await fetch("/api/client-email/clients", { credentials: "include" });
@@ -43,7 +43,7 @@ export default function ClientEmailPage() {
                 <div className="p-3">
                   {isLoading ? <div className="grid gap-2 sm:grid-cols-2"><div className="h-16 animate-pulse bg-[#dce5e1]" /><div className="h-16 animate-pulse bg-[#dce5e1]" /></div>
                     : error ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-3 text-xs text-[#8d433a]"><span>{(error as Error).message}</span><Button size="sm" variant="outline" onClick={() => void refetch()}>Retry</Button></div>
-                      : clients.length === 0 ? <div className="border border-dashed border-[#bdc9c5] bg-[#f6f8f6] px-4 py-8 text-center text-xs text-[#657977]">No clients are available for email.</div>
+                      : clients.length === 0 ? <div className="border border-dashed border-[#bdc9c5] bg-[#f6f8f6] px-4 py-8 text-center text-xs text-[#657977]">{user?.role === "employee" ? <><p className="font-semibold text-[#405b5c]">No clients assigned to you</p><p className="mt-1">Ask an administrator to assign a client before sending email.</p></> : "No clients available for email."}</div>
                         : <div className="space-y-3"><label className="block text-[10px] font-bold uppercase tracking-wider text-[#71817e]" htmlFor="email-history-client">Client history</label><select id="email-history-client" value={selectedId ?? ""} onChange={(event) => setSelectedId(event.target.value ? Number(event.target.value) : null)} className="h-9 w-full max-w-md rounded-sm border border-[#aebbb7] bg-white px-2 text-xs text-[#334c50] focus:outline-none focus:ring-1 focus:ring-[#087f8e]"><option value="">Choose a client…</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name} · {client.email || "No profile email"}</option>)}</select>
                           {selectedClient && <ClientEmailLog clientId={selectedClient.id} />}
                         </div>}

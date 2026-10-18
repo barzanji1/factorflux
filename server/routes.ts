@@ -1817,6 +1817,7 @@ ${message}
 
   // Current user's own permissions (no admin required)
   app.get("/api/auth/permissions", requireAuth, async (req: any, res) => {
+    res.setHeader("Cache-Control", "no-store");
     try {
       const userId = req.user?.id;
       // Admin and manager roles get all permissions

@@ -9,12 +9,12 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, permissions, permissionsLoaded, user } = useAuth();
+  const { isAuthenticated, isLoading, permissions, permissionsLoaded, permissionsReadyForRoute, permissionsError, refreshPermissions, user } = useAuth();
   const [location] = useLocation();
 
   console.log("ProtectedRoute - isLoading:", isLoading, "isAuthenticated:", isAuthenticated);
 
-  if (isLoading || (isAuthenticated && user?.role !== "admin" && !permissionsLoaded)) {
+  if (isLoading || (isAuthenticated && user?.role !== "admin" && (!permissionsReadyForRoute || (!permissionsLoaded && !permissionsError)))) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -28,6 +28,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!isAuthenticated) {
     console.log("Not authenticated, redirecting to login");
     return <Redirect to="/login" />;
+  }
+  if (user?.role !== "admin" && permissionsError) {
+    return <div role="alert" className="flex min-h-screen items-center justify-center bg-[#d4d0c8] p-6">
+      <div className="border-2 border-[#808080] bg-[#ece9df] p-5">
+        <p>{permissionsError}</p>
+        <button type="button" className="mt-3 border-2 border-[#808080] bg-[#d4d0c8] px-4 py-2" onClick={() => void refreshPermissions()}>Retry access check</button>
+      </div>
+    </div>;
   }
 
   const requiredPermission = pathToPermission(location);
