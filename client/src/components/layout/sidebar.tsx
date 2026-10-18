@@ -12,6 +12,7 @@ import {
   RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, Ticket, MessageCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import ItSupportBell from "@/components/it-support/ItSupportBell";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ const navSections: NavSection[] = [
       { name: "Documents",         href: "/documents",          icon: Archive,         permission: "documents"          },
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
       { name: "Tickets",           href: "/tickets",            icon: Ticket,          permission: "tickets"            },
+      { name: "IT Support",        href: "/it-support",         icon: LifeBuoy,         permission: "", staffVisible: true },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
       { name: "Team Chat",         href: "/chat",               icon: MessageCircle,  permission: "chat"               },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
@@ -371,7 +373,8 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                        <span className="truncate text-[13.5px] font-semibold leading-none tracking-[-0.01em]">
                         {item.name}
                       </span>
-                         {item.name === "Portal Submissions" && portalSubmissionsTotal > 0 && <span
+                          {item.name === "IT Support" && <ItSupportBell />}
+                          {item.name === "Portal Submissions" && portalSubmissionsTotal > 0 && <span
                            className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white"
                            title={portalSubmissionsBadgeLabel}
                            aria-label={portalSubmissionsBadgeLabel}

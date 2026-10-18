@@ -19,6 +19,8 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { MentionAutocomplete, type ChatUser } from "@/components/team-chat/MentionAutocomplete";
 import { MessageBody } from "@/components/team-chat/MessageBody";
+import { GifPicker } from "@/components/team-chat/GifPicker";
+import { gifMessage, type ChatGif } from "@shared/chat-gif";
 import { ThreadPanel, type ChatMessage } from "@/components/team-chat/ThreadPanel";
 import { ChatAvatar } from "@/components/team-chat/ChatAvatar";
 
@@ -580,6 +582,13 @@ function ChatPanel({ active }: ChatPanelProps) {
     }
   };
 
+  const sendGif = async (gif: ChatGif) => {
+    if (selectedId === null) throw new Error("Choose a conversation first.");
+    const channelId = selectedId;
+    await sendJson(`/api/chat/channels/${channelId}/messages`, "POST", { body: gifMessage(gif.id) });
+    if (String(selectedIdRef.current) === String(channelId)) void loadMessages();
+  };
+
   const startDirect = async (userId: string | number) => {
     try {
       const channel = await sendJson<Channel>("/api/chat/channels/direct", "POST", { userId });
@@ -736,6 +745,7 @@ function ChatPanel({ active }: ChatPanelProps) {
           </div>
             <div className="border-t border-[#808080] bg-[#d4d0c8] p-1.5"><div className="relative flex items-center gap-1">
               <MentionAutocomplete value={draft} onChange={(value) => { setDraft(value); draftsByChannelRef.current[String(selected.id)] = value; }} users={mentionUsers} onDirectoryRefresh={() => { void refreshMentionUsers(selected.id); }} onSubmit={submitMessage} placeholder={`Message ${selected.directName || selected.name}...`} textareaRef={(node) => { textareaRef.current = node; }} data-testid="chat-message-composer" className="ff-team-chat-input h-8 min-h-8 flex-1 resize-none overflow-hidden px-1.5 py-1 text-[11px] outline-none" />
+              <GifPicker key={String(selected.id)} onSelect={sendGif} />
               <div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="outline" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="ff-team-chat-icon-button h-8 w-8 p-0"><Smile className="h-4 w-4" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-xl border-2 border-[#808080] bg-white shadow-lg"><Picker data={emojiPickerData} onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="h-8 w-8 shrink-0 p-0"><Send className="h-3.5 w-3.5" /></Button></div></div>
             </div>
             {threadRootId !== null && <ThreadPanel channelId={selected.id} rootId={threadRootId} currentUserId={user?.id} active={active} onClose={() => setThreadRootId(null)} onChanged={() => { void loadMessages(); }} highlightedMessageId={highlightMessageId} />}

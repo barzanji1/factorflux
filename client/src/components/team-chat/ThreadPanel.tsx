@@ -6,6 +6,8 @@ import { queryClient } from "@/lib/queryClient";
 import { MentionAutocomplete, type ChatUser } from "./MentionAutocomplete";
 import { MessageBody, type MessageMention } from "./MessageBody";
 import { ChatAvatar } from "./ChatAvatar";
+import { GifPicker } from "./GifPicker";
+import { gifMessage, type ChatGif } from "@shared/chat-gif";
 
 export type ChatMessage = {
   id: string | number;
@@ -176,6 +178,15 @@ export function ThreadPanel({
     return () => window.cancelAnimationFrame(frame);
   }, [highlightedMessageId, replies]);
 
+  const sendGif = async (gif: ChatGif) => {
+    setSending(true);
+    try {
+      await postReply(channelId, gifMessage(gif.id), Number(rootId));
+      setRequestVersion((version) => version + 1);
+      onChanged();
+    } finally { setSending(false); }
+  };
+
   const submitReply = async () => {
     const body = draft.trim();
     if (!body || sending) return;
@@ -240,6 +251,7 @@ export function ThreadPanel({
             data-testid="chat-thread-composer"
             className="ff-team-chat-input h-8 min-h-8 flex-1 resize-none overflow-hidden px-1.5 py-1 text-[11px] outline-none"
           />
+          <GifPicker key={`${channelId}-${rootId}`} onSelect={sendGif} disabled={sending} />
           <Button onClick={submitReply} disabled={!draft.trim() || sending} aria-label="Send reply" data-testid="chat-send-reply" className="h-8 w-8 shrink-0 p-0"><Send className="h-3.5 w-3.5" /></Button>
         </div>
       </div>

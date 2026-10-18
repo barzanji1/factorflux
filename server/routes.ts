@@ -18,6 +18,8 @@ import {
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { customerLogoPath } from "./customerBranding";
+import { giphy, GiphyError } from "./services/giphy";
+import { registerItSupportRoutes } from "./routes/itSupport";
 import { z } from "zod";
 import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull, ne } from "drizzle-orm";
 
@@ -892,6 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", (req: any, res: any, next: any) => {
     const pathname = String(req.originalUrl || "").split("?")[0];
     if (publicApiPath(pathname)) return next();
+    if (/^\/api\/it-support(?:\/|$)/.test(pathname)) return requireAuth(req, res, next);
     // The default staff workbench must not fail because its bell polls an old
     // dashboard-module endpoint. These GET handlers always use req.user.id;
     // mutation permissions and access to anyone else's notifications stay unchanged.
@@ -1312,6 +1315,7 @@ ${message}
   });
 
   // ─── Tickets ───────────────────────────────────────────────────────────────
+  registerItSupportRoutes(app, requireAuth);
   const ticketCategories = ["billing", "technical", "carrier", "broker", "document", "payroll", "other"] as const;
   const ticketPriorities = ["low", "medium", "high", "urgent"] as const;
   const ticketStatuses = ["open", "in-progress", "pending", "resolved", "closed"] as const;
@@ -5261,6 +5265,12 @@ ${message}
     }
   };
 
+  app.get("/api/chat/giphy-config", chatPermission, (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!process.env.GIPHY_API_KEY) return res.status(503).json({ message: "GIPHY is not configured." });
+    // GIPHY requires direct browser API requests. This is its public client key, not an account/admin credential.
+    res.json({ apiKey: process.env.GIPHY_API_KEY });
+  });
   app.get("/api/chat/channels", chatPermission, async (req: any, res) => {
     try {
       const userId = req.user.id as string;
@@ -5433,11 +5443,16 @@ ${message}
   app.post("/api/chat/channels/:id/messages", chatPermission, async (req: any, res) => {
     try {
       const channelId = chatChannelIdSchema.parse(req.params.id);
+      if (typeof req.body?.body === "string" && req.body.body.includes("[giphy:")) {
+        await assertChatMembership(db, channelId, req.user.id);
+        await giphy.validateMessage(req.body.body);
+      }
       const message = await db.transaction(tx => createChatMessage(tx, channelId, req.user.id, req.body));
       res.status(201).json(message);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid message" });
       if (error instanceof ChatMessageError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof GiphyError) return res.status(error.statusCode).json({ message: error.message });
       console.error("Error sending chat message:", error);
       res.status(500).json({ message: "Failed to send chat message" });
     }

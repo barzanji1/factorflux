@@ -1,0 +1,30 @@
+Build an internal IT & Software Support ticket system — a dedicated place for staff to report software bugs/issues and feature requests about the SYSTEM ITSELF (separate from client/operational work), with a designated IT person who triages and resolves them, and bidirectional notifications.
+
+PAGE & ACCESS:
+1. An "IT Support" page in the sidebar, accessible to all staff/agents.
+2. Purpose: report a software problem or suggest a product improvement — for software issues, not client/operational work.
+
+SUBMITTING (all staff):
+3. A "Submit Request" button opens a form: title, description, type (bug / feature idea / question), and priority.
+4. Each request stores the original submitter's ID (submitted_by_agent_id) from the authenticated user.
+5. Submitters see "Your requests" — a list of their own submitted requests with status, expandable to view details.
+
+IT CONTACT (the designated handler):
+6. A setting to designate which active staff account is the IT contact (the person who handles requests) — stored as a flag on the account (is_it_support = true), NOT hardcoded to an email. Only one designated contact at a time; it's changeable. Confirm the assignment actually SAVES to the database (not just shown in the UI).
+7. The IT contact sees the full triage queue — all submitted requests — and can open, edit status, and respond.
+
+REQUEST LIFECYCLE (openable / editable / updatable):
+8. Clicking a request opens its detail.
+9. The IT contact can update status (Submitted → In Progress → Resolved) and add responses/notes.
+10. The IT contact can DELETE a completed request (with a confirm step) — removing it and its associated notifications cleanly (no orphaned records). Only the IT contact can delete, not submitters.
+11. Submitters can view their own requests and status; they cannot change status or delete.
+
+NOTIFICATIONS — BIDIRECTIONAL, via a bell on the IT Support sidebar item:
+12. FORWARD: when any staff member submits a request → the designated IT contact gets a notification (it_request_submitted), shown as a count badge/bell next to IT Support in their sidebar (incoming requests to handle).
+13. REVERSE: when the IT contact updates a request's status or adds a response → the ORIGINAL SUBMITTER gets a notification (it_request_updated), shown as a count badge/bell next to IT Support in THEIR sidebar (unread updates on their own requests).
+14. The sidebar bell is ROLE-AWARE: the IT contact's count = incoming requests to triage; a submitter's count = unread updates on their own requests. Counts stay SEPARATE, never combined. Unrelated staff's activity isn't included.
+15. Scoping: notifications target the exact right person (submitter notified about THEIR request; IT contact about new submissions). No self-notifications (updating your own request, or selecting an unchanged status, creates no notification).
+16. Opening a request clears only that person's alerts for it; updates on other unopened requests stay counted. The IT contact's triage count is unaffected when a submitter clears their own.
+17. Works on both desktop and mobile (same bell component).
+
+Verify the full loop: a staff member submits a request → the IT contact sees a bell next to IT Support → IT contact opens it, responds, marks Resolved → the original submitter sees a bell next to THEIR IT Support item → submitter opens it, bell clears → IT contact can delete the completed request → counts stay correctly scoped per role throughout.

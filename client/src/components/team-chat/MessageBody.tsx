@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { InlineGif } from "./GifPicker";
 
 export type MessageMention = { userId: string | number; handle: string; start: number; end: number };
 
@@ -15,11 +16,15 @@ const emojiSources: Record<string, { src: string; label: string }> = {
 const emojiPattern = /:(tpf-logo|ff-logo|tpf4life|gm-tpf|tpf-truck|funded|invoice|approved):/g;
 
 function renderSegment(text: string, keyPrefix: string): ReactNode[] {
-  return text.split(emojiPattern).map((part, index) => {
+  return text.split(/(\[giphy:[A-Za-z0-9]{1,64}\])/g).flatMap((segment, partIndex) => {
+    const gif = /^\[giphy:([A-Za-z0-9]{1,64})\]$/.exec(segment);
+    if (gif) return [<InlineGif key={`${keyPrefix}-gif-${partIndex}`} id={gif[1]} />];
+    return segment.split(emojiPattern).map((part, index) => {
     const emoji = emojiSources[part];
     return emoji
-      ? <img key={`${keyPrefix}-${index}`} src={emoji.src} alt={`:${part}:`} title={emoji.label} className="mx-0.5 inline-block h-6 w-6 align-middle object-contain" />
+      ? <img key={`${keyPrefix}-${partIndex}-${index}`} src={emoji.src} alt={`:${part}:`} title={emoji.label} className="mx-0.5 inline-block h-6 w-6 align-middle object-contain" />
       : part;
+    });
   });
 }
 

@@ -86,7 +86,7 @@ app.use((req, res, next) => {
       let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
 
       if (capturedJsonResponse) {
-      logLine += ` :: ${JSON.stringify(capturedJsonResponse, (key, value) => key === "brokerConfirmationToken" ? undefined : value)}`;
+      logLine += ` :: ${JSON.stringify(capturedJsonResponse, (key, value) => key === "brokerConfirmationToken" || key === "apiKey" ? undefined : value)}`;
       }
 
       if (logLine.length > 200) {

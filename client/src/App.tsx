@@ -74,6 +74,7 @@ import PortalChat from "@/pages/portal/chat";
 import { TeamChatWorkspace } from "@/pages/chat";
 import ClientEmailPage from "@/pages/client-email";
 import EmailLog from "@/pages/email-log";
+import ItSupport from "@/pages/it-support";
 
 function Router() {
   useTheme(); // Initialize theme
@@ -361,6 +362,9 @@ function Router() {
       </Route>
       <Route path="/tickets/:id">
         <ProtectedRoute><TicketDetail /></ProtectedRoute>
+      </Route>
+      <Route path="/it-support">
+        <ProtectedRoute><ItSupport /></ProtectedRoute>
       </Route>
       <Route path="/bulk-invoices">
         <ProtectedRoute>

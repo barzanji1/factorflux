@@ -46,6 +46,7 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role", { enum: ["employee", "manager", "admin"] }).default("employee").notNull(),
   isTestAccount: boolean("is_test_account").default(false).notNull(),
+  isItSupport: boolean("is_it_support").default(false).notNull(),
   // Personal settings
   bio: text("bio"),
   location: varchar("location"),
@@ -70,7 +71,9 @@ export const users = pgTable("users", {
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("users_single_it_support_idx").on(table.isItSupport).where(sql`${table.isItSupport} = true`),
+]);
 
 // Encrypted application-level integration settings.
 export const integrationSettings = pgTable("integration_settings", {
@@ -715,6 +718,38 @@ export const insertWrittenWarningSchema = createInsertSchema(writtenWarnings).om
 });
 export type WrittenWarning = typeof writtenWarnings.$inferSelect;
 export type InsertWrittenWarning = z.infer<typeof insertWrittenWarningSchema>;
+
+// Software/product support is separate from operational tickets and global alerts.
+export const itSupportRequests = pgTable("it_support_requests", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description").notNull(),
+  type: varchar("type", { enum: ["bug", "feature_idea", "question"] }).notNull(),
+  priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium").notNull(),
+  status: varchar("status", { enum: ["submitted", "in_progress", "resolved"] }).default("submitted").notNull(),
+  submittedByAgentId: varchar("submitted_by_agent_id").references(() => users.id).notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("it_support_requests_submitter_idx").on(table.submittedByAgentId),
+  index("it_support_requests_status_idx").on(table.status),
+]);
+export const itSupportResponses = pgTable("it_support_responses", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").references(() => itSupportRequests.id, { onDelete: "cascade" }).notNull(),
+  authorId: varchar("author_id").references(() => users.id).notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [index("it_support_responses_request_idx").on(table.requestId)]);
+export const itSupportNotifications = pgTable("it_support_notifications", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").references(() => itSupportRequests.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type", { enum: ["it_request_submitted", "it_request_updated"] }).notNull(),
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [index("it_support_notifications_recipient_idx").on(table.userId, table.type, table.read)]);
 
 // Notifications table
 export const notifications = pgTable("notifications", {

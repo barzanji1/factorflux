@@ -8,6 +8,7 @@
 - [Carrier onboarding secrets](carrier-onboarding-secrets.md) — SSNs and bank credentials are encrypted server-side, omitted from API responses, and preserved when blank on edit.
 - [Manager report scope](manager-report-scope.md) — until explicit teams exist, manager reporting scope is self plus active users created by that manager.
 - [Agent Dashboard policy](agent-dashboard-policy.md) — default work queue, not project management; managers see all queues, without broadening personnel-report permissions.
+- [IT Support policy](it-support-policy.md) — software-only requests, single designated handler, and separate role-aware alerts; leave operational Tickets unchanged.
 - [Two-role factoring workflow](two-role-factoring-workflow.md) — agents create/correct/submit only; managers review, reject, fund, collect, and settle.
 - [Carrier-broker AR aging](carrier-broker-ar-aging.md) — age funded receivables from funded date and exclude closed balances; short pay uses all applied cash.
 - [Bulk invoice uniqueness](bulk-invoice-uniqueness.md) — one broker/carrier/ticket/load identity may produce only one bulk receivable across all batches.
@@ -28,6 +29,7 @@
 - [Team Chat placement](team-chat-placement.md) — sidebar navigation opens full-page chat; no bottom dock or floating launcher, and background sounds must remain.
 - [Team Chat channel policy](team-chat-channel-policy.md) — only general/operations by default; custom channels are shared; never remove history without the user's archive/delete decision.
 - [Chat verification](chat-verification.md) — real-staff-only autocomplete; isolate test alerts and use actual pointer events for message/menu interaction checks.
+- [GIPHY integration policy](giphy-integration-policy.md) — G-only GIFs, direct browser/CDN delivery, official attribution, no stored media; client keys are public by design.
 - [Chat profile avatars](chat-profile-avatars.md) — reuse existing staff profile photos across all chat views; shared initials fallback, no separate chat upload.
 - [Broker receipt confirmation](broker-receipt-confirmation.md) — broker links must open a page, not change receipt status; the user approved explicit button submissions.
 - [Client email policy](client-email-policy.md) — shared sender and monitored replies; global log reads are staff-wide, while composing stays permission/assignment-scoped.
