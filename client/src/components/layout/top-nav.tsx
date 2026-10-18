@@ -39,6 +39,13 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface TopNavProps {
   title: string;
@@ -105,19 +112,36 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
+  const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<AppNotification | null>(null);
+  const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
+  const [markReadError, setMarkReadError] = useState<string | null>(null);
+  const selectedNotificationUserRef = useRef<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const previousNotificationIdsRef = useRef<Set<number> | null>(null);
   const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 300);
 
   const { data: notifications = [] } = useQuery<AppNotification[]>({
-    queryKey: ["/api/notifications"],
+    queryKey: ["/api/notifications", authUser?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load notifications");
+      return res.json();
+    },
+    enabled: !!authUser?.id,
     retry: false,
     staleTime: 20000,
     refetchInterval: 30000,
   });
 
   const { data: unreadCountData } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count"],
+    queryKey: ["/api/notifications/unread-count", authUser?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications/unread-count", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load unread notification count");
+      return res.json();
+    },
+    enabled: !!authUser?.id,
     retry: false,
     staleTime: 20000,
     refetchInterval: 30000,
@@ -164,9 +188,11 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
       return res.json();
     },
     onSuccess: () => {
+      setMarkReadError(null);
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
     },
+    onError: () => setMarkReadError("This notification could not be marked as read. Please try again."),
   });
 
   const markAllAsReadMutation = useMutation({
@@ -223,11 +249,56 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   }, [location]);
 
   const handleNotificationClick = (n: AppNotification) => {
-    if (!n.read) markAsReadMutation.mutate(n.id);
-    const notificationUrl = (n as any).actionUrl;
+    const notificationUrl = n.actionUrl;
     const url = normalizeCarrierChatUrl(notificationUrl);
-    if (url) setLocation(url);
-    if (n.entityType === "chat_mention" && url) {
+    let metadata: Record<string, unknown> | null = null;
+    try {
+      metadata = n.metadata ? JSON.parse(n.metadata) : null;
+    } catch {
+      metadata = null;
+    }
+    const isAdminRequestInfo = metadata?.trigger === "admin_request_info";
+
+    if (url && !isAdminRequestInfo) {
+      if (!n.read) markAsReadMutation.mutate(n.id);
+      setLocation(url);
+      if (n.entityType === "chat_mention") {
+        const params = new URL(url, window.location.origin).searchParams;
+        window.dispatchEvent(new CustomEvent("team-chat:open", { detail: {
+          channelId: params.get("channelId"), threadId: params.get("threadId"), messageId: params.get("messageId"),
+        } }));
+      }
+      return;
+    }
+
+    setNotificationMenuOpen(false);
+    setMarkReadError(null);
+    // Let Radix finish dismissing the controlled dropdown before opening the dialog.
+    window.setTimeout(() => {
+      if (selectedNotificationUserRef.current !== n.userId) return;
+      setSelectedNotification(n);
+      setNotificationDialogOpen(true);
+      if (!n.read) markAsReadMutation.mutate(n.id);
+    }, 0);
+  };
+
+  useEffect(() => {
+    const userId = authUser?.id ?? null;
+    if (selectedNotificationUserRef.current === userId) return;
+    selectedNotificationUserRef.current = userId;
+    setSelectedNotification(null);
+    setNotificationDialogOpen(false);
+    setMarkReadError(null);
+  }, [authUser?.id]);
+
+  const openSelectedNotificationUrl = () => {
+    if (!selectedNotification?.actionUrl) return;
+    const url = normalizeCarrierChatUrl(selectedNotification.actionUrl);
+    if (!url) return;
+    setNotificationDialogOpen(false);
+    setSelectedNotification(null);
+    setLocation(url);
+    if (selectedNotification.entityType === "chat_mention") {
       const params = new URL(url, window.location.origin).searchParams;
       window.dispatchEvent(new CustomEvent("team-chat:open", { detail: {
         channelId: params.get("channelId"), threadId: params.get("threadId"), messageId: params.get("messageId"),
@@ -287,6 +358,15 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
   const filteredNotifications = notifFilter === "unread"
     ? notifications.filter((n) => !n.read)
     : notifications;
+  let selectedMetadata: Record<string, unknown> | null = null;
+  try {
+    selectedMetadata = selectedNotification?.metadata ? JSON.parse(selectedNotification.metadata) : null;
+  } catch {
+    selectedMetadata = null;
+  }
+  const selectedMessage = selectedNotification?.message
+    || (typeof selectedMetadata?.emailBody === "string" ? selectedMetadata.emailBody : "")
+    || "No message content is available.";
 
   return (
     <>
@@ -418,13 +498,17 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
             </DropdownMenu>
 
             {/* ── Notification Bell ── */}
-            <DropdownMenu>
+            <DropdownMenu open={notificationMenuOpen} onOpenChange={setNotificationMenuOpen}>
               <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm"
+                    aria-label="Notifications"
+                    aria-haspopup="menu"
+                    aria-expanded={notificationMenuOpen}
                    className="relative h-9 w-9 rounded-sm border-2 border-[#808080] bg-white hover:bg-[#dff5f6]">
                    <Bell className="h-5 w-5 text-[#1a1a1a]" />
                   {unreadCount > 0 && (
                     <Badge variant="destructive"
+                      aria-label={`${unreadCount} unread notifications`}
                       className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </Badge>
@@ -432,7 +516,7 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                 </Button>
               </DropdownMenuTrigger>
 
-               <DropdownMenuContent align="end" className="ff-notification-panel w-[min(380px,calc(100vw-1rem))] rounded-sm border-2 border-[#808080] bg-white p-0 shadow-[2px_2px_0_#404040]">
+                <DropdownMenuContent align="end" className="ff-notification-panel w-[min(380px,calc(100vw-1rem))] rounded-sm border-2 border-[#808080] bg-white p-0 shadow-[2px_2px_0_#404040]">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                   <div>
@@ -575,6 +659,62 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
           </div>
         </div>
       </header>
+
+      <Dialog
+        open={notificationDialogOpen}
+        onOpenChange={(open) => {
+          setNotificationDialogOpen(open);
+          if (!open) {
+            setSelectedNotification(null);
+            setMarkReadError(null);
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100%-1.5rem)] max-w-xl flex-col gap-4 overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="pr-8 text-left">
+            <DialogTitle className="break-words text-lg font-bold leading-snug text-[#1a1a1a]">
+              {selectedNotification?.title || "Notification"}
+            </DialogTitle>
+            <DialogDescription className="sr-only">Full notification message</DialogDescription>
+          </DialogHeader>
+          <div
+            className="custom-scrollbar max-h-[min(55dvh,32rem)] overflow-y-auto overscroll-contain rounded-sm border-2 border-[#808080] bg-white p-4 text-sm leading-relaxed text-[#1a1a1a] [overflow-wrap:anywhere] whitespace-pre-wrap"
+            aria-label="Notification message"
+          >
+            {selectedMessage}
+          </div>
+          {markReadError && (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border border-red-700 bg-red-50 px-3 py-2 text-sm text-red-800">
+              <span>{markReadError}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={markAsReadMutation.isPending}
+                onClick={() => {
+                  if (!selectedNotification) return;
+                  setMarkReadError(null);
+                  markAsReadMutation.mutate(selectedNotification.id);
+                }}
+                className="rounded-sm border-2 border-[#808080] bg-[#d4d0c8] text-[#1a1a1a]"
+              >
+                {markAsReadMutation.isPending ? "Retrying…" : "Retry"}
+              </Button>
+            </div>
+          )}
+          {selectedNotification?.actionUrl && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={openSelectedNotificationUrl}
+                className="rounded-sm border-2 border-[#fff] bg-[#27aab8] text-white shadow-[2px_2px_0_#404040] hover:bg-[#098b9f]"
+              >
+                Open related item
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
