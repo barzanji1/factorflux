@@ -4,7 +4,7 @@ import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertCircle, Bug, Check, ChevronRight, Clock3, Lightbulb, MessageSquareText,
-  Plus, Send, Settings, ShieldCheck, Trash2, Wrench,
+  Plus, Send, ShieldCheck, Trash2, Wrench,
 } from "lucide-react";
 import {
   PageShell, Win95Badge, Win95Button as Button, Win95Card as Card,
@@ -21,7 +21,7 @@ type ITRequest = {
   status: RequestStatus; submittedByAgentId: string; submittedByName: string;
   createdAt: string; updatedAt: string; resolvedAt: string | null;
 };
-type Meta = { contact: { id: string; name: string } | null; isContact: boolean; canConfigure: boolean; staff: Array<{ id: string; name: string }> };
+type Meta = { contact: { id: string; name: string }; isContact: boolean };
 type RequestDetail = { request: ITRequest; responses: Array<{ id: number; body: string; createdAt: string; authorName: string }>; canManage: boolean };
 type RequestForm = { title: string; description: string; type: RequestType; priority: Priority };
 
@@ -56,7 +56,6 @@ export default function ItSupport() {
   const [scope, setScope] = useState<"mine" | "triage">("mine");
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<RequestForm>({ title: "", description: "", type: "bug", priority: "medium" });
-  const [contactId, setContactId] = useState("");
   const [responseText, setResponseText] = useState("");
   const [pageMessage, setPageMessage] = useState("");
   const [messageError, setMessageError] = useState(false);
@@ -71,8 +70,6 @@ export default function ItSupport() {
     refetchInterval: 15000,
   });
   const meta = metaQuery.data;
-  useEffect(() => { if (meta) setContactId(meta.contact?.id ?? ""); }, [meta?.contact?.id]);
-
   useEffect(() => {
     setScope(meta?.isContact ? "triage" : "mine");
   }, [meta?.isContact]);
@@ -119,16 +116,6 @@ export default function ItSupport() {
     },
     onError: (error: Error) => { setPageMessage(error.message); setMessageError(true); },
   });
-  const saveContact = useMutation({
-    mutationFn: () => requestJson<Meta>(`${root}/contact`, jsonBody("PUT", { userId: contactId || null })),
-    onSuccess: (data) => {
-      queryClient.setQueryData([root, "meta"], data);
-      setPageMessage("IT contact assignment saved.");
-      setMessageError(false);
-      refreshSupport();
-    },
-    onError: (error: Error) => { setPageMessage(error.message); setMessageError(true); },
-  });
   const updateRequest = useMutation({
     mutationFn: (body: { status?: RequestStatus; response?: string }) =>
       requestJson<ITRequest>(`${root}/requests/${requestId}`, jsonBody("PATCH", body)),
@@ -167,7 +154,7 @@ export default function ItSupport() {
       <header className="flex flex-col gap-3 rounded-sm border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-[#d4d0c8] p-4 shadow-bevel-light sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2"><Wrench className="h-5 w-5 text-[#087f8c]" /><h1 className="text-xl font-bold text-[#252525]">IT &amp; Software Support</h1></div>
-          <p className="mt-1 max-w-2xl text-sm text-[#505050]">A direct line for bugs, product ideas, and questions about the FactorFlux system. For carrier or funding work, use Tickets.</p>
+          <p className="mt-1 max-w-2xl text-sm text-[#505050]">A direct line for bugs, product ideas, and questions about the FactorFlux system.</p>
         </div>
         <Button primary className="shrink-0 gap-2" onClick={() => { setPageMessage(""); setFormOpen((open) => !open); }}><Plus className="h-4 w-4" />Submit Request</Button>
       </header>
@@ -177,18 +164,7 @@ export default function ItSupport() {
       {metaQuery.isError && <Card><CardContent className="flex items-center gap-3 text-sm text-[#812f25]"><AlertCircle className="h-5 w-5" />{(metaQuery.error as Error).message}<Button className="ml-auto" onClick={() => metaQuery.refetch()}>Retry</Button></CardContent></Card>}
 
       {meta && <>
-        {!meta.contact && <div className="flex gap-2 border-2 border-[#b3954e] bg-[#f5edce] px-3 py-2.5 text-sm text-[#6b5416]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span><strong>No IT contact is assigned.</strong> Requests can still be submitted and will be available when an administrator designates a contact.</span></div>}
-        {meta.contact && <div className="flex items-center gap-2 border-2 border-[#9bb4ac] bg-[#e5efeb] px-3 py-2 text-sm text-[#315953]"><ShieldCheck className="h-4 w-4" /><span>Designated IT contact: <strong>{meta.contact.name}</strong></span></div>}
-
-        {meta.canConfigure && <Card className="border-[#a4a19b]"><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="min-w-0 flex-1"><div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#303030]"><Settings className="h-4 w-4 text-[#087f8c]" />IT contact assignment</div>
-            <Select value={contactId || "none"} onValueChange={(value) => setContactId(value === "none" ? "" : value)}>
-              <SelectTrigger><SelectValue placeholder="Choose an active staff member" /></SelectTrigger>
-              <SelectContent><SelectItem value="none">No contact assigned</SelectItem>{meta.staff.map((person) => <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <Button primary disabled={saveContact.isPending || contactId === (meta.contact?.id ?? "")} onClick={() => { setPageMessage(""); saveContact.mutate(); }}>{saveContact.isPending ? "Saving…" : "Save contact"}</Button>
-        </CardContent></Card>}
+        <div className="flex items-center gap-2 border-2 border-[#9bb4ac] bg-[#e5efeb] px-3 py-2 text-sm text-[#315953]"><ShieldCheck className="h-4 w-4" /><span>Designated IT contact: <strong>Dosh Barzanji</strong></span></div>
 
         {formOpen && <Card className="border-[#087f8c]"><CardContent className="space-y-3">
           <div className="flex items-center justify-between"><h2 className="text-base font-bold">Submit a software request</h2><span className="text-xs text-[#656565]">All staff can submit</span></div>

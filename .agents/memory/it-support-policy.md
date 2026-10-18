@@ -3,14 +3,14 @@ name: IT Support policy
 description: Software-only support scope, designated-handler authority, and independent notification semantics.
 ---
 
-IT Support is for staff reports about the software itself: bugs, product ideas, and questions. It is separate from client and operational Tickets and must remain available to all staff regardless of operational module permissions.
+IT Support is the single staff support queue for bugs, product ideas, and questions. Do not restore a separate Tickets menu or workflow. It must remain available to all staff regardless of operational module permissions.
 
-**Why:** The user explicitly requested a dedicated system-support workflow, not another operational queue.
+**Why:** The user explicitly clarified that Tickets and IT Support are the same feature and must be consolidated without losing data.
 
-**How to apply:** Preserve the existing operational Tickets workflow. Designating the IT contact must not promote their general account role; request-management authority follows the single designated active account, not an email or a manager/admin role.
+**How to apply:** Preserve historical data when consolidating. The sole IT recipient is fixed to the owner's existing account; no staff selector or reassignment API. Do not promote general roles to grant triage authority.
 
 IT Support alerts are independent from the general notification bell. The designated contact counts incoming requests; other staff count updates on their own submissions. Never combine those counts.
 
 **Why:** The user requires role-separated alerts and acknowledgement of only the current person's opened request. General “mark all read” must not silently erase IT Support updates.
 
-**How to apply:** Keep request ownership immutable, suppress self/unchanged-status alerts, preserve submitter updates during contact changes, and transfer unresolved incoming work to the new contact. Only the designated contact can delete resolved requests, with confirmation and cleanup of all linked responses and alerts.
+**How to apply:** Keep request ownership immutable. Every submission alerts the fixed IT recipient, including their own submissions. Suppress unchanged-status alerts. Only the fixed contact can delete resolved requests, with confirmation and cleanup of all linked responses and alerts.

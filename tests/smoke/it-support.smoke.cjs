@@ -10,6 +10,7 @@ const { eq, sql } = require("drizzle-orm");
 const { db, pool } = require("../../server/db.ts");
 const { users, itSupportRequests, itSupportResponses, itSupportNotifications } = require("../../shared/schema.ts");
 const { registerItSupportRoutes } = require("../../server/routes/itSupport.ts");
+const { IT_CONTACT_USER_ID } = require("../../server/services/itSupport.ts");
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let chrome, ws, server, actor, injection;
 const errors = [], confirmedDeletes = [], apiCalls = [];
@@ -19,12 +20,17 @@ fs.mkdirSync(directory, { recursive: true });
 (async () => {
   await db.transaction(async tx => {
     const prefix = `it-ui-${randomUUID()}`;
-    const people = Object.fromEntries(["admin", "staff", "handler"].map(key => [key, {
+    const people = Object.fromEntries(["admin", "staff"].map(key => [key, {
       id: `${prefix}-${key}`, firstName: "IT", lastName: `${key} Fixture`, role: key === "admin" ? "admin" : "employee",
       status: "active", isTestAccount: false,
     }]));
-    await tx.update(users).set({ isItSupport: false }).where(eq(users.isItSupport, true));
     await tx.insert(users).values(Object.values(people));
+    const [handler] = await tx.select({
+      id: users.id, firstName: users.firstName, lastName: users.lastName,
+      role: users.role, status: users.status,
+    }).from(users).where(eq(users.id, IT_CONTACT_USER_ID));
+    assert.equal(handler?.status, "active");
+    people.handler = handler;
     const app = express();
     app.use(express.json());
     registerItSupportRoutes(app, (req, res, next) => {
@@ -125,11 +131,9 @@ fs.mkdirSync(directory, { recursive: true });
     };
     const count = async key => (await (await fetch(apiBase + "/api/it-support/unread-count", { headers: { "x-fixture-user": people[key].id } })).json()).count;
     await login("admin");
-    await choose(`document.querySelector('button[role="combobox"]')`, "IT handler Fixture");
-    await click(button("Save contact"));
-    await until(`document.body.innerText.includes('IT contact assignment saved.')`);
-    const [saved] = await tx.select({ value: users.isItSupport }).from(users).where(eq(users.id, people.handler.id));
-    assert.equal(saved.value, true);
+    assert.equal(await evaluate(`document.body.innerText.includes('Save contact')`), false);
+    assert.equal(await evaluate(`Array.from(document.querySelectorAll('a')).some(a=>a.getAttribute('href')==='/tickets')`), false);
+    assert.equal(await count("handler"), 0);
     await login("staff");
     await click(button("Submit Request"));
     await click(`document.querySelector('input[aria-label="Request title"]')`);
@@ -191,7 +195,7 @@ fs.mkdirSync(directory, { recursive: true });
     }
     assert.equal(await count("staff"), 0); assert.equal(await count("handler"), 0);
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ passed: true, realDatabaseAndApi: true, contactSaved: true, staffSubmit: true,
+    console.log(JSON.stringify({ passed: true, realDatabaseAndApi: true, permanentContact: true, singleMenu: true, noContactSelector: true, staffSubmit: true,
       triageBell: true, personalView: true, respondAndResolve: true, submitterBell: true,
       mobileBellAndDetail: true, scopedClearing: true, confirmedDelete: true, noOrphans: true, rolledBackFixtures: true }));
     throw rollback;

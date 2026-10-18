@@ -1316,6 +1316,11 @@ ${message}
 
   // ─── Tickets ───────────────────────────────────────────────────────────────
   registerItSupportRoutes(app, requireAuth);
+  // Retire the duplicate ticket transport as well as its sidebar/page. Retain
+  // legacy tables (verified empty) without allowing a second queue to grow.
+  app.all(["/api/tickets", "/api/tickets/*"], requireAuth, (_req, res) => {
+    res.status(410).json({ message: "Tickets have moved to IT Support.", location: "/it-support" });
+  });
   const ticketCategories = ["billing", "technical", "carrier", "broker", "document", "payroll", "other"] as const;
   const ticketPriorities = ["low", "medium", "high", "urgent"] as const;
   const ticketStatuses = ["open", "in-progress", "pending", "resolved", "closed"] as const;

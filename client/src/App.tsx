@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { CustomerBrandHead } from "@/components/brand/customer-brand-head";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -68,8 +68,7 @@ import PortalProfile from "@/pages/portal/profile";
 import PortalSubmissionsPage from "@/pages/portal-submissions";
 import CalendarPage from "@/pages/calendar";
 import Expenses from "@/pages/expenses";
-import Tickets from "@/pages/tickets";
-import TicketDetail from "@/pages/ticket-detail";
+import LegacyTicketRedirect from "@/pages/legacy-ticket-redirect";
 import PortalChat from "@/pages/portal/chat";
 import { TeamChatWorkspace } from "@/pages/chat";
 import ClientEmailPage from "@/pages/client-email";
@@ -357,11 +356,11 @@ function Router() {
         {/* The persistent workspace below supplies the page and background alerts. */}
         <ProtectedRoute>{null}</ProtectedRoute>
       </Route>
-      <Route path="/tickets">
-        <ProtectedRoute><Tickets /></ProtectedRoute>
-      </Route>
       <Route path="/tickets/:id">
-        <ProtectedRoute><TicketDetail /></ProtectedRoute>
+        <ProtectedRoute><LegacyTicketRedirect /></ProtectedRoute>
+      </Route>
+      <Route path="/tickets">
+        <ProtectedRoute><Redirect to="/it-support" /></ProtectedRoute>
       </Route>
       <Route path="/it-support">
         <ProtectedRoute><ItSupport /></ProtectedRoute>

@@ -16,7 +16,14 @@ export function registerItSupportRoutes(app: Express, requireAuth: RequestHandle
     }
   };
   app.get("/api/it-support/meta", requireAuth, wrap(req => support.supportMeta(database, req.user.id)));
-  app.put("/api/it-support/contact", requireAuth, wrap(req => database.transaction(tx => support.setSupportContact(tx, req.user.id, req.body))));
+  app.all("/api/it-support/contact", requireAuth, (_req, res) => {
+    res.status(405).json({ message: "Dosh Barzanji is the permanent IT contact. Contact assignment cannot be changed." });
+  });
+  // The retired Tickets tables were verified empty at consolidation. Keep the
+  // tables intact; old bookmarks fail explicitly rather than opening another ID.
+  app.get("/api/it-support/legacy/:id", requireAuth, (_req, res) => {
+    res.status(404).json({ message: "This legacy ticket does not exist. Open IT Support to submit or view requests." });
+  });
   app.get("/api/it-support/unread-count", requireAuth, wrap(req => support.supportUnread(database, req.user.id)));
   app.get("/api/it-support/requests", requireAuth, wrap(req => support.supportList(database, req.user.id, z.enum(["mine", "triage"]).parse(req.query.scope ?? "mine"))));
   app.post("/api/it-support/requests", requireAuth, wrap(req => database.transaction(tx => support.createSupportRequest(tx, req.user.id, req.body)), 201));

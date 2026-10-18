@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { users, itSupportRequests as requests, itSupportResponses as responses, itSupportNotifications as alerts } from "@shared/schema";
@@ -17,9 +17,10 @@ export const supportUpdateSchema = z.object({
   status: z.enum(["submitted", "in_progress", "resolved"]).optional(),
   response: z.string().trim().max(10000).optional(),
 }).strict();
-export const supportContactSchema = z.object({ userId: z.string().min(1).nullable() }).strict();
+// Stable account identity: email/profile edits must never reroute IT requests.
+export const IT_CONTACT_USER_ID = "admin-1";
 const staffRoles = ["employee", "manager", "admin"];
-// Every change and alert acknowledgement shares this lock with contact reassignment.
+// Serialize request changes and per-recipient acknowledgements.
 export async function supportLock(database: Database) {
   await database.execute(sql`SELECT pg_advisory_xact_lock(746281903)`);
 }
@@ -33,7 +34,7 @@ async function actor(database: Database, userId: string) {
 const name = (person: { firstName: string | null; lastName: string | null; email: string | null }) =>
   [person.firstName, person.lastName].filter(Boolean).join(" ") || person.email || "Staff member";
 async function contact(database: Database) {
-  const [person] = await database.select().from(users).where(and(eq(users.isItSupport, true), eq(users.status, "active"), eq(users.isTestAccount, false)));
+  const [person] = await database.select().from(users).where(and(eq(users.id, IT_CONTACT_USER_ID), eq(users.status, "active"), eq(users.isTestAccount, false)));
   return person && staffRoles.includes(person.role) ? person : null;
 }
 async function context(database: Database, userId: string) {
@@ -42,38 +43,11 @@ async function context(database: Database, userId: string) {
   return { person, handler, isContact: handler?.id === person.id };
 }
 export async function supportMeta(database: Database, userId: string) {
-  const { person, handler, isContact } = await context(database, userId);
-  const staff = person.role === "admin" ? (await database.select().from(users)
-    .where(and(eq(users.status, "active"), eq(users.isTestAccount, false)))).filter(user => staffRoles.includes(user.role)) : [];
+  const { handler, isContact } = await context(database, userId);
   return {
     contact: handler ? { id: handler.id, name: name(handler) } : null,
-    isContact, canConfigure: person.role === "admin",
-    staff: staff.map(user => ({ id: user.id, name: name(user) })),
+    isContact,
   };
-}
-export async function setSupportContact(database: Database, userId: string, raw: unknown) {
-  const input = supportContactSchema.parse(raw);
-  await supportLock(database);
-  const person = await actor(database, userId);
-  if (person.role !== "admin") throw new ItSupportError(403, "Only admins can designate the IT contact");
-  const current = await contact(database);
-  if ((current?.id ?? null) === input.userId) return supportMeta(database, userId);
-  if (input.userId) {
-    const next = await actor(database, input.userId);
-    if (next.isTestAccount) throw new ItSupportError(400, "Choose an active staff account, not a test account");
-  }
-  await database.update(users).set({ isItSupport: false }).where(eq(users.isItSupport, true));
-  if (input.userId) await database.update(users).set({ isItSupport: true }).where(eq(users.id, input.userId));
-  // Stale forward alerts cannot follow the previous handler into submitter mode.
-  await database.delete(alerts).where(eq(alerts.type, "it_request_submitted"));
-  if (input.userId) {
-    const pending = await database.select({ id: requests.id }).from(requests)
-      .where(and(ne(requests.status, "resolved"), ne(requests.submittedByAgentId, input.userId)));
-    if (pending.length) await database.insert(alerts).values(pending.map(request => ({
-      requestId: request.id, userId: input.userId!, type: "it_request_submitted" as const,
-    })));
-  }
-  return supportMeta(database, userId);
 }
 const requestSelection = {
   id: requests.id, title: requests.title, description: requests.description,
@@ -97,8 +71,9 @@ export async function createSupportRequest(database: Database, userId: string, r
   const input = supportCreateSchema.parse(raw);
   await supportLock(database);
   const ctx = await context(database, userId);
+  if (!ctx.handler) throw new ItSupportError(503, "Dosh's IT support account is unavailable. Please retry later.");
   const [request] = await database.insert(requests).values({ ...input, submittedByAgentId: userId }).returning();
-  if (ctx.handler && ctx.handler.id !== userId) {
+  {
     await database.insert(alerts).values({ requestId: request.id, userId: ctx.handler.id, type: "it_request_submitted" });
   }
   return requestRow(database, request.id);
