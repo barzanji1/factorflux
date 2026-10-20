@@ -9,6 +9,12 @@ Client email is send-only. Use a professional sender on the verified company dom
 
 **How to apply:** Keep send permission separate from client-profile read access, respect existing client assignments, and do not grant all agents send access automatically.
 
+Client broadcasts are admin-only. Employees and managers must not gain mass-send access through `client_email`, Full Access, or a delegated admin module. The existing assigned-client rule still governs employees' single-client emails.
+
+**Why:** The user explicitly chose admin-only broadcasts rather than extending mass-send access to permissioned staff.
+
+**How to apply:** Enforce the active administrator role on every broadcast endpoint and before queued delivery, not only in the UI. Each broadcast recipient receives a separate email with no shared To/CC/BCC list.
+
 The correct company email domain is truckingprosfinancial.com, not tpfactoring.com.
 
 **Why:** The user explicitly corrected the sender domain.

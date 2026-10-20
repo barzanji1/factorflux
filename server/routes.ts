@@ -26,6 +26,7 @@ import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte
 import { storage } from "./storage";
 import { registerBrokerConfirmationRoutes } from "./routes/brokerConfirmation";
 import { registerEmailLogRoutes } from "./routes/emailLog";
+import { registerEmailBroadcastRoutes } from "./routes/emailBroadcast";
 import { registerAgentDashboardRoutes } from "./routes/agentDashboard";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
@@ -813,6 +814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const permissionGroups: Array<[string, string]> = [
     ["/api/agent-dashboard", "all_authenticated"],
     ["/api/email-log", "all_authenticated"],
+    ["/api/email-broadcasts", "client_email"],
     ["/api/confirmation-follow-ups", "followups"],
     ["/api/broker-confirmation-settings", "factoring"],
     ["/api/firebase-test", "admin"],
@@ -932,6 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   registerBrokerConfirmationRoutes(app, { requireAuth, requireManagerOrAdmin, canAccessInvoice: employeeCanAccessInvoice });
   registerEmailLogRoutes(app, { requireAuth, requireManagerOrAdmin });
+  registerEmailBroadcastRoutes(app, { requireAuth, requireAdmin });
   registerAgentDashboardRoutes(app, requireAuth);
 
   app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {

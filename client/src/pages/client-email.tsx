@@ -6,6 +6,7 @@ import TopNav from "@/components/layout/top-nav";
 import { Button } from "@/components/ui/button";
 import { ClientEmailComposer, type EmailClient } from "@/components/client-email/client-email-composer";
 import { ClientEmailLog } from "@/components/client-email/client-email-log";
+import { EmailBroadcast } from "@/components/client-email/email-broadcast";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function ClientEmailPage() {
@@ -38,7 +39,8 @@ export default function ClientEmailPage() {
           <aside className="flex gap-2 border border-[#d1b579] bg-[#fff8e9] p-3 text-[11px] leading-relaxed text-[#765f30]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><p><strong>Send-only:</strong> replies are monitored outside this app. There is no inbox reader. Review the recipient carefully before sending.</p></aside>
           {!permissionsLoaded && user?.role !== "admin" ? <div className="h-20 animate-pulse border border-[#c5cecb] bg-[#e8eeeb]" />
             : !canSend ? <div className="border border-[#b9c7c2] bg-[#edf3f0] p-4 text-xs text-[#526968]">You can view communication history from client profiles. Sending requires the Client Email permission.</div>
-              : <section className="border border-[#9aa7a5] bg-[#edf2ef] shadow-[1px_1px_0_#fff]">
+              : <>{user?.role === "admin" && canSend && <EmailBroadcast />}
+                <section className="border border-[#9aa7a5] bg-[#edf2ef] shadow-[1px_1px_0_#fff]">
                 <div className="border-b border-[#c4cfcb] bg-[#dfe8e4] px-3 py-2"><h2 className="text-sm font-bold text-[#263f48]">Recent communication</h2><p className="text-[10px] text-[#697c7d]">Select a client to inspect its log</p></div>
                 <div className="p-3">
                   {isLoading ? <div className="grid gap-2 sm:grid-cols-2"><div className="h-16 animate-pulse bg-[#dce5e1]" /><div className="h-16 animate-pulse bg-[#dce5e1]" /></div>
@@ -48,7 +50,7 @@ export default function ClientEmailPage() {
                           {selectedClient && <ClientEmailLog clientId={selectedClient.id} />}
                         </div>}
                 </div>
-              </section>}
+                </section></>}
         </div>
       </main>
     </div>

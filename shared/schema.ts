@@ -147,6 +147,39 @@ export const clientEmailLogs = pgTable("client_email_logs", {
 }, table => [index("client_email_logs_client_created_idx").on(table.clientId, table.createdAt)]);
 export type ClientEmailLog = typeof clientEmailLogs.$inferSelect;
 
+export const emailBroadcasts = pgTable("email_broadcasts", {
+  id: varchar("id").primaryKey(),
+  requestId: varchar("request_id").notNull().unique(),
+  fingerprint: varchar("fingerprint").notNull(),
+  recipientFingerprint: varchar("recipient_fingerprint").notNull(),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  templateName: varchar("template_name"),
+  filters: jsonb("filters").$type<import("./email-broadcast").BroadcastFilters>().notNull(),
+  clientIds: jsonb("client_ids").$type<number[] | null>(),
+  createdBy: varchar("created_by").notNull(),
+  createdByName: varchar("created_by_name").notNull(),
+  status: varchar("status", { enum: ["draft", "queued", "sending", "completed", "cancelled"] }).notNull().default("draft"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  confirmedAt: timestamp("confirmed_at"),
+  completedAt: timestamp("completed_at"),
+}, table => [index("email_broadcasts_queue_idx").on(table.status, table.confirmedAt)]);
+export const emailBroadcastRecipients = pgTable("email_broadcast_recipients", {
+  id: serial("id").primaryKey(),
+  broadcastId: varchar("broadcast_id").notNull().references(() => emailBroadcasts.id),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+  clientName: varchar("client_name").notNull(),
+  email: varchar("email"),
+  status: varchar("status", { enum: ["pending", "sent", "skipped", "failed", "unconfirmed"] }).notNull(),
+  error: text("error"),
+  providerMessageId: varchar("provider_message_id"),
+  sentAt: timestamp("sent_at"),
+}, table => [index("email_broadcast_recipients_queue_idx").on(table.broadcastId, table.status, table.id)]);
+export const emailBroadcastDispatch = pgTable("email_broadcast_dispatch", {
+  id: integer("id").primaryKey(),
+  nextSendAt: timestamp("next_send_at").notNull().defaultNow(),
+});
+
 export const emailLogDirection = pgEnum("email_log_direction", ["outbound"]);
 export const emailLogStatus = pgEnum("email_log_status", ["sent", "delivered", "bounced", "complained", "failed"]);
 export type EmailLogAttachment = { filename: string; s3_key: string | null; size: number };

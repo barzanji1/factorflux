@@ -143,6 +143,9 @@ export async function startServer(
 
   startAuthorityScheduler();
   startBrokerCreditScheduler();
+  import("./services/emailBroadcast")
+    .then(m => m.startEmailBroadcastWorker())
+    .catch(e => console.error("[emailBroadcast] startup error:", e?.message));
   import("./services/brokerConfirmationService")
     .then(m => m.startBrokerConfirmationScheduler())
     .catch(e => console.warn("[brokerConfirmation] startup error:", e?.message));
