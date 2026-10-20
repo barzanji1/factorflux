@@ -133,6 +133,7 @@ export const clientEmailLogs = pgTable("client_email_logs", {
   agentId: varchar("agent_id").references(() => users.id, { onDelete: "set null" }),
   agentName: varchar("agent_name").notNull(),
   toEmail: varchar("to_email").notNull(),
+  ccEmails: text("cc_emails").array().notNull().default(sql`'{}'::text[]`),
   fromEmail: varchar("from_email").notNull(),
   replyTo: varchar("reply_to").notNull(),
   subject: varchar("subject").notNull(),

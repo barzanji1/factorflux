@@ -10,6 +10,7 @@ export interface ClientEmailLogEntry {
   agentId: string | null;
   agentName: string;
   toEmail: string;
+  ccEmails?: string[];
   fromEmail: string;
   replyTo: string;
   subject: string;
@@ -67,6 +68,7 @@ export function ClientEmailLog({ clientId }: { clientId: number }) {
                     <div><dt className="text-[9px] font-bold uppercase tracking-wider text-[#7a8986]">To</dt><dd className="mt-0.5 break-all text-[#344f54]">{entry.toEmail || "—"}</dd></div>
                     <div><dt className="text-[9px] font-bold uppercase tracking-wider text-[#7a8986]">From</dt><dd className="mt-0.5 break-all text-[#344f54]">{entry.fromEmail || "—"}</dd></div>
                     <div><dt className="text-[9px] font-bold uppercase tracking-wider text-[#7a8986]">Reply-to</dt><dd className="mt-0.5 break-all text-[#344f54]">{entry.replyTo || "—"}</dd></div>
+                    {!!entry.ccEmails?.length && <div><dt className="text-[9px] font-bold uppercase tracking-wider text-[#7a8986]">CC</dt><dd className="mt-0.5 break-all text-[#344f54]">{entry.ccEmails.join(", ")}</dd></div>}
                     <div><dt className="text-[9px] font-bold uppercase tracking-wider text-[#7a8986]">Sent by</dt><dd className="mt-0.5 text-[#344f54]">{entry.agentName || "Staff"} · {dateTime(entry.sentAt || entry.createdAt)}</dd></div>
                   </dl>
                   {entry.errorMessage && <p className="border border-[#d4a49d] bg-[#fff1ee] p-2 text-[11px] text-[#8d433a]">{entry.errorMessage}</p>}

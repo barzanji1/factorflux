@@ -15,7 +15,7 @@ const logRecorder = { async begin() { return 1; }, async accepted() {}, async fa
 const isolatedSender = (proxy: Parameters<typeof createResendSender>[0]) => createResendSender(proxy, logRecorder);
 const client = { id: 123, email: "delivered@resend.dev" };
 const agent = { id: "fixture-agent", name: "Test Agent" };
-const input = () => ({ clientId: client.id, requestId: randomUUID(), subject: "Document request", body: "Please send the requested documents." });
+const input = () => ({ clientId: client.id, requestId: randomUUID(), subject: "Document request", body: "Please send the requested documents.", cc: [] as string[] });
 
 function fakeStore(): ClientEmailStore & { rows: ClientEmailLog[] } {
   const rows: ClientEmailLog[] = [];
@@ -66,7 +66,7 @@ test("Resend payload fixes domain, monitored reply-to, recipient and retry idemp
   assert.equal(captured.connector, "resend");
   assert.equal(captured.path, "/emails");
   assert.equal(captured.body.from, CLIENT_EMAIL_FROM);
-  assert.equal(captured.body.from, "TruckingPros Financial <notifications@truckingprosfinancial.com>");
+  assert.equal(captured.body.from, "Trucking Pros Financial <notifications@truckingprosfinancial.com>");
   assert.equal(captured.body.reply_to, CLIENT_EMAIL_REPLY_TO);
   assert.deepEqual(captured.body.to, [client.email]);
   assert.equal(captured.headers["Idempotency-Key"], `client-email/${draft.requestId}`);
@@ -76,6 +76,41 @@ test("Resend payload fixes domain, monitored reply-to, recipient and retry idemp
   assert.equal(log.status, "sent");
   assert.equal(log.providerMessageId, "provider-fixture");
   assert(log.sentAt);
+});
+
+test("CC validates, normalizes and deduplicates without permitting header injection", () => {
+  assert.deepEqual(clientEmailSchema.parse({ ...input(), cc: [" Copy@Example.com ", "copy@example.com", "other@example.com"] }).cc,
+    ["copy@example.com", "other@example.com"]);
+  const { cc, ...legacy } = input();
+  assert.deepEqual(clientEmailSchema.parse(legacy).cc, []);
+  for (const invalid of [["not-an-email"], ["copy@example.com\r\nBcc: victim@example.com"], Array(21).fill("copy@example.com"), "copy@example.com"]) {
+    assert.throws(() => clientEmailSchema.parse({ ...input(), cc: invalid }));
+  }
+});
+
+test("CC persists and reaches the shared transport, including unchanged retries", async () => {
+  const store = fakeStore();
+  let attempts = 0;
+  let payload: any;
+  const sender = isolatedSender(async (_connector, _path, options) => {
+    attempts++;
+    payload = options.body;
+    if (attempts === 1) throw new Error("Connection lost");
+    return new Response(JSON.stringify({ id: "cc-fixture" }), { status: 200 });
+  });
+  const service = createClientEmailService(store, sender);
+  const draft = clientEmailSchema.parse({ ...input(), cc: ["copy@example.com", client.email] });
+  await assert.rejects(service(draft, client, agent));
+  assert.deepEqual(store.rows[0].ccEmails, ["copy@example.com"]);
+  await assert.rejects(service({ ...draft, cc: ["different@example.com"] }, client, agent), /different email/);
+  assert.equal(attempts, 1);
+  const log = await service(draft, client, agent);
+  assert.deepEqual(payload.to, [client.email]);
+  assert.deepEqual(payload.cc, ["copy@example.com"]);
+  assert.deepEqual(log.ccEmails, ["copy@example.com"]);
+  assert.equal(log.status, "sent");
+  await service(draft, client, agent);
+  assert.equal(attempts, 2);
 });
 
 test("duplicate/concurrent requests send once and cannot reuse another agent's email", async () => {
@@ -159,10 +194,11 @@ test("real database stores accepted message and sender, with all fixtures rolled
       assert.equal(persisted.status, "sending");
       return "mock-provider-id";
     });
-    const result = await service({ ...input(), clientId: record.id }, { id: record.id, email: client.email }, { id: staff.id, name: agent.name });
+    const result = await service({ ...input(), cc: ["copy@example.com"], clientId: record.id }, { id: record.id, email: client.email }, { id: staff.id, name: agent.name });
     assert.equal(result.status, "sent");
     const [saved] = await tx.select().from(clientEmailLogs).where(eq(clientEmailLogs.id, result.id));
     assert.equal(saved.agentId, staff.id);
+    assert.deepEqual(saved.ccEmails, ["copy@example.com"]);
     assert.equal(saved.toEmail, client.email);
     assert.equal(saved.providerMessageId, "mock-provider-id");
     throw rollback;

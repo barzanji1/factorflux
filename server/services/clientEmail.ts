@@ -12,6 +12,9 @@ export const clientEmailSchema = z.object({
   requestId: z.string().uuid(),
   subject: z.string().trim().min(1, "Subject is required").max(200).refine(value => !/[\r\n]/.test(value), "Subject must be a single line"),
   body: z.string().trim().min(1, "Message is required").max(20000),
+  cc: z.array(z.string().trim().email("Enter a valid CC email address").max(254))
+    .max(20, "Use no more than 20 CC addresses").optional()
+    .transform(values => [...new Set((values ?? []).map(value => value.toLowerCase()))].sort()),
 }).strict();
 export type ClientEmailInput = z.infer<typeof clientEmailSchema>;
 type Draft = typeof clientEmailLogs.$inferInsert;
@@ -21,7 +24,7 @@ export { ClientEmailError };
 export function createResendSender(proxy?: ResendProxy, recorder?: EmailLogRecorder) {
   const send = proxy ? createResendTransport(proxy, 30000, recorder) : sendResendEmail;
   return (log: ClientEmailLog) => send({
-    to: log.toEmail, subject: log.subject, text: log.body,
+    to: log.toEmail, cc: log.ccEmails ?? [], subject: log.subject, text: log.body,
     idempotencyKey: `client-email/${log.requestId}`,
     emailLog: { sentByUserId: log.agentId, entityType: "carrier", entityId: log.clientId, templateName: "client_email" },
   });
@@ -66,10 +69,13 @@ export function createClientEmailService(store: ClientEmailStore, send: (log: Cl
     const log = await store.reserve({
       requestId: input.requestId, clientId: client.id, agentId: agent.id, agentName: agent.name,
       toEmail: toEmail.data, fromEmail: CLIENT_EMAIL_FROM, replyTo: CLIENT_EMAIL_REPLY_TO,
+      ccEmails: (input.cc ?? []).filter(address => address.toLowerCase() !== toEmail.data.toLowerCase()),
       subject: input.subject, body: input.body, status: "pending",
     });
     if (log.clientId !== client.id || log.agentId !== agent.id || log.subject !== input.subject ||
-        log.body !== input.body || log.toEmail !== toEmail.data) {
+        log.body !== input.body || log.toEmail !== toEmail.data ||
+        JSON.stringify([...(log.ccEmails ?? [])].sort()) !==
+          JSON.stringify((input.cc ?? []).filter(address => address.toLowerCase() !== toEmail.data.toLowerCase()).sort())) {
       throw new ClientEmailError(409, "This send request belongs to a different email. Start a new draft before sending.");
     }
     if (log.status === "sent") return log;

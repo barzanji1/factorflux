@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { z } from "zod";
 
 export interface EmailClient {
   id: number;
@@ -17,6 +18,12 @@ export interface EmailClient {
 }
 
 const isValidEmail = (value?: string | null) => !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const parseCc = (value: string) => {
+  const entries = value.split(/[;,]/).map((address) => address.trim()).filter(Boolean);
+  const addresses = [...new Map(entries.map((address) => [address.toLowerCase(), address])).values()];
+  const invalidAddresses = addresses.filter((address) => !z.string().email().max(254).safeParse(address).success);
+  return { addresses, invalidAddresses, tooMany: addresses.length > 20 };
+};
 const getRequestId = () => crypto.randomUUID();
 
 type TemplateSet = { document: { subject: string; body: string }; deadline: { subject: string; body: string } };
@@ -40,6 +47,7 @@ export function ClientEmailComposer({
   const [clientId, setClientId] = useState(initialClient ? String(initialClient.id) : "");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [cc, setCc] = useState("");
   const [template, setTemplate] = useState("");
   const requestId = useRef(getRequestId());
   const draftSignature = useRef("");
@@ -75,14 +83,15 @@ export function ClientEmailComposer({
       setClientId(initialClient ? String(initialClient.id) : "");
       setSubject("");
       setBody("");
+      setCc("");
       setTemplate("");
       draftSignature.current = "";
       requestId.current = getRequestId();
     }
   }, [open, initialClient?.id]);
 
-  const noteDraftChanged = (nextClientId: string, nextSubject: string, nextBody: string) => {
-    const signature = JSON.stringify([nextClientId, nextSubject, nextBody]);
+  const noteDraftChanged = (nextClientId: string, nextSubject: string, nextBody: string, nextCc: string) => {
+    const signature = JSON.stringify([nextClientId, nextSubject, nextBody, nextCc]);
     if (signature !== draftSignature.current) {
       draftSignature.current = signature;
       requestId.current = getRequestId();
@@ -91,25 +100,32 @@ export function ClientEmailComposer({
   const changeClient = (value: string) => {
     setClientId(value);
     setTemplate("");
-    noteDraftChanged(value, subject, body);
+    noteDraftChanged(value, subject, body, cc);
   };
   const changeSubject = (value: string) => {
     setSubject(value);
-    noteDraftChanged(clientId, value, body);
+    noteDraftChanged(clientId, value, body, cc);
   };
   const changeBody = (value: string) => {
     setBody(value);
-    noteDraftChanged(clientId, subject, value);
+    noteDraftChanged(clientId, subject, value, cc);
   };
+  const changeCc = (value: string) => {
+    setCc(value);
+    noteDraftChanged(clientId, subject, body, value);
+  };
+  const parsedCc = useMemo(() => parseCc(cc), [cc]);
+  const ccIsInvalid = parsedCc.invalidAddresses.length > 0 || parsedCc.tooMany;
   const sendMutation = useMutation({
     mutationFn: async () => {
       if (!emailConfig || configError) throw new Error("Sender settings are unavailable. Reload them before sending.");
       if (!selectedClient || !isValidEmail(selectedClient.email)) throw new Error("This client needs a valid profile email before you can send.");
+      if (ccIsInvalid) throw new Error("Check the CC addresses before sending.");
       const response = await fetch("/api/client-email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ clientId: selectedClient.id, subject: subject.trim(), body: body.trim(), requestId: requestId.current }),
+        body: JSON.stringify({ clientId: selectedClient.id, subject: subject.trim(), body: body.trim(), cc: parsedCc.addresses, requestId: requestId.current }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || `Email could not be sent (HTTP ${response.status}).`);
@@ -120,6 +136,7 @@ export function ClientEmailComposer({
       if (selectedClient) queryClient.invalidateQueries({ queryKey: ["/api/clients", selectedClient.id, "email-log"] });
       setSubject("");
       setBody("");
+      setCc("");
       setTemplate("");
       draftSignature.current = "";
       requestId.current = getRequestId();
@@ -129,7 +146,7 @@ export function ClientEmailComposer({
       if (selectedClient) queryClient.invalidateQueries({ queryKey: ["/api/clients", selectedClient.id, "email-log"] });
     },
   });
-  const canSend = !!emailConfig && !configError && !!selectedClient && isValidEmail(selectedClient.email) && !!subject.trim() && !!body.trim() && !sendMutation.isPending;
+  const canSend = !!emailConfig && !configError && !!selectedClient && isValidEmail(selectedClient.email) && !ccIsInvalid && !!subject.trim() && !!body.trim() && !sendMutation.isPending;
 
   const applyTemplate = (value: string) => {
     setTemplate(value);
@@ -137,14 +154,14 @@ export function ClientEmailComposer({
       const chosen = defaultTemplates[value];
       setSubject(chosen.subject);
       setBody(chosen.body);
-      noteDraftChanged(clientId, chosen.subject, chosen.body);
+      noteDraftChanged(clientId, chosen.subject, chosen.body, cc);
     }
   };
   return <Dialog open={open} onOpenChange={value => { if (!sendMutation.isPending) onOpenChange(value); }}>
     <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto rounded-sm border-2 border-[#7c8582] bg-[#e8eeeb] p-0 shadow-[4px_4px_0_rgba(39,54,56,.25)]">
       <DialogHeader className="border-b border-[#b8c3bf] bg-[#d6e2de] px-5 py-4">
         <DialogTitle className="flex items-center gap-2 text-base text-[#203a46]"><Mail className="h-4 w-4 text-[#087f8e]" />Email client</DialogTitle>
-        <DialogDescription className="text-xs text-[#596d70]">Send-only communication. Recipients always come from the client profile.</DialogDescription>
+        <DialogDescription className="text-xs text-[#596d70]">Send-only communication to the assigned client, with optional CC recipients.</DialogDescription>
       </DialogHeader>
       <div className="space-y-4 px-5 py-4">
         {initialClient ? <div className="space-y-1"><Label>Client</Label><div className="border border-[#bcc8c5] bg-[#f4f7f5] px-3 py-2 text-sm font-semibold">{initialClient.name}</div></div>
@@ -160,6 +177,17 @@ export function ClientEmailComposer({
         </div>}
         <div className="space-y-1"><Label>From</Label><div className="break-all border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{emailConfig?.from ?? (configError ? "Sender unavailable" : "Loading sender settings…")}</div></div>
         <div className="space-y-1"><Label>Reply-to</Label><div className="break-all border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{emailConfig?.replyTo ?? (configError ? "Reply-to unavailable" : "Loading sender settings…")}</div></div>
+         <div className="space-y-1">
+           <Label htmlFor="client-email-cc">CC <span className="font-normal text-[#71817e]">(optional, up to 20)</span></Label>
+           <Input id="client-email-cc" value={cc} disabled={sendMutation.isPending} onChange={(event) => changeCc(event.target.value)} className={`rounded-sm bg-white ${ccIsInvalid ? "border-[#b75c50] focus-visible:ring-[#b75c50]" : ""}`} placeholder="name@example.com, another@example.com" aria-invalid={ccIsInvalid} aria-describedby="client-email-cc-help" />
+           <p id="client-email-cc-help" className={`text-[11px] ${ccIsInvalid ? "text-[#8d3f36]" : "text-[#596d70]"}`}>
+             {parsedCc.tooMany
+               ? "A maximum of 20 unique CC addresses is allowed."
+               : parsedCc.invalidAddresses.length
+                 ? `Enter bare email addresses only. Invalid: ${parsedCc.invalidAddresses.join(", ")}`
+                 : "Separate addresses with commas or semicolons. Duplicate addresses are removed."}
+           </p>
+         </div>
         {configError && <div role="alert" className="flex items-center justify-between gap-2 border border-[#d2a6a0] bg-[#fff1ee] p-2 text-xs text-[#8d3f36]"><span>Sender settings could not be loaded. Sending is disabled.</span><Button variant="outline" size="sm" onClick={() => void refetchConfig()}>Retry</Button></div>}
         <div className="rounded-sm border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Replies are monitored outside this app. This is a send-only tool; there is no inbox reader here.</div>
         <div className="flex flex-wrap items-center justify-between gap-2">
