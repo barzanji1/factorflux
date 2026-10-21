@@ -1,6 +1,6 @@
 ---
 name: Broker receipt confirmation
-description: User-approved confirmation action policy and hosting choice.
+description: Public receipt confirmation, sequential VP/RPS collections, safety boundaries, and hosting choice.
 ---
 
 Broker receipt and dispute links open public pages. Record the response only after an explicit button submission, never merely from opening the link.
@@ -15,11 +15,23 @@ Keep the existing Autoscale deployment for the broker confirmation rollout.
 
 **How to apply:** Retain startup catch-up. Do not switch to Reserved VM hosting or add an external scheduler for this feature without new approval.
 
-Automatic initial broker confirmation waits 48 hours after funding. Reminder cadence remains 3, 7, and 14 days after the first send, not after funding.
+Automatic collections use sequential VP and RPS phases. VP sends at 48 and 96 hours after funding, then escalates to the designated call handler. Agent-confirmed VP starts a new clock: RPS at days 20, 35, and 40, then another call escalation. Agent-marked Paid stops the sequence.
 
-**Why:** The user changed the initial delay from 24 to 48 hours while explicitly preserving the reminder cadence.
+**Why:** The user explicitly replaced the earlier 3/7/14-day reminder cadence with the two-phase collections sequence and requested integration with the existing first receipt email, not duplicate schedules.
 
-**How to apply:** Keep automatic initial eligibility and the scheduled candidate query aligned. Do not apply the initial-delay gate to reminders for emails already sent manually.
+**How to apply:** Keep one automatic schedule. Preserve earlier accepted receipt sends and history. Public broker responses remain explicit button submissions, but only an agent's VP confirmation starts RPS.
+
+Keep simulations distinct from live progress. Changing a global mode must never silently promote simulated sends or confirmations into real workflow progress. Initial rollout is globally off and dry-run; live activation requires explicit confirmation.
+
+**Why:** The user requires safe timing verification before contacting real brokers. Existing funded invoices can be overdue for several steps, so treating simulated progress as live could skip required contact or trigger unexpected escalations.
+
+**How to apply:** Dry runs log would-send/would-notify events without real mail or bells. Global off, per-invoice pause/stop, and failure pauses govern every automatic entry point. Resume failed delivery through its workflow, not an Email Log bypass.
+
+The manual Paid action is a collections stop marker, not evidence of cash posting, invoice settlement, or ledger reconciliation.
+
+**Why:** The user wants a clean payment-confirmation boundary that future auto-reconciliation can replace or augment, without changing the existing financial workflows.
+
+**How to apply:** Clearly explain the distinction in the UI. Future reconciliation should invoke the same stop boundary only after independently validating payment.
 
 Label an unsent broker confirmation action “Send”; use “Resend” only after a send is recorded. Determine availability separately from that label.
 

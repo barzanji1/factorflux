@@ -45,6 +45,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import ConfirmationFollowUpQueue from "@/components/broker-confirmation/follow-up-queue";
+import CollectionsAutomation from "@/components/broker-confirmation/collections-automation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1089,8 +1090,12 @@ export default function FollowUpPage() {
       </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="manual">
+            <Tabs defaultValue="collections">
               <TabsList className="mb-4">
+                <TabsTrigger value="collections" className="flex items-center gap-2" data-testid="collections-automation-tab">
+                  <FileText className="h-4 w-4" />
+                  VP / RPS Collections
+                </TabsTrigger>
                 <TabsTrigger value="manual" className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
                   Manual Tasks
@@ -1121,6 +1126,10 @@ export default function FollowUpPage() {
                   </span>
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="collections">
+                <CollectionsAutomation />
+              </TabsContent>
 
               <TabsContent value="confirmation">
                 <ConfirmationFollowUpQueue />

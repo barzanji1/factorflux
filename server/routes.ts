@@ -25,6 +25,7 @@ import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte
 
 import { storage } from "./storage";
 import { registerBrokerConfirmationRoutes } from "./routes/brokerConfirmation";
+import { registerBrokerCollectionsRoutes } from "./routes/brokerCollections";
 import { registerEmailLogRoutes } from "./routes/emailLog";
 import { registerEmailBroadcastRoutes } from "./routes/emailBroadcast";
 import { registerAgentDashboardRoutes } from "./routes/agentDashboard";
@@ -816,6 +817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/email-log", "all_authenticated"],
     ["/api/email-broadcasts", "client_email"],
     ["/api/confirmation-follow-ups", "followups"],
+    ["/api/broker-collections", "followups"],
     ["/api/broker-confirmation-settings", "factoring"],
     ["/api/firebase-test", "admin"],
     ["/api/firebase-clients", "carriers"],
@@ -933,6 +935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return typeof previousJsonReplacer === "function" ? previousJsonReplacer.call(this, key, value) : value;
   });
   registerBrokerConfirmationRoutes(app, { requireAuth, requireManagerOrAdmin, canAccessInvoice: employeeCanAccessInvoice });
+  registerBrokerCollectionsRoutes(app, { requireAuth });
   registerEmailLogRoutes(app, { requireAuth, requireManagerOrAdmin });
   registerEmailBroadcastRoutes(app, { requireAuth, requireAdmin });
   registerAgentDashboardRoutes(app, requireAuth);

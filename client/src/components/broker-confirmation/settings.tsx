@@ -31,19 +31,19 @@ export default function BrokerConfirmationSettings() {
     <div className="space-y-4 p-4">
       {query.error && <div role="alert" className="flex items-center gap-2 bg-[#f9e1dd] p-2 text-sm text-[#8a3028]"><AlertCircle className="h-4 w-4" />{(query.error as Error).message}<Button size="sm" variant="outline" onClick={() => query.refetch()}>Retry</Button></div>}
       {query.data && <>
-        <p className="text-xs text-[#555]">The automatic first email is sent after 48 hours from funding. Reminder days are measured from the first send; they do not change invoice funding or payment workflows.</p>
+        <p className="text-xs text-[#555]">Automatic collections now use VP at +48/+96 hours, followed by RPS at days 20/35/40 after agent verification. Manage the global switch and dry-run mode in <a className="underline" href="/follow-up">Follow-up → VP / RPS</a>. The public URL below is still used by receipt links. Legacy reminder values are retained for history and do not run a second schedule.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-xs font-bold">Maximum reminders (0–3)
-            <Input data-testid="confirmation-max-reminders" type="number" min={0} max={3} value={maxReminders} onChange={e => setMaxReminders(Number(e.target.value))} className="mt-1 h-9" />
+          <label className="text-xs font-bold">Legacy maximum reminders (not scheduled)
+            <Input data-testid="confirmation-max-reminders" disabled type="number" min={0} max={3} value={maxReminders} onChange={e => setMaxReminders(Number(e.target.value))} className="mt-1 h-9" />
           </label>
           <label className="text-xs font-bold">Public confirmation base URL
             <Input data-testid="confirmation-public-url" type="url" value={publicBaseUrl} onChange={e => setPublicBaseUrl(e.target.value)} className="mt-1 h-9" />
           </label>
         </div>
         <div>
-          <p className="mb-1 text-xs font-bold">Reminder days — positive, strictly ascending</p>
+          <p className="mb-1 text-xs font-bold">Legacy reminder days — retained for history only</p>
           <div className="grid grid-cols-3 gap-2">{days.map((day, i) => <label key={i} className="text-[11px] text-[#666]">Reminder {i + 1}
-            <Input data-testid={`confirmation-reminder-day-${i + 1}`} type="number" min={1} step={1} value={day} onChange={e => setDays(old => old.map((n, j) => j === i ? Number(e.target.value) : n) as [number, number, number])} className="mt-1 h-9" />
+            <Input data-testid={`confirmation-reminder-day-${i + 1}`} disabled type="number" min={1} step={1} value={day} onChange={e => setDays(old => old.map((n, j) => j === i ? Number(e.target.value) : n) as [number, number, number])} className="mt-1 h-9" />
           </label>)}</div>
         </div>
         {mutation.error && <p role="alert" className="text-sm text-red-700">{(mutation.error as Error).message}</p>}

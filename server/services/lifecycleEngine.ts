@@ -24,6 +24,7 @@ import { eq, and, inArray, sql } from "drizzle-orm";
 import { advanceInvoiceStage, STAGE_META, type FactoringStage } from "./invoiceStage";
 import { guardDocsForReview, guardDocsForApproval, getDocumentCompleteness, getInvoiceDocumentTypes } from "./docValidation";
 import { triggerBrokerFollowUp } from "./brokerFollowUpEngine";
+import { ensureCollectionState } from "./brokerCollections";
 import { sendEmailTracked } from "../emailService";
 import { emailDisplayName, textToEmailBody } from "../emailTemplate.js";
 import {
@@ -715,6 +716,7 @@ async function executeFundTransaction(
       updatedAt: new Date(),
     }).where(and(eq(invoices.id, invoiceId), eq(invoices.status, "approved"))).returning();
     if (!updated) throw new Error("Invoice status could not be updated");
+    await ensureCollectionState(tx, updated);
 
     await tx.insert(eventLedger).values({
       entityType: "invoice",

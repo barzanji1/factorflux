@@ -6,6 +6,7 @@ import {
 } from "../../shared/schema";
 import { sendEmailTracked } from "../emailService";
 import { emailDetailsTable, emailDisplayName } from "../emailTemplate.js";
+import { brokerCollectionsService, confirmCollectionVpInTransaction, recordCollectionReceiptSend, startBrokerCollectionsScheduler } from "./brokerCollections";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = typeof db | Tx;
@@ -158,6 +159,7 @@ export function createBrokerConfirmationService({
         brokerConfirmationStatus: "sent", confirmationSentAt: invoice.confirmationSentAt ?? at,
         confirmationRemindedCount: reminder ?? invoice.confirmationRemindedCount, updatedAt: at,
       }).where(eq(invoices.id, id));
+      await recordCollectionReceiptSend(tx, invoice, at);
       await event(tx, id, reminder ? "reminder_sent" : "sent", actor,
         `${reminder ? `Reminder ${reminder}. ` : ""}${automatic ? "Automatic" : "Manual"} send accepted by Resend (${delivery.messageId}).`, at);
       await tx.update(tasks).set({ status: "completed", progress: 100, updatedAt: at })
@@ -180,6 +182,7 @@ export function createBrokerConfirmationService({
         confirmationRemindedCount: Math.max(row.invoice.confirmationRemindedCount, reminder ?? 0), updatedAt: at,
       }).where(eq(invoices.id, id));
       await event(tx, id, reminder ? "reminder_sent" : "sent", actor, `Email Log retry accepted by Resend (${messageId}).`, at);
+      await recordCollectionReceiptSend(tx, row.invoice, at);
       await tx.update(tasks).set({ status: "completed", progress: 100, updatedAt: at })
         .where(and(eq(tasks.confirmationInvoiceId, id), eq(tasks.confirmationKind, "missing_email")));
       if (reminder === config.maxReminders && reminder === 3) {
@@ -223,6 +226,7 @@ export function createBrokerConfirmationService({
         brokerConfirmationStatus: status, brokerConfirmedAt: status === "confirmed" ? at : null, updatedAt: at,
       }).where(eq(invoices.id, id));
       await event(tx, id, status, actor, notes || null, at);
+      if (status === "confirmed" && actor.kind === "agent") await confirmCollectionVpInTransaction(tx, invoice, actor.id, at);
       if (status === "disputed") await task(tx, invoice, "disputed", notes || "Broker disputed invoice receipt. Contact the broker urgently.", at);
       else await tx.update(tasks).set({ status: "completed", progress: 100, updatedAt: at })
         .where(eq(tasks.confirmationInvoiceId, id));
@@ -279,6 +283,8 @@ export function createBrokerConfirmationService({
   }
 
   async function runScheduled(options: { invoiceIds?: number[] } = {}) {
+    // The old scheduler's public adapter now uses the one VP/RPS engine.
+    if (send === sendEmailTracked) return brokerCollectionsService.tick(options);
     const at = now();
     const candidates = await store.select({ id: invoices.id }).from(invoices).where(and(
       eq(invoices.status, "funded"), inArray(invoices.brokerConfirmationStatus, ["pending", "sent"]),
@@ -331,6 +337,11 @@ export async function getConfirmationAgingRows(scope?: ReturnType<typeof eq>, st
 
 let timer: ReturnType<typeof setInterval> | undefined;
 export function startBrokerConfirmationScheduler() {
+  startBrokerCollectionsScheduler();
+}
+
+// Legacy scheduler implementation is intentionally not exported or started.
+function startLegacyBrokerConfirmationScheduler() {
   if (timer) return;
   // Preview/testing must never automatically send real broker mail.
   if (process.env.NODE_ENV !== "production") {

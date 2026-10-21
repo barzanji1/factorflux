@@ -7,6 +7,9 @@ import { EmailLogError, type EmailStore } from "./emailLogService";
 
 export async function validateEmailRetryDomain(params: ResendEmailParams, store: EmailStore = db) {
   const meta = params.emailLog;
+  if (meta?.templateName?.startsWith("broker_collections_")) {
+    throw new EmailLogError(409, "Retry this email by resuming its VP / RPS workflow. Email Log cannot bypass automation pause, stop, paid, or global controls.");
+  }
   if (meta?.templateName === "broker_confirmation" && meta.entityId) {
     if (process.env.NODE_ENV !== "production") throw new EmailLogError(409, "Broker confirmation retries are disabled in Preview; publish first so confirmation links work.");
     const [invoice] = await store.select().from(invoices).where(eq(invoices.id, Number(meta.entityId)));

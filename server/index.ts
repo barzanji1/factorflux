@@ -146,18 +146,15 @@ export async function startServer(
   import("./services/emailBroadcast")
     .then(m => m.startEmailBroadcastWorker())
     .catch(e => console.error("[emailBroadcast] startup error:", e?.message));
-  import("./services/brokerConfirmationService")
-    .then(m => m.startBrokerConfirmationScheduler())
-    .catch(e => console.warn("[brokerConfirmation] startup error:", e?.message));
+  import("./services/brokerCollections")
+    .then(m => m.startBrokerCollectionsScheduler())
+    .catch(e => console.warn("[brokerCollections] startup error:", e?.message));
 
   // Recover any jobs that were stuck in "queued"/"processing" before the restart
   recoverStuckOcrJobs().catch(e =>
     console.warn("[JobQueue] Startup recovery error:", e?.message)
   );
 
-  import("./services/brokerFollowUpEngine")
-    .then(m => m.startReminderScheduler())
-    .catch(e => console.warn("[reminderScheduler] startup error:", e?.message));
   import("./services/invoiceAgingEngine")
     .then(m => m.startInvoiceAgingScheduler())
     .catch(e => console.warn("[agingScheduler] startup error:", e?.message));

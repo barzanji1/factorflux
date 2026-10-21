@@ -919,6 +919,52 @@ export const brokerConfirmationSettings = pgTable("broker_confirmation_settings"
   check("broker_confirmation_max_reminders_check", sql`${table.maxReminders} between 0 and 3`)]);
 
 // Calendar appointments and reminders. Recurring events remain a single row;
+export const brokerCollectionSettings = pgTable("broker_collection_settings", {
+  id: integer("id").primaryKey().default(1),
+  enabled: boolean("enabled").notNull().default(false),
+  mode: varchar("mode", { enum: ["dry_run", "live"] }).notNull().default("dry_run"),
+  nextSendAt: timestamp("next_send_at").notNull().defaultNow(),
+  updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, table => [check("broker_collection_settings_singleton", sql`${table.id} = 1`)]);
+
+export const brokerCollectionStates = pgTable("broker_collection_states", {
+  invoiceId: integer("invoice_id").primaryKey().references(() => invoices.id, { onDelete: "cascade" }),
+  generation: integer("generation").notNull().default(1),
+  phase: varchar("phase", { enum: ["vp", "rps", "paid", "stopped"] }).notNull().default("vp"),
+  mode: varchar("mode", { enum: ["dry_run", "live"] }).notNull().default("dry_run"),
+  paused: boolean("paused").notNull().default(false),
+  fundedAt: timestamp("funded_at").notNull(),
+  vpConfirmedAt: timestamp("vp_confirmed_at"),
+  paidAt: timestamp("paid_at"),
+  vpAttempts: integer("vp_attempts").notNull().default(0),
+  rpsAttempts: integer("rps_attempts").notNull().default(0),
+  lastSentAt: timestamp("last_sent_at"),
+  nextActionAt: timestamp("next_action_at"),
+  escalatedPhase: varchar("escalated_phase", { enum: ["vp", "rps"] }),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, table => [index("broker_collection_due_idx").on(table.nextActionAt)]);
+
+export const brokerCollectionEvents = pgTable("broker_collection_events", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  generation: integer("generation").notNull(),
+  step: varchar("step").notNull(),
+  phase: varchar("phase").notNull(),
+  mode: varchar("mode").notNull(),
+  outcome: varchar("outcome").notNull(),
+  scheduledAt: timestamp("scheduled_at"),
+  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+  recipient: text("recipient"),
+  providerMessageId: varchar("provider_message_id"),
+  error: text("error"),
+  details: jsonb("details"),
+}, table => [
+  uniqueIndex("broker_collection_event_step_unique").on(table.invoiceId, table.generation, table.step),
+  index("broker_collection_event_invoice_idx").on(table.invoiceId, table.occurredAt),
+]);
+
 // API consumers receive their materialized occurrences for the requested range.
 export const calendarEvents = pgTable("calendar_events", {
   id: serial("id").primaryKey(),

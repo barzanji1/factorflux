@@ -31,7 +31,7 @@
 - [Chat verification](chat-verification.md) — real-staff-only autocomplete; isolate test alerts and use actual pointer events for message/menu interaction checks.
 - [GIPHY integration policy](giphy-integration-policy.md) — G-only GIFs, direct browser/CDN delivery, official attribution, no stored media; client keys are public by design.
 - [Chat profile avatars](chat-profile-avatars.md) — reuse existing staff profile photos across all chat views; shared initials fallback, no separate chat upload.
-- [Broker receipt confirmation](broker-receipt-confirmation.md) — broker links must open a page, not change receipt status; the user approved explicit button submissions.
+- [Broker receipt confirmation](broker-receipt-confirmation.md) — explicit public buttons; sequential VP/RPS timing, isolated dry runs, and collections-only Paid markers.
 - [Client email policy](client-email-policy.md) — shared sender and monitored replies; global log reads are staff-wide, while composing stays permission/assignment-scoped.
 - [Customer branding boundary](customer-branding-boundary.md) — all customer-facing outputs use TPF; FactorFlux is internal-only, and the portal URL stays unchanged.
 - [Carrier chat terminal states](carrier-chat-terminal-states.md) — expected 404/no-portal states must stop polling; repeated error refetches cause visible profile-message flicker.

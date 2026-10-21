@@ -1,8 +1,10 @@
 /**
  * Broker Follow-Up Automation Engine
  * ─────────────────────────────────────────────────────────────────────────────
- * Fires automatically when an invoice is funded (collections-ready).
- * Supports a configurable multi-step reminder cadence:
+ * Historical cadence and explicit manual-send support.
+ * Automatic funding/scheduler entry points now delegate to brokerCollections (VP/RPS).
+ * Legacy scheduled rows are retained for history, not dispatched.
+ * The historical cadence supported:
  *   1. Immediate   — sent at funding time
  *   2. Due Date    — sent on the invoice due date
  *   3. Overdue N   — sent N days after the due date (configurable, default 3 & 7)
@@ -37,6 +39,7 @@ import { eq, and, lte, inArray, ne } from "drizzle-orm";
 import { storage } from "../storage";
 import { sendEmailTracked } from "../emailService";
 import { paymentInstructions, configuredPaymentBody, textToEmailBody, emailDisplayName } from "../emailTemplate.js";
+import { brokerCollectionsService } from "./brokerCollections";
 
 // ─── Default cadence ──────────────────────────────────────────────────────────
 
@@ -447,25 +450,13 @@ export async function triggerBrokerFollowUp(
   triggerType: "auto" | "manual" = "auto",
   cadenceOverride?: Partial<CadenceConfig>,
 ): Promise<number | null> {
+  if (triggerType === "auto") {
+    await brokerCollectionsService.enrolBatch([invoiceId]);
+    return null;
+  }
   // 1. Load invoice
   const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
   if (!inv) return null;
-
-  // 2. Idempotency guard for auto triggers
-  if (triggerType === "auto") {
-    const [existing] = await db
-      .select({ id: brokerFollowUps.id })
-      .from(brokerFollowUps)
-      .where(
-        and(
-          eq(brokerFollowUps.invoiceId, invoiceId),
-          eq(brokerFollowUps.triggerStatus, triggerStatus),
-          eq(brokerFollowUps.triggerType, "auto"),
-        ),
-      )
-      .limit(1);
-    if (existing) return existing.id;
-  }
 
   // 3. Resolve cadence + carrier/debtor names
   const cadence: CadenceConfig = { ...DEFAULT_CADENCE, ...cadenceOverride };
@@ -527,7 +518,7 @@ export async function triggerBrokerFollowUp(
     entityType: "invoice",
     entityId:   invoiceId,
     eventType:  "broker_followup_triggered",
-    actorType:  triggerType === "auto" ? "system" : "user",
+    actorType:  "user",
     actorId,
     payloadJson: {
       followUpId:    record.id,
@@ -591,6 +582,12 @@ let _schedulerHandle: NodeJS.Timeout | null = null;
  * Runs checkAndStopCadence() before sending each reminder.
  */
 export async function processScheduledReminders(): Promise<{ sent: number; skipped: number; stopped: number }> {
+  const result = await brokerCollectionsService.tick();
+  return { sent: result.processed, skipped: result.checked - result.processed, stopped: 0 };
+}
+
+// Retained only as historical implementation context; never scheduled or exported.
+async function processLegacyScheduledReminders(): Promise<{ sent: number; skipped: number; stopped: number }> {
   const now = new Date();
   let sent    = 0;
   let skipped = 0;

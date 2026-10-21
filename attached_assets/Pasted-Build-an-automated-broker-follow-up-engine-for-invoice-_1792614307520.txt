@@ -1,0 +1,30 @@
+Build an automated broker follow-up engine for invoice collections, with two sequential phases (VP and RPS), human escalation, and safety controls. This automates the TIMING and SENDING of follow-ups; agents mark status changes via a queue.
+
+PHASE 1 — VP (Verified Paperwork): confirm the broker RECEIVED the invoice/docs.
+1. Trigger: when an invoice is FUNDED (day 0), start the VP sequence.
+2. +48 hours: send automated follow-up #1 to the broker ("confirm you received the paperwork"). [Note: a +48h follow-up may already exist — integrate with it, don't duplicate.]
+3. +48 more hours (96h total), if VP not yet confirmed by an agent: send automated follow-up #2.
+4. If still not confirmed after follow-up #2: notify Alan Karam (bell notification) to CALL the broker to confirm receipt. Include broker name, invoice/load #, and reason ("VP — confirm receipt").
+5. An agent marks "VP Confirmed" (broker received docs) at any point — this STOPS the VP sequence and starts Phase 2.
+
+PHASE 2 — RPS (Request Payment Status): confirm the broker SENT funds. Starts when VP is confirmed.
+6. Trigger: agent marks VP Confirmed (day 0 of a 35-day payment window).
+7. Day 20: send automated reminder to broker ("has this been paid?").
+8. Day 35, if not marked paid: send automated reminder ("it's been 35 days, what's the payment status?").
+9. Day 40, if not marked paid: send another automated reminder.
+10. After day 40, if still not paid: notify Alan Karam (bell) to CALL the broker for payment status. Include broker, invoice/load #, reason ("RPS — payment status").
+11. An agent marks "Paid" at any point — this STOPS the RPS sequence. (Built so auto-reconciliation can later replace/augment this manual mark — keep the mark-paid as a clean, swappable step.)
+
+STATUS & QUEUE (efficient manual confirmation):
+12. A dashboard/queue showing invoices by their follow-up state: "Awaiting VP confirmation," "In RPS (awaiting payment)," "Escalated to Alan," etc. — so agents see what needs action at a glance and confirm with one click, rather than hunting.
+13. Each invoice shows its current phase, next scheduled follow-up date, and attempt count.
+
+SAFETY CONTROLS (critical — this sends real broker emails automatically):
+14. TEST MODE / dry-run: a way to test the engine without sending real emails to real brokers (e.g. a test invoice, or a dry-run that logs what WOULD send). Verify the timing logic before it goes live against real brokers.
+15. PER-INVOICE PAUSE / OFF SWITCH: ability to pause or stop the automation for a specific invoice (e.g. a broker being handled manually), and a global off switch, so a bug or special case doesn't keep firing automated emails.
+16. LOG every automated email sent (which invoice, which broker, when, which phase) for audit.
+17. Emails sent with FactorFlux/company branding, from the appropriate sender, reply-to a monitored inbox.
+
+USE the app's scheduled-task infrastructure for the timing (the day-counting and firing of follow-ups).
+
+Verify (in TEST MODE, not against real brokers): a funded invoice triggers VP follow-ups at +48h/+96h → escalates to Alan if unconfirmed → agent marks VP Confirmed → RPS starts → reminders fire at day 20/35/40 → escalates to Alan if unpaid → agent marks Paid → sequence stops. The queue shows each invoice's state; pause/off switch works; all sends logged.
