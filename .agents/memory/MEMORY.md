@@ -42,6 +42,7 @@
 - [Carrier FMCSA status](carrier-fmcsa-status.md) — only reliable carrier-level adverse evidence blocks invoices; conflicting authority classes and failed lookups remain unknown.
 - [Portal preflight audit](portal-preflight-audit.md) — portal submissions need submission-scoped acknowledgements and audit, not invoice/user foreign keys.
 - [Invoice intake freshness](invoice-intake-freshness.md) — refresh broker/carrier details and related choices on modal open or selection; never treat cached intake data as current.
+- [Invoice creation policy](invoice-creation-policy.md) — Rate is the invoice amount; lumper charges are separate, receipts conditional, and holds notify selected reviewers only.
 - [Agent Performance freshness](agent-performance-freshness.md) — employee/date changes and revisits require fresh snapshots and a full control reset, not only detail-dialog keys.
 - [Document compression](document-compression.md) — persist only compressed uploads; portal document rows need size provenance too; HEIC requires a separate system decoder.
 - [Document identity and viewing](document-identity-viewing.md) — dedupe pending uploads by original bytes and owner; distinguish browser CORS failures from S3 authorization.

@@ -299,6 +299,7 @@ export const invoices = pgTable("invoices", {
   branchName: varchar("branch_name"),
   buyout: boolean("buyout"),
   lumper: boolean("lumper"),
+  lumperTotal: decimal("lumper_total", { precision: 10, scale: 2 }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency").default("USD").notNull(),
   invoiceDate: timestamp("invoice_date"),
@@ -329,6 +330,8 @@ export const invoices = pgTable("invoices", {
     .default("draft")
     .notNull(),
   heldReason: text("held_reason"),
+  heldFor: text("held_for").array().notNull().default(sql`'{}'::text[]`),
+  heldRecipientIds: text("held_recipient_ids").array().notNull().default(sql`'{}'::text[]`),
   heldAt: timestamp("held_at"),
   heldBy: varchar("held_by").references(() => users.id),
   heldNotes: text("held_notes"),

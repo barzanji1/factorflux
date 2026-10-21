@@ -45,6 +45,7 @@ type HeldInvoice = {
   amount: string;
   status: string;
   heldReason: string | null;
+  heldFor?: string[];
   heldAt: string | null;
   heldBy: string | null;
   heldNotes: string | null;
@@ -135,6 +136,10 @@ function ReleaseDialog({
               <span className="text-slate-500">Hold reason</span>
               <span className="font-medium text-amber-600 dark:text-amber-400">{invoice.heldReason ?? "—"}</span>
             </div>
+            {!!invoice.heldFor?.length && <div className="flex items-center justify-between">
+              <span className="text-slate-500">Held for</span>
+              <span className="capitalize">{invoice.heldFor.join(", ")}</span>
+            </div>}
             <div className="flex items-center justify-between">
               <span className="text-slate-500">Days on hold</span>
               <DaysBadge days={days} />
@@ -347,6 +352,7 @@ export default function HeldQueue() {
                               <AlertTriangle className="h-2.5 w-2.5" />
                               {inv.heldReason ?? "Unspecified"}
                             </span>
+                            {!!inv.heldFor?.length && <p className="mt-1 text-xs capitalize">Held for: {inv.heldFor.join(", ")}</p>}
                             {inv.heldNotes && (
                               <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">{inv.heldNotes}</p>
                             )}

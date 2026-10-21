@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInvoiceEntityQuery } from "@/hooks/use-invoice-entity-query";
 import { displayLoadType, isLoadType } from "@shared/load-types";
 import { LoadTypeToggleGroup } from "@/components/load-type";
+import { HOLD_REASONS } from "@shared/invoice-creation-options";
 
 type Carrier = {
   id: number; name: string; status?: string | null; mcNumber?: string | null;
@@ -28,7 +29,6 @@ type Broker = {
   email?: string | null; phone?: string | null; creditLimit?: string | null;
   averageDaysToPay?: number | null; notes?: string | null; creditGrade?: string | null; creditScore?: number | null;
 };
-type Driver = { id: number; carrierId: number; firstName: string; lastName: string; status?: string | null };
 type PaperworkKey = "rateConfirmation" | "billOfLading" | "lumperReceipt" | "other";
 const PAPERWORK: Array<{ key: PaperworkKey; label: string; required?: boolean }> = [
   { key: "rateConfirmation", label: "Rate Confirmation", required: true },
@@ -50,11 +50,13 @@ type PreflightAlert = {
 
 const EMPTY = {
   carrierInvoiceNumber: "", loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
-  buyout: "", lumper: "", amount: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
-  driverId: "", driverName: "", instructionsSubject: "", instructionsDetails: "",
-  invoiceDate: "", pickupDate: "", deliveryDate: "", rate: "", origin: "", destination: "", bolNumber: "",
+  buyout: "", lumper: "", amount: "", lumperTotal: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
+  instructionsDetails: "", heldFor: [] as string[],
+  invoiceDate: "", pickupDate: "", deliveryDate: "", origin: "", destination: "", bolNumber: "",
   holdForManagerReview: false, holdReason: "",
 };
+
+type HoldRecipient = { value: string; label: string; available: boolean; unavailableReason?: string };
 
 function formatFileSize(bytes: number) {
   return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -365,14 +367,18 @@ export default function CreateInvoiceModal({
     },
     enabled: open && !!values.clientId && values.paymentType === "ACH",
   });
-  const { data: driversData = [], isFetching: driversLoading, isError: driversError } = useInvoiceEntityQuery<Driver[]>({
-    queryKey: ["/api/drivers", values.clientId],
+  const {
+    data: holdRecipientResponse,
+    isFetching: holdRecipientsLoading,
+    isError: holdRecipientsError,
+  } = useInvoiceEntityQuery<{ options: HoldRecipient[] }>({
+    queryKey: ["/api/invoices/hold-recipients"],
     queryFn: async () => {
-      const response = await fetch(`/api/drivers?carrierId=${values.clientId}`, { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to load drivers");
+      const response = await fetch("/api/invoices/hold-recipients", { credentials: "include" });
+      if (!response.ok) throw new Error("Unable to load hold recipients");
       return response.json();
     },
-    enabled: open && !!values.clientId,
+    enabled: open,
   });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
   const brokers = (Array.isArray(brokersResponse) ? brokersResponse : brokersResponse?.data ?? []).filter(item => item.status === "active");
@@ -380,9 +386,9 @@ export default function CreateInvoiceModal({
   const bankAccounts = Array.isArray(bankAccountsData) ? bankAccountsData : [];
   const carrier = carrierDetails;
   const broker = brokerDetails;
-  const entityDataLoading = brokerLoading || carrierLoading || branchesLoading || bankAccountsLoading || driversLoading;
-  const entityDataError = brokerError || carrierError || branchesError || bankAccountsError || driversError;
-  const drivers = driversData.filter(driver => driver.status === "active");
+  const entityDataLoading = brokerLoading || carrierLoading || branchesLoading || bankAccountsLoading;
+  const entityDataError = brokerError || carrierError || branchesError || bankAccountsError;
+  const holdRecipients = Array.isArray(holdRecipientResponse?.options) ? holdRecipientResponse.options : [];
   const renderOcrSource = (field: string) => {
     const source = ocrSources[field];
     if (!source) return null;
@@ -435,7 +441,7 @@ export default function CreateInvoiceModal({
     setOcrBrokerMatch(null);
     setValues(current => ({
       ...current, carrierInvoiceNumber: "", loadNumber: "", amount: "", invoiceDate: "",
-      pickupDate: "", deliveryDate: "", rate: "", origin: "", destination: "", bolNumber: "",
+      pickupDate: "", deliveryDate: "", origin: "", destination: "", bolNumber: "",
       brokerId: "", branchId: "",
     }));
     ocrSelectedBrokerId.current = null;
@@ -545,11 +551,10 @@ export default function CreateInvoiceModal({
             ...current,
             ...(fields.invoice_number?.trim() ? { carrierInvoiceNumber: fields.invoice_number } : {}),
             ...(fields.load_number?.trim() ? { loadNumber: fields.load_number } : {}),
-            ...(fields.amount?.trim() ? { amount: fields.amount } : {}),
+            ...((fields.rate?.trim() || fields.amount?.trim()) ? { amount: fields.rate?.trim() ? fields.rate : fields.amount } : {}),
             ...(fields.invoice_date ? { invoiceDate: asDate(fields.invoice_date) } : {}),
             ...(fields.pickup_date ? { pickupDate: asDate(fields.pickup_date) } : {}),
             ...(fields.delivery_date ? { deliveryDate: asDate(fields.delivery_date) } : {}),
-            ...(fields.rate?.trim() ? { rate: fields.rate } : {}),
             ...(fields.origin?.trim() ? { origin: fields.origin } : {}),
             ...(fields.destination?.trim() ? { destination: fields.destination } : {}),
             ...(fields.bol_number?.trim() ? { bolNumber: fields.bol_number } : {}),
@@ -707,19 +712,20 @@ export default function CreateInvoiceModal({
         clientId: Number(values.clientId),
         brokerId: Number(values.brokerId),
         branchId: Number(values.branchId),
-        driverId: values.driverId ? Number(values.driverId) : null,
-        driverName: values.driverName.trim() || null,
         code: values.code.trim() || null,
         buyout: values.buyout === "" ? null : values.buyout === "yes",
         lumper: values.lumper === "" ? null : values.lumper === "yes",
         holdForManagerReview: values.holdForManagerReview,
-        holdReason: values.holdForManagerReview ? values.holdReason.trim() || null : null,
+        holdReason: values.holdForManagerReview ? values.holdReason : null,
+        heldFor: values.holdForManagerReview
+          ? values.heldFor.filter(code => holdRecipients.some(option => option.value === code && option.available))
+          : [],
         amount: values.amount,
+        lumperTotal: values.lumperTotal.trim() === "" ? null : Number(values.lumperTotal).toFixed(2),
         invoiceDate: values.invoiceDate ? new Date(`${values.invoiceDate}T00:00:00.000Z`).toISOString() : null,
         serviceDate: values.deliveryDate || values.pickupDate || null,
         pickupDate: values.pickupDate || null,
         deliveryDate: values.deliveryDate || null,
-        rate: values.rate || null,
         origin: values.origin || null,
         destination: values.destination || null,
         bolNumber: values.bolNumber || null,
@@ -731,7 +737,6 @@ export default function CreateInvoiceModal({
         paymentType: values.paymentType,
         bankAccountId: values.bankAccountId ? Number(values.bankAccountId) : null,
         loadType: values.loadType,
-        instructionsSubject: values.instructionsSubject.trim() || null,
         instructionsDetails: values.instructionsDetails.trim() || null,
         sourceChannel: "drag_drop",
       };
@@ -744,7 +749,7 @@ export default function CreateInvoiceModal({
     onSuccess: invoice => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/held"] });
-      toast({ title: "Invoice created", description: invoice.status === "held" ? "The invoice is on hold for manager review." : "The invoice is now pending review." });
+      toast({ title: "Invoice created", description: invoice.status === "held" ? "The invoice is on hold for the selected reviewers." : "The invoice is now pending review." });
       onOpenChange(false);
       navigate("/invoices");
     },
@@ -775,17 +780,29 @@ export default function CreateInvoiceModal({
     && !(alert.code === "DUPLICATE_NEAR" && isManager && overrideNearDuplicate));
   const hasUnacknowledgedAlert = preflightAlerts.some(alert => alert.severity === "ack"
     && !acknowledgements[alert.code]?.acknowledged);
+  const selectedAvailableRecipients = holdRecipients.filter(option =>
+    option.available && values.heldFor.includes(option.value),
+  );
+  const lumperReceiptMissing = values.lumper === "yes" && !paperwork.lumperReceipt;
+  const lumperTotalInvalid = values.lumperTotal.trim() !== ""
+    && (!/^\d+(?:\.\d{1,2})?$/.test(values.lumperTotal) || Number(values.lumperTotal) > 99999999.99);
+  const holdDetailsInvalid = values.holdForManagerReview && (
+    holdRecipientsLoading || holdRecipientsError || !values.holdReason || selectedAvailableRecipients.length === 0
+  );
   const valid = values.carrierInvoiceNumber.trim().length <= 100
     && values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId
-    && Number(values.amount) > 0 && isLoadType(values.loadType)
+    && Number.isFinite(Number(values.amount)) && Number(values.amount) > 0
+    && !lumperTotalInvalid
+    && isLoadType(values.loadType)
     && paperwork.rateConfirmation && paperwork.billOfLading
+    && !lumperReceiptMissing && !holdDetailsInvalid
     && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
         <DialogHeader className="border-b px-6 py-5">
           <DialogTitle className="text-xl">Create Invoice</DialogTitle>
-          <DialogDescription>Enter the load details. The invoice enters Pending Review unless held for manager review.</DialogDescription>
+          <DialogDescription>Enter the load details. The invoice enters Pending Review unless placed on hold.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-5 p-6 lg:grid-cols-[240px_minmax(0,1fr)_240px]">
           <StatusPanel kind="broker" record={broker} />
@@ -917,9 +934,9 @@ export default function CreateInvoiceModal({
                 {renderOcrSource("invoice_date")}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="rateAmount">Rate</Label>
-                <Input id="rateAmount" value={values.rate} onChange={e => setValues(v => ({ ...v, rate: e.target.value }))} placeholder="Rate confirmation amount" />
-                {renderOcrSource("rate")}
+                <Label htmlFor="rateAmount">Rate <span className="text-red-500">*</span></Label>
+                <Input id="rateAmount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, amount: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Rate confirmation amount" />
+                {renderOcrSource(ocrFields?.rate?.trim() ? "rate" : "amount")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="pickupDate">Pickup Date</Label>
@@ -942,11 +959,6 @@ export default function CreateInvoiceModal({
                 {renderOcrSource("destination")}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="bolNumber">BOL #</Label>
-                <Input id="bolNumber" value={values.bolNumber} onChange={e => setValues(v => ({ ...v, bolNumber: e.target.value }))} placeholder="Bill of lading number" />
-                {renderOcrSource("bol_number")}
-              </div>
-              <div className="space-y-1.5">
                 <Label htmlFor="invoiceCode">Code</Label>
                 <Input id="invoiceCode" value={values.code} onChange={e => setValues(v => ({ ...v, code: e.target.value }))} placeholder="CA TO UT" />
               </div>
@@ -958,9 +970,9 @@ export default function CreateInvoiceModal({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="amount">Invoice Amount <span className="text-red-500">*</span></Label>
-                 <Input id="amount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, amount: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="0.00" />
-                 {renderOcrSource("amount")}
+                <Label htmlFor="lumperTotal">Lumper Total <span className="text-xs font-normal text-slate-500">(optional)</span></Label>
+                <Input id="lumperTotal" min="0" step="0.01" type="number" value={values.lumperTotal} onChange={e => setValues(v => ({ ...v, lumperTotal: e.target.value }))} placeholder="0.00" />
+                {lumperTotalInvalid && <p role="alert" className="text-xs text-red-700">Lumper Total must be a nonnegative amount.</p>}
               </div>
                <SearchSelect
                  label="Carrier"
@@ -971,12 +983,10 @@ export default function CreateInvoiceModal({
                     for (const queryKey of [
                       ["/api/clients", String(item.id)],
                       ["/api/carriers", String(item.id), "bank-accounts"],
-                      ["/api/drivers", String(item.id)],
                     ]) void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
                     const next = {
                       ...values,
                       clientId: String(item.id),
-                      driverId: "",
                       loadType: displayLoadType(item.cargoType),
                     };
                      invalidatePreflightAcknowledgements();
@@ -995,13 +1005,6 @@ export default function CreateInvoiceModal({
                  {brokerOpen && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-950">
                       {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { void queryClient.invalidateQueries({ queryKey: ["/api/brokers", String(item.id)] }, { cancelRefetch: false }); ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); const next = { ...values, brokerId: String(item.id), branchId: "" }; invalidatePreflightAcknowledgements(); setValues(next); setBrokerSearch(""); setBrokerOpen(false); void runPreflight(next, true); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
                  </div>}
-               </div>
-               <div className="space-y-1.5">
-                 <Label>Driver</Label>
-                 <Select disabled={!values.clientId || driversLoading || driversError} value={values.driverId} onValueChange={driverId => setValues(v => ({ ...v, driverId, driverName: "" }))}>
-                   <SelectTrigger><SelectValue placeholder={!values.clientId ? "Select a carrier first" : "Select a driver (optional)"} /></SelectTrigger>
-                   <SelectContent>{drivers.map(driver => <SelectItem key={driver.id} value={String(driver.id)}>{driver.firstName} {driver.lastName}</SelectItem>)}</SelectContent>
-                 </Select>
                </div>
               <div className="space-y-1.5">
                 <Label htmlFor="branchId">Branch <span className="text-red-500">*</span></Label>
@@ -1035,15 +1038,63 @@ export default function CreateInvoiceModal({
                   <Checkbox id="holdForManagerReview" checked={values.holdForManagerReview}
                     onCheckedChange={checked => setValues(v => ({ ...v, holdForManagerReview: checked === true }))}
                     className="rounded-none border-2 border-t-[#808080] border-l-[#808080] border-r-white border-b-white" />
-                  <Label htmlFor="holdForManagerReview">Hold for manager review</Label>
+                  <Label htmlFor="holdForManagerReview">Place on hold</Label>
                 </div>
-                {values.holdForManagerReview && <div className="space-y-1">
-                  <Label htmlFor="holdReason">Hold reason (optional)</Label>
-                  <Textarea id="holdReason" maxLength={10000} value={values.holdReason}
-                    onChange={event => setValues(v => ({ ...v, holdReason: event.target.value }))}
-                    placeholder="Amount exceeds threshold, missing NOA, verify rate con…"
-                    className="rounded-none border-2 border-t-[#808080] border-l-[#808080] border-r-white border-b-white bg-white" />
-                </div>}
+                {values.holdForManagerReview && (
+                  <div className="space-y-4 border-t border-[#aaa] pt-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="holdReason">Reason for hold <span className="text-red-600">*</span></Label>
+                      <Select value={values.holdReason} onValueChange={holdReason => setValues(v => ({ ...v, holdReason }))}>
+                        <SelectTrigger id="holdReason" className="rounded-none border-2 border-t-[#808080] border-l-[#808080] border-r-white border-b-white bg-white">
+                          <SelectValue placeholder="Select a reason" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HOLD_REASONS.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {!values.holdReason && <p className="text-xs text-red-700">Choose a reason before placing this invoice on hold.</p>}
+                    </div>
+                    <fieldset className="space-y-2">
+                      <legend className="text-sm font-medium">Held for <span className="text-red-600">*</span></legend>
+                      {holdRecipientsLoading && <p role="status" className="text-xs text-slate-700">Loading current hold recipients…</p>}
+                      {holdRecipientsError && <p role="alert" className="text-xs font-medium text-red-700">Unable to load hold recipients. Close and reopen the invoice form to retry; held submission is unavailable until this list loads.</p>}
+                      {!holdRecipientsLoading && !holdRecipientsError && holdRecipients.length === 0 && (
+                        <p role="alert" className="text-xs text-red-700">No hold recipients are currently available.</p>
+                      )}
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {holdRecipients.map(option => {
+                          const checked = values.heldFor.includes(option.value);
+                          return (
+                            <label key={option.value} className={cn(
+                              "flex items-start gap-2 border border-[#aaa] bg-white px-2.5 py-2 text-sm",
+                              !option.available && "cursor-not-allowed bg-slate-100 text-slate-500",
+                            )}>
+                              <Checkbox
+                                checked={checked && option.available}
+                                disabled={!option.available || holdRecipientsLoading || holdRecipientsError}
+                                onCheckedChange={nextChecked => setValues(current => ({
+                                  ...current,
+                                  heldFor: nextChecked === true
+                                    ? Array.from(new Set([...current.heldFor, option.value]))
+                                    : current.heldFor.filter(value => value !== option.value),
+                                }))}
+                              />
+                              <span className="min-w-0">
+                                <span className="block font-medium">{option.label}</span>
+                                {!option.available && option.unavailableReason && (
+                                  <span className="block text-xs text-slate-500">{option.unavailableReason}</span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {!holdRecipientsLoading && !holdRecipientsError && selectedAvailableRecipients.length === 0 && holdRecipients.length > 0 && (
+                        <p className="text-xs text-red-700">Select at least one available recipient.</p>
+                      )}
+                    </fieldset>
+                  </div>
+                )}
               </div>
               {values.paymentType === "ACH" && (
                 <div className="space-y-1.5 sm:col-span-2">
@@ -1060,15 +1111,10 @@ export default function CreateInvoiceModal({
                   </Select>
                 </div>
               )}
-               <div className="space-y-1.5">
-                 <Label htmlFor="driverName">Driver Name</Label>
-                 <Input id="driverName" value={values.driverName} onChange={event => setValues(v => ({ ...v, driverName: event.target.value, driverId: "" }))} placeholder="Carrier-entered driver name" />
-               </div>
               <div className="space-y-4 sm:col-span-2">
                 <div>
                   <h3 className="text-sm font-semibold">Instructions</h3>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Input value={values.instructionsSubject} onChange={e => setValues(v => ({ ...v, instructionsSubject: e.target.value }))} placeholder="Instructions Subject" />
                     <Textarea value={values.instructionsDetails} onChange={e => setValues(v => ({ ...v, instructionsDetails: e.target.value }))} placeholder="please be clear and specific" rows={3} className="sm:col-span-2" />
                   </div>
                   {renderOcrSource("broker_name")}
@@ -1077,7 +1123,21 @@ export default function CreateInvoiceModal({
                   <h3 className="text-sm font-semibold">Paperwork Uploads</h3>
                    <p className="mt-1 text-xs font-medium text-red-600">PDF files only. Large files are compressed automatically before storage (135MB upload limit).</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {PAPERWORK.map(({ key, label, required }) => <PaperworkDropzone key={key} label={label} required={required} file={paperwork[key]} onFile={file => setPaperwork(current => ({ ...current, [key]: file }))} onRemove={() => setPaperwork(current => ({ ...current, [key]: null }))} onInvalid={message => toast({ title: "Invalid paperwork", description: message, variant: "destructive" })} />)}
+                     {PAPERWORK.map(({ key, label, required }) => (
+                       <div key={key} className="space-y-1">
+                         <PaperworkDropzone
+                           label={label}
+                           required={required || (key === "lumperReceipt" && values.lumper === "yes")}
+                           file={paperwork[key]}
+                           onFile={file => setPaperwork(current => ({ ...current, [key]: file }))}
+                           onRemove={() => setPaperwork(current => ({ ...current, [key]: null }))}
+                           onInvalid={message => toast({ title: "Invalid paperwork", description: message, variant: "destructive" })}
+                         />
+                         {key === "lumperReceipt" && lumperReceiptMissing && (
+                           <p role="alert" className="text-xs font-medium text-red-700">Lumper Receipt is required when Lumper is Yes. Upload the receipt before submitting.</p>
+                         )}
+                       </div>
+                     ))}
                   </div>
                 </div>
               </div>

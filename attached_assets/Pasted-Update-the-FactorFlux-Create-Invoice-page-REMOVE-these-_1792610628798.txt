@@ -1,0 +1,22 @@
+Update the FactorFlux Create Invoice page:
+
+REMOVE these fields:
+1. "Driver" field AND "Driver Name" field (remove both)
+2. "BOL #" text field (keep the Bill of Lading upload in Paperwork Uploads — only remove the BOL# input field)
+3. The "Instructions Subject" line only (keep the Instructions body/description field)
+
+AMOUNT FIELDS (remove redundancy, add lumper total):
+4. The "Rate" field (under Load #) IS the actual invoice/rate amount — keep it as the invoice amount.
+5. The separate "Invoice Amount" field is redundant (it duplicates the Rate) — REPLACE it with a "Lumper Total" field that captures the lumper charge amount (a separate dollar amount from the rate). So: Rate = invoice/rate amount; Lumper Total = the lumper charge.
+
+CONDITIONAL LUMPER RECEIPT:
+6. When "Lumper" = Yes, the "Lumper Receipt" upload becomes REQUIRED (marked * like Rate Confirmation and Bill of Lading) — the agent cannot Submit the invoice without uploading it. When "Lumper" = No (or not selected), Lumper Receipt stays optional and Submit works without it.
+
+EXPAND THE HOLD WORKFLOW (replace the current simple "Hold for manager review" checkbox):
+7. When an agent puts an invoice on hold, they select:
+   - "Reason for hold" (selector): Missing docs, Missing signature on BOL, Missing signature on Rate Con
+   - "Held for" (checkboxes, multiple allowed): Managers, Mia, Jose, Jess, Alan
+8. The invoice is flagged on hold with the selected reason, routed to the selected person(s).
+9. NOTIFY the selected person(s): when an invoice is held for someone, they receive a notification (bell/alert) that an invoice is on hold for them, with the reason — so they know to review it. Use the same notification pattern as other alerts in the app.
+
+Verify: Driver and Driver Name removed; BOL# field removed (Bill of Lading upload intact); Instructions Subject removed (Instructions body intact); the redundant Invoice Amount field is gone and replaced by "Lumper Total"; Rate remains the invoice amount; Lumper=Yes makes Lumper Receipt required and blocks Submit until uploaded (Lumper=No doesn't); holding an invoice shows reason + held-for selections, records them, and notifies the selected person(s).

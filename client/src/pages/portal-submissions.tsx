@@ -757,11 +757,9 @@ export default function PortalSubmissionsPage() {
             branchId: detail.branchId ? String(detail.branchId) : "",
             code: detail.code || "",
             lumper: detail.lumper == null ? "" : detail.lumper ? "yes" : "no",
-            driverName: detail.driverName || "",
             amount: detail.amount || "",
             paymentType: detail.paymentType === "wire" ? "Wire" : "ACH",
             bankAccountId: detail.bankAccountId ? String(detail.bankAccountId) : "",
-            instructionsSubject: detail.instructionsSubject || "",
             instructionsDetails: detail.instructionsDetails || "",
           }}
         />

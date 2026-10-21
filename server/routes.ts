@@ -172,8 +172,8 @@ import {
 } from "./services/lifecycleEngine";
 import { getDocumentCompleteness, checklistType } from "./services/docValidation";
 import { refreshInvoiceDocumentRequirements } from "./services/invoiceDocumentWorkflow";
-import { creationHoldFields, recordCreationHold } from "./services/invoiceCreationHold";
-import { optionalLumperSchema } from "../shared/invoice-creation-options";
+import { getHoldRecipients, resolveCreationHold, recordCreationHold } from "./services/invoiceCreationHold";
+import { optionalLumperSchema, lumperTotalSchema, requireLumperReceipt } from "../shared/invoice-creation-options";
 import { documentClassification } from "../shared/document-display";
 import {
   compensateFundingReceiptUpload,
@@ -3109,6 +3109,16 @@ ${message}
     }
   });
 
+  app.get("/api/invoices/hold-recipients", requireAuth, async (_req, res) => {
+    try {
+      const options = await getHoldRecipients();
+      res.set("Cache-Control", "no-store").json({ options: options.map(({ recipientIds, ...option }) => option) });
+    } catch (error) {
+      console.error("Error loading hold recipients:", error);
+      res.status(500).json({ message: "Unable to load hold recipients." });
+    }
+  });
+
   app.post("/api/invoices/with-documents", requireAuth, handleInvoicePaperworkUpload, async (req: any, res) => {
     const uploadedKeys: string[] = [];
     let transactionCommitted = false;
@@ -3158,12 +3168,14 @@ ${message}
         bankAccountId: z.coerce.number().int().positive().nullable().optional(),
         code: z.string().trim().max(255).nullable().optional(),
         lumper: optionalLumperSchema,
+        lumperTotal: lumperTotalSchema,
         instructionsSubject: z.string().trim().max(255).nullable().optional(),
         instructionsDetails: z.string().trim().max(10000).nullable().optional(),
         paymentType: z.enum(["ACH", "Wire"]).optional(),
       }).parse({ ...invoiceMetadata, invoiceNumber: "INV000", carrierInvoiceNumber: suppliedCarrierInvoiceNumber ?? null });
       const invoiceData = await resolveInvoiceBrokerBranch(parsed as any);
-      const initialHold = creationHoldFields(metadata, req.user.id);
+      requireLumperReceipt(parsed.lumper, !!files.lumperReceipt?.[0]);
+      await resolveCreationHold(metadata, req.user.id);
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
       const ocrDocumentIds = parseIntakeIds(metadata.ocrDocumentIds);
       const intakeServiceDate = metadata.serviceDate == null ? undefined :
@@ -3248,7 +3260,7 @@ ${message}
 
       const {
         status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,
-        fundedAt, heldReason, heldAt, heldBy, heldNotes, previousStatus,
+        fundedAt, heldReason, heldFor, heldRecipientIds, heldAt, heldBy, heldNotes, previousStatus,
         ...draftData
       } = invoiceData as any;
       const committed = await db.transaction(async (tx) => {
@@ -3279,7 +3291,7 @@ ${message}
           submittedAt: new Date(),
           status: "submitted",
           factoringStage: "verification",
-          ...initialHold,
+          ...await resolveCreationHold(metadata, req.user.id, tx),
         }).returning();
         await recordCreationHold(tx, invoice, req.user);
         await tx.insert(eventLedger).values({
@@ -3355,9 +3367,11 @@ ${message}
           carrierInvoiceNumber: z.string().trim().max(100).nullable().optional(),
           loadType: z.enum(LOAD_TYPES),
           lumper: optionalLumperSchema,
+          lumperTotal: lumperTotalSchema,
         }).parse({ ...invoiceBody, invoiceNumber: "INV000", carrierInvoiceNumber: suppliedCarrierInvoiceNumber ?? null }) as any,
       );
-      const initialHold = creationHoldFields(req.body, req.user.id);
+      requireLumperReceipt(invoiceData.lumper, false);
+      await resolveCreationHold(req.body, req.user.id);
       const invoiceServiceDate = invoiceData.invoiceDate ?? new Date();
       if (!(await canAccessClient(req, invoiceData.clientId))) {
         return res.status(403).json({ message: "You may only create invoices for carriers assigned to you" });
@@ -3378,7 +3392,7 @@ ${message}
       if (!preflightDecision.accepted) return res.status(409).json({ message: "Invoice preflight requires attention", alerts: preflightResult.alerts });
       const {
         status, factoringStage, submittedBy, submittedAt, approvedBy, approvedAt,
-        fundedAt, heldReason, heldAt, heldBy, heldNotes, previousStatus,
+        fundedAt, heldReason, heldFor, heldRecipientIds, heldAt, heldBy, heldNotes, previousStatus,
         ...draftData
       } = invoiceData as any;
       const invoice = await db.transaction(async (tx) => {
@@ -3408,7 +3422,7 @@ ${message}
           submittedAt: new Date(),
           status: "submitted",
           factoringStage: "verification",
-          ...initialHold,
+          ...await resolveCreationHold(req.body, req.user.id, tx),
         }).returning();
         await recordCreationHold(tx, createdInvoice, req.user);
         await tx.insert(eventLedger).values({
@@ -3684,7 +3698,7 @@ ${message}
       if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid invoice ID" });
       const lifecycleFields = [
         "status", "factoringStage", "submittedBy", "submittedAt", "approvedBy",
-        "approvedAt", "fundedAt", "heldReason", "heldAt", "heldBy", "heldNotes",
+        "approvedAt", "fundedAt", "heldReason", "heldFor", "heldRecipientIds", "heldAt", "heldBy", "heldNotes",
         "previousStatus",
       ];
       const attemptedLifecycleField = lifecycleFields.find((field) =>

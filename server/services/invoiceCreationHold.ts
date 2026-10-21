@@ -1,7 +1,7 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { clients, eventLedger, invoices, notifications, users } from "../../shared/schema";
-import { invoiceCreationHoldSchema } from "../../shared/invoice-creation-options";
+import { HOLD_TARGETS, invoiceCreationHoldSchema } from "../../shared/invoice-creation-options";
 import { getDocumentCompleteness } from "./docValidation";
 
 type Executor = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -13,22 +13,46 @@ export function creationHoldFields(input: unknown, actorId: string) {
   return {
     status: "held" as const, previousStatus: "submitted",
     heldReason: options.holdReason || null, heldBy: actorId, heldAt: new Date(),
+    heldFor: [...new Set(options.heldFor)],
   };
+}
+
+export async function getHoldRecipients(database: Pick<Executor, "select"> = db) {
+  const staff = await database.select({ id: users.id, firstName: users.firstName, role: users.role })
+    .from(users).where(eq(users.status, "active"));
+  const matches = HOLD_TARGETS.map(target => {
+    const candidates = target.value === "managers"
+      ? staff.filter(user => ["admin", "manager"].includes(user.role ?? ""))
+      : staff.filter(user => (user.firstName ?? "").trim().toLowerCase() === target.value);
+    // Never guess among same-name staff or silently notify an unrelated account.
+    const available = target.value === "managers" ? candidates.length > 0 : candidates.length === 1;
+    return { ...target, available, recipientIds: available ? candidates.map(user => user.id) : [],
+      ...(!available ? { unavailableReason: candidates.length ? "Multiple active staff match; resolve the staff name first." : "No active staff account found." } : {}) };
+  });
+  return matches;
+}
+
+export async function resolveCreationHold(input: unknown, actorId: string, database: Pick<Executor, "select"> = db) {
+  const fields = creationHoldFields(input, actorId);
+  if (!fields.heldFor) return fields;
+  const options = await getHoldRecipients(database);
+  const selected = options.filter(option => fields.heldFor.includes(option.value));
+  const unavailable = selected.find(option => !option.available);
+  if (unavailable) throw Object.assign(new Error(`${unavailable.label}: ${unavailable.unavailableReason}`), { status: 400 });
+  return { ...fields, heldRecipientIds: [...new Set(selected.flatMap(option => option.recipientIds))] };
 }
 
 export async function recordCreationHold(tx: Executor, invoice: typeof invoices.$inferSelect, actor: Actor) {
   if (invoice.status !== "held") return;
   const [carrier] = await tx.select({ name: clients.name }).from(clients).where(eq(clients.id, invoice.clientId)).limit(1);
-  const managers = await tx.select({ id: users.id }).from(users)
-    .where(and(inArray(users.role, ["manager", "admin"]), eq(users.status, "active")));
   const agentName = [actor.firstName, actor.lastName].filter(Boolean).join(" ") || actor.name || actor.id;
   await tx.insert(eventLedger).values({
     entityType: "invoice", entityId: invoice.id, eventType: "invoice_status_changed",
     actorType: "user", actorId: actor.id,
-    payloadJson: { from: null, to: "held", reason: invoice.heldReason, label: "Invoice placed on hold during creation", heldAt: invoice.heldAt?.toISOString() },
+    payloadJson: { from: null, to: "held", reason: invoice.heldReason, heldFor: invoice.heldFor, recipientIds: invoice.heldRecipientIds, label: "Invoice placed on hold during creation", heldAt: invoice.heldAt?.toISOString() },
   });
-  if (managers.length) await tx.insert(notifications).values(managers.map(manager => ({
-    userId: manager.id, type: "warning" as const, title: "Invoice held for manager review",
+  if (invoice.heldRecipientIds.length) await tx.insert(notifications).values(invoice.heldRecipientIds.map(userId => ({
+    userId, type: "warning" as const, title: "Invoice held for your review",
     message: `${agentName} held invoice ${invoice.invoiceNumber} for ${carrier?.name ?? "carrier"} — ${invoice.heldReason || "No reason provided"}`,
     entityType: "invoice", entityId: invoice.id, actionUrl: "/held",
   })));
@@ -49,7 +73,7 @@ export async function releaseHeldInvoice(id: number, releasedBy: string, release
       status: restoreStatus,
       ...(restoreStatus === "docs_pending" ? { factoringStage: "document_intake" as const } :
         restoreStatus === "under_review" ? { factoringStage: "verification" as const } : {}),
-      heldReason: null, heldAt: null, heldBy: null, heldNotes: null, previousStatus: null, updatedAt: new Date(),
+      heldReason: null, heldFor: [], heldRecipientIds: [], heldAt: null, heldBy: null, heldNotes: null, previousStatus: null, updatedAt: new Date(),
     }).where(and(eq(invoices.id, id), eq(invoices.status, "held"))).returning();
     if (!updated) throw new Error("Invoice is no longer on hold");
     await tx.insert(eventLedger).values({
