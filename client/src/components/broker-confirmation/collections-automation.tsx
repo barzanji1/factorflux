@@ -5,10 +5,11 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pause, Play, RefreshCw, Search, ShieldAlert, StopCircle, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { CollectionRunFailure, runBrokerCollections } from "@/lib/brokerCollections";
 import { Win95Button as Button, Win95Card as Card } from "@/components/win95";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { CollectionRow as QueueRow, CollectionEvent, CollectionQueue as QueueResponse,
-  CollectionDetail as DetailResponse, CollectionSettings as Settings } from "@shared/broker-collections";
+  CollectionDetail as DetailResponse, CollectionSettings as Settings, CollectionRunResult } from "@shared/broker-collections";
 
 type Phase = "vp" | "rps" | "paid" | "stopped" | "escalated" | "paused";
 type PendingConfirmation = { kind: "global-live" } | { kind: "invoice"; invoiceId: number; action: "paid" | "stop" | "start_live" };
@@ -27,7 +28,7 @@ function dateLabel(value: string | null) {
 }
 
 function phaseLabel(row: QueueRow) {
-  if (row.paused && row.phase !== "paid" && row.phase !== "stopped") return "Paused";
+  if (row.paused && row.phase !== "paid" && row.phase !== "stopped") return row.lastError ? "Error · paused" : "Paused";
   if (row.escalatedPhase) return `Escalated · ${row.escalatedPhase.toUpperCase()}`;
   return ({ vp: "Awaiting VP", rps: "Awaiting payment", paid: "Workflow paid", stopped: "Stopped" } as const)[row.phase];
 }
@@ -47,6 +48,7 @@ export default function CollectionsAutomation() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [pending, setPending] = useState<PendingConfirmation | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [runResult, setRunResult] = useState<CollectionRunResult | null>(null);
   const pageSize = 50;
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
@@ -87,13 +89,16 @@ export default function CollectionsAutomation() {
     onError: (error) => setErrorMessage(error instanceof Error ? error.message : "Settings could not be saved."),
   });
   const runMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/broker-collections/run", {}),
-    onSuccess: async (response) => {
-      const result = await response.json();
-      refresh();
-      setErrorMessage(result.disabled ? "Automation is globally off; no schedules were processed." : `Run complete · ${result.checked} checked, ${result.processed} processed, ${Array.isArray(result.errors) ? result.errors.length : 0} errors.`);
+    mutationFn: runBrokerCollections,
+    retry: false,
+    onMutate: () => { setRunResult(null); setErrorMessage(""); },
+    onSuccess: setRunResult,
+    onError: (error) => {
+      if (error instanceof CollectionRunFailure) setRunResult(error.result);
+      else setErrorMessage(error instanceof Error ? error.message : "Automation run failed.");
     },
-    onError: (error) => setErrorMessage(error instanceof Error ? error.message : "Automation run failed."),
+    // A failed run may have paused invoices or partially completed other work.
+    onSettled: refresh,
   });
   const currentSettings = settings.data ?? queue.data?.settings;
   const rows = queue.data?.rows ?? [];
@@ -125,6 +130,10 @@ export default function CollectionsAutomation() {
           <Button size="sm" variant="outline" className="ml-auto h-7 px-2" onClick={() => { queue.refetch(); settings.refetch(); }}><RefreshCw className="mr-1 h-3 w-3" />Refresh</Button>
         </div>
 
+        {currentSettings?.liveEmailsBlocked && <div role="alert" data-testid="collections-preview-warning" className="border-b-2 border-[#a12b22] bg-[#fff1d6] px-3 py-3 text-xs text-[#7a291d]">
+          <strong>{currentSettings.liveEmailNotice}</strong>
+          <p className="mt-1">Saving LIVE does not bypass this safeguard. Dry-run tests work here; a real email test must run in the published production app using a broker email address you control.</p>
+        </div>}
         {currentSettings && <div className="grid gap-3 border-b border-[#b5b1a8] bg-[#ece9e2] p-3 md:grid-cols-[1fr_auto] md:items-center">
           <div className="flex items-start gap-2 text-xs text-[#45433e]">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#8b5a00]" />
@@ -149,7 +158,17 @@ export default function CollectionsAutomation() {
           </div>}
         </div>}
 
-        {errorMessage && <div role="status" className="flex items-center justify-between gap-2 border-b border-[#c9a46a] bg-[#fff5d8] px-3 py-2 text-xs text-[#634400]"><span>{errorMessage}</span><button aria-label="Dismiss notice" onClick={() => setErrorMessage("")}><X className="h-3.5 w-3.5" /></button></div>}
+        {runResult && <div role={runResult.failed ? "alert" : "status"} data-testid="collections-run-result"
+          className={`border-b px-3 py-3 text-xs ${runResult.failed ? "border-[#a12b22] bg-[#fce8e6] text-[#8b1d16]" : "border-[#808080] bg-[#ece9e2] text-[#333]"}`}>
+          <div className="flex items-start justify-between gap-2"><strong>{runResult.message}</strong><button aria-label="Dismiss run result" onClick={() => setRunResult(null)}><X className="h-3.5 w-3.5" /></button></div>
+          <p className="mt-1">{runResult.checked} checked · {runResult.processed} successful actions · {runResult.failed} failed. “Accepted” means accepted by the email provider, not confirmed delivered.</p>
+          {runResult.errors.length > 0 && <ul className="mt-2 max-h-56 list-disc space-y-2 overflow-y-auto pl-4">{runResult.errors.map((error, i) => <li key={`${error.invoiceId}-${i}`}>
+            <strong>{error.invoiceNumber ?? `Invoice ${error.invoiceId}`} — {error.outcome === "unconfirmed" ? "Delivery unconfirmed" : "Failed"}{error.step ? ` (${error.step})` : ""}: </strong>{error.message}
+            {error.outcome === "unconfirmed" && <span> Delivery may have been accepted. Resume the existing workflow to retry safely; do not start a new email.</span>}
+            <button className="ml-2 underline" onClick={() => setSelectedId(error.invoiceId)}>View audit</button>
+          </li>)}</ul>}
+        </div>}
+        {errorMessage && <div role="alert" className="flex items-center justify-between gap-2 border-b border-[#c9a46a] bg-[#fff5d8] px-3 py-2 text-xs text-[#634400]"><span>{errorMessage}</span><button aria-label="Dismiss notice" onClick={() => setErrorMessage("")}><X className="h-3.5 w-3.5" /></button></div>}
         <div className="flex flex-col gap-3 border-b border-[#c5c1b8] p-3 md:flex-row md:items-center">
           <div className="flex flex-wrap gap-1" role="group" aria-label="Filter collection phase">
             {phases.map(item => <button key={item.value} onClick={() => { setPhase(item.value); setPage(1); }} className={`border-2 px-2 py-1 text-[11px] font-bold ${phase === item.value ? "border-l-[#404040] border-t-[#404040] border-r-white border-b-white bg-[#c9e4e2] text-[#075e67]" : "border-l-white border-t-white border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] text-[#444]"}`}>{item.label}</button>)}
@@ -169,7 +188,7 @@ export default function CollectionsAutomation() {
               <thead className="bg-[#d4d0c8] text-[#333]"><tr>{["Invoice / broker", "Phase", "Next scheduled", "Attempts · VP / RPS", "Controls", ""].map((h, i) => <th key={i} className="border-b-2 border-[#808080] px-3 py-2 font-bold">{h}</th>)}</tr></thead>
               <tbody>{rows.map(row => <tr key={row.invoiceId} className="border-b border-[#c5c1b8] odd:bg-[#f7f6f2] hover:bg-[#eaf3f2]">
                 <td className="px-3 py-2.5"><Link href={`/invoices/${row.invoiceId}`} className="font-bold text-[#087f8c] underline">{row.invoiceNumber}</Link><div className="mt-0.5 text-[#333]">{row.broker || "Broker not listed"}</div><div className="text-[10px] text-[#666]">Load {row.loadNumber || "—"} · Carrier {row.carrier || "—"}</div></td>
-                <td className="px-3 py-2.5"><span className={`inline-block border px-1.5 py-0.5 text-[10px] font-bold ${row.phase === "paid" ? "border-[#468b55] bg-[#e5f1e7] text-[#235f31]" : row.escalatedPhase ? "border-[#a34139] bg-[#f8e6e4] text-[#84251d]" : "border-[#858078] bg-[#ece9e2] text-[#42403b]"}`}>{phaseLabel(row)}</span><div className="mt-1 text-[10px] font-bold uppercase text-[#666]">{row.mode === "dry_run" ? "SIMULATED" : "LIVE"}{row.paused ? " · paused" : ""}</div>{row.lastError && <div title={row.lastError} className="mt-1 max-w-48 truncate text-[10px] text-[#a12b22]">Error: {row.lastError}</div>}</td>
+                <td className="px-3 py-2.5"><span className={`inline-block border px-1.5 py-0.5 text-[10px] font-bold ${row.phase === "paid" ? "border-[#468b55] bg-[#e5f1e7] text-[#235f31]" : row.escalatedPhase || row.lastError ? "border-[#a34139] bg-[#f8e6e4] text-[#84251d]" : "border-[#858078] bg-[#ece9e2] text-[#42403b]"}`}>{phaseLabel(row)}</span><div className="mt-1 text-[10px] font-bold uppercase text-[#666]">{row.mode === "dry_run" ? "SIMULATED" : "LIVE"}{row.paused ? " · paused" : ""}</div>{row.lastError && <div className="mt-1 max-w-64 whitespace-normal break-words text-[10px] text-[#a12b22]">Error: {row.lastError}</div>}</td>
                 <td className="px-3 py-2.5 text-[#333]">{dateLabel(row.nextActionAt)}</td>
                 <td className="px-3 py-2.5 font-mono text-[#333]">{row.vpAttempts} VP <span className="text-[#888]">/</span> {row.rpsAttempts} RPS{row.escalatedPhase && <div className="mt-1 font-sans text-[10px] font-bold text-[#8c271e]">Escalated to Alan</div>}</td>
                 <td className="px-3 py-2.5"><div className="flex flex-wrap gap-1">
@@ -212,6 +231,7 @@ export default function CollectionsAutomation() {
           <DialogHeader><DialogTitle>{pending?.kind === "global-live" ? "Enable live broker automation?" : pending?.action === "paid" ? "Mark collection workflow paid?" : pending?.action === "stop" ? "Stop this collection workflow?" : "Start this invoice live?"}</DialogTitle></DialogHeader>
           <div className="space-y-3 text-sm text-[#3e3b35]">
             {pending?.kind === "global-live" && <p>This enables real automated broker emails for new enrollment. Global mode applies to new enrollment only and does not convert existing simulated invoices to live. Dry-run bell notices are logged only; live mode may create real notifications.</p>}
+            {currentSettings?.liveEmailsBlocked && (pending?.kind === "global-live" || (pending?.kind === "invoice" && pending.action === "start_live")) && <p role="alert" className="font-bold text-[#8b1d16]">{currentSettings.liveEmailNotice}</p>}
             {pending?.kind === "invoice" && pending.action === "start_live" && <p>This explicitly resets this selected invoice from simulation into live scheduling. It may send real broker emails and create real escalation notices. Other simulated invoices remain simulated.</p>}
             {pending?.kind === "invoice" && pending.action === "paid" && <p>This marks the COLLECTION WORKFLOW paid and stops RPS reminders. It does not reconcile cash, change invoice financial status, or update the financial ledger.</p>}
             {pending?.kind === "invoice" && pending.action === "stop" && <p>This permanently stops automation for this invoice. This action is irreversible. Manual broker contact remains available outside this workflow.</p>}

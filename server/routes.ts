@@ -6425,7 +6425,7 @@ Trucking Pros Financial Team
     try {
       if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
       const result = await processScheduledReminders();
-      res.json({ message: "Reminders processed", ...result });
+      res.status(result.statusCode).json(result);
     } catch (error) {
       console.error("Error processing reminders:", error);
       res.status(500).json({ message: "Failed to process reminders" });

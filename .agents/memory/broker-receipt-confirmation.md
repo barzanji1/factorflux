@@ -27,6 +27,12 @@ Keep simulations distinct from live progress. Changing a global mode must never 
 
 **How to apply:** Dry runs log would-send/would-notify events without real mail or bells. Global off, per-invoice pause/stop, and failure pauses govern every automatic entry point. Resume failed delivery through its workflow, not an Email Log bypass.
 
+Blocked or failed collections sends must be reported as run failures, not counted as successful processing. Preserve partial successes and distinguish simulated actions, provider acceptance, confirmed delivery, and uncertain acceptance.
+
+**Why:** The user explicitly called false success in a collections engine dangerous. Preview's live-send restriction must be visible, not mistaken for a saved LIVE setting authorizing delivery.
+
+**How to apply:** Propagate invoice-level failures through every manual and scheduled entry point and show the actual reason in the UI. Never bypass the Preview guard to test real mail; use an isolated recipient in published production.
+
 The manual Paid action is a collections stop marker, not evidence of cash posting, invoice settlement, or ledger reconciliation.
 
 **Why:** The user wants a clean payment-confirmation boundary that future auto-reconciliation can replace or augment, without changing the existing financial workflows.

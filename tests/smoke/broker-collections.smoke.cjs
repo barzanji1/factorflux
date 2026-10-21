@@ -10,7 +10,10 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let browser, ws, server;
 (async () => {
   let actor = { id: "collections-admin", role: "admin", firstName: "Collections", lastName: "Fixture", status: "active" };
-  const config = { enabled: false, mode: "dry_run", updatedAt: "2026-10-21T00:00:00Z", canManage: true };
+  const previewNotice = "Live broker emails are blocked in Preview — test in production.";
+  const config = { enabled: false, mode: "dry_run", updatedAt: "2026-10-21T00:00:00Z", canManage: true,
+    liveEmailsBlocked: true, liveEmailNotice: previewNotice };
+  let runCase = "disabled";
   const row = id => ({ invoiceId: id, invoiceNumber: `INV-FIXTURE-${id}`, loadNumber: `LOAD-${id}`, broker: "Fixture Broker",
     carrier: "Fixture Carrier", phase: "vp", mode: "dry_run", paused: false, escalatedPhase: null,
     vpAttempts: 1, rpsAttempts: 0, nextActionAt: "2026-10-23T00:00:00Z", vpConfirmedAt: null, paidAt: null,
@@ -31,7 +34,19 @@ let browser, ws, server;
       }
       return { ...config, canManage: actor.role === "admin" };
     }
-    if (path === "/api/broker-collections/run") return { checked: 2, processed: 1, errors: [], disabled: !config.enabled };
+    if (path === "/api/broker-collections/run") {
+      const base = { status: "completed", message: "Run complete — 0 emails accepted, 1 simulated action, 0 failed.",
+        checked: 1, processed: 1, sent: 0, simulated: 1, notified: 0, updated: 0, skipped: 0, failed: 0, errors: [], disabled: false };
+      if (runCase === "dry") return base;
+      const partial = runCase === "partial";
+      const message = runCase === "preview" ? previewNotice : "Provider rejected fixture email";
+      Object.assign(rows[1], { paused: true, lastError: message });
+      return { fixtureHttpStatus: runCase === "preview" ? 503 : runCase === "false200" ? 200 : 502,
+        body: { ...base, status: partial ? "partial_failure" : "failed",
+          message: partial ? "Run partially failed — 1 email accepted, 1 failed." : "Run failed — 0 emails accepted, 1 failed.",
+          checked: partial ? 2 : 1, processed: partial ? 1 : 0, sent: partial ? 1 : 0, simulated: 0, failed: 1,
+          errors: [{ invoiceId: 102, invoiceNumber: "INV-FIXTURE-102", step: "vp_2", outcome: "failed", status: runCase === "preview" ? 503 : 502, message }] } };
+    }
     if (path === "/api/broker-collections") {
       const phase = url.searchParams.get("phase"), q = url.searchParams.get("q");
       const selected = rows.filter(r => (!phase || (phase === "paused" ? r.paused : r.phase === phase)) && (!q || r.invoiceNumber.includes(q)));
@@ -85,7 +100,7 @@ let browser, ws, server;
     if (event.method !== "Fetch.requestPaused") return;
     const { requestId, request } = event.params;
     const result = api(new URL(request.url), request.method, request.postData ? JSON.parse(request.postData) : {});
-    await cdp("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: Buffer.from(JSON.stringify(result)).toString("base64") });
+    await cdp("Fetch.fulfillRequest", { requestId, responseCode: result.fixtureHttpStatus ?? 200, responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: Buffer.from(JSON.stringify(result.fixtureHttpStatus ? result.body : result)).toString("base64") });
   });
   await cdp("Page.enable"); await cdp("Runtime.enable");
   await cdp("Fetch.enable", { patterns: [{ urlPattern: "*/api/*" }] });
@@ -112,6 +127,7 @@ let browser, ws, server;
   await login("admin");
   assert.equal(writes.length, 0, "loading must not change settings or send");
   assert(await evaluate(`document.body.innerText.includes("Global automation is off.")`));
+  assert(await evaluate(`document.querySelector('[data-testid="collections-preview-warning"]').innerText.includes(${JSON.stringify(previewNotice)})`), "Preview restriction visible before enabling live");
   await click(button("Pause")); await until(`!!(${button("Resume")})`);
   await click(button("Resume")); await until(`!(${button("Resume")})`);
   await click(button("VP confirmed")); await until(`document.querySelector('tbody tr')?.innerText.includes("Awaiting payment")`);
@@ -131,6 +147,33 @@ let browser, ws, server;
   assert.equal(writes.length, beforeLive, "live selection requires confirmation");
   await click(button("Cancel")); await until(`!document.querySelector('[role="dialog"]')`);
   assert.equal(config.mode, "dry_run");
+  // Exercise error HTTP responses through the actual mutation and apiRequest,
+  // including the defensive case where a broken server returns 200 + failure.
+  config.mode = "live"; rows[1].mode = "live";
+  for (const scenario of ["preview", "provider", "partial", "false200", "dry"]) {
+    runCase = scenario;
+    const before = writes.filter(write => write.path.endsWith("/run")).length;
+    await click(button("Run now"));
+    await until(`!!document.querySelector('[data-testid="collections-run-result"]')`);
+    const result = await evaluate(`(()=>{const e=document.querySelector('[data-testid="collections-run-result"]');return{role:e.getAttribute("role"),text:e.innerText}})()`);
+    if (scenario === "dry") {
+      assert.equal(result.role, "status"); assert.match(result.text, /0 emails accepted/); assert.match(result.text, /1 simulated/);
+    } else {
+      assert.equal(result.role, "alert"); assert.match(result.text, /INV-FIXTURE-102/); assert.match(result.text, /Failed.*vp_2/);
+      assert.match(result.text, scenario === "preview" ? /Live broker emails are blocked in Preview — test in production/ : /Provider rejected fixture email/);
+      assert.match(result.text, scenario === "partial" ? /1 email accepted/ : /0 emails accepted/);
+      assert(!result.text.includes("Run complete"));
+    }
+    assert.equal(writes.filter(write => write.path.endsWith("/run")).length, before + 1, "failed mutations must not silently retry");
+    if (scenario === "preview") {
+      await until(`document.querySelector('tbody').innerText.includes("Error · paused")`);
+      fs.mkdirSync("generated-artifacts/broker-collections", { recursive: true });
+      const failureShot = await cdp("Page.captureScreenshot", { format: "png" });
+      fs.writeFileSync("generated-artifacts/broker-collections/preview-blocked-run.png", Buffer.from(failureShot.data, "base64"));
+    }
+    await click(`document.querySelector('[aria-label="Dismiss run result"]')`);
+    await until(`!document.querySelector('[data-testid="collections-run-result"]')`);
+  }
   fs.mkdirSync("generated-artifacts/broker-collections", { recursive: true });
   const shot = await cdp("Page.captureScreenshot", { format: "png" });
   fs.writeFileSync("generated-artifacts/broker-collections/queue.png", Buffer.from(shot.data, "base64"));
@@ -146,5 +189,7 @@ let browser, ws, server;
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, defaultQueue: true, scopedActions: true, pauseResume: true, vpConfirmation: true,
     paidRequiresConfirmation: true, simulationAudit: true, explicitLiveConfirmation: true, adminControlsOnly: true,
+    previewWarningBeforeLive: true, http503And502FailuresVisible: true, partialCountsPreserved: true,
+    http200FailureNotShownAsSuccess: true, noAutomaticRetry: true, dryRunNotCalledSent: true,
     mobileDialog: true, realEmails: 0, realNotifications: 0 }));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { ws?.close(); browser?.kill("SIGTERM"); server?.close(); });

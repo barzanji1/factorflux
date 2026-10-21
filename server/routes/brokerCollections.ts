@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { z } from "zod";
-import { brokerCollectionsService, CollectionError } from "../services/brokerCollections";
+import { brokerCollectionsService, CollectionError, collectionRunHttpStatus } from "../services/brokerCollections";
 
 export function registerBrokerCollectionsRoutes(app: Express, deps: {
   requireAuth: RequestHandler; service?: typeof brokerCollectionsService;
@@ -27,7 +27,9 @@ export function registerBrokerCollectionsRoutes(app: Express, deps: {
     const config = await service.settings(req.user.id);
     if (!config.canManage) throw new CollectionError(403, "Administrators only.");
     z.object({}).strict().parse(req.body ?? {});
-    res.json(await service.tick());
+    const result = await service.tick();
+    if (result.failed) console.error("[brokerCollections] manual run failed:", result.errors);
+    res.status(collectionRunHttpStatus(result)).json(result);
   }));
   app.get("/api/broker-collections", deps.requireAuth, wrap(async (req, res) => {
     const query = z.object({

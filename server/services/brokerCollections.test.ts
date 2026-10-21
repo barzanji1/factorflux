@@ -7,8 +7,8 @@ import { db, pool } from "../db";
 import { brokers, clients, users, invoices, notifications, emailLog,
   brokerCollectionStates as states, brokerCollectionEvents as events,
   brokerCollectionSettings as settings, brokerConfirmationSettings } from "../../shared/schema";
-import { COLLECTION_DAY as DAY, createBrokerCollectionsService, ensureCollectionState, nextCollectionAction } from "./brokerCollections";
-import { createResendTransport } from "../resendTransport.js";
+import { COLLECTION_DAY as DAY, createBrokerCollectionsService, ensureCollectionState, nextCollectionAction, PREVIEW_LIVE_EMAIL_NOTICE } from "./brokerCollections";
+import { createResendTransport, ResendDeliveryError } from "../resendTransport.js";
 import { createEmailLogRecorder } from "./emailLogService";
 import { validateEmailRetryDomain } from "./emailLogReconciliation";
 import { registerBrokerCollectionsRoutes } from "../routes/brokerCollections";
@@ -40,6 +40,20 @@ async function fixture(tx: Tx) {
 async function rolledBack(work: (tx: Tx) => Promise<void>) {
   const rollback = new Error("rollback collections fixture");
   await assert.rejects(db.transaction(async tx => { await work(tx); throw rollback; }), error => error === rollback);
+}
+async function runApi(service: ReturnType<typeof createBrokerCollectionsService>, actorId: string, invoiceIds: number[]) {
+  const app = express(); app.use(express.json());
+  registerBrokerCollectionsRoutes(app, {
+    service: { ...service, tick: () => service.tick({ invoiceIds }) },
+    requireAuth: (req: any, _res, next) => { req.user = { id: actorId }; next(); },
+  });
+  const server = app.listen(0);
+  try {
+    const response = await fetch(`http://127.0.0.1:${(server.address() as { port: number }).port}/api/broker-collections/run`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    assert(response.headers.get("content-type")?.includes("application/json"));
+    return { status: response.status, body: await response.json() };
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 }
 
 test("phase action planner is bounded and terminal/escalated workflows do not schedule", () => {
@@ -163,7 +177,12 @@ test("provider failures pause visibly; retries reuse the same intent, and HTTP e
     const service = createBrokerCollectionsService({ database: tx, now: () => new Date(funded.getTime() + 2 * DAY),
       send: async params => { keys.push(params.idempotencyKey!); if (fail) throw new Error("Provider AccessDenied fixture"); return "retry-provider"; } });
     await service.updateSettings(f.admin, { enabled: true, mode: "live", confirmLive: true });
-    await service.tick({ invoiceIds: [invoice.id] });
+    const failedRun = await service.tick({ invoiceIds: [invoice.id] });
+    assert.equal(failedRun.status, "failed");
+    assert.equal(failedRun.processed, 0);
+    assert.equal(failedRun.sent, 0);
+    assert.equal(failedRun.failed, 1);
+    assert.match(failedRun.errors[0].message, /AccessDenied/);
     let detail = await service.detail(f.employee, invoice.id);
     assert.equal(detail.row.paused, true);
     assert.match(detail.row.lastError!, /AccessDenied/);
@@ -193,5 +212,93 @@ test("provider failures pause visibly; retries reuse the same intent, and HTTP e
       assert.equal((await fetch(`http://127.0.0.1:${port}/api/broker-collections?phase=vp`)).status, 200);
       assert.equal((await fetch(`http://127.0.0.1:${port}/api/broker-collections/settings`)).status, 200);
     } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
+});
+
+test("real Preview guard returns HTTP 503 with invoice error, no successful action, and no transport log (rollback)", async () => {
+  // This uses the actual default sender. Abort before testing if the test runner
+  // is production, so this regression test can never make a real provider call.
+  assert.notEqual(process.env.NODE_ENV, "production");
+  await rolledBack(async tx => {
+    const f = await fixture(tx);
+    const invoice = await f.invoice();
+    const service = createBrokerCollectionsService({ database: tx, now: () => new Date(funded.getTime() + 3 * DAY) });
+    await service.updateSettings(f.admin, { enabled: true, mode: "live", confirmLive: true });
+    const config = await service.settings(f.admin);
+    assert.equal(config.mode, "live", "live saves even though the separate environment guard blocks sending");
+    assert.equal(config.liveEmailsBlocked, true);
+    assert.equal(config.liveEmailNotice, PREVIEW_LIVE_EMAIL_NOTICE);
+    const { status, body } = await runApi(service, f.admin, [invoice.id]);
+    assert.equal(status, 503);
+    assert.equal(body.status, "failed");
+    assert.equal(body.checked, 1);
+    assert.equal(body.processed, 0);
+    assert.equal(body.sent, 0);
+    assert.equal(body.failed, 1);
+    assert.equal(body.errors[0].invoiceNumber, invoice.invoiceNumber);
+    assert.equal(body.errors[0].code, "preview_live_blocked");
+    assert.equal(body.errors[0].message, PREVIEW_LIVE_EMAIL_NOTICE);
+    const detail = await service.detail(f.admin, invoice.id);
+    assert.equal(detail.row.paused, true);
+    assert.equal(detail.row.vpAttempts, 0);
+    assert.equal(detail.row.lastError, PREVIEW_LIVE_EMAIL_NOTICE);
+    assert.equal(detail.events[0].outcome, "failed");
+    const logs = await tx.select().from(emailLog).where(and(eq(emailLog.entityType, "invoice"), eq(emailLog.entityId, String(invoice.id))));
+    assert.equal(logs.length, 0, "blocked before any call to the shared transport");
+  });
+});
+
+test("mixed batch returns HTTP 502 and truthful partial counts; other invoices continue (rollback, fake provider)", async () => {
+  await rolledBack(async tx => {
+    const f = await fixture(tx);
+    const rejected = await f.invoice("-reject");
+    const accepted = await f.invoice("-accept");
+    const sentIds: number[] = [];
+    const service = createBrokerCollectionsService({ database: tx, now: () => new Date(funded.getTime() + 3 * DAY),
+      send: async params => {
+        const id = Number(params.emailLog!.entityId);
+        sentIds.push(id);
+        if (id === rejected.id) throw new Error("Provider rejection fixture");
+        return "accepted-fake-provider";
+      } });
+    await service.updateSettings(f.admin, { enabled: true, mode: "live", confirmLive: true });
+    const { status, body } = await runApi(service, f.admin, [rejected.id, accepted.id]);
+    assert.equal(status, 502);
+    assert.equal(body.status, "partial_failure");
+    assert.equal(body.checked, 2);
+    assert.equal(body.processed, 1);
+    assert.equal(body.sent, 1);
+    assert.equal(body.failed, 1);
+    assert.equal(body.errors[0].invoiceId, rejected.id);
+    assert.match(body.errors[0].message, /Provider rejection fixture/);
+    assert.deepEqual(sentIds, [rejected.id, accepted.id]);
+    assert.equal((await service.detail(f.employee, rejected.id)).row.paused, true);
+    assert.equal((await service.detail(f.employee, accepted.id)).row.vpAttempts, 1);
+    const again = await runApi(service, f.admin, [rejected.id, accepted.id]);
+    assert.equal(again.status, 200);
+    assert.equal(again.body.checked, 0);
+    assert.equal(again.body.sent, 0);
+    assert.match(again.body.message, /No due invoices/);
+    assert.equal(sentIds.length, 2, "paused failures and future successes must not be sent again");
+  });
+});
+
+test("uncertain delivery is a non-successful run, explicitly unconfirmed, with unchanged attempts (rollback)", async () => {
+  await rolledBack(async tx => {
+    const f = await fixture(tx);
+    const invoice = await f.invoice();
+    const service = createBrokerCollectionsService({ database: tx, now: () => new Date(funded.getTime() + 3 * DAY),
+      send: async () => { throw new ResendDeliveryError(504, "Provider acceptance unknown fixture", true); } });
+    await service.updateSettings(f.admin, { enabled: true, mode: "live", confirmLive: true });
+    const { status, body } = await runApi(service, f.admin, [invoice.id]);
+    assert.equal(status, 502);
+    assert.equal(body.status, "failed");
+    assert.equal(body.processed, 0);
+    assert.equal(body.failed, 1);
+    assert.equal(body.errors[0].outcome, "unconfirmed");
+    const detail = await service.detail(f.employee, invoice.id);
+    assert.equal(detail.row.vpAttempts, 0);
+    assert.equal(detail.row.paused, true);
+    assert.equal(detail.events[0].outcome, "unconfirmed");
   });
 });

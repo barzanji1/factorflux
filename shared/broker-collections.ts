@@ -14,7 +14,17 @@ export const collectionSettingsSchema = z.object({
     ctx.addIssue({ code: "custom", path: ["confirmLive"], message: "Explicitly confirm live broker emails." });
   }
 });
-export type CollectionSettings = { enabled: boolean; mode: "dry_run" | "live"; updatedAt: string; canManage: boolean };
+export type CollectionSettings = { enabled: boolean; mode: "dry_run" | "live"; updatedAt: string; canManage: boolean;
+  liveEmailsBlocked: boolean; liveEmailNotice: string | null };
+export type CollectionRunError = {
+  invoiceId: number; invoiceNumber?: string; step?: string; message: string;
+  outcome: "failed" | "unconfirmed"; status: number; code?: string;
+};
+export type CollectionRunResult = {
+  status: "completed" | "failed" | "partial_failure" | "disabled"; message: string;
+  checked: number; processed: number; sent: number; simulated: number; notified: number;
+  updated: number; skipped: number; failed: number; errors: CollectionRunError[]; disabled: boolean;
+};
 export type CollectionRow = {
   invoiceId: number; invoiceNumber: string; loadNumber: string | null;
   broker: string | null; carrier: string | null;

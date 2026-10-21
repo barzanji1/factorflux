@@ -39,7 +39,7 @@ import { eq, and, lte, inArray, ne } from "drizzle-orm";
 import { storage } from "../storage";
 import { sendEmailTracked } from "../emailService";
 import { paymentInstructions, configuredPaymentBody, textToEmailBody, emailDisplayName } from "../emailTemplate.js";
-import { brokerCollectionsService } from "./brokerCollections";
+import { brokerCollectionsService, collectionRunHttpStatus } from "./brokerCollections";
 
 // ─── Default cadence ──────────────────────────────────────────────────────────
 
@@ -581,9 +581,9 @@ let _schedulerHandle: NodeJS.Timeout | null = null;
  * Skips reminders belonging to paused follow-ups.
  * Runs checkAndStopCadence() before sending each reminder.
  */
-export async function processScheduledReminders(): Promise<{ sent: number; skipped: number; stopped: number }> {
+export async function processScheduledReminders() {
   const result = await brokerCollectionsService.tick();
-  return { sent: result.processed, skipped: result.checked - result.processed, stopped: 0 };
+  return { ...result, stopped: 0, statusCode: collectionRunHttpStatus(result) };
 }
 
 // Retained only as historical implementation context; never scheduled or exported.

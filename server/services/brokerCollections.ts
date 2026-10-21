@@ -6,7 +6,8 @@ import {
   brokerCollectionEvents as events, brokerConfirmationEvents, brokerConfirmationSettings,
   invoices, brokers, clients, users, notifications, eventLedger,
 } from "../../shared/schema";
-import { collectionActionSchema, collectionSettingsSchema, type CollectionQueue, type CollectionRow } from "../../shared/broker-collections";
+import { collectionActionSchema, collectionSettingsSchema, type CollectionQueue, type CollectionRow,
+  type CollectionRunResult, type CollectionRunError } from "../../shared/broker-collections";
 import { sendResendEmail, ResendDeliveryError, type ResendEmailParams } from "../resendTransport.js";
 import { emailDetailsTable } from "../emailTemplate.js";
 
@@ -17,7 +18,13 @@ type State = typeof states.$inferSelect;
 export const COLLECTION_DAY = 86_400_000;
 const DAY = COLLECTION_DAY;
 export class CollectionError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string) { super(message); }
+}
+export const PREVIEW_LIVE_EMAIL_NOTICE = "Live broker emails are blocked in Preview — test in production.";
+type InvoiceResult = false | { kind: "success"; outcome: "sent" | "simulated" | "notified" | "updated" } |
+  { kind: "failure"; error: CollectionRunError };
+export function collectionRunHttpStatus(result: CollectionRunResult) {
+  return result.failed ? (result.errors.some(error => error.code === "preview_live_blocked") ? 503 : 502) : 200;
 }
 
 export function nextCollectionAction(state: Pick<State, "phase" | "vpAttempts" | "rpsAttempts" | "escalatedPhase">) {
@@ -112,7 +119,9 @@ export function createBrokerCollectionsService({
     const user = await actor(actorId);
     const [config] = await database.select().from(settingsTable).where(eq(settingsTable.id, 1));
     if (!config) throw new CollectionError(503, "Collections settings are not configured.");
-    return { enabled: config.enabled, mode: config.mode, updatedAt: config.updatedAt.toISOString(), canManage: user.role === "admin" };
+    const liveEmailsBlocked = process.env.NODE_ENV !== "production";
+    return { enabled: config.enabled, mode: config.mode, updatedAt: config.updatedAt.toISOString(), canManage: user.role === "admin",
+      liveEmailsBlocked, liveEmailNotice: liveEmailsBlocked ? PREVIEW_LIVE_EMAIL_NOTICE : null };
   }
   async function updateSettings(actorId: string, input: unknown) {
     const value = collectionSettingsSchema.parse(input);
@@ -231,8 +240,8 @@ export function createBrokerCollectionsService({
     if (rows.length !== 1) throw new CollectionError(409, "Alan Karam must match exactly one active real staff account. Escalation not delivered.");
     return rows[0].id;
   }
-  async function processInvoice(invoiceId: number) {
-    return database.transaction(async tx => {
+  async function processInvoice(invoiceId: number): Promise<InvoiceResult> {
+    return database.transaction(async (tx): Promise<InvoiceResult> => {
       const lock = await tx.execute(sql`select pg_try_advisory_xact_lock(82651074) as acquired`);
       if (!lock.rows[0]?.acquired) return false;
       // Global controls are locked until provider acceptance: turning off waits for an in-flight send.
@@ -245,7 +254,7 @@ export function createBrokerCollectionsService({
       const at = now();
       if (["paid", "settled"].includes(invoice.status) || invoice.factoringStage === "final_settlement") {
         await markCollectionPaid(tx, invoiceId, at, "invoice_terminal_state");
-        return true;
+        return { kind: "success", outcome: "updated" };
       }
       if (invoice.status !== "funded" || state.paused || !state.nextActionAt || state.nextActionAt > at || ["paid", "stopped"].includes(state.phase)) return false;
       const due = nextCollectionAction(state);
@@ -253,7 +262,7 @@ export function createBrokerCollectionsService({
       if (invoice.brokerConfirmationStatus === "disputed") {
         await tx.update(states).set({ paused: true, lastError: "Broker disputed receipt. Resolve the dispute before resuming.", updatedAt: at }).where(eq(states.invoiceId, invoiceId));
         await audit(tx, invoiceId, "paused_dispute", { mode: state.mode }, at);
-        return true;
+        return { kind: "success", outcome: "updated" };
       }
       if (!due.escalation && state.mode === "live" && config.nextSendAt > at) return false;
       const [broker] = invoice.brokerId ? await tx.select().from(brokers).where(eq(brokers.id, invoice.brokerId)) : [];
@@ -292,7 +301,7 @@ export function createBrokerCollectionsService({
             `Has payment been sent? It has been ${[20, 35, 40][number - 1]} days since paperwork was verified. Please reply with payment status and remittance details.`;
           const text = `Trucking Pros Financial\n${message}\nInvoice: ${invoice.invoiceNumber}\nLoad: ${invoice.loadNumber ?? "Not provided"}\nAmount: $${Number(invoice.amount).toFixed(2)}${receiptLinks}`;
           if (state.mode === "live") {
-            if (send === sendResendEmail && process.env.NODE_ENV !== "production") throw new CollectionError(503, "Live broker automation is disabled in Preview. Use dry-run mode.");
+            if (send === sendResendEmail && process.env.NODE_ENV !== "production") throw new CollectionError(503, PREVIEW_LIVE_EMAIL_NOTICE, "preview_live_blocked");
             // Reuse the old initial confirmation intent, preventing duplicate +48h sends across rollout/recovery.
             const key = state.phase === "vp" && number === 1 ? `broker-confirm/${invoice.brokerConfirmationToken}/initial` :
               `broker-collections/${invoice.brokerConfirmationToken}/${state.generation}/${due.step}`;
@@ -327,7 +336,7 @@ export function createBrokerCollectionsService({
           target: [events.invoiceId, events.generation, events.step], set: record,
         });
         await audit(tx, invoiceId, due.step, record, at);
-        return true;
+        return { kind: "success", outcome: record.outcome as "sent" | "simulated" | "notified" };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Collections processing failed.";
         const outcome = error instanceof ResendDeliveryError && error.uncertain ? "unconfirmed" : "failed";
@@ -336,14 +345,19 @@ export function createBrokerCollectionsService({
           outcome, scheduledAt: state.nextActionAt, occurredAt: at, recipient, error: message, details };
         await tx.insert(events).values(record).onConflictDoUpdate({ target: [events.invoiceId, events.generation, events.step], set: record });
         await audit(tx, invoiceId, "error", { ...record }, at);
-        return true;
+        return { kind: "failure", error: { invoiceId, invoiceNumber: invoice.invoiceNumber, step: due.step,
+          message, outcome, status: error instanceof CollectionError ? error.status : 502,
+          ...(error instanceof CollectionError && error.code ? { code: error.code } : {}) } };
       }
     });
   }
-  async function tick(options: { invoiceIds?: number[] } = {}) {
+  async function tick(options: { invoiceIds?: number[] } = {}): Promise<CollectionRunResult> {
     await enrolBatch(options.invoiceIds);
     const [config] = await database.select().from(settingsTable).where(eq(settingsTable.id, 1));
-    const result = { checked: 0, processed: 0, errors: [] as Array<{ invoiceId: number; message: string }>, disabled: !config?.enabled };
+    const result: CollectionRunResult = { status: config?.enabled ? "completed" : "disabled",
+      message: config?.enabled ? "No due invoices. No emails sent." : "Automation is globally off. No emails sent.",
+      checked: 0, processed: 0, sent: 0, simulated: 0, notified: 0, updated: 0, skipped: 0,
+      failed: 0, errors: [], disabled: !config?.enabled };
     if (!config?.enabled || options.invoiceIds?.length === 0) return result;
     const due = await database.select({ id: states.invoiceId }).from(states).innerJoin(invoices, eq(states.invoiceId, invoices.id)).where(and(
       inArray(states.phase, ["vp", "rps"]), eq(states.paused, false),
@@ -353,15 +367,24 @@ export function createBrokerCollectionsService({
     result.checked = due.length;
     for (const row of due) {
       try {
-        if (await processInvoice(row.id)) {
+        const outcome = await processInvoice(row.id);
+        if (outcome && outcome.kind === "failure") {
+          result.errors.push(outcome.error);
+        } else if (outcome) {
           result.processed++;
+          result[outcome.outcome]++;
           // The persisted cooldown fences other workers; pacing lets this
           // bounded batch drain without skipping every later email.
-          if (send === sendResendEmail && config.mode === "live") await new Promise(resolve => setTimeout(resolve, 2000));
+          if (send === sendResendEmail && outcome.outcome === "sent") await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-      catch (error) { result.errors.push({ invoiceId: row.id, message: error instanceof Error ? error.message : "Collections processing failed." }); }
+      catch (error) { result.errors.push({ invoiceId: row.id, message: error instanceof Error ? error.message : "Collections processing failed.",
+        outcome: "failed", status: 500 }); }
     }
+    result.failed = result.errors.length;
+    result.skipped = result.checked - result.processed - result.failed;
+    result.status = result.failed ? (result.processed ? "partial_failure" : "failed") : "completed";
+    if (result.checked) result.message = `${result.failed ? (result.processed ? "Run partially failed" : "Run failed") : "Run complete"} — ${result.sent} emails accepted, ${result.simulated} simulated actions, ${result.notified} notifications, ${result.updated} state updates, ${result.failed} failed, ${result.skipped} skipped.`;
     return result;
   }
   return { settings, updateSettings, queue, detail, action, tick, enrolBatch };
