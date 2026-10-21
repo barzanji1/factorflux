@@ -959,10 +959,6 @@ export default function CreateInvoiceModal({
                 {renderOcrSource("destination")}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="invoiceCode">Code</Label>
-                <Input id="invoiceCode" value={values.code} onChange={e => setValues(v => ({ ...v, code: e.target.value }))} placeholder="CA TO UT" />
-              </div>
-              <div className="space-y-1.5">
                 <Label>Lumper</Label>
                 <Select value={values.lumper} onValueChange={lumper => setValues(v => ({ ...v, lumper: lumper === "unspecified" ? "" : lumper }))}>
                   <SelectTrigger><SelectValue placeholder="Select Yes or No" /></SelectTrigger>
