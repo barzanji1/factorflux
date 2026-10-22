@@ -14,3 +14,9 @@ Legacy database constraints can be stricter than the current Drizzle insert type
 **Why:** Rollback fixtures accepted by TypeScript were rejected by existing database NOT NULL constraints that the model did not declare.
 
 **How to apply:** Inspect actual required columns when seeding new fixture types and follow the existing validated create shape. Do not loosen database constraints merely to make fixtures pass.
+
+Historical credential verification requires an actual private comparison, not just delivery status or a correctly shaped password hash.
+
+**Why:** Original encrypted mail can be unreadable from the workspace even while production account metadata and delivered-email records are available.
+
+**How to apply:** Return only comparison results, never credentials or hashes. If the original payload is unavailable, explicitly distinguish what the account-creation code does from what can be proven about the historical emailed password.
