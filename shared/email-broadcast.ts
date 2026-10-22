@@ -13,6 +13,10 @@ export const broadcastDraftSchema = z.object({
   templateName: z.string().trim().min(1).max(120).nullable().optional(),
   filters: broadcastFiltersSchema.default({}),
   clientIds: z.array(z.number().int().positive()).min(1).max(10000).optional(),
+  scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
+  scheduleTimeZone: z.string().max(80).refine(value => {
+    try { new Intl.DateTimeFormat("en-US", { timeZone: value }); return true; } catch { return false; }
+  }, "Choose a valid IANA time zone").default("America/Denver"),
 }).strict();
 export type BroadcastFilters = z.infer<typeof broadcastFiltersSchema>;
 export type BroadcastDraftInput = z.infer<typeof broadcastDraftSchema>;
@@ -23,8 +27,11 @@ export type BroadcastClient = {
 };
 export type BroadcastSummary = {
   id: string; subject: string; body: string; templateName: string | null; filters: BroadcastFilters;
-  status: "draft" | "queued" | "sending" | "completed" | "cancelled";
+  clientIds: number[] | null;
+  status: "draft" | "scheduled" | "queued" | "sending" | "completed" | "cancelled" | "failed";
   createdBy: string; createdByName: string; createdAt: string; confirmedAt: string | null; completedAt: string | null;
+  scheduledAt: string | null; scheduleTimeZone: string; dispatchStartedAt: string | null;
+  revision: number; error: string | null;
   counts: BroadcastCounts;
 };
 export type BroadcastRecipient = {

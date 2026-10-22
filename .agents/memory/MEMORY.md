@@ -33,6 +33,7 @@
 - [Chat profile avatars](chat-profile-avatars.md) — reuse existing staff profile photos across all chat views; shared initials fallback, no separate chat upload.
 - [Broker receipt confirmation](broker-receipt-confirmation.md) — explicit public buttons; sequential VP/RPS timing, isolated dry runs, and collections-only Paid markers.
 - [Client email policy](client-email-policy.md) — shared sender and monitored replies; global log reads are staff-wide, while composing stays permission/assignment-scoped.
+- [Timed broadcast safety](broadcast-scheduling.md) — always-on hosting, dynamic audiences, safe outage handling, and serial shared-queue integration checks.
 - [Customer branding boundary](customer-branding-boundary.md) — all customer-facing outputs use TPF; FactorFlux is internal-only, and the portal URL stays unchanged.
 - [Production link boundary](production-link-boundary.md) — distributed login and email links must never inherit the admin's Preview host; obsolete packages must not reintroduce dev URLs.
 - [Carrier chat terminal states](carrier-chat-terminal-states.md) — expected 404/no-portal states must stop polling; repeated error refetches cause visible profile-message flicker.

@@ -168,11 +168,19 @@ export const emailBroadcasts = pgTable("email_broadcasts", {
   clientIds: jsonb("client_ids").$type<number[] | null>(),
   createdBy: varchar("created_by").notNull(),
   createdByName: varchar("created_by_name").notNull(),
-  status: varchar("status", { enum: ["draft", "queued", "sending", "completed", "cancelled"] }).notNull().default("draft"),
+  status: varchar("status", { enum: ["draft", "scheduled", "queued", "sending", "completed", "cancelled", "failed"] }).notNull().default("draft"),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  scheduleTimeZone: varchar("schedule_time_zone", { length: 80 }).notNull().default("America/Denver"),
+  dispatchStartedAt: timestamp("dispatch_started_at", { withTimezone: true }),
+  revision: integer("revision").notNull().default(1),
+  error: text("error"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   confirmedAt: timestamp("confirmed_at"),
   completedAt: timestamp("completed_at"),
-}, table => [index("email_broadcasts_queue_idx").on(table.status, table.confirmedAt)]);
+}, table => [
+  index("email_broadcasts_queue_idx").on(table.status, table.confirmedAt),
+  index("email_broadcasts_scheduled_idx").on(table.status, table.scheduledAt),
+]);
 export const emailBroadcastRecipients = pgTable("email_broadcast_recipients", {
   id: serial("id").primaryKey(),
   broadcastId: varchar("broadcast_id").notNull().references(() => emailBroadcasts.id),

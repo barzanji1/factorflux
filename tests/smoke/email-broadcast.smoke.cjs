@@ -76,19 +76,35 @@ let chrome, ws;
         else if (path.endsWith("/recipients")) {
           const rows = match(Object.fromEntries(url.searchParams));
           result = { clients: rows, counts: { matched: rows.length, sendable: rows.filter(row => row.canSend).length, skipped: rows.filter(row => !row.canSend).length } };
+        } else if (path.endsWith("/edit-preview")) {
+          const payload = JSON.parse(request.postData);
+          const job = jobs.find(row => row.broadcast.id === path.split("/")[3]);
+          assert.equal(payload.expectedRevision, job.broadcast.revision);
+          drafts.push(payload);
+          Object.assign(job.broadcast, { subject: payload.subject, body: payload.body, filters: payload.filters,
+            scheduledAt: payload.scheduledAt, scheduleTimeZone: payload.scheduleTimeZone,
+            status: "draft", confirmedAt: null, revision: job.broadcast.revision + 1 });
+          result = job;
         } else if (path.endsWith("/preview")) {
           const payload = JSON.parse(request.postData); drafts.push(payload);
           const recipients = match(payload.filters).map(row => ({ id: row.id, clientId: row.id, clientName: row.name,
             email: row.email, status: row.canSend ? "pending" : "skipped", error: row.skipReason, providerMessageId: null, sentAt: null }));
           const broadcast = { id: randomUUID(), subject: payload.subject, body: payload.body, templateName: payload.templateName ?? null,
-            filters: payload.filters, status: "draft", createdBy: actor.id, createdByName: "Broadcast Admin",
+            filters: payload.filters, clientIds: payload.clientIds || null, scheduledAt: payload.scheduledAt || null,
+            scheduleTimeZone: payload.scheduleTimeZone || "America/Denver", revision: 1, dispatchStartedAt: null, error: null,
+            status: "draft", createdBy: actor.id, createdByName: "Broadcast Admin",
             createdAt: new Date().toISOString(), confirmedAt: null, completedAt: null, counts: counts(recipients) };
           result = { broadcast, recipients }; jobs.push(result); responseCode = 201;
         } else if (path.endsWith("/confirm")) {
           const job = jobs.find(row => path.includes(row.broadcast.id));
           confirmations.push(JSON.parse(request.postData));
           if (stale) { stale = false; responseCode = 409; result = { message: "Recipients changed. Preview again." }; }
-          else { job.broadcast.status = "queued"; job.broadcast.confirmedAt = new Date().toISOString(); result = job; }
+          else { job.broadcast.status = job.broadcast.scheduledAt ? "scheduled" : "queued"; job.broadcast.confirmedAt = new Date().toISOString(); result = job; }
+        } else if (path.endsWith("/cancel")) {
+          const job = jobs.find(row => row.broadcast.id === path.split("/")[3]);
+          job.broadcast.status = "cancelled"; result = job;
+        } else if (path.endsWith("/scheduled")) {
+          result = jobs.map(row => row.broadcast).filter(row => row.scheduledAt && ["scheduled", "draft"].includes(row.status));
         } else if (path.endsWith("/cancel")) {
           const job = jobs.find(row => path.includes(row.broadcast.id)); job.broadcast.status = "cancelled"; result = job;
         } else if (path === "/api/email-broadcasts") result = jobs.map(row => row.broadcast);
@@ -219,7 +235,7 @@ let chrome, ws;
   await click(button("Confirm 2 emails"));
   await until(`!document.querySelector('[role="dialog"]')`);
   await until(`document.body.innerText.includes('Isolated provider failure')`);
-  assert.deepEqual(confirmations, [{ recipientCount: 2 }, { recipientCount: 2 }]);
+  assert.deepEqual(confirmations, [{ recipientCount: 2, expectedRevision: 1 }, { recipientCount: 2, expectedRevision: 1 }]);
   for (const draft of drafts) { assert.equal(draft.cc, undefined); assert.equal(draft.bcc, undefined); }
   assert(drafts.every(draft => draft.templateName === savedTemplates[0].id));
   await screenshot("broadcast-results");
@@ -230,7 +246,42 @@ let chrome, ws;
   await until(`!!${button("Confirm 2 emails")}`);
   assert.ok(await evaluate(`(()=>{const r=document.querySelector('[role="dialog"]').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.height<=innerHeight})()`));
   await screenshot("mobile-confirm");
-  await cdp("Emulation.clearDeviceMetricsOverride");
+  await click(button("Review message", true));
+  await until(`!document.querySelector('[role="dialog"]')`);
+  await cdp("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await evaluate(`window.scrollTo({left:0,behavior:"instant"})`);
+  // A year-planner row fills the real schedule inputs without silently queuing.
+  await click(`Array.from(document.querySelectorAll('button')).find(e=>e.textContent==="Review notice"&&!e.disabled)`);
+  await until(`document.getElementById('broadcast-scheduled-at').value!==""`);
+  const annualDate = await evaluate(`document.getElementById('broadcast-scheduled-at').value`);
+  assert(annualDate);
+  const beforeSchedule = confirmations.length;
+  await click(button("Preview scheduled broadcast"));
+  await until(`document.querySelector('[role="dialog"]')?.textContent.includes("Confirm scheduled broadcast")`);
+  assert.equal(confirmations.length, beforeSchedule);
+  await screenshot("schedule-confirm");
+  await click(`Array.from(document.querySelectorAll('[role="dialog"] button')).find(e=>e.textContent==="Confirm schedule")`);
+  await until(`!document.querySelector('[role="dialog"]')`);
+  const scheduledJob = jobs.find(row => row.broadcast.status === "scheduled");
+  assert(scheduledJob);
+  assert.equal(scheduledJob.broadcast.counts.sent, 0);
+  await until(`Array.from(document.querySelectorAll('button')).some(e=>e.textContent==="Edit")`);
+  await click(`Array.from(document.querySelectorAll('button')).find(e=>e.textContent==="Edit")`);
+  await until(`document.body.textContent.includes("Editing schedule rev")`);
+  await fill("broadcast-subject", "Edited annual holiday notice");
+  await click(button("Review schedule changes"));
+  await until(`document.querySelector('[role="dialog"]')?.textContent.includes("Confirm scheduled broadcast")`);
+  assert.equal(scheduledJob.broadcast.status, "draft");
+  assert.equal(scheduledJob.broadcast.revision, 2);
+  await click(`Array.from(document.querySelectorAll('[role="dialog"] button')).find(e=>e.textContent==="Confirm schedule")`);
+  await until(`!document.querySelector('[role="dialog"]')`);
+  assert.equal(scheduledJob.broadcast.subject, "Edited annual holiday notice");
+  await evaluate(`Array.from(document.querySelectorAll('h3')).find(e=>e.textContent==="Scheduled broadcasts").closest('section').scrollIntoView({block:"center",behavior:"instant"})`);
+  await screenshot("scheduled-edited");
+  await click(`Array.from(document.querySelectorAll('button')).find(e=>e.textContent==="Cancel")`);
+  await until(`document.body.textContent.includes("Nothing scheduled")`);
+  assert.equal(scheduledJob.broadcast.status, "cancelled");
+  assert.equal(scheduledJob.broadcast.counts.sent, 0);
   for (const role of ["employee", "manager"]) {
     await login(role);
     assert.equal(await evaluate(`!!document.getElementById('broadcast-subject')`), false);
@@ -247,6 +298,7 @@ let chrome, ws;
     noSendBeforeConfirm: true, editsInvalidatePreview: true, stalePreviewRefresh: true, progressAndFailureVisible: true,
     adminOnlyEvenWithAllPermissions: true, mobileConfirmation: true, holidayAutofillEditable: true,
     customSaveFailurePreservesDraft: true, customTemplatesSurviveReload: true, sharedWithSingleComposer: true,
+    yearPlannerScheduleConfirmed: true, scheduleEditReconfirmed: true, scheduledCancellation: true,
     noRealBroadcastsSent: true }));
 })().catch(error => { console.error(error.stack || error); process.exitCode = 1; })
   .finally(() => { ws?.close(); chrome?.kill("SIGKILL"); });

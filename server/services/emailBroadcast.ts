@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, lte, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { clients, emailBroadcasts, emailBroadcastRecipients, emailBroadcastDispatch, users } from "@shared/schema";
@@ -7,7 +7,8 @@ import { broadcastDraftSchema, broadcastFiltersSchema, type BroadcastCounts, typ
 import { sendResendEmail, ResendDeliveryError, type ResendEmailParams } from "../resendTransport.js";
 import { personalizeEmail, emailTemplateInputSchema } from "../../shared/email-templates";
 
-type Database = Pick<typeof db, "select" | "selectDistinct" | "insert" | "update" | "transaction" | "execute">;
+type Database = Pick<typeof db, "select" | "selectDistinct" | "insert" | "update" | "delete" | "transaction" | "execute">;
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Job = typeof emailBroadcasts.$inferSelect;
 type Recipient = typeof emailBroadcastRecipients.$inferSelect;
 const validEmail = z.string().trim().email().max(254);
@@ -41,15 +42,17 @@ function countsFor(rows: Pick<Recipient, "status">[]): BroadcastCounts {
     pending: count("pending"), sent: count("sent"), failed: count("failed"), unconfirmed: count("unconfirmed") };
 }
 function summary(job: Job, counts: BroadcastCounts): BroadcastSummary {
-  return { id: job.id, subject: job.subject, body: job.body, templateName: job.templateName, filters: job.filters,
+  return { id: job.id, subject: job.subject, body: job.body, templateName: job.templateName, filters: job.filters, clientIds: job.clientIds,
     status: job.status, createdBy: job.createdBy, createdByName: job.createdByName,
     createdAt: job.createdAt.toISOString(), confirmedAt: job.confirmedAt?.toISOString() ?? null,
-    completedAt: job.completedAt?.toISOString() ?? null, counts };
+    completedAt: job.completedAt?.toISOString() ?? null, counts,
+    scheduledAt: job.scheduledAt?.toISOString() ?? null, scheduleTimeZone: job.scheduleTimeZone,
+    dispatchStartedAt: job.dispatchStartedAt?.toISOString() ?? null, revision: job.revision, error: job.error };
 }
 
 export function createEmailBroadcastService({
-  database = db, send = sendResendEmail,
-}: { database?: Database; send?: (params: ResendEmailParams) => Promise<string> } = {}) {
+  database = db, send = sendResendEmail, now = () => new Date(),
+}: { database?: Database; send?: (params: ResendEmailParams) => Promise<string>; now?: () => Date } = {}) {
   async function admin(actorId: string, store: Database = database) {
     const [actor] = await store.select().from(users).where(eq(users.id, actorId));
     if (!actor || actor.role !== "admin" || actor.status !== "active") throw new BroadcastError(403, "Active administrators only");
@@ -74,6 +77,31 @@ export function createEmailBroadcastService({
       status: row.status, error: row.error, providerMessageId: row.providerMessageId, sentAt: row.sentAt?.toISOString() ?? null,
     })) };
   }
+  function prepare(input: unknown) {
+    const draft = broadcastDraftSchema.parse(input);
+    draft.clientIds = draft.clientIds ? [...new Set(draft.clientIds)].sort((a, b) => a - b) : undefined;
+    const scheduledAt = draft.scheduledAt ? new Date(draft.scheduledAt) : null;
+    if (scheduledAt && (scheduledAt.getTime() <= now().getTime() || scheduledAt.getTime() > now().getTime() + 731 * 86400000)) {
+      throw new BroadcastError(400, "Choose a future send time within the next two years.");
+    }
+    const fingerprint = digest({ subject: draft.subject, body: draft.body, templateName: draft.templateName ?? null,
+      filters: { search: draft.filters.search ?? "", status: draft.filters.status ?? "", assignedProcessor: draft.filters.assignedProcessor ?? "" },
+      clientIds: draft.clientIds ?? null, scheduledAt: scheduledAt?.toISOString() ?? null, scheduleTimeZone: draft.scheduleTimeZone });
+    return { draft, scheduledAt, fingerprint };
+  }
+  async function replaceRecipients(tx: Tx, id: string, rows: Awaited<ReturnType<typeof matching>>) {
+    await tx.delete(emailBroadcastRecipients).where(eq(emailBroadcastRecipients.broadcastId, id));
+    const plan = planBroadcastRecipients(rows);
+    for (let i = 0; i < plan.length; i += 500) {
+      await tx.insert(emailBroadcastRecipients).values(plan.slice(i, i + 500).map(row => ({ ...row, broadcastId: id })));
+    }
+  }
+  async function summaries(jobs: Job[]) {
+    if (!jobs.length) return [];
+    const rows = await database.select({ broadcastId: emailBroadcastRecipients.broadcastId, status: emailBroadcastRecipients.status })
+      .from(emailBroadcastRecipients).where(inArray(emailBroadcastRecipients.broadcastId, jobs.map(job => job.id)));
+    return jobs.map(job => summary(job, countsFor(rows.filter(row => row.broadcastId === job.id))));
+  }
   return {
     async options(actorId: string) {
       await admin(actorId);
@@ -92,18 +120,14 @@ export function createEmailBroadcastService({
     },
     async preview(actorId: string, input: unknown) {
       const actor = await admin(actorId);
-      const draft = broadcastDraftSchema.parse(input);
-      // Canonicalize selection/order so equivalent retries reserve only one draft.
-      draft.clientIds = draft.clientIds ? [...new Set(draft.clientIds)].sort((a, b) => a - b) : undefined;
-      const fingerprint = digest({ subject: draft.subject, body: draft.body, templateName: draft.templateName ?? null,
-        filters: { search: draft.filters.search ?? "", status: draft.filters.status ?? "", assignedProcessor: draft.filters.assignedProcessor ?? "" },
-        clientIds: draft.clientIds ?? null });
+      const { draft, scheduledAt, fingerprint } = prepare(input);
       return database.transaction(async tx => {
         const rows = await matching(draft.filters, draft.clientIds, tx);
         if (!rows.length) throw new BroadcastError(400, "No clients match this selection");
         const [job] = await tx.insert(emailBroadcasts).values({ id: randomUUID(), requestId: draft.requestId, fingerprint,
           recipientFingerprint: recipientDigest(rows), subject: draft.subject, body: draft.body,
           templateName: draft.templateName ?? null, filters: draft.filters, clientIds: draft.clientIds ?? null,
+          scheduledAt, scheduleTimeZone: draft.scheduleTimeZone, createdAt: now(),
           createdBy: actor.id, createdByName: [actor.firstName, actor.lastName].filter(Boolean).join(" ") || "Administrator",
         }).onConflictDoNothing({ target: emailBroadcasts.requestId }).returning();
         if (!job) {
@@ -121,23 +145,56 @@ export function createEmailBroadcastService({
         return detail(job.id, tx);
       });
     },
-    async confirm(actorId: string, id: string, recipientCount: number) {
+    async confirm(actorId: string, id: string, recipientCount: number, expectedRevision?: number) {
       await admin(actorId);
       return database.transaction(async tx => {
         const [job] = await tx.select().from(emailBroadcasts).where(eq(emailBroadcasts.id, id)).for("update");
         if (!job) throw new BroadcastError(404, "Broadcast not found");
         if (job.createdBy !== actorId) throw new BroadcastError(403, "Only the administrator who previewed this message may confirm it");
+        if ((job.scheduledAt && expectedRevision === undefined) || (expectedRevision !== undefined && job.revision !== expectedRevision)) {
+          throw new BroadcastError(409, "Schedule revision changed or is missing. Review the latest preview before confirming.");
+        }
         if (job.status !== "draft") {
-          if (["queued", "sending", "completed"].includes(job.status)) return detail(id, tx);
+          if (["scheduled", "queued", "sending", "completed"].includes(job.status)) return detail(id, tx);
           throw new BroadcastError(409, "This broadcast was cancelled");
         }
-        if (Date.now() - job.createdAt.getTime() > MAX_DRAFT_AGE_MS) throw new BroadcastError(409, "Preview expired. Preview the recipients again before sending.");
+        if (now().getTime() - job.createdAt.getTime() > MAX_DRAFT_AGE_MS) throw new BroadcastError(409, "Preview expired. Preview the recipients again before sending.");
+        if (job.scheduledAt && job.scheduledAt <= now()) throw new BroadcastError(409, "The send time has passed. Edit the schedule and confirm it again.");
         const rows = await matching(job.filters, job.clientIds, tx);
         if (recipientDigest(rows) !== job.recipientFingerprint) throw new BroadcastError(409, "Recipients changed. Preview the selection again before sending.");
         const result = await detail(id, tx);
         if (!result.broadcast.counts.sendable) throw new BroadcastError(400, "No valid unique email addresses in this selection");
         if (recipientCount !== result.broadcast.counts.sendable) throw new BroadcastError(409, "Recipient count changed. Preview the selection again.");
-        await tx.update(emailBroadcasts).set({ status: "queued", confirmedAt: new Date() }).where(eq(emailBroadcasts.id, id));
+        await tx.update(emailBroadcasts).set({ status: job.scheduledAt ? "scheduled" : "queued",
+          confirmedAt: now(), dispatchStartedAt: job.scheduledAt ? null : now() }).where(eq(emailBroadcasts.id, id));
+        return detail(id, tx);
+      });
+    },
+    async editPreview(actorId: string, id: string, input: unknown) {
+      const actor = await admin(actorId);
+      const { expectedRevision, ...rest } = broadcastDraftSchema.extend({ expectedRevision: z.number().int().positive() }).parse(input);
+      const { draft, scheduledAt, fingerprint } = prepare(rest);
+      if (!scheduledAt) throw new BroadcastError(400, "Editing a scheduled notice requires a future send time.");
+      return database.transaction(async tx => {
+        const [job] = await tx.select().from(emailBroadcasts).where(eq(emailBroadcasts.id, id)).for("update");
+        if (!job) throw new BroadcastError(404, "Broadcast not found");
+        if (job.requestId === draft.requestId && job.fingerprint === fingerprint && job.createdBy === actorId && job.status === "draft") {
+          return detail(id, tx);
+        }
+        if (job.revision !== expectedRevision) throw new BroadcastError(409, "This schedule changed. Reload it before editing.");
+        if (!job.scheduledAt || job.scheduledAt <= now() || job.dispatchStartedAt || !["scheduled", "draft"].includes(job.status)) {
+          throw new BroadcastError(409, "This notice is due, started or cancelled and can no longer be edited.");
+        }
+        const rows = await matching(draft.filters, draft.clientIds, tx);
+        if (!rows.length) throw new BroadcastError(400, "No clients match this selection");
+        await tx.update(emailBroadcasts).set({
+          requestId: draft.requestId, fingerprint, recipientFingerprint: recipientDigest(rows),
+          subject: draft.subject, body: draft.body, templateName: draft.templateName ?? null,
+          filters: draft.filters, clientIds: draft.clientIds ?? null, scheduledAt, scheduleTimeZone: draft.scheduleTimeZone,
+          revision: job.revision + 1, status: "draft", confirmedAt: null, createdAt: now(), error: null,
+          createdBy: actor.id, createdByName: [actor.firstName, actor.lastName].filter(Boolean).join(" ") || "Administrator",
+        }).where(eq(emailBroadcasts.id, id));
+        await replaceRecipients(tx, id, rows);
         return detail(id, tx);
       });
     },
@@ -146,7 +203,7 @@ export function createEmailBroadcastService({
       return database.transaction(async tx => {
         const [job] = await tx.select().from(emailBroadcasts).where(eq(emailBroadcasts.id, id)).for("update");
         if (!job) throw new BroadcastError(404, "Broadcast not found");
-        if (job.status === "completed" || job.status === "cancelled") return detail(id, tx);
+        if (["completed", "cancelled", "failed"].includes(job.status)) return detail(id, tx);
         await tx.update(emailBroadcasts).set({ status: "cancelled", completedAt: new Date() }).where(eq(emailBroadcasts.id, id));
         await tx.update(emailBroadcastRecipients).set({ status: "skipped", error: "Cancelled before sending" })
           .where(and(eq(emailBroadcastRecipients.broadcastId, id), eq(emailBroadcastRecipients.status, "pending")));
@@ -157,14 +214,17 @@ export function createEmailBroadcastService({
     async list(actorId: string) {
       await admin(actorId);
       const jobs = await database.select().from(emailBroadcasts).orderBy(desc(emailBroadcasts.createdAt)).limit(50);
-      if (!jobs.length) return [];
-      const rows = await database.select({ broadcastId: emailBroadcastRecipients.broadcastId, status: emailBroadcastRecipients.status })
-        .from(emailBroadcastRecipients).where(inArray(emailBroadcastRecipients.broadcastId, jobs.map(job => job.id)));
-      return jobs.map(job => summary(job, countsFor(rows.filter(row => row.broadcastId === job.id))));
+      return summaries(jobs);
+    },
+    async scheduled(actorId: string) {
+      await admin(actorId);
+      return summaries(await database.select().from(emailBroadcasts).where(and(
+        isNotNull(emailBroadcasts.scheduledAt), inArray(emailBroadcasts.status, ["scheduled", "draft", "queued", "sending", "failed"]),
+      )).orderBy(asc(emailBroadcasts.scheduledAt), asc(emailBroadcasts.id)).limit(1000));
     },
     // Globally serialized across processes. A DB transaction lock is released on
     // crash; retries reuse the same durable transport key and immutable payload.
-    async tick() {
+    async tick({ broadcastId }: { broadcastId?: string } = {}) {
       return database.transaction(async tx => {
         const lock = await tx.execute<{ acquired: boolean }>(sql`SELECT pg_try_advisory_xact_lock(${WORKER_LOCK}) AS acquired`);
         if (!lock.rows[0]?.acquired) return false;
@@ -172,18 +232,40 @@ export function createEmailBroadcastService({
         if (!dispatch) throw new Error("Broadcast dispatch state is missing; apply the broadcast migration");
         const clock = await tx.execute<{ ready: boolean }>(sql`SELECT ${dispatch.nextSendAt}::timestamp <= clock_timestamp() AS ready`);
         if (!clock.rows[0]?.ready) return false;
-        const [job] = await tx.select().from(emailBroadcasts).where(inArray(emailBroadcasts.status, ["queued", "sending"]))
-          .orderBy(asc(emailBroadcasts.confirmedAt), asc(emailBroadcasts.id)).limit(1).for("update");
+        const [job] = await tx.select().from(emailBroadcasts).where(and(
+          broadcastId ? eq(emailBroadcasts.id, broadcastId) : undefined,
+          or(inArray(emailBroadcasts.status, ["queued", "sending"]),
+            and(eq(emailBroadcasts.status, "scheduled"), lte(emailBroadcasts.scheduledAt, now()))),
+        )).orderBy(asc(sql`coalesce(${emailBroadcasts.dispatchStartedAt}, ${emailBroadcasts.scheduledAt}, ${emailBroadcasts.confirmedAt})`),
+          asc(emailBroadcasts.id)).limit(1).for("update");
         if (!job) return false;
         const [actor] = await tx.select().from(users).where(eq(users.id, job.createdBy));
         const stopReason = !actor || actor.role !== "admin" || actor.status !== "active"
           ? "Sender is no longer an active administrator; broadcast cancelled"
-          : !job.confirmedAt || Date.now() - job.confirmedAt.getTime() > MAX_SEND_AGE_MS
+          : !job.confirmedAt ? "This broadcast has not been confirmed"
+          : job.status === "scheduled" ? (job.scheduledAt && now().getTime() - job.scheduledAt.getTime() > 86400000
+            ? "Scheduled send was missed by more than 24 hours. No emails sent; review and create a new schedule." : null)
+          : now().getTime() - (job.scheduledAt ? job.dispatchStartedAt ?? job.confirmedAt : job.confirmedAt).getTime() > MAX_SEND_AGE_MS
             ? "Safe retry window expired; verify prior delivery before creating a new broadcast" : null;
         if (stopReason) {
           await tx.update(emailBroadcastRecipients).set({ status: "failed", error: stopReason })
             .where(and(eq(emailBroadcastRecipients.broadcastId, job.id), eq(emailBroadcastRecipients.status, "pending")));
-          await tx.update(emailBroadcasts).set({ status: "completed", completedAt: new Date() }).where(eq(emailBroadcasts.id, job.id));
+          await tx.update(emailBroadcasts).set({ status: job.scheduledAt ? "failed" : "completed",
+            completedAt: now(), error: stopReason }).where(eq(emailBroadcasts.id, job.id));
+          return false;
+        }
+        if (job.status === "scheduled") {
+          // Re-evaluate the explicitly confirmed saved filters at send time.
+          // Commit the final recipients before any provider call so a crash
+          // cannot regenerate recipient IDs/idempotency keys and duplicate mail.
+          const rows = await matching(job.filters, job.clientIds, tx);
+          await replaceRecipients(tx, job.id, rows);
+          const sendable = planBroadcastRecipients(rows).some(row => row.status === "pending");
+          await tx.update(emailBroadcasts).set({
+            status: sendable ? "queued" : "failed", dispatchStartedAt: now(), recipientFingerprint: recipientDigest(rows),
+            error: sendable ? null : "No valid clients match the confirmed audience at send time. No emails sent.",
+            completedAt: sendable ? null : now(),
+          }).where(eq(emailBroadcasts.id, job.id));
           return false;
         }
         const [recipient] = await tx.select().from(emailBroadcastRecipients).where(and(

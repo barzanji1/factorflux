@@ -51,11 +51,11 @@ All new outbound emails share one modern, mobile-readable company template. Win9
 
 **How to apply:** Apply branding at the single transport, including text-only and direct sends. Preserve immutable historical retries, but refuse unsafe placeholder instructions. Corporate bank routing numbers alone are not proof of fake details.
 
-The office is closed on all federal holidays. Holiday and closure templates are editable starting text, not an automatic holiday calendar or scheduled-send policy.
+The office is closed on all federal holidays. Holiday and closure templates are editable starting text. Admins can prepare the year's notices in advance, but each schedule requires explicit review and confirmation.
 
 **Why:** The user stated “FactorFlux is closed all FEDERAL HOLIDAYS” and requested all eleven federal holiday notices plus generic closure/hours templates.
 
-**How to apply:** Include all eleven holidays, preserve observed-date/hour review by the sender, and do not infer specific closure dates or promise funding during a holiday. Resolve Company personalization per recipient with a neutral fallback.
+**How to apply:** Include all eleven holidays, present actual and federally observed dates as reviewable defaults, preserve editable closure wording/hours, and never promise funding during a holiday. Resolve Company personalization per recipient with a neutral fallback.
 
 Shared custom templates may be saved by staff with client-email access, independently of the admin-only broadcast boundary.
 

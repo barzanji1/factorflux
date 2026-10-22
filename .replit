@@ -7,8 +7,8 @@ channel = "stable-24_05"
 packages = ["libuuid", "cairo", "pango", "giflib", "librsvg", "ghostscript", "libheif"]
 
 [deployment]
-deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+deploymentTarget = "vm"
+build = ["sh", "-c", "npm run build"]
 run = ["npm", "run", "start"]
 
 [[ports]]
