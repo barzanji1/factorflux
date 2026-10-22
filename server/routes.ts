@@ -25,6 +25,8 @@ import { z } from "zod";
 import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull, ne } from "drizzle-orm";
 
 import { storage } from "./storage";
+import { staffEmailSchema, staffLoginSchema } from "../shared/staff-auth";
+import { isStaffEmailConflict, StaffEmailConflictError } from "./services/staffAccounts";
 import { registerBrokerConfirmationRoutes } from "./routes/brokerConfirmation";
 import { registerBrokerCollectionsRoutes } from "./routes/brokerCollections";
 import { registerEmailLogRoutes } from "./routes/emailLog";
@@ -983,7 +985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, password } = staffLoginSchema.parse(req.body);
       const dbUser = await storage.getUserByEmail(username);
       if (!dbUser) {
         console.warn(`[login] No user found for email: ${username}`);
@@ -1020,6 +1022,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).user = sessionUser;
       return res.json({ success: true, user: sessionUser });
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Enter a valid email address and password." });
+      if (error instanceof StaffEmailConflictError) return res.status(409).json({ message: error.message });
       console.error("Login error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
@@ -1689,7 +1693,7 @@ ${message}
       const schema = z.object({
         firstName: z.string().trim().min(1, "First name required"),
         lastName: z.string().trim().min(1, "Last name required"),
-        email: z.string().trim().email("Valid email required"),
+        email: staffEmailSchema,
         role: z.enum(["employee", "manager", "admin"]),
         password: z.string().min(6, "Password must be at least 6 characters"),
       });
@@ -1756,6 +1760,7 @@ ${message}
       res.status(201).json(adminUserOutput(newUser));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0]?.message });
+      if (isStaffEmailConflict(error)) return res.status(409).json({ error: "An account with this email already exists." });
       console.error("Error creating agent:", error);
       res.status(500).json({ error: "Failed to create agent" });
     }
@@ -1768,11 +1773,15 @@ ${message}
       const schema = z.object({
         firstName: z.string().trim().min(1).optional(),
         lastName: z.string().trim().min(1).optional(),
-        email: z.string().trim().email().optional(),
+        email: staffEmailSchema.optional(),
         role: z.enum(["employee", "manager", "admin"]).optional(),
         status: z.enum(["active", "suspended", "inactive"]).optional(),
       });
       const updates = schema.parse(req.body);
+      if (updates.email) {
+        const existing = await storage.getUserByEmail(updates.email);
+        if (existing && existing.id !== id) return res.status(409).json({ error: "An account with this email already exists." });
+      }
 
       // Guard: admin cannot suspend/deactivate their own account
       if (id === adminUser.id && updates.status && updates.status !== "active") {
@@ -1792,6 +1801,7 @@ ${message}
       res.json(adminUserOutput(updatedUser));
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0]?.message });
+      if (isStaffEmailConflict(error)) return res.status(409).json({ error: "An account with this email already exists." });
       console.error("Error updating user:", error);
       res.status(500).json({ error: "Failed to update user" });
     }

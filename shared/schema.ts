@@ -73,6 +73,8 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   uniqueIndex("users_single_it_support_idx").on(table.isItSupport).where(sql`${table.isItSupport} = true`),
+  uniqueIndex("users_normalized_email_unique").on(sql`lower(btrim(${table.email}))`)
+    .where(sql`${table.email} is not null and btrim(${table.email}) <> ''`),
 ]);
 
 // Encrypted application-level integration settings.

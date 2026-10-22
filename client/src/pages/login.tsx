@@ -12,11 +12,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
+import { staffLoginSchema } from "@shared/staff-auth";
 
-const loginSchema = z.object({
-  username: z.string().email("Enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
-});
+const loginSchema = staffLoginSchema;
 
 type LoginFormData = z.infer<typeof loginSchema>;
 

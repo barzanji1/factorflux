@@ -15,6 +15,7 @@
 - [Invoice number provenance](invoice-number-provenance.md) — internal INV numbers and carrier invoice references are separate; never infer legacy carrier references from ambiguous identifiers.
 - [Fuel advance compatibility](fuel-advance-compatibility.md) — preserve legacy fuel-advance reads/API fields while normalized workflow fields are adopted.
 - [External Neon verification](external-neon-verification.md) — database callbacks may target a different managed DB; verify app data through the configured Neon connection.
+- [Staff email identity](staff-email-identity.md) — ignore case/spaces at login; preserve legacy credentials and reject ambiguous identities rather than choosing a duplicate.
 - [Permission override semantics](permission-override-semantics.md) — one explicit permission row replaces all role defaults; never seed a single module permission for default-only users.
 - [API authorization coverage](api-authorization-coverage.md) — inventory every concrete API prefix; alternate aliases and signed provider callbacks must not fall through generic auth.
 - [Direct-message identity](direct-message-identity.md) — canonical DM keys must encode participant IDs unambiguously; delimiter joins can collide and expose private threads.

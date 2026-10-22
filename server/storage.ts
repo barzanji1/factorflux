@@ -1,5 +1,7 @@
 import { refreshInvoiceDocumentRequirements } from "./services/invoiceDocumentWorkflow";
 import { releaseHeldInvoice } from "./services/invoiceCreationHold";
+import { createStaffAgent, findStaffByEmail } from "./services/staffAccounts";
+import { normalizeStaffEmail } from "../shared/staff-auth";
 import {
   users,
   clients,
@@ -399,31 +401,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    return findStaffByEmail(email);
   }
 
   async getUserByEmailAndType(email: string, authType: string): Promise<User[]> {
     return await db
       .select()
       .from(users)
-      .where(and(eq(users.email, email), eq(users.authType, authType as "replit" | "local")));
+      .where(and(sql`lower(btrim(${users.email})) = ${normalizeStaffEmail(email)}`, eq(users.authType, authType as "replit" | "local")));
   }
 
   async createAgent(data: { id: string; firstName: string; lastName: string; email: string; role: string; password: string; createdBy: string }): Promise<User> {
-    const [row] = await db.insert(users).values({
-      id: data.id,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      password: data.password,
-      role: data.role as "employee" | "manager" | "admin",
-      authType: "local",
-      status: "active",
-      createdBy: data.createdBy,
-      verified: true,
-    }).returning();
-    return row;
+    return createStaffAgent(data);
   }
 
   async deleteUser(id: string): Promise<void> {
