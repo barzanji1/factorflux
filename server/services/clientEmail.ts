@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { clientEmailLogs, type ClientEmailLog } from "@shared/schema";
 import { SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO } from "../emailConfig";
+import { personalizeEmail, emailTemplateInputSchema } from "../../shared/email-templates";
 
 export const CLIENT_EMAIL_FROM = SYSTEM_EMAIL_FROM;
 export const CLIENT_EMAIL_REPLY_TO = SYSTEM_EMAIL_REPLY_TO;
@@ -63,17 +64,20 @@ export function createClientEmailStore(database = db): ClientEmailStore {
 }
 
 export function createClientEmailService(store: ClientEmailStore, send: (log: ClientEmailLog) => Promise<string>) {
-  return async (input: ClientEmailInput, client: { id: number; email?: string | null }, agent: { id: string; name: string }) => {
+  return async (input: ClientEmailInput, client: { id: number; email?: string | null; name?: string | null }, agent: { id: string; name: string }) => {
     const toEmail = z.string().trim().email().safeParse(client.email);
     if (!toEmail.success) throw new ClientEmailError(400, "This client needs a valid email address saved on their profile before you can send.");
+    const content = emailTemplateInputSchema.pick({ subject: true, body: true }).parse({
+      subject: personalizeEmail(input.subject, client.name), body: personalizeEmail(input.body, client.name),
+    });
     const log = await store.reserve({
       requestId: input.requestId, clientId: client.id, agentId: agent.id, agentName: agent.name,
       toEmail: toEmail.data, fromEmail: CLIENT_EMAIL_FROM, replyTo: CLIENT_EMAIL_REPLY_TO,
       ccEmails: (input.cc ?? []).filter(address => address.toLowerCase() !== toEmail.data.toLowerCase()),
-      subject: input.subject, body: input.body, status: "pending",
+      subject: content.subject, body: content.body, status: "pending",
     });
-    if (log.clientId !== client.id || log.agentId !== agent.id || log.subject !== input.subject ||
-        log.body !== input.body || log.toEmail !== toEmail.data ||
+    if (log.clientId !== client.id || log.agentId !== agent.id || log.subject !== content.subject ||
+        log.body !== content.body || log.toEmail !== toEmail.data ||
         JSON.stringify([...(log.ccEmails ?? [])].sort()) !==
           JSON.stringify((input.cc ?? []).filter(address => address.toLowerCase() !== toEmail.data.toLowerCase()).sort())) {
       throw new ClientEmailError(409, "This send request belongs to a different email. Start a new draft before sending.");

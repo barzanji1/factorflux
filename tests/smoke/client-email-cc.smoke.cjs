@@ -65,7 +65,9 @@ let chrome, ws;
   };
   const button = text => `Array.from(document.querySelectorAll('button')).find(e=>e.textContent.trim()===${JSON.stringify(text)}&&e.getBoundingClientRect().width>0)`;
   const click = async expression => {
-    const point = await evaluate(`(()=>{const e=${expression};if(!e)throw Error("Missing target");e.scrollIntoView({block:"nearest"});const r=e.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+    await evaluate(`(()=>{const e=${expression};if(!e)throw Error("Missing target");e.scrollIntoView({block:"center",behavior:"instant"})})()`);
+    await sleep(250);
+    const point = await evaluate(`(()=>{const e=${expression};const r=e.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;const hit=document.elementFromPoint(x,y);if(!e.contains(hit))throw Error("Target intercepted by "+hit?.outerHTML?.slice(0,200));return{x,y}})()`);
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await cdp("Input.dispatchMouseEvent", {
       type, ...point, ...(type === "mouseMoved" ? {} : { button: "left", clickCount: 1 }),
     });

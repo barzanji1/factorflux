@@ -78,6 +78,26 @@ test("Resend payload fixes domain, monitored reply-to, recipient and retry idemp
   assert(log.sentAt);
 });
 
+test("edited holiday text personalizes and logs exactly what is delivered through the branded wrapper", async () => {
+  const store = fakeStore();
+  const payloads: any[] = [];
+  const service = createClientEmailService(store, isolatedSender(async (_connector, _path, options) => {
+    payloads.push(options.body);
+    return new Response(JSON.stringify({ id: "holiday-fixture" }), { status: 200 });
+  }));
+  const draft = { ...input(), subject: "Holiday for [Company]", body: "Hello [Company],\n\nEdited closure hours: noon." };
+  const log = await service(draft, { ...client, name: "A&B <Logistics>" }, agent);
+  assert.equal(log.subject, "Holiday for A&B <Logistics>");
+  assert.equal(log.body, "Hello A&B <Logistics>,\n\nEdited closure hours: noon.");
+  assert.equal(payloads[0].text, log.body);
+  assert.match(payloads[0].html, /A&amp;B &lt;Logistics&gt;/);
+  assert.match(payloads[0].html, /data-tpf-email="1"/);
+  await service(draft, { ...client, name: "A&B <Logistics>" }, agent);
+  assert.equal(payloads.length, 1, "unchanged retry cannot send a duplicate");
+  const fallback = await service({ ...draft, requestId: randomUUID() }, client, agent);
+  assert.equal(fallback.subject, "Holiday for Valued Client");
+});
+
 test("CC validates, normalizes and deduplicates without permitting header injection", () => {
   assert.deepEqual(clientEmailSchema.parse({ ...input(), cc: [" Copy@Example.com ", "copy@example.com", "other@example.com"] }).cc,
     ["copy@example.com", "other@example.com"]);

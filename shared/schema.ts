@@ -147,6 +147,15 @@ export const clientEmailLogs = pgTable("client_email_logs", {
 }, table => [index("client_email_logs_client_created_idx").on(table.clientId, table.createdAt)]);
 export type ClientEmailLog = typeof clientEmailLogs.$inferSelect;
 
+export const clientEmailTemplates = pgTable("client_email_templates", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const emailBroadcasts = pgTable("email_broadcasts", {
   id: varchar("id").primaryKey(),
   requestId: varchar("request_id").notNull().unique(),

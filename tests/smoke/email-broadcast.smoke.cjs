@@ -6,12 +6,15 @@ const assert = require("node:assert/strict");
 const WebSocket = require("ws");
 const { randomUUID } = require("node:crypto");
 const { ALL_PERMISSIONS } = require("../../shared/schema.ts");
+const { BUILT_IN_EMAIL_TEMPLATES } = require("../../shared/email-templates.ts");
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let chrome, ws;
 (async () => {
   let actor = { id: "broadcast-admin", firstName: "Broadcast", lastName: "Admin", role: "admin", status: "active" };
   let injection, stale = true, detailPolls = 0;
   const drafts = [], confirmations = [], jobs = [], errors = [], broadcastRequests = [];
+  const savedTemplates = [], templateRequests = [];
+  let failTemplateSave = true;
   const clients = [
     { id: 1, name: "Fixture One", email: "one@example.test", status: "active", assignedProcessor: "employee", canSend: true, skipReason: null },
     { id: 2, name: "Fixture Two", email: "two@example.test", status: "active", assignedProcessor: "employee", canSend: true, skipReason: null },
@@ -55,6 +58,17 @@ let chrome, ws;
       else if (path === "/api/auth/permissions") result = { permissions: [...ALL_PERMISSIONS] };
       else if (path === "/api/client-email/clients") result = clients;
       else if (path === "/api/client-email/config") result = { from: "notifications@truckingprosfinancial.com", replyTo: "dosh@truckingprosfinancial.com" };
+      else if (path === "/api/client-email/templates") {
+        if (request.method === "POST") {
+          const payload = JSON.parse(request.postData); templateRequests.push(payload);
+          if (failTemplateSave) {
+            failTemplateSave = false; responseCode = 503; result = { message: "Fixture save failure. Retry safely." };
+          } else {
+            result = { ...payload, id: `custom:${randomUUID()}`, kind: "custom" };
+            savedTemplates.push(result); responseCode = 201;
+          }
+        } else result = [...BUILT_IN_EMAIL_TEMPLATES, ...savedTemplates];
+      }
       else if (path.startsWith("/api/email-broadcasts")) {
         broadcastRequests.push({ role: actor.role, path });
         if (actor.role !== "admin") { responseCode = 403; result = { message: "Administrators only" }; }
@@ -107,7 +121,9 @@ let chrome, ws;
   };
   const button = text => `Array.from(document.querySelectorAll('button')).find(e=>e.textContent.trim()===${JSON.stringify(text)}&&e.getBoundingClientRect().width>0)`;
   const click = async expression => {
-    const point = await evaluate(`(()=>{const e=${expression};if(!e)throw Error("Missing target: "+${JSON.stringify(expression)});e.scrollIntoView({block:"nearest"});const r=e.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+    await evaluate(`(()=>{const e=${expression};if(!e)throw Error("Missing target: "+${JSON.stringify(expression)});e.scrollIntoView({block:"center",behavior:"instant"})})()`);
+    await sleep(250); // Let Radix's popup positioning/scroll controls settle.
+    const point = await evaluate(`(()=>{const e=${expression};const r=e.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;const hit=document.elementFromPoint(x,y);if(!e.contains(hit))throw Error("Target intercepted by "+hit?.outerHTML?.slice(0,200));return{x,y}})()`);
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await cdp("Input.dispatchMouseEvent", {
       type, ...point, ...(type === "mouseMoved" ? {} : { button: "left", clickCount: 1 }),
     });
@@ -121,6 +137,20 @@ let chrome, ws;
     await cdp("Input.insertText", { text });
     await until(`document.getElementById(${JSON.stringify(id)}).value===${JSON.stringify(text)}`);
   };
+  const chooseTemplate = async (id, text) => {
+    const index = await evaluate(`Array.from(document.getElementById(${JSON.stringify(id)}).options).findIndex(e=>e.textContent===${JSON.stringify(text)})`);
+    assert(index >= 0, `Missing option ${text}`);
+    await click(`document.getElementById(${JSON.stringify(id)})`);
+    const key = async key => {
+      await cdp("Input.dispatchKeyEvent", { type: "keyDown", key, code: key });
+      await cdp("Input.dispatchKeyEvent", { type: "keyUp", key, code: key });
+      await sleep(25);
+    };
+    await key("Home");
+    for (let i = 0; i < index; i++) await key("ArrowDown");
+    await key("Enter");
+    await until(`document.getElementById(${JSON.stringify(id)}).selectedOptions[0]?.textContent===${JSON.stringify(text)}`);
+  };
   const login = async role => {
     actor = { ...actor, id: `broadcast-${role}`, role };
     if (injection) await cdp("Page.removeScriptToEvaluateOnNewDocument", { identifier: injection });
@@ -131,6 +161,29 @@ let chrome, ws;
   };
   await login("admin");
   await until(`!!document.getElementById('broadcast-subject')`);
+  await until(`!!document.getElementById('broadcast-template')`);
+  assert.equal(await evaluate(`document.getElementById('broadcast-template').options.length`), 16);
+  await chooseTemplate("broadcast-template", "Thanksgiving");
+  await until(`document.getElementById('broadcast-subject').value==="Office closed — Thanksgiving"`);
+  await until(`document.getElementById('broadcast-body').value.includes("Hello [Company]")`);
+  await fill("broadcast-body", "Hello [Company],\nEdited holiday notice.");
+  await click(button("Add custom template"));
+  await until(`!!document.getElementById('broadcast-template-template-name')`);
+  await fill("broadcast-template-template-name", "Fixture custom closure");
+  await fill("broadcast-template-template-subject", "Custom closure for [Company]");
+  await fill("broadcast-template-template-body", "Hello [Company],\nOur custom closure hours.");
+  await click(button("Save shared template"));
+  await until(`document.body.innerText.includes('Template not saved.')`);
+  assert.equal(await evaluate(`document.getElementById('broadcast-body').value`), "Hello [Company],\nEdited holiday notice.");
+  await click(button("Save shared template"));
+  await until(`!document.querySelector('[role="dialog"]') && document.getElementById('broadcast-subject').value==="Custom closure for [Company]"`);
+  assert.equal(savedTemplates.length, 1);
+  await login("admin");
+  await until(`!!document.getElementById('broadcast-template')`);
+  await until(`Array.from(document.getElementById('broadcast-template').options).some(e=>e.textContent.includes('Fixture custom closure'))`);
+  await chooseTemplate("broadcast-template", "Fixture custom closure · Shared");
+  await until(`document.getElementById('broadcast-body').value.includes('Our custom closure hours.')`);
+  await fill("broadcast-body", "Hello [Company],\nEdited after selecting saved template.");
   await click(`document.getElementById('broadcast-status')`);
   await until(`!!document.querySelector('[role="option"][data-state]')`);
   await click(`Array.from(document.querySelectorAll('[role="option"]')).find(e=>e.textContent==='active')`);
@@ -168,6 +221,7 @@ let chrome, ws;
   await until(`document.body.innerText.includes('Isolated provider failure')`);
   assert.deepEqual(confirmations, [{ recipientCount: 2 }, { recipientCount: 2 }]);
   for (const draft of drafts) { assert.equal(draft.cc, undefined); assert.equal(draft.bcc, undefined); }
+  assert(drafts.every(draft => draft.templateName === savedTemplates[0].id));
   await screenshot("broadcast-results");
   await cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await sleep(300);
@@ -176,14 +230,23 @@ let chrome, ws;
   await until(`!!${button("Confirm 2 emails")}`);
   assert.ok(await evaluate(`(()=>{const r=document.querySelector('[role="dialog"]').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.height<=innerHeight})()`));
   await screenshot("mobile-confirm");
+  await cdp("Emulation.clearDeviceMetricsOverride");
   for (const role of ["employee", "manager"]) {
     await login(role);
     assert.equal(await evaluate(`!!document.getElementById('broadcast-subject')`), false);
   }
+  await click(button("Compose email"));
+  await until(`!!document.getElementById('email-template')`);
+  await until(`Array.from(document.getElementById('email-template').options).some(e=>e.textContent.includes('Fixture custom closure'))`);
+  await chooseTemplate("email-template", "Fixture custom closure · Shared");
+  await until(`document.getElementById('client-email-subject').value==="Custom closure for [Company]"`);
+  await fill("client-email-subject", "Edited single-client closure");
   assert.equal(broadcastRequests.some(row => row.role !== "admin"), false);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, isolatedFixturesOnly: true, filteredAudience: true, exactCountConfirmation: true,
     noSendBeforeConfirm: true, editsInvalidatePreview: true, stalePreviewRefresh: true, progressAndFailureVisible: true,
-    adminOnlyEvenWithAllPermissions: true, mobileConfirmation: true, noRealBroadcastsSent: true }));
+    adminOnlyEvenWithAllPermissions: true, mobileConfirmation: true, holidayAutofillEditable: true,
+    customSaveFailurePreservesDraft: true, customTemplatesSurviveReload: true, sharedWithSingleComposer: true,
+    noRealBroadcastsSent: true }));
 })().catch(error => { console.error(error.stack || error); process.exitCode = 1; })
   .finally(() => { ws?.close(); chrome?.kill("SIGKILL"); });

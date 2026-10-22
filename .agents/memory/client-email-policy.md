@@ -50,3 +50,21 @@ All new outbound emails share one modern, mobile-readable company template. Win9
 **Why:** The user explicitly requested consistent branding across all outbound email types and removal of fake payment details.
 
 **How to apply:** Apply branding at the single transport, including text-only and direct sends. Preserve immutable historical retries, but refuse unsafe placeholder instructions. Corporate bank routing numbers alone are not proof of fake details.
+
+The office is closed on all federal holidays. Holiday and closure templates are editable starting text, not an automatic holiday calendar or scheduled-send policy.
+
+**Why:** The user stated “FactorFlux is closed all FEDERAL HOLIDAYS” and requested all eleven federal holiday notices plus generic closure/hours templates.
+
+**How to apply:** Include all eleven holidays, preserve observed-date/hour review by the sender, and do not infer specific closure dates or promise funding during a holiday. Resolve Company personalization per recipient with a neutral fallback.
+
+Shared custom templates may be saved by staff with client-email access, independently of the admin-only broadcast boundary.
+
+**Why:** The user requested agents/admins create reusable templates without asking to broaden mass-send permission.
+
+**How to apply:** Saving or selecting a template never sends anything. Preserve editable draft snapshots, existing recipient scoping, and individual broadcast deliveries.
+
+Use a native selector for the shared long template list inside email dialogs.
+
+**Why:** Long portal-based menus in the nested composer caused focus/scroll interactions to select the wrong item or fail to reach a saved custom template during browser verification.
+
+**How to apply:** Preserve real keyboard and pointer verification; do not rely on scrolling a portal option's DOM node into view as proof that clicking will reach it.

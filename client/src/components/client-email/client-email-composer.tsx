@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EmailTemplatePicker } from "@/components/client-email/email-template-picker";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { personalizeEmail, type EmailTemplate } from "../../../../shared/email-templates";
 import { z } from "zod";
 
 export interface EmailClient {
@@ -25,12 +27,6 @@ const parseCc = (value: string) => {
   return { addresses, invalidAddresses, tooMany: addresses.length > 20 };
 };
 const getRequestId = () => crypto.randomUUID();
-
-type TemplateSet = { document: { subject: string; body: string }; deadline: { subject: string; body: string } };
-const defaultTemplates: TemplateSet = {
-  document: { subject: "Documents needed", body: "Hello,\n\nCould you please send the following documents when you have a chance?\n\n[Add document names]\n\nThank you,\nTruckingPros Financial" },
-  deadline: { subject: "Deadline reminder", body: "Hello,\n\nThis is a reminder to send the outstanding [documents/items] by [agreed deadline]. If you need more time, please reply so we can help.\n\nThank you,\nTruckingPros Financial" },
-};
 
 export function ClientEmailComposer({
   open,
@@ -49,6 +45,7 @@ export function ClientEmailComposer({
   const [body, setBody] = useState("");
   const [cc, setCc] = useState("");
   const [template, setTemplate] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const requestId = useRef(getRequestId());
   const draftSignature = useRef("");
   const sendGuard = useRef(false);
@@ -85,6 +82,7 @@ export function ClientEmailComposer({
       setBody("");
       setCc("");
       setTemplate("");
+      setSelectedTemplate(null);
       draftSignature.current = "";
       requestId.current = getRequestId();
     }
@@ -100,6 +98,7 @@ export function ClientEmailComposer({
   const changeClient = (value: string) => {
     setClientId(value);
     setTemplate("");
+    setSelectedTemplate(null);
     noteDraftChanged(value, subject, body, cc);
   };
   const changeSubject = (value: string) => {
@@ -138,6 +137,7 @@ export function ClientEmailComposer({
       setBody("");
       setCc("");
       setTemplate("");
+      setSelectedTemplate(null);
       draftSignature.current = "";
       requestId.current = getRequestId();
       toast({ title: "Email sent", description: `Message sent to ${selectedClient?.email}.` });
@@ -148,15 +148,18 @@ export function ClientEmailComposer({
   });
   const canSend = !!emailConfig && !configError && !!selectedClient && isValidEmail(selectedClient.email) && !ccIsInvalid && !!subject.trim() && !!body.trim() && !sendMutation.isPending;
 
-  const applyTemplate = (value: string) => {
-    setTemplate(value);
-    if (value === "document" || value === "deadline") {
-      const chosen = defaultTemplates[value];
+  const applyTemplate = (chosen: EmailTemplate | null) => {
+    setTemplate(chosen?.id || "");
+    setSelectedTemplate(chosen);
+    if (chosen) {
       setSubject(chosen.subject);
       setBody(chosen.body);
       noteDraftChanged(clientId, chosen.subject, chosen.body, cc);
     }
   };
+  const resolvedTemplateBody = selectedTemplate && selectedClient
+    ? personalizeEmail(body, selectedClient.name)
+    : "";
   return <Dialog open={open} onOpenChange={value => { if (!sendMutation.isPending) onOpenChange(value); }}>
     <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto rounded-sm border-2 border-[#7c8582] bg-[#e8eeeb] p-0 shadow-[4px_4px_0_rgba(39,54,56,.25)]">
       <DialogHeader className="border-b border-[#b8c3bf] bg-[#d6e2de] px-5 py-4">
@@ -190,13 +193,14 @@ export function ClientEmailComposer({
          </div>
         {configError && <div role="alert" className="flex items-center justify-between gap-2 border border-[#d2a6a0] bg-[#fff1ee] p-2 text-xs text-[#8d3f36]"><span>Sender settings could not be loaded. Sending is disabled.</span><Button variant="outline" size="sm" onClick={() => void refetchConfig()}>Retry</Button></div>}
         <div className="rounded-sm border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Replies are monitored outside this app. This is a send-only tool; there is no inbox reader here.</div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Label htmlFor="email-template">Optional template</Label>
-           <div className="flex items-center gap-2"><Select value={template} onValueChange={applyTemplate} disabled={sendMutation.isPending}><SelectTrigger id="email-template" className="h-8 w-52 rounded-sm bg-white text-xs"><SelectValue placeholder="Start from a template…" /></SelectTrigger><SelectContent><SelectItem value="document">Document request</SelectItem><SelectItem value="deadline">Deadline reminder</SelectItem></SelectContent></Select></div>
-        </div>
-         <p className="text-[11px] text-[#596d70]">Templates are starting text only. Review and replace bracketed items or dates before sending.</p>
+         <EmailTemplatePicker id="email-template" value={template} onChange={applyTemplate} disabled={sendMutation.isPending} />
+          <p className="border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Templates are starting text only. [Company] resolves to the selected client name; when unavailable, it falls back to “Valued Client.” Review observed closure dates and hours before sending.</p>
          <div className="space-y-1"><Label htmlFor="client-email-subject">Subject</Label><Input id="client-email-subject" value={subject} maxLength={200} disabled={sendMutation.isPending} onChange={(event) => changeSubject(event.target.value)} className="rounded-sm bg-white" placeholder="A clear, specific subject" /></div>
          <div className="space-y-1"><Label htmlFor="client-email-body">Message</Label><Textarea id="client-email-body" value={body} maxLength={20000} disabled={sendMutation.isPending} rows={8} onChange={(event) => changeBody(event.target.value)} className="resize-y rounded-sm bg-white leading-relaxed" placeholder="Write your message…" /></div>
+         {selectedTemplate && selectedClient && <div className="border border-[#c6d0cd] bg-[#f4f7f5] p-2.5">
+           <p className="mb-1 text-[9px] font-bold uppercase tracking-wide text-[#657977]">Resolved [Company] preview · {selectedClient.name || "Valued Client"}</p>
+           <p className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-[#34494c]">{resolvedTemplateBody}</p>
+         </div>}
         {sendMutation.error && <div role="alert" className="border border-[#d2a6a0] bg-[#fff1ee] px-3 py-2 text-xs text-[#8d3f36]"><strong>Draft retained.</strong> {(sendMutation.error as Error).message} Retry uses the same request ID while the client and message remain unchanged.</div>}
       </div>
       <DialogFooter className="border-t border-[#c5cfcc] bg-[#e1e8e5] px-5 py-3">

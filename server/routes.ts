@@ -29,6 +29,7 @@ import { registerBrokerConfirmationRoutes } from "./routes/brokerConfirmation";
 import { registerBrokerCollectionsRoutes } from "./routes/brokerCollections";
 import { registerEmailLogRoutes } from "./routes/emailLog";
 import { registerEmailBroadcastRoutes } from "./routes/emailBroadcast";
+import { registerEmailTemplateRoutes } from "./routes/emailTemplates";
 import { registerAgentDashboardRoutes } from "./routes/agentDashboard";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
@@ -939,6 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerBrokerCollectionsRoutes(app, { requireAuth });
   registerEmailLogRoutes(app, { requireAuth, requireManagerOrAdmin });
   registerEmailBroadcastRoutes(app, { requireAuth, requireAdmin });
+  registerEmailTemplateRoutes(app, { requireAuth, requireEmailPermission: requireModulePermission("client_email") });
   registerAgentDashboardRoutes(app, requireAuth);
 
   app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {

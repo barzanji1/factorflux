@@ -9,6 +9,7 @@ import { broadcastDraftSchema } from "@shared/email-broadcast";
 import { createResendTransport, ResendDeliveryError } from "../resendTransport.js";
 import { createEmailBroadcastService, planBroadcastRecipients, BROADCAST_GAP_MS } from "./emailBroadcast";
 import { registerEmailBroadcastRoutes } from "../routes/emailBroadcast";
+import { BUILT_IN_EMAIL_TEMPLATES } from "../../shared/email-templates";
 
 after(async () => { await pool.end(); });
 const rollback = new Error("rollback broadcast fixtures");
@@ -63,7 +64,9 @@ test("durable broadcast: admin scope, exact confirmation, privacy, real spacing,
     assert.deepEqual(audience.counts, { matched: 5, sendable: 3, skipped: 2 });
     assert.equal((await service.recipients(admin.id, { ...filters, assignedProcessor: employee.id })).counts.sendable, 2);
     assert.equal((await service.recipients(admin.id, { search: marker })).counts.matched, 6);
-    const input = { requestId: randomUUID(), subject: "Private test", body: "One shared message, separate deliveries.", filters };
+    const holiday = BUILT_IN_EMAIL_TEMPLATES.find(row => row.id === "holiday-thanksgiving")!;
+    const input = { requestId: randomUUID(), subject: `${holiday.subject} — [Company]`,
+      body: `${holiday.body}\n\nEdited special hours: noon.`, templateName: holiday.id, filters };
     const preview = await service.preview(admin.id, input);
     const id = preview.broadcast.id;
     assert.equal(preview.broadcast.status, "draft");
@@ -105,6 +108,11 @@ test("durable broadcast: admin scope, exact confirmation, privacy, real spacing,
       assert.equal(capture.body.from, "Trucking Pros Financial <notifications@truckingprosfinancial.com>");
       assert.equal(capture.body.reply_to, "dosh@truckingprosfinancial.com");
       assert.match(capture.body.html, /data-tpf-email="1"/);
+      const recipient = fixtureClients.find(row => row.email === capture.body.to[0])!;
+      assert.equal(capture.body.subject, `${holiday.subject} — ${recipient.name}`);
+      assert(capture.body.text.includes(`Hello ${recipient.name},`));
+      assert(capture.body.text.includes("Edited special hours: noon."));
+      assert(!capture.body.text.includes("[Company]"));
     }
     assert.deepEqual(captures.map(capture => capture.body.to[0]), ["one@example.test", "two@example.test", "three@example.test"]);
     assert(progress.recipients.filter(row => row.status === "sent").every(row => row.providerMessageId && row.sentAt));

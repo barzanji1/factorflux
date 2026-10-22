@@ -10,7 +10,7 @@ export const broadcastDraftSchema = z.object({
   subject: z.string().trim().min(1, "Subject is required").max(200)
     .refine(value => !/[\r\n]/.test(value), "Subject must be a single line"),
   body: z.string().trim().min(1, "Message is required").max(20000),
-  templateName: z.enum(["document", "deadline"]).nullable().optional(),
+  templateName: z.string().trim().min(1).max(120).nullable().optional(),
   filters: broadcastFiltersSchema.default({}),
   clientIds: z.array(z.number().int().positive()).min(1).max(10000).optional(),
 }).strict();

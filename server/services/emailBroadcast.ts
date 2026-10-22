@@ -5,6 +5,7 @@ import { db } from "../db";
 import { clients, emailBroadcasts, emailBroadcastRecipients, emailBroadcastDispatch, users } from "@shared/schema";
 import { broadcastDraftSchema, broadcastFiltersSchema, type BroadcastCounts, type BroadcastDetail, type BroadcastFilters, type BroadcastSummary } from "@shared/email-broadcast";
 import { sendResendEmail, ResendDeliveryError, type ResendEmailParams } from "../resendTransport.js";
+import { personalizeEmail, emailTemplateInputSchema } from "../../shared/email-templates";
 
 type Database = Pick<typeof db, "select" | "selectDistinct" | "insert" | "update" | "transaction" | "execute">;
 type Job = typeof emailBroadcasts.$inferSelect;
@@ -203,7 +204,10 @@ export function createEmailBroadcastService({
         try {
           // Privacy boundary: precisely one To address; never CC or BCC.
           const email = validEmail.parse(recipient.email);
-          const messageId = await send({ to: email, subject: job.subject, text: job.body,
+          const content = emailTemplateInputSchema.pick({ subject: true, body: true }).parse({
+            subject: personalizeEmail(job.subject, recipient.clientName), body: personalizeEmail(job.body, recipient.clientName),
+          });
+          const messageId = await send({ to: email, subject: content.subject, text: content.body,
             idempotencyKey: `broadcast/${job.id}/${recipient.id}`,
             emailLog: { sentByUserId: job.createdBy, entityType: recipient.clientId ? "carrier" : undefined,
               entityId: recipient.clientId ?? undefined, templateName: "client_broadcast" } });

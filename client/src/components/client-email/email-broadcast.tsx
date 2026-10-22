@@ -7,21 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EmailTemplatePicker } from "@/components/client-email/email-template-picker";
+import type { EmailTemplate } from "../../../../shared/email-templates";
 import type { BroadcastClient, BroadcastDetail, BroadcastDraftInput, BroadcastFilters, BroadcastSummary } from "../../../../shared/email-broadcast";
 
 type BroadcastOptions = { statuses: string[]; agents: { id: string; name: string }[] };
 type RecipientResponse = { clients: BroadcastClient[]; counts: { matched: number; sendable: number; skipped: number } };
-
-const templates = {
-  document: {
-    subject: "Documents needed",
-    body: "Hello,\n\nCould you please send the following documents when you have a chance?\n\n[Add document names]\n\nThank you,\nTruckingPros Financial",
-  },
-  deadline: {
-    subject: "Deadline reminder",
-    body: "Hello,\n\nThis is a reminder to send the outstanding [documents/items] by [agreed deadline]. If you need more time, please reply so we can help.\n\nThank you,\nTruckingPros Financial",
-  },
-} as const;
 
 const dateTime = (value?: string | null) => value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
 const newRequestId = () => crypto.randomUUID();
@@ -115,7 +106,7 @@ export function EmailBroadcast() {
         requestId: requestId.current,
         subject: subject.trim(),
         body: body.trim(),
-        ...(templateName ? { templateName: templateName as "document" | "deadline" } : {}),
+        ...(templateName ? { templateName: templateName as BroadcastDraftInput["templateName"] } : {}),
         filters,
       };
       return api<BroadcastDetail>("/api/email-broadcasts/preview", {
@@ -193,14 +184,11 @@ export function EmailBroadcast() {
       setPreviewRefreshing(false);
     }
   };
-  const applyTemplate = (value: string) => {
-    setTemplateName(value);
-    if (value === "document" || value === "deadline") {
-      setSubject(templates[value].subject);
-      setBody(templates[value].body);
-    } else {
-      setSubject("");
-      setBody("");
+  const applyTemplate = (template: EmailTemplate | null) => {
+    setTemplateName(template?.id || "");
+    if (template) {
+      setSubject(template.subject);
+      setBody(template.body);
     }
   };
   const statusOptions = optionsQuery.data?.statuses || [];
@@ -242,8 +230,8 @@ export function EmailBroadcast() {
         </div>
         <div className="space-y-2 border-t border-[#cbd5d1] pt-3">
           <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-[#758582]">02 / Message</p><h3 className="text-xs font-bold text-[#304a52]">Write once, delivered separately</h3></div>
-          <div className="flex flex-wrap items-center justify-between gap-2"><Label htmlFor="broadcast-template" className="text-[10px]">Optional template</Label><Select value={templateName || "none"} disabled={inputsDisabled} onValueChange={(value) => applyTemplate(value === "none" ? "" : value)}><SelectTrigger id="broadcast-template" className="h-8 w-full max-w-xs rounded-sm bg-white text-xs"><SelectValue placeholder="Start from a template…" /></SelectTrigger><SelectContent><SelectItem value="none">No template</SelectItem><SelectItem value="document">Document request</SelectItem><SelectItem value="deadline">Deadline reminder</SelectItem></SelectContent></Select></div>
-          <p className="text-[10px] text-[#657977]">Starting text only. Replace bracketed details before previewing.</p>
+          <EmailTemplatePicker id="broadcast-template" value={templateName} onChange={applyTemplate} disabled={inputsDisabled} />
+          <p className="border border-[#c6d0cd] bg-[#f8faf8] p-2 text-[10px] leading-relaxed text-[#657977]">The [Company] placeholder is personalized separately for each recipient; if a company name is unavailable, “Valued Client” is used. Review observed closure dates and hours before sending.</p>
           <div className="space-y-1"><Label htmlFor="broadcast-subject" className="text-[10px]">Subject</Label><Input id="broadcast-subject" value={subject} disabled={inputsDisabled} maxLength={200} onChange={(e) => setSubject(e.target.value)} className="rounded-sm bg-white text-xs" placeholder="A clear, specific subject" /><p className="text-right text-[9px] text-[#84918f]">{subject.length}/200</p></div>
           <div className="space-y-1"><Label htmlFor="broadcast-body" className="text-[10px]">Message</Label><Textarea id="broadcast-body" value={body} disabled={inputsDisabled} maxLength={20000} rows={7} onChange={(e) => setBody(e.target.value)} className="resize-y rounded-sm bg-white text-xs leading-relaxed" placeholder="Write your message…" /><p className="text-right text-[9px] text-[#84918f]">{body.length}/20,000</p></div>
           <p className="text-[10px] text-[#657977]">TPF branding and monitored Reply-To are applied by the server sender. No recipient is exposed to another.</p>
