@@ -4,7 +4,7 @@
 const { spawn, exec } = require('child_process');
 const os = require('os');
 
-const FACTORFLUX_URL = 'https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev';
+const FACTORFLUX_URL = 'https://factorflux.co';
 
 console.log('🚀 Starting FactorFlux Desktop...');
 console.log('📱 Opening in your default web browser...');

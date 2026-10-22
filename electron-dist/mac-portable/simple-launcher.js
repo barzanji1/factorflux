@@ -20,7 +20,7 @@ function createWindow() {
 
   // Load the web version directly
   console.log('Loading QuantumCore from web...');
-  mainWindow.loadURL('https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev');
+  mainWindow.loadURL('https://factorflux.co');
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();

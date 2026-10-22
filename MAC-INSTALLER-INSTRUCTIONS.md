@@ -66,7 +66,7 @@ chmod +x /Applications/QuantumCore.app/Contents/MacOS/QuantumCore
 ## Manual Browser Access
 If the app doesn't work, you can always access QuantumCore directly:
 ```
-https://your-app-domain.replit.app
+https://factorflux.co
 ```
 
 ## Technical Details

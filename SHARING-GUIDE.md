@@ -4,7 +4,7 @@
 
 **Live Application URL:**
 ```
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+https://factorflux.co
 ```
 
 This URL provides immediate access to QuantumCore - no downloads or installations required.
@@ -34,7 +34,7 @@ Hi [Client Name],
 
 You now have access to QuantumCore, our freight factoring management system:
 
-🌐 Access QuantumCore: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+🌐 Access QuantumCore: https://factorflux.co
 
 Features available:
 • Invoice processing and tracking
@@ -61,22 +61,22 @@ Trucking Pros Financial
 
 ### Common Solutions:
 - **Page not loading**: Wait 30 seconds and refresh
-- **Login issues**: Use Replit authentication when prompted
+- **Login issues**: Sign in with the credentials sent by your administrator
 - **Slow loading**: The app may take a moment to start if inactive
 
 ## User Authentication
 
 Users will need to:
 1. Click the QuantumCore URL
-2. Authenticate via Replit (secure login)
+2. Sign in with your staff email and password
 3. Access the freight factoring system
 
 As an admin, you can manage user roles and permissions through the Admin Panel.
 
 ## For Professional Deployment
 
-For a custom domain and enhanced reliability, consider deploying QuantumCore to production through Replit Deployments. This provides:
-- Custom domain (your-company.replit.app)
+Use the published application at https://factorflux.co. This provides:
+- A custom company domain
 - Enhanced performance and uptime
 - Professional client experience
 

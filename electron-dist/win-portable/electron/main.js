@@ -23,19 +23,8 @@ function createWindow() {
     show: false, // Don't show until ready
   });
 
-  // Load the app - for desktop, always load from static files
-  const indexPath = path.join(__dirname, '../dist/public/index.html');
-  console.log('Loading from:', indexPath);
-  
-  // Check if the file exists
-  const fs = require('fs');
-  if (fs.existsSync(indexPath)) {
-    mainWindow.loadFile(indexPath);
-  } else {
-    // Fallback: try to connect to web version
-    console.log('Static files not found, connecting to web version...');
-    mainWindow.loadURL('https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev');
-  }
+  // Do not load stale bundled pages or workspace URLs in installed clients.
+  mainWindow.loadURL('https://factorflux.co');
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {

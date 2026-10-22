@@ -1,3 +1,4 @@
+import { PRODUCTION_APP_URL, productionAppUrl } from "@shared/production-urls.js";
 import ContextualDownload from "@/components/contextual-download";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -182,7 +183,7 @@ export default function DownloadPage() {
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => window.open(`${window.location.origin}/api/desktop/download/guide`, '_blank')}
+                  onClick={() => window.open(productionAppUrl("/api/desktop/download/guide"), '_blank', 'noopener,noreferrer')}
                   className="flex items-center gap-2"
                 >
                   <Download className="h-4 w-4" />
@@ -190,7 +191,7 @@ export default function DownloadPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => window.location.href = window.location.origin}
+                  onClick={() => window.location.href = PRODUCTION_APP_URL}
                   className="flex items-center gap-2"
                 >
                   Use Web Version Instead

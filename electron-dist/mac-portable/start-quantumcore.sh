@@ -17,7 +17,7 @@ else
     echo "This will open QuantumCore in your default web browser..."
     echo
 
-    URL="https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev"
+    URL="https://factorflux.co"
 
     # Try to open in default browser
     if command -v open &> /dev/null; then

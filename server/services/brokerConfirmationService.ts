@@ -1,3 +1,4 @@
+import { isProductionAppOrigin } from "../../shared/production-urls.js";
 import { and, asc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
@@ -131,10 +132,10 @@ export function createBrokerConfirmationService({
         await task(tx, invoice, "missing_email", "No valid primary broker email on file. Add a broker contact email and follow up manually.", at);
         return { message: "Not sent: no valid broker email on file. Flagged for manual follow-up.", skipped: true };
       }
-      const root = new URL(config.publicBaseUrl);
-      if (root.protocol !== "https:" || root.pathname !== "/" || root.search || root.hash || root.username || root.password) {
-        throw new ConfirmationError(503, "Configure a valid HTTPS public URL in Factoring Settings.");
+      if (!isProductionAppOrigin(config.publicBaseUrl)) {
+        throw new ConfirmationError(503, "Set the published URL to https://factorflux.co or https://factorflux.io in Factoring Settings. Development links cannot be emailed.");
       }
+      const root = new URL(config.publicBaseUrl);
       const confirmationUrl = `${root.origin}/api/broker-confirm/${invoice.brokerConfirmationToken}`;
       const disputeUrl = `${root.origin}/api/broker-dispute/${invoice.brokerConfirmationToken}`;
       const reminder = action === "reminder" ? invoice.confirmationRemindedCount + 1 : null;

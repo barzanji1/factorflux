@@ -6,10 +6,11 @@
  */
 
 import { sendResendEmail } from './server/resendTransport.js';
+import { PRODUCTION_APP_URL } from './shared/production-urls.js';
 
 async function sendInstallerLinks() {
   const recipientEmail = 'doshbarzanji@gmail.com';
-  const appUrl = 'https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev';
+  const appUrl = PRODUCTION_APP_URL;
   
   const emailContent = {
     to: recipientEmail,

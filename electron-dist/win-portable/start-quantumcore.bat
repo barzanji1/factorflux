@@ -18,10 +18,10 @@ if %errorlevel% equ 0 (
     echo.
     
     REM Try to open in default browser
-    start "" "https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev" 2>nul
+    start "" "https://factorflux.co" 2>nul
     if %errorlevel% neq 0 (
         echo If browser didn't open, manually go to:
-        echo https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+        echo https://factorflux.co
     )
     
     echo.

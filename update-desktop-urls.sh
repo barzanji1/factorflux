@@ -1,15 +1,7 @@
 #!/bin/bash
 
-# Get the current Replit URL
-CURRENT_URL="https://$REPLIT_DEV_DOMAIN"
-FALLBACK_URL="https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev"
-
-# Use current URL if available, otherwise use fallback
-if [ -z "$REPLIT_DEV_DOMAIN" ]; then
-    URL="$FALLBACK_URL"
-else
-    URL="$CURRENT_URL"
-fi
+# Distribution links must never depend on the workspace environment.
+URL="https://factorflux.co"
 
 echo "Updating desktop launchers with URL: $URL"
 

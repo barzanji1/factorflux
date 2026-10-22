@@ -5,27 +5,27 @@
 Use these direct download links to share FactorFlux desktop installers with clients:
 
 ### 🚀 Live Web Application
-**Instant Access (Recommended):** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+**Instant Access (Recommended):** https://factorflux.co
 
 ### 💻 Desktop Installers
 
 #### Windows
-**Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
+**Download Link:** https://factorflux.co/api/desktop/download/windows
 - File: FactorFlux-Windows-Portable.tar.gz (5.7 MB)
 - Supports: Windows 10/11
 
 #### Mac
-**Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/mac
+**Download Link:** https://factorflux.co/api/desktop/download/mac
 - File: FactorFlux-Mac-Portable.tar.gz (5.7 MB)
 - Supports: macOS 10.15+ (Catalina and newer)
 
 #### Linux
-**Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/linux
+**Download Link:** https://factorflux.co/api/desktop/download/linux
 - File: FactorFlux-Linux-Portable.tar.gz (5.7 MB)
 - Supports: Ubuntu, Debian, CentOS, Fedora
 
 #### Installation Guide
-**Download Link:** https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/guide
+**Download Link:** https://factorflux.co/api/desktop/download/guide
 - File: FactorFlux-Installation-Guide.md
 - Complete setup instructions and troubleshooting
 
@@ -60,13 +60,13 @@ Hi [Client Name],
 
 You now have access to FactorFlux, our freight factoring management system.
 
-🌐 Web Access (Instant): https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+🌐 Web Access (Instant): https://factorflux.co
 
 💻 Desktop Installers:
-- Windows: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
-- Mac: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/mac
-- Linux: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/linux
-- Setup Guide: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/guide
+- Windows: https://factorflux.co/api/desktop/download/windows
+- Mac: https://factorflux.co/api/desktop/download/mac
+- Linux: https://factorflux.co/api/desktop/download/linux
+- Setup Guide: https://factorflux.co/api/desktop/download/guide
 
 Best regards,
 [Your Name]
@@ -82,7 +82,7 @@ From the admin panel, you can:
 
 ## 🛠️ Technical Notes
 
-- All downloads are served directly from the live Replit application
+- All downloads are served directly from the published production application
 - No authentication required for downloads (public access)
 - Files are cached for 1 hour for optimal performance
 - Desktop launchers work universally across all operating systems

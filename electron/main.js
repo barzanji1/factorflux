@@ -31,8 +31,8 @@ function createWindow() {
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
   } else {
-    // In production, load the built files
-    mainWindow.loadFile(path.join(__dirname, '../dist/public/index.html'));
+    // Installed clients use the same deployed backend as the web application.
+    mainWindow.loadURL('https://factorflux.co');
   }
 
   // Show window when ready to prevent visual flash

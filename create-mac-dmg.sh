@@ -61,11 +61,11 @@ if command -v node >/dev/null 2>&1; then
     echo "✅ Node.js found, starting enhanced launcher..."
     node simple-browser-launcher.js 2>/dev/null || {
         echo "⚠️  Enhanced launcher failed, using browser fallback..."
-        open "https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev"
+        open "https://factorflux.co"
     }
 else
     echo "🌐 Opening FactorFlux in your web browser..."
-    open "https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev"
+    open "https://factorflux.co"
 fi
 
 echo "✅ FactorFlux launched successfully!"

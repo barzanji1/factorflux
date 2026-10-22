@@ -6,16 +6,15 @@ Copy and paste these complete URLs for direct downloads:
 
 ### Windows Desktop Installer
 ```
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
+https://factorflux.co/api/desktop/download/windows
 ```
-**LOCAL TESTING:** http://localhost:5000/api/desktop/download/windows (VERIFIED WORKING)
 - **File:** QuantumCore-Windows-Portable.tar.gz
 - **Size:** 5.7 MB
 - **Platform:** Windows 10/11
 
 ### Direct Web Access (Recommended)
 ```
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+https://factorflux.co
 ```
 - **Access:** Instant web-based access
 - **Platform:** All devices (Windows, Mac, Linux, mobile)
@@ -23,7 +22,7 @@ https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
 
 ### Linux Desktop Installer
 ```
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/linux
+https://factorflux.co/api/desktop/download/linux
 ```
 - **File:** QuantumCore-Linux-Portable.tar.gz
 - **Size:** 5.7 MB
@@ -31,7 +30,7 @@ https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
 
 ### Installation Guide
 ```
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/guide
+https://factorflux.co/api/desktop/download/guide
 ```
 - **File:** QuantumCore-Installation-Guide.md
 - **Content:** Complete setup instructions and troubleshooting
@@ -50,13 +49,13 @@ Hi [Client Name],
 
 Download QuantumCore desktop installer for your platform:
 
-Windows: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
+Windows: https://factorflux.co/api/desktop/download/windows
 
-Mac: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/mac
+Mac: https://factorflux.co/api/desktop/download/mac
 
-Linux: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/linux
+Linux: https://factorflux.co/api/desktop/download/linux
 
-Installation Guide: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/guide
+Installation Guide: https://factorflux.co/api/desktop/download/guide
 
 Best regards,
 [Your Name]
@@ -74,7 +73,7 @@ Best regards,
 
 Test any download link by opening in a new browser tab or using curl:
 ```bash
-curl -I https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
+curl -I https://factorflux.co/api/desktop/download/windows
 ```
 
 All links are active and ready for immediate use.

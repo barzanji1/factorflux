@@ -10,6 +10,7 @@ import {
   type ConfirmationStore,
 } from "../services/brokerConfirmationService";
 import { SYSTEM_EMAIL_REPLY_TO } from "../resendTransport.js";
+import { isProductionAppOrigin } from "../../shared/production-urls.js";
 
 type Dependencies = {
   requireAuth: RequestHandler;
@@ -25,12 +26,8 @@ export const confirmationSettingsSchema = z.object({
   maxReminders: z.number().int().min(0).max(3),
   reminderDays: z.tuple([z.number().int().min(1).max(365), z.number().int().min(1).max(365), z.number().int().min(1).max(365)])
     .refine(days => days[0] < days[1] && days[1] < days[2], "Reminder days must be strictly increasing."),
-  publicBaseUrl: z.string().url().refine(value => {
-    const url = new URL(value);
-    return url.protocol === "https:" && url.pathname === "/" && !url.search && !url.hash &&
-      !url.username && !url.password && !url.hostname.endsWith(".replit.dev") &&
-      !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-  }, "Use the published HTTPS site URL, without a path."),
+  publicBaseUrl: z.string().url().refine(isProductionAppOrigin,
+    "Use https://factorflux.co or https://factorflux.io, without a path."),
 }).strict();
 
 function page(title: string, content: string): string {

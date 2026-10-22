@@ -1,1 +1,4 @@
 /generated-artifacts/
+# Obsolete prebuilt packages contain workspace URLs and must not be distributed.
+/electron-dist/QuantumCore-*.tar.gz
+/electron-dist/*/dist/

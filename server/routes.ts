@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
 import { registerOcrIntakeRoutes } from "./routes/ocrIntake";
 import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
@@ -1711,6 +1712,7 @@ ${message}
       });
 
       // Send welcome email
+      const loginUrl = productionAppUrl("/login");
       const welcomeHtml = `
         <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;">
           <div style="background:#1e40af;color:#fff;border-radius:12px 12px 0 0;padding:20px 24px;">
@@ -1721,7 +1723,7 @@ ${message}
             <p>Hi ${firstName},</p>
             <p>Your FactorFlux account has been created. Here are your login credentials:</p>
             <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
-              <p style="margin:0 0 8px;"><strong>Login URL:</strong> ${req.protocol}://${req.get("host")}/login</p>
+              <p style="margin:0 0 8px;"><strong>Login URL:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
               <p style="margin:0 0 8px;"><strong>Email:</strong> ${email}</p>
               <p style="margin:0;"><strong>Temporary Password:</strong> ${password}</p>
             </div>
@@ -1734,7 +1736,7 @@ ${message}
       await sendEmail({
         to: email,
         subject: "Your FactorFlux Account Has Been Created",
-        text: `Welcome to FactorFlux!\n\nEmail: ${email}\nTemporary Password: ${password}\n\nPlease log in at ${req.protocol}://${req.get("host")}/login`,
+        text: `Welcome to FactorFlux!\n\nEmail: ${email}\nTemporary Password: ${password}\n\nPlease log in at ${loginUrl}`,
         html: welcomeHtml,
       });
 
@@ -5666,9 +5668,7 @@ ${message}
         return res.status(400).json({ message: "Email address is required" });
       }
 
-      const appUrl = process.env.REPLIT_DEV_DOMAIN
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : "https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev";
+      const appUrl = PRODUCTION_APP_URL;
 
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

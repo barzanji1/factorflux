@@ -1,15 +1,15 @@
 FACTORFLUX DESKTOP DOWNLOAD LINKS
 
 Windows (5.7 MB):
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/windows
+https://factorflux.co/api/desktop/download/windows
 
 Mac (5.7 MB):
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/mac
+https://factorflux.co/api/desktop/download/mac
 
 Linux (5.7 MB):
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/linux
+https://factorflux.co/api/desktop/download/linux
 
 Installation Guide:
-https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev/api/desktop/download/guide
+https://factorflux.co/api/desktop/download/guide
 
 Copy and paste any link for direct download.

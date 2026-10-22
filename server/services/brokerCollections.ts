@@ -1,3 +1,4 @@
+import { isProductionAppOrigin } from "../../shared/production-urls.js";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
@@ -288,8 +289,8 @@ export function createBrokerCollectionsService({
           let receiptHtml = "";
           if (state.phase === "vp") {
             if (!confirmationConfig) throw new CollectionError(503, "Configure the published broker confirmation URL first.");
+            if (!isProductionAppOrigin(confirmationConfig.publicBaseUrl)) throw new CollectionError(503, "Set the published URL to https://factorflux.co or https://factorflux.io in Factoring Settings. Development links cannot be emailed.");
             const url = new URL(confirmationConfig.publicBaseUrl);
-            if (url.protocol !== "https:" || url.pathname !== "/" || url.username || url.password || url.search || url.hash || url.hostname.endsWith(".replit.dev")) throw new CollectionError(503, "A valid published HTTPS confirmation URL is required.");
             receiptLinks = `\nConfirm receipt: ${url.origin}/api/broker-confirm/${invoice.brokerConfirmationToken}\nDispute: ${url.origin}/api/broker-dispute/${invoice.brokerConfirmationToken}\nOpening a link does not confirm receipt; use the confirmation button.`;
             // URL origin is validated above; the token is a server-generated UUID.
             const origin = url.origin.replaceAll("&", "&amp;").replaceAll('"', "&quot;");

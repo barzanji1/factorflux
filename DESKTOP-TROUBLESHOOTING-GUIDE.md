@@ -53,7 +53,7 @@ Users can create a true "desktop app" experience by:
 
 **Windows:**
 - Double-click `start-factorflux.bat`
-- If that fails, manually open: `https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev`
+- If that fails, manually open: `https://factorflux.co`
 
 **Mac:**
 - Double-click `start-factorflux.sh`
@@ -63,12 +63,12 @@ Users can create a true "desktop app" experience by:
 **Linux:**
 - Double-click `start-factorflux.sh` or run `./start-factorflux.sh`
 - If permission denied: `chmod +x start-factorflux.sh`
-- If that fails, run: `xdg-open https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev`
+- If that fails, run: `xdg-open https://factorflux.co`
 
 ### 📋 Manual Access
 
 If all else fails, users can always access FactorFlux directly:
-- **Live URL**: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+- **Live URL**: https://factorflux.co
 - **Bookmark this URL** for instant access
 - **Add to browser favorites** for easy access
 

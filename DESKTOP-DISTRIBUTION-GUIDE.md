@@ -16,7 +16,7 @@ Your QuantumCore desktop installers are **ready for immediate distribution**:
 
 ### Method 1: Direct Download & Email
 ```bash
-# Download files from Replit:
+# Download files from https://factorflux.co/download:
 1. Right-click each .tar.gz file → Download
 2. Attach to email and send to users
 3. Include USER-INSTALLATION-GUIDE.md

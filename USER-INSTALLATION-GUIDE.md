@@ -74,7 +74,7 @@ Choose the version for your operating system:
 ## 🆘 Troubleshooting
 
 ### Browser Doesn't Open:
-- Manually go to: https://e603594c-e028-4700-8f9c-83ea4151f86f-00-1yv0wd2mfzho3.janeway.replit.dev
+- Manually go to: https://factorflux.co
 - Check if you have a default browser set
 - Try running the script as administrator
 

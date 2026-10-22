@@ -29,7 +29,8 @@ async function fixture(tx: Tx) {
   const [broker] = await tx.insert(brokers).values({ name: `COLLECTIONS BROKER ${tag}`, email: "broker@example.test",
     contactPerson: "Fixture", phone: "000-000-0000", dataOrigin: "pilot" }).returning();
   await tx.update(settings).set({ enabled: false, mode: "dry_run", nextSendAt: new Date(0) }).where(eq(settings.id, 1));
-  await tx.update(brokerConfirmationSettings).set({ publicBaseUrl: "https://collections.example.test" }).where(eq(brokerConfirmationSettings.id, 1));
+  // Only the URL format is real; all transports remain fakes or Preview-blocked.
+  await tx.update(brokerConfirmationSettings).set({ publicBaseUrl: "https://factorflux.co" }).where(eq(brokerConfirmationSettings.id, 1));
   const invoice = async (suffix = "", extra: Partial<typeof invoices.$inferInsert> = {}) => (await tx.insert(invoices).values({
     invoiceNumber: `COLLECTIONS-${tag}${suffix}`, loadNumber: `LOAD-${tag}${suffix}`, loadId: null,
     clientId: carrier.id, brokerId: broker.id, amount: "1500", status: "funded", fundedAt: funded,
