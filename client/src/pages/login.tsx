@@ -64,7 +64,7 @@ export default function LoginPage() {
         <Card className="shadow-none">
           <CardHeader className="space-y-2 text-center">
             <div className="flex justify-center">
-              <FactorFluxLogo markSrc="/images/ff-logo-emboss.png" markClassName="h-9 w-9" />
+              <FactorFluxLogo className="flex-col" markSrc="/images/ff-logo-emboss.png" markClassName="h-9 w-9" />
             </div>
             <p className="text-[#444]">Freight Factoring OS</p>
             <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
