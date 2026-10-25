@@ -67,6 +67,8 @@ export default function LoginPage() {
               <FactorFluxLogo className="flex-col" markSrc="/images/ff-logo-emboss.png" markClassName="h-9 w-9" />
             </div>
             <p className="text-[#444]">Freight Factoring OS</p>
+            <hr className="w-full border-0 border-t border-[#b0ada6]" />
+            <p className="text-lg font-semibold text-[#1a1a1a]">Trucking Pros Financial</p>
             <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
             <CardDescription>
               Enter your credentials to access the system

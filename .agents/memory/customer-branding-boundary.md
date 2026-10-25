@@ -8,3 +8,9 @@ All customer-facing outputs use Trucking Pros Financial branding: emails, fundin
 **Why:** The user explicitly separated the customer-facing company brand from the internal application brand.
 
 **How to apply:** Use the supplied TPF mark or the company wordmark on customer surfaces. Keep the portal URL factorflux.io unchanged. Do not rename infrastructure identifiers or internal app assets merely because their names contain FactorFlux.
+
+The staff login may show both names: FactorFlux is the platform; Trucking Pros Financial is who the staff work for.
+
+**Why:** The user explicitly clarified this distinction when requesting both names inside the login card.
+
+**How to apply:** Preserve the platform/company distinction on staff-facing entry screens; this does not permit FactorFlux branding on customer-facing outputs.
