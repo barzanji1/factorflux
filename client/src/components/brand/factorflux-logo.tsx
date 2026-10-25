@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useId } from "react";
+import { Link } from "wouter";
 
 type FactorFluxLogoProps = {
   className?: string;
@@ -8,14 +9,15 @@ type FactorFluxLogoProps = {
   showWordmark?: boolean;
   inverted?: boolean;
   shine?: boolean;
+  linkToDashboard?: boolean;
 };
 
-export function FactorFluxLogo({ className, markClassName, markSrc, showWordmark = true, inverted = false, shine = false }: FactorFluxLogoProps) {
+export function FactorFluxLogo({ className, markClassName, markSrc, showWordmark = true, inverted = false, shine = false, linkToDashboard = true }: FactorFluxLogoProps) {
   const instanceId = useId().replace(/:/g, "");
   const clipId = `factorflux-mark-clip-${instanceId}`;
   const shineGradientId = `factorflux-shine-gradient-${instanceId}`;
 
-  return (
+  const logo = (
     <div className={cn("flex items-center gap-2", className)}>
       <span className={cn("relative inline-flex shrink-0", shine && !markSrc && "logo-shine-wrapper")}>
         {markSrc ? (
@@ -69,4 +71,10 @@ export function FactorFluxLogo({ className, markClassName, markSrc, showWordmark
       )}
     </div>
   );
+
+  return linkToDashboard ? (
+    <Link href="/" aria-label="FactorFlux dashboard" className="inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#098b9f]">
+      {logo}
+    </Link>
+  ) : logo;
 }
