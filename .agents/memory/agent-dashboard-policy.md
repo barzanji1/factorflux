@@ -14,3 +14,9 @@ Agents see their own invoice queues; managers see all agents' queues side by sid
 **Why:** The user explicitly requested all-agent queue visibility for managers, unlike the narrower team scope of personnel/performance reports.
 
 **How to apply:** Apply this exception only to the workbench. Do not broaden personnel-report scope, entity mutation permissions, or staff account administration.
+
+Performance optimizations must preserve the unfunded queue's live preflight checks, not replace them with saved intake snapshots.
+
+**Why:** Broker/carrier conditions can change after intake; a faster dashboard must not hide new review actions.
+
+**How to apply:** Batch current lookups and reuse the existing preflight rules. Keep acknowledgement semantics consistent when counting and limiting queue items.

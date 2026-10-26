@@ -982,32 +982,14 @@ export class DatabaseStorage implements IStorage {
     totalRevenue: string;
     activeClients: number;
   }> {
-    const [pendingInvoicesResult] = await db
-      .select({ count: count() })
-      .from(invoices)
-      .where(eq(invoices.status, "submitted"));
-
-    const [processedTodayResult] = await db
-      .select({ count: count() })
-      .from(invoices)
-      .where(and(eq(invoices.status, "approved"), sql`DATE(${invoices.approvedAt}) = CURRENT_DATE`));
-
-    const [totalRevenueResult] = await db
-      .select({ sum: sql<string>`COALESCE(SUM(${invoices.amount}), 0)` })
-      .from(invoices)
-      .where(eq(invoices.status, "paid"));
-
-    const [activeClientsResult] = await db
-      .select({ count: count() })
-      .from(clients)
-      .where(eq(clients.status, "active"));
-
-    return {
-      pendingInvoices: pendingInvoicesResult.count,
-      processedToday: processedTodayResult.count,
-      totalRevenue: totalRevenueResult.sum || "0",
-      activeClients: activeClientsResult.count,
-    };
+    const [stats] = await db.select({
+      pendingInvoices: sql<number>`(count(*) filter (where ${invoices.status} = 'submitted'))::int`,
+      processedToday: sql<number>`(count(*) filter (where ${invoices.status} = 'approved'
+        and ${invoices.approvedAt} >= current_date and ${invoices.approvedAt} < current_date + interval '1 day'))::int`,
+      totalRevenue: sql<string>`coalesce(sum(${invoices.amount}) filter (where ${invoices.status} = 'paid'), 0)`,
+      activeClients: sql<number>`(select count(*)::int from ${clients} where ${clients.status} = 'active')`,
+    }).from(invoices);
+    return stats;
   }
 
   // Fuel card application operations

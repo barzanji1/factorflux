@@ -66,6 +66,22 @@ const PROCESSED_STATUSES = ["approved", "funded", "settled", "paid"] as const;
 const OPEN_CHARGEBACK_STATUSES = ["scheduled", "extended"] as const;
 
 type PreflightDb = typeof db;
+type ManualAlert = { id: number; severity: "block" | "ack" | "info"; title: string; message: string };
+/** Request-local bulk lookups for dashboard ack/block checks. The dashboard
+ * reads OCR failure state separately; ordinary intake still runs every check. */
+export type DashboardPreflightContext = {
+  settings: InvoicePreflightSettings; now: Date;
+  exactMatches: { id: number; carrierInvoiceNumber: string | null; loadNumber: string | null }[];
+  carrier: { id: number; name: string } | null; lastProcessed: Date | null;
+  manualCarrier: ManualAlert[]; manualBroker: ManualAlert[];
+  broker: { id: number; creditGrade: string | null } | null;
+  unconfirmed: { id: number; invoiceNumber: string } | null;
+  brokerChargeback: { id: number } | null; carrierChargeback: { id: number } | null;
+  brokerAuthority: Pick<typeof brokerAuthorityChecks.$inferSelect, "authorityStatus" | "checkStatus" | "allowedToOperate" |
+    "operatingStatus" | "commonAuthorityStatus" | "contractAuthorityStatus" | "brokerAuthorityStatus"> | null;
+  carrierAuthority: Pick<typeof carrierAuthorityChecks.$inferSelect, "authorityStatus" | "checkStatus"> | null;
+  expiredInsuranceAlerts: { id: number; notes: string | null }[];
+};
 
 function enabled(settings: InvoicePreflightSettings, code: string): boolean {
   return settings.rules[code] !== false;
@@ -91,8 +107,11 @@ function dateLabel(value: Date | null): string {
   return value ? value.toLocaleDateString("en-US", { timeZone: "UTC" }) : "unknown";
 }
 
-async function readSettings(client: PreflightDb): Promise<InvoicePreflightSettings> {
-  const [row] = await client.select().from(invoicePreflightSettings).limit(1);
+export async function readSettings(client: PreflightDb): Promise<InvoicePreflightSettings> {
+  const [row] = await client.select({
+    rules: invoicePreflightSettings.rules, dormantDays: invoicePreflightSettings.dormantDays,
+    nearAmountTolerance: invoicePreflightSettings.nearAmountTolerance, nearServiceDateDays: invoicePreflightSettings.nearServiceDateDays,
+  }).from(invoicePreflightSettings).limit(1);
   const storedRules = row?.rules ?? {};
   return {
     rules: { ...DEFAULT_RULES, ...storedRules },
@@ -121,18 +140,19 @@ function withoutExcludedInvoice<T extends { id: number }>(
 export async function runInvoicePreflight(
   input: InvoicePreflightInput,
   dbClient: PreflightDb = db,
+  context?: DashboardPreflightContext,
 ): Promise<{ alerts: InvoicePreflightAlert[] }> {
-  const settings = await readSettings(dbClient);
+  const settings = context?.settings ?? await readSettings(dbClient);
   const alerts: InvoicePreflightAlert[] = [];
-  if (input.excludeInvoiceId) {
+  if (input.excludeInvoiceId && !context) {
     alerts.push(...await getInvoiceOcrAlerts(input.excludeInvoiceId, dbClient));
   }
-  const now = new Date();
+  const now = context?.now ?? new Date();
   const excludeWhere = input.excludeInvoiceId
     ? ne(invoices.id, input.excludeInvoiceId)
     : undefined;
 
-  const exactMatches = input.invoiceNumber || input.loadNumber
+  const exactMatches = context ? context.exactMatches : input.invoiceNumber || input.loadNumber
     ? await dbClient.select({
       id: invoices.id,
       carrierInvoiceNumber: invoices.carrierInvoiceNumber,
@@ -204,14 +224,14 @@ export async function runInvoicePreflight(
     }
   }
 
-  const [carrier] = await dbClient.select({
+  const [carrier] = context ? [context.carrier] : await dbClient.select({
     id: clients.id,
     name: clients.name,
   }).from(clients).where(eq(clients.id, input.carrierId)).limit(1);
   if (!carrier) throw new Error(`Carrier ${input.carrierId} was not found.`);
 
   if (enabled(settings, "CARRIER_DORMANT")) {
-    const processed = await dbClient.select({
+    const processed = context ? [] : await dbClient.select({
       invoiceId: invoices.id,
       submittedAt: invoices.submittedAt,
       approvedAt: invoices.approvedAt,
@@ -221,7 +241,7 @@ export async function runInvoicePreflight(
       eq(invoices.clientId, input.carrierId),
       inArray(invoices.status, [...PROCESSED_STATUSES]),
     ));
-    const lastProcessed = processed
+    const lastProcessed = context ? context.lastProcessed : processed
       .map(row => validDate(row.approvedAt) ?? validDate(row.fundedAt) ??
         validDate(row.submittedAt) ?? validDate(row.createdAt))
       .filter((date): date is Date => date !== null)
@@ -252,7 +272,7 @@ export async function runInvoicePreflight(
   if (enabled(settings, "CARRIER_MANUAL_ALERT")) {
     manualAlertQueries.push({
       code: "CARRIER_MANUAL_ALERT",
-      query: dbClient.select({
+      query: context ? Promise.resolve(context.manualCarrier) : dbClient.select({
         id: carrierAlerts.id,
         severity: carrierAlerts.severity,
         title: carrierAlerts.title,
@@ -268,7 +288,7 @@ export async function runInvoicePreflight(
   if (enabled(settings, "BROKER_MANUAL_ALERT") && input.brokerId != null) {
     manualAlertQueries.push({
       code: "BROKER_MANUAL_ALERT",
-      query: dbClient.select({
+      query: context ? Promise.resolve(context.manualBroker) : dbClient.select({
         id: carrierAlerts.id,
         severity: carrierAlerts.severity,
         title: carrierAlerts.title,
@@ -298,14 +318,14 @@ export async function runInvoicePreflight(
   }
 
   if (input.brokerId != null) {
-    const [broker] = await dbClient.select({
+    const [broker] = context ? [context.broker] : await dbClient.select({
       id: brokers.id,
       creditGrade: brokers.creditGrade,
     }).from(brokers).where(eq(brokers.id, input.brokerId)).limit(1);
     if (!broker) throw new Error(`Broker ${input.brokerId} was not found.`);
 
     if (enabled(settings, "BROKER_UNCONFIRMED")) {
-      const [unconfirmed] = await dbClient.select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
+      const [unconfirmed] = context ? [context.unconfirmed] : await dbClient.select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
         .from(invoices).where(and(
           eq(invoices.brokerId, input.brokerId),
           inArray(invoices.status, ["funded", "held"]),
@@ -333,7 +353,7 @@ export async function runInvoicePreflight(
     }
 
     if (enabled(settings, "BROKER_CHARGEBACKS")) {
-      const [chargeback] = await dbClient.select({ id: invoices.id })
+      const [chargeback] = context ? [context.brokerChargeback] : await dbClient.select({ id: invoices.id })
         .from(invoices)
         .where(and(
           eq(invoices.brokerId, input.brokerId),
@@ -352,7 +372,7 @@ export async function runInvoicePreflight(
     }
 
     if (enabled(settings, "AUTHORITY_INACTIVE")) {
-      const [authority] = await dbClient.select().from(brokerAuthorityChecks)
+      const [authority] = context ? [context.brokerAuthority] : await dbClient.select().from(brokerAuthorityChecks)
         .where(and(
           eq(brokerAuthorityChecks.entityType, "broker"),
           eq(brokerAuthorityChecks.entityId, input.brokerId),
@@ -387,7 +407,7 @@ export async function runInvoicePreflight(
     }
 
     if (enabled(settings, "DOCS_EXPIRED")) {
-      const expiredInsuranceAlerts = await dbClient.select({
+      const expiredInsuranceAlerts = context ? context.expiredInsuranceAlerts : await dbClient.select({
         id: brokerAuthorityAlerts.id,
         notes: brokerAuthorityAlerts.notes,
       }).from(brokerAuthorityAlerts).where(and(
@@ -409,7 +429,7 @@ export async function runInvoicePreflight(
   }
 
   if (enabled(settings, "AUTHORITY_INACTIVE")) {
-    const [authority] = await dbClient.select().from(carrierAuthorityChecks)
+    const [authority] = context ? [context.carrierAuthority] : await dbClient.select().from(carrierAuthorityChecks)
       .where(eq(carrierAuthorityChecks.carrierId, input.carrierId))
       .orderBy(desc(carrierAuthorityChecks.checkedAt))
       .limit(1);
@@ -442,7 +462,7 @@ export async function runInvoicePreflight(
   }
 
   if (enabled(settings, "CARRIER_OPEN_CHARGEBACK")) {
-    const [chargeback] = await dbClient.select({ id: invoices.id })
+    const [chargeback] = context ? [context.carrierChargeback] : await dbClient.select({ id: invoices.id })
       .from(invoices)
       .where(and(
         eq(invoices.clientId, input.carrierId),

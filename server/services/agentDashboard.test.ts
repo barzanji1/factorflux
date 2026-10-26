@@ -4,11 +4,15 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 import { db, pool } from "../db";
 import { users, clients, brokers, invoices, tasks, followUps, documents, docExtractionJobs,
-  eventLedger, emailLog, carrierAuthorityChecks, brokerAuthorityChecks, notifications, carrierPortalUsers, complianceIntegrationRuns } from "../../shared/schema";
+  eventLedger, emailLog, carrierAuthorityChecks, brokerAuthorityChecks, notifications, carrierPortalUsers, complianceIntegrationRuns, carrierAlerts } from "../../shared/schema";
 import { invoiceWork, readAgentDashboard, unacknowledgedCodes, fmcsaAuthorityHealth } from "./agentDashboard";
 import { registerAgentDashboardRoutes } from "../routes/agentDashboard";
 import type { InvoicePreflightAlert } from "./invoicePreflight";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { dashboardReaders } from "./agentDashboard";
+import { readDashboardQueue, readDashboardFollowUps } from "./agentDashboardQueries";
+import { dashboardPreflights } from "./dashboardPreflight";
+import { runInvoicePreflight } from "./invoicePreflight";
 
 after(() => pool.end());
 const at = new Date("2099-01-01T12:00:00Z");
@@ -88,6 +92,41 @@ test("HTTP identity is server-owned; authenticated reads only, no scope override
     assert.equal((await fetch(`${url}?agentId=someone-else&role=admin`, { headers: { "x-fixture-role": "employee" } })).status, 400);
     assert.equal((await fetch(url, { method: "POST", headers: { "x-fixture-role": "manager" } })).status, 404);
     assert.equal(calls, 3);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+});
+
+test("section HTTP reads are independent, authenticated, scoped and fail visibly with timing", async () => {
+  const app = express();
+  const seen: string[] = [];
+  registerAgentDashboardRoutes(app, (req: any, res, next) => {
+    if (!req.get("x-fixture-role")) return void res.status(401).json({ message: "Login required" });
+    req.user = { id: "fixture-actor", role: req.get("x-fixture-role") }; next();
+  }, undefined, {
+    ...dashboardReaders,
+    queue: async () => { throw Error("PRIVATE_DATABASE_ERROR"); },
+    followups: async viewer => { seen.push(viewer.id); return { viewer, generatedAt: at.toISOString(), followUps: [], totalCount: 0, limit: 20 }; },
+    activity: async viewer => ({ viewer, generatedAt: at.toISOString(), activity: [] }),
+    alerts: async viewer => ({ viewer, generatedAt: at.toISOString(), alerts: [],
+      alertCounts: { email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 }, systemHealth: { fmcsaAuthority: fmcsaAuthorityHealth() } }),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>(resolve => server.once("listening", resolve));
+  const root = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/agent-dashboard`;
+  try {
+    for (const section of ["queue", "followups", "activity", "alerts"]) {
+      assert.equal((await fetch(`${root}/${section}`)).status, 401);
+      assert.equal((await fetch(`${root}/${section}`, { headers: { "x-fixture-role": "carrier" } })).status, 403);
+      assert.equal((await fetch(`${root}/${section}?agentId=someone-else`, { headers: { "x-fixture-role": "employee" } })).status, 400);
+    }
+    const [failed, working] = await Promise.all([
+      fetch(`${root}/queue`, { headers: { "x-fixture-role": "employee" } }),
+      fetch(`${root}/followups`, { headers: { "x-fixture-role": "employee" } }),
+    ]);
+    assert.equal(failed.status, 500);
+    assert.match(failed.headers.get("server-timing")!, /dashboard;dur=/);
+    assert.doesNotMatch(await failed.text(), /PRIVATE_DATABASE_ERROR/);
+    assert.equal(working.status, 200);
+    assert.deepEqual(seen, ["fixture-actor"]);
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 
@@ -231,6 +270,94 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
         assert.equal(dashboard.systemHealth.fmcsaAuthority.state, "warning");
         assert.equal(dashboard.systemHealth.fmcsaAuthority.active, 2800);
         assert.equal(dashboard.systemHealth.fmcsaAuthority.failed, 111);
+      });
+      await t.test("one failed section does not discard successful sections in the aggregate response", async () => {
+        const broken = new Proxy(store, { get(target, property) {
+          if (property !== "select") return Reflect.get(target, property);
+          return (...args: Parameters<typeof db.select>) => {
+            const builder = target.select(...args);
+            return new Proxy(builder, { get(query, key) {
+              if (key !== "from") return Reflect.get(query, key);
+              return (table: Parameters<typeof builder.from>[0]) => {
+                if (table === eventLedger) throw Error("Injected activity failure");
+                return query.from(table);
+              };
+            } });
+          };
+        } });
+        const result = await readAgentDashboard({ id: agent, role: "employee" }, broken, at);
+        assert(result.sectionErrors.activity);
+        assert(!result.sectionErrors.queue && !result.sectionErrors.alerts && !result.sectionErrors.followups);
+        assert(result.queueGroups[0].items.length > 0);
+        assert(result.followUps.length > 0);
+        assert.equal(result.activity.length, 0);
+      });
+      await t.test("bulk lookups preserve live ack/block preflight checks rather than dropping them for speed", async () => {
+        await tx.update(brokers).set({ creditGrade: "D" }).where(eq(brokers.id, broker.id));
+        await tx.insert(carrierAlerts).values([
+          { entityType: "carrier", entityId: clientId, severity: "ack", title: "Carrier fixture", message: "Verify carrier", active: true },
+          { entityType: "broker", entityId: broker.id, severity: "block", title: "Broker fixture", message: "Stop broker", active: true },
+        ]);
+        await tx.insert(carrierAuthorityChecks).values({ carrierId: clientId, checkStatus: "ok", authorityStatus: "INACTIVE", checkedAt: at });
+        const input = { carrierId: clientId, brokerId: broker.id, invoiceNumber: mine.invoiceNumber, amount: "100", excludeInvoiceId: mine.id };
+        const ordinary = await runInvoicePreflight(input, store);
+        const [bulk] = await dashboardPreflights([input], store);
+        assert.deepEqual(bulk.alerts.filter(a => a.severity !== "info"), ordinary.alerts.filter(a => a.severity !== "info"));
+        assert(bulk.alerts.some(a => a.code === "BROKER_GRADE_LOW"));
+        assert(bulk.alerts.some(a => a.title === "Carrier authority is inactive"));
+      });
+      await t.test("20-row limits retain full SQL counts and constant query count as a queue grows", async () => {
+        await tx.insert(invoices).values(Array.from({ length: 22 }, (_, index) => ({
+          invoiceNumber: `DASH-LIMIT-${index}-${tag}`, loadId: null, clientId, brokerId: broker.id,
+          amount: "100", assignedTo: agent, status: "docs_pending" as const, createdAt: at,
+        })));
+        await tx.insert(tasks).values(Array.from({ length: 22 }, (_, index) => ({
+          title: `Limit task ${index} ${tag}`, type: "followup" as const, assignedTo: agent, clientId,
+          dueDate: new Date(at.getTime() + index * 1000), status: "todo" as const,
+        })));
+        await tx.insert(notifications).values({ userId: agent, entityType: "invoice", entityId: legacy.id,
+          title: "Old malformed metadata", message: "Ignored", metadata: "{broken json" });
+        let queryCount = 0;
+        const counted = new Proxy(store, { get(target, key) {
+          if (key !== "select" && key !== "execute") return Reflect.get(target, key);
+          return (...args: unknown[]) => { queryCount++; return (Reflect.get(target, key) as Function).apply(target, args); };
+        } });
+        const queue = await readDashboardQueue({ id: agent, role: "employee" }, counted, at);
+        assert.equal(queue.queueGroups[0].items.length, 20);
+        assert.equal(queue.queueGroups[0].totalCount, 24);
+        assert.equal(queue.queueCount, 24);
+        assert.equal(queryCount, 4); // staff + bounded rows/counts + two batch lookups, not queries per invoice
+        const followups = await readDashboardFollowUps({ id: agent, role: "employee" }, store, at);
+        assert.equal(followups.followUps.length, 20);
+        assert.equal(followups.totalCount, 25);
+      });
+      await t.test("funded queue filtering matches acknowledgement semantics before pagination", async () => {
+        const keys = ["acked", "changed", "info", "legacy-notice"] as const;
+        const records = await tx.insert(invoices).values(keys.map(key => ({
+          invoiceNumber: `DASH-ACK-${key}-${tag}`, loadId: null, clientId, brokerId: broker.id, amount: "100",
+          assignedTo: agent, status: "funded" as const, brokerConfirmationStatus: "confirmed" as const,
+          createdAt: at, fundedAt: new Date(at.getTime() - 86_400_000),
+        }))).returning({ id: invoices.id, invoiceNumber: invoices.invoiceNumber });
+        const id = (key: string) => records.find(row => row.invoiceNumber === `DASH-ACK-${key}-${tag}`)!.id;
+        const alert = (message: string, severity: string = "ack") => ({ code: "FIXTURE_ONLY", severity, message, title: "Review" });
+        await tx.insert(eventLedger).values([
+          { entityType: "invoice", entityId: id("acked"), eventType: "invoice_preflight", actorType: "system", createdAt: at,
+            payloadJson: { alerts: [alert("same")], acknowledgements: [{ code: "FIXTURE_ONLY" }] } },
+          { entityType: "invoice", entityId: id("changed"), eventType: "invoice_preflight", actorType: "system", createdAt: at,
+            payloadJson: { alerts: [alert("old"), alert("new")], acknowledgements: [{ code: "FIXTURE_ONLY" }] } },
+          { entityType: "invoice", entityId: id("info"), eventType: "invoice_preflight", actorType: "system", createdAt: at,
+            payloadJson: { alerts: [alert("old"), alert("new", "info")], acknowledgements: [] } },
+        ]);
+        await tx.insert(notifications).values(["acked", "legacy-notice"].map(key => ({
+          userId: agent, entityType: "invoice", entityId: id(key), title: "Review", message: "Legacy alert", read: true,
+          metadata: JSON.stringify({ severity: "ack", code: "FIXTURE_ONLY", acknowledged: false, message: "Legacy alert" }),
+        })));
+        const result = await readDashboardQueue({ id: agent, role: "employee" }, store, at);
+        const visible = result.queueGroups[0].items.map(row => row.id);
+        assert(visible.includes(id("changed")));
+        assert(visible.includes(id("legacy-notice")));
+        assert(!visible.includes(id("acked")) && !visible.includes(id("info")));
+        assert.equal(result.queueCount, 26); // 24 previous + only the two genuinely actionable funded invoices
       });
       throw rollback;
     });

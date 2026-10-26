@@ -127,6 +127,7 @@ export const clients = pgTable("clients", {
 }, (table) => [
   index("clients_name_idx").on(table.name),
   index("clients_assigned_processor_idx").on(table.assignedProcessor),
+  index("clients_dashboard_new_idx").on(table.createdAt, table.id).where(sql`${table.status} = 'new_client'`),
 ]);
 
 // New addition for debtors table
@@ -228,6 +229,7 @@ export const emailLog = pgTable("email_log", {
   index("email_log_provider_idx").on(table.resendMessageId),
   index("email_log_entity_idx").on(table.entityType, table.entityId),
   index("email_log_sender_idx").on(table.sentByUserId),
+  index("email_log_dashboard_bounced_idx").on(table.statusUpdatedAt, table.id).where(sql`${table.status} = 'bounced'`),
 ]);
 export const emailLogEvents = pgTable("email_log_events", {
   id: serial("id").primaryKey(),
@@ -406,6 +408,10 @@ export const invoices = pgTable("invoices", {
   index("invoices_driver_id_idx").on(table.driverId),
   index("invoices_created_at_idx").on(table.createdAt),
   index("invoices_submitted_by_created_at_idx").on(table.submittedBy, table.createdAt),
+  index("invoices_dashboard_open_owner_idx").on(table.assignedTo, table.createdAt, table.id)
+    .where(sql`${table.status} not in ('paid','settled')`),
+  index("invoices_dashboard_last_processed_idx").on(table.clientId, sql`coalesce(${table.approvedAt},${table.fundedAt},${table.submittedAt},${table.createdAt})`)
+    .where(sql`${table.status} in ('approved','funded','settled','paid')`),
 ]);
 
 // Carrier and broker profile alerts share one polymorphic table. Alerts are
@@ -574,7 +580,7 @@ export const documents = pgTable("documents", {
     enum: ["processing", "processed", "failed"],
   }).default("processing").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, table => [index("documents_dashboard_invoice_idx").on(table.invoiceId)]);
 
 // Durable retry queue for S3 objects that could not be removed during
 // compensation or another cleanup operation.
@@ -624,7 +630,12 @@ export const eventLedger = pgTable("event_ledger", {
   actorId: varchar("actor_id"),
   payloadJson: jsonb("payload_json"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, table => [
+  index("event_ledger_dashboard_activity_idx").on(table.createdAt, table.id)
+    .where(sql`${table.actorType} = 'user' and ${table.actorId} is not null`),
+  index("event_ledger_dashboard_preflight_idx").on(table.entityId, table.createdAt, table.id)
+    .where(sql`${table.entityType} = 'invoice' and ${table.eventType} = 'invoice_preflight'`),
+]);
 
 // Activity log table
 export const activities = pgTable("activities", {
@@ -822,7 +833,7 @@ export const notifications = pgTable("notifications", {
   actionUrl: varchar("action_url"),
   metadata: text("metadata"), // JSON string: emailSubject, emailBody, recipientEmail
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, table => [index("notifications_dashboard_entity_idx").on(table.entityType, table.entityId)]);
 
 // One durable alert per aging threshold. Acknowledgement is intentionally
 // retained so collections history remains visible after resolution.
@@ -918,6 +929,7 @@ export const tasks = pgTable("tasks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, table => [
   uniqueIndex("tasks_confirmation_invoice_kind_unique").on(table.confirmationInvoiceId, table.confirmationKind),
+  index("tasks_dashboard_due_idx").on(table.assignedTo, table.dueDate, table.id).where(sql`${table.status} <> 'completed'`),
 ]);
 
 export const brokerConfirmationEvents = pgTable("broker_confirmation_events", {
@@ -1183,7 +1195,8 @@ export const followUps = pgTable("follow_ups", {
   dueDate: timestamp("due_date").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, table => [index("follow_ups_dashboard_due_idx").on(table.clientId, table.dueDate, table.id)
+  .where(sql`${table.status} <> 'completed'`)]);
 
 // Internal support tickets and their chronological discussion.
 export const tickets = pgTable("tickets", {
@@ -1752,7 +1765,7 @@ export const paymentApplicationLines = pgTable("payment_application_lines", {
   }).default("full_match").notNull(),
   varianceReason: text("variance_reason"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, table => [index("payment_application_lines_dashboard_invoice_idx").on(table.invoiceId)]);
 
 export const insertPaymentApplicationLineSchema = createInsertSchema(paymentApplicationLines).omit({
   id: true, createdAt: true,
@@ -1847,7 +1860,8 @@ export const complianceIntegrationRuns = pgTable("compliance_integration_runs", 
   noKeyCount: integer("no_key_count").default(0),
   alertsCreated: integer("alerts_created").default(0),
   errorLog: jsonb("error_log"),
-});
+}, table => [index("compliance_runs_dashboard_latest_idx").on(table.startedAt, table.id)
+  .where(sql`${table.status} in ('completed','failed')`)]);
 
 export const insertComplianceIntegrationRunSchema = createInsertSchema(complianceIntegrationRuns).omit({
   id: true, startedAt: true,
@@ -1910,6 +1924,7 @@ export const brokerAuthorityChecks = pgTable("broker_authority_checks", {
   statusIdx: index("bac_check_status_idx").on(table.checkStatus),
   checkedAtIdx: index("bac_checked_at_idx").on(table.checkedAt),
   entityIdx: index("bac_entity_idx").on(table.entityType, table.entityId),
+  dashboardLatestIdx: index("broker_authority_checks_dashboard_latest_idx").on(table.entityType, table.entityId, table.checkedAt),
   brokerIdx: index("bac_broker_id_idx").on(table.brokerId),
 }));
 
@@ -1940,6 +1955,7 @@ export const carrierAuthorityChecks = pgTable("carrier_authority_checks", {
   rawResponse: jsonb("raw_response"),
 }, (table) => ({
   carrierIdx: index("cac_carrier_id_idx").on(table.carrierId),
+  dashboardLatestIdx: index("carrier_authority_checks_dashboard_latest_idx").on(table.carrierId, table.checkedAt),
   mcIdx: index("cac_mc_number_idx").on(table.mcNumber),
   dotIdx: index("cac_dot_number_idx").on(table.dotNumber),
   authorityStatusIdx: index("cac_authority_status_idx").on(table.authorityStatus),
@@ -2050,6 +2066,7 @@ export const docExtractionJobs = pgTable("doc_extraction_jobs", {
 }, (table) => ({
   dejDocIdx:    index("dej_document_idx").on(table.documentId),
   dejStatusIdx: index("dej_status_idx").on(table.status),
+  dashboardLatestIdx: index("doc_extraction_jobs_dashboard_latest_idx").on(table.documentId, table.id),
 }));
 
 export const docExtractionResults = pgTable("doc_extraction_results", {
@@ -2146,7 +2163,8 @@ export const brokerFollowUps = pgTable("broker_follow_ups", {
   cadenceConfig: jsonb("cadence_config").$type<CadenceConfig>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, table => [index("broker_follow_ups_dashboard_invoice_idx").on(table.invoiceId, table.createdAt)
+  .where(sql`${table.status} <> 'acknowledged'`)]);
 
 export const insertBrokerFollowUpSchema = createInsertSchema(brokerFollowUps).omit({
   id: true,
@@ -2185,7 +2203,8 @@ export const brokerFollowUpReminders = pgTable("broker_follow_up_reminders", {
   // deliveryStatus values: pending | delivered | bounced | failed | spam | unsubscribed
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, table => [index("broker_follow_up_reminders_dashboard_due_idx").on(table.followUpId, table.scheduledSendAt)
+  .where(sql`${table.status} in ('scheduled','sending')`)]);
 
 export const insertBrokerFollowUpReminderSchema = createInsertSchema(brokerFollowUpReminders).omit({
   id: true,
@@ -2441,7 +2460,8 @@ export const carrierPortalUsers = pgTable("carrier_portal_users", {
   reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   lastLoginAt: timestamp("last_login_at"),
-});
+}, table => [index("carrier_portal_users_dashboard_pending_idx").on(table.createdAt, table.id)
+  .where(sql`${table.status} = 'pending'`)]);
 
 export const insertCarrierPortalUserSchema = createInsertSchema(carrierPortalUsers).omit({
   id: true, createdAt: true, lastLoginAt: true, rejectionReason: true, reviewedAt: true, reviewedBy: true,
