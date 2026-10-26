@@ -4,7 +4,20 @@ import { mkdtemp, readFile, rm, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { backupKey, obsoleteBackups, runDatabaseBackup, dumpDatabase, BackupInProgressError } from "./databaseBackup";
+import { backupKey, obsoleteBackups, runDatabaseBackup, dumpDatabase, BackupInProgressError, directBackupConnectionUrl } from "./databaseBackup";
+
+test("Neon backups use direct connections, preserving the database and credentials", () => {
+  const source = new URL("postgresql://test:synthetic-password@ep-example-pooler.us-east-2.aws.neon.tech/test-db?sslmode=require&channel_binding=require");
+  const direct = new URL(directBackupConnectionUrl(source.toString()));
+  assert.equal(direct.hostname, "ep-example.us-east-2.aws.neon.tech");
+  assert.equal(direct.username, source.username);
+  assert.equal(direct.password, source.password);
+  assert.equal(direct.pathname, source.pathname);
+  assert.equal(direct.search, source.search);
+  assert.equal(directBackupConnectionUrl(direct.toString()), direct.toString());
+  assert.equal(new URL(directBackupConnectionUrl("postgresql://test:synthetic@example-pooler.other.invalid/db")).hostname,
+    "example-pooler.other.invalid");
+});
 
 test("UTC filenames and retention keep exactly the newest 30 matching objects", () => {
   assert.equal(backupKey(new Date("2026-10-26T03:04:05Z")), "backups/db/factorflux-2026-10-26-030405.sql.gz");
@@ -77,11 +90,12 @@ test("pg_dump streams valid gzip and uses libpq env, not credential-bearing argu
     await writeFile(executable, `#!/usr/bin/env node
 if (process.argv.slice(2).join(" ") !== "--no-password" ||
     process.env.PGDATABASE !== "test-db" ||
+    process.env.PGHOST !== "ep-example.us-east-2.aws.neon.tech" ||
     process.env.PGPASSWORD !== "synthetic-password") process.exit(2);
 process.stdout.write("SELECT 1;");
 `, { mode: 0o700 });
     const file = path.join(dir, "backup.gz");
-    await dumpDatabase(file, "postgresql://test:synthetic-password@example.invalid/test-db", executable);
+    await dumpDatabase(file, "postgresql://test:synthetic-password@ep-example-pooler.us-east-2.aws.neon.tech/test-db", executable);
     assert.equal(gunzipSync(await readFile(file)).toString(), "SELECT 1;");
     await writeFile(executable, "#!/usr/bin/env node\nprocess.stdout.write('partial'); process.exit(2);", { mode: 0o700 });
     await assert.rejects(dumpDatabase(path.join(dir, "failed.gz"),

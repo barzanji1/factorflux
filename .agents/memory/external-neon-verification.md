@@ -15,6 +15,12 @@ Check the external Neon's actual server major version before choosing backup too
 
 **How to apply:** Use a compatible client for backups rather than assuming the workspace's default binary is sufficient. Preserve this compatibility when changing the Neon server or rebuilding deployment tools.
 
+Never run `pg_dump` through Neon's `-pooler` hostname; use its direct endpoint for backups and other session-dependent maintenance.
+
+**Why:** A dump against the transaction pool left an empty `search_path` on a reused backend. Tables were intact in `public`, but normal unqualified application queries failed with `42P01`, breaking login in development and production. WebSocket-only session repairs missed an affected TCP backend.
+
+**How to apply:** Preserve pooled app connections but make maintenance connections direct. Diagnose an apparent missing table with `current_setting('search_path')` and `to_regclass('public.<table>')` before attempting schema creation or restoration. If repairing this incident, reset only affected session settings and verify both WebSocket and TCP request paths; do not reset passwords or recreate intact tables.
+
 Legacy database constraints can be stricter than the current Drizzle insert types.
 
 **Why:** Rollback fixtures accepted by TypeScript were rejected by existing database NOT NULL constraints that the model did not declare.

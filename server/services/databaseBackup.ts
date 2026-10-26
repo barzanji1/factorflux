@@ -19,11 +19,21 @@ export class BackupInProgressError extends Error {
   constructor() { super("A database backup is already running"); }
 }
 
+export function directBackupConnectionUrl(value: string): string {
+  const url = new URL(value);
+  // pg_dump changes session settings with set_config(), which Neon/PgBouncer
+  // transaction pooling cannot safely isolate. Never run it through -pooler.
+  if (url.hostname.endsWith(".neon.tech")) {
+    url.hostname = url.hostname.replace(/-pooler(?=\.)/, "");
+  }
+  return url.toString();
+}
+
 function connectionUrl(): string {
   // This app uses external Neon, not the separate Replit-managed DATABASE_URL.
   const value = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
   if (!value) throw new Error("Database connection is not configured");
-  return value;
+  return directBackupConnectionUrl(value);
 }
 
 export function backupKey(date: Date): string {
@@ -40,7 +50,7 @@ export async function dumpDatabase(
   databaseUrl = connectionUrl(),
   binary = path.resolve("dist/tools/bin/pg_dump"),
 ): Promise<void> {
-  const url = new URL(databaseUrl);
+  const url = new URL(directBackupConnectionUrl(databaseUrl));
   const child = spawn(existsSync(binary) ? binary : "pg_dump", ["--no-password"], {
     stdio: ["ignore", "pipe", "pipe"],
     // Credentials are never passed in arguments, logs, or backup metadata.

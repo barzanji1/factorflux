@@ -22,6 +22,12 @@ This is intentional: a separate managed `DATABASE_URL` must not silently back
 up a different database. `DATABASE_URL` is supported when Neon is not configured.
 The script does not migrate, restore, or modify application tables.
 
+For Neon, the backup runner removes the `-pooler` hostname suffix and connects
+directly to the same endpoint/database. Both the backup lock and `pg_dump` use
+this direct connection. Neon does not support `pg_dump` through transaction
+pooling: dump session settings can otherwise leak into ordinary app requests
+and break unqualified table lookups. The app itself retains its pooled connection.
+
 `pg_dump` streams plain SQL through gzip into a private temporary directory.
 It uploads only after both the dump process and compression finish successfully:
 
