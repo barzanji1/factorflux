@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
+import { SystemHealthCard } from "@/components/dashboard/SystemHealthCard";
+import type { SystemHealthStatus } from "@/components/dashboard/SystemHealthCard";
 import { Win95Button } from "@/components/win95";
 import { apiRequest } from "@/lib/queryClient";
 import { AlertTriangle, ArrowUpRight, BriefcaseBusiness, Clock3, RefreshCw } from "lucide-react";
@@ -32,11 +34,11 @@ type DashboardData = {
   followUps: FollowUp[];
   activity: Activity[];
   alerts: Alert[];
-  alertCounts: { fmcsa_run: number; email_bounced: number; ocr_failed: number; unverified_carrier: number };
+  alertCounts: { email_bounced: number; ocr_failed: number; unverified_carrier: number };
+  systemHealth: { fmcsaAuthority: SystemHealthStatus };
 };
 
 const countKinds = [
-  ["fmcsa_run", "MC Check runs"],
   ["email_bounced", "Bounced email"],
   ["ocr_failed", "OCR failures"],
   ["unverified_carrier", "Unverified carriers"],
@@ -147,6 +149,7 @@ export default function Dashboard() {
     return dashboardData.queueGroups.filter(group => group.agentId === user.id);
   }, [dashboardData, isManager, user?.id]);
   const followUps = useMemo(() => [...(dashboardData?.followUps ?? [])].sort((a, b) => dateSort(a.dueDate) - dateSort(b.dueDate)), [dashboardData?.followUps]);
+  const alerts = dashboardData?.alerts.filter(alert => alert.kind !== "fmcsa_run") ?? [];
 
   return (
     <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace">
@@ -235,7 +238,10 @@ export default function Dashboard() {
 
           <section aria-labelledby="alerts-heading" data-testid="section-alerts">
             <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
-              <SectionHeading id="alerts-heading" number="04" title="Alerts" count={dashboardData.alerts.length} />
+              <SectionHeading id="alerts-heading" number="04" title="Alerts" count={alerts.length + 1} />
+              <div className="border-b border-[#a0a0a0] p-3">
+                <SystemHealthCard health={dashboardData.systemHealth.fmcsaAuthority} />
+              </div>
               <div className="grid grid-cols-2 gap-px border-b border-[#a0a0a0] bg-[#a0a0a0] sm:grid-cols-4">
                 {countKinds.map(([kind, label]) => <div key={kind} className="bg-[#f4f2ed] px-3 py-2">
                   <p className="font-mono text-lg font-bold text-[#087c8d]">{dashboardData.alertCounts[kind]}</p><p className="text-[11px] text-[#555]">{label}</p>
@@ -244,13 +250,15 @@ export default function Dashboard() {
               <div className="overflow-x-auto">
                 <table className="ff-data-table w-full min-w-[650px]" data-testid="alerts-table">
                   <thead><tr><th>Kind</th><th>Alert</th><th>Detail</th><th>Time</th><th>Link</th></tr></thead>
-                  <tbody>{dashboardData.alerts.length ? dashboardData.alerts.map(alert => (
+                  <tbody>{alerts.length ? alerts.map(alert => (
                     <tr key={alert.id} data-testid="alert-row">
                       <td><span className="ff-badge ff-badge-overdue">{alert.kind.replace(/_/g, " ")}</span></td>
-                      <td className="font-semibold">{alert.title}</td><td>{alert.detail}</td><td className="whitespace-nowrap font-mono text-xs">{displayDate(alert.when)}</td>
+                      <td className="font-semibold">{alert.title}</td>
+                      <td>{alert.detail}</td>
+                      <td className="whitespace-nowrap font-mono text-xs">{displayDate(alert.when)}</td>
                       <td><a href={alert.href} onClick={event => { event.preventDefault(); go(alert.href); }} className="inline-flex items-center gap-1 text-[#087c8d] underline-offset-2 hover:underline">Open <ArrowUpRight className="h-3 w-3" /></a></td>
                     </tr>
-                  )) : <EmptyRow columns={5}>No active alerts. All clear.</EmptyRow>}</tbody>
+                  )) : <EmptyRow columns={5}>No other active alerts. All clear.</EmptyRow>}</tbody>
                 </table>
               </div>
             </div>

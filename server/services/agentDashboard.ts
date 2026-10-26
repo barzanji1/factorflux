@@ -182,6 +182,21 @@ type QueueItem = { id: number; invoiceNumber: string; carrierName: string; broke
   ageDays: number | null; ageBasis: string; actions: string[]; href: string };
 type FailedDocument = { id: number; invoiceId: number | null; name: string; error: string | null; when: Date | null };
 
+export function fmcsaAuthorityHealth(run?: {
+  status: string; activeCount: number | null; failureCount: number | null;
+  completedAt: Date | null; startedAt: Date;
+}) {
+  return {
+    state: !run ? "not_run" as const
+      : run.status === "failed" ? "failed" as const
+      : (run.failureCount ?? 0) > 0 ? "warning" as const : "healthy" as const,
+    active: run?.activeCount ?? null,
+    failed: run?.failureCount ?? 0,
+    lastChecked: run ? iso(run.completedAt ?? run.startedAt) : null,
+    href: "/fmcsa-authority" as const,
+  };
+}
+
 async function latestFailedDocuments(store: Store): Promise<FailedDocument[]> {
   const latest = store.selectDistinctOn([docExtractionJobs.documentId], {
     documentId: docExtractionJobs.documentId, status: docExtractionJobs.status, error: docExtractionJobs.errorMessage, when: docExtractionJobs.createdAt,
@@ -194,9 +209,14 @@ async function latestFailedDocuments(store: Store): Promise<FailedDocument[]> {
 
 async function systemAlerts(store: Store, failedDocs: FailedDocument[]) {
   const [runs, bounced, unverified, pendingPortal] = await Promise.all([
-    store.select().from(complianceIntegrationRuns)
-      .where(inArray(complianceIntegrationRuns.status, ["completed", "failed", "skipped"]))
-      .orderBy(desc(complianceIntegrationRuns.startedAt), desc(complianceIntegrationRuns.id)).limit(100),
+    store.select({
+      id: complianceIntegrationRuns.id, activeCount: complianceIntegrationRuns.activeCount,
+      status: complianceIntegrationRuns.status,
+      failureCount: complianceIntegrationRuns.failureCount, startedAt: complianceIntegrationRuns.startedAt,
+      completedAt: complianceIntegrationRuns.completedAt,
+    }).from(complianceIntegrationRuns)
+      .where(inArray(complianceIntegrationRuns.status, ["completed", "failed"]))
+      .orderBy(desc(complianceIntegrationRuns.startedAt), desc(complianceIntegrationRuns.id)).limit(1),
     store.select({ id: emailLog.id, subject: emailLog.subject, to: emailLog.toAddresses, error: emailLog.error, when: emailLog.statusUpdatedAt })
       .from(emailLog).where(eq(emailLog.status, "bounced")).orderBy(desc(emailLog.statusUpdatedAt), desc(emailLog.id)),
     store.select({ id: clients.id, name: clients.name, when: clients.createdAt }).from(clients)
@@ -204,11 +224,8 @@ async function systemAlerts(store: Store, failedDocs: FailedDocument[]) {
     store.select({ id: carrierPortalUsers.id, carrierId: carrierPortalUsers.carrierId, name: carrierPortalUsers.companyName,
       when: carrierPortalUsers.createdAt }).from(carrierPortalUsers).where(eq(carrierPortalUsers.status, "pending")),
   ]);
+  const fmcsaAuthority = fmcsaAuthorityHealth(runs[0]);
   const all: DashboardAlert[] = [
-    ...runs.map(run => ({ id: `fmcsa_run:${run.id}`, kind: "fmcsa_run" as const,
-      title: `MC Check completed: ${run.successCount ?? 0} checked, ${run.failureCount ?? 0} failed, ${run.noKeyCount ?? 0} skipped`,
-      detail: `Run #${run.id} · ${run.status}${run.reason ? ` — ${run.reason}` : ""}. View Run History for details.`,
-      when: iso(run.completedAt ?? run.startedAt), href: `/fmcsa-authority?tab=runs&runId=${run.id}` })),
     ...bounced.map(e => ({ id: `email:${e.id}`, kind: "email_bounced" as const, title: `Bounced email: ${e.subject}`,
       detail: `${e.to.join(", ")} — ${e.error ?? "Check the recipient address."}`, when: iso(e.when), href: `/email-log?emailId=${e.id}` })),
     ...failedDocs.map(d => ({ id: `document:${d.id}`, kind: "ocr_failed" as const, title: `Document extraction failed: ${d.name}`,
@@ -222,10 +239,10 @@ async function systemAlerts(store: Store, failedDocs: FailedDocument[]) {
     })),
   ];
   all.sort((a, b) => (b.when ? Date.parse(b.when) : 0) - (a.when ? Date.parse(a.when) : 0) || a.id.localeCompare(b.id));
-  const alertCounts = { fmcsa_run: 0, email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 };
+  const alertCounts = { email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 };
   const shown = { ...alertCounts };
   for (const alert of all) alertCounts[alert.kind]++;
-  return { alerts: all.filter(a => shown[a.kind]++ < 100), alertCounts };
+  return { alerts: all.filter(a => shown[a.kind]++ < 100), alertCounts, systemHealth: { fmcsaAuthority } };
 }
-type DashboardAlert = { id: string; kind: "fmcsa_run" | "email_bounced" | "ocr_failed" | "unverified_carrier";
+type DashboardAlert = { id: string; kind: "email_bounced" | "ocr_failed" | "unverified_carrier";
   title: string; detail: string; when: string | null; href: string };

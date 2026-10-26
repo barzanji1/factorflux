@@ -5,7 +5,7 @@ import express from "express";
 import { db, pool } from "../db";
 import { users, clients, brokers, invoices, tasks, followUps, documents, docExtractionJobs,
   eventLedger, emailLog, carrierAuthorityChecks, brokerAuthorityChecks, notifications, carrierPortalUsers, complianceIntegrationRuns } from "../../shared/schema";
-import { invoiceWork, readAgentDashboard, unacknowledgedCodes } from "./agentDashboard";
+import { invoiceWork, readAgentDashboard, unacknowledgedCodes, fmcsaAuthorityHealth } from "./agentDashboard";
 import { registerAgentDashboardRoutes } from "../routes/agentDashboard";
 import type { InvoicePreflightAlert } from "./invoicePreflight";
 import { sql } from "drizzle-orm";
@@ -14,6 +14,17 @@ after(() => pool.end());
 const at = new Date("2099-01-01T12:00:00Z");
 const ago = (days: number) => new Date(at.getTime() - days * 86400000);
 const base = { status: "funded", fundedAt: ago(31), createdAt: ago(100), brokerConfirmationStatus: "confirmed" };
+
+test("FMCSA health has healthy, warning, failed and never-run states", () => {
+  assert.deepEqual(fmcsaAuthorityHealth(), {
+    state: "not_run", active: null, failed: 0, lastChecked: null, href: "/fmcsa-authority",
+  });
+  const run = { status: "completed", activeCount: 2800, failureCount: 0, startedAt: at, completedAt: at };
+  assert.equal(fmcsaAuthorityHealth(run).state, "healthy");
+  assert.equal(fmcsaAuthorityHealth({ ...run, failureCount: 111 }).state, "warning");
+  assert.equal(fmcsaAuthorityHealth({ ...run, status: "failed" }).state, "failed");
+  assert.equal(fmcsaAuthorityHealth({ ...run, activeCount: null }).active, null);
+});
 
 test("queue covers pending docs, role-specific review, OCR and unacknowledged preflight", () => {
   assert.deepEqual(invoiceWork({ ...base, status: "docs_pending" }, true, ["RATE_MISMATCH"], at, false).actions,
@@ -59,7 +70,8 @@ test("HTTP identity is server-owned; authenticated reads only, no scope override
     req.user = { id: "fixture-actor", role: req.get("x-fixture-role") }; next();
   }, async viewer => {
     calls++; return { generatedAt: at.toISOString(), viewer, queueGroups: [], followUps: [], activity: [],
-      alerts: [], alertCounts: { fmcsa_run: 0, email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 } };
+      alerts: [], alertCounts: { email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 },
+      systemHealth: { fmcsaAuthority: fmcsaAuthorityHealth() } };
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>(resolve => server.once("listening", resolve));
@@ -135,7 +147,7 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
         brokerId: broker.id, entityName: broker.name, checkStatus: "error", checkError: "Fixture lookup failed", checkedAt: at }).returning();
       const [run] = await tx.insert(complianceIntegrationRuns).values({
         status: "failed", triggeredBy: agent, runType: "manual", startedAt: at, completedAt: at,
-        successCount: 12, failureCount: 20, noKeyCount: 8, reason: "Fixture circuit breaker",
+        successCount: 12, activeCount: 10, failureCount: 20, noKeyCount: 8, reason: "Fixture circuit breaker",
       }).returning();
       const [bounce] = await tx.insert(emailLog).values({ fromAddress: "fixture@example.test", toAddresses: ["recipient@example.test"],
         subject: "Fixture bounced message", bodyPreview: "Fixture preview", status: "bounced", statusUpdatedAt: at }).returning();
@@ -171,11 +183,10 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
         assert(!JSON.stringify(employee).includes("NEVER_RETURN_FIXTURE_PAYLOAD"));
       });
       await t.test("global alerts contain real current failures; successful retries clear stale failures", () => {
-        assert(!employee.alerts.some(a => a.id === `broker_check:${badCheck.id}` || a.kind === "fmcsa_failed"));
-        const summaries = employee.alerts.filter(a => a.id === `fmcsa_run:${run.id}`);
-        assert.equal(summaries.length, 1);
-        assert.equal(summaries[0].title, "MC Check completed: 12 checked, 20 failed, 8 skipped");
-        assert.equal(summaries[0].href, `/fmcsa-authority?tab=runs&runId=${run.id}`);
+        assert(!employee.alerts.some(a => a.id === `broker_check:${badCheck.id}` || a.id.startsWith("fmcsa_run:")));
+        assert.deepEqual(employee.systemHealth.fmcsaAuthority, {
+          state: "failed", active: 10, failed: 20, lastChecked: at.toISOString(), href: "/fmcsa-authority",
+        });
         assert(employee.alerts.some(a => a.id === `document:${failed.id}`));
         assert(!employee.alerts.some(a => a.id === `document:${recovered.id}`));
         assert(!employee.alerts.some(a => a.detail === "Old fixture failure"));
@@ -188,6 +199,38 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
         const actions = employee.queueGroups[0].items.find(i => i.id === mine.id)!.actions;
         assert(actions.includes("Review preflight alert: FIXTURE_UNACKNOWLEDGED"));
         assert(actions.includes("Review preflight alert: FIXTURE_NOTIFICATION"));
+      });
+      await t.test("latest clean run shows healthy without resurfacing older failures", async () => {
+        await tx.insert(complianceIntegrationRuns).values({
+          status: "completed", triggeredBy: agent, runType: "manual",
+          startedAt: new Date(at.getTime() + 1000), completedAt: new Date(at.getTime() + 2000),
+          successCount: 32, activeCount: 30, failureCount: 0,
+        });
+        const dashboard = await readAgentDashboard({ id: agent, role: "employee" }, store, at);
+        assert.deepEqual(dashboard.systemHealth.fmcsaAuthority, {
+          state: "healthy", active: 30, failed: 0,
+          lastChecked: new Date(at.getTime() + 2000).toISOString(), href: "/fmcsa-authority",
+        });
+      });
+      await t.test("latest running run also does not resurrect an old failure", async () => {
+        await tx.insert(complianceIntegrationRuns).values({
+          status: "running", triggeredBy: agent, runType: "manual",
+          startedAt: new Date(at.getTime() + 3000), successCount: 0, failureCount: 0,
+        });
+        const dashboard = await readAgentDashboard({ id: agent, role: "employee" }, store, at);
+        assert.equal(dashboard.systemHealth.fmcsaAuthority.state, "healthy");
+        assert.equal(dashboard.systemHealth.fmcsaAuthority.active, 30);
+      });
+      await t.test("latest completed run with check failures shows warning, not failed", async () => {
+        await tx.insert(complianceIntegrationRuns).values({
+          status: "completed", triggeredBy: agent, runType: "manual",
+          startedAt: new Date(at.getTime() + 4000), completedAt: new Date(at.getTime() + 5000),
+          successCount: 2802, activeCount: 2800, failureCount: 111,
+        });
+        const dashboard = await readAgentDashboard({ id: agent, role: "employee" }, store, at);
+        assert.equal(dashboard.systemHealth.fmcsaAuthority.state, "warning");
+        assert.equal(dashboard.systemHealth.fmcsaAuthority.active, 2800);
+        assert.equal(dashboard.systemHealth.fmcsaAuthority.failed, 111);
       });
       throw rollback;
     });
