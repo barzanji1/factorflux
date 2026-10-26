@@ -69,12 +69,14 @@ export default function LoginPage() {
             <p className="text-[#444]">Freight Factoring OS</p>
             <hr className="w-full border-0 border-t border-[#b0ada6]" />
             <p className="text-lg font-semibold text-[#1a1a1a]">Trucking Pros Financial</p>
-            <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
-            <CardDescription>
-              Enter your credentials to access the system
-            </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 space-y-2 text-center">
+              <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
+              <CardDescription>
+                Enter your credentials to access the system
+              </CardDescription>
+            </div>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
