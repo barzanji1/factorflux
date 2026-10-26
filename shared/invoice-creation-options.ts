@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const optionalInvoiceBranchSchema = z.preprocess(
+  value => value == null || (typeof value === "string" && !value.trim()) ? null : value,
+  z.coerce.number().int().positive().nullable().optional(),
+);
+
+export const optionalInvoiceBuyoutSchema = z.preprocess(
+  value => value === "" ? null : value,
+  z.boolean().nullable().optional(),
+);
+
 export const optionalLumperSchema = z.preprocess(value => {
   if (value == null || value === "") return null;
   if (value === "yes" || value === "true") return true;

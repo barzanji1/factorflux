@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, CheckCircle2, Search, ShieldAlert, Truck, Upload, X } from "lucide-react";
+import { Building2, CheckCircle2, Plus, Search, ShieldAlert, Truck, Upload, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +50,7 @@ type PreflightAlert = {
 
 const EMPTY = {
   carrierInvoiceNumber: "", loadNumber: "", code: "", clientId: "", brokerId: "", branchId: "",
-  buyout: "", lumper: "", amount: "", lumperTotal: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
+  lumper: "", amount: "", lumperTotal: "", paymentType: "ACH", bankAccountId: "", loadType: "other",
   instructionsDetails: "", heldFor: [] as string[],
   invoiceDate: "", pickupDate: "", deliveryDate: "", origin: "", destination: "", bolNumber: "",
   holdForManagerReview: false, holdReason: "",
@@ -294,6 +294,16 @@ export default function CreateInvoiceModal({
   const { user } = useAuth();
   const isManager = user?.role === "manager" || user?.role === "admin";
   const [values, setValues] = useState(EMPTY);
+  const [branchDialogOpen, setBranchDialogOpen] = useState(false);
+  const [branchForm, setBranchForm] = useState({
+    branchName: "", address: "", city: "", state: "", zip: "", contactName: "", email: "", phone: "",
+  });
+  const [branchCreateError, setBranchCreateError] = useState("");
+  const selectedBrokerIdRef = useRef(values.brokerId);
+  const modalOpenRef = useRef(open);
+  const protectedBranchRef = useRef<{ brokerId: string; branchId: string } | null>(null);
+  selectedBrokerIdRef.current = values.brokerId;
+  modalOpenRef.current = open;
   const [preflightAlerts, setPreflightAlerts] = useState<PreflightAlert[]>([]);
   const [preflightOpen, setPreflightOpen] = useState(false);
   const [preflightLoading, setPreflightLoading] = useState(false);
@@ -656,9 +666,13 @@ export default function CreateInvoiceModal({
   useEffect(() => {
     if (!open || branchesLoading || branchesError) return;
     if (ocrSelectedBrokerId.current === values.brokerId && values.brokerId && !values.branchId) return;
-    if (branches.length === 1 && values.branchId !== String(branches[0].id)) {
-      setValues(v => ({ ...v, branchId: String(branches[0].id) }));
-    } else if (values.branchId && !branches.some(branch => String(branch.id) === values.branchId)) {
+    const protectedBranch = protectedBranchRef.current;
+    if (protectedBranch && protectedBranch.brokerId !== values.brokerId) protectedBranchRef.current = null;
+    if (protectedBranch?.brokerId === values.brokerId && protectedBranch.branchId === values.branchId) {
+      if (branches.some(branch => String(branch.id) === values.branchId)) protectedBranchRef.current = null;
+      return;
+    }
+    if (values.branchId && !branches.some(branch => String(branch.id) === values.branchId)) {
       setValues(v => ({ ...v, branchId: "" }));
     }
   }, [open, branchesLoading, branchesError, branches, values.branchId, values.brokerId]);
@@ -672,6 +686,7 @@ export default function CreateInvoiceModal({
       ocrController.current = null;
       preflightRequestId.current += 1;
       setPreflightLoading(false);
+      setBranchDialogOpen(false);
       setValues(EMPTY);
       setPreflightAlerts([]);
       setPreflightOpen(false);
@@ -711,9 +726,8 @@ export default function CreateInvoiceModal({
         loadNumber: values.loadNumber.trim(),
         clientId: Number(values.clientId),
         brokerId: Number(values.brokerId),
-        branchId: Number(values.branchId),
+        branchId: values.branchId ? Number(values.branchId) : null,
         code: values.code.trim() || null,
-        buyout: values.buyout === "" ? null : values.buyout === "yes",
         lumper: values.lumper === "" ? null : values.lumper === "yes",
         holdForManagerReview: values.holdForManagerReview,
         holdReason: values.holdForManagerReview ? values.holdReason : null,
@@ -775,6 +789,72 @@ export default function CreateInvoiceModal({
     },
   });
 
+  const branchMutation = useMutation({
+    mutationFn: async ({ brokerId, fields }: {
+      brokerId: string;
+      fields: typeof branchForm;
+    }) => {
+      const response = await apiRequest("POST", "/api/invoices/broker-branches", {
+        brokerId: Number(brokerId),
+        branchName: fields.branchName.trim(),
+        ...(fields.address.trim() ? { address: fields.address.trim() } : {}),
+        ...(fields.city.trim() ? { city: fields.city.trim() } : {}),
+        ...(fields.state.trim() ? { state: fields.state.trim() } : {}),
+        ...(fields.zip.trim() ? { zip: fields.zip.trim() } : {}),
+        ...(fields.phone.trim() ? { phone: fields.phone.trim() } : {}),
+        ...(fields.email.trim() ? { email: fields.email.trim() } : {}),
+        ...(fields.contactName.trim() ? { contactName: fields.contactName.trim() } : {}),
+      });
+      const payload = await response.json();
+      const branch = payload?.branch ?? payload?.data ?? payload;
+      if (!branch || typeof branch.id !== "number" || typeof branch.branchName !== "string") {
+        throw new Error("Branch was saved, but the server returned an invalid branch record.");
+      }
+      return { branch, brokerId };
+    },
+    onSuccess: async ({ branch, brokerId }) => {
+      const branchesKey = ["/api/brokers", brokerId, "branches"] as const;
+      const cached = queryClient.getQueryData<any[]>(branchesKey);
+      queryClient.setQueryData(branchesKey, [
+        ...(Array.isArray(cached) ? cached.filter(item => item.id !== branch.id) : []),
+        { ...branch, status: branch.status ?? "active" },
+      ]);
+      void queryClient.invalidateQueries({ queryKey: branchesKey, exact: true });
+      const brokerKey = ["/api/brokers", brokerId] as const;
+      void queryClient.invalidateQueries({ queryKey: brokerKey, exact: true });
+      if (modalOpenRef.current && selectedBrokerIdRef.current === brokerId) {
+        const branchId = String(branch.id);
+        protectedBranchRef.current = { brokerId, branchId };
+        setValues(current => current.brokerId === brokerId ? { ...current, branchId } : current);
+        setBranchDialogOpen(false);
+        setBranchCreateError("");
+        setBranchForm({ branchName: "", address: "", city: "", state: "", zip: "", contactName: "", email: "", phone: "" });
+      }
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: branchesKey, exact: true, type: "all" }),
+        queryClient.refetchQueries({ queryKey: brokerKey, exact: true, type: "all" }),
+      ]);
+      if (modalOpenRef.current && selectedBrokerIdRef.current === brokerId) {
+        const refreshed = queryClient.getQueryData<any[]>(branchesKey);
+        if (!Array.isArray(refreshed) || !refreshed.some(item => item.id === branch.id)) {
+          queryClient.setQueryData(branchesKey, [
+            ...(Array.isArray(refreshed) ? refreshed : []),
+            { ...branch, status: branch.status ?? "active" },
+          ]);
+        }
+      }
+      toast({ title: "Branch added", description: `${branch.branchName} was added to the broker.` });
+    },
+    onError: error => {
+      let message = error instanceof Error ? error.message : "Unable to save this branch. Please try again.";
+      try {
+        const parsed = JSON.parse(message);
+        message = parsed.message || parsed.error || message;
+      } catch { /* Keep the original readable error. */ }
+      setBranchCreateError(message);
+    },
+  });
+
   const nearDuplicateAlert = preflightAlerts.some(alert => alert.code === "DUPLICATE_NEAR" && alert.severity === "block");
   const hasUnresolvedBlock = preflightAlerts.some(alert => alert.severity === "block"
     && !(alert.code === "DUPLICATE_NEAR" && isManager && overrideNearDuplicate));
@@ -790,7 +870,7 @@ export default function CreateInvoiceModal({
     holdRecipientsLoading || holdRecipientsError || !values.holdReason || selectedAvailableRecipients.length === 0
   );
   const valid = values.carrierInvoiceNumber.trim().length <= 100
-    && values.loadNumber.trim() && values.clientId && values.brokerId && values.branchId
+    && values.loadNumber.trim() && values.clientId && values.brokerId
     && Number.isFinite(Number(values.amount)) && Number(values.amount) > 0
     && !lumperTotalInvalid
     && isLoadType(values.loadType)
@@ -798,7 +878,10 @@ export default function CreateInvoiceModal({
     && !lumperReceiptMissing && !holdDetailsInvalid
     && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={nextOpen => {
+      if (branchMutation.isPending) return;
+      onOpenChange(nextOpen);
+    }}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
         <DialogHeader className="border-b px-6 py-5">
           <DialogTitle className="text-xl">Create Invoice</DialogTitle>
@@ -1003,23 +1086,34 @@ export default function CreateInvoiceModal({
                  </div>}
                </div>
               <div className="space-y-1.5">
-                <Label htmlFor="branchId">Branch <span className="text-red-500">*</span></Label>
-                <Select disabled={!values.brokerId || branchesLoading || branchesError || branches.length === 0} value={values.branchId} onValueChange={branchId => setValues(v => ({ ...v, branchId }))}>
-                  <SelectTrigger id="branchId"><SelectValue placeholder={!values.brokerId ? "Select a broker first" : branchesLoading ? "Loading branches..." : branchesError ? "Unable to load branches" : branches.length === 0 ? "No branches on file — add in broker profile." : "Select a branch"} /></SelectTrigger>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="branchId">Branch</Label>
+                  <button
+                    type="button"
+                    disabled={!values.brokerId || branchMutation.isPending}
+                    title={!values.brokerId ? "Select a broker first" : undefined}
+                    onClick={() => {
+                      setBranchForm({ branchName: "", address: "", city: "", state: "", zip: "", contactName: "", email: "", phone: "" });
+                      setBranchCreateError("");
+                      setBranchDialogOpen(true);
+                    }}
+                    className="inline-flex h-7 items-center gap-1 border-2 border-t-white border-l-white border-r-[#777] border-b-[#777] bg-[#d4d0c8] px-2 text-xs font-semibold text-black active:border-t-[#777] active:border-l-[#777] active:border-r-white active:border-b-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Plus className="h-3 w-3" /> Add Branch
+                  </button>
+                </div>
+                <Select value={values.branchId || "__none"} onValueChange={branchId => setValues(v => ({ ...v, branchId: branchId === "__none" ? "" : branchId }))}>
+                  <SelectTrigger id="branchId" disabled={!values.brokerId || branchesLoading || branchesError}>
+                    <SelectValue placeholder={!values.brokerId ? "Select a broker first" : branchesLoading ? "Loading branches..." : branchesError ? "Unable to load branches" : "Select a branch"} />
+                  </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none">None — optional</SelectItem>
                     {branches.map(branch => <SelectItem key={branch.id} value={String(branch.id)}>{branch.branchName}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                {values.brokerId && !branchesLoading && branches.length === 0 && (
-                  <p className={cn("text-xs", branchesError ? "text-red-700" : "text-amber-700")}>{branchesError ? "Unable to load branches." : "No branches on file — add in broker profile."}</p>
+                {values.brokerId && branchesError && (
+                  <p role="alert" className="text-xs text-red-700">Unable to load branches. Retry by reopening the invoice form.</p>
                 )}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Buyout</Label>
-                <Select value={values.buyout} onValueChange={buyout => setValues(v => ({ ...v, buyout }))}>
-                  <SelectTrigger><SelectValue placeholder="Select Yes or No" /></SelectTrigger>
-                  <SelectContent><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem></SelectContent>
-                </Select>
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Payment Type</Label>
@@ -1139,7 +1233,9 @@ export default function CreateInvoiceModal({
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button type="button" variant="ghost" disabled={branchMutation.isPending} onClick={() => {
+                if (!branchMutation.isPending) onOpenChange(false);
+              }}>Cancel</Button>
               <Button type="button" variant="outline" onClick={() => {
                 stopOcrRequest();
                 ocrSelectedBrokerId.current = null;
@@ -1162,7 +1258,7 @@ export default function CreateInvoiceModal({
               }}>Reset</Button>
               {entityDataLoading && <p role="status" className="text-sm">Refreshing broker and carrier data…</p>}
               {entityDataError && <p role="alert" className="text-sm text-red-700">Unable to refresh broker or carrier data. Reselect the record or reopen the form to retry.</p>}
-              <Button type="submit" disabled={!valid || mutation.isPending || preflightLoading || entityDataLoading || entityDataError} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
+              <Button type="submit" disabled={!valid || mutation.isPending || branchMutation.isPending || preflightLoading || entityDataLoading || entityDataError} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
                 {mutation.isPending ? "Creating..." : "Submit"}
               </Button>
             </div>
@@ -1170,6 +1266,79 @@ export default function CreateInvoiceModal({
           <StatusPanel kind="carrier" record={carrier} />
         </div>
       </DialogContent>
+      <Dialog open={branchDialogOpen} onOpenChange={nextOpen => {
+        if (branchMutation.isPending) return;
+        setBranchDialogOpen(nextOpen);
+      }}>
+        <DialogContent
+          showCloseButton={false}
+          className="max-h-[85vh] max-w-lg overflow-y-auto rounded-none border-2 border-slate-600 bg-[#c0c0c0] p-1 shadow-[4px_4px_0_#404040]"
+        >
+          <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">
+            <DialogTitle className="text-sm font-bold">Add Broker Branch</DialogTitle>
+            <button
+              type="button"
+              aria-label="Close add branch"
+              disabled={branchMutation.isPending}
+              onClick={() => setBranchDialogOpen(false)}
+              className="border-2 border-white bg-[#c0c0c0] px-2 font-bold leading-5 text-black disabled:opacity-50"
+            >×</button>
+          </div>
+          <DialogDescription className="sr-only">Add a branch to the selected broker. Only the branch name is required.</DialogDescription>
+          <form
+            className="space-y-3 bg-[#c0c0c0] p-3"
+            onSubmit={event => {
+              event.preventDefault();
+              const brokerId = values.brokerId;
+              if (!brokerId || !branchForm.branchName.trim() || branchMutation.isPending) return;
+              setBranchCreateError("");
+              branchMutation.mutate({ brokerId, fields: branchForm });
+            }}
+          >
+            <p className="border border-[#888] bg-[#e7e5df] px-2 py-1.5 text-xs text-[#333]">
+              Adding branch for <strong>{broker?.name ?? "selected broker"}</strong>. Name is required; all other details are optional.
+            </p>
+            {branchCreateError && <p role="alert" className="border border-red-700 bg-red-100 px-2 py-1.5 text-xs text-red-900">{branchCreateError}</p>}
+            <div className="grid grid-cols-2 gap-2.5">
+              {([
+                ["branchName", "Branch name", true],
+                ["address", "Address", false],
+                ["city", "City", false],
+                ["state", "State", false],
+                ["zip", "ZIP", false],
+                ["contactName", "Contact name", false],
+                ["email", "Email", false],
+                ["phone", "Phone", false],
+              ] as const).map(([key, label, required]) => (
+                <label key={key} className="space-y-1 text-xs font-semibold text-[#222]">
+                  <span>{label}{required ? " *" : ""}</span>
+                  <Input
+                    autoComplete="off"
+                    type={key === "email" ? "email" : "text"}
+                    required={required}
+                    value={branchForm[key]}
+                    onChange={event => setBranchForm(current => ({ ...current, [key]: event.target.value }))}
+                    className="h-8 rounded-none border border-[#777] bg-white px-2 text-sm shadow-[inset_1px_1px_0_#aaa]"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[#888] pt-3">
+              <Button
+                type="button"
+                disabled={branchMutation.isPending}
+                onClick={() => setBranchDialogOpen(false)}
+                className="h-8 rounded-none border-2 border-t-white border-l-white border-r-[#555] border-b-[#555] bg-[#c0c0c0] px-3 text-black shadow-[1px_1px_0_#333] hover:bg-[#d0d0d0]"
+              >Cancel</Button>
+              <Button
+                type="submit"
+                disabled={!values.brokerId || !branchForm.branchName.trim() || branchMutation.isPending}
+                className="h-8 rounded-none border-2 border-t-white border-l-white border-r-[#555] border-b-[#555] bg-[#c0c0c0] px-3 text-black shadow-[1px_1px_0_#333] hover:bg-[#d0d0d0] disabled:opacity-60"
+              >{branchMutation.isPending ? "Saving..." : "Save Branch"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog open={preflightOpen} onOpenChange={setPreflightOpen}>
         <DialogContent showCloseButton={false} className="max-h-[80vh] max-w-xl overflow-y-auto rounded-none border-2 border-slate-600 bg-[#c0c0c0] p-1 shadow-[4px_4px_0_#404040]">
           <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">

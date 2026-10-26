@@ -34,6 +34,7 @@ import { registerEmailLogRoutes } from "./routes/emailLog";
 import { registerEmailBroadcastRoutes } from "./routes/emailBroadcast";
 import { registerEmailTemplateRoutes } from "./routes/emailTemplates";
 import { registerAgentDashboardRoutes } from "./routes/agentDashboard";
+import { registerInvoiceBranchRoutes } from "./routes/invoiceBranches";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
@@ -948,6 +949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerEmailBroadcastRoutes(app, { requireAuth, requireAdmin });
   registerEmailTemplateRoutes(app, { requireAuth, requireEmailPermission: requireModulePermission("client_email") });
   registerAgentDashboardRoutes(app, requireAuth);
+  registerInvoiceBranchRoutes(app, requireAuth, canAccessBroker);
 
   app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {
     streamTestPdf(
@@ -3183,7 +3185,6 @@ ${message}
         amount: z.coerce.number().positive("Amount must be greater than zero"),
         clientId: z.coerce.number().int().positive(),
         brokerId: z.coerce.number().int().positive(),
-        branchId: z.coerce.number().int().positive(),
         driverId: z.coerce.number().int().positive().nullable().optional(),
         driverName: z.string().trim().max(255).nullable().optional(),
         bankAccountId: z.coerce.number().int().positive().nullable().optional(),

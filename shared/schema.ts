@@ -1,3 +1,4 @@
+import { optionalInvoiceBranchSchema, optionalInvoiceBuyoutSchema } from "./invoice-creation-options";
 import {
   pgTable,
   text,
@@ -1312,6 +1313,9 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true, createdAt: true, updatedAt: true,
   brokerConfirmationStatus: true, brokerConfirmedAt: true, brokerConfirmationToken: true,
   confirmationSentAt: true, confirmationRemindedCount: true, assignedFollowupAgentId: true,
+}).extend({
+  branchId: optionalInvoiceBranchSchema,
+  buyout: optionalInvoiceBuyoutSchema,
 });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
 export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
