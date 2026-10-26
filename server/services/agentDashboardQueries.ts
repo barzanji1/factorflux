@@ -1,14 +1,14 @@
 import { performance } from "node:perf_hooks";
-import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db";
-import { users, invoices, eventLedger, complianceIntegrationRuns } from "../../shared/schema";
+import { users, invoices, eventLedger } from "../../shared/schema";
 import type {
   DashboardViewer, DashboardSection, DashboardQueue, DashboardFollowUps, DashboardActivityFeed,
   DashboardAlerts, DashboardQueueGroup,
 } from "../../shared/agent-dashboard";
 import type { InvoicePreflightAlert } from "./invoicePreflight";
 import { dashboardPreflights } from "./dashboardPreflight";
-import { invoiceWork, unacknowledgedCodes, fmcsaAuthorityHealth } from "./agentDashboardWork";
+import { invoiceWork, unacknowledgedCodes } from "./agentDashboardWork";
 
 export const DASHBOARD_LIMIT = 20;
 type Store = typeof db;
@@ -169,13 +169,7 @@ export async function readDashboardActivity(viewer: DashboardViewer, store: Stor
   })) };
 }
 export async function readDashboardAlerts(viewer: DashboardViewer, store: Store = db, now = new Date()): Promise<DashboardAlerts> {
-  const [runs, result] = await Promise.all([
-    dashboardQuery("alerts", "latest-fmcsa-summary", store.select({
-      status: complianceIntegrationRuns.status, activeCount: complianceIntegrationRuns.activeCount,
-      failureCount: complianceIntegrationRuns.failureCount, startedAt: complianceIntegrationRuns.startedAt, completedAt: complianceIntegrationRuns.completedAt,
-    }).from(complianceIntegrationRuns).where(inArray(complianceIntegrationRuns.status, ["completed", "failed"]))
-      .orderBy(desc(complianceIntegrationRuns.startedAt), desc(complianceIntegrationRuns.id)).limit(1)),
-    dashboardQuery("alerts", "bounded-alerts-and-counts", store.execute<{
+  const result = await dashboardQuery("alerts", "bounded-alerts-and-counts", store.execute<{
       alerts: DashboardAlerts["alerts"]; counts: DashboardAlerts["alertCounts"];
     }>(sql`
       WITH active_alerts AS (
@@ -188,22 +182,11 @@ export async function readDashboardAlerts(viewer: DashboardViewer, store: Store 
         FROM documents d LEFT JOIN LATERAL (SELECT status,error_message,created_at FROM doc_extraction_jobs j
           WHERE j.document_id=d.id ORDER BY j.id DESC LIMIT 1) j ON true
         WHERE j.status='failed' OR (j.status IS NULL AND d.status='failed')
-        UNION ALL
-        SELECT 'carrier:'||c.id,'unverified_carrier','Unverified carrier: '||c.name,
-          'New client awaiting onboarding verification.',c.created_at,'/clients/'||c.id FROM clients c WHERE c.status='new_client'
-        UNION ALL
-        SELECT 'carrier_portal:'||p.id,'unverified_carrier','Unverified carrier registration: '||p.company_name,
-          'Portal registration awaiting administrative approval.',p.created_at,
-          CASE WHEN p.carrier_id IS NULL THEN '/admin' ELSE '/clients/'||p.carrier_id END
-        FROM carrier_portal_users p WHERE p.status='pending'
-          AND NOT EXISTS (SELECT 1 FROM clients c WHERE c.id=p.carrier_id AND c.status='new_client')
       )
       SELECT jsonb_build_object('email_bounced',count(*) FILTER(WHERE kind='email_bounced'),
-        'ocr_failed',count(*) FILTER(WHERE kind='ocr_failed'),'unverified_carrier',count(*) FILTER(WHERE kind='unverified_carrier')) AS counts,
+        'ocr_failed',count(*) FILTER(WHERE kind='ocr_failed')) AS counts,
         coalesce((SELECT jsonb_agg(to_jsonb(t) ORDER BY "when" DESC NULLS LAST,id)
           FROM (SELECT * FROM active_alerts ORDER BY "when" DESC NULLS LAST,id LIMIT ${DASHBOARD_LIMIT}) t),'[]') AS alerts
-      FROM active_alerts`)),
-  ]);
-  return { ...meta(viewer, now), alerts: result.rows[0].alerts, alertCounts: result.rows[0].counts,
-    systemHealth: { fmcsaAuthority: fmcsaAuthorityHealth(runs[0]) } };
+      FROM active_alerts`));
+  return { ...meta(viewer, now), alerts: result.rows[0].alerts, alertCounts: result.rows[0].counts };
 }

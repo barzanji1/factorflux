@@ -20,3 +20,9 @@ Performance optimizations must preserve the unfunded queue's live preflight chec
 **Why:** Broker/carrier conditions can change after intake; a faster dashboard must not hide new review actions.
 
 **How to apply:** Batch current lookups and reuse the existing preflight rules. Keep acknowledgement semantics consistent when counting and limiting queue items.
+
+Do not surface FMCSA run summaries or unverified/new-client onboarding state on the Agent Dashboard. Alerts are for actionable work today; an empty section should say "No alerts".
+
+**Why:** The user clarified that imported new_client carriers are onboarding state, not agent alerts.
+
+**How to apply:** Keep onboarding data/status and MC Check functionality intact outside this dashboard; retain actionable email/OCR failures and invoice preflight work.

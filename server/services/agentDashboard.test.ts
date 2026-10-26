@@ -10,7 +10,8 @@ import { registerAgentDashboardRoutes } from "../routes/agentDashboard";
 import type { InvoicePreflightAlert } from "./invoicePreflight";
 import { eq, sql } from "drizzle-orm";
 import { dashboardReaders } from "./agentDashboard";
-import { readDashboardQueue, readDashboardFollowUps } from "./agentDashboardQueries";
+import { readDashboardQueue, readDashboardFollowUps, readDashboardAlerts } from "./agentDashboardQueries";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { dashboardPreflights } from "./dashboardPreflight";
 import { runInvoicePreflight } from "./invoicePreflight";
 
@@ -18,6 +19,24 @@ after(() => pool.end());
 const at = new Date("2099-01-01T12:00:00Z");
 const ago = (days: number) => new Date(at.getTime() - days * 86400000);
 const base = { status: "funded", fundedAt: ago(31), createdAt: ago(100), brokerConfirmationStatus: "confirmed" };
+
+test("alerts exclude onboarding and FMCSA at the source; empty results contain no health card", async () => {
+  let queries = 0;
+  const store = {
+    select: () => { throw Error("Dashboard must not query FMCSA run summaries"); },
+    execute: async (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
+      queries++;
+      const text = new PgDialect().sqlToQuery(query).sql;
+      assert.doesNotMatch(text, /\b(clients|carrier_portal_users|compliance_integration_runs|unverified_carrier)\b/i);
+      return { rows: [{ alerts: [], counts: { email_bounced: 0, ocr_failed: 0 } }] };
+    },
+  } as unknown as typeof db;
+  const result = await readDashboardAlerts({ id: "fixture-actor", role: "employee" }, store, at);
+  assert.equal(queries, 1);
+  assert.deepEqual(result.alerts, []);
+  assert.deepEqual(result.alertCounts, { email_bounced: 0, ocr_failed: 0 });
+  assert(!("systemHealth" in result));
+});
 
 test("FMCSA health has healthy, warning, failed and never-run states", () => {
   assert.deepEqual(fmcsaAuthorityHealth(), {
@@ -74,8 +93,7 @@ test("HTTP identity is server-owned; authenticated reads only, no scope override
     req.user = { id: "fixture-actor", role: req.get("x-fixture-role") }; next();
   }, async viewer => {
     calls++; return { generatedAt: at.toISOString(), viewer, queueGroups: [], followUps: [], activity: [],
-      alerts: [], alertCounts: { email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 },
-      systemHealth: { fmcsaAuthority: fmcsaAuthorityHealth() } };
+      alerts: [], alertCounts: { email_bounced: 0, ocr_failed: 0 } };
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>(resolve => server.once("listening", resolve));
@@ -107,7 +125,7 @@ test("section HTTP reads are independent, authenticated, scoped and fail visibly
     followups: async viewer => { seen.push(viewer.id); return { viewer, generatedAt: at.toISOString(), followUps: [], totalCount: 0, limit: 20 }; },
     activity: async viewer => ({ viewer, generatedAt: at.toISOString(), activity: [] }),
     alerts: async viewer => ({ viewer, generatedAt: at.toISOString(), alerts: [],
-      alertCounts: { email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 }, systemHealth: { fmcsaAuthority: fmcsaAuthorityHealth() } }),
+      alertCounts: { email_bounced: 0, ocr_failed: 0 } }),
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>(resolve => server.once("listening", resolve));
@@ -223,15 +241,13 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
       });
       await t.test("global alerts contain real current failures; successful retries clear stale failures", () => {
         assert(!employee.alerts.some(a => a.id === `broker_check:${badCheck.id}` || a.id.startsWith("fmcsa_run:")));
-        assert.deepEqual(employee.systemHealth.fmcsaAuthority, {
-          state: "failed", active: 10, failed: 20, lastChecked: at.toISOString(), href: "/fmcsa-authority",
-        });
+        assert(!("systemHealth" in employee));
         assert(employee.alerts.some(a => a.id === `document:${failed.id}`));
         assert(!employee.alerts.some(a => a.id === `document:${recovered.id}`));
         assert(!employee.alerts.some(a => a.detail === "Old fixture failure"));
         assert(employee.alerts.some(a => a.id === `email:${bounce.id}`));
-        assert(employee.alerts.some(a => a.id === `carrier:${clientId - 1}`));
-        assert(employee.alerts.some(a => a.id === `carrier_portal:${pendingSignup.id}`));
+        assert(!employee.alerts.some(a => a.id.startsWith("carrier:") || a.id === `carrier_portal:${pendingSignup.id}`));
+        assert(employee.alerts.every(a => ["email_bounced", "ocr_failed"].includes(a.kind)));
         assert.equal(employee.alertCounts.ocr_failed, managerView.alertCounts.ocr_failed);
       });
       await t.test("unacknowledged preflight appears even when its notification was marked read", () => {
@@ -239,17 +255,14 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
         assert(actions.includes("Review preflight alert: FIXTURE_UNACKNOWLEDGED"));
         assert(actions.includes("Review preflight alert: FIXTURE_NOTIFICATION"));
       });
-      await t.test("latest clean run shows healthy without resurfacing older failures", async () => {
+      await t.test("clean FMCSA runs stay off the dashboard", async () => {
         await tx.insert(complianceIntegrationRuns).values({
           status: "completed", triggeredBy: agent, runType: "manual",
           startedAt: new Date(at.getTime() + 1000), completedAt: new Date(at.getTime() + 2000),
           successCount: 32, activeCount: 30, failureCount: 0,
         });
         const dashboard = await readAgentDashboard({ id: agent, role: "employee" }, store, at);
-        assert.deepEqual(dashboard.systemHealth.fmcsaAuthority, {
-          state: "healthy", active: 30, failed: 0,
-          lastChecked: new Date(at.getTime() + 2000).toISOString(), href: "/fmcsa-authority",
-        });
+        assert(!("systemHealth" in dashboard));
       });
       await t.test("latest running run also does not resurrect an old failure", async () => {
         await tx.insert(complianceIntegrationRuns).values({
@@ -257,19 +270,16 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
           startedAt: new Date(at.getTime() + 3000), successCount: 0, failureCount: 0,
         });
         const dashboard = await readAgentDashboard({ id: agent, role: "employee" }, store, at);
-        assert.equal(dashboard.systemHealth.fmcsaAuthority.state, "healthy");
-        assert.equal(dashboard.systemHealth.fmcsaAuthority.active, 30);
+        assert(!("systemHealth" in dashboard));
       });
-      await t.test("latest completed run with check failures shows warning, not failed", async () => {
+      await t.test("FMCSA failures stay on MC Check, not on the dashboard", async () => {
         await tx.insert(complianceIntegrationRuns).values({
           status: "completed", triggeredBy: agent, runType: "manual",
           startedAt: new Date(at.getTime() + 4000), completedAt: new Date(at.getTime() + 5000),
           successCount: 2802, activeCount: 2800, failureCount: 111,
         });
         const dashboard = await readAgentDashboard({ id: agent, role: "employee" }, store, at);
-        assert.equal(dashboard.systemHealth.fmcsaAuthority.state, "warning");
-        assert.equal(dashboard.systemHealth.fmcsaAuthority.active, 2800);
-        assert.equal(dashboard.systemHealth.fmcsaAuthority.failed, 111);
+        assert(!("systemHealth" in dashboard));
       });
       await t.test("one failed section does not discard successful sections in the aggregate response", async () => {
         const broken = new Proxy(store, { get(target, property) {

@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
-import { SystemHealthCard } from "@/components/dashboard/SystemHealthCard";
 import { Win95Button } from "@/components/win95";
 import { AlertTriangle, ArrowUpRight, BriefcaseBusiness, Clock3, RefreshCw } from "lucide-react";
 import type {
@@ -17,7 +16,6 @@ import type {
 const countKinds = [
   ["email_bounced", "Bounced email"],
   ["ocr_failed", "OCR failures"],
-  ["unverified_carrier", "Unverified carriers"],
 ] as const;
 
 function displayDate(value: string | null | undefined) {
@@ -217,7 +215,7 @@ export default function Dashboard() {
     [followupsData?.followUps],
   );
   const alertTotal = alertsData
-    ? alertsData.alertCounts.email_bounced + alertsData.alertCounts.ocr_failed + alertsData.alertCounts.unverified_carrier
+    ? alertsData.alertCounts.email_bounced + alertsData.alertCounts.ocr_failed
     : undefined;
 
   const refreshAll = async () => {
@@ -327,16 +325,12 @@ export default function Dashboard() {
           <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
             <SectionHeading id="alerts-heading" number="04" title="Alerts" count={alertTotal} />
             {alertsLoading ? <div className="space-y-3 p-3" data-testid="alerts-loading" aria-label="Loading alerts">
-              <div className="h-20 animate-pulse border-2 border-[#a0a0a0] bg-[#dedbd3]" />
               <div className="h-12 animate-pulse border border-[#a0a0a0] bg-[#dedbd3]" />
               <TableSkeleton testId="alerts-loading-table" rows={3} columns={5} />
             </div> : alertsQuery.isError || identityMismatch(alertsQuery.data, user) ? (
               <SectionError section="alerts" error={alertsQuery.error ?? new Error("This response does not match the signed-in account.")} retry={() => alertsQuery.refetch()} />
             ) : alertsData ? <>
-              <div className="border-b border-[#a0a0a0] p-3">
-                <SystemHealthCard health={alertsData.systemHealth.fmcsaAuthority} />
-              </div>
-              <div className="grid grid-cols-2 gap-px border-b border-[#a0a0a0] bg-[#a0a0a0] sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-px border-b border-[#a0a0a0] bg-[#a0a0a0]">
                 {countKinds.map(([kind, label]) => <div key={kind} className="bg-[#f4f2ed] px-3 py-2">
                   <p className="font-mono text-lg font-bold text-[#087c8d]">{alertsData.alertCounts[kind]}</p><p className="text-[11px] text-[#555]">{label}</p>
                 </div>)}
@@ -352,7 +346,7 @@ export default function Dashboard() {
                       <td className="whitespace-nowrap font-mono text-xs">{displayDate(alert.when)}</td>
                       <td><a href={alert.href} onClick={event => { event.preventDefault(); go(alert.href); }} className="inline-flex items-center gap-1 text-[#087c8d] underline-offset-2 hover:underline">Open <ArrowUpRight className="h-3 w-3" /></a></td>
                     </tr>
-                  )) : <EmptyRow columns={5}>No other active alerts. All clear.</EmptyRow>}</tbody>
+                  )) : <EmptyRow columns={5}>No alerts</EmptyRow>}</tbody>
                 </table>
               </div>
             </> : <div data-testid="alerts-loading"><TableSkeleton testId="alerts-loading-table" rows={3} columns={5} /></div>}
