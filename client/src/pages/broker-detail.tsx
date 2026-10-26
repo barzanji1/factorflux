@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
 import BrokerEditDialog from "@/components/brokers/broker-edit-dialog";
+import DumpStatementTimeline from "@/components/brokers/dump-statement-timeline";
 import type { Broker } from "@shared/schema";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -568,6 +569,12 @@ export default function BrokerDetail() {
                       )}
                     </div>
                   ),
+                },
+                {
+                  value: "timeline",
+                  label: "Timeline",
+                  icon: <Clock className="h-3.5 w-3.5" />,
+                  content: <DumpStatementTimeline brokerId={brokerId} />,
                 },
               ]}
             />

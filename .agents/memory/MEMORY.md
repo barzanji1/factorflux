@@ -10,7 +10,7 @@
 - [Agent Dashboard policy](agent-dashboard-policy.md) — default work queue, not project management; managers see all queues, without broadening personnel-report permissions.
 - [IT Support policy](it-support-policy.md) — software-only requests, single designated handler, and separate role-aware alerts; leave operational Tickets unchanged.
 - [Two-role factoring workflow](two-role-factoring-workflow.md) — agents create/correct/submit only; managers review, reject, fund, collect, and settle.
-- [Carrier-broker AR aging](carrier-broker-ar-aging.md) — age funded receivables from funded date and exclude closed balances; short pay uses all applied cash.
+- [Receivable report rules](carrier-broker-ar-aging.md) — funded-date aging, all-cash short pays, and independent chargeback report totals; zero-paid funded invoices belong in reconciliation.
 - [Bulk invoice uniqueness](bulk-invoice-uniqueness.md) — one broker/carrier/ticket/load identity may produce only one bulk receivable across all batches.
 - [Invoice number provenance](invoice-number-provenance.md) — internal INV numbers and carrier invoice references are separate; never infer legacy carrier references from ambiguous identifiers.
 - [Fuel advance compatibility](fuel-advance-compatibility.md) — preserve legacy fuel-advance reads/API fields while normalized workflow fields are adopted.
@@ -50,3 +50,4 @@
 - [Agent Performance freshness](agent-performance-freshness.md) — employee/date changes and revisits require fresh snapshots and a full control reset, not only detail-dialog keys.
 - [Document compression](document-compression.md) — persist only compressed uploads; portal document rows need size provenance too; HEIC requires a separate system decoder.
 - [Document identity and viewing](document-identity-viewing.md) — dedupe pending uploads by original bytes and owner; distinguish browser CORS failures from S3 authorization.
+- [Dump statement cadence](dump-statement-cadence.md) — invoice-funded milestones trigger consolidated broker statements; no broker-wide cooldown or catch-up email bursts.

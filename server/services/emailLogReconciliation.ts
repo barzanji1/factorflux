@@ -4,9 +4,17 @@ import { db } from "../db";
 import type { ResendEmailParams } from "../resendTransport.js";
 import { createBrokerConfirmationService } from "./brokerConfirmationService";
 import { EmailLogError, type EmailStore } from "./emailLogService";
+import { recordChargebackWarningSent, validateChargebackWarningRetry } from "./chargebackWarning";
+import { recordDumpStatementSent, DUMP_STATEMENT_TEMPLATE } from "./dumpStatements";
 
 export async function validateEmailRetryDomain(params: ResendEmailParams, store: EmailStore = db) {
   const meta = params.emailLog;
+  if (meta?.templateName === DUMP_STATEMENT_TEMPLATE)
+    throw new EmailLogError(409, "Dump statements are retried by the aging job after checking current balances. Email Log cannot resend an obsolete financial statement.");
+  if (meta?.templateName === "chargeback_warning" && meta.entityId) {
+    try { await validateChargebackWarningRetry(Number(meta.entityId), store); }
+    catch (error) { throw new EmailLogError(409, error instanceof Error ? error.message : "Warning retry is not allowed."); }
+  }
   if (meta?.templateName?.startsWith("broker_collections_")) {
     throw new EmailLogError(409, "Retry this email by resuming its VP / RPS workflow. Email Log cannot bypass automation pause, stop, paid, or global controls.");
   }
@@ -27,6 +35,11 @@ export async function validateEmailRetryDomain(params: ResendEmailParams, store:
 }
 export async function reconcileEmailRetry(params: ResendEmailParams, messageId: string, actorId: string | null, store: EmailStore = db, acceptedAt?: Date) {
   const meta = params.emailLog, at = new Date();
+  if (meta?.templateName === DUMP_STATEMENT_TEMPLATE && meta.dumpStatementId)
+    await recordDumpStatementSent(meta.dumpStatementId, messageId, store, acceptedAt ?? at);
+  if (meta?.templateName === "chargeback_warning" && meta.entityId) {
+    await recordChargebackWarningSent(Number(meta.entityId), messageId, store, acceptedAt ?? at);
+  }
   if (meta?.templateName === "client_email" && params.idempotencyKey?.startsWith("client-email/")) {
     await store.update(clientEmailLogs).set({ status: "sent", sentAt: at, updatedAt: at, errorMessage: null, providerMessageId: messageId })
       .where(eq(clientEmailLogs.requestId, params.idempotencyKey.slice("client-email/".length)));

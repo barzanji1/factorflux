@@ -491,6 +491,16 @@ const invoiceTimelineEventFormats: Record<string, TimelineEventFormat> = {
     title: () => "Chargeback applied",
     description: payload => `Chargeback applied after ${timelineText(payload.days)} days${payload.broker ? ` for ${payload.broker}` : ""}`,
   },
+  chargeback_warning_sent: {
+    category: "system",
+    title: payload => `${timelineText(payload.thresholdDays, "80")}-day chargeback warning sent`,
+    description: payload => `Broker notified of $${timelineText(payload.amountDue)} outstanding after ${timelineText(payload.agedDays)} days. Agent follow-up task created.`,
+  },
+  chargeback_warning_failed: {
+    category: "system",
+    title: () => "Chargeback warning delivery failed",
+    description: payload => timelineText(payload.error, "Delivery could not be confirmed. Check Email Log and the assigned follow-up."),
+  },
   chargeback_extended: {
     category: "system",
     title: () => "Chargeback extended",
@@ -569,7 +579,7 @@ const invoiceTimelineEventFormats: Record<string, TimelineEventFormat> = {
   },
 };
 
-function formatInvoiceTimelineEvent(eventType: string, payload: Record<string, unknown>) {
+export function formatInvoiceTimelineEvent(eventType: string, payload: Record<string, unknown>) {
   const brokerDeliveryStatus = eventType.startsWith("broker_followup_delivery_")
     ? eventType.slice("broker_followup_delivery_".length).replace(/_/g, " ")
     : null;

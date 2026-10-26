@@ -23,6 +23,8 @@ const idSchema = z.coerce.number().int().positive();
 const tokenSchema = z.string().uuid();
 const noteSchema = z.object({ notes: z.string().trim().min(3).max(2000) }).strict();
 export const confirmationSettingsSchema = z.object({
+  chargebackWarningDays: z.number().int().min(1).max(89).optional(),
+  dumpStatementIntervalDays: z.number().int().min(1).max(365).optional(),
   maxReminders: z.number().int().min(0).max(3),
   reminderDays: z.tuple([z.number().int().min(1).max(365), z.number().int().min(1).max(365), z.number().int().min(1).max(365)])
     .refine(days => days[0] < days[1] && days[1] < days[2], "Reminder days must be strictly increasing."),

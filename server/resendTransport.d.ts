@@ -21,6 +21,7 @@ export interface ResendEmailParams {
     confirmationReminder?: number | null;
     followupReminderId?: number;
     followupImmediate?: boolean;
+    dumpStatementId?: string;
   };
   attachments?: Array<{
     content: string;

@@ -31,13 +31,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
+import ChargebackReport from "@/components/reports/chargeback-report";
+import AgingReport from "@/components/reports/aging-report";
 import {
   Win95Tabs,
   Win95TabsList,
   Win95TabsTrigger,
 } from "@/components/win95";
 import { Link } from "wouter";
-import { ConfirmationStatusBadge, type ConfirmationStatus } from "@/components/broker-confirmation/confirmation-status";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ const TABS = [
   { id: "broker",   label: "Broker",   icon: Building2   },
   { id: "carrier",  label: "Carrier",  icon: Truck       },
   { id: "carrier-ar", label: "Carrier AR", icon: DollarSign },
+  { id: "chargeback", label: "Chargeback", icon: FileText },
   { id: "daily-ar", label: "Daily AR", icon: DollarSign  },
   { id: "monthly",  label: "Monthly",  icon: CalendarDays},
 ] as const;
@@ -123,146 +125,6 @@ function SkeletonRows({ cols, rows = 4 }: { cols: number; rows?: number }) {
         </tr>
       ))}
     </>
-  );
-}
-
-// ─── Aging ────────────────────────────────────────────────────────────────────
-
-type AgingBuckets = Record<string, { count: number; total: number; carriers: Record<string, number>; brokers: Record<string, number> }>;
-type ConfirmationAgingRow = {
-  invoiceId: number; invoiceNumber: string; carrier: string; broker: string;
-  amount: number; outstanding: number; ageDays: number; fundedAt: string;
-  confirmationStatus: ConfirmationStatus;
-};
-
-const BUCKET_CFG = {
-  "0-30":  { bar: "bg-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400", text: "text-emerald-700 dark:text-emerald-400" },
-  "31-60": { bar: "bg-amber-400",   badge: "bg-amber-100 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400",             text: "text-amber-700 dark:text-amber-400" },
-  "61-90": { bar: "bg-orange-500",  badge: "bg-orange-100 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-400",        text: "text-orange-700 dark:text-orange-400" },
-  "90+":   { bar: "bg-red-600",     badge: "bg-red-100 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400",                          text: "text-red-700 dark:text-red-400" },
-} as const;
-const BUCKETS = ["0-30", "31-60", "61-90", "90+"] as const;
-
-function AgingTab() {
-  const { data, isLoading } = useQuery<AgingBuckets>({ queryKey: ["/api/reports/aging"] });
-  const confirmationAging = useQuery<ConfirmationAgingRow[]>({
-    queryKey: ["/api/reports/confirmation-aging"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/reports/confirmation-aging");
-      return response.json();
-    },
-  });
-  const grandTotal = data ? BUCKETS.reduce((s, b) => s + (data[b]?.total ?? 0), 0) : 0;
-
-  const csvRows = useMemo(() => {
-    if (!data) return [];
-    return BUCKETS.flatMap(b =>
-      Object.entries(data[b].carriers).map(([carrier, amt]) => ({ bucket: b, carrier, amount: amt.toFixed(2) }))
-    );
-  }, [data]);
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding funded invoices grouped by days since funding</p>
-        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("aging_report.csv", csvRows)}>
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-4 gap-3">{BUCKETS.map(b => <div key={b} className="ff-reports-surface h-32 bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {BUCKETS.map(b => {
-              const bkt = data?.[b];
-              const pct = grandTotal > 0 ? ((bkt?.total ?? 0) / grandTotal) * 100 : 0;
-              const s = BUCKET_CFG[b];
-              return (
-                <div key={b} className={cn("ff-reports-bucket ff-reports-surface border p-4", s.badge)}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold">{b} days</span>
-                    <span className="text-[10px] font-medium opacity-60">{pct.toFixed(1)}%</span>
-                  </div>
-                  <p className="text-xl font-bold">{fmtShort(bkt?.total ?? 0)}</p>
-                  <p className="text-[11px] opacity-70 mt-0.5">{bkt?.count ?? 0} invoices</p>
-                  <div className="mt-2 h-1.5 rounded-full bg-black/10 dark:bg-white/10">
-                    <div className={cn("h-1.5 rounded-full", s.bar)} style={{ width: `${Math.min(pct, 100)}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {BUCKETS.map(b => {
-            const bkt = data?.[b];
-            if (!bkt || bkt.count === 0) return null;
-            const topCarriers = Object.entries(bkt.carriers).sort((a, z) => z[1] - a[1]).slice(0, 5);
-            const topBrokers  = Object.entries(bkt.brokers ).sort((a, z) => z[1] - a[1]).slice(0, 5);
-            return (
-              <Card key={b} className="border border-slate-200 dark:border-slate-700">
-                <CardHeader className="pb-2 pt-4 px-5">
-                  <CardTitle className={cn("text-sm font-semibold flex items-center gap-2", BUCKET_CFG[b].text)}>
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    {b} days — {fmt(bkt.total)} across {bkt.count} invoices
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-5 pb-4 grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Top Carriers</p>
-                    <div className="space-y-1">
-                      {topCarriers.map(([name, amt]) => (
-                        <div key={name} className="flex items-center justify-between text-xs">
-                          <span className="text-slate-600 dark:text-slate-300 truncate max-w-[140px]">{name}</span>
-                          <span className="font-semibold tabular-nums">{fmt(amt)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Top Brokers</p>
-                    <div className="space-y-1">
-                      {topBrokers.map(([name, amt]) => (
-                        <div key={name} className="flex items-center justify-between text-xs">
-                          <span className="text-slate-600 dark:text-slate-300 truncate max-w-[140px]">{name}</span>
-                          <span className="font-semibold tabular-nums">{fmt(amt)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </>
-      )}
-      <Card data-testid="confirmation-aging-table" className="overflow-hidden border-2 border-[#808080] border-r-[#404040] border-b-[#404040]">
-        <CardHeader className="border-b border-slate-200 pb-3">
-          <CardTitle className="text-sm">Funded balances · receipt confirmation</CardTitle>
-          <p className="text-xs text-slate-500">Positive outstanding balances with broker receipt status. This indicator is independent of aging date filters.</p>
-        </CardHeader>
-        {confirmationAging.isLoading ? <div className="space-y-2 p-4">{[1, 2, 3].map(n => <div key={n} className="h-8 animate-pulse bg-slate-100" />)}</div>
-          : confirmationAging.error ? <div role="alert" className="p-4 text-sm text-red-700">{(confirmationAging.error as Error).message}<Button size="sm" variant="outline" className="ml-2" onClick={() => confirmationAging.refetch()}>Retry</Button></div>
-          : <div className="overflow-x-auto">
-            <table className="ff-data-table w-full text-sm">
-              <thead><tr className="border-b border-slate-200 bg-slate-50">
-                {["Invoice", "Carrier", "Broker", "Amount", "Outstanding", "Age", "Funded", "Confirmation status"].map(label => <th key={label} className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</th>)}
-              </tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {!confirmationAging.data?.length ? <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">No positive funded balances require confirmation reporting.</td></tr>
-                  : confirmationAging.data.map(row => <tr key={row.invoiceId} data-testid="confirmation-aging-row">
-                    <td className="px-3 py-2 font-semibold"><Link href={`/invoices/${row.invoiceId}`} className="text-[#087f8c] underline">{row.invoiceNumber}</Link></td>
-                    <td className="px-3 py-2">{row.carrier}</td><td className="px-3 py-2">{row.broker}</td>
-                    <td className="px-3 py-2 tabular-nums">{fmt(Number(row.amount))}</td><td className="px-3 py-2 tabular-nums">{fmt(Number(row.outstanding))}</td>
-                    <td className="px-3 py-2 tabular-nums">{row.ageDays}d</td><td className="px-3 py-2 whitespace-nowrap">{row.fundedAt ? format(new Date(row.fundedAt), "MMM d, yyyy") : "—"}</td>
-                    <td className="px-3 py-2"><ConfirmationStatusBadge status={row.confirmationStatus} /></td>
-                  </tr>)}
-              </tbody>
-            </table>
-          </div>}
-      </Card>
-    </div>
   );
 }
 
@@ -1161,12 +1023,13 @@ export default function Reports() {
 
             <div>
               {activeTab === "global"   && <GlobalReportsTab />}
-              {activeTab === "aging"    && <AgingTab />}
+              {activeTab === "aging"    && <AgingReport />}
               {activeTab === "agent"    && <AgentTab />}
               {activeTab === "agent-performance" && <AgentPerformanceTab />}
               {activeTab === "broker"   && <BrokerTab />}
               {activeTab === "carrier"  && <CarrierTab />}
               {activeTab === "carrier-ar" && <CarrierArTab />}
+              {activeTab === "chargeback" && <ChargebackReport />}
               {activeTab === "daily-ar" && <DailyARTab />}
               {activeTab === "monthly"  && <MonthlyTab />}
             </div>

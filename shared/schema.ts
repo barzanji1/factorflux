@@ -21,6 +21,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
 import { LOAD_TYPES } from "./load-types";
+import type { DumpStatementInvoice, DumpStatementTrigger } from "./dump-statements";
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -613,7 +614,7 @@ export const invoiceStatusHistory = pgTable("invoice_status_history", {
 export const eventLedger = pgTable("event_ledger", {
   id: serial("id").primaryKey(),
   entityType: varchar("entity_type", {
-    enum: ["client", "debtor", "invoice", "load", "document", "user", "system"],
+    enum: ["client", "debtor", "broker", "invoice", "load", "document", "user", "system"],
   }).notNull(),
   entityId: integer("entity_id").notNull(),
   eventType: varchar("event_type").notNull(),
@@ -930,13 +931,67 @@ export const brokerConfirmationEvents = pgTable("broker_confirmation_events", {
 
 export const brokerConfirmationSettings = pgTable("broker_confirmation_settings", {
   id: integer("id").primaryKey().default(1),
+  chargebackWarningDays: integer("chargeback_warning_days").default(80).notNull(),
+  dumpStatementIntervalDays: integer("dump_statement_interval_days").default(10).notNull(),
   maxReminders: integer("max_reminders").default(3).notNull(),
   reminderDays: jsonb("reminder_days").$type<[number, number, number]>().default([3, 7, 14]).notNull(),
   publicBaseUrl: varchar("public_base_url").notNull(),
   updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, table => [check("broker_confirmation_settings_singleton", sql`${table.id} = 1`),
+  check("broker_confirmation_warning_days_check", sql`${table.chargebackWarningDays} between 1 and 89`),
+  check("broker_dump_statement_interval_check", sql`${table.dumpStatementIntervalDays} between 1 and 365`),
   check("broker_confirmation_max_reminders_check", sql`${table.maxReminders} between 0 and 3`)]);
+
+// One durable warning per invoice, independent of scheduler runs/settings edits.
+export const brokerDumpStatements = pgTable("broker_dump_statements", {
+  id: varchar("id").primaryKey(),
+  brokerId: integer("broker_id").references(() => brokers.id).notNull(),
+  brokerName: text("broker_name").notNull(),
+  recipient: text("recipient").notNull(),
+  intervalDays: integer("interval_days").notNull(),
+  statementAt: timestamp("statement_at").notNull(),
+  totalBalance: decimal("total_balance", { precision: 14, scale: 2 }).notNull(),
+  invoiceSnapshot: jsonb("invoice_snapshot").$type<DumpStatementInvoice[]>().notNull(),
+  triggers: jsonb("triggers").$type<DumpStatementTrigger[]>().notNull(),
+  s3Key: text("s3_key").notNull(),
+  pdfStoredAt: timestamp("pdf_stored_at"),
+  status: varchar("status", { enum: ["sending", "sent", "failed", "uncertain", "skipped"] }).notNull(),
+  attemptStartedAt: timestamp("attempt_started_at").notNull(),
+  messageId: text("message_id"),
+  error: text("error"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, table => [
+  index("broker_dump_statements_history_idx").on(table.brokerId, table.createdAt),
+  uniqueIndex("broker_dump_statements_active_idx").on(table.brokerId)
+    .where(sql`${table.status} in ('sending','failed','uncertain')`),
+  check("broker_dump_statements_status_check", sql`${table.status} in ('sending','sent','failed','uncertain','skipped')`),
+]);
+export const brokerDumpStatementCursors = pgTable("broker_dump_statement_cursors", {
+  invoiceId: integer("invoice_id").primaryKey().references(() => invoices.id, { onDelete: "cascade" }),
+  fundedAt: timestamp("funded_at").notNull(),
+  lastStatementAt: timestamp("last_statement_at"),
+  activeStatementId: varchar("active_statement_id").references(() => brokerDumpStatements.id),
+});
+
+export const invoiceChargebackWarnings = pgTable("invoice_chargeback_warnings", {
+  invoiceId: integer("invoice_id").primaryKey().references(() => invoices.id, { onDelete: "cascade" }),
+  thresholdDays: integer("threshold_days").notNull(),
+  agedDays: integer("aged_days").notNull(),
+  amountDue: decimal("amount_due", { precision: 12, scale: 2 }).notNull(),
+  recipient: text("recipient"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  status: varchar("status", { enum: ["sending", "sent", "failed", "uncertain", "skipped"] }).notNull(),
+  messageId: text("message_id"),
+  error: text("error"),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, table => [
+  check("invoice_chargeback_warnings_status_check", sql`${table.status} in ('sending','sent','failed','uncertain','skipped')`),
+]);
 
 // Calendar appointments and reminders. Recurring events remain a single row;
 export const brokerCollectionSettings = pgTable("broker_collection_settings", {

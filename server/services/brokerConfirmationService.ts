@@ -2,7 +2,7 @@ import { isProductionAppOrigin } from "../../shared/production-urls.js";
 import { and, asc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
-  invoices, brokers, clients, debtors, users, tasks, paymentApplicationLines,
+  invoices, brokers, clients, debtors, loads, users, tasks, paymentApplicationLines,
   brokerConfirmationEvents, brokerConfirmationSettings, eventLedger,
 } from "../../shared/schema";
 import { sendEmailTracked } from "../emailService";
@@ -15,7 +15,7 @@ export type ConfirmationStore = Store;
 type Invoice = typeof invoices.$inferSelect;
 type Event = typeof brokerConfirmationEvents.$inferInsert.event;
 export type ConfirmationActor = { kind: "system" | "agent" | "broker"; id: string };
-export type ConfirmationSettings = Pick<typeof brokerConfirmationSettings.$inferSelect, "maxReminders" | "reminderDays" | "publicBaseUrl">;
+export type ConfirmationSettings = Pick<typeof brokerConfirmationSettings.$inferSelect, "maxReminders" | "reminderDays" | "publicBaseUrl"> & { chargebackWarningDays?: number; dumpStatementIntervalDays?: number };
 const DAY = 86_400_000;
 export const INITIAL_CONFIRMATION_DELAY_MS = 2 * DAY;
 
@@ -62,7 +62,8 @@ export function createBrokerConfirmationService({
   async function settings(): Promise<ConfirmationSettings> {
     const [row] = await store.select().from(brokerConfirmationSettings).where(eq(brokerConfirmationSettings.id, 1));
     if (!row) throw new ConfirmationError(503, "Broker confirmation settings have not been configured.");
-    return { maxReminders: row.maxReminders, reminderDays: row.reminderDays, publicBaseUrl: row.publicBaseUrl };
+    return { maxReminders: row.maxReminders, reminderDays: row.reminderDays, publicBaseUrl: row.publicBaseUrl,
+      chargebackWarningDays: row.chargebackWarningDays, dumpStatementIntervalDays: row.dumpStatementIntervalDays };
   }
 
   async function event(tx: Tx, invoiceId: number, kind: Event, actor: ConfirmationActor, notes: string | null, at: Date) {
@@ -324,11 +325,14 @@ export async function getConfirmationInvoiceScope(user: { id: string; role: stri
 export async function getConfirmationAgingRows(scope?: ReturnType<typeof eq>, store: Store = db, at = new Date()) {
   const rows = await store.select({
     invoiceId: invoices.id, invoiceNumber: invoices.invoiceNumber, amount: invoices.amount,
+    carrierId: invoices.clientId, brokerId: invoices.brokerId, debtorId: invoices.debtorId,
+    status: invoices.status, loadType: invoices.loadType,
+    loadNumber: sql<string | null>`coalesce(${invoices.loadNumber}, ${loads.loadNumber})`,
     carrier: clients.name, broker: sql<string | null>`coalesce(${brokers.name}, ${debtors.name})`, fundedAt: invoices.fundedAt,
     confirmationStatus: invoices.brokerConfirmationStatus,
     applied: sql<string>`coalesce((select sum(${paymentApplicationLines.appliedAmount} + case when ${paymentApplicationLines.varianceType} = 'write_off' then abs(coalesce(${paymentApplicationLines.variance},0)) else 0 end) from ${paymentApplicationLines} where ${paymentApplicationLines.invoiceId} = ${invoices.id}), 0)`,
   }).from(invoices).leftJoin(clients, eq(invoices.clientId, clients.id)).leftJoin(brokers, eq(invoices.brokerId, brokers.id))
-    .leftJoin(debtors, eq(invoices.debtorId, debtors.id))
+    .leftJoin(debtors, eq(invoices.debtorId, debtors.id)).leftJoin(loads, eq(invoices.loadId, loads.id))
     .where(and(isNotNull(invoices.fundedAt), inArray(invoices.status, ["funded", "held"]), scope)).orderBy(asc(invoices.fundedAt));
   return rows.flatMap(({ applied, ...row }) => {
     const outstanding = Math.max(0, Number(row.amount) - Number(applied));

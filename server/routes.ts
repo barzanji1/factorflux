@@ -35,6 +35,9 @@ import { registerEmailBroadcastRoutes } from "./routes/emailBroadcast";
 import { registerEmailTemplateRoutes } from "./routes/emailTemplates";
 import { registerAgentDashboardRoutes } from "./routes/agentDashboard";
 import { registerInvoiceBranchRoutes } from "./routes/invoiceBranches";
+import { registerChargebackReportRoutes } from "./routes/chargebackReport";
+import { registerDumpStatementRoutes } from "./routes/dumpStatements";
+import { agingReportFiltersSchema, groupAgingRows } from "../shared/aging-report";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
@@ -9031,6 +9034,9 @@ Trucking Pros Financial Team
     for (const row of report.rows) drawRow(report.columns.map(column => display(row[column.key], column.type)));
     doc.end();
   };
+  registerChargebackReportRoutes(app, requireReportsPermission);
+  registerDumpStatementRoutes(app, requireAuth);
+
   app.get("/api/reports/global/:reportId/pdf", requireReportsPermission, async (req, res) => {
     try { streamGlobalReportPdf(res, await buildGlobalReport(req.params.reportId), req.params.reportId); }
     catch (error: any) { res.status(error.status || 400).json({ message: error.message || "Failed to generate report PDF" }); }
@@ -9674,7 +9680,12 @@ Trucking Pros Financial Team
   // Aging Report
   app.get("/api/reports/aging", requireAuth, async (req: any, res) => {
     try {
+      const filters = req.query.view === undefined ? null : agingReportFiltersSchema.parse(req.query);
       const allInvoices = await getConfirmationAgingRows(await getConfirmationInvoiceScope(req.user));
+      if (filters) {
+        res.set("Cache-Control", "no-store");
+        return res.json(groupAgingRows(allInvoices, filters));
+      }
       const bucket = (inv: typeof allInvoices[0]) => {
         const days = inv.ageDays;
         if (days <= 30) return "0-30";
@@ -9702,7 +9713,10 @@ Trucking Pros Financial Team
       }
 
       res.json(buckets);
-    } catch (e) { res.status(500).json({ message: "Failed to generate aging report" }); }
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0]?.message || "Invalid aging filters" });
+      res.status(500).json({ message: "Failed to generate aging report" });
+    }
   });
 
   // Agent Report

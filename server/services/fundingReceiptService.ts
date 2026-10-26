@@ -1,7 +1,6 @@
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
 import PDFDocument from "pdfkit";
+import { tpfPdfHeader, tpfPdfFooter } from "./tpfPdfBranding";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
@@ -50,12 +49,6 @@ export interface IssuedFundingReceipt {
 }
 
 const money = (value: string | number) => Number(value).toFixed(2);
-const logoCandidates = [
-  path.resolve(process.cwd(), "client/public/images/tpf-logo.png"),
-  path.resolve(process.cwd(), "dist/public/images/tpf-logo.png"),
-  path.resolve(process.cwd(), "server/assets/tpf-logo.png"),
-  path.resolve(process.cwd(), "dist/tpf-logo.png"),
-];
 
 function canonicalize(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
@@ -125,15 +118,13 @@ export function buildFundingReceiptPdf(
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "LETTER", margin: 48, info: {
       Title: `Funding Receipt ${receipt.receiptNo} v${receipt.version}`,
-      Author: "FactorFlux",
+      Author: "Trucking Pros Financial",
     } });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
-    const logoPath = logoCandidates.find(candidate => fs.existsSync(candidate));
-    if (logoPath) doc.image(logoPath, 48, 38, { fit: [58, 58] });
-    doc.font("Helvetica-Bold").fontSize(16).text("Trucking Pros Financial", 122, 55, { width: 420 });
+    tpfPdfHeader(doc);
     doc.font("Helvetica-Bold").fontSize(22).text("Funding Receipt", 48, 115);
     doc.font("Helvetica").fontSize(10).fillColor("#555")
       .text(`Receipt ${receipt.receiptNo} · Version ${receipt.version}`, 48, 145);
@@ -164,8 +155,7 @@ export function buildFundingReceiptPdf(
       doc.font("Helvetica-Bold");
       y += 24;
     }
-    doc.font("Helvetica").fontSize(8).fillColor("#64748b")
-      .text("Trucking Pros Financial · Immutable funding record. New payment references create a new receipt version.", 48, 730, { width: 516 });
+    tpfPdfFooter(doc, "Immutable funding record. New payment references create a new receipt version.");
     doc.end();
   });
 }

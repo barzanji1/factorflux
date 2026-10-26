@@ -3,6 +3,8 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { brokers, clients, debtors, eventLedger, invoiceAgingAlerts, invoices, invoiceStatusHistory, notifications, users } from "@shared/schema";
 import { recalculateBrokerCreditSafe } from "./brokerCreditEngine";
+import { processChargebackWarnings } from "./chargebackWarning";
+import { processDumpStatements } from "./dumpStatements";
 
 const DAY_MS = 86_400_000;
 
@@ -11,7 +13,7 @@ const DAY_MS = 86_400_000;
  * key makes repeated scheduler runs safe, including concurrent application
  * instances.
  */
-export async function processInvoiceAgingAlerts(): Promise<{ created: number }> {
+export async function processInvoiceAgingAlerts() {
   const now = new Date();
   let created = 0;
 
@@ -148,7 +150,12 @@ export async function processInvoiceAgingAlerts(): Promise<{ created: number }> 
       }
     }
   }
-  return { created };
+  const chargebackWarnings = await processChargebackWarnings();
+  const dumpStatements = await processDumpStatements();
+  if (chargebackWarnings.blockedInPreview) console.info("[agingScheduler] Live chargeback warning emails are blocked in Preview.");
+  if (dumpStatements.blockedInPreview) console.info("[agingScheduler] Live dump-load statements are blocked in Preview.");
+  if (dumpStatements.failed) console.warn(`[agingScheduler] ${dumpStatements.failed} dump-load statements failed. See broker timelines / Email Log.`);
+  return { created, chargebackWarnings, dumpStatements };
 }
 
 let scheduler: NodeJS.Timeout | null = null;
