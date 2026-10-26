@@ -608,7 +608,7 @@ export default function FmcsaAuthority() {
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="status">
+            <Tabs defaultValue={new URLSearchParams(window.location.search).get("tab") === "runs" ? "runs" : "status"}>
               <TabsList>
                 <TabsTrigger value="status">Authority Status</TabsTrigger>
                 <TabsTrigger value="alerts" className="relative">

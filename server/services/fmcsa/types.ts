@@ -8,7 +8,8 @@
 export interface FmcsaQueryOptions {
   /** Request timeout in milliseconds. Default: 10 000 */
   timeoutMs?: number;
-  /** Maximum number of attempts (1 = no retry). Default: 3 */
+  /** Maximum number of attempts (1 = no retry). Default: 4 (initial + 3 retries).
+   * FMCSA_MAX_RETRIES retains its legacy total-attempts meaning. */
   maxRetries?: number;
   /** Optional run-level cancellation signal. */
   signal?: AbortSignal;

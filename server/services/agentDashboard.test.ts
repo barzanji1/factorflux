@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 import { db, pool } from "../db";
 import { users, clients, brokers, invoices, tasks, followUps, documents, docExtractionJobs,
-  eventLedger, emailLog, carrierAuthorityChecks, brokerAuthorityChecks, notifications, carrierPortalUsers } from "../../shared/schema";
+  eventLedger, emailLog, carrierAuthorityChecks, brokerAuthorityChecks, notifications, carrierPortalUsers, complianceIntegrationRuns } from "../../shared/schema";
 import { invoiceWork, readAgentDashboard, unacknowledgedCodes } from "./agentDashboard";
 import { registerAgentDashboardRoutes } from "../routes/agentDashboard";
 import type { InvoicePreflightAlert } from "./invoicePreflight";
@@ -59,7 +59,7 @@ test("HTTP identity is server-owned; authenticated reads only, no scope override
     req.user = { id: "fixture-actor", role: req.get("x-fixture-role") }; next();
   }, async viewer => {
     calls++; return { generatedAt: at.toISOString(), viewer, queueGroups: [], followUps: [], activity: [],
-      alerts: [], alertCounts: { fmcsa_failed: 0, email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 } };
+      alerts: [], alertCounts: { fmcsa_run: 0, email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 } };
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>(resolve => server.once("listening", resolve));
@@ -133,6 +133,10 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
       ]);
       const [badCheck] = await tx.insert(brokerAuthorityChecks).values({ entityType: "broker", entityId: broker.id,
         brokerId: broker.id, entityName: broker.name, checkStatus: "error", checkError: "Fixture lookup failed", checkedAt: at }).returning();
+      const [run] = await tx.insert(complianceIntegrationRuns).values({
+        status: "failed", triggeredBy: agent, runType: "manual", startedAt: at, completedAt: at,
+        successCount: 12, failureCount: 20, noKeyCount: 8, reason: "Fixture circuit breaker",
+      }).returning();
       const [bounce] = await tx.insert(emailLog).values({ fromAddress: "fixture@example.test", toAddresses: ["recipient@example.test"],
         subject: "Fixture bounced message", bodyPreview: "Fixture preview", status: "bounced", statusUpdatedAt: at }).returning();
       const [pendingSignup] = await tx.insert(carrierPortalUsers).values({ email: `${tag}@example.test`,
@@ -167,7 +171,11 @@ test("real database queues, follow-ups, audit feed and global alerts (isolated r
         assert(!JSON.stringify(employee).includes("NEVER_RETURN_FIXTURE_PAYLOAD"));
       });
       await t.test("global alerts contain real current failures; successful retries clear stale failures", () => {
-        assert(employee.alerts.some(a => a.id === `broker_check:${badCheck.id}`));
+        assert(!employee.alerts.some(a => a.id === `broker_check:${badCheck.id}` || a.kind === "fmcsa_failed"));
+        const summaries = employee.alerts.filter(a => a.id === `fmcsa_run:${run.id}`);
+        assert.equal(summaries.length, 1);
+        assert.equal(summaries[0].title, "MC Check completed: 12 checked, 20 failed, 8 skipped");
+        assert.equal(summaries[0].href, `/fmcsa-authority?tab=runs&runId=${run.id}`);
         assert(employee.alerts.some(a => a.id === `document:${failed.id}`));
         assert(!employee.alerts.some(a => a.id === `document:${recovered.id}`));
         assert(!employee.alerts.some(a => a.detail === "Old fixture failure"));

@@ -723,6 +723,17 @@ export async function runAllAuthorityChecks(
     if (abortReason) {
       summary.status = "failed";
       summary.reason = abortReason;
+      // Queued/in-flight work cancelled by the breaker was not a failed lookup.
+      // Account for it explicitly so the run summary does not hide skipped work.
+      const finished = new Set(summary.detail.map(item => `${item.entityType}:${item.entityId}`));
+      for (const task of tasks) {
+        if (finished.has(`${task.entityType}:${task.id}`)) continue;
+        summary.noKey++;
+        summary.detail.push({
+          entityType: task.entityType, entityId: task.id, outcome: "skipped",
+          authorityStatus: null, error: abortReason,
+        });
+      }
     }
 
     // Mark run complete (or failed after the consecutive-failure circuit breaker).
@@ -755,6 +766,12 @@ export async function runAllAuthorityChecks(
         status: "failed",
         reason: err instanceof Error ? err.message : String(err),
         completedAt: new Date(),
+        totalChecked: summary.detail.length,
+        successCount: summary.success,
+        failureCount: summary.apiError,
+        noKeyCount: summary.noKey,
+        notFoundCount: summary.notFound,
+        alertsCreated: summary.alertsCreated,
         errorLog: [err instanceof Error ? err.message : String(err)],
         detail: summary.detail,
       })

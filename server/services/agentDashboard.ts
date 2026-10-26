@@ -3,7 +3,7 @@ import { db } from "../db";
 import {
   invoices, clients, brokers, users, tasks, followUps, brokerFollowUps, brokerFollowUpReminders,
   documents, docExtractionJobs, eventLedger, notifications, emailLog,
-  carrierAuthorityChecks, brokerAuthorityChecks, paymentApplicationLines, carrierPortalUsers,
+  complianceIntegrationRuns, paymentApplicationLines, carrierPortalUsers,
 } from "../../shared/schema";
 import { runInvoicePreflight, type InvoicePreflightAlert } from "./invoicePreflight";
 
@@ -193,15 +193,10 @@ async function latestFailedDocuments(store: Store): Promise<FailedDocument[]> {
 }
 
 async function systemAlerts(store: Store, failedDocs: FailedDocument[]) {
-  const [carrierChecks, brokerChecks, bounced, unverified, pendingPortal] = await Promise.all([
-    store.selectDistinctOn([carrierAuthorityChecks.carrierId], { id: carrierAuthorityChecks.id, entityId: carrierAuthorityChecks.carrierId,
-      status: carrierAuthorityChecks.checkStatus, error: carrierAuthorityChecks.checkError, when: carrierAuthorityChecks.checkedAt, name: clients.name })
-      .from(carrierAuthorityChecks).innerJoin(clients, eq(carrierAuthorityChecks.carrierId, clients.id))
-      .orderBy(carrierAuthorityChecks.carrierId, desc(carrierAuthorityChecks.checkedAt), desc(carrierAuthorityChecks.id)),
-    store.selectDistinctOn([brokerAuthorityChecks.entityType, brokerAuthorityChecks.entityId], {
-      id: brokerAuthorityChecks.id, entityId: brokerAuthorityChecks.entityId, entityType: brokerAuthorityChecks.entityType,
-      status: brokerAuthorityChecks.checkStatus, error: brokerAuthorityChecks.checkError, when: brokerAuthorityChecks.checkedAt, name: brokerAuthorityChecks.entityName,
-    }).from(brokerAuthorityChecks).orderBy(brokerAuthorityChecks.entityType, brokerAuthorityChecks.entityId, desc(brokerAuthorityChecks.checkedAt), desc(brokerAuthorityChecks.id)),
+  const [runs, bounced, unverified, pendingPortal] = await Promise.all([
+    store.select().from(complianceIntegrationRuns)
+      .where(inArray(complianceIntegrationRuns.status, ["completed", "failed", "skipped"]))
+      .orderBy(desc(complianceIntegrationRuns.startedAt), desc(complianceIntegrationRuns.id)).limit(100),
     store.select({ id: emailLog.id, subject: emailLog.subject, to: emailLog.toAddresses, error: emailLog.error, when: emailLog.statusUpdatedAt })
       .from(emailLog).where(eq(emailLog.status, "bounced")).orderBy(desc(emailLog.statusUpdatedAt), desc(emailLog.id)),
     store.select({ id: clients.id, name: clients.name, when: clients.createdAt }).from(clients)
@@ -210,11 +205,10 @@ async function systemAlerts(store: Store, failedDocs: FailedDocument[]) {
       when: carrierPortalUsers.createdAt }).from(carrierPortalUsers).where(eq(carrierPortalUsers.status, "pending")),
   ]);
   const all: DashboardAlert[] = [
-    ...carrierChecks.filter(c => c.status === "error").map(c => ({ id: `carrier_check:${c.id}`, kind: "fmcsa_failed" as const,
-      title: `FMCSA carrier check failed: ${c.name}`, detail: c.error ?? "Retry the carrier authority check.", when: iso(c.when), href: `/clients/${c.entityId}` })),
-    ...brokerChecks.filter(c => c.status === "error").map(c => ({ id: `broker_check:${c.id}`, kind: "fmcsa_failed" as const,
-      title: `FMCSA ${c.entityType} check failed: ${c.name ?? `#${c.entityId}`}`, detail: c.error ?? "Retry the authority check.", when: iso(c.when),
-      href: c.entityType === "broker" ? `/brokers/${c.entityId}` : "/fmcsa-authority" })),
+    ...runs.map(run => ({ id: `fmcsa_run:${run.id}`, kind: "fmcsa_run" as const,
+      title: `MC Check completed: ${run.successCount ?? 0} checked, ${run.failureCount ?? 0} failed, ${run.noKeyCount ?? 0} skipped`,
+      detail: `Run #${run.id} · ${run.status}${run.reason ? ` — ${run.reason}` : ""}. View Run History for details.`,
+      when: iso(run.completedAt ?? run.startedAt), href: `/fmcsa-authority?tab=runs&runId=${run.id}` })),
     ...bounced.map(e => ({ id: `email:${e.id}`, kind: "email_bounced" as const, title: `Bounced email: ${e.subject}`,
       detail: `${e.to.join(", ")} — ${e.error ?? "Check the recipient address."}`, when: iso(e.when), href: `/email-log?emailId=${e.id}` })),
     ...failedDocs.map(d => ({ id: `document:${d.id}`, kind: "ocr_failed" as const, title: `Document extraction failed: ${d.name}`,
@@ -228,10 +222,10 @@ async function systemAlerts(store: Store, failedDocs: FailedDocument[]) {
     })),
   ];
   all.sort((a, b) => (b.when ? Date.parse(b.when) : 0) - (a.when ? Date.parse(a.when) : 0) || a.id.localeCompare(b.id));
-  const alertCounts = { fmcsa_failed: 0, email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 };
+  const alertCounts = { fmcsa_run: 0, email_bounced: 0, ocr_failed: 0, unverified_carrier: 0 };
   const shown = { ...alertCounts };
   for (const alert of all) alertCounts[alert.kind]++;
   return { alerts: all.filter(a => shown[a.kind]++ < 100), alertCounts };
 }
-type DashboardAlert = { id: string; kind: "fmcsa_failed" | "email_bounced" | "ocr_failed" | "unverified_carrier";
+type DashboardAlert = { id: string; kind: "fmcsa_run" | "email_bounced" | "ocr_failed" | "unverified_carrier";
   title: string; detail: string; when: string | null; href: string };

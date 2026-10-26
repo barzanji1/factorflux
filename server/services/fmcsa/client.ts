@@ -32,7 +32,7 @@ function loadConfig(): FmcsaClientConfig {
       process.env.FMCSA_BASE_URL?.replace(/\/$/, "") ??
       "https://mobile.fmcsa.dot.gov/qc/services",
     defaultTimeoutMs: parseInt(process.env.FMCSA_TIMEOUT_MS ?? "10000", 10),
-    defaultMaxRetries: parseInt(process.env.FMCSA_MAX_RETRIES ?? "3", 10),
+    defaultMaxRetries: parseInt(process.env.FMCSA_MAX_RETRIES ?? "4", 10),
   };
 }
 
@@ -87,19 +87,18 @@ function logGiveUp(ctx: Omit<LogContext, "attempt">): void {
 async function fetchRaw(url: string, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let res: Response;
   try {
-    res = await fetch(url, {
+    const res = await fetch(url, {
       headers: { Accept: "application/json" },
       signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
     });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new HttpError(res.status, res.statusText, url);
+    // Keep the timeout active while streaming/decoding the response body too.
+    return await res.json();
   } finally {
     clearTimeout(timeout);
   }
-
-  if (res.status === 404) return null; // Not found — valid empty result, do not retry
-  if (!res.ok) throw new HttpError(res.status, res.statusText, url);
-  return res.json();
 }
 
 // ─── Retry wrapper ────────────────────────────────────────────────────────────
@@ -111,7 +110,7 @@ interface FetchResult {
   attempts: number;
 }
 
-async function fetchWithRetry(
+export async function fetchWithRetry(
   urlFactory: () => string,
   method: string,
   identifier: string,
@@ -125,11 +124,17 @@ async function fetchWithRetry(
     if (attempt > 1) {
       const delay = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
       await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(resolve, delay);
-        opts.signal?.addEventListener("abort", () => {
+        const abort = () => {
           clearTimeout(timeout);
+          opts.signal?.removeEventListener("abort", abort);
           reject(new DOMException("FMCSA run aborted", "AbortError"));
-        }, { once: true });
+        };
+        const timeout = setTimeout(() => {
+          opts.signal?.removeEventListener("abort", abort);
+          resolve();
+        }, delay);
+        opts.signal?.addEventListener("abort", abort, { once: true });
+        if (opts.signal?.aborted) abort();
       });
     }
 

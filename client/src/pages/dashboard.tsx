@@ -32,11 +32,11 @@ type DashboardData = {
   followUps: FollowUp[];
   activity: Activity[];
   alerts: Alert[];
-  alertCounts: { fmcsa_failed: number; email_bounced: number; ocr_failed: number; unverified_carrier: number };
+  alertCounts: { fmcsa_run: number; email_bounced: number; ocr_failed: number; unverified_carrier: number };
 };
 
 const countKinds = [
-  ["fmcsa_failed", "FMCSA checks failed"],
+  ["fmcsa_run", "MC Check runs"],
   ["email_bounced", "Bounced email"],
   ["ocr_failed", "OCR failures"],
   ["unverified_carrier", "Unverified carriers"],
