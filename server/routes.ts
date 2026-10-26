@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
 import { registerOcrIntakeRoutes } from "./routes/ocrIntake";
 import { createServer, type Server } from "http";
@@ -801,6 +802,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok", ts: Date.now() });
   });
+
+  // Explicitly authorized backup precedes the generic API/SPA fallbacks.
+  registerBackupRoute(app, requireAuth);
 
   // Apply a single permission gate to route groups whose handlers historically
   // only checked authentication. Public authentication and carrier/portal

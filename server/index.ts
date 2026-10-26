@@ -1,3 +1,4 @@
+import { Sentry, sentryRequestHandler } from "./instrumentation";
 import express, { type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -15,8 +16,13 @@ import { recoverStuckOcrJobs } from "./services/jobQueue";
 import { ensureDevAdmin } from "./services/devAdminBootstrap";
 import { startBrokerCreditScheduler } from "./services/brokerCreditEngine";
 import { emailActorContext } from "./services/emailContext";
+import { startDatabaseBackupScheduler } from "./services/databaseBackup";
+import { registerHealthRoute } from "./routes/maintenance";
 
 const app = express();
+app.use(sentryRequestHandler);
+// No session lookup: dependency failures must still return health-check JSON.
+registerHealthRoute(app);
 
 // Trust Replit's HTTPS proxy so secure cookies work in production
 app.set("trust proxy", 1);
@@ -107,6 +113,16 @@ export async function startServer(
   const server = await registerRoutes(app);
   app.use("/api", apiNotFound);
 
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (isDev) {
+    await setupVite(app, server);
+  } else {
+    serveStatic(app);
+  }
+
+  Sentry.setupExpressErrorHandler(app);
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err?.status || err?.statusCode || 500;
     const message = err?.message || "Internal Server Error";
@@ -117,14 +133,6 @@ export async function startServer(
 
     console.error("Server error:", err);
   });
-
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (isDev) {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -143,6 +151,7 @@ export async function startServer(
 
   startAuthorityScheduler();
   startBrokerCreditScheduler();
+  startDatabaseBackupScheduler();
   import("./services/emailBroadcast")
     .then(m => m.startEmailBroadcastWorker())
     .catch(e => console.error("[emailBroadcast] startup error:", e?.message));
@@ -175,8 +184,10 @@ export async function startServer(
 }
 
 if (process.env.ELECTRON_RUN_AS_NODE !== "1") {
-  startServer().catch((err) => {
+  startServer().catch(async (err) => {
+    Sentry.captureException(err);
     console.error("Failed to start server:", err);
+    await Sentry.flush(2000);
     process.exit(1);
   });
 }

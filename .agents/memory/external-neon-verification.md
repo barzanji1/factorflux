@@ -9,6 +9,12 @@ This project’s application data uses its configured external Neon connection. 
 
 **How to apply:** For application-record verification, run a small project script through the existing database module and return only non-sensitive metadata. Never print connection strings, password hashes, or secret values.
 
+Check the external Neon's actual server major version before choosing backup tooling; the installed Replit PostgreSQL tools can lag behind it.
+
+**Why:** The external server was PostgreSQL 18 while the installed client was 16 and available managed toolchains stopped at 17. An older `pg_dump` refuses to dump a newer server.
+
+**How to apply:** Use a compatible client for backups rather than assuming the workspace's default binary is sufficient. Preserve this compatibility when changing the Neon server or rebuilding deployment tools.
+
 Legacy database constraints can be stricter than the current Drizzle insert types.
 
 **Why:** Rollback fixtures accepted by TypeScript were rejected by existing database NOT NULL constraints that the model did not declare.
