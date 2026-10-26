@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,22 +60,26 @@ export default function LoginPage() {
 
   return (
     <div className="ff-auth-page min-h-screen bg-[#d4d0c8] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <Card className="shadow-none">
-          <CardHeader className="space-y-2 text-center">
+      <div className="w-full max-w-[420px]">
+        <Card className="ff-login-card shadow-none">
+          <CardHeader className="ff-login-brand text-center">
             <div className="flex justify-center">
-              <FactorFluxLogo linkToDashboard={false} className="flex-col" markSrc="/images/ff-logo-emboss.png" markClassName="h-9 w-9" />
+              <FactorFluxLogo
+                linkToDashboard={false}
+                inverted
+                className="flex-col gap-1.5"
+                markSrc="/images/ff-logo-emboss.png"
+                markClassName="h-9 w-9"
+              />
             </div>
-            <p className="text-[#444]">Freight Factoring OS</p>
-            <hr className="w-full border-0 border-t border-[#b0ada6]" />
-            <p className="text-lg font-semibold text-[#1a1a1a]">Trucking Pros Financial</p>
+            <p className="ff-login-tagline">Freight Factoring OS</p>
+            <hr className="ff-login-divider" />
+            <p className="ff-login-company">Trucking Pros Financial</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="ff-login-content">
             <div className="mb-4 space-y-2 text-center">
-              <CardTitle className="text-2xl font-bold">Agent Login</CardTitle>
-              <CardDescription>
-                Enter your credentials to access the system
-              </CardDescription>
+              <CardTitle className="ff-login-title">Agent Login</CardTitle>
+              <CardDescription className="ff-login-description">Enter your credentials</CardDescription>
             </div>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -164,8 +168,10 @@ export default function LoginPage() {
               </form>
             </Form>
 
-            <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
-              <p className="text-xs">Contact IT support for credential issues</p>
+            <div className="mt-5 text-center">
+              <a className="ff-login-support" href="mailto:dosh@truckingprosfinancial.com">
+                Contact IT support
+              </a>
             </div>
           </CardContent>
         </Card>
