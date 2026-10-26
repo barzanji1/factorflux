@@ -18,12 +18,16 @@ export function creationHoldFields(input: unknown, actorId: string) {
 }
 
 export async function getHoldRecipients(database: Pick<Executor, "select"> = db) {
-  const staff = await database.select({ id: users.id, firstName: users.firstName, role: users.role })
+  const staff = await database.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, role: users.role })
     .from(users).where(eq(users.status, "active"));
+  const normalizeName = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
   const matches = HOLD_TARGETS.map(target => {
     const candidates = target.value === "managers"
       ? staff.filter(user => ["admin", "manager"].includes(user.role ?? ""))
-      : staff.filter(user => (user.firstName ?? "").trim().toLowerCase() === target.value);
+      // Confirmed nickname: match both names, not a broad "Jes*" prefix.
+      : target.value === "jess"
+        ? staff.filter(user => normalizeName(user.firstName) === "jesabel" && normalizeName(user.lastName) === "agostina")
+        : staff.filter(user => normalizeName(user.firstName) === target.value);
     // Never guess among same-name staff or silently notify an unrelated account.
     const available = target.value === "managers" ? candidates.length > 0 : candidates.length === 1;
     return { ...target, available, recipientIds: available ? candidates.map(user => user.id) : [],

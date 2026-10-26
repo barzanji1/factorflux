@@ -14,3 +14,9 @@ Creation holds require one of the requested reasons and one or more explicitly s
 **Why:** The user replaced the general manager-review hold with selected-person routing and bell notifications.
 
 **How to apply:** Keep the selected targets and resolved recipients in the hold audit, and preserve the normal document-readiness flow on manager release.
+
+Named hold options may represent a user-confirmed nickname rather than the stored first name. Require explicit identity confirmation before adding an alias; never infer recipients from a name prefix. Aliases must still reject inactive or ambiguous matches.
+
+**Why:** The user confirmed that an unavailable named reviewer was an existing active manager using a different stored first name.
+
+**How to apply:** Preserve confirmed aliases when changing recipient lookup; retain active-account filtering, uniqueness checks, and group/individual deduplication.

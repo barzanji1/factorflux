@@ -25,6 +25,31 @@ test("creation hold requires a supported reason and recipients only when held", 
   assert.throws(() => creationHoldFields({ holdForManagerReview: "false" }, "agent"));
 });
 
+test("Jess resolves only to the confirmed active full-name match and deduplicates Managers", async () => {
+  const makeDirectory = (staff: { id: string; firstName: string; lastName: string; role: string; status: string }[]) => ({
+    select: () => ({ from: () => ({ where: async () => staff.filter(user => user.status === "active") }) }),
+  }) as unknown as Pick<typeof db, "select">;
+  const confirmed = { id: "confirmed-reviewer", firstName: " Jesabel ", lastName: " AGOSTINA ", role: "manager", status: "active" };
+  const otherStaff = [
+    { id: "unrelated-nickname", firstName: "Jess", lastName: "Other", role: "employee", status: "active" },
+    { id: "unrelated-first-name", firstName: "Jesabel", lastName: "Other", role: "manager", status: "active" },
+    { ...confirmed, id: "inactive-reviewer", status: "inactive" },
+  ];
+  const directory = makeDirectory([confirmed, ...otherStaff]);
+  const option = (await getHoldRecipients(directory)).find(option => option.value === "jess");
+  assert.equal(option?.available, true);
+  assert.deepEqual(option?.recipientIds, [confirmed.id]);
+  const input = { holdForManagerReview: true, holdReason: "Missing docs", heldFor: ["jess"] };
+  const fields = await resolveCreationHold(input, "creator", directory);
+  assert.deepEqual("heldRecipientIds" in fields ? fields.heldRecipientIds : [], [confirmed.id]);
+  const grouped = await resolveCreationHold({ ...input, heldFor: ["managers", "jess"] }, "creator", directory);
+  assert.deepEqual("heldRecipientIds" in grouped ? [...grouped.heldRecipientIds].sort() : [],
+    [confirmed.id, "unrelated-first-name"].sort());
+  await assert.rejects(resolveCreationHold(input, "creator", makeDirectory(otherStaff)), /No active staff/);
+  await assert.rejects(resolveCreationHold(input, "creator", makeDirectory([confirmed, { ...confirmed, id: "duplicate" }])),
+    /Multiple active staff match/);
+});
+
 test("receipt enforcement and separate nonnegative lumper totals", () => {
   for (const value of [true, "yes", "true"]) assert.throws(() => requireLumperReceipt(value, false), /Lumper Receipt is required/);
   requireLumperReceipt(true, true);
