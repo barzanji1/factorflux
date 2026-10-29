@@ -90,8 +90,8 @@ export default function LoginPage() {
               <FactorFluxLogo
                 linkToDashboard={false}
                 showWordmark={false}
-                className="flex-col gap-1.5"
-                markClassName="h-10 w-10"
+                className="flex-col gap-1"
+                markClassName="h-9 w-9"
               />
             </div>
             <p className="ff-login-product">FactorFlux</p>
