@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2, Lock, User, Eye, EyeOff } from "lucide-react";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
 import { staffLoginSchema } from "@shared/staff-auth";
 import "./login.css";
@@ -89,19 +89,16 @@ export default function LoginPage() {
             <div className="flex justify-center">
               <FactorFluxLogo
                 linkToDashboard={false}
+                showWordmark={false}
                 className="flex-col gap-1.5"
                 markClassName="h-10 w-10"
               />
             </div>
+            <p className="ff-login-product">FactorFlux</p>
             <p className="ff-login-tagline">Freight Factoring OS</p>
-            <hr className="ff-login-divider" />
             <p className="ff-login-company">Trucking Pros Financial</p>
           </CardHeader>
           <CardContent className="ff-login-content">
-            <div className="ff-login-heading">
-              <CardTitle className="ff-login-title">Agent Login</CardTitle>
-              <CardDescription className="ff-login-description">Enter your credentials</CardDescription>
-            </div>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="ff-login-form">
                 <FormField
@@ -109,14 +106,13 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="ff-login-label">Email Address</FormLabel>
                       <FormControl>
                         <div className="ff-login-input-wrap">
                           <User className="ff-login-input-icon" aria-hidden="true" />
                           <Input
                             {...field}
                             type="email"
-                            placeholder="you@company.com"
+                            placeholder="Email Address"
                             className="ff-login-input ff-login-email-input"
                             aria-label="Email address"
                             autoComplete="email"
@@ -134,14 +130,13 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="ff-login-label">Password</FormLabel>
                       <FormControl>
                         <div className="ff-login-input-wrap">
                           <Lock className="ff-login-input-icon" aria-hidden="true" />
                           <Input
                             {...field}
                             type={showPassword ? "text" : "password"}
-                            placeholder="Enter your password"
+                            placeholder="Password"
                             className="ff-login-input ff-login-password-input"
                             aria-label="Password"
                             autoComplete="current-password"

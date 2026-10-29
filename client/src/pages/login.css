@@ -6,14 +6,13 @@
   --login-muted: #718184;
   --login-teal: #178b91;
   --login-teal-dark: #116f76;
-  --login-line: #c5cecd;
   display: grid;
   min-height: 100vh;
   min-height: 100dvh;
   place-items: center;
   perspective: 1000px;
   overflow-x: hidden;
-  padding: 28px 20px;
+  padding: 40px;
   background: var(--login-bg);
   color: var(--login-ink);
   font-family: "DM Sans", "Avenir Next", sans-serif;
@@ -29,16 +28,16 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  width: min(570px, calc(100vw - 36px));
+  width: min(570px, calc(100vw - 80px), max(500px, calc(100dvh - 80px)));
   aspect-ratio: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   border: 0 !important;
   border-radius: 50% !important;
   background: #e0e0e0 !important;
-  padding: 62px 108px 58px !important;
+  padding: clamp(28px, 10%, 62px) clamp(24px, 18%, 108px) !important;
   box-shadow:
     18px 18px 38px #bebebe,
     -18px -18px 38px #ffffff,
@@ -71,46 +70,41 @@
   margin-top: 0;
 }
 
-.ff-login-brand > div:first-child {
-  margin-bottom: 3px;
-}
-
 .ff-login-brand img {
   filter: none !important;
 }
 
-.ff-login-brand > div:first-child > div > span:last-child {
-  color: #304649 !important;
-  font-family: "Manrope", "Avenir Next", sans-serif;
-  font-size: 19px;
-  font-weight: 750;
-  letter-spacing: -0.045em;
-  line-height: 1.1;
+.ff-login-brand > div:first-child {
+  margin-bottom: 7px;
 }
 
-.ff-login-tagline {
-  margin: 1px 0 0;
-  color: var(--login-muted);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.045em;
-  line-height: 1.3;
-}
-
-.ff-login-divider {
-  width: 72%;
-  margin: 13px 0 11px;
-  border: 0;
-  border-top: 1px solid var(--login-line);
-}
-
-.ff-login-company {
+.ff-login-page .ff-login-product {
   margin: 0;
-  color: #40585a;
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: 0.005em;
+  color: #758587;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
   line-height: 1.3;
+}
+
+.ff-login-page .ff-login-tagline {
+  margin: 3px 0 0;
+  color: var(--login-muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+}
+
+.ff-login-page .ff-login-brand .ff-login-company {
+  margin: 10px 0 0;
+  color: #304649;
+  font-family: "Manrope", "Avenir Next", sans-serif;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 1.13;
+  text-wrap: balance;
 }
 
 .ff-login-content {
@@ -118,44 +112,13 @@
   flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
-}
-
-.ff-login-heading {
-  margin: 18px 0 15px;
-  text-align: center;
-}
-
-.ff-login-page .ff-login-title {
-  display: block;
-  margin: 0 !important;
-  color: #2c4143;
-  font-family: "Manrope", "Avenir Next", sans-serif;
-  font-size: 21px !important;
-  font-weight: 500 !important;
-  letter-spacing: -0.035em !important;
-  line-height: 1.25;
-}
-
-.ff-login-description {
-  margin-top: 4px;
-  color: var(--login-muted);
-  font-size: 13px;
-  line-height: 1.35;
+  margin-top: 32px;
 }
 
 .ff-login-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.ff-login-label {
-  display: block;
-  margin-bottom: 6px;
-  color: #52686a;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.025em;
 }
 
 .ff-login-input-wrap {
@@ -305,7 +268,7 @@
 
 .ff-login-support {
   color: #657779;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.4;
   text-decoration: underline;
   text-decoration-color: #a1b0af;
@@ -364,7 +327,7 @@
 
 @media (max-width: 560px) {
   .ff-login-page {
-    padding: 22px 18px;
+    padding: 40px 18px;
   }
 
   .ff-login-page .ff-login-card {
@@ -379,10 +342,6 @@
       inset 1px 1px 1px rgba(255, 255, 255, 0.46) !important;
   }
 
-  .ff-login-heading {
-    margin-top: 19px;
-  }
-
   .ff-login-form {
     gap: 13px;
   }
@@ -390,7 +349,7 @@
 
 @media (max-width: 360px) {
   .ff-login-page {
-    padding: 16px 14px;
+    padding: 40px 14px;
   }
 
   .ff-login-card {

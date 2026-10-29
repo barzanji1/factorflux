@@ -14,3 +14,9 @@ The login page is the explicit exception: use a circular neumorphic desktop card
 **Why:** The user explicitly requested neumorphic styling for login only; authenticated internal pages must retain their existing Win95 style.
 
 **How to apply:** Scope login styling to the login page so shared retro rules cannot override it and the exception cannot affect internal pages.
+
+Login hierarchy is company-first: Trucking Pros Financial is the largest, boldest name; FactorFlux is a muted product label and Freight Factoring OS is a caption. Omit the divider and extra login heading/subtitle; use placeholder-only fields with accessible names.
+
+**Why:** The user clarified that TPF is the company and FactorFlux is the product, and requested less visual weight around the form.
+
+**How to apply:** Preserve clear branding-to-form spacing and at least 40px desktop background clearance when adjusting the login layout.
