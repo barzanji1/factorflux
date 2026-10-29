@@ -215,9 +215,9 @@
   margin-top: 3px;
   border: 0 !important;
   border-radius: 13px !important;
-  background: var(--login-teal) !important;
+  background: var(--login-bg) !important;
   padding: 0 18px !important;
-  color: #f8ffff !important;
+  color: var(--login-ink) !important;
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -226,16 +226,19 @@
   box-shadow:
     5px 5px 11px #bfc4c3,
     -4px -4px 10px rgba(255, 255, 255, 0.85) !important;
-  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  transition: background-color 200ms ease, color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
 }
 
-.ff-login-submit:hover:not(:disabled) {
-  background: var(--login-teal-dark) !important;
+.ff-login-page .ff-login-submit:hover:not(:disabled) {
+  background: var(--login-teal) !important;
+  color: #ffffff !important;
   transform: translateY(-1px);
 }
 
-.ff-login-submit:active:not(:disabled) {
-  box-shadow: inset 3px 3px 7px rgba(5, 67, 72, 0.3) !important;
+.ff-login-page .ff-login-submit:active:not(:disabled) {
+  box-shadow:
+    inset 4px 4px 8px rgba(25, 58, 60, 0.3),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.25) !important;
   transform: translateY(0);
 }
 
