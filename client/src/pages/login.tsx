@@ -56,7 +56,7 @@ export default function LoginPage() {
             didNavigate.current = true;
             setLocation("/");
           }
-        }, 700);
+        }, 1400);
       } else {
         setError("Invalid email or password. Please try again.");
         setShakeCount((count) => count + 1);

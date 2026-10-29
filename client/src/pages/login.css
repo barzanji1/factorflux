@@ -11,6 +11,7 @@
   min-height: 100vh;
   min-height: 100dvh;
   place-items: center;
+  perspective: 1000px;
   overflow-x: hidden;
   padding: 28px 20px;
   background: var(--login-bg);
@@ -44,7 +45,8 @@
     inset 3px 3px 8px rgba(190, 190, 190, 0.35),
     inset -3px -3px 8px rgba(255, 255, 255, 0.5) !important;
   color: var(--login-ink);
-  transform: rotate(0deg);
+  transform: rotateY(0deg);
+  transform-origin: center center;
 }
 
 .ff-login-card > .ff-login-brand,
@@ -331,8 +333,8 @@
   clip-path: inset(50%);
 }
 
-.ff-login-card--rotating {
-  animation: ff-login-rotate 600ms ease-in-out both;
+.ff-login-page .ff-login-card--rotating {
+  animation: ff-login-rotate 1200ms ease-in-out both;
 }
 
 .ff-login-card--shake-1 {
@@ -344,8 +346,8 @@
 }
 
 @keyframes ff-login-rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
 }
 
 @keyframes ff-login-shake-a {
@@ -397,7 +399,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ff-login-card--rotating {
+  .ff-login-page .ff-login-card--rotating {
     animation-duration: 1ms;
   }
 
