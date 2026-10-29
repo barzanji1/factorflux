@@ -1,10 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, User, Eye, EyeOff } from "lucide-react";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
@@ -13,6 +11,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
 import { staffLoginSchema } from "@shared/staff-auth";
+import "./login.css";
 
 const loginSchema = staffLoginSchema;
 
@@ -24,6 +23,16 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [shakeCount, setShakeCount] = useState(0);
+  const [isRotating, setIsRotating] = useState(false);
+  const rotationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didNavigate = useRef(false);
+
+  useEffect(() => () => {
+    if (rotationTimer.current) clearTimeout(rotationTimer.current);
+    if (navigationTimer.current) clearTimeout(navigationTimer.current);
+  }, []);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -38,38 +47,50 @@ export default function LoginPage() {
     setError("");
 
     try {
-      console.log("Attempting login with:", data.username);
       const success = await login(data.username, data.password);
-      console.log("Login result:", success);
-      
       if (success) {
-        console.log("Login successful, redirecting to dashboard");
-        // Use window.location for hard refresh to ensure state is properly updated
-        window.location.href = "/";
+        setIsRotating(true);
+        // Keep a fallback so reduced motion or a cancelled animation never blocks navigation.
+        navigationTimer.current = setTimeout(() => {
+          if (!didNavigate.current) {
+            didNavigate.current = true;
+            setLocation("/");
+          }
+        }, 700);
       } else {
-        console.log("Login failed - invalid credentials");
-        setError("Invalid username or password. Please try again.");
+        setError("Invalid email or password. Please try again.");
+        setShakeCount((count) => count + 1);
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Login error:", error);
+    } catch {
       setError("Login failed. Please check your connection and try again.");
-    } finally {
+      setShakeCount((count) => count + 1);
       setIsLoading(false);
     }
   };
 
+  const finishRotation = () => {
+    if (didNavigate.current) return;
+    didNavigate.current = true;
+    if (navigationTimer.current) clearTimeout(navigationTimer.current);
+    rotationTimer.current = setTimeout(() => setLocation("/"), 0);
+  };
+
   return (
-    <div className="ff-auth-page min-h-screen bg-[#d4d0c8] flex items-center justify-center p-4">
-      <div className="w-full max-w-[420px]">
-        <Card className="ff-login-card shadow-none">
-          <CardHeader className="ff-login-brand text-center">
+    <main className="ff-login-page">
+      <Card
+        className={`ff-login-card${isRotating ? " ff-login-card--rotating" : shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget && event.animationName === "ff-login-rotate") finishRotation();
+        }}
+        aria-busy={isLoading}
+      >
+          <CardHeader className="ff-login-brand">
             <div className="flex justify-center">
               <FactorFluxLogo
                 linkToDashboard={false}
-                inverted
                 className="flex-col gap-1.5"
-                markSrc="/images/ff-logo-emboss.png"
-                markClassName="h-9 w-9"
+                markClassName="h-10 w-10"
               />
             </div>
             <p className="ff-login-tagline">Freight Factoring OS</p>
@@ -77,26 +98,27 @@ export default function LoginPage() {
             <p className="ff-login-company">Trucking Pros Financial</p>
           </CardHeader>
           <CardContent className="ff-login-content">
-            <div className="mb-4 space-y-2 text-center">
+            <div className="ff-login-heading">
               <CardTitle className="ff-login-title">Agent Login</CardTitle>
               <CardDescription className="ff-login-description">Enter your credentials</CardDescription>
             </div>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="ff-login-form">
                 <FormField
                   control={form.control}
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email Address</FormLabel>
+                      <FormLabel className="ff-login-label">Email Address</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <div className="ff-login-input-wrap">
+                          <User className="ff-login-input-icon" aria-hidden="true" />
                           <Input
                             {...field}
                             type="email"
                             placeholder="you@company.com"
-                            className="pl-10"
+                            className="ff-login-input ff-login-email-input"
+                            aria-label="Email address"
                             autoComplete="email"
                             disabled={isLoading}
                           />
@@ -112,24 +134,26 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel className="ff-login-label">Password</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <div className="ff-login-input-wrap">
+                          <Lock className="ff-login-input-icon" aria-hidden="true" />
                           <Input
                             {...field}
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
-                            className="pl-10 pr-14"
+                            className="ff-login-input ff-login-password-input"
+                            aria-label="Password"
                             autoComplete="current-password"
                             disabled={isLoading}
                           />
                           <button
                             type="button"
-                            className="absolute bottom-[2px] right-[2px] top-[2px] flex w-10 items-center justify-center border-l-2 border-[#808080] bg-[#d4d0c8] text-[#555] hover:bg-[#c8e7e9] hover:text-[#098b9f] focus-visible:z-10"
+                            className="ff-login-toggle"
                             onClick={() => setShowPassword(!showPassword)}
                             aria-label={showPassword ? "Hide password" : "Show password"}
                             aria-pressed={showPassword}
+                            disabled={isLoading}
                           >
                             {showPassword ? (
                               <EyeOff className="h-4 w-4" />
@@ -144,21 +168,15 @@ export default function LoginPage() {
                   )}
                 />
 
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full" 
+                <Button
+                  type="submit"
+                  className="ff-login-submit"
                   disabled={isLoading}
                   data-testid="button-login"
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                       Signing in...
                     </>
                   ) : (
@@ -168,14 +186,19 @@ export default function LoginPage() {
               </form>
             </Form>
 
-            <div className="mt-5 text-center">
+            <div className="ff-login-error" role="alert" aria-live="assertive" aria-atomic="true">
+              {error}
+            </div>
+            <div className="ff-login-support-wrap">
               <a className="ff-login-support" href="mailto:dosh@truckingprosfinancial.com">
-                Contact IT support
+                Contact IT support for credential issues
               </a>
             </div>
           </CardContent>
-        </Card>
+      </Card>
+      <div className="ff-login-status" role="status" aria-live="polite" aria-atomic="true">
+        {isLoading ? "Signing in…" : ""}
       </div>
-    </div>
+    </main>
   );
 }
