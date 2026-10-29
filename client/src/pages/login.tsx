@@ -90,6 +90,7 @@ export default function LoginPage() {
               <FactorFluxLogo
                 linkToDashboard={false}
                 showWordmark={false}
+                markSrc="/images/ff-login-emboss.webp"
                 className="flex-col gap-1"
                 markClassName="h-16 w-16"
               />
