@@ -13,6 +13,7 @@ import NotFound from "@/pages/not-found";
 import AccessDenied from "@/pages/access-denied";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
+import NeuPreview from "@/pages/neu-preview";
 import Invoices from "@/pages/invoices";
 import Clients from "@/pages/clients";
 import Documents from "@/pages/documents";
@@ -99,6 +100,9 @@ function Router() {
     <Switch>
       <Route path="/login">
         <LoginPage />
+      </Route>
+      <Route path="/neu-preview">
+        <ProtectedRoute><NeuPreview /></ProtectedRoute>
       </Route>
       
       {/* Protected routes */}
@@ -397,7 +401,8 @@ function Router() {
     </Switch>
   );
 
-  if (isPublicRoute) {
+  // Isolate the opt-in design preview from retro shell styles; it remains protected above.
+  if (isPublicRoute || location === "/neu-preview") {
     return (
       <>
         <PermissionWatcher />

@@ -20,3 +20,9 @@ Login hierarchy is company-first: Trucking Pros Financial is the largest, boldes
 **Why:** The user clarified that TPF is the company and FactorFlux is the product, and requested less visual weight around the form.
 
 **How to apply:** Preserve clear branding-to-form spacing and at least 40px desktop background clearance when adjusting the login layout.
+
+The reusable neumorphic system is opt-in and review-only, not a replacement theme for existing pages. Its admin preview must stay isolated from the Win95 shell and absent from sidebar navigation.
+
+**Why:** The user requested a separate component library for team review before any page migration.
+
+**How to apply:** Do not apply the library to existing pages without a new explicit request; use Tailwind classes rather than global CSS overrides.

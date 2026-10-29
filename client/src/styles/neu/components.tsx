@@ -1,0 +1,344 @@
+import React, {
+  createContext,
+  forwardRef,
+  useContext,
+  useId,
+  useState,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type InputHTMLAttributes,
+  type SelectHTMLAttributes,
+  type TableHTMLAttributes,
+  type ThHTMLAttributes,
+  type TdHTMLAttributes,
+  type ReactNode,
+  type KeyboardEvent,
+} from "react";
+import { cn } from "@/lib/utils";
+import { neuTokenClasses } from "./tokens";
+
+export interface NeuCardProps extends HTMLAttributes<HTMLDivElement> {
+  pressed?: boolean;
+}
+
+export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
+  ({ className, pressed = false, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "rounded-2xl bg-[#e0e0e0] text-[#333333]",
+        pressed ? neuTokenClasses.concave : neuTokenClasses.convex,
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+NeuCard.displayName = "NeuCard";
+
+export interface NeuButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "default" | "accent";
+}
+
+export const NeuButton = forwardRef<HTMLButtonElement, NeuButtonProps>(
+  ({ className, variant = "default", type = "button", disabled, ...props }, ref) => (
+    <button
+      ref={ref}
+      type={type}
+      disabled={disabled}
+      className={cn(
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-[transform,box-shadow,background-color] duration-150",
+        "bg-[#e0e0e0] text-[#333333] active:translate-y-px active:shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        "disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:shadow-[-7px_-7px_16px_#ffffff,7px_7px_16px_#b8b8b8]",
+        variant === "accent"
+          ? "bg-[#27aab8] text-[#ffffff] shadow-[-5px_-5px_12px_#ffffff,5px_5px_12px_#b8b8b8] active:bg-[#2398a4]"
+          : neuTokenClasses.convex,
+        neuTokenClasses.focus,
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+NeuButton.displayName = "NeuButton";
+
+export const NeuInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  ({ className, ...props }, ref) => (
+    <input
+      ref={ref}
+      className={cn(
+        "min-h-11 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 text-sm !text-[#333333] placeholder:text-[#888888]",
+        "!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        neuTokenClasses.focus,
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+NeuInput.displayName = "NeuInput";
+
+export interface NeuSelectOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+export interface NeuSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  options?: NeuSelectOption[];
+  children?: ReactNode;
+}
+
+export const NeuSelect = forwardRef<HTMLSelectElement, NeuSelectProps>(
+  ({ className, options, children, ...props }, ref) => (
+    <select
+      ref={ref}
+      className={cn(
+        "min-h-11 w-full appearance-auto !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 pr-10 text-sm !text-[#333333]",
+        "!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        neuTokenClasses.focus,
+        className,
+      )}
+      {...props}
+    >
+      {options
+        ? options.map((option) => (
+            <option key={option.value} value={option.value} disabled={option.disabled}>
+              {option.label}
+            </option>
+          ))
+        : children}
+    </select>
+  ),
+);
+NeuSelect.displayName = "NeuSelect";
+
+interface NeuTabsContextValue {
+  selectedValue: string;
+  setSelectedValue: (value: string) => void;
+  baseId: string;
+}
+
+const NeuTabsContext = createContext<NeuTabsContextValue | null>(null);
+
+function useNeuTabs() {
+  const context = useContext(NeuTabsContext);
+  if (!context) throw new Error("NeuTabs components must be rendered inside NeuTabs.");
+  return context;
+}
+
+export interface NeuTabsProps extends HTMLAttributes<HTMLDivElement> {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+}
+
+export const NeuTabs = forwardRef<HTMLDivElement, NeuTabsProps>(
+  ({ className, value, defaultValue = "", onValueChange, children, ...props }, ref) => {
+    const generatedId = useId();
+    const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue);
+    const selectedValue = value ?? uncontrolledValue;
+    const setSelectedValue = (nextValue: string) => {
+      if (value === undefined) setUncontrolledValue(nextValue);
+      onValueChange?.(nextValue);
+    };
+    const context = { selectedValue, setSelectedValue, baseId: `neu-tabs-${generatedId}` };
+    return (
+      <NeuTabsContext.Provider value={context}>
+        <div ref={ref} className={cn("w-full", className)} {...props}>
+          {children}
+        </div>
+      </NeuTabsContext.Provider>
+    );
+  },
+);
+NeuTabs.displayName = "NeuTabs";
+
+export const NeuTabList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      role="tablist"
+      className={cn("flex flex-wrap gap-2 rounded-2xl bg-[#e0e0e0] p-2 shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]", className)}
+      {...props}
+    />
+  ),
+);
+NeuTabList.displayName = "NeuTabList";
+
+export interface NeuTabProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  value: string;
+}
+
+export const NeuTab = forwardRef<HTMLButtonElement, NeuTabProps>(
+  ({ value, className, onKeyDown, onClick, ...props }, ref) => {
+    const { selectedValue, setSelectedValue, baseId } = useNeuTabs();
+    const selected = selectedValue === value;
+    const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+      onKeyDown?.(event);
+      if (event.defaultPrevented) return;
+      const tabs = Array.from(
+        event.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') ?? [],
+      );
+      const index = tabs.indexOf(event.currentTarget);
+      let nextIndex = index;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (index + 1) % tabs.length;
+      else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (index - 1 + tabs.length) % tabs.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = tabs.length - 1;
+      else return;
+      event.preventDefault();
+      const nextTab = tabs[nextIndex];
+      nextTab?.focus();
+      nextTab?.click();
+    };
+    return (
+      <button
+        ref={ref}
+        id={`${baseId}-tab-${value}`}
+        type="button"
+        role="tab"
+        aria-selected={selected}
+        aria-controls={`${baseId}-panel-${value}`}
+        tabIndex={selected ? 0 : -1}
+        className={cn(
+          "min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition-[transform,box-shadow,color] duration-150 focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]",
+          selected
+            ? "bg-[#e0e0e0] text-[#27aab8] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]"
+            : "bg-[#e0e0e0] text-[#333333] shadow-[-4px_-4px_9px_#ffffff,4px_4px_9px_#c1c1c1] hover:text-[#27aab8]",
+          className,
+        )}
+        onClick={(event) => {
+          onClick?.(event);
+          if (!event.defaultPrevented) setSelectedValue(value);
+        }}
+        onKeyDown={handleKeyDown}
+        {...props}
+      />
+    );
+  },
+);
+NeuTab.displayName = "NeuTab";
+
+export interface NeuTabPanelProps extends HTMLAttributes<HTMLDivElement> {
+  value: string;
+}
+
+export const NeuTabPanel = forwardRef<HTMLDivElement, NeuTabPanelProps>(
+  ({ value, className, ...props }, ref) => {
+    const { selectedValue, baseId } = useNeuTabs();
+    return (
+      <div
+        ref={ref}
+        id={`${baseId}-panel-${value}`}
+        role="tabpanel"
+        aria-labelledby={`${baseId}-tab-${value}`}
+        tabIndex={0}
+        hidden={selectedValue !== value}
+        className={cn("mt-5 rounded-2xl bg-[#e0e0e0] p-5 text-[#333333] shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]", className)}
+        {...props}
+      />
+    );
+  },
+);
+NeuTabPanel.displayName = "NeuTabPanel";
+
+export const NeuTable = forwardRef<HTMLTableElement, TableHTMLAttributes<HTMLTableElement>>(
+  ({ className, ...props }, ref) => (
+    <div className="overflow-x-auto rounded-2xl bg-[#e0e0e0] shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]">
+      <table ref={ref} className={cn("w-full border-collapse text-left text-sm text-[#333333]", className)} {...props} />
+    </div>
+  ),
+);
+NeuTable.displayName = "NeuTable";
+
+export const NeuTableHeader = forwardRef<HTMLTableSectionElement, HTMLAttributes<HTMLTableSectionElement>>(
+  ({ className, ...props }, ref) => (
+    <thead ref={ref} className={cn("bg-[#d7d7d7] text-[#555555]", className)} {...props} />
+  ),
+);
+NeuTableHeader.displayName = "NeuTableHeader";
+
+export const NeuTableBody = forwardRef<HTMLTableSectionElement, HTMLAttributes<HTMLTableSectionElement>>(
+  ({ className, ...props }, ref) => (
+    <tbody ref={ref} className={cn("divide-y divide-[#c9c9c9]", className)} {...props} />
+  ),
+);
+NeuTableBody.displayName = "NeuTableBody";
+
+export const NeuTableRow = forwardRef<HTMLTableRowElement, HTMLAttributes<HTMLTableRowElement>>(
+  ({ className, ...props }, ref) => (
+    <tr ref={ref} className={cn("transition-colors hover:bg-[#d9e8e8]", className)} {...props} />
+  ),
+);
+NeuTableRow.displayName = "NeuTableRow";
+
+export const NeuTableHead = forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTableCellElement>>(
+  ({ className, ...props }, ref) => (
+    <th ref={ref} scope="col" className={cn("whitespace-nowrap px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#777777]", className)} {...props} />
+  ),
+);
+NeuTableHead.displayName = "NeuTableHead";
+
+export const NeuTableCell = forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLTableCellElement>>(
+  ({ className, ...props }, ref) => (
+    <td ref={ref} className={cn("whitespace-nowrap px-5 py-4", className)} {...props} />
+  ),
+);
+NeuTableCell.displayName = "NeuTableCell";
+
+export interface NeuBadgeProps extends HTMLAttributes<HTMLSpanElement> {
+  tone?: "neutral" | "accent" | "success" | "warning";
+}
+
+export const NeuBadge = forwardRef<HTMLSpanElement, NeuBadgeProps>(
+  ({ className, tone = "neutral", ...props }, ref) => (
+    <span
+      ref={ref}
+      className={cn(
+        "inline-flex items-center rounded-full bg-[#e0e0e0] px-3 py-1 text-xs font-semibold shadow-[-3px_-3px_7px_#ffffff,3px_3px_7px_#c1c1c1]",
+        tone === "accent" && "text-[#27aab8]",
+        tone === "success" && "text-[#347d69]",
+        tone === "warning" && "text-[#9b6a22]",
+        tone === "neutral" && "text-[#666666]",
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+NeuBadge.displayName = "NeuBadge";
+
+export interface NeuStatCardProps extends Omit<NeuCardProps, "children"> {
+  label: string;
+  value: ReactNode;
+  detail?: ReactNode;
+  icon?: ReactNode;
+}
+
+export const NeuStatCard = forwardRef<HTMLDivElement, NeuStatCardProps>(
+  ({ label, value, detail, icon, className, ...props }, ref) => (
+    <NeuCard ref={ref} className={cn("flex min-h-40 flex-col justify-between p-5", className)} {...props}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-[0.13em] text-[#888888]">{label}</p>
+        {icon && <span className="text-[#27aab8]">{icon}</span>}
+      </div>
+      <div>
+        <p className="mt-5 text-3xl font-semibold tracking-tight text-[#333333]">{value}</p>
+        {detail && <p className="mt-1 text-sm text-[#888888]">{detail}</p>}
+      </div>
+    </NeuCard>
+  ),
+);
+NeuStatCard.displayName = "NeuStatCard";
+
+export const NeuPageShell = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <main
+      ref={ref}
+      className={cn("min-h-[100dvh] overflow-y-auto bg-[#e0e0e0] text-[#333333]", className)}
+      {...props}
+    />
+  ),
+);
+NeuPageShell.displayName = "NeuPageShell";
