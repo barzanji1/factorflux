@@ -331,33 +331,128 @@
 
 @media (max-width: 560px) {
   .ff-login-page {
-    padding: 40px 18px;
+    padding: 40px 20px;
   }
 
   .ff-login-page .ff-login-card {
-    width: min(430px, 100%);
+    container-type: inline-size;
+    width: calc(100vw - 40px);
+    height: calc(100vw - 40px);
     min-height: 0;
-    aspect-ratio: auto;
-    border-radius: 30px !important;
-    padding: 25px clamp(24px, 9vw, 40px) 21px !important;
+    aspect-ratio: 1;
+    border-radius: 50% !important;
+    padding: 7vw 10vw !important;
     box-shadow:
       12px 12px 26px #bebebe,
       -12px -12px 26px #ffffff,
       inset 1px 1px 1px rgba(255, 255, 255, 0.46) !important;
   }
 
+  .ff-login-brand svg {
+    width: 9cqw;
+    height: 9cqw;
+  }
+
+  .ff-login-brand > div:first-child {
+    margin-bottom: 3px;
+  }
+
+  .ff-login-page .ff-login-product {
+    font-size: 4cqw;
+  }
+
+  .ff-login-page .ff-login-tagline {
+    font-size: 3.4cqw;
+  }
+
+  .ff-login-page .ff-login-brand .ff-login-company {
+    margin-top: 5px;
+    font-size: 6.8cqw;
+  }
+
+  .ff-login-content {
+    margin-top: 5cqw;
+  }
+
   .ff-login-form {
-    gap: 9px;
+    gap: 2cqw;
+  }
+
+  .ff-login-page .ff-login-input {
+    height: 12cqw;
+    font-size: 4.5cqw;
+    padding-left: 30px !important;
+    border-radius: 10px !important;
+  }
+
+  .ff-login-input-icon {
+    left: 10px;
+    width: 13px;
+    height: 13px;
+  }
+
+  .ff-login-toggle {
+    right: 3px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .ff-login-page .ff-login-submit {
+    min-height: 13cqw;
+    height: 13cqw;
+    font-size: 4.4cqw;
+    margin-top: 2px;
+    border-radius: 10px !important;
+  }
+
+  .ff-login-support-wrap {
+    margin-top: 2cqw;
+    line-height: 1;
+  }
+
+  .ff-login-support {
+    font-size: 3.2cqw;
+  }
+
+  .ff-login-error {
+    font-size: 3.7cqw;
   }
 }
 
-@media (max-width: 360px) {
-  .ff-login-page {
-    padding: 40px 14px;
+@media (max-width: 319px) {
+  .ff-login-page .ff-login-card {
+    height: auto;
+    min-height: 360px;
+    aspect-ratio: auto;
+    border-radius: 999px !important;
+    padding: 48px 24px !important;
   }
 
-  .ff-login-card {
-    padding: 28px 22px 25px !important;
+  .ff-login-page .ff-login-input {
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .ff-login-page .ff-login-submit {
+    min-height: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .ff-login-page .ff-login-product {
+    font-size: 11px;
+  }
+
+  .ff-login-page .ff-login-tagline {
+    font-size: 9px;
+  }
+
+  .ff-login-page .ff-login-brand .ff-login-company {
+    font-size: 17px;
+  }
+
+  .ff-login-support {
+    font-size: 9px;
   }
 }
 

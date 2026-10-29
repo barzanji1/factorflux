@@ -9,7 +9,7 @@ Use the shared Windows 95 page shell, cards, stats, controls, tabs, tables, badg
 
 **How to apply:** Put breadcrumb, title, subtitle, global search, New menu, notifications, and user controls in the shared page shell. Do not render a second body H1. Keep page data, actions, routes, and permissions unchanged when migrating visual surfaces.
 
-The login page is the explicit exception: use a circular neumorphic desktop card and rounded mobile card, without Win95 bevels. Keep the login logo unlinked. Successful sign-in uses a 1200ms Y-axis coin-flip spin with perspective before dashboard navigation, never an upside-down Z-axis rotation; failed sign-in shakes it instead.
+The login page is the explicit exception: use a circular neumorphic card on desktop and mobile, without Win95 bevels. On mobile keep 20px margins and scale the contents proportionally; only below 320px may it become a fully rounded pill, never a square or ordinary rounded rectangle. Keep the login logo unlinked. Successful sign-in uses a 1200ms Y-axis coin-flip spin with perspective before dashboard navigation, never an upside-down Z-axis rotation; failed sign-in shakes it instead.
 
 **Why:** The user explicitly requested neumorphic styling for login only; authenticated internal pages must retain their existing Win95 style.
 
