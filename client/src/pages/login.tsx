@@ -90,7 +90,7 @@ export default function LoginPage() {
               <FactorFluxLogo
                 linkToDashboard={false}
                 showWordmark={false}
-                markSrc="/images/ff-login-clean.webp"
+                markSrc="/images/ff-login-two-tone.webp"
                 className="flex-col gap-1"
                 markClassName="h-14 w-14"
               />
