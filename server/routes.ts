@@ -38,6 +38,7 @@ import { registerInvoiceBranchRoutes } from "./routes/invoiceBranches";
 import { registerChargebackReportRoutes } from "./routes/chargebackReport";
 import { registerDumpStatementRoutes } from "./routes/dumpStatements";
 import { agingReportFiltersSchema, groupAgingRows } from "../shared/aging-report";
+import { readCarrierFinancial } from "./services/carrierFinancial";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
@@ -2402,6 +2403,20 @@ ${message}
     } catch (error) {
       console.error("Error fetching client:", error);
       res.status(500).json({ message: "Failed to fetch client" });
+    }
+  });
+
+  app.get("/api/clients/:id/financial-summary", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid carrier id" });
+      const client = await storage.getClient(id);
+      if (!client) return res.status(404).json({ message: "Carrier not found" });
+      if (!canAccessAssignedRecord(req, client.assignedProcessor)) return res.status(403).json({ message: "You can only access carriers assigned to you" });
+      res.json(await readCarrierFinancial(id));
+    } catch (error) {
+      console.error("Error reading carrier financial summary:", error);
+      res.status(500).json({ message: "Unable to load carrier financial summary" });
     }
   });
 

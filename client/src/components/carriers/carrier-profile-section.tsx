@@ -3,14 +3,25 @@ import { CompressionInfo } from "@/components/documents/compression-info";
 import { FileText, Plus, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { NeuButton, NeuCard } from "@/styles/neu/components";
 
-export function ProfileSection({ title, eyebrow, action, children, className }: {
+export function ProfileSection({ title, eyebrow, action, children, className, neuStyle = false }: {
   title: string;
   eyebrow?: string;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  neuStyle?: boolean;
 }) {
+  if (neuStyle) return (
+    <NeuCard className={cn("overflow-hidden", className)}>
+      <div className="flex items-center justify-between gap-3 border-b border-[#c7c7c7] px-4 py-3">
+        <div>{eyebrow && <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#718187]">{eyebrow}</p>}<h2 className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#354548]">{title}</h2></div>
+        {action}
+      </div>
+      <div className="p-4">{children}</div>
+    </NeuCard>
+  );
   return (
     <section className={cn("border border-[#b7c2c7] bg-white shadow-[1px_1px_0_#7b8589]", className)}>
       <div className="flex items-center justify-between border-b border-[#c7d0d3] bg-[#e7edef] px-3 py-2">
@@ -37,7 +48,13 @@ export function ProfileField({ label, value, tone }: { label: string; value?: Re
   );
 }
 
-export function EmptyState({ label = "No records on file", actionLabel, onAction }: { label?: string; actionLabel?: string; onAction?: () => void }) {
+export function EmptyState({ label = "No records on file", actionLabel, onAction, neuStyle = false }: { label?: string; actionLabel?: string; onAction?: () => void; neuStyle?: boolean }) {
+  if (neuStyle) return (
+    <div className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-dashed border-[#bfc4c4] bg-[#e0e0e0] px-4 py-3 text-sm text-[#718187]">
+      <p>{label}</p>
+      {actionLabel && onAction && <NeuButton onClick={onAction} className="min-h-9 px-3 text-xs"><Plus className="h-3 w-3" />{actionLabel}</NeuButton>}
+    </div>
+  );
   return (
     <div className="flex min-h-16 items-center justify-between border border-dashed border-[#c9d2d5] bg-[#f8faf9] px-3 py-3">
       <p className="text-[11px] text-[#7b8a8f]">{label}</p>
@@ -46,12 +63,13 @@ export function EmptyState({ label = "No records on file", actionLabel, onAction
   );
 }
 
-export function DocumentList({ title, docs, categories, onUpload, onDownload }: {
+export function DocumentList({ title, docs, categories, onUpload, onDownload, neuStyle = false }: {
   title?: string;
   docs: any[];
   categories: string[];
   onUpload?: (category: string, file: File) => void;
   onDownload?: (doc: any) => void;
+  neuStyle?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -60,7 +78,7 @@ export function DocumentList({ title, docs, categories, onUpload, onDownload }: 
         {categories.map((category) => {
           const matches = docs.filter((doc) => (doc.documentCategory || doc.documentType || "").toLowerCase() === category.toLowerCase());
           return (
-            <div key={category} className="border border-[#d0d9dc] bg-[#fbfcfb] p-2">
+            <div key={category} className={cn("p-2", neuStyle ? "rounded-xl bg-[#e0e0e0] shadow-[inset_3px_3px_7px_#b8b8b8,inset_-3px_-3px_7px_#ffffff]" : "border border-[#d0d9dc] bg-[#fbfcfb]")}>
               <div className="flex items-center gap-2">
                 <FileText className={cn("h-4 w-4 shrink-0", matches.length ? "text-[#078393]" : "text-[#a7b2b5]")} />
                 <div className="min-w-0 flex-1">
@@ -80,7 +98,7 @@ export function DocumentList({ title, docs, categories, onUpload, onDownload }: 
                     <div key={doc.id} className="flex items-center justify-between gap-2">
                       <span className="min-w-0 truncate text-[9px] text-[#667a80]">{doc.originalName || doc.filename}</span>
                       <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
-                      {onDownload && <Button type="button" variant="ghost" size="sm" onClick={() => onDownload(doc)} className="h-6 shrink-0 px-1.5 text-[10px] text-[#087d8d]">Download</Button>}
+                      {onDownload && (neuStyle ? <NeuButton type="button" onClick={() => onDownload(doc)} className="min-h-8 shrink-0 rounded-lg px-2 text-[10px]">Download</NeuButton> : <Button type="button" variant="ghost" size="sm" onClick={() => onDownload(doc)} className="h-6 shrink-0 px-1.5 text-[10px] text-[#087d8d]">Download</Button>)}
                     </div>
                   ))}
                 </div>

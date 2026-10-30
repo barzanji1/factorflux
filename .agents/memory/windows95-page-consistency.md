@@ -3,7 +3,7 @@ name: Windows 95 page consistency
 description: Visual consistency rule for internal FactorFlux pages and controls.
 ---
 
-Use the shared Windows 95 content shell, controls, tables, and filter chips for authenticated internal pages except the Agent Dashboard, Invoice List, Invoice Detail, and Create Invoice modal. The shared sidebar and these explicitly approved surfaces use neumorphism; other page content remains Win95.
+Use the shared Windows 95 content shell, controls, tables, and filter chips for authenticated internal pages except the Agent Dashboard, Invoice List, Invoice Detail, Create Invoice modal, Carrier List, and Carrier Profile. The shared sidebar and these explicitly approved surfaces use neumorphism; other page content remains Win95.
 
 **Why:** A page assembled directly from generic primitives drifted away from the established application theme and duplicated the title outside the shared header.
 
@@ -11,7 +11,7 @@ Use the shared Windows 95 content shell, controls, tables, and filter chips for 
 
 The login page is the explicit exception: use a circular neumorphic card on desktop and mobile, without Win95 bevels. On mobile keep 20px margins and scale the contents proportionally; only below 320px may it become a fully rounded pill, never a square or ordinary rounded rectangle. Keep the login logo unlinked. Successful sign-in uses a 1200ms Y-axis coin-flip spin with perspective before dashboard navigation, never an upside-down Z-axis rotation; failed sign-in shakes it instead.
 
-**Why:** The user initially requested login as the sole exception, then explicitly approved the Agent Dashboard, shared sidebar, Invoice List, Invoice Detail, and Create Invoice modal migrations while leaving other page content unchanged.
+**Why:** The user initially requested login as the sole exception, then explicitly approved the Agent Dashboard, shared sidebar, invoice surfaces, Carrier List, and Carrier Profile migrations while leaving other page content unchanged.
 
 **How to apply:** Scope login styling to the login page so shared retro rules cannot override it and the exception cannot affect internal pages.
 
@@ -21,8 +21,8 @@ Login hierarchy is company-first: Trucking Pros Financial is the largest, boldes
 
 **How to apply:** Preserve clear branding-to-form spacing and at least 40px desktop background clearance when adjusting the login layout.
 
-The reusable neumorphic system remains opt-in outside the approved dashboard, Invoice List, Invoice Detail, Create Invoice modal, and shared sidebar. Its admin preview must stay isolated from the Win95 shell and absent from sidebar navigation.
+The reusable neumorphic system remains opt-in outside the approved dashboard, invoice surfaces, Carrier List, Carrier Profile, and shared sidebar. Its admin preview must stay isolated from the Win95 shell and absent from sidebar navigation.
 
-**Why:** The user requested review before migration and subsequently approved dashboard content, the global sidebar, Invoice List, Invoice Detail, and Create Invoice modal.
+**Why:** The user requested review before migration and subsequently approved dashboard content, the global sidebar, invoice surfaces, Carrier List, and Carrier Profile.
 
 **How to apply:** Do not apply the library to existing pages without a new explicit request; use Tailwind classes rather than global CSS overrides.

@@ -50,7 +50,7 @@ function shortMonth(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
 }
 
-function CylinderBar(props: { x?: number; y?: number; width?: number; height?: number; fill?: string; value?: number }) {
+export function CylinderBar(props: { x?: number; y?: number; width?: number; height?: number; fill?: string; value?: number }) {
   const { x = 0, y = 0, width = 0, height = 0 } = props;
   if (height <= 0 || width <= 0 || (props.value !== undefined && props.value <= 0)) return null;
   const radius = Math.min(width / 2, 8);

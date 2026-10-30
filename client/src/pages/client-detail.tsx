@@ -10,21 +10,41 @@ import TopNav from "@/components/layout/top-nav";
 import InvoiceModal from "@/components/modals/invoice-modal";
 import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
 import { Button } from "@/components/ui/button";
+import type { ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ProfileSection, ProfileField, EmptyState, DocumentList } from "@/components/carriers/carrier-profile-section";
+import { ProfileSection as BaseProfileSection, ProfileField, EmptyState as BaseEmptyState, DocumentList } from "@/components/carriers/carrier-profile-section";
 import { DriverSection } from "@/components/carriers/driver-section";
 import CarrierChatThread from "@/components/carriers/CarrierChatThread";
 import { LoadTypeBadge, LoadTypeToggleGroup } from "@/components/load-type";
 import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientEmailComposer } from "@/components/client-email/client-email-composer";
 import { ClientEmailLog } from "@/components/client-email/client-email-log";
+import { CarrierFinancialOverview } from "@/components/carriers/carrier-financial-overview";
+import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
+
+function ProfileSection(props: Parameters<typeof BaseProfileSection>[0]) {
+  return <BaseProfileSection {...props} neuStyle />;
+}
+
+function EmptyState(props: Parameters<typeof BaseEmptyState>[0]) {
+  return <BaseEmptyState {...props} neuStyle />;
+}
+
+function ProfileActionButton({ variant = "default", size = "default", className, ...props }: Omit<ButtonProps, "asChild">) {
+  const cleanClassName = (className || "").split(/\s+/).filter((token) =>
+    !/^(bg-|hover:bg-|rounded-|h-|w-|px-|py-|text-\[\d+px\])/.test(token),
+  ).join(" ");
+  return <NeuButton variant={variant === "default" ? "accent" : "default"} className={cn(
+    size === "icon" ? "min-h-9 h-9 w-9 rounded-lg p-0" : size === "sm" ? "min-h-9 rounded-lg px-3 py-2 text-xs" : "min-h-10 rounded-xl px-4",
+    cleanClassName,
+  )} {...props} />;
+}
 
 const money = (value: unknown) => value === null || value === undefined || value === "" ? "Not recorded" : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Not recorded";
@@ -33,12 +53,12 @@ const pretty = (value: unknown) => value === true ? "Yes" : value === false ? "N
 const first = (obj: any, ...keys: string[]) => keys.map((key) => obj?.[key]).find((value) => value !== undefined && value !== null && value !== "");
 
 function StatusBadge({ status }: { status?: string }) {
-  return <span className={cn("inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-bold uppercase tracking-wide", status === "active" ? "border-[#85c7b1] bg-[#e9f7f1] text-[#167152]" : "border-[#d7b46c] bg-[#fff8e8] text-[#946316]")}><span className="h-1.5 w-1.5 rounded-full bg-current" />{status?.replace("_", " ") || "unknown"}</span>;
+  return <NeuBadge tone={status === "active" ? "success" : status === "new_client" ? "accent" : "warning"}>{status?.replace("_", " ") || "unknown"}</NeuBadge>;
 }
 
 function MiniTable({ columns, rows, empty }: { columns: string[]; rows: React.ReactNode[][]; empty: string }) {
-  if (!rows.length) return <EmptyState label={empty} />;
-  return <div className="overflow-x-auto border border-[#d0d9dc]"><table className="w-full text-left text-[11px]"><thead className="bg-[#f0f4f3] text-[9px] uppercase tracking-wider text-[#63767d]"><tr>{columns.map((column) => <th key={column} className="whitespace-nowrap px-2 py-2 font-bold">{column}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} className="border-t border-[#e1e6e7] odd:bg-[#fbfcfb] hover:bg-[#edf8f8]">{row.map((cell, cellIndex) => <td key={cellIndex} className="whitespace-nowrap px-2 py-2 text-[#334b54]">{cell}</td>)}</tr>)}</tbody></table></div>;
+  if (!rows.length) return <EmptyState label={empty} neuStyle />;
+  return <NeuTable className="min-w-max text-[11px]"><NeuTableHeader><tr>{columns.map((column) => <NeuTableHead key={column} className="px-3 py-2 text-[9px]">{column}</NeuTableHead>)}</tr></NeuTableHeader><NeuTableBody>{rows.map((row, index) => <NeuTableRow key={index} className="border-t border-[#c8c8c8]">{row.map((cell, cellIndex) => <NeuTableCell key={cellIndex} className="whitespace-nowrap px-3 py-2 text-[#354548]">{cell}</NeuTableCell>)}</NeuTableRow>)}</NeuTableBody></NeuTable>;
 }
 
 function CarrierAlerts({ carrierId, canManage }: { carrierId: number; canManage: boolean }) {
@@ -112,7 +132,7 @@ function CarrierAlerts({ carrierId, canManage }: { carrierId: number; canManage:
                   <p className="mt-1 text-[11px] font-bold">{alert.title}</p>
                   <p className="mt-1 whitespace-pre-wrap text-[11px]">{alert.message}</p>
                 </div>
-                {canManage && alert.active && <Button variant="outline" size="sm" className="h-7 shrink-0 rounded-sm px-2 text-[10px]" disabled={deactivateAlert.isPending} onClick={() => deactivateAlert.mutate(Number(alert.id))}>Deactivate</Button>}
+                {canManage && alert.active && <ProfileActionButton variant="outline" size="sm" className="shrink-0" disabled={deactivateAlert.isPending} onClick={() => deactivateAlert.mutate(Number(alert.id))}>Deactivate</ProfileActionButton>}
               </div>
             </div>)}
           </div> : <EmptyState label="No carrier preflight alerts are recorded" />}
@@ -124,7 +144,7 @@ function CarrierAlerts({ carrierId, canManage }: { carrierId: number; canManage:
         </div>
         <div><Label htmlFor={`alert-title-${carrierId}`} className="text-[10px]">Title</Label><Input id={`alert-title-${carrierId}`} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required className="h-8 rounded-sm text-[11px]" placeholder="e.g. AR hold" /></div>
         <div><Label htmlFor={`alert-message-${carrierId}`} className="text-[10px]">Message</Label><Textarea id={`alert-message-${carrierId}`} value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} required rows={3} className="rounded-sm text-[11px]" placeholder="Explain the risk and any required action." /></div>
-        <Button type="submit" size="sm" disabled={addAlert.isPending || !title.trim() || !message.trim()} className="h-8 rounded-sm bg-[#098b9f] text-[11px] text-white hover:bg-[#08798b]"><Plus className="mr-1 h-3.5 w-3.5" />Add alert</Button>
+        <ProfileActionButton type="submit" size="sm" disabled={addAlert.isPending || !title.trim() || !message.trim()}><Plus className="mr-1 h-3.5 w-3.5" />Add alert</ProfileActionButton>
       </form> : <p className="border-t border-[#d4dcde] pt-3 text-[10px] text-[#718187]">Only managers and administrators can add or deactivate alerts.</p>}
     </div>
   </ProfileSection>;
@@ -253,50 +273,48 @@ export default function ClientDetail() {
   const physical = { address: first(onboarding, "physicalAddress") || client.address, city: first(onboarding, "physicalCity", "city"), state: first(onboarding, "physicalState", "state"), zip: first(onboarding, "physicalZip", "zipCode") };
   const mailing = { address: first(onboarding, "mailingAddress"), city: first(onboarding, "mailingCity"), state: first(onboarding, "mailingState"), zip: first(onboarding, "mailingZip") };
   const docs = (categories: string[]) => isManager
-    ? <DocumentList docs={clientDocs} categories={categories} onUpload={uploadDocument} onDownload={downloadDocument} />
+    ? <DocumentList docs={clientDocs} categories={categories} onUpload={uploadDocument} onDownload={downloadDocument} neuStyle />
     : <EmptyState label="Carrier documents are restricted to managers and administrators" />;
 
-  return <div className="flex min-h-[100dvh] bg-[#d4d0c8] text-[#263b44]">
+  return <div className="flex h-full min-h-0 bg-[#e0e0e0] text-[#354548]">
     <Sidebar />
-    <div className="flex min-w-0 flex-1 flex-col">
-      <TopNav title="Carrier profile" subtitle="Operations workspace · complete record" group="Operations" />
-      <main className="custom-scrollbar flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1580px] space-y-3 p-3 md:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 border border-[#718087] bg-[#edf2f1] px-3 py-2 shadow-[1px_1px_0_#fff]">
-            <div className="flex items-center gap-3"><Button variant="ghost" size="sm" onClick={() => navigate("/clients")} className="h-8 gap-1 rounded-sm px-2 text-[#52666d]"><ArrowLeft className="h-4 w-4" />Close / Back</Button><div className="h-7 w-px bg-[#b5c0c3]" /><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-bold tracking-tight text-[#203a46]">{client.name}</h1><StatusBadge status={client.status} /></div><p className="text-[10px] text-[#667a80]">MC {client.mcNumber || "Not recorded"} · DOT {dotNumber || "Not recorded"} · created {date(client.createdAt)}</p></div></div>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <TopNav title="Carrier profile" subtitle="Operations workspace · complete record" group="Operations" neu />
+      <NeuPageShell className="custom-scrollbar !min-h-0 flex-1">
+        <div className="mx-auto max-w-[1580px] space-y-5 p-4 md:p-6">
+          <NeuCard className="flex flex-wrap items-center justify-between gap-4 p-4 md:p-5">
+            <div className="flex min-w-0 items-center gap-3"><NeuButton onClick={() => navigate("/clients")} className="min-h-10 px-3 text-xs"><ArrowLeft className="h-4 w-4" />Back</NeuButton><div className="h-8 w-px bg-[#c5c5c5]" /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight text-[#354548] md:text-2xl">{client.name}</h1><StatusBadge status={client.status} /></div><p className="mt-1 text-xs text-[#718187]">MC {client.mcNumber || "Not recorded"} · DOT {dotNumber || "Not recorded"} · created {date(client.createdAt)}</p><p className="mt-1 text-sm text-[#526164]">{client.email || "No email recorded"}{client.phone ? ` · ${client.phone}` : ""}</p></div></div>
             <div className="flex flex-wrap gap-1.5">
-              <Button size="sm" onClick={() => navigate(`/carriers/${clientId}/edit`)} className="h-8 gap-1 rounded-sm bg-[#098b9f] px-2.5 text-[11px] text-white hover:bg-[#08798b]"><Edit2 className="h-3.5 w-3.5" />Edit carrier</Button>
+              <NeuButton onClick={() => navigate(`/carriers/${clientId}/edit`)} className="min-h-10 px-3 text-xs"><Edit2 className="h-4 w-4" />Edit carrier</NeuButton>
                <div className="flex items-center gap-2 border border-[#c5d0d1] bg-white px-2 py-1">
                  <span className="text-[10px] font-bold uppercase tracking-wide text-[#718187]">Assigned Processor</span>
                  <div className="min-w-[170px]"><ProcessorAssignment record={client} endpoint={`/api/clients/${clientId}/assign`} queryKey={["/api/clients", clientId]} compact /></div>
                </div>
-              <Button size="sm" variant="outline" onClick={() => toast({ title: "UCC review is not available", description: "No review mutation is configured for this workspace." })} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><ShieldCheck className="h-3.5 w-3.5" />Review UCC</Button>
-              <Button size="sm" variant="outline" onClick={() => toast({ title: "Corporation review is not available", description: "No review mutation is configured for this workspace." })} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">Review Corp</Button>
+              <NeuButton onClick={() => toast({ title: "UCC review is not available", description: "No review mutation is configured for this workspace." })} className="min-h-9 px-3 text-xs"><ShieldCheck className="h-3.5 w-3.5" />Review UCC</NeuButton>
+              <NeuButton onClick={() => toast({ title: "Corporation review is not available", description: "No review mutation is configured for this workspace." })} className="min-h-9 px-3 text-xs">Review Corp</NeuButton>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Download className="h-3.5 w-3.5" />Downloads<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><NeuButton className="min-h-9 px-3 text-xs"><Download className="h-3.5 w-3.5" />Downloads<ChevronDown className="h-3 w-3" /></NeuButton></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-sm">
                   <DropdownMenuItem onSelect={() => document.getElementById("aging-report")?.scrollIntoView({ behavior: "smooth" })}>Aging Statement</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {clientDocs.length ? clientDocs.map((doc: any) => <DropdownMenuItem key={doc.id} asChild><a href={`/api/documents/${doc.id}/download`} target="_blank" rel="noreferrer"><FileText className="mr-2 h-3.5 w-3.5" />{doc.originalName || doc.filename}</a></DropdownMenuItem>) : <DropdownMenuItem disabled>No carrier documents on file</DropdownMenuItem>}
                 </DropdownMenuContent>
               </DropdownMenu>
-              {hasPermission("client_email") && <Button size="sm" variant="outline" onClick={() => setClientEmailOpen(true)} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Mail className="h-3.5 w-3.5" />Email Client</Button>}
-              <Button size="sm" variant="outline" disabled title="Carrier SMS sending is unavailable because no SMS API is configured" aria-label="Send carrier SMS unavailable" className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><Phone className="h-3.5 w-3.5" />Send SMS</Button>
-              {canUseCarrierChat && <Button size="sm" variant="outline" onClick={() => setProfileTab("messages")} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]"><MessageCircle className="h-3.5 w-3.5" />Message Carrier</Button>}
-              <Button size="sm" variant="outline" disabled={!fmcsaUrl} title={fmcsaUrl ? "Open official FMCSA SAFER company snapshot" : "DOT number required for FMCSA lookup"} aria-label={fmcsaUrl ? "Open carrier on FMCSA" : "Carrier on FMCSA unavailable"} onClick={() => fmcsaUrl && window.open(fmcsaUrl, "_blank", "noopener,noreferrer")} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">Carrier on FMCSA</Button>
-              {isManager && <Button size="sm" variant="outline" disabled={updateClient.isPending} onClick={() => updateClient.mutate({ status: client.status === "active" ? "inactive" : "active" })} className="h-8 gap-1 rounded-sm px-2.5 text-[11px]">{client.status === "active" ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{client.status === "active" ? "Set inactive" : "Activate"}</Button>}
+              {hasPermission("client_email") && <NeuButton onClick={() => setClientEmailOpen(true)} className="min-h-9 px-3 text-xs"><Mail className="h-3.5 w-3.5" />Email Client</NeuButton>}
+              <NeuButton disabled title="Carrier SMS sending is unavailable because no SMS API is configured" aria-label="Send carrier SMS unavailable" className="min-h-9 px-3 text-xs"><Phone className="h-3.5 w-3.5" />Send SMS</NeuButton>
+              {canUseCarrierChat && <NeuButton onClick={() => setProfileTab("messages")} className="min-h-9 px-3 text-xs"><MessageCircle className="h-3.5 w-3.5" />Message Carrier</NeuButton>}
+              <NeuButton disabled={!fmcsaUrl} title={fmcsaUrl ? "Open official FMCSA SAFER company snapshot" : "DOT number required for FMCSA lookup"} aria-label={fmcsaUrl ? "Open carrier on FMCSA" : "Carrier on FMCSA unavailable"} onClick={() => fmcsaUrl && window.open(fmcsaUrl, "_blank", "noopener,noreferrer")} className="min-h-9 px-3 text-xs">Carrier on FMCSA</NeuButton>
+              {isManager && <NeuButton disabled={updateClient.isPending} onClick={() => updateClient.mutate({ status: client.status === "active" ? "inactive" : "active" })} className="min-h-9 px-3 text-xs">{client.status === "active" ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{client.status === "active" ? "Set inactive" : "Activate"}</NeuButton>}
             </div>
-          </div>
-           <Tabs value={profileTab} onValueChange={setProfileTab}>
-             <TabsList>
-               <TabsTrigger value="profile">Profile</TabsTrigger>
-               <TabsTrigger value="communications">Communications</TabsTrigger>
-               {canUseCarrierChat && <TabsTrigger value="messages">Messages</TabsTrigger>}
-             </TabsList>
-             <TabsContent value="profile">
-           <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
-             {[["Open AR", money(openBalance), "text-[#a33131]"], ["Paid", money(paid), "text-[#187455]"], ["Invoices", clientInvoices.length, "text-[#087d8d]"], ["Documents", clientDocs.length, "text-[#42616c]"], ["Advance", onboarding.prePay ? `${onboarding.prePay}%` : "Not recorded", "text-[#42616c]"], ["Current limit", money(onboarding.currentLimit), "text-[#42616c]"]].map(([label, value, color]) => <div key={String(label)} className="border border-[#9eabad] bg-[#eef3f1] px-3 py-2 shadow-[1px_1px_0_#fff]"><p className="text-[9px] font-bold uppercase tracking-wider text-[#718187]">{label}</p><p className={cn("mt-1 text-base font-bold", color)}>{value}</p></div>)}
-           </div>
+          </NeuCard>
+          <CarrierFinancialOverview carrierId={clientId} />
+          <NeuTabs value={profileTab} onValueChange={setProfileTab} className="carrier-neu-tabs">
+            <NeuTabList>
+              <NeuTab value="profile">Profile</NeuTab>
+              <NeuTab value="communications">Communications</NeuTab>
+              {canUseCarrierChat && <NeuTab value="messages">Messages</NeuTab>}
+            </NeuTabList>
+            <NeuTabPanel value="profile" unmountInactive>
            <div className="grid items-start gap-3 xl:grid-cols-2">
             <div className="space-y-3">
               <ProfileSection title={owners.length === 1 ? "Owner" : "Owners"} eyebrow="Identity & contact">
@@ -319,11 +337,11 @@ export default function ClientDetail() {
               <ProfileSection title="Outstanding" eyebrow="Risk & collections"><div className="grid gap-x-5 sm:grid-cols-3"><ProfileField label="Debt amount" value={money(onboarding.debt || client.shorts)} tone="danger" /><ProfileField label="Type" value={onboarding.loanType} /><ProfileField label="Details" value={onboarding.collectionBalance || onboarding.vendor} /></div></ProfileSection>
               <ProfileSection title="Administrative"><div className="grid gap-x-5 sm:grid-cols-2"><ProfileField label="UCC reviewed by / date" value={[onboarding.ucc1IniReviewBy, onboarding.ucc1IniReviewDate].filter(Boolean).join(" · ")} /><ProfileField label="COI reviewed by / date" value={[onboarding.coiReviewBy, onboarding.coiReviewDate].filter(Boolean).join(" · ")} /><ProfileField label="Corporation reviewed by / date" value={[onboarding.corpReviewBy, onboarding.corpReviewDate].filter(Boolean).join(" · ")} /><ProfileField label="Rating reviewed by / date" value={[onboarding.authorityReviewBy, onboarding.authorityReviewDate].filter(Boolean).join(" · ")} /></div></ProfileSection>
               <ProfileSection title="Miscellaneous"><div className="grid gap-x-5 sm:grid-cols-2"><ProfileField label="Language" value={client.language || onboarding.language} /><ProfileField label="Dispatch" value={onboarding.dispatch} /><ProfileField label="Text notifications" value={pretty(onboarding.smsAlert)} /><ProfileField label="Email notifications" value={pretty(onboarding.emailAlert)} /><ProfileField label="Admin" value={onboarding.referralAdmin} /><ProfileField label="Reserves" value={money(onboarding.reserves || client.reserves)} /></div></ProfileSection>
-              <ProfileSection title="Notification email addresses" action={<Button onClick={() => openList("email")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Email", "Actions"]} rows={((onboarding.notificationEmails || onboarding.emailAddresses || []) as any[]).map((email, i) => [email, <span className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => openList("email", email, i)}><Pencil className="h-3 w-3" /></Button><Button variant="ghost" size="sm" onClick={() => deleteList("email", i)}><Trash2 className="h-3 w-3 text-[#a33131]" /></Button></span>])} empty="No notification email addresses are recorded" /></ProfileSection>
-              <ProfileSection title="Notification phone numbers" action={<Button onClick={() => openList("phone")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Phone", "Actions"]} rows={((onboarding.notificationPhones || onboarding.phoneNumbers || []) as any[]).map((phone, i) => [phone, <span className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => openList("phone", phone, i)}><Pencil className="h-3 w-3" /></Button><Button variant="ghost" size="sm" onClick={() => deleteList("phone", i)}><Trash2 className="h-3 w-3 text-[#a33131]" /></Button></span>])} empty="No notification phone numbers are recorded" /></ProfileSection>
-              <ProfileSection title="Trucks" action={<Button onClick={() => openList("truck")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Unit", "Vehicle", "Plate", "Status", "Actions"]} rows={trucks.map((truck: any) => [truck.truckNumber, [truck.year, truck.make, truck.model].filter(Boolean).join(" "), `${truck.licensePlate || ""} ${truck.state || ""}`, truck.status, <span className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => openList("truck", truck)}><Pencil className="h-3 w-3" /></Button><Button variant="ghost" size="sm" onClick={() => window.confirm("Delete this truck?") && deleteTruck.mutate(truck.id)}><Trash2 className="h-3 w-3 text-[#a33131]" /></Button></span>])} empty="No carrier-linked trucks are recorded" /></ProfileSection>
-              <ProfileSection title="Rules" action={<Button onClick={() => openList("rule")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Rule", "Actions"]} rows={(Array.isArray(onboarding.rules) ? onboarding.rules : Object.entries(onboarding.rules || {}).map(([key, value]) => `${key}: ${value}`)).map((rule: any, i: number) => [rule, <span className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => openList("rule", rule, i)}><Pencil className="h-3 w-3" /></Button><Button variant="ghost" size="sm" onClick={() => deleteList("rule", i)}><Trash2 className="h-3 w-3 text-[#a33131]" /></Button></span>])} empty="No carrier-specific rules are recorded" /></ProfileSection>
-              <ProfileSection title="Tasks" action={<Button onClick={() => openList("task")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Task", "Status", "Due", "Actions"]} rows={carrierTasks.map((task: any) => [task.title, task.status, date(task.dueDate), <span className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => openList("task", task)}><Pencil className="h-3 w-3" /></Button><Button variant="ghost" size="sm" onClick={() => window.confirm("Delete this task?") && deleteTask.mutate(task.id)}><Trash2 className="h-3 w-3 text-[#a33131]" /></Button></span>])} empty="No carrier tasks are recorded" /></ProfileSection>
+              <ProfileSection title="Notification email addresses" action={<ProfileActionButton onClick={() => openList("email")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Email", "Actions"]} rows={((onboarding.notificationEmails || onboarding.emailAddresses || []) as any[]).map((email, i) => [email, <span className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => openList("email", email, i)} aria-label="Edit email"><Pencil className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="icon" onClick={() => deleteList("email", i)} aria-label="Delete email"><Trash2 className="h-3 w-3 text-[#a33131]" /></ProfileActionButton></span>])} empty="No notification email addresses are recorded" /></ProfileSection>
+              <ProfileSection title="Notification phone numbers" action={<ProfileActionButton onClick={() => openList("phone")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Phone", "Actions"]} rows={((onboarding.notificationPhones || onboarding.phoneNumbers || []) as any[]).map((phone, i) => [phone, <span className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => openList("phone", phone, i)} aria-label="Edit phone"><Pencil className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="icon" onClick={() => deleteList("phone", i)} aria-label="Delete phone"><Trash2 className="h-3 w-3 text-[#a33131]" /></ProfileActionButton></span>])} empty="No notification phone numbers are recorded" /></ProfileSection>
+              <ProfileSection title="Trucks" action={<ProfileActionButton onClick={() => openList("truck")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Unit", "Vehicle", "Plate", "Status", "Actions"]} rows={trucks.map((truck: any) => [truck.truckNumber, [truck.year, truck.make, truck.model].filter(Boolean).join(" "), `${truck.licensePlate || ""} ${truck.state || ""}`, truck.status, <span className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => openList("truck", truck)} aria-label="Edit truck"><Pencil className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="icon" onClick={() => window.confirm("Delete this truck?") && deleteTruck.mutate(truck.id)} aria-label="Delete truck"><Trash2 className="h-3 w-3 text-[#a33131]" /></ProfileActionButton></span>])} empty="No carrier-linked trucks are recorded" /></ProfileSection>
+              <ProfileSection title="Rules" action={<ProfileActionButton onClick={() => openList("rule")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Rule", "Actions"]} rows={(Array.isArray(onboarding.rules) ? onboarding.rules : Object.entries(onboarding.rules || {}).map(([key, value]) => `${key}: ${value}`)).map((rule: any, i: number) => [rule, <span className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => openList("rule", rule, i)} aria-label="Edit rule"><Pencil className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="icon" onClick={() => deleteList("rule", i)} aria-label="Delete rule"><Trash2 className="h-3 w-3 text-[#a33131]" /></ProfileActionButton></span>])} empty="No carrier-specific rules are recorded" /></ProfileSection>
+              <ProfileSection title="Tasks" action={<ProfileActionButton onClick={() => openList("task")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Task", "Status", "Due", "Actions"]} rows={carrierTasks.map((task: any) => [task.title, task.status, date(task.dueDate), <span className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => openList("task", task)} aria-label="Edit task"><Pencil className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="icon" onClick={() => window.confirm("Delete this task?") && deleteTask.mutate(task.id)} aria-label="Delete task"><Trash2 className="h-3 w-3 text-[#a33131]" /></ProfileActionButton></span>])} empty="No carrier tasks are recorded" /></ProfileSection>
               <ProfileSection title="Factoring documents">{docs(["Factoring Application", "Security Agreement", "NOA", "Deposit & Withdrawals Agreement"])}</ProfileSection>
               <ProfileSection title="Carrier documents">{docs(["W9", "Void Check", "Driver License", "Insurance Certificate", "Authority MC#", "EIN Letter", "Articles Of Organization"])}</ProfileSection>
               <ProfileSection title="Other sign-up documents">{docs(["Other", "Letter Of Intent", "Buyout Agreement"])}</ProfileSection>
@@ -338,12 +356,13 @@ export default function ClientDetail() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-[11px]">
                     <span className="font-bold uppercase tracking-wider text-[#718187]">Current</span>
-                    <LoadTypeBadge value={client.cargoType} />
+                    <LoadTypeBadge value={client.cargoType} neuStyle />
                   </div>
                   <LoadTypeToggleGroup
                     value={client.cargoType}
                     disabled={!isManager || updateClient.isPending}
                     onChange={(cargoType) => updateClient.mutate({ cargoType })}
+                    neuStyle
                   />
                   {!isManager && <p className="text-[10px] text-[#718187]">Only managers and administrators can change the carrier default.</p>}
                   <div className="grid gap-x-5 sm:grid-cols-3">
@@ -354,45 +373,45 @@ export default function ClientDetail() {
                 </div>
               </ProfileSection>
               <ProfileSection title="Other info"><div className="grid gap-x-5 sm:grid-cols-2"><ProfileField label="Since" value={date(onboarding.since)} /><ProfileField label="Referral" value={onboarding.referral} /><ProfileField label="Last invoice" value={date([...clientInvoices].sort((a, b) => new Date(b.invoiceDate || b.createdAt).getTime() - new Date(a.invoiceDate || a.createdAt).getTime())[0]?.invoiceDate)} /><ProfileField label="Date created" value={date(client.createdAt)} /></div></ProfileSection>
-              <ProfileSection title="To do list" action={<Button onClick={() => openList("task")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Item", "Status"]} rows={(carrierTasks.length ? carrierTasks.filter((task: any) => task.status !== "completed") : (onboarding.toDo || onboarding.todo || [])).map((task: any) => [task.title || task.name, task.status])} empty="No open carrier to-do items are recorded" /></ProfileSection>
+              <ProfileSection title="To do list" action={<ProfileActionButton onClick={() => openList("task")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Item", "Status"]} rows={(carrierTasks.length ? carrierTasks.filter((task: any) => task.status !== "completed") : (onboarding.toDo || onboarding.todo || [])).map((task: any) => [task.title || task.name, task.status])} empty="No open carrier to-do items are recorded" /></ProfileSection>
               <ProfileSection title="Dispatcher"><div className="flex items-center gap-3 border border-[#d0d9dc] bg-[#fbfcfb] p-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#d9edf0] text-[#087d8d]"><UserRound className="h-5 w-5" /></div><div className="min-w-0 flex-1"><p className="text-[12px] font-bold">{carrierDispatcher ? [carrierDispatcher.firstName, carrierDispatcher.lastName].filter(Boolean).join(" ") : onboarding.dispatcherName || "No dispatcher linked"}</p><p className="text-[10px] text-[#718187]">{carrierDispatcher?.phone || onboarding.dispatcherPhone || "Phone not recorded"} · {carrierDispatcher?.email || onboarding.dispatcherEmail || "Email not recorded"}</p></div><span className="text-[10px] text-[#9aa7ab]">{carrierDispatcher?.status || (onboarding.dispatcherName ? onboarding.dispatcherStatus || "Linked" : "Unavailable")}</span></div></ProfileSection>
-              <ProfileSection title="Bank accounts" eyebrow="Secure Vault" action={isManager ? <Button onClick={() => openBank()} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button> : undefined}>
+              <ProfileSection title="Bank accounts" eyebrow="Secure Vault" action={isManager ? <ProfileActionButton onClick={() => openBank()} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton> : undefined}>
                 {isManager ? (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[600px] text-left text-[10px]">
                       <thead className="bg-[#f0f4f3] uppercase tracking-wider text-[#63767d]"><tr>{["For", "Account name", "Financial institution", "Routing", "Account", "Type", "Actions"].map((heading) => <th key={heading} className="px-2 py-2 font-bold">{heading}</th>)}</tr></thead>
-                      <tbody>{bankAccounts.map((account: any) => <tr key={account.id} className="border-t border-[#e1e6e7]"><td className="px-2 py-2">{account.paymentType || "Not recorded"}</td><td className="px-2 py-2 font-semibold">{account.nickname || "Operating account"}</td><td className="px-2 py-2">{account.bankName || "Not recorded"}</td><td className="px-2 py-2">•••••••••</td><td className="px-2 py-2">{revealed[account.id] || `•••• ${account.lastFour || "----"}`}</td><td className="px-2 py-2">{account.accountType || "Checking"}</td><td className="px-2 py-2"><div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => revealBank(account.id)} className="h-6 px-1.5" title="Reveal for 30 seconds"><Eye className="h-3 w-3" /></Button><Button variant="ghost" size="sm" onClick={() => openBank(account)} className="h-6 px-1.5 text-[#087d8d]">Edit</Button><Button variant="ghost" size="sm" onClick={() => window.confirm("Remove this bank account?") && deleteBank.mutate(account.id)} className="h-6 px-1.5 text-[#a33131]">Delete</Button></div></td></tr>)}</tbody>
+                      <tbody>{bankAccounts.map((account: any) => <tr key={account.id} className="border-t border-[#c8c8c8]"><td className="px-2 py-2">{account.paymentType || "Not recorded"}</td><td className="px-2 py-2 font-semibold">{account.nickname || "Operating account"}</td><td className="px-2 py-2">{account.bankName || "Not recorded"}</td><td className="px-2 py-2">•••••••••</td><td className="px-2 py-2">{revealed[account.id] || `•••• ${account.lastFour || "----"}`}</td><td className="px-2 py-2">{account.accountType || "Checking"}</td><td className="px-2 py-2"><div className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => revealBank(account.id)} title="Reveal for 30 seconds" aria-label="Reveal bank account"><Eye className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="sm" onClick={() => openBank(account)}>Edit</ProfileActionButton><ProfileActionButton variant="ghost" size="sm" onClick={() => window.confirm("Remove this bank account?") && deleteBank.mutate(account.id)}>Delete</ProfileActionButton></div></td></tr>)}</tbody>
                     </table>
                     {!bankAccounts.length && <EmptyState label="No bank accounts are stored in the secure Vault" />}
                   </div>
                 ) : <EmptyState label="Bank accounts are restricted to managers and administrators" />}
               </ProfileSection>
-              <ProfileSection title="Monitors" action={<Button onClick={() => openList("monitor")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}><MiniTable columns={["Name", "Phone", "Email", "Status", "Actions"]} rows={((onboarding.monitors || []) as any[]).map((monitor, i) => [monitor.name, monitor.phone, monitor.email, monitor.status, <span className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => openList("monitor", monitor, i)}><Pencil className="h-3 w-3" /></Button><Button variant="ghost" size="sm" onClick={() => deleteList("monitor", i)}><Trash2 className="h-3 w-3 text-[#a33131]" /></Button></span>])} empty="No monitors are recorded" /></ProfileSection>
+              <ProfileSection title="Monitors" action={<ProfileActionButton onClick={() => openList("monitor")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Name", "Phone", "Email", "Status", "Actions"]} rows={((onboarding.monitors || []) as any[]).map((monitor, i) => [monitor.name, monitor.phone, monitor.email, monitor.status, <span className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => openList("monitor", monitor, i)} aria-label="Edit monitor"><Pencil className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="icon" onClick={() => deleteList("monitor", i)} aria-label="Delete monitor"><Trash2 className="h-3 w-3 text-[#a33131]" /></ProfileActionButton></span>])} empty="No monitors are recorded" /></ProfileSection>
                <DriverSection carrierId={clientId} canEdit={isManager} legacyDriver={{ name: onboarding.driverName, phone: onboarding.driverPhone, email: onboarding.driverEmail }} />
-              <ProfileSection title="Messages" action={<Button onClick={() => openList("message")} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add</Button>}>{(onboarding.messages || []).length ? <div className="space-y-2">{onboarding.messages.map((message: any, i: number) => <div key={i} className="border border-[#d0d9dc] p-2 text-[11px]"><div className="flex justify-between gap-3"><b>{message.author}</b><span className="shrink-0 text-[#718187]">{dateTime(message.timestamp)}</span></div><p className="mt-1 whitespace-pre-wrap">{message.message}</p><Button variant="ghost" size="sm" onClick={() => deleteList("message", i)}><Trash2 className="h-3 w-3 text-[#a33131]" /></Button></div>)}</div> : <EmptyState label="No internal messages are recorded" />}</ProfileSection>
+              <ProfileSection title="Messages" action={<ProfileActionButton onClick={() => openList("message")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}>{(onboarding.messages || []).length ? <div className="space-y-2">{onboarding.messages.map((message: any, i: number) => <div key={i} className="border border-[#d0d9dc] p-2 text-[11px]"><div className="flex justify-between gap-3"><b>{message.author}</b><span className="shrink-0 text-[#718187]">{dateTime(message.timestamp)}</span></div><p className="mt-1 whitespace-pre-wrap text-[11px]">{message.message}</p><ProfileActionButton variant="ghost" size="sm" onClick={() => deleteList("message", i)}>Delete message</ProfileActionButton></div>)}</div> : <EmptyState label="No internal messages are recorded" />}</ProfileSection>
               <ProfileSection title="RAP sheet">{docs(["RAP Sheet"])}</ProfileSection>
               <ProfileSection title="Preferred brokers"><MiniTable columns={["Broker", "Reference"]} rows={((onboarding.preferredBrokers || []) as any[]).map((broker) => [broker.name || broker, broker.mcNumber || "Onboarding"]) } empty="No preferred brokers are recorded" /></ProfileSection>
               <ProfileSection title="UCC">{docs(["UCC-1-UT Initial Financing Statement", "UCC-3-UT Continuation"])}</ProfileSection>
               <ProfileSection title="Other documents">{docs(["Other Documents", "Envelope", "Logo"])}</ProfileSection>
-              <ProfileSection title="Notes" eyebrow="Internal record"><div className="space-y-2">{client.notes && <div className="border border-[#d0d9dc] bg-[#fbfcfb] p-3 text-[12px] whitespace-pre-wrap">{client.notes}</div>}{isManager ? <><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Add an internal note..." className="w-full border border-[#aebdc1] bg-white p-2 text-[12px] outline-none focus:border-[#098b9f]" /><Button onClick={saveNote} disabled={!note.trim() || updateClient.isPending} size="sm" className="h-8 rounded-sm bg-[#098b9f] text-[11px] text-white"><MessageSquare className="mr-1 h-3.5 w-3.5" />Save note</Button></> : !client.notes && <EmptyState label="No internal notes are recorded" />}</div></ProfileSection>
-              <ProfileSection title="Invoices" eyebrow="Funding activity" action={<Button onClick={() => setInvoiceOpen(true)} size="sm" className="h-7 gap-1 rounded-sm bg-[#098b9f] px-2 text-[10px] text-white hover:bg-[#08798b]"><Plus className="h-3 w-3" />Create invoice</Button>}><MiniTable columns={["Invoice", "Date", "Amount", "Status"]} rows={clientInvoices.map((invoice) => [<a key={invoice.id} className="text-[#087d8d] hover:underline" href={`/invoices/${invoice.id}`}>{invoice.invoiceNumber}</a>, date(invoice.invoiceDate || invoice.createdAt), money(invoice.amount), invoice.status])} empty="No invoices are recorded for this carrier" /></ProfileSection>
+              <ProfileSection title="Notes" eyebrow="Internal record"><div className="space-y-2">{client.notes && <div className="rounded-xl bg-[#e0e0e0] p-3 text-[12px] shadow-[inset_3px_3px_7px_#b8b8b8,inset_-3px_-3px_7px_#ffffff] whitespace-pre-wrap">{client.notes}</div>}{isManager ? <><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Add an internal note..." className="w-full rounded-xl border-0 bg-[#e0e0e0] p-3 text-[12px] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff] outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]" /><ProfileActionButton onClick={saveNote} disabled={!note.trim() || updateClient.isPending} size="sm"><MessageSquare className="mr-1 h-3.5 w-3.5" />Save note</ProfileActionButton></> : !client.notes && <EmptyState label="No internal notes are recorded" />}</div></ProfileSection>
+              <ProfileSection title="Invoices" eyebrow="Funding activity" action={<ProfileActionButton onClick={() => setInvoiceOpen(true)} size="sm"><Plus className="h-3 w-3" />Create invoice</ProfileActionButton>}><MiniTable columns={["Invoice", "Date", "Amount", "Status"]} rows={clientInvoices.map((invoice) => [<a key={invoice.id} className="font-semibold text-[#168d98] hover:underline" href={`/invoices/${invoice.id}`}>{invoice.invoiceNumber}</a>, date(invoice.invoiceDate || invoice.createdAt), money(invoice.amount), <NeuBadge key={`status-${invoice.id}`} tone={["paid", "settled"].includes(invoice.status) ? "success" : ["rejected", "void"].includes(invoice.status) ? "warning" : "accent"}>{invoice.status}</NeuBadge>])} empty="No invoices are recorded for this carrier" /></ProfileSection>
               <ProfileSection title="Aging report" className="scroll-mt-4" ><div id="aging-report" className="space-y-3"><p className="text-[11px] text-[#718187]">Download open funded invoices in the carrier aging format.</p><AgingPdfDownload carrierId={clientId} minDays={agingDays} onMinDaysChange={setAgingDays} compact /></div></ProfileSection>
             </div>
             </div>
-             </TabsContent>
-             <TabsContent value="communications" className="space-y-3">
+            </NeuTabPanel>
+            <NeuTabPanel value="communications" unmountInactive className="space-y-3">
                {hasPermission("client_email") && <div className="flex flex-wrap items-center justify-between gap-3 border border-[#b7c6c1] bg-[#eaf1ee] px-3 py-3">
                  <div><p className="text-xs font-bold text-[#304a52]">Send a message to {client.name}</p><p className="mt-0.5 text-[10px] text-[#687b78]">{client.email || "No email address recorded on this profile"}</p></div>
-                 <Button size="sm" onClick={() => setClientEmailOpen(true)} className="h-8 gap-1.5 rounded-sm bg-[#087f8e] px-3 text-[11px] text-white hover:bg-[#076c78]"><Mail className="h-3.5 w-3.5" />Email Client</Button>
+                 <NeuButton onClick={() => setClientEmailOpen(true)} className="min-h-9 px-3 text-xs"><Mail className="h-3.5 w-3.5" />Email Client</NeuButton>
                </div>}
                <ClientEmailLog clientId={clientId} />
-             </TabsContent>
-             {canUseCarrierChat && <TabsContent value="messages" className="min-h-[520px]">
+            </NeuTabPanel>
+            {canUseCarrierChat && <NeuTabPanel value="messages" unmountInactive className="min-h-[520px]">
                <CarrierChatThread carrierId={clientId} carrierName={client.name} mcNumber={client.mcNumber} />
-             </TabsContent>}
-           </Tabs>
+            </NeuTabPanel>}
+          </NeuTabs>
           </div>
-      </main>
+      </NeuPageShell>
     </div>
     <Dialog open={bankOpen} onOpenChange={setBankOpen}><DialogContent className="rounded-sm"><DialogHeader><DialogTitle>{editingBank ? "Edit bank account" : "Add bank account to Vault"}</DialogTitle><DialogDescription>Account and routing numbers are encrypted before storage.</DialogDescription></DialogHeader><div className="grid gap-3 sm:grid-cols-2"><div><Label>Bank name</Label><Input value={bank.bankName} onChange={(e) => setBank({ ...bank, bankName: e.target.value })} /></div><div><Label>Nickname</Label><Input value={bank.nickname} onChange={(e) => setBank({ ...bank, nickname: e.target.value })} /></div><div><Label>Payment type</Label><Select value={bank.paymentType} onValueChange={(value) => setBank({ ...bank, paymentType: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{bank.paymentType === "not_recorded" && <SelectItem value="not_recorded" disabled>Not recorded — choose one</SelectItem>}<SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent></Select></div><div><Label>Account type</Label><Select value={bank.accountType} onValueChange={(value) => setBank({ ...bank, accountType: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="checking">Checking</SelectItem><SelectItem value="savings">Savings</SelectItem></SelectContent></Select></div><div><Label>Routing number</Label><div className="relative"><Input className="pr-8" type={showRouting ? "text" : "password"} value={bank.routingNumber} onChange={(e) => setBank({ ...bank, routingNumber: e.target.value.replace(/\D/g, "").slice(0, 9) })} /><Button type="button" variant="ghost" size="icon" onClick={() => setShowRouting(!showRouting)} className="absolute right-0 top-0 h-9 w-8">{showRouting ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</Button></div></div><div><Label>Account number</Label><div className="relative"><Input className="pr-8" type={showAccount ? "text" : "password"} value={bank.accountNumber} onChange={(e) => setBank({ ...bank, accountNumber: e.target.value.replace(/\D/g, "") })} /><Button type="button" variant="ghost" size="icon" onClick={() => setShowAccount(!showAccount)} className="absolute right-0 top-0 h-9 w-8">{showAccount ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</Button></div></div></div><DialogFooter><Button variant="outline" onClick={() => setBankOpen(false)}>Cancel</Button><Button onClick={() => saveBank.mutate()} disabled={saveBank.isPending || !bank.bankName || bank.paymentType === "not_recorded" || bank.routingNumber.length !== 9 || !bank.accountNumber}>Save to Vault</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={!!listDialog} onOpenChange={(open) => !open && setListDialog(null)}>
