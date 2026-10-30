@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from 
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Building2, CheckCircle2, Plus, Search, ShieldAlert, Truck, Upload, X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NeuBadge, NeuButton, NeuCard, NeuInput } from "@/styles/neu";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -898,8 +898,16 @@ export default function CreateInvoiceModal({
       if (branchMutation.isPending) return;
       onOpenChange(nextOpen);
     }}>
-      <DialogContent className="ff-create-invoice-dialog max-h-[92vh] max-w-6xl overflow-y-auto p-0">
-        <DialogHeader className="border-b border-[#c6c6c6] px-6 py-5">
+      <DialogContent showCloseButton={false} className="ff-create-invoice-dialog max-h-[92vh] max-w-6xl overflow-y-auto p-0">
+        <DialogClose asChild>
+          <NeuButton
+            aria-label="Close"
+            className="absolute right-4 top-4 h-8 min-h-8 w-8 rounded-full p-0 text-[#666666] shadow-[-3px_-3px_7px_#ffffff,3px_3px_7px_#c1c1c1] hover:text-[#27aab8]"
+          >
+            <X className="h-4 w-4" />
+          </NeuButton>
+        </DialogClose>
+        <DialogHeader className="border-b border-[#c6c6c6] px-6 py-5 pr-16">
           <DialogTitle className="text-xl">Create Invoice</DialogTitle>
           <DialogDescription>Enter the load details. The invoice enters Pending Review unless placed on hold.</DialogDescription>
         </DialogHeader>
