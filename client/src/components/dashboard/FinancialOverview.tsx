@@ -225,7 +225,6 @@ export function FinancialSummary({ data, isLoading, error, onRetry }: Props) {
           <h1 className="ff-neu-page-title">Good work moves forward.</h1>
           <p className="ff-neu-page-subtitle">A clear view of what is ready, waiting, and getting older.</p>
         </div>
-        <div className="ff-neu-intro-mark" aria-hidden="true"><span>FF</span><i /></div>
       </div>
       <section aria-label="Financial key performance indicators" className="mt-6">
         <div className="mb-3 flex items-center justify-between gap-2">

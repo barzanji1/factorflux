@@ -20,7 +20,7 @@ export function AppShell({ children, title, subtitle, group, neu = false }: AppS
       <Sidebar />
 
       <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${neu ? "ff-neu-main-column" : ""}`}>
-        <TopNav title={title} subtitle={subtitle} group={group} />
+        <TopNav title={title} subtitle={subtitle} group={group} neu={neu} />
 
         {neu ? (
           <NeuPageShell className="ff-neu-page-shell custom-scrollbar min-h-0 flex-1 overflow-auto px-3 py-4 sm:px-5 sm:py-6 xl:px-8">

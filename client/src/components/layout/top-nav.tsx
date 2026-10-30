@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NeuButton, NeuInput } from "@/styles/neu";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import Sidebar from "@/components/layout/sidebar";
 import {
@@ -51,6 +52,7 @@ interface TopNavProps {
   title: string;
   subtitle?: string;
   group?: string;
+  neu?: boolean;
 }
 
 function normalizeCarrierChatUrl(url?: string | null) {
@@ -104,7 +106,7 @@ const NOTIF_ICON: Record<string, { icon: typeof Info; className: string }> = {
   error:   { icon: XCircle,      className: "text-red-500 bg-red-50 dark:bg-red-950/40" },
 };
 
-export default function TopNav({ title, subtitle, group }: TopNavProps) {
+export default function TopNav({ title, subtitle, group, neu = false }: TopNavProps) {
   const { user: authUser, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -376,34 +378,60 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
         </SheetContent>
       </Sheet>
 
-      <header className="ff-top-nav sticky top-0 z-30 border-b-2 border-[#808080] !bg-[#c0c0c0] px-4 py-3">
+      <header className={cn(
+        "ff-top-nav sticky top-0 z-30 px-4 py-3",
+        neu
+          ? "ff-neu-top-nav border-0 bg-[#e0e0e0]"
+          : "border-b-2 border-[#808080] !bg-[#c0c0c0]",
+      )}>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center">
             <div className="flex min-w-0 items-start gap-3">
-              <Button
+              {neu ? <NeuButton
+                aria-label="Open navigation"
+                className="mt-1 h-10 w-10 shrink-0 p-0 md:hidden"
+                onClick={() => setMobileNavOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </NeuButton> : <Button
                 variant="ghost"
                 size="icon"
                  className="mt-1 h-10 w-10 shrink-0 rounded-sm border-2 border-[#808080] bg-white md:hidden"
                 onClick={() => setMobileNavOpen(true)}
               >
                 <Menu className="h-5 w-5" />
-              </Button>
+              </Button>}
               <div className="min-w-0">
                 {group && (
-                   <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-[#444]">
+                    <div className={cn("mb-1 flex items-center gap-1 text-[11px] font-medium", neu ? "text-[#7c8983]" : "text-[#444]")}>
                     <span>{group}</span>
                     <ChevronRight className="h-3 w-3" />
-                     <span className="text-[#1a1a1a]">{title}</span>
+                     <span className={neu ? "text-[#394541]" : "text-[#1a1a1a]"}>{title}</span>
                   </div>
                 )}
-                <h1 className="truncate text-xl font-bold tracking-tight text-[#1a1a1a]">{title}</h1>
-                 {subtitle && <p className="mt-0.5 truncate text-sm text-[#444]">{subtitle}</p>}
+                <h1 className={cn("truncate text-xl font-bold tracking-tight", neu ? "text-[#394541]" : "text-[#1a1a1a]")}>{title}</h1>
+                 {subtitle && <p className={cn("mt-0.5 truncate text-sm", neu ? "text-[#7d8883]" : "text-[#444]")}>{subtitle}</p>}
               </div>
             </div>
 
             <div className="relative w-full max-w-2xl lg:ml-4" ref={searchRef}>
-               <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[#666]" />
-              <Input
+               <Search className={cn("pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2", neu ? "text-[#8b9691]" : "text-[#666]")} />
+              {neu ? <NeuInput
+                type="text"
+                placeholder="Search carriers, load ledger, counterparties..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setActiveSearchIndex(-1);
+                  if (e.target.value.trim().length < 2) setShowSearchResults(false);
+                }}
+                onFocus={() => searchEnabled && setShowSearchResults(true)}
+                onKeyDown={handleSearchKeyDown}
+                role="combobox"
+                aria-expanded={showSearchResults}
+                aria-controls="global-search-results"
+                className="ff-neu-top-search h-12 w-full pl-11 pr-4 text-sm"
+              /> : <Input
                 type="text"
                 placeholder="Search carriers, load ledger, counterparties..."
                 value={searchQuery}
@@ -418,9 +446,9 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                 aria-expanded={showSearchResults}
                 aria-controls="global-search-results"
                 className="qc-topbar-search h-12 w-full pl-11 pr-4 text-sm"
-              />
+              />}
               {showSearchResults && (
-                 <div id="global-search-results" className="ff-top-nav-menu absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-sm border-2 border-[#808080] bg-white shadow-[2px_2px_0_#404040]">
+                  <div id="global-search-results" className={cn("ff-top-nav-menu absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden", neu ? "ff-neu-menu rounded-2xl bg-[#e0e0e0] shadow-[7px_7px_16px_#c1c5c2,-7px_-7px_16px_#fff]" : "rounded-sm border-2 border-[#808080] bg-white shadow-[2px_2px_0_#404040]")}>
                   <div className="custom-scrollbar max-h-96 overflow-y-auto p-2">
                     {isSearching ? (
                       <div className="px-4 py-8 text-center text-sm text-slate-500">Searching...</div>
@@ -481,13 +509,15 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                 <Button className="h-11 rounded-sm border-2 border-[#fff] bg-[#27aab8] px-4 text-white shadow-[2px_2px_0_#404040] hover:bg-[#098b9f]">
+                 {neu ? <NeuButton variant="accent" className="h-11 rounded-xl px-4 shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8]">
+                   <Plus className="mr-2 h-4 w-4" />New<ChevronDown className="ml-2 h-4 w-4" />
+                 </NeuButton> : <Button className="h-11 rounded-sm border-2 border-[#fff] bg-[#27aab8] px-4 text-white shadow-[2px_2px_0_#404040] hover:bg-[#098b9f]">
                   <Plus className="mr-2 h-4 w-4" />
                   New
                   <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
+                </Button>}
               </DropdownMenuTrigger>
-               <DropdownMenuContent align="end" className="w-56 rounded-sm border-2 border-[#808080] bg-[#fff] p-2 shadow-[2px_2px_0_#404040]">
+               <DropdownMenuContent align="end" className={cn("w-56 p-2", neu ? "ff-neu-menu rounded-2xl bg-[#e0e0e0] shadow-[7px_7px_16px_#c1c5c2,-7px_-7px_16px_#fff]" : "rounded-sm border-2 border-[#808080] bg-[#fff] shadow-[2px_2px_0_#404040]")}>
                 {quickActions.map((action) => (
                    <DropdownMenuItem key={action.label} onClick={action.action} className="cursor-pointer rounded-sm px-3 py-2.5">
                     <action.icon className="mr-2 h-4 w-4" />
@@ -500,7 +530,14 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
             {/* ── Notification Bell ── */}
             <DropdownMenu open={notificationMenuOpen} onOpenChange={setNotificationMenuOpen}>
               <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm"
+                {neu ? <NeuButton
+                    aria-label="Notifications"
+                    aria-haspopup="menu"
+                    aria-expanded={notificationMenuOpen}
+                    className="relative h-10 w-10 rounded-xl p-0 text-[#53605b] shadow-[4px_4px_9px_#c1c5c2,-4px_-4px_9px_#fff]">
+                    <Bell className="h-5 w-5 text-[#53605b]" />
+                    {unreadCount > 0 && <Badge variant="destructive" aria-label={`${unreadCount} unread notifications`} className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">{unreadCount > 99 ? "99+" : unreadCount}</Badge>}
+                  </NeuButton> : <Button variant="ghost" size="sm"
                     aria-label="Notifications"
                     aria-haspopup="menu"
                     aria-expanded={notificationMenuOpen}
@@ -513,10 +550,10 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </Badge>
                   )}
-                </Button>
+                </Button>}
               </DropdownMenuTrigger>
 
-                <DropdownMenuContent align="end" className="ff-notification-panel w-[min(380px,calc(100vw-1rem))] rounded-sm border-2 border-[#808080] bg-white p-0 shadow-[2px_2px_0_#404040]">
+                <DropdownMenuContent align="end" className={cn("ff-notification-panel w-[min(380px,calc(100vw-1rem))] p-0", neu ? "ff-neu-menu rounded-2xl bg-[#e0e0e0] shadow-[7px_7px_16px_#c1c5c2,-7px_-7px_16px_#fff]" : "rounded-sm border-2 border-[#808080] bg-white shadow-[2px_2px_0_#404040]")}>
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                   <div>
@@ -623,7 +660,20 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
             {/* ── User menu ── */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost"
+                {neu ? <NeuButton
+                  className="h-10 rounded-xl px-2 pr-3 text-[#53605b] shadow-[4px_4px_9px_#c1c5c2,-4px_-4px_9px_#fff]">
+                  <div className="mr-2 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#27aab8] text-[10px] font-bold text-white shadow-[2px_2px_5px_#b8bcba,-2px_-2px_5px_#fff]">
+                    {avatarSrc ? <img src={avatarSrc} alt="User Profile" className="h-full w-full object-cover" /> : initials}
+                  </div>
+                  <div className="hidden text-left md:block">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-[#394541]">{fullName}</p>
+                      {authUser?.verified && <BadgeCheck className="h-4 w-4 flex-shrink-0 text-[#168f99]" />}
+                    </div>
+                    <p className="text-xs capitalize text-[#7d8883]">{userRole}</p>
+                  </div>
+                  <ChevronDown className="ml-2 h-4 w-4 text-[#7d8883]" />
+                </NeuButton> : <Button variant="ghost"
                   className="h-9 rounded-sm border-2 border-[#808080] bg-white px-2 pr-3 hover:bg-[#dff5f6]">
                   <div className="mr-2 flex h-7 w-7 items-center justify-center overflow-hidden rounded-sm border border-[#808080] bg-[#098b9f] text-[10px] font-bold text-white">
                     {avatarSrc ? <img src={avatarSrc} alt="User Profile" className="h-full w-full object-cover" /> : initials}
@@ -636,9 +686,9 @@ export default function TopNav({ title, subtitle, group }: TopNavProps) {
                     <p className="text-xs capitalize text-slate-500 dark:text-slate-400">{userRole}</p>
                   </div>
                   <ChevronDown className="ml-2 h-4 w-4 text-slate-500" />
-                </Button>
+                </Button>}
               </DropdownMenuTrigger>
-               <DropdownMenuContent align="end" className="w-56 rounded-sm border-2 border-[#808080] bg-white p-2 shadow-[2px_2px_0_#404040]">
+                <DropdownMenuContent align="end" className={cn("w-56 p-2", neu ? "ff-neu-menu rounded-2xl bg-[#e0e0e0] shadow-[7px_7px_16px_#c1c5c2,-7px_-7px_16px_#fff]" : "rounded-sm border-2 border-[#808080] bg-white shadow-[2px_2px_0_#404040]")}>
                 <div className="px-3 py-2">
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">{fullName}</p>
                   <p className="text-xs capitalize text-slate-500 dark:text-slate-400">{userRole}</p>
