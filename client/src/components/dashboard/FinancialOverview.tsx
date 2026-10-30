@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -10,8 +10,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowRight, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Clock3, RotateCcw, TrendingUp, WalletCards } from "lucide-react";
+import { ArrowRight, CircleDollarSign, ClipboardCheck, Clock3, RotateCcw, TrendingUp, WalletCards } from "lucide-react";
 import { NeuBadge, NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
+import { KpiCarousel } from "./KpiCarousel";
 
 export type FinancialDashboardData = {
   generatedAt: string;
@@ -184,11 +185,11 @@ function FinancialChartsLoading() {
 }
 
 const metrics = [
-  { key: "readyToFund", label: "Ready to Fund", icon: WalletCards, money: true },
-  { key: "inReview", label: "In Review", icon: ClipboardCheck },
-  { key: "openFollowups", label: "Open Follow-ups", icon: RotateCcw },
-  { key: "aging60Plus", label: "Aging 60+", icon: Clock3 },
-  { key: "fundedThisWeek", label: "Funded This Week", icon: TrendingUp, money: true },
+  { key: "readyToFund", label: "Ready to Fund", href: "/sheets", icon: WalletCards, money: true },
+  { key: "inReview", label: "In Review", href: "/invoices?status=under_review", icon: ClipboardCheck },
+  { key: "openFollowups", label: "Open Follow-ups", href: "/follow-up", icon: RotateCcw },
+  { key: "aging60Plus", label: "Aging 60+", href: "/reports?tab=aging", icon: Clock3 },
+  { key: "fundedThisWeek", label: "Funded This Week", href: "/invoices?status=funded", icon: TrendingUp, money: true },
 ] as const;
 
 function MetricSkeleton() {
@@ -196,42 +197,23 @@ function MetricSkeleton() {
 }
 
 export function FinancialSummary({ data, isLoading, error, onRetry }: Props) {
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const pauseReasons = useRef(new Set<string>());
-  const frameRef = useRef<number | null>(null);
-  const [hovered, setHovered] = useState(false);
-  const dragRef = useRef<{ pointerId: number; x: number; scroll: number } | null>(null);
-
-  useEffect(() => {
-    const node = carouselRef.current;
-    if (!node || !data || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const half = node.scrollWidth / 2;
-    let prior = 0;
-    const animate = (time: number) => {
-      if (prior && pauseReasons.current.size === 0 && !dragRef.current) {
-        node.scrollLeft += Math.min(2, (time - prior) * 0.014);
-        if (half > 0 && node.scrollLeft >= half) node.scrollLeft -= half;
-      }
-      prior = time;
-      frameRef.current = window.requestAnimationFrame(animate);
-    };
-    frameRef.current = window.requestAnimationFrame(animate);
-    return () => { if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current); };
-  }, [data]);
-
   const metricCards = data ? metrics.map(metric => {
     const Icon = metric.icon;
     const value = data.kpis[metric.key];
     const isMoney = "money" in metric && metric.money;
     return (
-      <NeuStatCard
-        key={metric.key}
-        label={metric.label}
-        value={isMoney ? currency.format(value) : value.toLocaleString()}
-        detail={isMoney ? "USD" : "Open work"}
-        icon={<Icon aria-hidden="true" className="h-5 w-5" />}
-        className="ff-neu-kpi-card"
-      />
+      {
+        key: metric.key,
+        href: metric.href,
+        label: metric.label,
+        content: <NeuStatCard
+          label={metric.label}
+          value={isMoney ? currency.format(value) : value.toLocaleString()}
+          detail={isMoney ? "USD" : "Open work"}
+          icon={<Icon aria-hidden="true" className="h-5 w-5" />}
+          className="ff-neu-kpi-card"
+        />
+      }
     );
   }) : null;
 
@@ -251,47 +233,10 @@ export function FinancialSummary({ data, isLoading, error, onRetry }: Props) {
             <span className="ff-neu-eyebrow">At a glance</span>
             {data && <span className="ff-neu-live-dot" aria-label="Live data" />}
           </div>
-          <div className="flex gap-1">
-            <button className="ff-neu-carousel-arrow" type="button" aria-label="Scroll metrics left" onClick={() => carouselRef.current?.scrollBy({ left: -220, behavior: "smooth" })}><ChevronLeft /></button>
-            <button className="ff-neu-carousel-arrow" type="button" aria-label="Scroll metrics right" onClick={() => carouselRef.current?.scrollBy({ left: 220, behavior: "smooth" })}><ChevronRight /></button>
-          </div>
         </div>
-        <div
-          ref={carouselRef}
-          className={`ff-neu-metrics-viewport ${dragRef.current ? "is-dragging" : ""}`}
-          onMouseEnter={() => { pauseReasons.current.add("hover"); setHovered(true); }}
-          onMouseLeave={() => {
-            pauseReasons.current.delete("hover");
-            pauseReasons.current.delete("drag");
-            setHovered(false);
-            dragRef.current = null;
-          }}
-          onFocus={() => pauseReasons.current.add("focus")}
-          onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) pauseReasons.current.delete("focus"); }}
-          onPointerDown={event => {
-            if (event.pointerType === "mouse" && event.button !== 0) return;
-            dragRef.current = { pointerId: event.pointerId, x: event.clientX, scroll: event.currentTarget.scrollLeft };
-            pauseReasons.current.add("drag");
-            event.currentTarget.setPointerCapture(event.pointerId);
-          }}
-          onPointerMove={event => {
-            if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
-            event.currentTarget.scrollLeft = dragRef.current.scroll - (event.clientX - dragRef.current.x);
-          }}
-          onPointerUp={event => { dragRef.current = null; pauseReasons.current.delete("drag"); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
-          onPointerCancel={() => { dragRef.current = null; pauseReasons.current.delete("drag"); }}
-          tabIndex={0}
-          aria-label="Key metrics carousel. Drag or swipe to browse."
-          data-testid="financial-kpi-carousel"
-        >
-          {isLoading ? <div className="ff-neu-metrics-track">{metrics.map(metric => <MetricSkeleton key={metric.key} />)}</div> :
-            error ? <div className="ff-neu-financial-error" role="alert"><span>Financial summary could not be loaded.</span><NeuButton onClick={onRetry} className="!min-h-9 !px-3"><RotateCcw className="h-4 w-4" /> Retry</NeuButton></div> :
-            data && metricCards ? <div className="ff-neu-metrics-track">
-              {metricCards}
-              <div className="ff-neu-duplicate" aria-hidden="true">{metricCards}</div>
-            </div> : null}
-        </div>
-        {hovered && <span className="sr-only" role="status">Metric auto-scroll paused</span>}
+        {isLoading ? <div className="ff-neu-metrics-viewport"><div className="ff-neu-metrics-track">{metrics.map(metric => <MetricSkeleton key={metric.key} />)}</div></div> :
+          error ? <div className="ff-neu-financial-error" role="alert"><span>Financial summary could not be loaded.</span><NeuButton onClick={onRetry} className="!min-h-9 !px-3"><RotateCcw className="h-4 w-4" /> Retry</NeuButton></div> :
+          data && metricCards ? <KpiCarousel items={metricCards} speedPixelsPerSecond={30} /> : null}
       </section>
       {isLoading && <FinancialChartsLoading />}
       {data && <FinancialCharts months={data.months} />}

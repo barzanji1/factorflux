@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -60,6 +60,8 @@ export default function Invoices() {
   }[status] ?? status);
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const statusFilter = new URLSearchParams(routeSearch).get("status") ?? "";
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -85,13 +87,14 @@ export default function Invoices() {
   }, [searchQuery]);
 
   const { data: invoicesResponse, isLoading: invoicesLoading, isError: invoicesError } = useQuery<InvoicesResponse>({
-    queryKey: ["/api/invoices", page, debouncedSearchQuery, loadTypeFilter],
+    queryKey: ["/api/invoices", page, debouncedSearchQuery, loadTypeFilter, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         limit: "50",
         q: debouncedSearchQuery,
         loadType: loadTypeFilter === "all" ? "" : loadTypeFilter,
+        status: statusFilter,
       });
       const res = await fetch(`/api/invoices?${params.toString()}`, {
         credentials: "include",
@@ -191,6 +194,9 @@ export default function Invoices() {
 
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <div className="relative w-full sm:w-[380px]">
+                    {statusFilter && <button type="button" className="mb-2 text-xs underline" onClick={() => { setPage(1); navigate("/invoices"); }}>
+                      Status: {statusFilter.replace(/_/g, " ")} · Clear filter
+                    </button>}
                     <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       placeholder="Search by invoice number or load number..."

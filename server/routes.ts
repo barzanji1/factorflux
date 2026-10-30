@@ -3058,6 +3058,11 @@ ${message}
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const all = req.query.all === "true";
+      const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
+      if (req.query.status !== undefined && (typeof req.query.status !== "string" ||
+        (status && !["draft", "submitted", "docs_pending", "under_review", "approved", "rejected", "funded", "settled", "paid", "held"].includes(status)))) {
+        return res.status(400).json({ message: "Invalid invoice status filter" });
+      }
       if (req.query.loadType !== undefined && typeof req.query.loadType !== "string") {
         return res.status(400).json({ message: "Invalid load type filter" });
       }
@@ -3095,6 +3100,10 @@ ${message}
         ilike(invoiceBrokerSearchDocument, `%${q}%`),
       ) : undefined;
       let where = scope && search ? and(scope, search) : scope || search;
+      if (status) {
+        const condition = eq(invoices.status, status as typeof invoices.$inferSelect.status);
+        where = where ? and(where, condition) : condition;
+      }
       if (loadType) {
         const loadTypeCondition = loadType === "other"
           ? or(eq(invoices.loadType, "other"), isNull(invoices.loadType))

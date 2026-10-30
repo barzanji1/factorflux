@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type ReactNode } from "react";
+import { useState, useMemo, useRef, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +38,7 @@ import {
   Win95TabsList,
   Win95TabsTrigger,
 } from "@/components/win95";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -987,7 +987,11 @@ function GlobalReportsTab() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const [activeTab, setActiveTab] = useState<TabId>("global");
+  const routeSearch = useSearch();
+  const requestedTab = new URLSearchParams(routeSearch).get("tab");
+  const validTab = TABS.find(tab => tab.id === requestedTab)?.id;
+  const [activeTab, setActiveTab] = useState<TabId>(validTab ?? "global");
+  useEffect(() => { setActiveTab(validTab ?? "global"); }, [validTab]);
 
   return (
     <div className="ff-reports-page flex h-screen bg-[#d4d0c8]">
