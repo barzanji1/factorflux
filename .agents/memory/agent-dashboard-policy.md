@@ -38,3 +38,9 @@ Verify 3D-card navigation with real pointer hit-testing after the animation, not
 **Why:** Coplanar front/back faces with near-zero cursor tilt could render the back correctly and focus Go while the browser hit the container instead of the button.
 
 **How to apply:** Keep the visible face's click targets stable, exclude hidden faces from interaction, and check the actual hit element before declaring a flip-card link functional.
+
+Use one action-grid interaction model: front click/tap flips; Go navigates; back-face background or its close control returns to the front. No double-click or press-and-hold navigation.
+
+**Why:** The user reported inconsistent first-click behavior after shortcuts were added and explicitly required their removal.
+
+**How to apply:** Keep each card's face and animation state in React, ignore interaction during the flip, and keep tilt separate from the flip transition.
