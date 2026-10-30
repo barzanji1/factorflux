@@ -4,13 +4,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Broker } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { brokerFormSchema, type BrokerFormData } from "./broker-form-schema";
+import { NeuButton, NeuInput } from "@/styles/neu/components";
 
 export default function BrokerEditDialog({ broker, onClose }: { broker: Broker; onClose: () => void }) {
   const qc = useQueryClient();
@@ -40,7 +39,7 @@ export default function BrokerEditDialog({ broker, onClose }: { broker: Broker; 
 
   return (
     <Dialog open onOpenChange={open => { if (!open && !update.isPending) onClose(); }}>
-      <DialogContent data-testid="broker-edit-dialog" className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+      <DialogContent data-testid="broker-edit-dialog" className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto rounded-2xl border-0 bg-[#e0e0e0] text-[#354548] shadow-[-10px_-10px_24px_#ffffff,10px_10px_24px_#b8b8b8]">
         <DialogHeader>
           <DialogTitle>Edit Broker</DialogTitle>
           <DialogDescription>Update {broker.name} without leaving this profile.</DialogDescription>
@@ -56,7 +55,7 @@ export default function BrokerEditDialog({ broker, onClose }: { broker: Broker; 
               <FormField key={name} control={form.control} name={name} render={({ field }) => (
                 <FormItem className={name === "address" ? "col-span-2" : ""}>
                   <FormLabel>{label}{required ? " *" : ""}</FormLabel>
-                  <FormControl><Input data-testid={`broker-edit-${name}`} type={name === "email" ? "email" : "text"} {...field} /></FormControl>
+                  <FormControl><NeuInput data-testid={`broker-edit-${name}`} type={name === "email" ? "email" : "text"} {...field} className="min-h-10 text-sm" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -64,7 +63,7 @@ export default function BrokerEditDialog({ broker, onClose }: { broker: Broker; 
             <FormField control={form.control} name="creditLimit" render={({ field }) => (
               <FormItem>
                 <FormLabel>Credit Limit</FormLabel>
-                <FormControl><Input data-testid="broker-edit-creditLimit" type="number" {...field} onChange={event => field.onChange(Number(event.target.value))} /></FormControl>
+                <FormControl><NeuInput data-testid="broker-edit-creditLimit" type="number" {...field} onChange={event => field.onChange(Number(event.target.value))} className="min-h-10 text-sm" /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -76,7 +75,7 @@ export default function BrokerEditDialog({ broker, onClose }: { broker: Broker; 
                 <FormItem>
                   <FormLabel>{label}</FormLabel>
                   <Select value={field.value} onValueChange={value => { if (value) field.onChange(value); }}>
-                    <FormControl><SelectTrigger data-testid={`broker-edit-${name}`}><SelectValue /></SelectTrigger></FormControl>
+                    <FormControl><SelectTrigger data-testid={`broker-edit-${name}`} className="min-h-10 rounded-xl border-0 bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]"><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>{options.map(([value, text]) => <SelectItem key={value} value={value}>{text}</SelectItem>)}</SelectContent>
                   </Select>
                   <FormMessage />
@@ -86,14 +85,14 @@ export default function BrokerEditDialog({ broker, onClose }: { broker: Broker; 
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem className="col-span-2">
                 <FormLabel>Notes</FormLabel>
-                <FormControl><Textarea data-testid="broker-edit-notes" rows={3} {...field} /></FormControl>
+                <FormControl><Textarea data-testid="broker-edit-notes" rows={3} {...field} className="rounded-xl border-0 bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff] focus-visible:ring-[#27aab8]" /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             {update.error && <p role="alert" className="col-span-2 text-sm text-red-700">{update.error.message}</p>}
             <DialogFooter className="col-span-2">
-              <Button data-testid="broker-edit-cancel" type="button" variant="outline" disabled={update.isPending} onClick={onClose}>Cancel</Button>
-              <Button data-testid="broker-edit-save" type="submit" disabled={update.isPending}>{update.isPending ? "Saving…" : "Update Broker"}</Button>
+              <NeuButton data-testid="broker-edit-cancel" type="button" disabled={update.isPending} onClick={onClose}>Cancel</NeuButton>
+              <NeuButton data-testid="broker-edit-save" type="submit" variant="accent" disabled={update.isPending}>{update.isPending ? "Saving…" : "Update Broker"}</NeuButton>
             </DialogFooter>
           </form>
         </Form>

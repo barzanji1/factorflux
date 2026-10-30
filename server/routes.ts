@@ -39,6 +39,7 @@ import { registerChargebackReportRoutes } from "./routes/chargebackReport";
 import { registerDumpStatementRoutes } from "./routes/dumpStatements";
 import { agingReportFiltersSchema, groupAgingRows } from "../shared/aging-report";
 import { readCarrierFinancial } from "./services/carrierFinancial";
+import { readBrokerFinancial } from "./services/brokerFinancial";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
@@ -7020,6 +7021,21 @@ Trucking Pros Financial Team
     } catch (error) {
       console.error("Error deleting broker branch:", error);
       res.status(500).json({ message: "Failed to delete broker branch" });
+    }
+  });
+
+  app.get("/api/brokers/:id/financial-summary", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647) return res.status(400).json({ message: "Invalid broker id" });
+      const [broker] = await db.select({ id: brokers.id, creditGrade: brokers.creditGrade, assignedProcessor: brokers.assignedProcessor })
+        .from(brokers).where(eq(brokers.id, id)).limit(1);
+      if (!broker) return res.status(404).json({ message: "Broker not found" });
+      if (!canAccessAssignedRecord(req, broker.assignedProcessor)) return res.status(403).json({ message: "You can only access brokers assigned to you" });
+      res.json(await readBrokerFinancial(id, broker.creditGrade));
+    } catch (error) {
+      console.error("Error reading broker financial summary:", error);
+      res.status(500).json({ message: "Unable to load broker financial summary" });
     }
   });
 

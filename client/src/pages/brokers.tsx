@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -18,19 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { ProcessorIdentity } from "@/components/assignments/processor-assignment";
+import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuStatCard, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { 
   Building, 
   Plus, 
   Edit, 
   Trash2, 
-  Eye, 
-  Phone, 
-  Mail, 
-  MapPin,
   TrendingUp,
-  Users,
   DollarSign,
-  Calendar,
   ExternalLink,
   Search,
   ArrowUpDown,
@@ -129,7 +122,7 @@ export default function Brokers() {
     : statusFilter.startsWith("quickpay_")
       ? statusFilter.slice("quickpay_".length)
       : undefined;
-  const { data: brokersResponse, isLoading } = useQuery<BrokersResponse>({
+  const { data: brokersResponse, isLoading, isError, refetch } = useQuery<BrokersResponse>({
     queryKey: ["/api/brokers", page, debouncedSearch, statusQuery, paymentTermsQuery, processorFilter, creditGradeFilter, creditSort],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -153,6 +146,18 @@ export default function Brokers() {
   const visibleBrokers = brokers;
   const totalBrokers = brokersResponse?.total ?? 0;
   const totalPages = brokersResponse?.totalPages ?? 1;
+  const gradeRank: Record<string, number> = { A: 4, B: 3, C: 2, D: 1, F: 0 };
+  const gradedBrokers = brokers.filter((broker) => broker.creditGrade && broker.creditGrade in gradeRank);
+  const averageGradeMean = gradedBrokers.length
+    ? gradedBrokers.reduce((sum, broker) => sum + gradeRank[broker.creditGrade!], 0) / gradedBrokers.length
+    : null;
+  const averageGrade = averageGradeMean === null
+    ? "—"
+    : (["F", "D", "C", "B", "A"][Math.round(averageGradeMean)] ?? "—");
+  const averageGradeLabel = averageGradeMean === null
+    ? "No graded brokers"
+    : `Mean rank ${averageGradeMean.toFixed(1)} · A=4 to F=0`;
+  const currentPageRange = `${totalBrokers === 0 ? 0 : (page - 1) * 50 + 1}–${Math.min(page * 50, totalBrokers)}`;
 
   // Broker form
   const form = useForm<BrokerFormData>({
@@ -295,108 +300,90 @@ export default function Brokers() {
   };
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="flex h-full min-h-0 bg-[#e0e0e0]">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Broker Desk" subtitle="Freight broker relationships, contacts, and risk ratings" group="Risk" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Broker Desk" subtitle="Freight broker relationships, contacts, and risk ratings" group="Risk" neu />
+        <NeuPageShell className="custom-scrollbar !min-h-0 flex-1">
+          <div className="mx-auto w-full max-w-[1680px] space-y-6 p-4 md:p-7 xl:p-9">
         {/* ── Stats strip ──────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
-            {[
-             { label: "Total Brokers",      value: totalBrokers,                                           icon: Building    },
-            { label: "Current page active",             value: brokers.filter(b => b.status === "active").length,       icon: TrendingUp  },
-            { label: "Current page credit limit", value: `$${brokers.reduce((s,b) => s+(b.creditLimit||0), 0).toLocaleString()}`, icon: DollarSign },
-            { label: "Current page quick pay",          value: brokers.filter(b => b.paymentTerms === "quickpay").length, icon: Calendar  },
-          ].map(s => {
-            const Icon = s.icon;
-            return (
-              <Card key={s.label} className="ff-dashboard-card px-4 py-3">
-                <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
-                <p className="mt-0.5 text-[22px] font-bold tracking-tight text-slate-900 dark:text-white">{s.value}</p>
-              </Card>
-            );
-          })}
-        </div>
+        <section aria-label="Broker portfolio snapshot">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#758587]">Portfolio snapshot</p><h2 className="mt-1 text-lg font-semibold text-[#354548]">Broker relationships</h2></div>
+            <p className="text-xs text-[#7b898a]">Status and grade figures reflect this page · {currentPageRange} of {totalBrokers}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <NeuStatCard label="Total brokers" value={totalBrokers} detail="Across this filtered directory" icon={<Building className="h-5 w-5" />} className="min-h-32 p-4" />
+            <NeuStatCard label="Active · this page" value={brokers.filter(b => b.status === "active").length} detail="Current page only" icon={<TrendingUp className="h-5 w-5" />} className="min-h-32 p-4" />
+            <NeuStatCard label="Suspended · this page" value={brokers.filter(b => b.status === "suspended").length} detail="Current page only" icon={<ShieldAlert className="h-5 w-5" />} className="min-h-32 p-4" />
+            <NeuStatCard label="Average credit grade" value={averageGrade} detail={`${averageGradeLabel} · this page`} icon={<DollarSign className="h-5 w-5" />} className="min-h-32 p-4" />
+          </div>
+        </section>
 
         {/* ── Search + filter bar ──────────────────────────────────────── */}
-        <Card className="mb-5 overflow-hidden">
+        <NeuCard className="overflow-hidden p-4 sm:p-5">
           {/* Saved view pills */}
-          <div className="flex items-center gap-1.5 px-5 pt-3 pb-1.5 border-b border-slate-100 dark:border-slate-800">
-            <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-600">Views</span>
+          <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[#c5c5c5] pb-3">
+            <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-[#758587]">Saved views</span>
             {savedViews.map(view => (
-              <button
+              <NeuButton
                 key={view.id}
                 type="button"
                 onClick={() => applyView(view)}
-                className={`flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                className={`min-h-9 rounded-lg px-3 py-1.5 text-xs ${
                   activeViewId === view.id
-                    ? "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-400"
+                    ? "text-[#168d98]"
+                    : "text-[#586668]"
                 }`}
               >
-                <span>{view.emoji}</span> {view.label}
-              </button>
+                {view.label}
+              </NeuButton>
             ))}
           </div>
-          <div className="flex items-center gap-3 px-5 py-3">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <Input
+          <div className="flex flex-col gap-3">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#788b8d]" />
+              <NeuInput
                 placeholder="Search by name, MC#, DOT#, contact, or email…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 data-testid="input-search-brokers"
-                className="h-8 rounded-full pl-9 text-[12px]"
+                className="pl-11"
               />
             </div>
-            <div className="flex border-2 border-[#808080] bg-[#d4d0c8] p-1">
-              {isManager && <button type="button" onClick={() => { setProcessorFilter("all"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "all" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-500"}`}>All Brokers</button>}
-              <button type="button" onClick={() => { setProcessorFilter("me"); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-[11.5px] font-semibold ${processorFilter === "me" ? "bg-blue-600 text-white" : "text-slate-500"}`}>My Brokers</button>
-            </div>
-             <div className="flex gap-1.5">
-              {(["all","active","suspended","inactive"] as const).map(s => (
-                <button
-                  key={s}
-                  type="button"
-                   onClick={() => { setStatusFilter(s); setPage(1); setActiveViewId(null); }}
-                  className={`rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors capitalize ${
-                    statusFilter === s
-                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
-                  }`}
-                >
-                  {s === "all" ? `All ${brokers.length}` : s}
-                </button>
-              ))}
-            </div>
-             <Select value={creditGradeFilter} onValueChange={value => { setCreditGradeFilter(value as typeof creditGradeFilter); setPage(1); }}>
-               <SelectTrigger className="h-8 w-[108px] rounded-full text-[11px]"><SelectValue placeholder="Credit grade" /></SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="all">All grades</SelectItem>
-                 {["A", "B", "C", "D", "F"].map(grade => <SelectItem key={grade} value={grade}>Grade {grade}</SelectItem>)}
-               </SelectContent>
-             </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <NeuSelect aria-label="Broker assignment" value={processorFilter} onChange={e => { setProcessorFilter(e.target.value as "all" | "me"); setPage(1); }} className="w-auto min-w-36">
+                {isManager ? <><option value="all">All brokers</option><option value="me">My brokers</option></> : <option value="me">My brokers</option>}
+              </NeuSelect>
+              <NeuSelect aria-label="Broker status and payment terms" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); setActiveViewId(null); }} className="w-auto min-w-40">
+                <option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option>
+                <option value="quickpay">Quick Pay</option>{["net15", "net30", "net45", "net60"].map(term => <option key={term} value={`quickpay_${term}`}>{getPaymentTermsLabel(term)}</option>)}
+              </NeuSelect>
+              <NeuSelect aria-label="Credit grade" value={creditGradeFilter} onChange={e => { setCreditGradeFilter(e.target.value as typeof creditGradeFilter); setPage(1); }} className="w-auto min-w-32">
+                <option value="all">All grades</option>{["A", "B", "C", "D", "F"].map(grade => <option key={grade} value={grade}>Grade {grade}</option>)}
+              </NeuSelect>
              <button type="button" onClick={() => { setCreditSort(value => value === "none" ? "desc" : value === "desc" ? "asc" : "none"); setPage(1); }}
-               className="flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-[#e0e0e0] px-3 text-xs font-semibold text-[#425153] shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]"
                title={creditSort === "none" ? "Sort by credit score" : `Credit score ${creditSort === "asc" ? "ascending" : "descending"}`}>
-               <ArrowUpDown className="h-3 w-3" /> Score{creditSort !== "none" ? ` ${creditSort === "asc" ? "↑" : "↓"}` : ""}
+                <ArrowUpDown className="h-4 w-4" /> Score{creditSort !== "none" ? ` ${creditSort}` : ""}
              </button>
-            <button
+             <NeuButton
               type="button"
               onClick={openCreateDialog}
               data-testid="button-create-broker"
-              className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-blue-700"
+               variant="accent"
+               className="min-h-11 px-4 text-xs"
             >
-              <Plus className="h-3 w-3" /> Add Broker
-            </button>
+               <Plus className="h-4 w-4" />Add Broker
+             </NeuButton>
+            </div>
           </div>
-        </Card>
+        </NeuCard>
 
         {/* ── Broker table ─────────────────────────────────────────────── */}
-        <Card className="overflow-hidden">
+        <NeuCard className="overflow-hidden p-4 sm:p-5">
           {isLoading ? (
-             <div className="space-y-3 p-5">
+             <div className="space-y-3 p-2">
                {[1, 2, 3, 4, 5].map((row) => (
                  <div key={row} className="flex animate-pulse items-center gap-4">
                    <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-800" />
@@ -406,8 +393,15 @@ export default function Brokers() {
                  </div>
                ))}
             </div>
-           ) : brokers.length === 0 ? (
-            <div className="px-8 py-10">
+            ) : isError ? (
+             <div className="flex flex-col items-center py-14 text-center">
+               <Building className="mb-3 h-8 w-8 text-[#788b8d]" />
+               <p className="font-semibold text-[#354548]">Broker records did not load</p>
+               <p className="mt-1 text-sm text-[#758587]">Check your connection and try again.</p>
+               <NeuButton className="mt-4 min-h-10 px-4 text-xs" onClick={() => refetch()}>Retry</NeuButton>
+             </div>
+            ) : brokers.length === 0 ? (
+             <div className="px-4 py-8">
                {totalBrokers === 0 && !debouncedSearch && statusFilter === "all" ? (
                 <FFOnboarding
                   title="No brokers yet"
@@ -443,130 +437,114 @@ export default function Brokers() {
                  </div>
                )}
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="ff-data-table w-full min-w-[980px]">
-                <thead>
+           ) : (
+             <div>
+               <NeuTable className="min-w-[980px]">
+                 <NeuTableHeader>
                   <tr>
-                    <th>Broker Name</th>
-                    <th>MC#</th>
-                    <th>DOT#</th>
-                    <th>DBA</th>
-                     <th>Status</th>
-                     <th>Credit Grade</th>
-                     <th>Score</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Assigned To</th>
-                    <th className="pr-5">Actions</th>
+                     {["Broker Name", "MC#", "DOT#", "DBA", "Status", "Credit Grade", "Score", "Email", "Phone", "Assigned To", "Actions"].map((label) => <NeuTableHead key={label}>{label}</NeuTableHead>)}
                   </tr>
-                </thead>
-                <tbody>
+                 </NeuTableHeader>
+                 <NeuTableBody>
                     {visibleBrokers.map((broker) => (
-                    <tr
+                     <NeuTableRow
                       key={broker.id}
-                       className={`${broker.status === "suspended" ? "ff-row-urgent" : broker.status === "inactive" ? "ff-row-stale" : ""} ${broker.creditGrade === "A" ? "bg-emerald-50/60" : broker.creditGrade === "F" ? "bg-red-50/70" : ""}`}
+                        className={`${broker.status === "suspended" ? "bg-[#f6e4e2]" : broker.status === "inactive" ? "bg-[#dedede]" : ""}`}
                     >
-                      <td>
+                       <NeuTableCell>
                         <div className="flex items-center gap-2">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                            <Building className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#d5e7e7]">
+                             <Building className="h-4 w-4 text-[#168d98]" />
                           </div>
-                          <p className="font-medium text-slate-900 dark:text-white">{broker.name}</p>
+                           <p className="font-semibold text-[#354548]">{broker.name}</p>
                         </div>
-                      </td>
-                      <td className="font-mono text-xs text-slate-600 dark:text-slate-300">{broker.mcNumber || "—"}</td>
-                      <td className="font-mono text-xs text-slate-600 dark:text-slate-300">{broker.dotNumber || "—"}</td>
-                      <td className="text-slate-700 dark:text-slate-300">{getBrokerDba(broker)}</td>
-                      <td>
-                        <span className={getBrokerBadge(broker.status)}>
-                          {broker.status.charAt(0).toUpperCase() + broker.status.slice(1)}
-                        </span>
-                      </td>
-                       <td>
-                         <span className={`inline-flex min-w-7 items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${
-                           broker.creditGrade === "A" ? "border-emerald-200 bg-emerald-100 text-emerald-700" :
-                           broker.creditGrade === "B" ? "border-teal-200 bg-teal-100 text-teal-700" :
-                           broker.creditGrade === "C" ? "border-yellow-200 bg-yellow-100 text-yellow-700" :
-                           broker.creditGrade === "D" ? "border-orange-200 bg-orange-100 text-orange-700" :
-                           broker.creditGrade === "F" ? "border-red-200 bg-red-100 text-red-700" :
-                           "border-slate-200 bg-slate-100 text-slate-500"
-                         }`}>{broker.creditGrade ?? "—"}</span>
-                       </td>
-                       <td className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{broker.creditScore ?? "—"}</td>
-                      <td className="text-slate-600 dark:text-slate-400">{broker.email || "—"}</td>
-                      <td className="text-slate-600 dark:text-slate-400">{broker.phone || "—"}</td>
-                      <td><ProcessorIdentity person={broker.assignedProcessorUser} compact /></td>
-                      <td className="pr-5">
+                       </NeuTableCell>
+                       <NeuTableCell className="font-mono text-xs">{broker.mcNumber || "—"}</NeuTableCell>
+                       <NeuTableCell className="font-mono text-xs">{broker.dotNumber || "—"}</NeuTableCell>
+                       <NeuTableCell>{getBrokerDba(broker)}</NeuTableCell>
+                       <NeuTableCell><NeuBadge tone={broker.status === "active" ? "success" : broker.status === "suspended" ? "warning" : "neutral"}>{broker.status}</NeuBadge></NeuTableCell>
+                       <NeuTableCell><NeuBadge className={`min-w-8 justify-center px-2 font-bold ${
+                         broker.creditGrade === "A" ? "text-emerald-700" :
+                         broker.creditGrade === "B" ? "text-teal-700" :
+                         broker.creditGrade === "C" ? "text-yellow-700" :
+                         broker.creditGrade === "D" ? "text-orange-700" :
+                         broker.creditGrade === "F" ? "text-red-700" : "text-[#777]"
+                       }`}>{broker.creditGrade ?? "—"}</NeuBadge></NeuTableCell>
+                       <NeuTableCell className="font-mono text-xs font-semibold">{broker.creditScore ?? "—"}</NeuTableCell>
+                       <NeuTableCell>{broker.email || "—"}</NeuTableCell>
+                       <NeuTableCell>{broker.phone || "—"}</NeuTableCell>
+                       <NeuTableCell><ProcessorIdentity person={broker.assignedProcessorUser} compact /></NeuTableCell>
+                       <NeuTableCell>
                         <div className="flex items-center gap-1">
-                          <button
+                           <NeuButton
                             type="button"
                             onClick={() => navigate(`/brokers/${broker.id}`)}
-                            className="flex h-7 items-center gap-1 rounded-[7px] bg-blue-50 px-2 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-300"
+                             className="h-9 min-h-9 rounded-lg px-2.5 text-[11px] text-[#168d98]"
                           >
-                            <ExternalLink className="h-3 w-3" /> View
-                          </button>
-                          <button
+                             <ExternalLink className="h-3.5 w-3.5" />View
+                           </NeuButton>
+                           <NeuButton
                             type="button"
                             onClick={() => openEditDialog(broker)}
                             data-testid={`button-edit-${broker.id}`}
-                            className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                             aria-label={`Edit ${broker.name}`}
+                             className="h-9 min-h-9 w-9 rounded-lg p-0 text-[#667477]"
                           >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
+                             <Edit className="h-4 w-4" />
+                           </NeuButton>
                           {isManager && (
-                            <button
+                             <NeuButton
                               type="button"
                               onClick={() => { if (confirm("Delete this broker?")) deleteBrokerMutation.mutate(broker.id); }}
                               data-testid={`button-delete-${broker.id}`}
-                              className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-slate-100 text-red-400 hover:bg-red-50 dark:bg-slate-800 dark:text-red-400"
+                               aria-label={`Delete ${broker.name}`}
+                               className="h-9 min-h-9 w-9 rounded-lg p-0 text-[#a34e48]"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                               <Trash2 className="h-4 w-4" />
+                             </NeuButton>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                       </NeuTableCell>
+                     </NeuTableRow>
                   ))}
-                </tbody>
-              </table>
-              <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
-                 <span className="text-[11.5px] text-slate-400">
+                 </NeuTableBody>
+               </NeuTable>
+               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#c5c5c5] px-1 pt-3">
+                  <span className="text-xs text-[#758587]">
                    Showing {totalBrokers === 0 ? 0 : (page - 1) * 50 + 1}-{Math.min(page * 50, totalBrokers)} of {totalBrokers} brokers
                  </span>
-                <span className="text-[11.5px] text-slate-400">
+                 <span className="text-xs text-[#758587]">
                    ${brokers.reduce((s, b) => s + (b.creditLimit || 0), 0).toLocaleString()} total credit
                 </span>
               </div>
-               <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
-                 <Button
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <NeuButton
                    type="button"
-                   variant="outline"
-                   size="sm"
+                    className="min-h-10 px-3 text-xs"
                    disabled={page <= 1 || isLoading}
                    onClick={() => setPage(currentPage => Math.max(1, currentPage - 1))}
                  >
                    Previous
-                 </Button>
-                 <Button
+                  </NeuButton>
+                  <span className="px-2 text-xs text-[#758587]">Page {page} of {totalPages}</span>
+                  <NeuButton
                    type="button"
-                   variant="outline"
-                   size="sm"
+                    className="min-h-10 px-3 text-xs"
                    disabled={page >= totalPages || isLoading}
                    onClick={() => setPage(currentPage => Math.min(totalPages, currentPage + 1))}
                  >
                    Next
-                 </Button>
+                  </NeuButton>
                </div>
             </div>
           )}
-        </Card>
+        </NeuCard>
       </div>
-      </main>
+        </NeuPageShell>
 
       {/* Create/Edit Broker Dialog */}
       <Dialog open={isBrokerDialogOpen} onOpenChange={setIsBrokerDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto rounded-2xl border-0 bg-[#e0e0e0] text-[#354548] shadow-[-10px_-10px_24px_#ffffff,10px_10px_24px_#b8b8b8]">
           <DialogHeader>
             <DialogTitle>
               {editingBroker ? "Edit Broker" : "Add New Broker"}
@@ -586,7 +564,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>Broker Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="ABC Freight Solutions" {...field} />
+                        <NeuInput placeholder="Broker legal name" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -600,7 +578,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>Contact Person *</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Smith" {...field} />
+                        <NeuInput placeholder="Primary contact" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -616,7 +594,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>Email *</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john@abcfreight.com" {...field} />
+                        <NeuInput type="email" placeholder="contact@broker.com" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -630,7 +608,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>Phone *</FormLabel>
                       <FormControl>
-                        <Input placeholder="(555) 123-4567" {...field} />
+                        <NeuInput placeholder="(555) 123-4567" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -645,7 +623,7 @@ export default function Brokers() {
                   <FormItem>
                     <FormLabel>Address</FormLabel>
                     <FormControl>
-                      <Input placeholder="123 Main Street" {...field} />
+                      <NeuInput placeholder="Street address" {...field} className="min-h-10 text-sm" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -660,7 +638,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>City</FormLabel>
                       <FormControl>
-                        <Input placeholder="Atlanta" {...field} />
+                        <NeuInput placeholder="City" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -674,7 +652,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>State</FormLabel>
                       <FormControl>
-                        <Input placeholder="GA" {...field} />
+                        <NeuInput placeholder="State" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -688,7 +666,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>ZIP Code</FormLabel>
                       <FormControl>
-                        <Input placeholder="30309" {...field} />
+                        <NeuInput placeholder="ZIP code" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -704,7 +682,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>MC Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="MC123456" {...field} />
+                        <NeuInput placeholder="MC number" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -718,7 +696,7 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>DOT Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="123456" {...field} />
+                        <NeuInput placeholder="DOT number" {...field} className="min-h-10 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -734,11 +712,12 @@ export default function Brokers() {
                     <FormItem>
                       <FormLabel>Credit Limit</FormLabel>
                       <FormControl>
-                        <Input
+                        <NeuInput
                           type="number"
                           placeholder="50000"
                           {...field}
                           onChange={(e) => field.onChange(Number(e.target.value))}
+                          className="min-h-10 text-sm"
                         />
                       </FormControl>
                       <FormMessage />
@@ -754,7 +733,7 @@ export default function Brokers() {
                       <FormLabel>Payment Terms</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="min-h-10 rounded-xl border-0 bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
                             <SelectValue placeholder="Select terms" />
                           </SelectTrigger>
                         </FormControl>
@@ -779,7 +758,7 @@ export default function Brokers() {
                       <FormLabel>Status</FormLabel>
                       <Select onValueChange={(value) => field.onChange(value || "active")} value={field.value || "active"}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="min-h-10 rounded-xl border-0 bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                         </FormControl>
@@ -806,6 +785,7 @@ export default function Brokers() {
                         placeholder="Additional notes about this broker..."
                         rows={3}
                         {...field}
+                        className="rounded-xl border-0 bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff] focus-visible:ring-[#27aab8]"
                       />
                     </FormControl>
                     <FormMessage />
@@ -813,13 +793,13 @@ export default function Brokers() {
                 )}
               />
 
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsBrokerDialogOpen(false)}>
+              <div className="flex justify-end gap-2">
+                <NeuButton type="button" onClick={() => setIsBrokerDialogOpen(false)}>
                   Cancel
-                </Button>
-                <Button type="submit" disabled={createBrokerMutation.isPending || updateBrokerMutation.isPending}>
+                </NeuButton>
+                <NeuButton type="submit" variant="accent" disabled={createBrokerMutation.isPending || updateBrokerMutation.isPending}>
                   {editingBroker ? "Update Broker" : "Create Broker"}
-                </Button>
+                </NeuButton>
               </div>
             </form>
           </Form>

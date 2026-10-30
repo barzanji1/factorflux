@@ -1,97 +1,51 @@
 import { useState } from "react";
-import { useParams } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useParams } from "wouter";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { cn } from "@/lib/utils";
-
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import RecordDetail, {
-  DetailRow, DetailSection, EmptyTab,
-} from "@/components/layout/record-detail";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-
-import {
-  Building2, ReceiptText, Phone, Mail, MapPin, ShieldCheck,
-  CreditCard, DollarSign, Clock, FileText, Edit2, Ban,
-  CheckCircle2, AlertTriangle, User, Hash, TrendingUp, Plus, Trash2,
-  MessageSquare, Send,
-  RefreshCw, Award,
-} from "lucide-react";
 import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
 import BrokerEditDialog from "@/components/brokers/broker-edit-dialog";
 import DumpStatementTimeline from "@/components/brokers/dump-statement-timeline";
+import { BrokerFinancialOverview } from "@/components/brokers/broker-financial-overview";
+import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Award, AlertTriangle, Ban, Building2, CheckCircle2, Clock, Edit2, MapPin, MessageSquare, Plus, ReceiptText, RefreshCw, Send, Trash2 } from "lucide-react";
 import type { Broker } from "@shared/schema";
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
-
-function BrokerStatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    active:    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300",
-    inactive:  "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
-    suspended: "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300",
-  };
-  return (
-    <Badge className={cn("rounded-full border px-3 py-1 text-xs font-semibold shadow-sm", colors[status] ?? colors.inactive)}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </Badge>
-  );
-}
-
-// ─── Invoice status badge ─────────────────────────────────────────────────────
-
-function InvBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    approved:     "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
-    funded:       "bg-violet-100 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300",
-    submitted:    "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300",
-    under_review: "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300",
-    docs_pending: "bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300",
-    rejected:     "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300",
-    settled:      "bg-teal-100 text-teal-700 dark:bg-teal-950/30 dark:text-teal-300",
-    draft:        "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  };
-  return (
-    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", colors[status] ?? colors.draft)}>
-      {status.replace(/_/g, " ")}
-    </span>
-  );
-}
-
 const TERMS_LABEL: Record<string, string> = {
-  quickpay: "Quick Pay", net15: "Net 15", net30: "Net 30",
-  net45: "Net 45", net60: "Net 60",
+  quickpay: "Quick Pay",
+  net15: "Net 15",
+  net30: "Net 30",
+  net45: "Net 45",
+  net60: "Net 60",
 };
 
-const fmt = (v: string | number | null | undefined) =>
-  v == null ? "—" : `$${parseFloat(String(v)).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-const fmtDate = (v: string | null | undefined) =>
-  v ? new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+const formatMoney = (value: unknown) =>
+  value == null || value === ""
+    ? "—"
+    : `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function creditGradeClass(grade?: string | null) {
-  return grade === "A" ? "border-emerald-200 bg-emerald-100 text-emerald-700" :
-    grade === "B" ? "border-teal-200 bg-teal-100 text-teal-700" :
-    grade === "C" ? "border-yellow-200 bg-yellow-100 text-yellow-700" :
-    grade === "D" ? "border-orange-200 bg-orange-100 text-orange-700" :
-    grade === "F" ? "border-red-200 bg-red-100 text-red-700" :
-    "border-slate-200 bg-slate-100 text-slate-500";
+const formatDate = (value: string | null | undefined) =>
+  value
+    ? new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "—";
+
+function gradeTone(grade?: string | null) {
+  if (grade === "A") return "text-emerald-700";
+  if (grade === "B") return "text-teal-700";
+  if (grade === "C") return "text-yellow-700";
+  if (grade === "D") return "text-orange-700";
+  if (grade === "F") return "text-red-700";
+  return "text-[#777]";
 }
 
 function CreditScorePanel({ brokerId, canRecalculate }: { brokerId: number; canRecalculate: boolean }) {
   const { toast } = useToast();
-  const qc = useQueryClient();
-  const { data, isLoading } = useQuery<{ current: any | null; history: any[] }>({
+  const queryClient = useQueryClient();
+  const { data, isLoading, isError, refetch } = useQuery<{ current: any | null; history: any[] }>({
     queryKey: ["/api/brokers", brokerId, "credit"],
     queryFn: async () => {
       const response = await fetch(`/api/brokers/${brokerId}/credit`, { credentials: "include" });
@@ -102,16 +56,20 @@ function CreditScorePanel({ brokerId, canRecalculate }: { brokerId: number; canR
   });
   const calculateMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/brokers/${brokerId}/calculate-credit`, { method: "POST", credentials: "include" });
+      const response = await fetch(`/api/brokers/${brokerId}/calculate-credit`, {
+        method: "POST",
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to recalculate credit");
       return response.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "credit"] });
-      qc.invalidateQueries({ queryKey: ["/api/brokers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "credit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers"] });
       toast({ title: "Credit score recalculated" });
     },
-    onError: (error: Error) => toast({ title: "Unable to recalculate credit", description: error.message, variant: "destructive" }),
+    onError: (error: Error) =>
+      toast({ title: "Unable to recalculate credit", description: error.message, variant: "destructive" }),
   });
   const report = data?.current;
   const history = data?.history ?? [];
@@ -123,73 +81,150 @@ function CreditScorePanel({ brokerId, canRecalculate }: { brokerId: number; canR
     ["Short Pay / Disputes", Number(report?.shortPayScore ?? report?.breakdown?.shortPayDisputes ?? 0), 10],
   ];
   const grade = report?.grade ?? report?.creditGrade ?? null;
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-        <div className="flex items-center gap-2"><Award className="h-4 w-4 text-violet-600" /><h3 className="text-xs font-semibold text-slate-700 dark:text-white">Broker Creditworthiness</h3></div>
-        {canRecalculate && <Button size="sm" variant="outline" className="h-7 gap-1 rounded-lg px-2 text-[10px]" disabled={calculateMutation.isPending} onClick={() => calculateMutation.mutate()}><RefreshCw className={cn("h-3 w-3", calculateMutation.isPending && "animate-spin")} />Recalculate</Button>}
+    <NeuCard className="overflow-hidden p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#c5c5c5] px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Award className="h-4 w-4 text-[#168d98]" />
+          <h3 className="text-xs font-semibold text-[#354548]">Broker creditworthiness</h3>
+        </div>
+        {canRecalculate && (
+          <NeuButton
+            className="min-h-9 gap-1 rounded-lg px-3 text-[10px]"
+            disabled={calculateMutation.isPending}
+            onClick={() => calculateMutation.mutate()}
+          >
+            <RefreshCw className={`h-3 w-3 ${calculateMutation.isPending ? "animate-spin" : ""}`} />
+            Recalculate
+          </NeuButton>
+        )}
       </div>
       <div className="space-y-4 p-5">
-        {isLoading ? <div className="py-6 text-center text-xs text-slate-400">Loading credit report…</div> : !report ? (
-          <div className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-xs text-slate-500">No credit score calculated yet.</div>
+        {isLoading ? (
+          <div className="space-y-3 py-3" aria-label="Loading credit report">
+            <div className="h-5 w-36 animate-pulse rounded bg-[#d1d1d1]" />
+            <div className="h-20 animate-pulse rounded-xl bg-[#d1d1d1]" />
+          </div>
+        ) : isError ? (
+          <div role="alert" className="rounded-xl bg-[#e0e0e0] p-5 text-center text-xs text-[#667477] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+            Credit report unavailable.
+            <NeuButton className="ml-3 min-h-8 px-3 text-[10px]" onClick={() => refetch()}>Retry</NeuButton>
+          </div>
+        ) : !report ? (
+          <div className="rounded-xl bg-[#e0e0e0] p-5 text-center text-xs text-[#667477] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+            No credit score calculated yet.
+          </div>
         ) : (
           <>
             <div className="flex items-center gap-4">
-              <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#27aab8 ${score * 3.6}deg, #e2e8f0 0deg)` }}>
-                <div className="flex h-[74px] w-[74px] flex-col items-center justify-center rounded-full bg-white dark:bg-slate-900"><span className="text-2xl font-black text-slate-900 dark:text-white">{score}</span><span className="text-[9px] uppercase tracking-wide text-slate-400">/ 100</span></div>
+              <div
+                className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full"
+                style={{ background: `conic-gradient(#27aab8 ${score * 3.6}deg, #d2d2d2 0deg)` }}
+              >
+                <div className="flex h-[74px] w-[74px] flex-col items-center justify-center rounded-full bg-[#e0e0e0]">
+                  <span className="text-2xl font-black text-[#354548]">{score}</span>
+                  <span className="text-[9px] uppercase tracking-wide text-[#758587]">/ 100</span>
+                </div>
               </div>
-              <div><span className={`inline-flex rounded-full border px-3 py-1 text-lg font-black ${creditGradeClass(grade)}`}>{grade ?? "—"}</span><p className="mt-1 text-xs text-slate-500">{grade === "F" ? "Critical — do not factor" : grade === "D" ? "Poor — frequent delays or issues" : grade === "A" ? "Excellent — pay fast, no issues" : "Broker payment performance"}</p></div>
+              <div>
+                <NeuBadge className={`border-0 px-3 py-1 text-lg font-black ${gradeTone(grade)}`}>
+                  {grade ?? "—"}
+                </NeuBadge>
+                <p className="mt-1 text-xs text-[#667477]">
+                  {grade === "F" ? "Critical — do not factor" : grade === "D" ? "Poor — frequent delays or issues" : grade === "A" ? "Excellent — pay fast, no issues" : "Broker payment performance"}
+                </p>
+              </div>
             </div>
-            <div className="space-y-2.5">{breakdown.map(([label, value, max]) => <div key={String(label)}><div className="mb-1 flex justify-between text-[11px] font-medium text-slate-500"><span>{label}</span><span>{value} / {max}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-[#27aab8]" style={{ width: `${Math.min(100, Number(value) / Number(max) * 100)}%` }} /></div></div>)}</div>
+            <div className="space-y-2.5">
+              {breakdown.map(([label, value, max]) => (
+                <div key={String(label)}>
+                  <div className="mb-1 flex justify-between text-[11px] font-medium text-[#667477]">
+                    <span>{label}</span><span>{value} / {max}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#d2d2d2]">
+                    <div className="h-full rounded-full bg-[#27aab8]" style={{ width: `${Math.min(100, Number(value) / Number(max) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
-              {[["Avg Days to Pay", report.avgDaysToPayment ?? "—"], ["Total Invoices", report.totalInvoices ?? 0], ["Chargebacks", report.totalChargebacks ?? 0], ["Short Pays", report.totalShortPays ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-slate-50 px-2.5 py-2 dark:bg-slate-900/50"><p className="text-slate-400">{label}</p><p className="mt-0.5 font-bold text-slate-700 dark:text-slate-200">{value}</p></div>)}
+              {[
+                ["Avg Days to Pay", report.avgDaysToPayment ?? "—"],
+                ["Total Invoices", report.totalInvoices ?? 0],
+                ["Chargebacks", report.totalChargebacks ?? 0],
+                ["Short Pays", report.totalShortPays ?? 0],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-lg bg-[#e0e0e0] px-2.5 py-2 shadow-[inset_2px_2px_5px_#c1c1c1,inset_-2px_-2px_5px_#ffffff]">
+                  <p className="text-[#758587]">{label}</p>
+                  <p className="mt-0.5 font-bold text-[#354548]">{value}</p>
+                </div>
+              ))}
             </div>
-            {history.length > 0 && <div><p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Credit history · last 12 months</p><div className="flex h-16 items-end gap-1">{history.slice(-12).map((item: any, index: number) => <div key={`${item.id ?? item.lastCalculatedAt ?? index}`} title={`${item.grade ?? "—"} · ${item.score ?? 0}`} className="flex-1 rounded-t bg-[#27aab8]" style={{ height: `${Math.max(8, Number(item.score ?? 0))}%` }} />)}</div></div>}
-            <p className="text-[10px] text-slate-400">Last calculated: {fmtDate(report.lastCalculatedAt)}</p>
+            {history.length > 0 && (
+              <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[#758587]">Credit history · last 12 months</p>
+                <div className="flex h-16 items-end gap-1">
+                  {history.slice(-12).map((item: any, index: number) => (
+                    <div
+                      key={`${item.id ?? item.lastCalculatedAt ?? index}`}
+                      title={`${item.grade ?? "—"} · ${item.score ?? 0}`}
+                      className="flex-1 rounded-t bg-[#27aab8]"
+                      style={{ height: `${Math.max(8, Number(item.score ?? 0))}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-[10px] text-[#758587]">Last calculated: {formatDate(report.lastCalculatedAt)}</p>
           </>
         )}
       </div>
-    </div>
+    </NeuCard>
   );
 }
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function BrokerDetail() {
   const { id } = useParams<{ id: string }>();
   const brokerId = Number(id);
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const qc = useQueryClient();
-
-  const [statusDialog, setStatusDialog] = useState(false);
+  const queryClient = useQueryClient();
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
+  const [profileTab, setProfileTab] = useState("overview");
   const [editingBroker, setEditingBroker] = useState<Broker | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
-  const [newStatus, setNewStatus] = useState<"active" | "inactive" | "suspended">("inactive");
+  const [statusDialog, setStatusDialog] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [branchDialog, setBranchDialog] = useState(false);
   const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
   const [branchForm, setBranchForm] = useState({
-    branchName: "", address: "", city: "", state: "", zip: "",
-    phone: "", email: "", contactName: "", status: "active" as "active" | "inactive",
+    branchName: "",
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+    phone: "",
+    email: "",
+    contactName: "",
+    status: "active" as "active" | "inactive",
   });
 
-  const { data: broker, isLoading, refetch: refetchBroker } = useQuery<any>({
+  const { data: broker, isLoading, isError, refetch: refetchBroker } = useQuery<any>({
     queryKey: ["/api/brokers", brokerId],
     queryFn: async () => {
-      const r = await fetch(`/api/brokers/${brokerId}`, { credentials: "include" });
-      if (!r.ok) throw new Error("Not found");
-      return r.json();
+      const response = await fetch(`/api/brokers/${brokerId}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Not found");
+      return response.json();
     },
     enabled: !isNaN(brokerId),
   });
-
   const { data: allInvoices = [] } = useQuery<any[]>({
     queryKey: ["/api/invoices", { all: true }],
     enabled: !isNaN(brokerId),
   });
-
-  const { data: branches = [], isLoading: branchesLoading, isError: branchesError } = useQuery<any[]>({
+  const { data: branches = [], isLoading: branchesLoading, isError: branchesError, refetch: refetchBranches } = useQuery<any[]>({
     queryKey: ["/api/brokers", brokerId, "branches"],
     queryFn: async () => {
       const response = await fetch(`/api/brokers/${brokerId}/branches`, { credentials: "include" });
@@ -198,51 +233,33 @@ export default function BrokerDetail() {
     },
     enabled: !isNaN(brokerId),
   });
-
-  const brokerInvoices = allInvoices.filter(
-    (inv: any) => inv.brokerId != null ? inv.brokerId === brokerId : inv.debtorId === brokerId
+  const brokerInvoices = allInvoices.filter((invoice: any) =>
+    invoice.brokerId != null ? invoice.brokerId === brokerId : invoice.debtorId === brokerId,
   );
-
-  const totalVolume = brokerInvoices.reduce((s: number, inv: any) => s + parseFloat(inv.amount ?? "0"), 0);
-  const openCount   = brokerInvoices.filter((inv: any) => !["settled", "rejected"].includes(inv.status)).length;
+  const creditLimit = Number(broker?.creditLimit ?? 0);
+  const exposure = brokerInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.amount || 0), 0);
+  const openCount = brokerInvoices.filter((invoice: any) => !["settled", "rejected"].includes(invoice.status)).length;
+  const creditUtilPct = creditLimit && exposure ? Math.min(100, Math.round((exposure / creditLimit) * 100)) : 0;
 
   const statusMutation = useMutation({
-    mutationFn: (status: string) =>
-      apiRequest("PATCH", `/api/brokers/${brokerId}`, { status }),
+    mutationFn: (status: string) => apiRequest("PATCH", `/api/brokers/${brokerId}`, { status }),
     onSuccess: () => {
       toast({ title: "Status updated" });
-      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId] });
-      qc.invalidateQueries({ queryKey: ["/api/brokers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers", brokerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers"] });
       setStatusDialog(false);
     },
     onError: () => toast({ title: "Failed to update status", variant: "destructive" }),
   });
-
   const notesMutation = useMutation({
-    mutationFn: (notes: string) =>
-      apiRequest("PATCH", `/api/brokers/${brokerId}`, { notes }),
+    mutationFn: (notes: string) => apiRequest("PATCH", `/api/brokers/${brokerId}`, { notes }),
     onSuccess: () => {
       toast({ title: "Notes saved" });
-      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers", brokerId] });
       setNoteText("");
     },
     onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
   });
-
-  const isAdmin = user?.role === "admin" || user?.role === "manager";
-  const openEditBroker = async () => {
-    setLoadingEdit(true);
-    try {
-      const result = await refetchBroker({ throwOnError: true });
-      if (!result.data || result.data.id !== brokerId) throw new Error("Broker information is unavailable.");
-      setEditingBroker(result.data);
-    } catch (error) {
-      toast({ title: "Unable to open broker editor", description: error instanceof Error ? error.message : "Failed to load broker.", variant: "destructive" });
-    } finally {
-      setLoadingEdit(false);
-    }
-  };
-
   const branchPayload = () => ({
     branchName: branchForm.branchName.trim(),
     address: branchForm.address.trim() || null,
@@ -262,7 +279,7 @@ export default function BrokerDetail() {
     ),
     onSuccess: () => {
       toast({ title: editingBranchId ? "Branch updated" : "Branch added" });
-      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
       setBranchDialog(false);
     },
     onError: (error: Error) => toast({ title: "Failed to save branch", description: error.message, variant: "destructive" }),
@@ -271,7 +288,7 @@ export default function BrokerDetail() {
     mutationFn: (branchId: number) => apiRequest("DELETE", `/api/brokers/${brokerId}/branches/${branchId}`),
     onSuccess: () => {
       toast({ title: "Branch removed" });
-      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
     },
     onError: (error: Error) => toast({ title: "Failed to remove branch", description: error.message, variant: "destructive" }),
   });
@@ -280,363 +297,304 @@ export default function BrokerDetail() {
       apiRequest("PATCH", `/api/brokers/${brokerId}/branches/${branchId}`, { status }),
     onSuccess: () => {
       toast({ title: "Branch status updated" });
-      qc.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brokers", brokerId, "branches"] });
     },
     onError: (error: Error) => toast({ title: "Failed to update branch status", description: error.message, variant: "destructive" }),
   });
+  const openEditBroker = async () => {
+    setLoadingEdit(true);
+    try {
+      const result = await refetchBroker({ throwOnError: true });
+      if (!result.data || result.data.id !== brokerId) throw new Error("Broker information is unavailable.");
+      setEditingBroker(result.data);
+    } catch (error) {
+      toast({
+        title: "Unable to open broker editor",
+        description: error instanceof Error ? error.message : "Failed to load broker.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
   const openBranchDialog = (branch?: any) => {
     setEditingBranchId(branch?.id ?? null);
     setBranchForm({
-      branchName: branch?.branchName ?? "", address: branch?.address ?? "",
-      city: branch?.city ?? "", state: branch?.state ?? "", zip: branch?.zip ?? "",
-      phone: branch?.phone ?? "", email: branch?.email ?? "",
-      contactName: branch?.contactName ?? "", status: branch?.status ?? "active",
+      branchName: branch?.branchName ?? "",
+      address: branch?.address ?? "",
+      city: branch?.city ?? "",
+      state: branch?.state ?? "",
+      zip: branch?.zip ?? "",
+      phone: branch?.phone ?? "",
+      email: branch?.email ?? "",
+      contactName: branch?.contactName ?? "",
+      status: branch?.status ?? "active",
     });
     setBranchDialog(true);
   };
+  const terms = TERMS_LABEL[broker?.paymentTerms] ?? broker?.paymentTerms ?? "—";
+  const grade = broker?.creditGrade as string | null | undefined;
+  const gradeStyle = gradeTone(grade);
 
-  const creditUtilPct = broker?.creditLimit && totalVolume
-    ? Math.min(100, Math.round((totalVolume / broker.creditLimit) * 100))
-    : 0;
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-0 bg-[#e0e0e0]">
+        <Sidebar />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <TopNav title="Broker profile" group="Risk" neu />
+          <NeuPageShell className="!min-h-0 flex-1 p-5">
+            <div className="mx-auto max-w-[1500px] animate-pulse space-y-5">
+              <div className="h-28 rounded-2xl bg-[#d3d3d3]" />
+              <div className="h-48 rounded-2xl bg-[#d3d3d3]" />
+              <div className="h-64 rounded-2xl bg-[#d3d3d3]" />
+            </div>
+          </NeuPageShell>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.05),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="flex h-full min-h-0 bg-[#e0e0e0] text-[#354548]">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav
-          title="Broker Detail"
-          subtitle="Debtor profile, credit terms, and linked invoices"
-          group="Workspace"
-        />
-        <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1400px] p-6 xl:p-8">
-            <RecordDetail
-              backHref="/brokers"
-              backLabel="Back to Brokers"
-              isLoading={isLoading}
-              notFound={!isLoading && !broker}
-              notFoundIcon={<Building2 className="h-8 w-8" />}
-              notFoundLabel="Broker not found"
-              icon={<Building2 className="h-7 w-7" />}
-              iconBg="bg-violet-600 text-white shadow-[0_8px_20px_rgba(124,58,237,0.28)]"
-              title={broker?.name ?? ""}
-              titleSub={[
-                broker?.city && broker?.state ? `${broker.city}, ${broker.state}` : null,
-                broker?.mcNumber ? `MC# ${broker.mcNumber}` : null,
-                broker?.dotNumber ? `DOT# ${broker.dotNumber}` : null,
-              ].filter(Boolean).join(" · ")}
-              statusBadge={broker ? <BrokerStatusBadge status={broker.status} /> : undefined}
-              metrics={[
-                { label: "Credit Limit", value: fmt(broker?.creditLimit), tint: "violet" },
-                { label: "Total Volume", value: fmt(totalVolume), tint: "blue" },
-                { label: "Open Invoices", value: String(openCount), tint: "amber" },
-                { label: "All Invoices", value: String(brokerInvoices.length), tint: "slate" },
-                { label: "Payment Terms", value: TERMS_LABEL[broker?.paymentTerms] ?? broker?.paymentTerms ?? "—", tint: "slate" },
-              ]}
-              alertBanner={creditUtilPct >= 90 ? (
-                <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-3.5 dark:border-red-900/40 dark:bg-red-950/20">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-                    Credit utilisation at {creditUtilPct}% — approaching or exceeding credit limit
-                  </p>
-                </div>
-              ) : undefined}
-              linkedRecords={[
-                { label: "MC Number",   icon: <Hash className="h-4 w-4" />,      value: broker?.mcNumber || "—",     tint: "violet" },
-                { label: "DOT Number",  icon: <ShieldCheck className="h-4 w-4" />, value: broker?.dotNumber || "—",    tint: "blue" },
-                { label: "Contact",     icon: <User className="h-4 w-4" />,       value: broker?.contactPerson || "—", tint: "slate" },
-                { label: "Email",       icon: <Mail className="h-4 w-4" />,       value: broker?.email || "—",         tint: "slate" },
-                { label: "Phone",       icon: <Phone className="h-4 w-4" />,      value: broker?.phone || "—",         tint: "slate" },
-              ]}
-              actions={
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Actions</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start gap-2 rounded-2xl border-slate-200 text-xs dark:border-slate-700"
-                    data-testid="broker-profile-edit"
-                    disabled={loadingEdit || !broker}
-                    onClick={openEditBroker}
-                  >
-                    <Edit2 className="h-3.5 w-3.5" />{loadingEdit ? "Loading…" : "Edit Broker"}
-                  </Button>
-                   <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-                     <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned Processor</p>
-                     <ProcessorAssignment record={broker} endpoint={`/api/brokers/${brokerId}/assign`} queryKey={["/api/brokers", brokerId]} />
-                   </div>
-                  {isAdmin && broker && broker.status !== "active" && (
-                    <Button size="sm" onClick={() => statusMutation.mutate("active")}
-                      disabled={statusMutation.isPending}
-                      className="w-full justify-start gap-2 rounded-2xl bg-emerald-600 text-xs text-white hover:bg-emerald-700">
-                      <CheckCircle2 className="h-3.5 w-3.5" />Activate Broker
-                    </Button>
-                  )}
-                  {isAdmin && broker && broker.status === "active" && (
-                    <Button size="sm" variant="outline"
-                      onClick={() => { setNewStatus("suspended"); setStatusDialog(true); }}
-                      className="w-full justify-start gap-2 rounded-2xl border-red-200 text-xs text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-400">
-                      <Ban className="h-3.5 w-3.5" />Suspend Broker
-                    </Button>
-                  )}
-                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <p className="text-[11px] text-slate-400 mb-2">Credit limit utilisation</p>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div className={cn("h-full rounded-full transition-all", creditUtilPct >= 90 ? "bg-red-500" : creditUtilPct >= 70 ? "bg-amber-500" : "bg-emerald-500")}
-                        style={{ width: `${creditUtilPct}%` }} />
-                    </div>
-                    <p className="mt-1 text-[11px] font-semibold text-slate-500">{creditUtilPct}% of {fmt(broker?.creditLimit)}</p>
-                  </div>
-                </div>
-              }
-              rightExtra={
-                <>
-                <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-600" />
-                      <h3 className="text-xs font-semibold text-slate-700 dark:text-white">Payment Risk</h3>
-                    </div>
-                  </div>
-                  <div className="divide-y divide-slate-50 px-5 dark:divide-slate-800/60">
-                    {[
-                      { label: "Open Invoices", value: String(openCount), tint: openCount > 5 ? "red" : "slate" },
-                      { label: "Total Exposure", value: fmt(totalVolume), tint: totalVolume > (broker?.creditLimit ?? 0) ? "red" : "emerald" },
-                      { label: "Credit Limit", value: fmt(broker?.creditLimit), tint: "slate" },
-                    ].map(r => (
-                      <div key={r.label} className="flex items-center justify-between py-3">
-                        <span className="text-xs text-slate-500">{r.label}</span>
-                        <span className={cn("text-xs font-semibold",
-                          r.tint === "red" ? "text-red-600 dark:text-red-400" :
-                          r.tint === "emerald" ? "text-emerald-600 dark:text-emerald-400" :
-                          "text-slate-700 dark:text-slate-300"
-                        )}>{r.value}</span>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Broker profile" subtitle="Relationship, credit terms, and linked invoices" group="Risk" neu />
+        <NeuPageShell className="custom-scrollbar !min-h-0 flex-1">
+          <div className="mx-auto max-w-[1580px] space-y-5 p-4 md:p-6">
+            {isError || !broker ? (
+              <NeuCard className="flex flex-col items-center p-12 text-center">
+                <Building2 className="mb-3 h-8 w-8 text-[#758587]" />
+                <h1 className="font-semibold">Broker record unavailable</h1>
+                <NeuButton className="mt-4" onClick={() => refetchBroker()}>Retry</NeuButton>
+              </NeuCard>
+            ) : (
+              <>
+                <NeuCard className="flex flex-wrap items-center justify-between gap-4 p-4 md:p-5">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <NeuButton onClick={() => navigate("/brokers")} className="min-h-10 px-3 text-xs">
+                      <Building2 className="h-4 w-4" />Brokers
+                    </NeuButton>
+                    <div className="h-10 w-px bg-[#c5c5c5]" />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-xl font-semibold tracking-tight text-[#354548] md:text-2xl">{broker.name}</h1>
+                        <NeuBadge tone={broker.status === "active" ? "success" : broker.status === "suspended" ? "warning" : "neutral"}>{broker.status}</NeuBadge>
+                        <NeuBadge className={`font-bold ${gradeStyle}`}>Grade {grade || "—"}</NeuBadge>
                       </div>
-                    ))}
+                      <p className="mt-1 text-xs text-[#718187]">MC {broker.mcNumber || "Not recorded"} · DOT {broker.dotNumber || "Not recorded"} · {terms}</p>
+                      <p className="mt-1 text-sm text-[#526164]">
+                        {broker.contactPerson || "No contact recorded"} · {broker.email || "No email recorded"}{broker.phone ? ` · ${broker.phone}` : ""}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <CreditScorePanel brokerId={brokerId} canRecalculate={isAdmin} />
-                </>
-              }
-              tabs={[
-                {
-                  value: "overview",
-                  label: "Overview",
-                  icon: <Building2 className="h-3.5 w-3.5" />,
-                  content: (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      <DetailSection title="Contact Details">
-                        <DetailRow label="Contact Person" value={broker?.contactPerson} />
-                        <DetailRow label="Email" value={broker?.email} />
-                        <DetailRow label="Phone" value={broker?.phone} />
-                      </DetailSection>
-                      <DetailSection title="Location">
-                        <DetailRow label="Address" value={broker?.address} />
-                        <DetailRow label="City" value={broker?.city} />
-                        <DetailRow label="State" value={broker?.state} />
-                        <DetailRow label="ZIP" value={broker?.zipCode} />
-                      </DetailSection>
-                      <DetailSection title="Credentials">
-                        <DetailRow label="MC Number" value={broker?.mcNumber} />
-                        <DetailRow label="DOT Number" value={broker?.dotNumber} />
-                        <DetailRow label="Payment Terms" value={TERMS_LABEL[broker?.paymentTerms] ?? broker?.paymentTerms} />
-                        <DetailRow label="Credit Limit" value={fmt(broker?.creditLimit)} />
-                      </DetailSection>
-                      <DetailSection title="Record">
-                        <DetailRow label="Status" value={broker?.status} />
-                        <DetailRow label="Created" value={fmtDate(broker?.createdAt)} />
-                        <DetailRow label="Updated" value={fmtDate(broker?.updatedAt)} />
-                      </DetailSection>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <NeuBadge className="px-3 py-2 text-sm font-semibold">Credit limit&nbsp; {formatMoney(broker.creditLimit)}</NeuBadge>
+                    <NeuButton disabled={loadingEdit} data-testid="broker-profile-edit" onClick={openEditBroker} className="min-h-10 px-3 text-xs">
+                      <Edit2 className="h-4 w-4" />{loadingEdit ? "Loading…" : "Edit Broker"}
+                    </NeuButton>
+                    {isAdmin && broker.status === "active" && (
+                      <NeuButton disabled={statusMutation.isPending} onClick={() => setStatusDialog(true)} className="min-h-10 px-3 text-xs text-[#a34e48]">
+                        <Ban className="h-4 w-4" />Suspend
+                      </NeuButton>
+                    )}
+                    {isAdmin && broker.status !== "active" && (
+                      <NeuButton variant="accent" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("active")} className="min-h-10 px-3 text-xs">
+                        <CheckCircle2 className="h-4 w-4" />Activate
+                      </NeuButton>
+                    )}
+                    <div className="rounded-xl bg-[#e0e0e0] px-3 py-2 shadow-[inset_3px_3px_7px_#b8b8b8,inset_-3px_-3px_7px_#ffffff]">
+                      <span className="block text-[9px] font-bold uppercase tracking-wide text-[#758587]">Assigned processor</span>
+                      <ProcessorAssignment record={broker} endpoint={`/api/brokers/${brokerId}/assign`} queryKey={["/api/brokers", brokerId]} compact />
                     </div>
-                  ),
-                },
-                {
-                  value: "invoices",
-                  label: "Invoices",
-                  icon: <ReceiptText className="h-3.5 w-3.5" />,
-                  count: brokerInvoices.length,
-                  content: !brokerInvoices.length ? (
-                    <EmptyTab icon={<ReceiptText className="h-7 w-7" />} label="No invoices linked to this broker" />
-                  ) : (
-                    <div className="space-y-2">
-                      {brokerInvoices.map((inv: any) => (
-                        <a key={inv.id} href={`/invoices/${inv.id}`}
-                          className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition-colors hover:border-blue-200 hover:bg-blue-50/30 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-blue-900/40">
-                          <div className="flex items-center gap-3">
-                            <ReceiptText className="h-4 w-4 shrink-0 text-blue-500" />
-                            <div>
-                              <p className="text-sm font-semibold text-slate-800 dark:text-white">{inv.invoiceNumber}</p>
-                              <p className="text-xs text-slate-400">{fmtDate(inv.invoiceDate ?? inv.createdAt)}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(inv.amount)}</span>
-                            <InvBadge status={inv.status} />
-                          </div>
-                        </a>
-                      ))}
+                  </div>
+                  {creditUtilPct >= 90 && (
+                    <div className="flex w-full items-center gap-2 rounded-xl bg-[#f3dfdd] px-4 py-3 text-sm font-semibold text-[#9b4943]">
+                      <AlertTriangle className="h-4 w-4" />Credit utilisation is {creditUtilPct}% — approaching or exceeding the limit.
                     </div>
-                  ),
-                },
-                {
-                  value: "branches",
-                  label: "Branches",
-                  icon: <MapPin className="h-3.5 w-3.5" />,
-                  count: branches.length,
-                  content: (
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-800 dark:text-white">Broker Branches</h3>
-                          <p className="text-xs text-slate-500">Manage branch contacts and operating locations.</p>
-                        </div>
-                        {isAdmin && (
-                          <Button size="sm" onClick={() => openBranchDialog()} className="gap-2 rounded-xl bg-violet-600 text-xs text-white hover:bg-violet-700">
-                            <Plus className="h-3.5 w-3.5" /> Add Branch
-                          </Button>
-                        )}
-                      </div>
-                      {branchesLoading ? (
-                        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Loading branches...</div>
-                      ) : branchesError ? (
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Unable to load branches. Please try again.</div>
-                      ) : !branches.length ? (
-                        <EmptyTab icon={<MapPin className="h-7 w-7" />} label="No branches on file" />
-                      ) : (
-                        <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
-                          <div className="min-w-[760px]">
-                            <div className="grid grid-cols-[1.3fr_1fr_0.7fr_1fr_1fr_0.7fr_auto] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900/60">
-                              <span>Branch Name</span><span>City</span><span>State</span><span>Phone</span><span>Contact</span><span>Status</span><span />
-                            </div>
-                            {branches.map((branch: any) => (
-                              <div key={branch.id} className="grid grid-cols-[1.3fr_1fr_0.7fr_1fr_1fr_0.7fr_auto] items-center gap-3 border-t border-slate-100 px-4 py-3 text-sm dark:border-slate-800">
-                                <span className="font-semibold text-slate-800 dark:text-white">{branch.branchName}</span>
-                                <span className="text-slate-600 dark:text-slate-300">{branch.city || "—"}</span>
-                                <span className="text-slate-600 dark:text-slate-300">{branch.state || "—"}</span>
-                                <span className="text-slate-600 dark:text-slate-300">{branch.phone || "—"}</span>
-                                <span className="text-slate-600 dark:text-slate-300">{branch.contactName || "—"}</span>
-                                <Badge className={cn("w-fit capitalize", branch.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>{branch.status}</Badge>
-                                {isAdmin ? (
-                                  <div className="flex items-center gap-1">
-                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openBranchDialog(branch)}><Edit2 className="h-3.5 w-3.5" /></Button>
-                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-[11px]" disabled={toggleBranchMutation.isPending} onClick={() => toggleBranchMutation.mutate({ branchId: branch.id, status: branch.status === "active" ? "inactive" : "active" })}>{branch.status === "active" ? "Deactivate" : "Activate"}</Button>
-                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-red-600" disabled={deleteBranchMutation.isPending} onClick={() => { if (window.confirm(`Remove ${branch.branchName}?`)) deleteBranchMutation.mutate(branch.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
-                                  </div>
-                                ) : <span />}
+                  )}
+                </NeuCard>
+
+                <BrokerFinancialOverview brokerId={brokerId} />
+
+                <NeuTabs value={profileTab} onValueChange={setProfileTab} className="space-y-4">
+                  <NeuTabList className="w-full">
+                    <NeuTab value="overview"><Building2 className="mr-2 inline h-4 w-4" />Overview</NeuTab>
+                    <NeuTab value="invoices"><ReceiptText className="mr-2 inline h-4 w-4" />Invoices <span className="ml-2 text-xs">{brokerInvoices.length}</span></NeuTab>
+                    <NeuTab value="branches"><MapPin className="mr-2 inline h-4 w-4" />Branches <span className="ml-2 text-xs">{branches.length}</span></NeuTab>
+                    <NeuTab value="notes"><MessageSquare className="mr-2 inline h-4 w-4" />Notes</NeuTab>
+                    <NeuTab value="credit"><Award className="mr-2 inline h-4 w-4" />Credit score</NeuTab>
+                    <NeuTab value="timeline"><Clock className="mr-2 inline h-4 w-4" />Timeline</NeuTab>
+                  </NeuTabList>
+
+                  <NeuTabPanel value="overview" unmountInactive className="mt-0 p-4 md:p-5">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {[
+                        { title: "Contact", rows: [["Contact person", broker.contactPerson], ["Email", broker.email], ["Phone", broker.phone]] },
+                        { title: "Location", rows: [["Address", broker.address], ["City", broker.city], ["State / ZIP", [broker.state, broker.zipCode].filter(Boolean).join(" ")]] },
+                        { title: "Broker credentials", rows: [["MC number", broker.mcNumber], ["DOT number", broker.dotNumber], ["Payment terms", terms]] },
+                        { title: "Credit exposure", rows: [["Credit limit", formatMoney(broker.creditLimit)], ["Current volume", formatMoney(exposure)], ["Open invoices", openCount]] },
+                        { title: "Record", rows: [["Status", broker.status], ["Created", formatDate(broker.createdAt)], ["Updated", formatDate(broker.updatedAt)]] },
+                      ].map(section => (
+                        <NeuCard key={section.title} className="p-4">
+                          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#758587]">{section.title}</h3>
+                          <dl className="divide-y divide-[#c9c9c9]">
+                            {section.rows.map(([label, value]) => (
+                              <div key={label} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+                                <dt className="text-[#758587]">{label}</dt>
+                                <dd className="text-right font-semibold text-[#354548]">{value || "—"}</dd>
                               </div>
                             ))}
-                          </div>
+                          </dl>
+                        </NeuCard>
+                      ))}
+                      <NeuCard className="p-4">
+                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#758587]">Credit limit utilisation</p>
+                        <div className="h-2 overflow-hidden rounded-full bg-[#d2d2d2] shadow-[inset_2px_2px_4px_#b9b9b9,inset_-2px_-2px_4px_#f5f5f5]">
+                          <div className={`h-full rounded-full ${creditUtilPct >= 90 ? "bg-[#bd665e]" : "bg-[#27aab8]"}`} style={{ width: `${creditUtilPct}%` }} />
                         </div>
-                      )}
+                        <p className="mt-2 text-sm font-semibold">{creditUtilPct}% of {formatMoney(broker.creditLimit)}</p>
+                      </NeuCard>
                     </div>
-                  ),
-                },
-                {
-                  value: "notes",
-                  label: "Notes",
-                  icon: <MessageSquare className="h-3.5 w-3.5" />,
-                  content: (
-                    <div className="space-y-4">
-                      {broker?.notes && (
-                        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Current Notes</p>
-                          <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap">{broker.notes}</p>
-                        </div>
-                      )}
-                      {isAdmin && (
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                            {broker?.notes ? "Update Notes" : "Add Notes"}
-                          </p>
-                          <textarea
-                            value={noteText}
-                            onChange={e => setNoteText(e.target.value)}
-                            placeholder="Add internal notes about this broker..."
-                            rows={4}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                          />
-                          <Button size="sm"
-                            disabled={notesMutation.isPending || !noteText.trim()}
-                            onClick={() => notesMutation.mutate(noteText)}
-                            className="gap-2 rounded-xl bg-violet-600 text-xs text-white hover:bg-violet-700">
-                            <Send className="h-3.5 w-3.5" />
-                            {notesMutation.isPending ? "Saving..." : "Save Notes"}
-                          </Button>
-                        </div>
-                      )}
-                      {!broker?.notes && !isAdmin && (
-                        <EmptyTab icon={<MessageSquare className="h-7 w-7" />} label="No notes for this broker" />
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  value: "timeline",
-                  label: "Timeline",
-                  icon: <Clock className="h-3.5 w-3.5" />,
-                  content: <DumpStatementTimeline brokerId={brokerId} />,
-                },
-              ]}
-            />
-          </div>
-        </main>
-      </div>
+                  </NeuTabPanel>
 
-      {/* Status change confirm dialog */}
-      {editingBroker?.id === brokerId && (
-        <BrokerEditDialog broker={editingBroker} onClose={() => setEditingBroker(null)} />
-      )}
+                  <NeuTabPanel value="invoices" unmountInactive className="mt-0 p-4 md:p-5">
+                    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#758587]">Linked records</p>
+                        <h2 className="mt-1 text-lg font-semibold">Invoices</h2>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <NeuBadge tone="accent">{brokerInvoices.length} records</NeuBadge>
+                      </div>
+                    </div>
+                    {brokerInvoices.length ? (
+                      <NeuTable className="min-w-[680px]">
+                        <NeuTableHeader><tr>{["Invoice", "Date", "Amount", "Status"].map(label => <NeuTableHead key={label}>{label}</NeuTableHead>)}</tr></NeuTableHeader>
+                        <NeuTableBody>
+                          {brokerInvoices.map((invoice: any) => (
+                            <NeuTableRow key={invoice.id} className="border-t border-[#c9c9c9]">
+                              <NeuTableCell><a className="font-semibold text-[#168d98] hover:underline" href={`/invoices/${invoice.id}`}>{invoice.invoiceNumber || `Invoice ${invoice.id}`}</a></NeuTableCell>
+                              <NeuTableCell>{formatDate(invoice.invoiceDate ?? invoice.createdAt)}</NeuTableCell>
+                              <NeuTableCell className="font-semibold">{formatMoney(invoice.amount)}</NeuTableCell>
+                              <NeuTableCell><NeuBadge tone={invoice.status === "funded" || invoice.status === "settled" ? "success" : invoice.status === "rejected" ? "warning" : "neutral"}>{String(invoice.status || "unknown").replace(/_/g, " ")}</NeuBadge></NeuTableCell>
+                            </NeuTableRow>
+                          ))}
+                        </NeuTableBody>
+                      </NeuTable>
+                    ) : (
+                      <NeuCard className="p-10 text-center">
+                        <ReceiptText className="mx-auto mb-2 h-7 w-7 text-[#849395]" />
+                        <p className="font-semibold">No invoices linked to this broker</p>
+                        <p className="mt-1 text-sm text-[#758587]">Invoices associated with this broker will appear here.</p>
+                      </NeuCard>
+                    )}
+                  </NeuTabPanel>
+
+                  <NeuTabPanel value="branches" unmountInactive className="mt-0 p-4 md:p-5">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#758587]">Operating locations</p><h2 className="mt-1 text-lg font-semibold">Broker branches</h2></div>
+                      {isAdmin && <NeuButton variant="accent" onClick={() => openBranchDialog()} className="min-h-10 px-3 text-xs"><Plus className="h-4 w-4" />Add branch</NeuButton>}
+                    </div>
+                    {branchesLoading ? (
+                      <div className="space-y-3">{[1, 2, 3].map(row => <div key={row} className="h-16 animate-pulse rounded-xl bg-[#d1d1d1]" />)}</div>
+                    ) : branchesError ? (
+                      <NeuCard className="p-6 text-center"><p className="font-semibold">Unable to load branches</p><NeuButton className="mt-3" onClick={() => refetchBranches()}>Retry</NeuButton></NeuCard>
+                    ) : branches.length ? (
+                      <NeuTable className="min-w-[1050px]">
+                        <NeuTableHeader><tr>{["Branch", "Address", "City", "State", "ZIP", "Phone", "Email", "Contact", "Status", "Actions"].map(label => <NeuTableHead key={label}>{label}</NeuTableHead>)}</tr></NeuTableHeader>
+                        <NeuTableBody>
+                          {branches.map((branch: any) => (
+                            <NeuTableRow key={branch.id} className="border-t border-[#c9c9c9]">
+                              <NeuTableCell className="font-semibold">{branch.branchName}</NeuTableCell>
+                              <NeuTableCell>{branch.address || "—"}</NeuTableCell>
+                              <NeuTableCell>{branch.city || "—"}</NeuTableCell>
+                              <NeuTableCell>{branch.state || "—"}</NeuTableCell>
+                              <NeuTableCell>{branch.zip || "—"}</NeuTableCell>
+                              <NeuTableCell>{branch.phone || "—"}</NeuTableCell>
+                              <NeuTableCell>{branch.email || "—"}</NeuTableCell>
+                              <NeuTableCell>{branch.contactName || "—"}</NeuTableCell>
+                              <NeuTableCell><NeuBadge tone={branch.status === "active" ? "success" : "neutral"}>{branch.status}</NeuBadge></NeuTableCell>
+                              <NeuTableCell>{isAdmin ? (
+                                <div className="flex flex-wrap gap-1">
+                                  <NeuButton aria-label={`Edit ${branch.branchName}`} onClick={() => openBranchDialog(branch)} className="h-9 min-h-9 w-9 rounded-lg p-0"><Edit2 className="h-4 w-4" /></NeuButton>
+                                  <NeuButton disabled={toggleBranchMutation.isPending} onClick={() => toggleBranchMutation.mutate({ branchId: branch.id, status: branch.status === "active" ? "inactive" : "active" })} className="h-9 min-h-9 px-2 text-[10px]">{branch.status === "active" ? "Deactivate" : "Activate"}</NeuButton>
+                                  <NeuButton disabled={deleteBranchMutation.isPending} aria-label={`Remove ${branch.branchName}`} onClick={() => { if (window.confirm(`Remove ${branch.branchName}?`)) deleteBranchMutation.mutate(branch.id); }} className="h-9 min-h-9 w-9 rounded-lg p-0 text-[#a34e48]"><Trash2 className="h-4 w-4" /></NeuButton>
+                                </div>
+                              ) : "—"}</NeuTableCell>
+                            </NeuTableRow>
+                          ))}
+                        </NeuTableBody>
+                      </NeuTable>
+                    ) : (
+                      <NeuCard className="p-10 text-center"><MapPin className="mx-auto mb-2 h-7 w-7 text-[#849395]" /><p className="font-semibold">No branches on file</p><p className="mt-1 text-sm text-[#758587]">Branch contacts and operating locations will appear here.</p></NeuCard>
+                    )}
+                  </NeuTabPanel>
+
+                  <NeuTabPanel value="notes" unmountInactive className="mt-0 p-4 md:p-5">
+                    <div className="mb-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#758587]">Internal record</p><h2 className="mt-1 text-lg font-semibold">Broker notes</h2></div>
+                    {broker.notes ? (
+                      <NeuCard className="mb-5 whitespace-pre-wrap p-4 text-sm leading-6">{broker.notes}</NeuCard>
+                    ) : (
+                      <NeuCard className="mb-5 p-5 text-sm text-[#758587]">No notes have been recorded for this broker.</NeuCard>
+                    )}
+                    {isAdmin ? (
+                      <form className="space-y-3" onSubmit={event => { event.preventDefault(); if (noteText.trim()) notesMutation.mutate(noteText); }}>
+                        <label htmlFor="broker-note-input" className="text-sm font-semibold">{broker.notes ? "Replace notes" : "Add notes"}</label>
+                        <textarea id="broker-note-input" value={noteText} onChange={event => setNoteText(event.target.value)} placeholder="Add internal notes about this broker..." rows={4} className="w-full rounded-xl border-0 bg-[#e0e0e0] px-4 py-3 text-sm text-[#354548] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]" />
+                        <NeuButton type="submit" variant="accent" disabled={notesMutation.isPending || !noteText.trim()} className="min-h-10 px-4 text-xs"><Send className="h-4 w-4" />{notesMutation.isPending ? "Saving…" : "Save notes"}</NeuButton>
+                      </form>
+                    ) : <p className="text-xs text-[#758587]">Only managers and administrators can update broker notes.</p>}
+                  </NeuTabPanel>
+
+                  <NeuTabPanel value="credit" unmountInactive className="mt-0 p-4 md:p-5"><CreditScorePanel brokerId={brokerId} canRecalculate={isAdmin} /></NeuTabPanel>
+                  <NeuTabPanel value="timeline" unmountInactive className="mt-0 p-4 md:p-5"><DumpStatementTimeline brokerId={brokerId} neuStyle /></NeuTabPanel>
+                </NeuTabs>
+              </>
+            )}
+          </div>
+        </NeuPageShell>
+      </div>
+      {editingBroker?.id === brokerId && <BrokerEditDialog broker={editingBroker} onClose={() => setEditingBroker(null)} />}
       <Dialog open={statusDialog} onOpenChange={setStatusDialog}>
-        <DialogContent className="max-w-sm rounded-3xl border-slate-200 dark:border-slate-800">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Ban className="h-5 w-5 text-red-500" />
-              Suspend Broker
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Suspending this broker will flag all linked invoices. Are you sure?
-          </p>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" className="rounded-xl text-xs" onClick={() => setStatusDialog(false)}>Cancel</Button>
-            <Button size="sm" className="rounded-xl bg-red-600 text-xs text-white hover:bg-red-700"
-              disabled={statusMutation.isPending}
-              onClick={() => statusMutation.mutate(newStatus)}>
-              {statusMutation.isPending ? "Suspending..." : "Confirm Suspend"}
-            </Button>
+        <DialogContent className="rounded-2xl border-0 bg-[#e0e0e0] text-[#354548] shadow-[-10px_-10px_24px_#ffffff,10px_10px_24px_#b8b8b8]">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Ban className="h-5 w-5 text-[#a34e48]" />Suspend broker</DialogTitle></DialogHeader>
+          <DialogDescription className="text-[#667477]">Suspending this broker will flag all linked invoices. Are you sure?</DialogDescription>
+          <DialogFooter>
+            <NeuButton onClick={() => setStatusDialog(false)}>Cancel</NeuButton>
+            <NeuButton variant="accent" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("suspended")}>{statusMutation.isPending ? "Suspending…" : "Confirm suspend"}</NeuButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <Dialog open={branchDialog} onOpenChange={setBranchDialog}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-3xl border-slate-200 dark:border-slate-800">
-          <DialogHeader>
-            <DialogTitle>{editingBranchId ? "Edit Branch" : "Add Branch"}</DialogTitle>
-            <DialogDescription>Store the branch contact and location used for broker invoices.</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-2xl border-0 bg-[#e0e0e0] text-[#354548] shadow-[-10px_-10px_24px_#ffffff,10px_10px_24px_#b8b8b8]">
+          <DialogHeader><DialogTitle>{editingBranchId ? "Edit branch" : "Add branch"}</DialogTitle><DialogDescription>Store the branch contact and location used for broker invoices.</DialogDescription></DialogHeader>
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={event => { event.preventDefault(); if (branchForm.branchName.trim()) branchMutation.mutate(); }}>
             {([
-              ["branchName", "Branch Name", true], ["address", "Address", false],
-              ["city", "City", false], ["state", "State", false], ["zip", "ZIP", false],
-              ["phone", "Phone", false], ["email", "Email", false], ["contactName", "Contact Name", false],
+              ["branchName", "Branch name", true],
+              ["address", "Address", false],
+              ["city", "City", false],
+              ["state", "State", false],
+              ["zip", "ZIP", false],
+              ["phone", "Phone", false],
+              ["email", "Email", false],
+              ["contactName", "Contact name", false],
             ] as const).map(([key, label, required]) => (
-              <div key={key} className={key === "address" ? "space-y-1.5 sm:col-span-2" : "space-y-1.5"}>
-                <label className="text-sm font-medium">{label}{required && <span className="text-red-500"> *</span>}</label>
-                <Input required={required} type={key === "email" ? "email" : "text"} value={branchForm[key]} onChange={event => setBranchForm(form => ({ ...form, [key]: event.target.value }))} />
-              </div>
+              <label key={key} className={`space-y-1.5 text-xs font-semibold text-[#647275] ${key === "address" ? "sm:col-span-2" : ""}`} htmlFor={`branch-${key}`}>
+                {label}{required ? " *" : ""}
+                <NeuInput id={`branch-${key}`} required={required} type={key === "email" ? "email" : "text"} value={branchForm[key]} onChange={event => setBranchForm(form => ({ ...form, [key]: event.target.value }))} className="min-h-10 text-sm" />
+              </label>
             ))}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Status</label>
-              <Select value={branchForm.status} onValueChange={status => setBranchForm(form => ({ ...form, status: status as "active" | "inactive" }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
-              </Select>
-            </div>
+            <label className="space-y-1.5 text-xs font-semibold text-[#647275]">
+              Status
+              <NeuSelect value={branchForm.status} onChange={event => setBranchForm(form => ({ ...form, status: event.target.value as "active" | "inactive" }))} className="min-h-10">
+                <option value="active">Active</option><option value="inactive">Inactive</option>
+              </NeuSelect>
+            </label>
             <DialogFooter className="sm:col-span-2">
-              <Button type="button" variant="outline" onClick={() => setBranchDialog(false)}>Cancel</Button>
-              <Button type="submit" disabled={branchMutation.isPending || !branchForm.branchName.trim()} className="bg-violet-600 text-white hover:bg-violet-700">
-                {branchMutation.isPending ? "Saving..." : editingBranchId ? "Save Changes" : "Add Branch"}
-              </Button>
+              <NeuButton type="button" onClick={() => setBranchDialog(false)}>Cancel</NeuButton>
+              <NeuButton type="submit" variant="accent" disabled={branchMutation.isPending || !branchForm.branchName.trim()}>
+                {branchMutation.isPending ? "Saving…" : editingBranchId ? "Save changes" : "Add branch"}
+              </NeuButton>
             </DialogFooter>
           </form>
         </DialogContent>
