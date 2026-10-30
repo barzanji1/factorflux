@@ -23,6 +23,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, string> = {
   "/audit-log": "logs",
   "/collections": "followups",
   "/follow-up": "followups",
+  "/followups": "followups",
   "/reports": "reports",
   "/admin": "admin",
   "/payroll": "payroll",

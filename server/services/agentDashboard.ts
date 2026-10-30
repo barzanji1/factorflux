@@ -2,10 +2,11 @@ import { db } from "../db";
 import type { DashboardViewer, DashboardSection } from "../../shared/agent-dashboard";
 import { readDashboardQueue, readDashboardFollowUps, readDashboardActivity, readDashboardAlerts, DASHBOARD_LIMIT } from "./agentDashboardQueries";
 import { readDashboardFinancial } from "./dashboardFinancial";
+import { readDashboardActivityPage } from "./dashboardActivity";
 export type { DashboardViewer } from "../../shared/agent-dashboard";
 export { invoiceWork, unacknowledgedCodes, fmcsaAuthorityHealth } from "./agentDashboardWork";
 export const dashboardReaders = {
-  queue: readDashboardQueue, followups: readDashboardFollowUps, activity: readDashboardActivity, alerts: readDashboardAlerts,
+  queue: readDashboardQueue, followups: readDashboardFollowUps, activity: readDashboardActivityPage, alerts: readDashboardAlerts,
   financial: readDashboardFinancial,
 };
 /** Compatibility endpoint: parallel sections with explicit, isolated failures.

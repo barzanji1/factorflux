@@ -86,6 +86,10 @@ export default function Invoices() {
     return () => window.clearTimeout(timeout);
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (new URLSearchParams(routeSearch).get("create") === "1") setIsCreateInvoiceOpen(true);
+  }, [routeSearch]);
+
   const { data: invoicesResponse, isLoading: invoicesLoading, isError: invoicesError } = useQuery<InvoicesResponse>({
     queryKey: ["/api/invoices", page, debouncedSearchQuery, loadTypeFilter, statusFilter],
     queryFn: async () => {

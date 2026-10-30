@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, type KeyboardEvent, type Ref } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { Button } from "@/components/ui/button";
@@ -202,6 +202,7 @@ function MessageBubble({
 export default function AIAssistant() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const routeSearch = useSearch();
   const { permissions, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -211,6 +212,11 @@ export default function AIAssistant() {
   const latestStructuredCardRef = useRef<HTMLElement>(null);
   const latestAssistantMessageRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const draft = new URLSearchParams(routeSearch).get("draft");
+    if (draft) setInput(draft);
+  }, [routeSearch]);
 
   useEffect(() => {
     if (permissions.length > 0 && !permissions.includes("earl")) {

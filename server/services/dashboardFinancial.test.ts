@@ -16,9 +16,21 @@ test("financial summary uses one bounded aggregate query with server-owned staff
       assert(compiled.params.includes("isolated-agent"));
       assert.match(compiled.sql, /interval '5 months'/);
       assert.match(compiled.sql, /payment_date/);
-      assert.doesNotMatch(compiled.sql, /sum\([^)]*variance/);
+      const collectedSql = compiled.sql.split("), collected AS (")[1]?.split("), open_followups AS (")[0];
+      assert.ok(collectedSql, "cash collection aggregation must remain separate from write-offs");
+      assert.match(collectedSql, /sum\(applied_amount\)/);
+      assert.doesNotMatch(collectedSql, /variance/);
       assert.match(compiled.sql, /interval '60 days'/);
-      return { rows: [{ kpis: { readyToFund: 5, inReview: 2, openFollowups: 1, aging60Plus: 0, fundedThisWeek: 3, pendingActions: 2 }, months: [] }] };
+      assert.match(compiled.sql, /LIMIT 3/);
+      assert.match(compiled.sql, /variance_type='write_off'/);
+      assert.match(compiled.sql, /count\(DISTINCT broker_id\)/);
+      assert.match(compiled.sql, /chargeback_status='charged' AND outstanding>0/);
+      assert.match(compiled.sql, /due_date<date_trunc\('day',clock.at\)/);
+      assert.match(compiled.sql, /due_date>=date_trunc\('day',clock.at\)/);
+      return { rows: [{ kpis: { readyToFund: 5, inReview: 2, openFollowups: 1, aging60Plus: 0, fundedThisWeek: 3, pendingActions: 2 }, months: [],
+        actionGrid: { docsPending: 2, recentInvoices: [], readyToFundCount: 1, readyToFundAmount: 5,
+          openFollowups: 1, overdueFollowups: 1, dueTodayFollowups: 0, openChargebacks: 0,
+          chargebackAmount: 0, oldestChargebackDays: null, aging60Count: 0, aging60Amount: 0, brokerCount: 0 } }] };
     },
   } as unknown as typeof db;
   const viewer = { id: "isolated-agent", role: "employee" as const };
@@ -26,6 +38,9 @@ test("financial summary uses one bounded aggregate query with server-owned staff
   assert.equal(queries, 1);
   assert.deepEqual(result.viewer, viewer);
   assert.equal(result.kpis.readyToFund, 5);
+  assert.equal(result.actionGrid.docsPending, 2);
+  assert.equal(result.actionGrid.readyToFundAmount, 5);
+  assert.equal(result.actionGrid.overdueFollowups, 1);
   assert.equal(result.generatedAt, "2026-10-29T12:00:00.000Z");
 });
 

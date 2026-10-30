@@ -146,6 +146,11 @@ function Router() {
           <FollowUp />
         </ProtectedRoute>
       </Route>
+      <Route path="/followups">
+        <ProtectedRoute>
+          <FollowUp />
+        </ProtectedRoute>
+      </Route>
       <Route path="/collections">
         <ProtectedRoute>
           <Collections />

@@ -509,7 +509,7 @@ export default function TopNav({ title, subtitle, group, neu = false }: TopNavPr
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                 {neu ? <NeuButton variant="accent" className="h-11 rounded-xl px-4 shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8]">
+                 {neu ? <NeuButton className="ff-neu-new-button h-11 rounded-xl px-4">
                    <Plus className="mr-2 h-4 w-4" />New<ChevronDown className="ml-2 h-4 w-4" />
                  </NeuButton> : <Button className="h-11 rounded-sm border-2 border-[#fff] bg-[#27aab8] px-4 text-white shadow-[2px_2px_0_#404040] hover:bg-[#098b9f]">
                   <Plus className="mr-2 h-4 w-4" />
@@ -536,7 +536,7 @@ export default function TopNav({ title, subtitle, group, neu = false }: TopNavPr
                     aria-expanded={notificationMenuOpen}
                     className="relative h-10 w-10 rounded-xl p-0 text-[#53605b] shadow-[4px_4px_9px_#c1c5c2,-4px_-4px_9px_#fff]">
                     <Bell className="h-5 w-5 text-[#53605b]" />
-                    {unreadCount > 0 && <Badge variant="destructive" aria-label={`${unreadCount} unread notifications`} className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">{unreadCount > 99 ? "99+" : unreadCount}</Badge>}
+                     {unreadCount > 0 && <span role="status" aria-label={`${unreadCount} unread notifications`} className="ff-neu-notification-count absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">{unreadCount > 99 ? "99+" : unreadCount}</span>}
                   </NeuButton> : <Button variant="ghost" size="sm"
                     aria-label="Notifications"
                     aria-haspopup="menu"
@@ -662,7 +662,7 @@ export default function TopNav({ title, subtitle, group, neu = false }: TopNavPr
               <DropdownMenuTrigger asChild>
                 {neu ? <NeuButton
                   className="h-10 rounded-xl px-2 pr-3 text-[#53605b] shadow-[4px_4px_9px_#c1c5c2,-4px_-4px_9px_#fff]">
-                  <div className="mr-2 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#27aab8] text-[10px] font-bold text-white shadow-[2px_2px_5px_#b8bcba,-2px_-2px_5px_#fff]">
+                  <div className="ff-neu-profile-avatar mr-2 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#27aab8] text-[10px] font-bold text-white">
                     {avatarSrc ? <img src={avatarSrc} alt="User Profile" className="h-full w-full object-cover" /> : initials}
                   </div>
                   <div className="hidden text-left md:block">

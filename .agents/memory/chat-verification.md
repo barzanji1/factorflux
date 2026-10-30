@@ -15,8 +15,8 @@ Use real pointer event sequences for pointer-driven browser controls rather than
 
 **How to apply:** For menu-trigger verification, send browser mouse/pointer press and release events. Test message clicks directly as well as their explicit Reply buttons.
 
-Browser interaction checks must assert that the intended input has focus before replacement typing, and verify its resulting value rather than treating dispatched events as proof of input.
+Browser interaction checks must assert that the document and intended input have focus before keyboard input, and verify the resulting value or action rather than treating dispatched events as proof.
 
-**Why:** Dialog transitions and viewport changes can redirect a pointer/keyboard sequence to the page instead of the intended input, producing misleading test results without an application error.
+**Why:** Dialog transitions and viewport changes can redirect a pointer/keyboard sequence away from the intended input. A focused element in an inactive document, or key events without native default activation, can also falsely suggest a broken control.
 
-**How to apply:** Wait for dismissed dialogs to release pointer capture and confirm input focus/value when testing composer edits, retries, and mobile layouts.
+**How to apply:** Wait for dismissed dialogs to release pointer capture and confirm document focus, input focus/value, and native activation when testing controls. For hidden/inert panels, make the destination interactive before moving focus into it; focusing an inert descendant fails silently.

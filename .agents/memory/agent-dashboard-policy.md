@@ -3,11 +3,11 @@ name: Agent Dashboard policy
 description: Default work-queue landing page, no project-management UI, and dashboard-specific manager visibility.
 ---
 
-The Agent Dashboard is the default staff landing page and a work queue, not a project-management tool. No boards, kanban cards, task drag-and-drop, or sprints. Neumorphic section/KPI cards and a draggable KPI carousel are explicitly approved.
+The Agent Dashboard is the default staff landing page, not a project-management tool. No boards, kanban cards, task drag-and-drop, or sprints. Neumorphic section/KPI cards, the KPI carousel, and floating 3D action cards are explicitly approved.
 
 **Why:** The user explicitly required agents to see what needs action and click through to existing operational pages.
 
-**How to apply:** Keep the four ordered work sections: My Queue, My Follow-ups, Team Activity, and system-wide Alerts. Reuse existing operational sources; the user approved actual source equivalents without adding tables or a task system.
+**How to apply:** The user replaced the Operational Queue/My Queue table with six action cards (Create Invoice, Fund Queue, Follow-ups, Chargebacks, Reports, Ask Earl). Keep the financial charts and remaining sections below the grid. Reuse existing operational sources, without adding tables or a task system.
 
 Agents see their own invoice queues; managers see all agents' queues side by side. Team Activity and system alerts are staff-wide.
 
@@ -26,3 +26,15 @@ Do not surface FMCSA run summaries or unverified/new-client onboarding state on 
 **Why:** The user clarified that imported new_client carriers are onboarding state, not agent alerts.
 
 **How to apply:** Keep onboarding data/status and MC Check functionality intact outside this dashboard; retain actionable email/OCR failures and invoice preflight work.
+
+Do not reuse a normal-query cache key when changing a section to an infinite/paginated query.
+
+**Why:** Retained normal-query data has no pages/pageParams; reusing its key caused a dashboard exception during the activity-feed migration before any request ran.
+
+**How to apply:** Give structurally different response/query modes distinct keys while retaining the staff identity scope and common invalidation prefix.
+
+Verify 3D-card navigation with real pointer hit-testing after the animation, not only DOM clicks or keyboard activation.
+
+**Why:** Coplanar front/back faces with near-zero cursor tilt could render the back correctly and focus Go while the browser hit the container instead of the button.
+
+**How to apply:** Keep the visible face's click targets stable, exclude hidden faces from interaction, and check the actual hit element before declaring a flip-card link functional.

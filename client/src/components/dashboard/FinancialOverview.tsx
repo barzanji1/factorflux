@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -13,26 +13,16 @@ import {
 import { ArrowRight, CircleDollarSign, ClipboardCheck, Clock3, RotateCcw, TrendingUp, WalletCards } from "lucide-react";
 import { NeuBadge, NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
 import { KpiCarousel } from "./KpiCarousel";
+import type { DashboardFinancial } from "@shared/agent-dashboard";
 
-export type FinancialDashboardData = {
-  generatedAt: string;
-  viewer: { id: string; role: string };
-  kpis: {
-    readyToFund: number;
-    inReview: number;
-    openFollowups: number;
-    aging60Plus: number;
-    fundedThisWeek: number;
-    pendingActions: number;
-  };
-  months: Array<{ month: string; invoiced: number; collected: number }>;
-};
+export type FinancialDashboardData = DashboardFinancial;
 
 type Props = {
   data?: FinancialDashboardData;
   isLoading: boolean;
   error?: unknown;
   onRetry: () => void;
+  children?: ReactNode;
 };
 
 type WorkShortcutsProps = {
@@ -196,7 +186,7 @@ function MetricSkeleton() {
   return <div className="ff-neu-metric-skeleton" aria-hidden="true"><span /><span /><span /></div>;
 }
 
-export function FinancialSummary({ data, isLoading, error, onRetry }: Props) {
+export function FinancialSummary({ data, isLoading, error, onRetry, children }: Props) {
   const metricCards = data ? metrics.map(metric => {
     const Icon = metric.icon;
     const value = data.kpis[metric.key];
@@ -237,6 +227,7 @@ export function FinancialSummary({ data, isLoading, error, onRetry }: Props) {
           error ? <div className="ff-neu-financial-error" role="alert"><span>Financial summary could not be loaded.</span><NeuButton onClick={onRetry} className="!min-h-9 !px-3"><RotateCcw className="h-4 w-4" /> Retry</NeuButton></div> :
           data && metricCards ? <KpiCarousel items={metricCards} speedPixelsPerSecond={30} /> : null}
       </section>
+      {children}
       {isLoading && <FinancialChartsLoading />}
       {data && <FinancialCharts months={data.months} />}
       {error && !isLoading && <section className="mt-7" role="status"><p className="ff-neu-eyebrow">Financial Overview</p><p className="mt-2 text-sm text-[#8a6558]">Financial charts are unavailable until the summary can be loaded.</p></section>}
