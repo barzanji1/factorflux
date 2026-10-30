@@ -1,11 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, type ComponentProps } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge as BadgePrimitive } from "@/components/ui/badge";
+import { Button as ButtonPrimitive } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input as InputPrimitive } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +37,11 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  NeuTable, NeuTableBody, NeuTableCell, NeuTableHead,
+  NeuTableHeader, NeuTableRow, NeuBadge, NeuButton, NeuInput,
+  NeuTab, NeuTabList, NeuTabPanel, NeuTabs,
+} from "@/styles/neu";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,6 +88,29 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onReviewComplete?: (reviewStatus: string, invoiceId?: number | null) => void;
+  neuStyle?: boolean;
+}
+
+function ReviewAction({ neuStyle, ...props }: ComponentProps<typeof ButtonPrimitive> & { neuStyle?: boolean }) {
+  if (!neuStyle) return <ButtonPrimitive {...props} />;
+  const { variant, size, className, asChild: _asChild, ...buttonProps } = props;
+  return (
+    <NeuButton
+      {...buttonProps}
+      className={cn(
+        "min-h-9 px-3 py-1.5 text-xs",
+        size === "sm" && "min-h-7 px-2 py-1",
+        size === "icon" && "min-h-8 w-8 p-1",
+        variant === "ghost" && "bg-transparent shadow-none",
+        variant === "destructive" && "bg-[#b84b45] text-white shadow-none",
+        className,
+      )}
+    />
+  );
+}
+
+function ReviewInput({ neuStyle, ...props }: ComponentProps<typeof InputPrimitive> & { neuStyle?: boolean }) {
+  return neuStyle ? <NeuInput {...props} /> : <InputPrimitive {...props} />;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -172,11 +199,13 @@ function FieldRow({
   editedValues,
   onEdit,
   showSnippet,
+  neuStyle,
 }: {
   candidate: FieldCandidate;
   editedValues: Record<number, string>;
   onEdit: (id: number, value: string) => void;
   showSnippet: boolean;
+  neuStyle?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [localVal, setLocalVal] = useState("");
@@ -198,11 +227,11 @@ function FieldRow({
 
   return (
     <>
-      <tr className={cn(
+      <NeuTableRow className={cn(
         "border-b border-slate-50 dark:border-slate-800/60 group",
         isLow && "bg-amber-50/30 dark:bg-amber-950/10",
       )}>
-        <td className="px-3 py-2 min-w-[130px]">
+        <NeuTableCell className="min-w-[130px] px-3 py-2">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
               {FIELD_LABELS[candidate.fieldName] ?? candidate.fieldName.replace(/_/g, " ")}
@@ -214,23 +243,24 @@ function FieldRow({
               <span className="text-[10px] text-violet-500 font-medium">edited</span>
             )}
           </div>
-        </td>
-        <td className="px-3 py-2 w-full">
+        </NeuTableCell>
+        <NeuTableCell className="w-full px-3 py-2">
           {editing ? (
             <div className="flex items-center gap-1.5">
-              <Input
+              <ReviewInput
+                neuStyle={neuStyle}
                 autoFocus
                 value={localVal}
                 onChange={e => setLocalVal(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
                 className="h-6 rounded-md px-2 text-xs font-mono"
               />
-              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-emerald-600 hover:text-emerald-700" onClick={commitEdit}>
+              <ReviewAction neuStyle={neuStyle} size="sm" variant="ghost" className="h-6 w-6 p-0 text-emerald-600 hover:text-emerald-700" onClick={commitEdit}>
                 <Check className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600" onClick={cancelEdit}>
+              </ReviewAction>
+              <ReviewAction neuStyle={neuStyle} size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600" onClick={cancelEdit}>
                 <X className="h-3.5 w-3.5" />
-              </Button>
+              </ReviewAction>
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
@@ -249,19 +279,19 @@ function FieldRow({
               </button>
             </div>
           )}
-        </td>
-        <td className="px-3 py-2 text-right whitespace-nowrap">
+        </NeuTableCell>
+        <NeuTableCell className="whitespace-nowrap px-3 py-2 text-right">
           <ConfidenceBadge score={conf} />
-        </td>
-      </tr>
+        </NeuTableCell>
+      </NeuTableRow>
       {showSnippet && candidate.sourceSnippet && (
-        <tr className="border-b border-slate-50 dark:border-slate-800/60">
-          <td colSpan={3} className="px-3 pb-2 pt-0">
+        <NeuTableRow className="border-b border-slate-50 dark:border-slate-800/60">
+          <NeuTableCell colSpan={3} className="px-3 pb-2 pt-0">
             <p className="rounded-md border border-slate-100 bg-white/60 px-2.5 py-1.5 font-mono text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
               …{candidate.sourceSnippet}…
             </p>
-          </td>
-        </tr>
+          </NeuTableCell>
+        </NeuTableRow>
       )}
     </>
   );
@@ -274,9 +304,11 @@ export default function DocumentReviewDialog({
   open,
   onOpenChange,
   onReviewComplete,
+  neuStyle = false,
 }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const BadgeView = neuStyle ? NeuBadge : BadgePrimitive;
 
   // Local state
   const [notes, setNotes] = useState("");
@@ -413,7 +445,7 @@ export default function DocumentReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+      <DialogContent className={cn("max-w-6xl w-full h-[90vh] flex flex-col gap-0 p-0 overflow-hidden", neuStyle && "ff-invoice-neu-dialog ff-invoice-review-dialog")}>
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <DialogHeader className="shrink-0 border-b border-slate-100 dark:border-slate-800 px-5 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -429,28 +461,28 @@ export default function DocumentReviewDialog({
             <div className="flex items-center gap-2 shrink-0">
               {/* Classification badge + override */}
               {displayType && (
-                <Badge className={cn(
+                <BadgeView className={cn(
                   "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold flex items-center gap-1",
                   DOC_TYPE_COLORS[displayType] ?? DOC_TYPE_COLORS.other,
                 )}>
                   <Tag className="h-2.5 w-2.5" />
                   {docTypeLabel(displayType)}
                   {isOverridden && <span className="opacity-60 ml-0.5">·override</span>}
-                </Badge>
+                </BadgeView>
               )}
               {confidence !== null && (
                 <ConfidenceBadge score={confidence} />
               )}
               {/* Already-reviewed badge */}
               {isAlreadyReviewed && (
-                <Badge className={cn(
+                <BadgeView className={cn(
                   "rounded-full border px-2.5 py-0.5 text-[11px] capitalize",
                   REVIEW_COLORS[review!.reviewStatus] ?? REVIEW_COLORS.pending,
                 )}>
                   {review!.reviewStatus === "confirmed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
                   {review!.reviewStatus === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
                   {review!.reviewStatus}
-                </Badge>
+                </BadgeView>
               )}
             </div>
           </div>
@@ -505,26 +537,26 @@ export default function DocumentReviewDialog({
 
           {/* Right: extracted data */}
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <Tabs defaultValue="fields" className="flex flex-col flex-1 min-h-0">
+            <NeuTabs defaultValue="fields" className="flex flex-col flex-1 min-h-0">
               <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 shrink-0">
-                <TabsList className="h-7 rounded-lg text-xs">
-                  <TabsTrigger value="fields" className="h-6 px-3 text-xs">
+                <NeuTabList className="h-8 rounded-xl p-1">
+                  <NeuTab value="fields" className="h-6 px-3 text-xs">
                     Fields
                     {fieldCandidates.length > 0 && (
                       <span className="ml-1.5 rounded-full bg-violet-100 px-1.5 py-0 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                         {fieldCandidates.length}
                       </span>
                     )}
-                  </TabsTrigger>
-                  <TabsTrigger value="text" className="h-6 px-3 text-xs">
+                  </NeuTab>
+                  <NeuTab value="text" className="h-6 px-3 text-xs">
                     Extracted Text
-                  </TabsTrigger>
-                  <TabsTrigger value="type" className="h-6 px-3 text-xs">
+                  </NeuTab>
+                  <NeuTab value="type" className="h-6 px-3 text-xs">
                     Classification
-                  </TabsTrigger>
-                </TabsList>
+                  </NeuTab>
+                </NeuTabList>
                 {/* Snippet toggle */}
-                <Button
+                <ReviewAction neuStyle={neuStyle}
                   variant="ghost"
                   size="sm"
                   className="h-6 gap-1 px-2 text-[11px] text-slate-400 hover:text-slate-600"
@@ -532,11 +564,11 @@ export default function DocumentReviewDialog({
                 >
                   {showSnippets ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                   {showSnippets ? "Hide" : "Show"} snippets
-                </Button>
+                </ReviewAction>
               </div>
 
               {/* ── Fields tab ─────────────────────────────────────────────── */}
-              <TabsContent value="fields" className="flex-1 min-h-0 overflow-auto m-0 p-0">
+              <NeuTabPanel value="fields" unmountInactive className="flex-1 min-h-0 overflow-auto m-0 p-0">
                 {/* Low-confidence warning strip */}
                 {lowConfFields.length > 0 && (
                   <div className="flex items-start gap-2 border-b border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
@@ -560,15 +592,15 @@ export default function DocumentReviewDialog({
                     No fields could be extracted — this may be a scanned image or handwritten document.
                   </div>
                 ) : (
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="border-b border-slate-100 bg-slate-50/95 dark:border-slate-800 dark:bg-slate-800/70 backdrop-blur">
-                        <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400 min-w-[130px]">Field</th>
-                        <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400 w-full">Value</th>
-                        <th className="px-3 py-2 text-right font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Confidence</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <NeuTable className="text-xs">
+                    <NeuTableHeader className="sticky top-0 z-10">
+                      <NeuTableRow className="border-b border-[#c9c9c9] bg-[#d7d7d7]">
+                        <NeuTableHead className="px-3 py-2 text-left font-semibold text-[#777] min-w-[130px]">Field</NeuTableHead>
+                        <NeuTableHead className="w-full px-3 py-2 text-left font-semibold text-[#777]">Value</NeuTableHead>
+                        <NeuTableHead className="whitespace-nowrap px-3 py-2 text-right font-semibold text-[#777]">Confidence</NeuTableHead>
+                      </NeuTableRow>
+                    </NeuTableHeader>
+                    <NeuTableBody>
                       {fieldCandidates.map(c => (
                         <FieldRow
                           key={c.id}
@@ -576,18 +608,19 @@ export default function DocumentReviewDialog({
                           editedValues={editedValues}
                           onEdit={handleEdit}
                           showSnippet={showSnippets}
+                          neuStyle={neuStyle}
                         />
                       ))}
-                    </tbody>
-                  </table>
+                    </NeuTableBody>
+                  </NeuTable>
                 )}
-              </TabsContent>
+              </NeuTabPanel>
 
               {/* ── Extracted text tab ─────────────────────────────────────── */}
-              <TabsContent value="text" className="flex-1 min-h-0 overflow-hidden m-0 p-0 flex flex-col">
+              <NeuTabPanel value="text" unmountInactive className="flex-1 min-h-0 overflow-hidden m-0 p-0 flex flex-col">
                 <div className="relative px-3 py-2 border-b border-slate-100 dark:border-slate-800 shrink-0">
                   <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                  <Input
+                  <ReviewInput neuStyle={neuStyle}
                     placeholder="Type to search extracted text (or use Ctrl+F for in-page search)…"
                     value={textSearch}
                     onChange={e => setTextSearch(e.target.value)}
@@ -611,10 +644,10 @@ export default function DocumentReviewDialog({
                     {extraction.pageCount} page{extraction.pageCount !== 1 ? "s" : ""} · {extraction.processingMethod ?? "extracted"}
                   </div>
                 )}
-              </TabsContent>
+              </NeuTabPanel>
 
               {/* ── Classification tab ─────────────────────────────────────── */}
-              <TabsContent value="type" className="flex-1 min-h-0 overflow-auto m-0 p-4 space-y-4">
+              <NeuTabPanel value="type" unmountInactive className="flex-1 min-h-0 overflow-auto m-0 p-4 space-y-4">
                 <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
                   <div className="bg-slate-50/80 dark:bg-slate-800/40 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
                     <Tag className="h-3.5 w-3.5 text-slate-500" />
@@ -625,12 +658,12 @@ export default function DocumentReviewDialog({
                   <div className="px-4 py-3 space-y-3">
                     <div className="flex items-center gap-3">
                       {displayType ? (
-                        <Badge className={cn(
+                        <BadgeView className={cn(
                           "rounded-full border px-3 py-0.5 text-xs font-semibold",
                           DOC_TYPE_COLORS[displayType] ?? DOC_TYPE_COLORS.other,
                         )}>
                           {docTypeLabel(displayType)}
-                        </Badge>
+                        </BadgeView>
                       ) : (
                         <span className="text-xs text-slate-400 italic">Not yet classified</span>
                       )}
@@ -641,14 +674,14 @@ export default function DocumentReviewDialog({
                         </div>
                       )}
                       {isOverridden && (
-                        <Badge className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0 text-[10px] text-amber-600 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                        <BadgeView className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0 text-[10px] text-amber-600 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
                           agent override
-                        </Badge>
+                        </BadgeView>
                       )}
                     </div>
                     {/* Override controls */}
                     <div>
-                      <Button
+                      <ReviewAction neuStyle={neuStyle}
                         variant="outline"
                         size="sm"
                         className="h-7 gap-1.5 rounded-lg text-xs"
@@ -659,14 +692,14 @@ export default function DocumentReviewDialog({
                       >
                         <Edit3 className="h-3 w-3" />
                         {editingType ? "Cancel override" : "Override type"}
-                      </Button>
+                      </ReviewAction>
                       {editingType && (
                         <div className="mt-2 flex items-center gap-2">
                           <Select value={pendingType} onValueChange={setPendingType}>
-                            <SelectTrigger className="h-7 w-48 rounded-lg text-xs">
+                            <SelectTrigger className={cn("h-7 w-48 rounded-lg text-xs", neuStyle && "ff-invoice-select-trigger")}>
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className={neuStyle ? "ff-invoice-neu-select-content" : undefined}>
                               {DOC_TYPES.map(t => (
                                 <SelectItem key={t.value} value={t.value} className="text-xs">
                                   {t.label}
@@ -674,14 +707,14 @@ export default function DocumentReviewDialog({
                               ))}
                             </SelectContent>
                           </Select>
-                          <Button
+                          <ReviewAction neuStyle={neuStyle}
                             size="sm"
                             className="h-7 rounded-lg px-3 text-xs"
                             disabled={docTypeMutation.isPending || !pendingType}
                             onClick={() => docTypeMutation.mutate(pendingType)}
                           >
                             {docTypeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
-                          </Button>
+                          </ReviewAction>
                         </div>
                       )}
                     </div>
@@ -698,8 +731,8 @@ export default function DocumentReviewDialog({
                     </span>
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </NeuTabPanel>
+            </NeuTabs>
           </div>
         </div>
 
@@ -729,7 +762,7 @@ export default function DocumentReviewDialog({
                 onChange={e => setNotes(e.target.value)}
               />
               <div className="flex gap-2 flex-wrap justify-end shrink-0">
-                <Button
+                <ReviewAction neuStyle={neuStyle}
                   size="sm"
                   className="gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs hover:bg-emerald-700 font-medium"
                   disabled={reviewMutation.isPending}
@@ -740,8 +773,8 @@ export default function DocumentReviewDialog({
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     : <ClipboardCheck className="h-3.5 w-3.5" />}
                   Confirm
-                </Button>
-                <Button
+                </ReviewAction>
+                <ReviewAction neuStyle={neuStyle}
                   size="sm"
                   variant="outline"
                   className="gap-1.5 rounded-xl px-3 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:text-red-400"
@@ -751,8 +784,8 @@ export default function DocumentReviewDialog({
                 >
                   <XCircle className="h-3.5 w-3.5" />
                   Reject
-                </Button>
-                <Button
+                </ReviewAction>
+                <ReviewAction neuStyle={neuStyle}
                   size="sm"
                   variant="outline"
                   className="gap-1.5 rounded-xl px-3 text-xs text-amber-600 border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400"
@@ -762,8 +795,8 @@ export default function DocumentReviewDialog({
                 >
                   <AlertTriangle className="h-3.5 w-3.5" />
                   Unreadable
-                </Button>
-                <Button
+                </ReviewAction>
+                <ReviewAction neuStyle={neuStyle}
                   size="sm"
                   variant="outline"
                   className="gap-1.5 rounded-xl px-3 text-xs text-slate-500"
@@ -775,7 +808,7 @@ export default function DocumentReviewDialog({
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     : <RotateCcw className="h-3.5 w-3.5" />}
                   Retry
-                </Button>
+                </ReviewAction>
               </div>
             </div>
           )}

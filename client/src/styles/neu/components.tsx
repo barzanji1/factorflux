@@ -222,11 +222,13 @@ NeuTab.displayName = "NeuTab";
 
 export interface NeuTabPanelProps extends HTMLAttributes<HTMLDivElement> {
   value: string;
+  unmountInactive?: boolean;
 }
 
 export const NeuTabPanel = forwardRef<HTMLDivElement, NeuTabPanelProps>(
-  ({ value, className, ...props }, ref) => {
+  ({ value, className, unmountInactive = false, ...props }, ref) => {
     const { selectedValue, baseId } = useNeuTabs();
+    if (unmountInactive && selectedValue !== value) return null;
     return (
       <div
         ref={ref}

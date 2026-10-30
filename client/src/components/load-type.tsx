@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { NeuBadge } from "@/styles/neu";
 import {
   LOAD_TYPES,
   LOAD_TYPE_LABELS,
@@ -30,8 +31,12 @@ const LOAD_TYPE_STYLES: Record<LoadType, { badge: string; selected: string; idle
   },
 };
 
-export function LoadTypeBadge({ value }: { value?: string | null }) {
+export function LoadTypeBadge({ value, neuStyle = false }: { value?: string | null; neuStyle?: boolean }) {
   const type = displayLoadType(value);
+  if (neuStyle) {
+    const tone = type === "otr_load" ? "success" : type === "hotshot" ? "accent" : "neutral";
+    return <NeuBadge tone={tone} className="px-2.5 py-1 text-xs">{LOAD_TYPE_LABELS[type]}</NeuBadge>;
+  }
   return (
     <Badge className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", LOAD_TYPE_STYLES[type].badge)}>
       {LOAD_TYPE_LABELS[type]}

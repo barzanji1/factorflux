@@ -1,8 +1,8 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, type ComponentProps } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge as BadgePrimitive } from "@/components/ui/badge";
+import { Button as ButtonPrimitive } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -27,6 +27,7 @@ import {
 import ExtractionResultPanel from "./extraction-result-panel";
 import DocumentReviewDialog from "./document-review-dialog";
 import { useSafeDrop } from "@/hooks/use-safe-drop";
+import { NeuBadge, NeuButton, NeuCard } from "@/styles/neu";
 
 export type IntakeEntityType = "invoice" | "load" | "client" | "broker";
 
@@ -35,6 +36,25 @@ interface Props {
   entityId: number;
   onUploadComplete?: (doc: any) => void;
   compact?: boolean;
+  neuStyle?: boolean;
+}
+
+function IntakeAction({ neuStyle, ...props }: ComponentProps<typeof ButtonPrimitive> & { neuStyle?: boolean }) {
+  if (!neuStyle) return <ButtonPrimitive {...props} />;
+  const { variant, size, className, asChild: _asChild, ...buttonProps } = props;
+  return (
+    <NeuButton
+      {...buttonProps}
+      className={cn(
+        "min-h-9 px-3 py-1.5 text-xs",
+        size === "sm" && "min-h-8 px-3 py-1",
+        size === "icon" && "min-h-8 w-8 p-1",
+        variant === "ghost" && "bg-transparent shadow-none",
+        variant === "destructive" && "bg-[#b84b45] text-white",
+        className,
+      )}
+    />
+  );
 }
 
 interface UploadedFile {
@@ -140,8 +160,10 @@ function ExtractionPoller({
   return null;
 }
 
-export default function DocumentIntakeZone({ entityType, entityId, onUploadComplete, compact }: Props) {
+export default function DocumentIntakeZone({ entityType, entityId, onUploadComplete, compact, neuStyle }: Props) {
   const qc       = useQueryClient();
+  const BadgeView = neuStyle ? NeuBadge : BadgePrimitive;
+  const FileSurface = neuStyle ? NeuCard : "div";
   const inputRef = useRef<HTMLInputElement>(null);
   const [files,       setFiles]       = useState<UploadedFile[]>([]);
   const [reviewDocId, setReviewDocId] = useState<number | null>(null);
@@ -258,16 +280,16 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
   );
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", neuStyle && "ff-neu-document-intake")}>
       <div className="space-y-1.5">
         <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
           Document type
         </label>
         <Select value={documentType} onValueChange={setDocumentType}>
-          <SelectTrigger className="h-10 rounded-xl bg-white dark:bg-slate-950">
+          <SelectTrigger className={cn("h-10 rounded-xl bg-white dark:bg-slate-950", neuStyle && "ff-invoice-select-trigger")}>
             <SelectValue placeholder="Select the type before uploading" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className={neuStyle ? "ff-invoice-neu-select-content" : undefined}>
             <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
             <SelectItem value="bol">Bill of Lading (BOL)</SelectItem>
             <SelectItem value="commercial_invoice">Commercial Invoice</SelectItem>
@@ -286,10 +308,13 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
       )}
 
       {/* Drop zone */}
-      <div
+      <FileSurface
         {...dropProps}
         className={cn(
-          "relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-150",
+          "relative flex cursor-pointer flex-col items-center justify-center rounded-2xl transition-all duration-150",
+          neuStyle
+            ? "border-0 bg-[#e0e0e0]"
+            : "border-2 border-dashed",
           compact ? "py-6" : "py-10",
           isDragOver && isValidDrag
             ? "border-blue-400 bg-blue-50/70 scale-[1.01] dark:border-blue-500 dark:bg-blue-950/25"
@@ -335,15 +360,15 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
         </p>
         <p className="mt-1 text-xs text-slate-400">PDF, JPG, PNG · max 10 MB · tagged with the selected type</p>
 
-        <Button
+        <IntakeAction neuStyle={neuStyle}
           variant="outline"
           size="sm"
           className="mt-4 rounded-xl px-4 text-xs"
           onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
         >
           Browse files
-        </Button>
-      </div>
+        </IntakeAction>
+      </FileSurface>
 
       {/* File list */}
       {files.length > 0 && (
@@ -351,9 +376,14 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           {files.map((f) => {
             const displayType = f.finalDocumentType || f.candidateDocumentType;
             return (
-              <div
+                <FileSurface
                 key={f.localId}
-                className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+                className={cn(
+                  "overflow-hidden rounded-xl",
+                  neuStyle
+                    ? "border-0 bg-[#e0e0e0]"
+                    : "border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60",
+                )}
               >
                 {/* File row */}
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -372,38 +402,38 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
 
                   {/* Classification badge */}
                   {f.status === "completed" && displayType && (
-                    <Badge className={cn(
+                    <BadgeView className={cn(
                       "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium shrink-0",
                       DOC_TYPE_COLORS[displayType] ?? DOC_TYPE_COLORS.other,
                     )}>
                       <Tag className="h-2.5 w-2.5" />
                       {DOC_TYPE_LABELS[displayType] ?? displayType.replace(/_/g, " ")}
-                    </Badge>
+                    </BadgeView>
                   )}
 
-                  <Badge className={cn("flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium shrink-0", statusColor(f.status))}>
+                  <BadgeView className={cn("flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium shrink-0", statusColor(f.status))}>
                     {statusIcon(f.status)}
                     {f.status === "uploading" ? `${f.progress}%` : f.status}
-                  </Badge>
+                  </BadgeView>
 
                   {f.documentId && f.status === "completed" && (
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button
+                      <IntakeAction neuStyle={neuStyle}
                         size="sm"
                         className="h-7 gap-1.5 rounded-lg px-2.5 text-[11px] bg-violet-600 hover:bg-violet-700 text-white font-medium"
                         onClick={() => setReviewDocId(f.documentId!)}
                       >
                         <ClipboardCheck className="h-3 w-3" />
                         Review
-                      </Button>
-                      <Button
+                      </IntakeAction>
+                      <IntakeAction neuStyle={neuStyle}
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 rounded-lg p-0 text-slate-400 hover:text-slate-600"
                         onClick={() => updateFile(f.localId, { expanded: !f.expanded })}
                       >
                         {f.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      </Button>
+                      </IntakeAction>
                     </div>
                   )}
                 </div>
@@ -441,7 +471,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
                     {f.error}
                   </div>
                 )}
-              </div>
+              </FileSurface>
             );
           })}
         </div>
@@ -452,6 +482,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
         <DocumentReviewDialog
           documentId={reviewDocId}
           open={reviewDocId !== null}
+          neuStyle={neuStyle}
           onOpenChange={(open) => { if (!open) setReviewDocId(null); }}
           onReviewComplete={(status, invoiceId) => {
             if (invoiceId) {

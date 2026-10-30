@@ -5,12 +5,11 @@ import Sidebar from "@/components/layout/sidebar";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import { documentClassification, documentClassificationLabel } from "@shared/document-display";
 import TopNav from "@/components/layout/top-nav";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge as BadgePrimitive } from "@/components/ui/badge";
+import { Button as ButtonPrimitive } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { Input as InputPrimitive } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -33,6 +32,47 @@ import DocumentIntakeZone from "@/components/documents/document-intake-zone";
 import DocumentReviewDialog from "@/components/documents/document-review-dialog";
 import { LoadTypeBadge } from "@/components/load-type";
 import BrokerConfirmationPanel from "@/components/broker-confirmation/invoice-panel";
+import {
+  NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuStatCard,
+  NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell,
+  NeuTableHead, NeuTableHeader, NeuTableRow,
+} from "@/styles/neu";
+import { forwardRef, type ComponentProps } from "react";
+import "./invoice-detail.css";
+
+// Radix Select is deliberately retained for its current controlled Select value contract.
+// NeuSelect is native HTML and would alter keyboard/portal semantics.
+
+type LegacyButtonProps = ComponentProps<typeof ButtonPrimitive> & { primary?: boolean };
+const Button = forwardRef<HTMLButtonElement, LegacyButtonProps>(
+  ({ className, size = "default", variant = "default", primary, ...props }, ref) => (
+    <NeuButton
+      ref={ref}
+      variant={primary ? "accent" : "default"}
+      className={cn(
+        size === "sm" && "min-h-9 px-3 py-1.5 text-xs",
+        size === "lg" && "min-h-12 px-7 py-3 text-base",
+        size === "icon" && "h-9 w-9 min-h-9 p-0",
+        variant === "link" && "min-h-0 bg-transparent px-1 py-0 text-[#168c98] shadow-none underline-offset-4 hover:underline",
+        variant === "ghost" && "shadow-none hover:bg-white/30",
+        variant === "destructive" && "bg-red-600 text-white hover:bg-red-700",
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+Button.displayName = "InvoiceNeuButton";
+
+function Badge({ className, variant, ...props }: ComponentProps<typeof BadgePrimitive>) {
+  const tone = variant === "destructive" ? "warning" : "neutral";
+  return <NeuBadge tone={tone} className={className} {...props} />;
+}
+
+const Input = forwardRef<HTMLInputElement, ComponentProps<typeof InputPrimitive>>(
+  ({ className, ...props }, ref) => <NeuInput ref={ref} className={className} {...props} />,
+);
+Input.displayName = "InvoiceNeuInput";
 
 // ─── Stage constants ───────────────────────────────────────────────────────────
 
@@ -95,9 +135,9 @@ function StagePipeline({ current }: { current: FactoringStage }) {
                   <div className={cn("h-0.5 flex-1", idx === 0 ? "invisible" : done || active ? "bg-blue-500" : "bg-slate-200 dark:bg-slate-700")} />
                   <div className={cn(
                     "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                    done   && "border-blue-500 bg-blue-500 text-white",
-                    active && "border-blue-600 bg-blue-600 text-white shadow-[0_0_0_4px_rgba(37,99,235,0.18)]",
-                    !done && !active && "border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500",
+                    done   && "border-0 bg-[#e0e0e0] text-[#27aab8] shadow-[-4px_-4px_9px_#ffffff,4px_4px_9px_#c1c1c1]",
+                    active && "border-0 bg-[#e0e0e0] text-[#27aab8] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+                    !done && !active && "border-0 bg-[#e0e0e0] text-[#999] shadow-none",
                   )}>
                     {done ? <CheckCircle2 className="h-4 w-4" /> : active ? <span className="text-[11px] font-bold">{idx + 1}</span> : <Circle className="h-3 w-3" />}
                   </div>
@@ -105,7 +145,7 @@ function StagePipeline({ current }: { current: FactoringStage }) {
                 </div>
                 <div className="flex flex-col items-center gap-0.5 text-center">
                   <span className={cn("text-[11px] font-semibold leading-tight",
-                    active ? "text-blue-700 dark:text-blue-300" : done ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500",
+                    active ? "text-[#247d85]" : done ? "text-[#5b8889]" : "text-[#999]",
                   )}>
                     {meta.label}
                   </span>
@@ -127,21 +167,13 @@ function StagePipeline({ current }: { current: FactoringStage }) {
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 function InvoiceStatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    approved:     "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300",
-    paid:         "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300",
-    funded:       "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-300",
-    submitted:    "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300",
-    under_review: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300",
-    docs_pending: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-300",
-    rejected:     "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300",
-    settled:      "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900/60 dark:bg-teal-950/30 dark:text-teal-300",
-    draft:        "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  };
+  const tone = ["approved", "paid", "settled"].includes(status) ? "success"
+    : ["rejected", "docs_pending"].includes(status) ? "warning"
+    : ["funded", "submitted"].includes(status) ? "accent" : "neutral";
   return (
-    <Badge className={cn("rounded-full border px-3 py-1 text-xs font-semibold shadow-sm", colors[status] ?? colors.draft)}>
+    <NeuBadge tone={tone} className={status === "rejected" ? "text-red-700" : ""}>
       {status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
-    </Badge>
+    </NeuBadge>
   );
 }
 
@@ -206,19 +238,19 @@ function LifecycleActionsCard({
   const isAdmin = userRole === "admin" || userRole === "manager";
 
   if (isLoading) return (
-    <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+    <NeuCard className="p-5">
       <Skeleton className="h-5 w-48 mb-4" />
       <div className="flex gap-3">
         <Skeleton className="h-10 w-40 rounded-2xl" />
         <Skeleton className="h-10 w-40 rounded-2xl" />
       </div>
-    </div>
+    </NeuCard>
   );
 
   if (!transitions.length) return null;
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+    <NeuCard className="overflow-hidden">
       <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
         <Zap className="h-4 w-4 text-blue-600" />
         <h2 className="text-sm font-semibold text-slate-700 dark:text-white">Lifecycle Actions</h2>
@@ -232,8 +264,8 @@ function LifecycleActionsCard({
           const canForce      = isSoftBlocked && isAdmin;
 
           return (
-            <div key={t.id} className={cn(
-              "flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between",
+            <NeuCard key={t.id} className={cn(
+              "flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between",
               isHardBlocked && "opacity-60",
             )}>
               {/* Left: description */}
@@ -275,10 +307,9 @@ function LifecycleActionsCard({
               {/* Right: action button */}
               <div className="shrink-0">
                 {isHardBlocked ? (
-                  <Button disabled size="sm" variant="outline"
-                    className="gap-1.5 rounded-2xl border-slate-200 text-xs opacity-50 dark:border-slate-700">
+                  <NeuBadge tone="warning" className="gap-1.5 text-red-700">
                     <Lock className="h-3 w-3" />Blocked
-                  </Button>
+                  </NeuBadge>
                 ) : t.variant === "danger" ? (
                   <Button
                     size="sm"
@@ -311,11 +342,11 @@ function LifecycleActionsCard({
                   </Button>
                 )}
               </div>
-            </div>
+            </NeuCard>
           );
         })}
       </div>
-    </div>
+    </NeuCard>
   );
 }
 
@@ -347,7 +378,7 @@ function TransitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setReason(""); setForce(false); } }}>
-      <DialogContent className="max-w-md rounded-3xl border-slate-200 dark:border-slate-800">
+      <DialogContent className="ff-invoice-neu-dialog max-w-md rounded-3xl border-slate-200 dark:border-slate-800">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
             {transition.variant === "danger"
@@ -756,17 +787,17 @@ export default function InvoiceDetail() {
   const isAdmin = user?.role === "admin" || user?.role === "manager";
 
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.06),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="ff-invoice-detail-page flex h-full min-h-0 bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Load Detail" subtitle="Full factoring lifecycle — documents, status, and funding timeline" group="Workspace" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <TopNav title="Load Detail" subtitle="Full factoring lifecycle — documents, status, and funding timeline" group="Workspace" neu />
+        <NeuPageShell className="custom-scrollbar min-h-0 flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1400px] p-6 xl:p-8">
 
-            <Button variant="ghost" onClick={() => navigate("/invoices")}
-              className="mb-5 -ml-2 gap-2 rounded-xl text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+            <NeuButton onClick={() => navigate("/invoices")}
+              className="mb-5 min-h-9 -ml-2 px-3 text-sm text-[#777]">
               <ArrowLeft className="h-4 w-4" />Back to Invoices
-            </Button>
+            </NeuButton>
 
             {preflight?.alerts.filter(alert => alert.code === "DOCS_OCR_FAILED").map(alert => (
               <div key={alert.code} role="status" data-testid="invoice-ocr-failed"
@@ -794,7 +825,7 @@ export default function InvoiceDetail() {
               <div className="space-y-5">
 
                 {/* ── Header card ────────────────────────────────────────── */}
-                 <div className="overflow-hidden rounded-[6px] border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f7f7f7] shadow-[2px_2px_0_#808080]">
+                 <NeuCard className="overflow-hidden">
                   <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-4">
                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[3px] bg-[#098b9f] text-white">
@@ -811,7 +842,7 @@ export default function InvoiceDetail() {
                            <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{fmtDate(detail.submittedAt ?? detail.createdAt)}</span>
                         </div>
                       </div>
-                      {(isManager || canAgentCorrect) && <Button variant="outline" className="gap-2" onClick={() => {
+                        {(isManager || canAgentCorrect) && <NeuButton className="gap-2 hover:bg-[#27aab8] hover:text-white" onClick={() => {
                         setEditValues({
                           amount: String(detail.amount ?? ""),
                           loadNumber: detail.loadNumber ?? "",
@@ -823,11 +854,12 @@ export default function InvoiceDetail() {
                         setEditOpen(true);
                       }}>
                         <Pencil className="h-4 w-4" />Edit Invoice
-                      </Button>}
+                      </NeuButton>}
                     </div>
                      <div className="text-right">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Invoice Amount</p>
                       <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{fmtCurrency(detail.amount)}</p>
+                    </div>
                     </div>
                    <div className="flex items-center gap-2 border-t-2 border-[#808080] bg-[#dff5f6] px-6 py-2.5 text-xs font-semibold text-[#155e63]">
                      <Activity className="h-3.5 w-3.5" />
@@ -836,26 +868,22 @@ export default function InvoiceDetail() {
                      <span className="capitalize">{(detail.displayStatus || detail.status || "in progress").replace(/_/g, " ")}</span>
                      <span className="ml-auto font-normal text-[#5a5a5a]">{STAGE_META[currentStage]?.description}</span>
                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 sm:grid-cols-4 dark:divide-slate-800 dark:border-slate-800">
+                   <div className="grid grid-cols-2 gap-3 border-t border-[#c9c9c9] p-4 sm:grid-cols-4">
                     {[
                       { label: "Advance",   value: detail.payout ? fmtCurrency(detail.payout.advanceAmount) : "—", tint: "violet" },
                       { label: "Fee",       value: detail.payout ? fmtCurrency(detail.payout.feeAmount)     : "—", tint: "amber"  },
                       { label: "Reserve",   value: detail.payout ? fmtCurrency(detail.payout.reserveAmount) : "—", tint: "blue"   },
                       { label: "Documents", value: String(detail.documents?.length ?? 0),                           tint: "slate"  },
                     ].map(({ label, value, tint }) => (
-                      <div key={label} className="p-4 text-center">
-                        <p className={cn("text-xl font-semibold",
+                      <NeuStatCard key={label} label={label} value={<span className={cn(
                           tint === "violet" && "text-violet-600 dark:text-violet-400",
                           tint === "amber"  && "text-amber-600 dark:text-amber-400",
                           tint === "blue"   && "text-blue-600 dark:text-blue-400",
                           tint === "slate"  && "text-slate-700 dark:text-slate-300",
-                        )}>{value}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">{label}</p>
-                      </div>
+                        )}>{value}</span>} className="min-h-24 p-3 text-center [&_p.mt-5]:mt-0 [&_p.text-3xl]:text-xl" />
                     ))}
                   </div>
-                </div>
+                </NeuCard>
 
                  {isManager && <>
                 <LifecycleActionsCard
@@ -867,10 +895,10 @@ export default function InvoiceDetail() {
                 /></>}
 
                 {/* ── Tabs ──────────────────────────────────────────────── */}
-                <div className="rounded-[28px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                     <Tabs defaultValue="overview">
+                <NeuCard className="overflow-hidden">
+                     <NeuTabs defaultValue="overview">
                     <div className="border-b border-slate-100 px-6 pt-5 dark:border-slate-800">
-                       <TabsList className="custom-scrollbar flex h-auto w-full gap-1 overflow-x-auto rounded-none bg-transparent p-0">
+                        <NeuTabList className="ff-invoice-tabs custom-scrollbar flex h-auto w-full gap-1 overflow-x-auto">
                          {[
                             { value: "overview",   label: "Overview",     icon: <ReceiptText className="h-3.5 w-3.5" /> },
                            { value: "paperwork",  label: "Paperwork",    icon: <FileText className="h-3.5 w-3.5" />,    count: detail.documents?.length, alert: docStatus && !docStatus.canApprove },
@@ -882,8 +910,8 @@ export default function InvoiceDetail() {
                             { value: "sheet",      label: "Payout / Sheet", icon: <Banknote className="h-3.5 w-3.5" /> },
                            { value: "timeline",    label: "Timeline",      icon: <Activity className="h-3.5 w-3.5" /> },
                          ].map(({ value, label, icon, count, alert }: any) => (
-                          <TabsTrigger key={value} value={value}
-                            className="flex items-center gap-1.5 rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-xs font-semibold text-slate-500 transition-colors data-[state=active]:border-blue-600 data-[state=active]:text-blue-700 dark:text-slate-400 dark:data-[state=active]:text-blue-300">
+                          <NeuTab key={value} value={value}
+                             className="flex items-center gap-1.5 px-3 py-2 text-xs">
                             {icon}{label}
                             {!!count && count > 0 && (
                               <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{count}</span>
@@ -891,17 +919,17 @@ export default function InvoiceDetail() {
                             {alert && (
                               <span className="ml-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
                             )}
-                          </TabsTrigger>
+                          </NeuTab>
                         ))}
-                      </TabsList>
+                        </NeuTabList>
                     </div>
 
-                     <TabsContent value="broker" className="p-6">
+                     <NeuTabPanel value="broker" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                        <div className="mb-5">
                          <BrokerConfirmationPanel invoiceId={invoiceId} isManager={isManager} />
                        </div>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                        <NeuCard className="p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker profile</p>
                           {canonicalBroker ? <div className="space-y-2 text-sm">
                             <p className="text-lg font-bold text-[#1a1a1a]">{canonicalBroker.name}</p>
@@ -915,23 +943,28 @@ export default function InvoiceDetail() {
                             <InfoRow label="Status" value={canonicalBroker.status || "Not available"} />
                             <InfoRow label="Credit limit" value={canonicalBroker.creditLimit ? fmtCurrency(canonicalBroker.creditLimit) : "Not available"} />
                           </div> : <EmptyTabState icon={<Building2 className="h-7 w-7" />} label="No broker details available" />}
-                        </div>
-                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                        </NeuCard>
+                         <NeuCard className="p-4">
                            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Broker history</p>
                            <div className="mb-3 grid grid-cols-3 gap-2 text-center">
                              <div><p className="text-lg font-bold">{fmtCurrency(detail.brokerHistory?.totals?.billed)}</p><p className="text-[10px] text-[#666]">Billed</p></div>
                              <div><p className="text-lg font-bold text-teal-700">{fmtCurrency(detail.brokerHistory?.totals?.applied)}</p><p className="text-[10px] text-[#666]">Applied</p></div>
                              <div><p className="text-lg font-bold text-amber-700">{fmtCurrency(detail.brokerHistory?.totals?.outstanding)}</p><p className="text-[10px] text-[#666]">Outstanding</p></div>
                            </div>
-                           {detail.brokerHistory?.invoices?.length ? <div className="max-h-64 overflow-auto">{detail.brokerHistory.invoices.map((row: any) => <div key={row.id} className="flex items-center justify-between border-t border-[#d4d0c8] py-2 text-xs"><span><strong>{row.invoiceNumber}</strong><br /><span className="text-[#666]">{fmtDate(row.invoiceDate)} · {row.status}</span></span><span className="text-right">{fmtCurrency(row.amount)}<br /><span className="text-[#666]">Bal. {fmtCurrency(row.balance)}</span></span></div>)}</div> : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No broker history available" />}
+                           {detail.brokerHistory?.invoices?.length ? (
+                             <NeuTable className="text-xs">
+                               <NeuTableHeader><NeuTableRow><NeuTableHead>Invoice</NeuTableHead><NeuTableHead>Date / status</NeuTableHead><NeuTableHead className="text-right">Amount / balance</NeuTableHead></NeuTableRow></NeuTableHeader>
+                               <NeuTableBody>{detail.brokerHistory.invoices.map((row: any) => <NeuTableRow key={row.id}><NeuTableCell className="font-semibold">{row.invoiceNumber}</NeuTableCell><NeuTableCell className="text-xs text-[#777]">{fmtDate(row.invoiceDate)} · {row.status}</NeuTableCell><NeuTableCell className="text-right">{fmtCurrency(row.amount)} · Bal. {fmtCurrency(row.balance)}</NeuTableCell></NeuTableRow>)}</NeuTableBody>
+                             </NeuTable>
+                           ) : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No broker history available" />}
                            <div className="mt-3 border-t border-[#d4d0c8] pt-3 text-xs"><InfoRow label="Current AR" value={fmtCurrency(detail.brokerHistory?.credit?.currentAr)} /><InfoRow label="Latest credit check" value={detail.brokerHistory?.credit?.latestCheck ? `${fmtDate(detail.brokerHistory.credit.latestCheck.createdAt)} · ${detail.brokerHistory.credit.latestCheck.status || detail.brokerHistory.credit.latestCheck.result || "Recorded"}` : "Not available"} /></div>
-                         </div>
+                         </NeuCard>
                       </div>
-                    </TabsContent>
+                    </NeuTabPanel>
 
-                    <TabsContent value="carrier" className="p-6">
+                    <NeuTabPanel value="carrier" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                       <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                        <NeuCard className="p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Carrier profile</p>
                           {detail.client ? <div className="space-y-2 text-sm">
                             <p className="text-lg font-bold text-[#1a1a1a]">{detail.client.name}</p>
@@ -944,25 +977,25 @@ export default function InvoiceDetail() {
                             <InfoRow label="Status" value={detail.client.status || "Not available"} />
                             <InfoRow label="Assigned processor" value={detail.assignedProcessorUser ? `${detail.assignedProcessorUser.firstName} ${detail.assignedProcessorUser.lastName}` : "Not assigned"} />
                           </div> : <EmptyTabState icon={<User className="h-7 w-7" />} label="No carrier details available" />}
-                        </div>
-                        <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4">
+                        </NeuCard>
+                        <NeuCard className="p-4">
                           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Bank account</p>
-                           {detail.carrierInvoices?.bankAccounts?.length ? detail.carrierInvoices.bankAccounts.map((a: any) => <div key={a.id} className="mb-2 rounded-[3px] border border-[#b5b5b5] bg-white px-3 py-2 text-sm"><p className="font-semibold">{a.bankName || "Bank account"}</p><p className="text-xs text-[#666]">{a.accountType || "Account"} ending in {a.lastFour || "••••"}</p></div>) : <p className="text-sm text-[#666]">No bank account on file.</p>}
+                           {detail.carrierInvoices?.bankAccounts?.length ? detail.carrierInvoices.bankAccounts.map((a: any) => <NeuCard key={a.id} className="mb-2 px-3 py-2 text-sm"><p className="font-semibold">{a.bankName || "Bank account"}</p><p className="text-xs text-[#666]">{a.accountType || "Account"} ending in {a.lastFour || "••••"}</p></NeuCard>) : <p className="text-sm text-[#666]">No bank account on file.</p>}
                           <p className="mt-3 text-[11px] text-[#666]">Full bank credentials are restricted to authorized funding workflows.</p>
-                        </div>
-                         <div className="rounded-[4px] border-2 border-[#808080] border-r-white border-b-white bg-[#f4f4f4] p-4 md:col-span-2">
+                        </NeuCard>
+                         <NeuCard className="p-4 md:col-span-2">
                            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#666]">Other carrier invoices</p>
                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                              {(detail.carrierInvoices?.invoices ?? []).filter((row: any) => !row.isCurrent).map((row: any) => (
-                               <button key={row.id} type="button" onClick={() => navigate(`/invoices/${row.id}`)} className="flex items-center justify-between rounded-[3px] border border-[#b5b5b5] bg-white px-3 py-2 text-left text-xs hover:border-[#098b9f]">
+                                <NeuButton key={row.id} type="button" onClick={() => navigate(`/invoices/${row.id}`)} className="flex min-h-10 w-full items-center justify-between px-3 py-2 text-left text-xs">
                                  <span><strong>{row.invoiceNumber}</strong><br /><span className="text-[#666]">{fmtDate(row.invoiceDate)} · {row.status}</span></span><span className="font-semibold">{fmtCurrency(row.amount)}</span>
-                               </button>
+                                </NeuButton>
                              ))}
                            </div>
                            {!detail.carrierInvoices?.invoices?.some((row: any) => !row.isCurrent) && <p className="text-sm text-[#666]">No other carrier invoices.</p>}
-                         </div>
+                         </NeuCard>
                       </div>
-                    </TabsContent>
+                    </NeuTabPanel>
 
                     {/* Doc Checklist */}
                     {false && (
@@ -1201,10 +1234,10 @@ export default function InvoiceDetail() {
                                 <p className="mb-3 text-xs font-semibold text-slate-600 dark:text-slate-300">Add Review Note</p>
                                 <div className="space-y-3">
                                   <Select value={reviewStatus} onValueChange={(v: any) => setReviewStatus(v)}>
-                                    <SelectTrigger className="rounded-xl border-slate-200 text-xs dark:border-slate-700">
+                                    <SelectTrigger className="ff-invoice-select-trigger rounded-xl border-slate-200 text-xs dark:border-slate-700">
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="ff-invoice-neu-select-content">
                                       <SelectItem value="approved">Approved — all documents acceptable</SelectItem>
                                       <SelectItem value="needs_revision">Needs Revision — documents need correction</SelectItem>
                                       <SelectItem value="incomplete">Incomplete — documents still missing</SelectItem>
@@ -1234,21 +1267,21 @@ export default function InvoiceDetail() {
                        )
                      )}
 
-                    <TabsContent value="chargeback" className="p-6">
+                    <NeuTabPanel value="chargeback" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                          <div className="space-y-5">
-                           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-5 dark:border-orange-900/50 dark:bg-orange-950/20">
+                           <NeuCard className="flex flex-wrap items-center justify-between gap-3 p-5">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Chargeback Status</p>
                                <Badge className={cn("mt-2 capitalize", detail.chargeback.status === "charged" ? "bg-red-600" : detail.chargeback.status === "extended" ? "bg-emerald-600" : "bg-amber-600")}>{detail.chargeback.status}</Badge>
                                <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">Chargeback date: <strong>{fmtDate(detail.chargeback.chargebackDate)}</strong></p>
                             </div>
                              {isManager && ["scheduled", "extended"].includes(detail.chargeback.status) && <Button onClick={() => setChargebackDialogOpen(true)} disabled={detail.chargeback.status === "charged"}>Extend Chargeback</Button>}
-                          </div>
-                           {detail.chargeback.extension && <div className="rounded-xl border p-4 text-sm">
+                           </NeuCard>
+                            {detail.chargeback.extension && <NeuCard className="p-4 text-sm">
                             <p className="font-semibold">Latest Extension</p>
                              <p className="mt-1 text-slate-500">Extended {fmtDate(detail.chargeback.extension.at)} to {fmtDate(detail.chargeback.extension.date)}</p>
                              <p className="mt-2">{detail.chargeback.extension.reason}</p>
-                          </div>}
+                           </NeuCard>}
                           <div>
                             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Extension History</h3>
                              {detail.chargeback.history?.length ? (
@@ -1260,16 +1293,16 @@ export default function InvoiceDetail() {
                                    || event.metadata?.agentName
                                    || event.actorId
                                    || "System";
-                                 return <div key={event.id} className="rounded-xl border p-3 text-sm"><p className="font-semibold capitalize">{event.eventType.replace(/_/g, " ")}</p><p className="mt-1">{event.reason || "No reason recorded"}</p><p className="text-xs text-slate-400">{actorName} · {fmtDate(event.createdAt)}{event.extensionDate ? ` · through ${fmtDate(event.extensionDate)}` : ""}</p></div>;
+                                  return <NeuCard key={event.id} className="p-3 text-sm"><p className="font-semibold capitalize">{event.eventType.replace(/_/g, " ")}</p><p className="mt-1">{event.reason || "No reason recorded"}</p><p className="text-xs text-slate-400">{actorName} · {fmtDate(event.createdAt)}{event.extensionDate ? ` · through ${fmtDate(event.extensionDate)}` : ""}</p></NeuCard>;
                                })}</div>
                             ) : <p className="text-sm text-slate-400">No extension history.</p>}
                           </div>
-                           <div className="rounded-xl border p-4"><div className="flex justify-between text-sm"><span>Refunded</span><strong>{fmtCurrency(detail.chargeback.refundedAmount)}</strong></div>{detail.chargeback.refunds?.length ? <div className="mt-3 space-y-2">{detail.chargeback.refunds.map((refund: any) => <div key={refund.id} className="flex justify-between border-t pt-2 text-xs"><span>{fmtDate(refund.refundDate)} · {refund.method} · {refund.reference || "No reference"}<br /><span className="text-slate-400">{refund.createdByUser?.firstName || "Team"} {refund.createdByUser?.lastName || ""}</span></span><strong>{fmtCurrency(refund.amount)}</strong></div>)}</div> : <p className="mt-2 text-xs text-slate-400">No refunds recorded.</p>}</div>
+                            <NeuCard className="p-4"><div className="flex justify-between text-sm"><span>Refunded</span><strong>{fmtCurrency(detail.chargeback.refundedAmount)}</strong></div>{detail.chargeback.refunds?.length ? <div className="mt-3 space-y-2">{detail.chargeback.refunds.map((refund: any) => <div key={refund.id} className="flex justify-between border-t pt-2 text-xs"><span>{fmtDate(refund.refundDate)} · {refund.method} · {refund.reference || "No reference"}<br /><span className="text-slate-400">{refund.createdByUser?.firstName || "Team"} {refund.createdByUser?.lastName || ""}</span></span><strong>{fmtCurrency(refund.amount)}</strong></div>)}</div> : <p className="mt-2 text-xs text-slate-400">No refunds recorded.</p>}</NeuCard>
                          </div>
-                    </TabsContent>
+                    </NeuTabPanel>
 
                     {/* Overview */}
-                     <TabsContent value="overview" className="p-6">
+                     <NeuTabPanel value="overview" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <div className="space-y-3">
                           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Invoice Details</h3>
@@ -1288,7 +1321,7 @@ export default function InvoiceDetail() {
                             { label: "BOL Number",   value: detail.bolNumber || "—" },
                             { label: "Payment Type", value: detail.paymentType || "—" },
                              { label: "Selected Bank", value: detail.selectedBankAccount ? `${detail.selectedBankAccount.bankName} — ending in ${detail.selectedBankAccount.lastFour}` : "—" },
-                            { label: "Load Type",    value: <LoadTypeBadge value={detail.loadType} /> },
+                            { label: "Load Type",    value: <LoadTypeBadge value={detail.loadType} neuStyle /> },
                             { label: "Driver",       value: detail.driver ? `${detail.driver.firstName} ${detail.driver.lastName}` : "—" },
                             { label: "Pickup",       value: detail.pickupLocation || "—" },
                             { label: "Delivery",     value: detail.deliveryLocation || "—" },
@@ -1297,17 +1330,17 @@ export default function InvoiceDetail() {
                               ? <span className="whitespace-pre-wrap break-words">{detail.instructionsDetails}</span>
                               : "—" },
                           ].map(({ label, value }) => (
-                            <div key={label} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
+                            <NeuCard key={label} className="flex items-start justify-between gap-3 px-4 py-2.5">
                               <span className="text-xs font-medium text-slate-400">{label}</span>
                               <span className="text-right text-xs font-semibold text-slate-700 dark:text-slate-200">{value}</span>
-                            </div>
+                            </NeuCard>
                           ))}
                         </div>
                         <div className="space-y-5">
                           {detail.client && (
                             <div>
                               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Carrier / Client</h3>
-                              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                              <NeuCard className="p-4">
                                 <div className="mb-1 flex items-center gap-2">
                                   <User className="h-4 w-4 text-blue-500" />
                                   <span className="font-semibold text-slate-800 dark:text-white">{detail.client.name}</span>
@@ -1323,13 +1356,13 @@ export default function InvoiceDetail() {
                                   className="mt-2 h-7 gap-1 rounded-lg px-2 text-[11px] text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/20">
                                   <ExternalLink className="h-3 w-3" />View Client
                                 </Button>
-                              </div>
+                              </NeuCard>
                             </div>
                           )}
                            {canonicalBroker && (
                             <div>
                               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Debtor / Broker</h3>
-                              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                              <NeuCard className="p-4">
                                 <div className="mb-1 flex items-center gap-2">
                                   <Building2 className="h-4 w-4 text-violet-500" />
                                    <span className="font-semibold text-slate-800 dark:text-white">{canonicalBroker.name}</span>
@@ -1341,21 +1374,21 @@ export default function InvoiceDetail() {
                                    {canonicalBroker.dotNumber && <p>DOT# {canonicalBroker.dotNumber}</p>}
                                    {(detail.branch?.branchName || detail.branchName) && <p>Branch: {detail.branch?.branchName || detail.branchName}</p>}
                                 </div>
-                              </div>
+                              </NeuCard>
                             </div>
                           )}
                           {detail.notes && (
                             <div>
                               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Notes</h3>
-                              <p className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">{detail.notes}</p>
+                              <NeuCard className="p-4 text-sm">{detail.notes}</NeuCard>
                             </div>
                           )}
                         </div>
                       </div>
-                    </TabsContent>
+                    </NeuTabPanel>
 
                     {/* Documents */}
-                    <TabsContent value="paperwork" className="p-6">
+                    <NeuTabPanel value="paperwork" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                       <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                           {[
@@ -1386,7 +1419,7 @@ export default function InvoiceDetail() {
                                     if (file) uploadPaperworkFile(type, label, file, doc);
                                   }}
                                 />
-                                <div
+                                <NeuCard
                                   role="button"
                                   tabIndex={0}
                                    onClick={() => doc
@@ -1400,12 +1433,7 @@ export default function InvoiceDetail() {
                                         : choosePaperworkFile(type, label);
                                     }
                                   }}
-                                  className={cn(
-                                    "group min-h-[132px] cursor-pointer rounded-xl border-2 p-3 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-                                    present
-                                      ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500 hover:shadow-sm"
-                                      : "border-red-300 bg-red-50 hover:border-red-500 hover:shadow-sm",
-                                  )}
+                                  className="group min-h-[132px] cursor-pointer p-3 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]"
                                 >
                                   <div className="flex items-start justify-between gap-2">
                                     <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", present ? "bg-emerald-100" : "bg-red-100")}>
@@ -1415,11 +1443,11 @@ export default function InvoiceDetail() {
                                     </div>
                                     {present && doc && !uploading && (
                                       <div className="flex items-center gap-1">
-                                        <button type="button" title={`View ${label}`}
+                                         <NeuButton type="button" title={`View ${label}`} className="h-8 min-h-8 w-8 p-1.5 text-emerald-700 hover:bg-emerald-100"
                                            onClick={(event) => { event.stopPropagation(); window.open(`/api/documents/${doc.id}/view`, "_blank", "noopener,noreferrer"); }}
-                                          className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-100">
+                                         >
                                           <Eye className="h-4 w-4" />
-                                        </button>
+                                        </NeuButton>
                                         <a title={`Download ${label}`} href={`/api/documents/${doc.id}/download`}
                                           onClick={(event) => event.stopPropagation()}
                                           className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-100">
@@ -1434,13 +1462,13 @@ export default function InvoiceDetail() {
                                   </p>
                                   {doc && <p className="mt-1 truncate text-[10px] text-slate-500" title={doc.originalName}>{doc.originalName}</p>}
                                   {present && doc && !uploading && (
-                                    <button type="button"
+                                    <NeuButton type="button" className="mt-2 min-h-7 gap-1 bg-transparent px-1 py-0 text-[10px] text-emerald-700 shadow-none hover:underline"
                                       onClick={(event) => { event.stopPropagation(); choosePaperworkFile(type, label, doc); }}
-                                      className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:underline">
+                                      >
                                        <Upload className="h-3 w-3" />Add newer copy
-                                    </button>
+                                    </NeuButton>
                                   )}
-                                </div>
+                                </NeuCard>
                               </div>
                             );
                           })}
@@ -1456,7 +1484,7 @@ export default function InvoiceDetail() {
                                <span className="truncate">{previewDocument.originalName}</span>
                                <div className="flex items-center gap-2">
                                  <a href={`/api/documents/${previewDocument.id}/download`} className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2 py-1 hover:bg-slate-600"><Download className="h-3 w-3" />Download</a>
-                                 <button type="button" onClick={() => setPreviewDocument(null)} className="rounded-md px-2 py-1 hover:bg-slate-700">Close</button>
+                                <NeuButton type="button" onClick={() => setPreviewDocument(null)} className="min-h-7 px-2 py-1 text-xs">Close</NeuButton>
                                </div>
                              </div>
                              {String(previewDocument.mimeType || "").startsWith("image/") ? <img src={`/api/documents/${previewDocument.id}/view`} alt={previewDocument.originalName} className="mx-auto max-h-[520px] max-w-full object-contain" /> : <iframe title={`Preview ${previewDocument.originalName}`} src={`/api/documents/${previewDocument.id}/view`} className="h-[520px] w-full bg-white" />}
@@ -1470,6 +1498,7 @@ export default function InvoiceDetail() {
                           <DocumentIntakeZone
                             entityType="invoice"
                             entityId={invoiceId}
+                            neuStyle
                             onUploadComplete={() => {
                               qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
                               qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
@@ -1486,7 +1515,7 @@ export default function InvoiceDetail() {
                             </h3>
                             <div className="space-y-2">
                               {detail.documents.map((doc: any) => (
-                                <div key={doc.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+                                <NeuCard key={doc.id} className="flex items-center justify-between gap-3 px-4 py-3">
                                   <div className="flex items-center gap-3">
                                      <FileText className="h-5 w-5 shrink-0 text-red-500" />
                                     <div>
@@ -1506,10 +1535,10 @@ export default function InvoiceDetail() {
                                       }
                                       disabled={documentTypeMutation.isPending}
                                     >
-                                      <SelectTrigger className="h-8 w-[190px] rounded-lg bg-white text-xs dark:bg-slate-950">
+                                      <SelectTrigger className="ff-invoice-select-trigger h-8 w-[190px] rounded-lg bg-white text-xs dark:bg-slate-950">
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent>
+                                      <SelectContent className="ff-invoice-neu-select-content">
                                         <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
                                         <SelectItem value="bill_of_lading">Bill of Lading (BOL)</SelectItem>
                                         <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
@@ -1529,7 +1558,7 @@ export default function InvoiceDetail() {
                                       {doc.status}
                                     </Badge>
                                   </div>
-                                </div>
+                                </NeuCard>
                               ))}
                               <div className="pt-1">
                                 <Button variant="outline" size="sm" onClick={() => navigate("/documents")} className="gap-1.5 rounded-xl text-xs">
@@ -1540,10 +1569,10 @@ export default function InvoiceDetail() {
                           </div>
                         )}
                       </div>
-                    </TabsContent>
+                    </NeuTabPanel>
 
                     {/* Payout */}
-                    <TabsContent value="sheet" className="p-6">
+                    <NeuTabPanel value="sheet" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                       {!detail.payout ? (
                         <div className="flex flex-col items-center justify-center py-16">
                           <EmptyTabState icon={<Banknote className="h-7 w-7" />} label="No payout record yet — fund the invoice to auto-create one" />
@@ -1564,7 +1593,7 @@ export default function InvoiceDetail() {
                               { label: "Reserve",        value: fmtCurrency(detail.payout.reserveAmount), tint: "teal"   },
                               { label: "Payment Method", value: String(detail.payout.paymentMethod ?? "ach").toUpperCase(), tint: "slate" },
                             ].map(({ label, value, tint }) => (
-                              <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                              <NeuCard key={label} className="p-4">
                                 <p className="mb-1 text-xs text-slate-400">{label}</p>
                                 <p className={cn("text-lg font-semibold",
                                   tint === "emerald" && "text-emerald-600 dark:text-emerald-400",
@@ -1574,18 +1603,18 @@ export default function InvoiceDetail() {
                                   tint === "teal"    && "text-teal-600 dark:text-teal-400",
                                   tint === "slate"   && "text-slate-700 dark:text-slate-200",
                                 )}>{value}</p>
-                              </div>
+                              </NeuCard>
                             ))}
                           </div>
-                          <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+                          <NeuCard className="flex items-center justify-between px-4 py-3">
                             <span className="text-sm text-slate-500">Payout Status</span>
                             <Badge className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300">
                               {detail.payout.paymentStatus?.replace(/_/g, " ")}
                             </Badge>
-                          </div>
+                          </NeuCard>
                            {detail.payoutDetail?.funding && <div className={cn("flex items-center gap-2 rounded-xl border px-4 py-3 text-sm", detail.payoutDetail.funding.paymentSent ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}><CheckCircle2 className="h-4 w-4" />Payment sent: <strong>{detail.payoutDetail.funding.paymentSent ? "Yes" : "No"}</strong></div>}
-                           {detail.payoutDetail?.funding && <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900/40 dark:bg-violet-950/20"><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Funding details</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-xs text-violet-600">Funding status</span><p className="font-semibold capitalize">{String(detail.payoutDetail.funding.status || "pending").replace(/_/g, " ")}</p></div><div><span className="text-xs text-violet-600">Funded date</span><p className="font-semibold">{fmtDate(detail.payoutDetail.funding.fundedDate)}</p></div><div><span className="text-xs text-violet-600">Funded by</span><p className="font-semibold">{detail.payoutDetail.funding.fundedBy ? `${detail.payoutDetail.funding.fundedBy.firstName || ""} ${detail.payoutDetail.funding.fundedBy.lastName || ""}`.trim() : "—"}</p></div></div></div>}
-                           <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/30">
+                           {detail.payoutDetail?.funding && <NeuCard className="p-4"><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Funding details</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-xs text-violet-600">Funding status</span><p className="font-semibold capitalize">{String(detail.payoutDetail.funding.status || "pending").replace(/_/g, " ")}</p></div><div><span className="text-xs text-violet-600">Funded date</span><p className="font-semibold">{fmtDate(detail.payoutDetail.funding.fundedDate)}</p></div><div><span className="text-xs text-violet-600">Funded by</span><p className="font-semibold">{detail.payoutDetail.funding.fundedBy ? `${detail.payoutDetail.funding.fundedBy.firstName || ""} ${detail.payoutDetail.funding.fundedBy.lastName || ""}`.trim() : "—"}</p></div></div></NeuCard>}
+                            <NeuCard className="p-4">
                              <div className="flex items-center justify-between gap-3">
                                <div>
                                  <p className="text-sm font-semibold text-slate-800 dark:text-white">Funding receipts</p>
@@ -1605,7 +1634,7 @@ export default function InvoiceDetail() {
                              ) : (
                                <div className="mt-4 space-y-2">
                                  {receipts.map((receipt) => (
-                                   <div key={`${receipt.receiptNo}-${receipt.version}`} className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-800/50">
+                                    <NeuCard key={`${receipt.receiptNo}-${receipt.version}`} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center">
                                      <div className="min-w-0 flex-1">
                                        <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
                                          {receipt.receiptNo} · Version {receipt.version}
@@ -1614,7 +1643,7 @@ export default function InvoiceDetail() {
                                          {receipt.createdAt || receipt.fundedAt ? new Date(receipt.createdAt || receipt.fundedAt || "").toLocaleDateString() : "Date unavailable"}
                                          {" · "}{receipt.paymentReference || "Payment reference pending"}
                                        </p>
-                                     </div>
+                                      </div>
                                      <a
                                        href={`/api/receipts/${encodeURIComponent(receipt.receiptNo)}/download?version=${receipt.version}`}
                                        target="_blank"
@@ -1635,7 +1664,7 @@ export default function InvoiceDetail() {
                                          Resend
                                        </Button>
                                      )}
-                                   </div>
+                                    </NeuCard>
                                  ))}
                                </div>
                              )}
@@ -1661,9 +1690,9 @@ export default function InvoiceDetail() {
                                  </div>
                                </div>
                              )}
-                           </div>
+                            </NeuCard>
                           {detail.payout.notes && (
-                            <p className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">{detail.payout.notes}</p>
+                             <NeuCard className="p-4 text-sm">{detail.payout.notes}</NeuCard>
                           )}
                           {/* Document readiness for payment */}
                           {docStatus && (
@@ -1693,15 +1722,15 @@ export default function InvoiceDetail() {
                           </Button>
                         </div>
                       )}
-                    </TabsContent>
+                    </NeuTabPanel>
 
                     {/* Collections */}
-                    <TabsContent value="collections" className="p-6">
+                    <NeuTabPanel value="collections" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                        <div className="space-y-5">
                          {detail.collections?.length ? (
                          <div className="space-y-2">
                           {detail.collections.map((c: any) => (
-                            <div key={c.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                            <NeuCard key={c.id} className="p-4">
                               <div className="flex items-center justify-between">
                                 <div>
                                   <p className="font-semibold text-slate-800 dark:text-white">{c.description}</p>
@@ -1715,12 +1744,12 @@ export default function InvoiceDetail() {
                                   </div>
                                 </div>
                               </div>
-                            </div>
+                            </NeuCard>
                           ))}
                          </div>
                          ) : <EmptyTabState icon={<CreditCard className="h-7 w-7" />} label="No collection records linked to this invoice" />}
                          {!!detail.collectionsDetail?.brokerFollowUps?.length && (
-                           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                            <NeuCard className="p-4">
                              <h3 className="mb-3 text-sm font-semibold">Broker follow-ups</h3>
                              <div className="space-y-3">
                                {detail.collectionsDetail.brokerFollowUps.map((followUp: any) => (
@@ -1746,22 +1775,22 @@ export default function InvoiceDetail() {
                                  </div>
                                ))}
                              </div>
-                           </div>
+                            </NeuCard>
                          )}
-                         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                          <NeuCard className="p-4">
                            <div className="mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-semibold">Collection notes</h3><span className="text-xs text-slate-400">Append-only</span></div>
                            <div className="flex gap-2"><Textarea value={collectionNote} onChange={e => setCollectionNote(e.target.value)} placeholder="Record a call, promise to pay, or collection context…" rows={2} /><Button disabled={!collectionNote.trim() || noteMutation.isPending} onClick={() => noteMutation.mutate(collectionNote.trim())}>{noteMutation.isPending ? "Saving…" : "Add note"}</Button></div>
-                           <div className="mt-4 space-y-2">{(detail.collectionsDetail?.notes ?? []).map((note: any) => <div key={note.id} className="border-t border-slate-200 pt-2 text-xs dark:border-slate-700"><p className="whitespace-pre-wrap">{note.body}</p><p className="mt-1 text-slate-400">{note.createdByUser?.firstName || "Team"} {note.createdByUser?.lastName || ""} · {fmtDate(note.createdAt)}</p></div>)}</div>
-                         </div>
+                            <div className="mt-4 space-y-2">{(detail.collectionsDetail?.notes ?? []).map((note: any) => <div key={note.id} className="border-t border-slate-200 pt-2 text-xs dark:border-slate-700"><p className="whitespace-pre-wrap">{note.body}</p><p className="mt-1 text-slate-400">{note.createdByUser?.firstName || "Team"} {note.createdByUser?.lastName || ""} · {fmtDate(note.createdAt)}</p></div>)}</div>
+                          </NeuCard>
                        </div>
-                    </TabsContent>
+                     </NeuTabPanel>
 
                     {/* Cash Application */}
-                    <TabsContent value="cashapp" className="p-6">
+                    <NeuTabPanel value="cashapp" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                        <div className="mb-4 grid grid-cols-3 gap-3">
-                         <div className="rounded-xl border bg-slate-50 p-3"><p className="text-xs text-slate-400">Invoice amount</p><p className="text-lg font-semibold">{fmtCurrency(detail.amount)}</p></div>
-                         <div className="rounded-xl border bg-emerald-50 p-3"><p className="text-xs text-emerald-700">Applied</p><p className="text-lg font-semibold text-emerald-700">{fmtCurrency(detail.cash?.appliedTotal)}</p></div>
-                         <div className="rounded-xl border bg-amber-50 p-3"><p className="text-xs text-amber-700">Running balance</p><p className="text-lg font-semibold text-amber-700">{fmtCurrency(detail.cash?.outstanding)}</p></div>
+                          <NeuCard className="p-3"><p className="text-xs text-slate-400">Invoice amount</p><p className="text-lg font-semibold">{fmtCurrency(detail.amount)}</p></NeuCard>
+                          <NeuCard className="p-3"><p className="text-xs text-emerald-700">Applied</p><p className="text-lg font-semibold text-emerald-700">{fmtCurrency(detail.cash?.appliedTotal)}</p></NeuCard>
+                          <NeuCard className="p-3"><p className="text-xs text-amber-700">Running balance</p><p className="text-lg font-semibold text-amber-700">{fmtCurrency(detail.cash?.outstanding)}</p></NeuCard>
                        </div>
                        {(detail.cash?.applications?.length ?? detail.cashAppLines?.length ?? 0) === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16">
@@ -1773,7 +1802,7 @@ export default function InvoiceDetail() {
                       ) : (
                         <div className="space-y-2">
                            {(detail.cash?.applications ?? detail.cashAppLines).map((l: any) => (
-                            <div key={l.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                             <NeuCard key={l.id} className="p-4">
                               <div className="flex items-center justify-between">
                                 <div>
                                   <p className="text-sm font-semibold text-slate-800 dark:text-white">Applied: {fmtCurrency(l.appliedAmount)}</p>
@@ -1789,17 +1818,17 @@ export default function InvoiceDetail() {
                                   {l.varianceType?.replace(/_/g, " ")}
                                 </Badge>
                               </div>
-                            </div>
+                            </NeuCard>
                           ))}
                           <div className="pt-2">
                             <Button variant="outline" size="sm" onClick={() => navigate("/cash-application")} className="gap-1.5 rounded-xl text-xs">
                               <ExternalLink className="h-3.5 w-3.5" />Manage in Cash Application
                             </Button>
                           </div>
-                           {detail.cash?.shortPay && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Short-pay: <strong>{fmtCurrency(detail.cash.shortPay.amount)}</strong>{detail.cash.shortPay.reason ? ` · ${detail.cash.shortPay.reason}` : ""}</div>}
+                           {detail.cash?.shortPay && <NeuCard className="p-3 text-xs text-amber-800">Short-pay: <strong>{fmtCurrency(detail.cash.shortPay.amount)}</strong>{detail.cash.shortPay.reason ? ` · ${detail.cash.shortPay.reason}` : ""}</NeuCard>}
                         </div>
                       )}
-                    </TabsContent>
+                    </NeuTabPanel>
 
                     {/* Exceptions */}
                      {false && (
@@ -1845,7 +1874,7 @@ export default function InvoiceDetail() {
                      )}
 
                     {/* Timeline */}
-                    <TabsContent value="timeline" className="p-6">
+                    <NeuTabPanel value="timeline" unmountInactive className="mt-0 rounded-none bg-transparent p-6 shadow-none">
                       {timelineLoading ? (
                         <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
                        ) : !(timeline?.length || detail.timeline?.length) ? (
@@ -1856,7 +1885,7 @@ export default function InvoiceDetail() {
                            {(timeline?.length ? timeline : detail.timeline).map((event: any) => (
                             <div key={event.id} className="relative flex gap-4 pb-5">
                               <div className="relative z-10 mt-0.5 shrink-0"><TimelineIcon category={event.category} /></div>
-                              <div className="flex-1 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+                              <NeuCard className="flex-1 px-4 py-3">
                                 <div className="flex items-start justify-between gap-3">
                                   <p className="text-sm font-semibold text-slate-800 dark:text-white">{event.title}</p>
                                   <time className="shrink-0 text-[11px] text-slate-400">
@@ -1864,24 +1893,24 @@ export default function InvoiceDetail() {
                                   </time>
                                 </div>
                                 {event.description && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{event.description}</p>}
-                                 {(event.actor?.name || event.actor?.firstName || event.actorUser?.name || event.actorUser?.firstName || event.actorName || event.actorId || event.meta?.actorType === "system") && <p className="mt-1 text-[11px] text-slate-400">By {event.actor?.name || [event.actor?.firstName, event.actor?.lastName].filter(Boolean).join(" ") || event.actorUser?.name || [event.actorUser?.firstName, event.actorUser?.lastName].filter(Boolean).join(" ") || event.actorName || event.actorId || "System"}</p>}
-                              </div>
+                                  {(event.actor?.name || event.actor?.firstName || event.actorUser?.name || event.actorUser?.firstName || event.actorName || event.actorId || event.meta?.actorType === "system") && <p className="mt-1 text-[11px] text-slate-400">By {event.actor?.name || [event.actor?.firstName, event.actor?.lastName].filter(Boolean).join(" ") || event.actorUser?.name || [event.actorUser?.firstName, event.actorUser?.lastName].filter(Boolean).join(" ") || event.actorName || event.actorId || "System"}</p>}
+                              </NeuCard>
                             </div>
                           ))}
                         </div>
                       )}
-                    </TabsContent>
-                  </Tabs>
-                </div>
+                    </NeuTabPanel>
+                  </NeuTabs>
+                </NeuCard>
 
               </div>
             )}
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
-        <DialogContent>
+        <DialogContent className="ff-invoice-neu-dialog">
           <DialogHeader>
             <DialogTitle>Override & Approve</DialogTitle>
             <DialogDescription>Override document requirements and approve this invoice? This will be logged.</DialogDescription>
@@ -1895,7 +1924,7 @@ export default function InvoiceDetail() {
       </Dialog>
 
       <Dialog open={!!fundTransition} onOpenChange={(open) => { if (!open) setFundTransition(null); }}>
-        <DialogContent>
+        <DialogContent className="ff-invoice-neu-dialog">
           <DialogHeader>
             <DialogTitle>Fund Invoice</DialogTitle>
             <DialogDescription>
@@ -1913,8 +1942,8 @@ export default function InvoiceDetail() {
           <div>
             <label className="mb-1.5 block text-sm font-medium">Payment Method</label>
             <Select value={fundMethod} onValueChange={(v: "ach" | "wire" | "check") => setFundMethod(v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="ach">ACH</SelectItem><SelectItem value="wire">Wire</SelectItem><SelectItem value="check">Check</SelectItem></SelectContent>
+              <SelectTrigger className="ff-invoice-select-trigger"><SelectValue /></SelectTrigger>
+              <SelectContent className="ff-invoice-neu-select-content"><SelectItem value="ach">ACH</SelectItem><SelectItem value="wire">Wire</SelectItem><SelectItem value="check">Check</SelectItem></SelectContent>
             </Select>
           </div>
           <div>
@@ -1923,8 +1952,8 @@ export default function InvoiceDetail() {
               <p className="text-sm text-slate-500">Loading bank accounts…</p>
             ) : carrierBankAccounts.length ? (
               <Select value={fundBankAccountId} onValueChange={setFundBankAccountId}>
-                <SelectTrigger><SelectValue placeholder="Select destination account" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="ff-invoice-select-trigger"><SelectValue placeholder="Select destination account" /></SelectTrigger>
+                <SelectContent className="ff-invoice-neu-select-content">
                   {carrierBankAccounts.map((account: any) => (
                     <SelectItem key={account.id} value={String(account.id)}>
                       Account ending in {account.lastFour} — {account.bankName}
@@ -1950,19 +1979,19 @@ export default function InvoiceDetail() {
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
+        <DialogContent className="ff-invoice-neu-dialog">
           <DialogHeader><DialogTitle>Edit Invoice</DialogTitle><DialogDescription>Update invoice billing and load details.</DialogDescription></DialogHeader>
           <div className="grid gap-4">
             <div><label className="text-sm font-medium">Amount</label><Input type="number" value={editValues.amount} onChange={e => setEditValues(v => ({ ...v, amount: e.target.value }))} /></div>
             <div><label className="text-sm font-medium">Load Number</label><Input value={editValues.loadNumber} onChange={e => setEditValues(v => ({ ...v, loadNumber: e.target.value }))} /></div>
-             <div><label className="text-sm font-medium">Broker</label><Select value={editValues.brokerId || "none"} onValueChange={v => setEditValues(s => ({ ...s, brokerId: v === "none" ? "" : v, debtorId: "" }))}><SelectTrigger><SelectValue placeholder="Select broker" /></SelectTrigger><SelectContent><SelectItem value="none">No broker</SelectItem>{brokers.map((broker: any) => <SelectItem key={broker.id} value={String(broker.id)}>{broker.name}</SelectItem>)}</SelectContent></Select></div>
-            <div><label className="text-sm font-medium">Payment Type</label><Select value={editValues.paymentType} onValueChange={v => setEditValues(s => ({ ...s, paymentType: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent></Select></div>
+            <div><label className="text-sm font-medium">Broker</label><Select value={editValues.brokerId || "none"} onValueChange={v => setEditValues(s => ({ ...s, brokerId: v === "none" ? "" : v, debtorId: "" }))}><SelectTrigger className="ff-invoice-select-trigger"><SelectValue placeholder="Select broker" /></SelectTrigger><SelectContent className="ff-invoice-neu-select-content"><SelectItem value="none">No broker</SelectItem>{brokers.map((broker: any) => <SelectItem key={broker.id} value={String(broker.id)}>{broker.name}</SelectItem>)}</SelectContent></Select></div>
+            <div><label className="text-sm font-medium">Payment Type</label><Select value={editValues.paymentType} onValueChange={v => setEditValues(s => ({ ...s, paymentType: v }))}><SelectTrigger className="ff-invoice-select-trigger"><SelectValue /></SelectTrigger><SelectContent className="ff-invoice-neu-select-content"><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent></Select></div>
             {["ACH", "Wire"].includes(editValues.paymentType) && <div>
               <label className="text-sm font-medium">Bank Account</label>
               {carrierBankAccounts.length ? (
                 <Select value={editValues.bankAccountId} onValueChange={bankAccountId => setEditValues(s => ({ ...s, bankAccountId }))}>
-                  <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
-                  <SelectContent>{carrierBankAccounts.map((account: any) => <SelectItem key={account.id} value={String(account.id)}>{account.bankName} — {account.accountType ? account.accountType.charAt(0).toUpperCase() + account.accountType.slice(1) : "Account"} ending in {account.lastFour}</SelectItem>)}</SelectContent>
+                  <SelectTrigger className="ff-invoice-select-trigger"><SelectValue placeholder="Select bank account" /></SelectTrigger>
+                  <SelectContent className="ff-invoice-neu-select-content">{carrierBankAccounts.map((account: any) => <SelectItem key={account.id} value={String(account.id)}>{account.bankName} — {account.accountType ? account.accountType.charAt(0).toUpperCase() + account.accountType.slice(1) : "Account"} ending in {account.lastFour}</SelectItem>)}</SelectContent>
                 </Select>
               ) : <p className="mt-1 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No bank accounts on file — <a className="font-semibold underline" href={`/vault?clientId=${carrierId}`}>add in carrier Vault</a></p>}
             </div>}
@@ -1971,7 +2000,7 @@ export default function InvoiceDetail() {
         </DialogContent>
       </Dialog>
       <Dialog open={chargebackDialogOpen} onOpenChange={setChargebackDialogOpen}>
-        <DialogContent>
+        <DialogContent className="ff-invoice-neu-dialog">
           <DialogHeader><DialogTitle>Extend Chargeback</DialogTitle><DialogDescription>Choose a new future chargeback date and provide the reason for the extension.</DialogDescription></DialogHeader>
           <div className="space-y-4">
             <div><label className="text-sm font-medium">New Chargeback Date</label><Input type="date" min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)} value={chargebackExtensionDate} onChange={e => setChargebackExtensionDate(e.target.value)} /></div>
@@ -1996,6 +2025,7 @@ export default function InvoiceDetail() {
         <DocumentReviewDialog
           documentId={reviewDocId}
           open={reviewDocId !== null}
+          neuStyle
           onOpenChange={(open) => { if (!open) setReviewDocId(null); }}
           onReviewComplete={() => {
             qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
