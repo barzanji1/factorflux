@@ -48,10 +48,12 @@ export function LoadTypeToggleGroup({
   value,
   onChange,
   disabled,
+  neuStyle = false,
 }: {
   value?: string | null;
   onChange: (value: LoadType) => void;
   disabled?: boolean;
+  neuStyle?: boolean;
 }) {
   const selected = displayLoadType(value);
   return (
@@ -66,8 +68,18 @@ export function LoadTypeToggleGroup({
             disabled={disabled}
             onClick={() => onChange(type)}
             className={cn(
-              "rounded-full border px-4 py-2 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-70",
-              active ? LOAD_TYPE_STYLES[type].selected : LOAD_TYPE_STYLES[type].idle,
+              neuStyle
+                ? cn(
+                    "min-h-10 rounded-xl border-0 px-4 py-2 text-sm font-semibold transition-[transform,box-shadow,color] duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+                    active
+                      ? "bg-[#e0e0e0] text-[#168894] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]"
+                      : "bg-[#e0e0e0] text-[#555] shadow-[-4px_-4px_9px_#ffffff,4px_4px_9px_#c1c1c1] hover:text-[#168894]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]",
+                  )
+                : cn(
+                    "rounded-full border px-4 py-2 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-70",
+                    active ? LOAD_TYPE_STYLES[type].selected : LOAD_TYPE_STYLES[type].idle,
+                  ),
             )}
           >
             {LOAD_TYPE_LABELS[type]}

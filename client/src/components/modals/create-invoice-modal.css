@@ -1,0 +1,68 @@
+.ff-create-invoice-dialog {
+  border: 0 !important;
+  border-radius: 20px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -10px -10px 22px #fff, 10px 10px 22px #b8b8b8 !important;
+}
+
+.ff-create-invoice-dialog textarea,
+.ff-create-invoice-dialog .ff-create-invoice-select-trigger {
+  min-height: 2.75rem;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+.ff-create-invoice-dialog textarea {
+  padding: 0.7rem 1rem;
+}
+
+.ff-create-invoice-select-trigger:focus-visible,
+.ff-create-invoice-dialog input:focus-visible,
+.ff-create-invoice-dialog textarea:focus-visible {
+  outline: 2px solid #27aab8;
+  outline-offset: 2px;
+}
+
+.ff-create-invoice-select-content,
+.ff-create-invoice-search-popup {
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.ff-create-invoice-select-content [data-highlighted],
+.ff-create-invoice-search-popup button:hover {
+  background: #d3e8e7 !important;
+  color: #247d85 !important;
+}
+
+.ff-create-invoice-search-popup {
+  z-index: 60;
+  max-height: 14rem;
+  overflow: auto;
+  padding: 0.25rem;
+}
+
+.ff-create-invoice-search-popup button {
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.ff-create-invoice-dialog [data-required-mark] {
+  color: #168894 !important;
+}
+
+@media (max-width: 767px) {
+  .ff-create-invoice-dialog {
+    width: calc(100vw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+    border-radius: 16px !important;
+  }
+}

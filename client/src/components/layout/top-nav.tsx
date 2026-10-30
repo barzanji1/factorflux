@@ -500,7 +500,11 @@ export default function TopNav({ title, subtitle, group, neu = false }: TopNavPr
 
           <div className="flex flex-wrap items-center justify-end gap-3">
             {showHomeButton && (
-              <Button variant="outline" size="sm" onClick={() => setLocation("/")}
+              neu ? <NeuButton onClick={() => setLocation("/")}
+                className="h-11 px-4 text-[#27aab8] transition-colors duration-200 hover:bg-[#27aab8] hover:text-white">
+                <Home className="mr-2 h-4 w-4" />
+                Home
+              </NeuButton> : <Button variant="outline" size="sm" onClick={() => setLocation("/")}
                  className="h-11 rounded-sm border-2 border-[#808080] bg-[#d4d0c8] px-4 text-[#1a1a1a] hover:bg-[#dff5f6]">
                 <Home className="mr-2 h-4 w-4" />
                 Home

@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Building2, CheckCircle2, Plus, Search, ShieldAlert, Truck, Upload, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NeuBadge, NeuButton, NeuCard, NeuInput } from "@/styles/neu";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +17,23 @@ import { useInvoiceEntityQuery } from "@/hooks/use-invoice-entity-query";
 import { displayLoadType, isLoadType } from "@shared/load-types";
 import { LoadTypeToggleGroup } from "@/components/load-type";
 import { HOLD_REASONS } from "@shared/invoice-creation-options";
+import "./create-invoice-modal.css";
+
+type ModalButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "default" | "outline" | "ghost" | "accent";
+};
+
+function Button({ variant = "default", className, ...props }: ModalButtonProps) {
+  return (
+    <NeuButton
+      variant={variant === "accent" ? "accent" : "default"}
+      className={cn(variant === "ghost" && "text-[#666666]", className)}
+      {...props}
+    />
+  );
+}
+
+const Input = NeuInput;
 
 type Carrier = {
   id: number; name: string; status?: string | null; mcNumber?: string | null;
@@ -100,7 +116,7 @@ function PaperworkDropzone({
       onDragOver={event => { event.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={event => { event.preventDefault(); setDragging(false); const dropped = event.dataTransfer.files[0]; if (dropped) void validate(dropped); }}
-      className={cn("rounded-xl border border-dashed p-3 transition-colors", dragging ? "border-blue-500 bg-blue-50" : file ? "border-emerald-400 bg-emerald-50/70" : "border-slate-300 hover:border-blue-400")}
+      className={cn("rounded-xl border border-dashed p-3 transition-colors shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]", dragging ? "border-[#27aab8] bg-[#d8eeee] ring-2 ring-[#27aab8]" : file ? "border-emerald-400 bg-emerald-50/70" : "border-[#aaa] hover:border-[#27aab8]")}
     >
       <input ref={inputRef} type="file" className="hidden" accept="application/pdf,.pdf" onChange={event => {
         const selected = event.target.files?.[0];
@@ -114,7 +130,7 @@ function PaperworkDropzone({
           <button type="button" aria-label={`Remove ${label}`} className="rounded p-1 text-slate-500 hover:bg-white" onClick={event => { event.stopPropagation(); onRemove(); }}><X className="h-4 w-4" /></button>
         </div>
       ) : (
-        <div className="flex items-center gap-2.5"><Upload className="h-5 w-5 text-slate-500" /><span className="text-xs font-medium">{label}{required && <span className="text-red-500"> *</span>}</span></div>
+        <div className="flex items-center gap-2.5"><Upload className="h-5 w-5 text-slate-500" /><span className="text-xs font-medium">{label}{required && <span data-required-mark> *</span>}</span></div>
       )}
     </div>
   );
@@ -134,7 +150,7 @@ function SearchSelect<T extends { id: number; name: string }>({
   );
   return (
     <div className="relative space-y-1.5">
-      <Label>{label}{required && <span className="text-red-500"> *</span>}</Label>
+      <Label>{label}{required && <span data-required-mark> *</span>}</Label>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <Input
@@ -152,7 +168,7 @@ function SearchSelect<T extends { id: number; name: string }>({
         )}
       </div>
       {open && (
-        <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-950">
+        <div className="ff-create-invoice-search-popup absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border p-1">
           {filtered.length ? filtered.map(item => (
             <button key={item.id} type="button"
               onClick={() => { onSelect(item); setOpen(false); setQuery(""); }}
@@ -173,7 +189,7 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
   const status = record ? record.status ?? "Unknown" : "Not selected";
   const favorable = status === "active" || status === "approved";
   return (
-    <aside className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+      <NeuCard className="rounded-2xl p-4">
       <div className="mb-4 flex items-center gap-2">
         <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl", isCarrier ? "bg-blue-100 text-blue-700" : "bg-violet-100 text-violet-700")}>
           {isCarrier ? <Truck className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
@@ -184,16 +200,16 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
         </div>
       </div>
       {!record ? (
-        <p className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-slate-500">
+        <p className="rounded-xl border border-dashed border-[#aaa] px-3 py-6 text-center text-xs text-slate-500">
           Select a {kind} to view status and messages.
         </p>
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="truncate pr-2 text-sm font-semibold">{record.name}</span>
-            <Badge className={cn("capitalize", favorable ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800")}>
+            <NeuBadge tone={favorable ? "success" : "warning"} className="capitalize">
               {status.replace(/_/g, " ")}
-            </Badge>
+            </NeuBadge>
           </div>
           {!isCarrier && (
             <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
@@ -228,7 +244,7 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
           </div>
         </div>
       )}
-    </aside>
+      </NeuCard>
   );
 }
 
@@ -882,8 +898,8 @@ export default function CreateInvoiceModal({
       if (branchMutation.isPending) return;
       onOpenChange(nextOpen);
     }}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded-3xl p-0">
-        <DialogHeader className="border-b px-6 py-5">
+      <DialogContent className="ff-create-invoice-dialog max-h-[92vh] max-w-6xl overflow-y-auto p-0">
+        <DialogHeader className="border-b border-[#c6c6c6] px-6 py-5">
           <DialogTitle className="text-xl">Create Invoice</DialogTitle>
           <DialogDescription>Enter the load details. The invoice enters Pending Review unless placed on hold.</DialogDescription>
         </DialogHeader>
@@ -896,7 +912,8 @@ export default function CreateInvoiceModal({
                 <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
               </div>
             ))}
-            <section className="space-y-3 rounded-none border border-slate-400 bg-slate-100 p-3" aria-labelledby="ocr-upload-heading">
+            <NeuCard pressed className="rounded-2xl p-4">
+            <section className="space-y-3" aria-labelledby="ocr-upload-heading">
               <div>
                 <h3 id="ocr-upload-heading" className="text-sm font-semibold">Staff intake · document set</h3>
                 <p className="mt-0.5 text-xs text-slate-600">Drop the rate confirmation, carrier invoice, and BOL/POD together. Up to 8 PDFs, 135MB each. Large PDFs are compressed automatically.</p>
@@ -930,15 +947,15 @@ export default function CreateInvoiceModal({
                   void stageOcrFiles(Array.from(event.dataTransfer.files));
                 }}
                 className={cn(
-                  "w-full border-2 border-t-white border-l-white border-r-[#555] border-b-[#555] bg-[#c0c0c0] px-4 py-5 text-left text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#000080]",
-                  ocrDragActive && "border-2 border-dashed border-[#000080] bg-[#d8d8d8]",
+                  "w-full rounded-2xl border border-dashed border-[#aaa] bg-[#e0e0e0] px-4 py-5 text-left text-sm text-[#333] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff] focus:outline-none focus:ring-2 focus:ring-blue-500",
+                  ocrDragActive && "border-blue-500 bg-blue-50 ring-2 ring-blue-500",
                 )}
               >
                 <span className="block font-semibold">Drop PDF documents here</span>
                 <span className="mt-1 block text-xs">or choose files · rate con, invoice, BOL/POD, and supporting docs</span>
               </button>
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" disabled={!ocrFiles.length || ["uploading", "queued", "processing"].includes(ocrStatus)} onClick={() => void uploadOcrBatch(ocrFiles)}>
+                <Button type="button" variant="accent" disabled={!ocrFiles.length || ["uploading", "queued", "processing"].includes(ocrStatus)} onClick={() => void uploadOcrBatch(ocrFiles)}>
                   {ocrStatus === "failed" || ocrDocuments.some(document => document.status === "failed") ? "Retry / reupload set" : ocrStatus === "completed" ? "Process replacement set" : "Process document set"}
                 </Button>
                 {ocrFiles.length > 0 && <span className="text-xs text-slate-600">{ocrFiles.length} PDF{ocrFiles.length === 1 ? "" : "s"} staged</span>}
@@ -993,11 +1010,13 @@ export default function CreateInvoiceModal({
                 </>
               )}
             </section>
+            </NeuCard>
             <div className="space-y-2">
-              <Label>Load Type <span className="text-red-500">*</span></Label>
+              <Label>Load Type <span data-required-mark>*</span></Label>
               <LoadTypeToggleGroup
                 value={values.loadType}
                 onChange={loadType => setValues(v => ({ ...v, loadType }))}
+                neuStyle
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1007,28 +1026,28 @@ export default function CreateInvoiceModal({
                 {renderOcrSource("invoice_number")}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="loadNumber">Load # <span className="text-red-500">*</span></Label>
+                <Label htmlFor="loadNumber">Load # <span data-required-mark>*</span></Label>
                 <Input id="loadNumber" required value={values.loadNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, loadNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Enter load number" />
                 {renderOcrSource("load_number")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="invoiceDate">Invoice Date</Label>
-                <Input id="invoiceDate" type="date" className="rounded-none" value={values.invoiceDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, invoiceDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                <Input id="invoiceDate" type="date" value={values.invoiceDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, invoiceDate: e.target.value })); }} onBlur={() => void runPreflight()} />
                 {renderOcrSource("invoice_date")}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="rateAmount">Rate <span className="text-red-500">*</span></Label>
+                <Label htmlFor="rateAmount">Rate <span data-required-mark>*</span></Label>
                 <Input id="rateAmount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, amount: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Rate confirmation amount" />
                 {renderOcrSource(ocrFields?.rate?.trim() ? "rate" : "amount")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="pickupDate">Pickup Date</Label>
-                <Input id="pickupDate" type="date" className="rounded-none" value={values.pickupDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, pickupDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                <Input id="pickupDate" type="date" value={values.pickupDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, pickupDate: e.target.value })); }} onBlur={() => void runPreflight()} />
                 {renderOcrSource("pickup_date")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="deliveryDate">Delivery Date</Label>
-                <Input id="deliveryDate" type="date" className="rounded-none" value={values.deliveryDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, deliveryDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                <Input id="deliveryDate" type="date" value={values.deliveryDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, deliveryDate: e.target.value })); }} onBlur={() => void runPreflight()} />
                 {renderOcrSource("delivery_date")}
               </div>
               <div className="space-y-1.5">
@@ -1044,8 +1063,8 @@ export default function CreateInvoiceModal({
               <div className="space-y-1.5">
                 <Label>Lumper</Label>
                 <Select value={values.lumper} onValueChange={lumper => setValues(v => ({ ...v, lumper: lumper === "unspecified" ? "" : lumper }))}>
-                  <SelectTrigger><SelectValue placeholder="Select Yes or No" /></SelectTrigger>
-                  <SelectContent><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem><SelectItem value="unspecified">Not specified</SelectItem></SelectContent>
+                  <SelectTrigger className="ff-create-invoice-select-trigger"><SelectValue placeholder="Select Yes or No" /></SelectTrigger>
+                  <SelectContent className="ff-create-invoice-select-content"><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem><SelectItem value="unspecified">Not specified</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
@@ -1075,21 +1094,22 @@ export default function CreateInvoiceModal({
                  placeholder="Search carriers..."
                />
                <div className="relative space-y-1.5">
-                 <Label>Broker <span className="text-red-500">*</span></Label>
+                  <Label>Broker <span data-required-mark>*</span></Label>
                  <div className="relative">
                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input className="h-11 pl-9" value={brokerOpen ? brokerSearch : broker?.name ?? ""} placeholder={brokerLoading ? "Loading broker..." : "Search brokers..."} onFocus={() => { setBrokerOpen(true); setBrokerSearch(""); }} onChange={event => { setBrokerSearch(event.target.value); setBrokerOpen(true); }} />
                      {values.brokerId && !brokerOpen && <button type="button" aria-label="Clear Broker" onClick={() => { invalidatePreflightAcknowledgements(); ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); setValues(v => ({ ...v, brokerId: "", branchId: "" })); setBrokerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
                  </div>
-                 {brokerOpen && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border bg-white p-1 shadow-xl dark:bg-slate-950">
+                  {brokerOpen && <div className="ff-create-invoice-search-popup absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border p-1">
                       {brokers.length ? brokers.map(item => <button key={item.id} type="button" onClick={() => { void queryClient.invalidateQueries({ queryKey: ["/api/brokers", String(item.id)] }, { cancelRefetch: false }); ocrSelectedBrokerId.current = null; setOcrBrokerMatch(null); const next = { ...values, brokerId: String(item.id), branchId: "" }; invalidatePreflightAcknowledgements(); setValues(next); setBrokerSearch(""); setBrokerOpen(false); void runPreflight(next, true); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><span className="font-medium">{item.name}</span><span className="text-xs capitalize text-slate-400">{item.status}</span></button>) : <p className="px-3 py-4 text-center text-xs text-slate-500">No matches found</p>}
                  </div>}
                </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor="branchId">Branch</Label>
-                  <button
+                  <Button
                     type="button"
+                    variant="default"
                     disabled={!values.brokerId || branchMutation.isPending}
                     title={!values.brokerId ? "Select a broker first" : undefined}
                     onClick={() => {
@@ -1097,16 +1117,16 @@ export default function CreateInvoiceModal({
                       setBranchCreateError("");
                       setBranchDialogOpen(true);
                     }}
-                    className="inline-flex h-7 items-center gap-1 border-2 border-t-white border-l-white border-r-[#777] border-b-[#777] bg-[#d4d0c8] px-2 text-xs font-semibold text-black active:border-t-[#777] active:border-l-[#777] active:border-r-white active:border-b-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-8 rounded-lg px-2 text-xs"
                   >
                     <Plus className="h-3 w-3" /> Add Branch
-                  </button>
+                  </Button>
                 </div>
                 <Select value={values.branchId || "__none"} onValueChange={branchId => setValues(v => ({ ...v, branchId: branchId === "__none" ? "" : branchId }))}>
-                  <SelectTrigger id="branchId" disabled={!values.brokerId || branchesLoading || branchesError}>
+                  <SelectTrigger id="branchId" className="ff-create-invoice-select-trigger" disabled={!values.brokerId || branchesLoading || branchesError}>
                     <SelectValue placeholder={!values.brokerId ? "Select a broker first" : branchesLoading ? "Loading branches..." : branchesError ? "Unable to load branches" : "Select a branch"} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="ff-create-invoice-select-content">
                     <SelectItem value="__none">None — optional</SelectItem>
                     {branches.map(branch => <SelectItem key={branch.id} value={String(branch.id)}>{branch.branchName}</SelectItem>)}
                   </SelectContent>
@@ -1118,34 +1138,34 @@ export default function CreateInvoiceModal({
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Payment Type</Label>
                 <Select value={values.paymentType} onValueChange={paymentType => setValues(v => ({ ...v, paymentType, bankAccountId: paymentType === "ACH" ? v.bankAccountId : "" }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent>
+                  <SelectTrigger className="ff-create-invoice-select-trigger"><SelectValue /></SelectTrigger>
+                  <SelectContent className="ff-create-invoice-select-content"><SelectItem value="ACH">ACH</SelectItem><SelectItem value="Wire">Wire</SelectItem></SelectContent>
                 </Select>
                  <p className="text-xs font-medium text-red-600">Wire (same day funding) cutoff time is at 13:00:00 MT</p>
               </div>
-              <div className="space-y-3 border-2 border-t-white border-l-white border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] p-3 sm:col-span-2">
+              <NeuCard pressed className="space-y-3 p-4 sm:col-span-2">
                 <div className="flex items-center gap-2">
                   <Checkbox id="holdForManagerReview" checked={values.holdForManagerReview}
                     onCheckedChange={checked => setValues(v => ({ ...v, holdForManagerReview: checked === true }))}
-                    className="rounded-none border-2 border-t-[#808080] border-l-[#808080] border-r-white border-b-white" />
+                    className="rounded-md border-[#999] data-[state=checked]:border-[#168894] data-[state=checked]:bg-[#168894] data-[state=checked]:text-white" />
                   <Label htmlFor="holdForManagerReview">Place on hold</Label>
                 </div>
                 {values.holdForManagerReview && (
                   <div className="space-y-4 border-t border-[#aaa] pt-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="holdReason">Reason for hold <span className="text-red-600">*</span></Label>
+                        <Label htmlFor="holdReason">Reason for hold <span data-required-mark>*</span></Label>
                       <Select value={values.holdReason} onValueChange={holdReason => setValues(v => ({ ...v, holdReason }))}>
-                        <SelectTrigger id="holdReason" className="rounded-none border-2 border-t-[#808080] border-l-[#808080] border-r-white border-b-white bg-white">
+                        <SelectTrigger id="holdReason" className="ff-create-invoice-select-trigger">
                           <SelectValue placeholder="Select a reason" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="ff-create-invoice-select-content">
                           {HOLD_REASONS.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       {!values.holdReason && <p className="text-xs text-red-700">Choose a reason before placing this invoice on hold.</p>}
                     </div>
                     <fieldset className="space-y-2">
-                      <legend className="text-sm font-medium">Held for <span className="text-red-600">*</span></legend>
+                      <legend className="text-sm font-medium">Held for <span data-required-mark>*</span></legend>
                       {holdRecipientsLoading && <p role="status" className="text-xs text-slate-700">Loading current hold recipients…</p>}
                       {holdRecipientsError && <p role="alert" className="text-xs font-medium text-red-700">Unable to load hold recipients. Close and reopen the invoice form to retry; held submission is unavailable until this list loads.</p>}
                       {!holdRecipientsLoading && !holdRecipientsError && holdRecipients.length === 0 && (
@@ -1156,8 +1176,8 @@ export default function CreateInvoiceModal({
                           const checked = values.heldFor.includes(option.value);
                           return (
                             <label key={option.value} className={cn(
-                              "flex items-start gap-2 border border-[#aaa] bg-white px-2.5 py-2 text-sm",
-                              !option.available && "cursor-not-allowed bg-slate-100 text-slate-500",
+                              "flex items-start gap-2 rounded-xl bg-[#e0e0e0] px-3 py-2 text-sm shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]",
+                              !option.available && "cursor-not-allowed bg-[#d8d8d8] text-slate-500 opacity-75",
                             )}>
                               <Checkbox
                                 checked={checked && option.available}
@@ -1185,13 +1205,13 @@ export default function CreateInvoiceModal({
                     </fieldset>
                   </div>
                 )}
-              </div>
+              </NeuCard>
               {values.paymentType === "ACH" && (
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Bank Account Credentials</Label>
                   <Select disabled={!values.clientId || bankAccountsLoading || bankAccountsError} value={values.bankAccountId} onValueChange={bankAccountId => setValues(v => ({ ...v, bankAccountId }))}>
-                    <SelectTrigger><SelectValue placeholder={values.clientId ? "Select carrier bank account" : "Select a carrier first"} /></SelectTrigger>
-                    <SelectContent>
+                    <SelectTrigger className="ff-create-invoice-select-trigger"><SelectValue placeholder={values.clientId ? "Select carrier bank account" : "Select a carrier first"} /></SelectTrigger>
+                    <SelectContent className="ff-create-invoice-select-content">
                       {bankAccounts.map(account => (
                         <SelectItem key={account.id} value={String(account.id)}>
                           {account.bankName || "Bank account"} · {account.accountType || "Account"} ending in {account.lastFour || "••••"}
@@ -1258,7 +1278,7 @@ export default function CreateInvoiceModal({
               }}>Reset</Button>
               {entityDataLoading && <p role="status" className="text-sm">Refreshing broker and carrier data…</p>}
               {entityDataError && <p role="alert" className="text-sm text-red-700">Unable to refresh broker or carrier data. Reselect the record or reopen the form to retry.</p>}
-              <Button type="submit" disabled={!valid || mutation.isPending || branchMutation.isPending || preflightLoading || entityDataLoading || entityDataError} className="bg-blue-600 px-6 text-white hover:bg-blue-700">
+              <Button type="submit" variant="accent" disabled={!valid || mutation.isPending || branchMutation.isPending || preflightLoading || entityDataLoading || entityDataError} className="px-6">
                 {mutation.isPending ? "Creating..." : "Submit"}
               </Button>
             </div>
@@ -1272,21 +1292,21 @@ export default function CreateInvoiceModal({
       }}>
         <DialogContent
           showCloseButton={false}
-          className="max-h-[85vh] max-w-lg overflow-y-auto rounded-none border-2 border-slate-600 bg-[#c0c0c0] p-1 shadow-[4px_4px_0_#404040]"
+          className="ff-create-invoice-dialog max-h-[85vh] max-w-lg overflow-y-auto p-0"
         >
-          <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">
+          <div className="flex items-center justify-between border-b border-[#c6c6c6] px-5 py-4">
             <DialogTitle className="text-sm font-bold">Add Broker Branch</DialogTitle>
             <button
               type="button"
               aria-label="Close add branch"
               disabled={branchMutation.isPending}
               onClick={() => setBranchDialogOpen(false)}
-              className="border-2 border-white bg-[#c0c0c0] px-2 font-bold leading-5 text-black disabled:opacity-50"
+              className="rounded-lg bg-[#e0e0e0] px-2 font-bold leading-5 text-[#555] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff] disabled:opacity-50"
             >×</button>
           </div>
           <DialogDescription className="sr-only">Add a branch to the selected broker. Only the branch name is required.</DialogDescription>
           <form
-            className="space-y-3 bg-[#c0c0c0] p-3"
+            className="space-y-3 bg-[#e0e0e0] p-5"
             onSubmit={event => {
               event.preventDefault();
               const brokerId = values.brokerId;
@@ -1295,7 +1315,7 @@ export default function CreateInvoiceModal({
               branchMutation.mutate({ brokerId, fields: branchForm });
             }}
           >
-            <p className="border border-[#888] bg-[#e7e5df] px-2 py-1.5 text-xs text-[#333]">
+            <p className="rounded-xl bg-[#e0e0e0] px-3 py-2 text-xs text-[#555] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">
               Adding branch for <strong>{broker?.name ?? "selected broker"}</strong>. Name is required; all other details are optional.
             </p>
             {branchCreateError && <p role="alert" className="border border-red-700 bg-red-100 px-2 py-1.5 text-xs text-red-900">{branchCreateError}</p>}
@@ -1311,14 +1331,14 @@ export default function CreateInvoiceModal({
                 ["phone", "Phone", false],
               ] as const).map(([key, label, required]) => (
                 <label key={key} className="space-y-1 text-xs font-semibold text-[#222]">
-                  <span>{label}{required ? " *" : ""}</span>
+                  <span>{label}{required ? <span data-required-mark> *</span> : ""}</span>
                   <Input
                     autoComplete="off"
                     type={key === "email" ? "email" : "text"}
                     required={required}
                     value={branchForm[key]}
                     onChange={event => setBranchForm(current => ({ ...current, [key]: event.target.value }))}
-                    className="h-8 rounded-none border border-[#777] bg-white px-2 text-sm shadow-[inset_1px_1px_0_#aaa]"
+                    className="min-h-9"
                   />
                 </label>
               ))}
@@ -1328,26 +1348,27 @@ export default function CreateInvoiceModal({
                 type="button"
                 disabled={branchMutation.isPending}
                 onClick={() => setBranchDialogOpen(false)}
-                className="h-8 rounded-none border-2 border-t-white border-l-white border-r-[#555] border-b-[#555] bg-[#c0c0c0] px-3 text-black shadow-[1px_1px_0_#333] hover:bg-[#d0d0d0]"
+                className="min-h-9 px-3"
               >Cancel</Button>
               <Button
                 type="submit"
                 disabled={!values.brokerId || !branchForm.branchName.trim() || branchMutation.isPending}
-                className="h-8 rounded-none border-2 border-t-white border-l-white border-r-[#555] border-b-[#555] bg-[#c0c0c0] px-3 text-black shadow-[1px_1px_0_#333] hover:bg-[#d0d0d0] disabled:opacity-60"
+                variant="accent"
+                className="min-h-9 px-3 disabled:opacity-60"
               >{branchMutation.isPending ? "Saving..." : "Save Branch"}</Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
       <Dialog open={preflightOpen} onOpenChange={setPreflightOpen}>
-        <DialogContent showCloseButton={false} className="max-h-[80vh] max-w-xl overflow-y-auto rounded-none border-2 border-slate-600 bg-[#c0c0c0] p-1 shadow-[4px_4px_0_#404040]">
-          <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">
+        <DialogContent showCloseButton={false} className="ff-create-invoice-dialog max-h-[80vh] max-w-xl overflow-y-auto p-0">
+          <div className="flex items-center justify-between border-b border-[#c6c6c6] px-5 py-4">
             <DialogTitle className="text-sm font-bold">Invoice Preflight Alerts</DialogTitle>
-            <button type="button" onClick={() => setPreflightOpen(false)} aria-label="Close preflight alerts" className="border-2 border-white bg-[#c0c0c0] px-2 font-bold leading-5 text-black">×</button>
+            <button type="button" onClick={() => setPreflightOpen(false)} aria-label="Close preflight alerts" className="rounded-lg bg-[#e0e0e0] px-2 font-bold leading-5 text-[#555] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">×</button>
           </div>
           <DialogDescription className="sr-only">Review carrier and broker alerts before submitting this invoice.</DialogDescription>
-          <div className="space-y-3 bg-[#c0c0c0] p-4 text-sm">
-            {preflightLoading && <p className="border border-gray-500 bg-white px-3 py-2">Checking carrier and broker records…</p>}
+          <div className="space-y-3 bg-[#e0e0e0] p-5 text-sm">
+            {preflightLoading && <p className="rounded-xl px-3 py-2 shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">Checking carrier and broker records…</p>}
             {preflightError && <p role="alert" className="border border-red-700 bg-red-100 px-3 py-2 text-red-900">{preflightError}</p>}
             {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
               <div key={alert.code} className="border border-blue-700 bg-blue-100 px-3 py-2 text-blue-950">
@@ -1384,7 +1405,7 @@ export default function CreateInvoiceModal({
             )}
             {preflightAlerts.length === 0 && !preflightLoading && !preflightError && <p className="border border-gray-500 bg-white px-3 py-2">No active preflight alerts.</p>}
             <div className="flex justify-end gap-2 border-t border-gray-500 pt-3">
-              <Button type="button" onClick={() => setPreflightOpen(false)} className="rounded-none border-2 border-white bg-[#c0c0c0] text-black shadow-[1px_1px_0_#333] hover:bg-[#d0d0d0]">Close</Button>
+              <Button type="button" onClick={() => setPreflightOpen(false)}>Close</Button>
             </div>
           </div>
         </DialogContent>
