@@ -131,7 +131,7 @@ test("section HTTP reads are independent, authenticated, scoped and fail visibly
   await new Promise<void>(resolve => server.once("listening", resolve));
   const root = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/agent-dashboard`;
   try {
-    for (const section of ["queue", "followups", "activity", "alerts"]) {
+    for (const section of ["queue", "followups", "activity", "alerts", "financial"]) {
       assert.equal((await fetch(`${root}/${section}`)).status, 401);
       assert.equal((await fetch(`${root}/${section}`, { headers: { "x-fixture-role": "carrier" } })).status, 403);
       assert.equal((await fetch(`${root}/${section}?agentId=someone-else`, { headers: { "x-fixture-role": "employee" } })).status, 400);

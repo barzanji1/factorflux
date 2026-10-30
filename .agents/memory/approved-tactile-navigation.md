@@ -3,8 +3,8 @@ name: Approved tactile navigation
 description: User-approved visual direction for FactorFlux sidebar and shared button styling.
 ---
 
-Preserve the strongly raised, rectangular, stacked button treatment for FactorFlux navigation. Keep labels crisp, dark, and high-contrast; avoid text shadows that soften small sidebar type.
+Use light neumorphic shared navigation with a collapsed icon rail, hover expansion, persistent pinning, collapsible groups, and a teal active indicator. Keep labels crisp and readable.
 
-**Why:** The user explicitly approved the stronger reference-matched bevel treatment, then identified sidebar label legibility as the remaining issue.
+**Why:** The user superseded the earlier beveled-button direction by explicitly requesting a global neumorphic sidebar while retaining Win95 content on other pages.
 
-**How to apply:** Future visual changes should retain the tactile white top/left and dark bottom/right edges, pale teal selected state, and readable modern typography rather than reverting to flat or low-contrast navigation.
+**How to apply:** Preserve navigation permissions, destinations, unread indicators, keyboard access, and mobile navigation when adjusting the shared frame. Do not re-theme unrelated page content.

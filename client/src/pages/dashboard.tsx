@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
-import { Win95Button } from "@/components/win95";
+import { FinancialSummary, WorkShortcuts, type FinancialDashboardData } from "@/components/dashboard/FinancialOverview";
+import { NeuBadge, NeuButton, NeuCard, NeuTable } from "@/styles/neu";
 import { AlertTriangle, ArrowUpRight, BriefcaseBusiness, Clock3, RefreshCw } from "lucide-react";
 import type {
   DashboardActivityFeed,
@@ -32,93 +33,91 @@ function dateSort(value: string | null) {
 
 function SectionHeading({ number, title, count, id }: { number: string; title: string; count?: number; id: string }) {
   return (
-    <div className="flex items-center gap-2 border-b-2 border-[#808080] bg-[#d4d0c8] px-3 py-2">
-      <span aria-hidden="true" className="font-mono text-xs font-bold text-[#087c8d]">{number}</span>
-      <h2 id={id} className="text-sm font-bold text-[#202020]">{title}</h2>
-      {count !== undefined && <span className="ml-auto min-w-6 border border-[#808080] bg-white px-1.5 text-center font-mono text-xs">{count}</span>}
+    <div className="ff-neu-section-heading">
+      <span aria-hidden="true" className="ff-neu-section-number">{number}</span>
+      <h2 id={id} className="ff-neu-section-title">{title}</h2>
+      {count !== undefined && <NeuBadge className="ml-auto">{count.toLocaleString()}</NeuBadge>}
     </div>
   );
 }
 
 function EmptyRow({ children, columns }: { children: string; columns: number }) {
-  return <tr><td colSpan={columns} className="!py-8 text-center text-sm text-[#555]">{children}</td></tr>;
+  return <tr><td colSpan={columns} className="!py-8 text-center text-sm text-[#77817e]">{children}</td></tr>;
 }
 
 function QueueTable({ group, go }: { group: DashboardQueue["queueGroups"][number]; go: (href: string) => void }) {
   const truncated = group.items.length < group.totalCount;
   return (
-    <div className="min-w-[610px] border-2 border-[#808080] border-b-white border-r-white bg-white shadow-[inset_1px_1px_2px_rgba(0,0,0,0.15)]">
-      <div className="flex items-center justify-between border-b border-[#a0a0a0] bg-[#ece9e2] px-2.5 py-2">
+    <NeuCard pressed className="ff-neu-queue-card">
+      <div className="ff-neu-queue-heading">
         <div className="flex min-w-0 items-center gap-2">
-          <BriefcaseBusiness className="h-4 w-4 shrink-0 text-[#087c8d]" />
-          <h3 className="truncate text-xs font-bold text-[#222]">{group.agentName}</h3>
+          <BriefcaseBusiness className="h-4 w-4 shrink-0 text-[#168f99]" />
+          <h3 className="truncate text-sm font-semibold text-[#3e4946]">{group.agentName}</h3>
         </div>
-        <span className="font-mono text-[11px] text-[#555]">{group.totalCount} open</span>
+        <span className="ff-neu-small-count">{group.totalCount} open</span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="ff-data-table w-full min-w-[600px]" aria-label={`${group.agentName} invoice queue`} data-testid="queue-table">
-          <thead><tr><th>Invoice #</th><th>Carrier</th><th>Broker</th><th>Status</th><th>Age</th><th>Action needed</th></tr></thead>
-          <tbody>
-            {group.items.length === 0 ? <EmptyRow columns={6}>No invoices in this queue.</EmptyRow> : group.items.map(item => (
-              <tr
-                key={item.id}
-                role="link"
-                tabIndex={0}
-                aria-label={`Open invoice ${item.invoiceNumber}`}
-                data-testid="queue-row"
-                className="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#087c8d]"
-                onClick={() => go(item.href)}
-                onKeyDown={event => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    go(item.href);
-                  }
-                }}
-              >
-                <td className="font-mono font-semibold">
-                  <a href={item.href} className="text-[#087c8d] underline-offset-2 hover:underline" onClick={event => { event.preventDefault(); event.stopPropagation(); go(item.href); }}>
-                    {item.invoiceNumber}
-                  </a>
-                </td>
-                <td>{item.carrierName}</td>
-                <td>{item.brokerName}</td>
-                <td><span className="ff-badge ff-badge-pending">{item.status.replace(/_/g, " ")}</span></td>
-                <td className="whitespace-nowrap font-mono text-xs">
-                  <span>{item.ageDays === null ? "—" : `${item.ageDays}d`}</span>
-                  <span className="ml-1 text-[10px] text-[#666]">({item.ageBasis || "basis unavailable"})</span>
-                </td>
-                <td className="max-w-[220px]">
-                  {item.actions.length ? <span className="flex flex-wrap gap-1">{item.actions.map((action, index) => <span key={`${action}-${index}`} className="border border-[#a0a0a0] bg-[#ece9e2] px-1.5 py-0.5 text-[11px]">{action}</span>)}</span> : <span className="text-[#666]">No action listed</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <NeuTable className="ff-neu-table w-full min-w-[700px]" aria-label={`${group.agentName} invoice queue`} data-testid="queue-table">
+        <thead><tr><th>Invoice #</th><th>Carrier</th><th>Broker</th><th>Status</th><th>Age</th><th>Action needed</th></tr></thead>
+        <tbody>
+          {group.items.length === 0 ? <EmptyRow columns={6}>No invoices in this queue.</EmptyRow> : group.items.map(item => (
+            <tr
+              key={item.id}
+              role="link"
+              tabIndex={0}
+              aria-label={`Open invoice ${item.invoiceNumber}`}
+              data-testid="queue-row"
+              className="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#168f99]"
+              onClick={() => go(item.href)}
+              onKeyDown={event => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  go(item.href);
+                }
+              }}
+            >
+              <td className="font-mono font-semibold">
+                <a href={item.href} className="text-[#168f99] underline-offset-2 hover:underline" onClick={event => { event.preventDefault(); event.stopPropagation(); go(item.href); }}>
+                  {item.invoiceNumber}
+                </a>
+              </td>
+              <td>{item.carrierName}</td>
+              <td>{item.brokerName}</td>
+              <td><NeuBadge tone="warning">{item.status.replace(/_/g, " ")}</NeuBadge></td>
+              <td className="whitespace-nowrap font-mono text-xs">
+                <span>{item.ageDays === null ? "—" : `${item.ageDays}d`}</span>
+                <span className="ml-1 text-[10px] text-[#818a87]">({item.ageBasis || "basis unavailable"})</span>
+              </td>
+              <td className="max-w-[220px]">
+                {item.actions.length ? <span className="flex flex-wrap gap-1">{item.actions.map((action, index) => <NeuBadge key={`${action}-${index}`} className="text-[10px]">{action}</NeuBadge>)}</span> : <span className="text-[#818a87]">No action listed</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </NeuTable>
       {truncated && (
-        <div className="flex items-center justify-between gap-3 border-t border-[#a0a0a0] bg-[#f4f2ed] px-2.5 py-2 text-[11px]">
-          <span className="font-mono text-[#555]">Showing {group.items.length} of {group.totalCount}</span>
-          <a href="/invoices" onClick={event => { event.preventDefault(); go("/invoices"); }} className="font-bold text-[#087c8d] underline underline-offset-2">View invoices</a>
+        <div className="ff-neu-table-footer">
+          <span>Showing {group.items.length} of {group.totalCount}</span>
+          <button type="button" onClick={() => go("/invoices")} className="ff-neu-text-link">View invoices <ArrowUpRight className="h-3 w-3" /></button>
         </div>
       )}
-    </div>
+    </NeuCard>
   );
 }
 
 function QueueSkeleton() {
-  return <div className="space-y-3 p-3" data-testid="queue-loading" aria-label="Loading queue">
-    {[0, 1].map(card => <div key={card} className="overflow-hidden border-2 border-[#a0a0a0] bg-white">
-      <div className="h-9 animate-pulse bg-[#dedbd3]" />
-      <div className="space-y-2 p-3">{[0, 1, 2].map(row => <div key={row} className="h-8 animate-pulse bg-[#ece9e2]" />)}</div>
+  return <div className="space-y-3 p-4" data-testid="queue-loading" aria-label="Loading queue">
+    {[0, 1].map(card => <div key={card} className="ff-neu-skeleton-card">
+      <div className="h-8 w-40 animate-pulse rounded-xl bg-[#e0e0e0] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]" />
+      <div className="mt-4 space-y-2">{[0, 1, 2].map(row => <div key={row} className="h-7 animate-pulse rounded-lg bg-[#e0e0e0] shadow-[inset_3px_3px_6px_#c1c1c1,inset_-3px_-3px_6px_#fff]" />)}</div>
     </div>)}
   </div>;
 }
 
 function TableSkeleton({ testId, rows, columns }: { testId: string; rows: number; columns: number }) {
-  return <div className="overflow-x-auto p-3" data-testid={testId} aria-label="Loading section">
-    <div className="min-w-[600px] border border-[#a0a0a0]">
-      <div className="flex gap-2 border-b border-[#a0a0a0] bg-[#dedbd3] p-2">{Array.from({ length: columns }, (_, index) => <div key={index} className="h-4 flex-1 animate-pulse bg-[#c7c4bc]" />)}</div>
-      {Array.from({ length: rows }, (_, row) => <div key={row} className="flex gap-2 border-b border-[#d0cdc5] p-2">{Array.from({ length: columns }, (_, col) => <div key={col} className="h-5 flex-1 animate-pulse bg-[#ece9e2]" />)}</div>)}
+  return <div className="space-y-3 p-4" data-testid={testId} aria-label="Loading section">
+    <div className="ff-neu-skeleton-card">
+      <div className="flex gap-3 pb-3">{Array.from({ length: columns }, (_, index) => <div key={index} className="h-3 flex-1 animate-pulse rounded-full bg-[#d3d6d3]" />)}</div>
+      {Array.from({ length: rows }, (_, row) => <div key={row} className="flex gap-3 border-t border-[#d0d3d0] py-3">{Array.from({ length: columns }, (_, col) => <div key={col} className="h-4 flex-1 animate-pulse rounded-full bg-[#d5d8d5]" />)}</div>)}
     </div>
   </div>;
 }
@@ -126,14 +125,12 @@ function TableSkeleton({ testId, rows, columns }: { testId: string; rows: number
 function SectionError({ section, error, retry }: { section: DashboardSection; error: unknown; retry: () => void }) {
   const message = error instanceof Error ? error.message : "This dashboard section is temporarily unavailable.";
   return (
-    <div className="m-3 border-2 border-[#808080] bg-[#ece9e2] p-4 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]" role="alert" data-testid={`dashboard-error-${section}`}>
-      <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#a12b20]" />
-        <div className="flex-1">
-          <h3 className="font-bold text-[#222]">{section[0].toUpperCase() + section.slice(1)} could not be loaded</h3>
-          <p className="mt-1 text-sm text-[#555]">{message}</p>
-          <Win95Button type="button" primary onClick={retry} className="mt-3" data-testid={`dashboard-retry-${section}`}>Retry</Win95Button>
-        </div>
+    <div className="ff-neu-section-error" role="alert" data-testid={`dashboard-error-${section}`}>
+      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#a45e45]" />
+      <div className="flex-1">
+        <h3 className="font-semibold text-[#3e4946]">{section[0].toUpperCase() + section.slice(1)} could not be loaded</h3>
+        <p className="mt-1 text-sm text-[#77817e]">{message}</p>
+        <NeuButton variant="accent" onClick={retry} className="mt-3 !min-h-9 !px-4" data-testid={`dashboard-retry-${section}`}>Retry</NeuButton>
       </div>
     </div>
   );
@@ -156,6 +153,12 @@ async function fetchSection<T>(endpoint: DashboardSection, signal: AbortSignal):
   const response = await fetch(`/api/agent-dashboard/${endpoint}`, { credentials: "include", signal });
   if (!response.ok) throw await responseError(response);
   return response.json() as Promise<T>;
+}
+
+async function fetchFinancial(signal: AbortSignal): Promise<FinancialDashboardData> {
+  const response = await fetch("/api/agent-dashboard/financial", { credentials: "include", signal });
+  if (!response.ok) throw await responseError(response);
+  return response.json() as Promise<FinancialDashboardData>;
 }
 
 function matchesViewer(data: { viewer: { id: string; role: string } } | undefined, user: { id: string; role?: string } | null | undefined) {
@@ -192,18 +195,25 @@ export default function Dashboard() {
     queryFn: ({ signal }) => fetchSection<DashboardAlerts>("alerts", signal),
     ...queryOptions,
   });
+  const financialQuery = useQuery<FinancialDashboardData>({
+    queryKey: ["/api/agent-dashboard/financial", userId, userRole],
+    queryFn: ({ signal }) => fetchFinancial(signal),
+    ...queryOptions,
+  });
   const [refreshStatus, setRefreshStatus] = useState("");
-  const isFetching = queueQuery.isFetching || followupsQuery.isFetching || activityQuery.isFetching || alertsQuery.isFetching;
+  const isFetching = queueQuery.isFetching || followupsQuery.isFetching || activityQuery.isFetching || alertsQuery.isFetching || financialQuery.isFetching;
 
   const queueMatches = matchesViewer(queueQuery.data, user);
   const followupsMatches = matchesViewer(followupsQuery.data, user);
   const activityMatches = matchesViewer(activityQuery.data, user);
   const alertsMatches = matchesViewer(alertsQuery.data, user);
+  const financialMatches = matchesViewer(financialQuery.data, user);
 
   const queue = queueMatches ? queueQuery.data : undefined;
   const followupsData = followupsMatches ? followupsQuery.data : undefined;
   const activityData = activityMatches ? activityQuery.data : undefined;
   const alertsData = alertsMatches ? alertsQuery.data : undefined;
+  const financialData = financialMatches ? financialQuery.data : undefined;
   const isManager = user?.role === "manager" || user?.role === "admin";
   const visibleGroups = useMemo(() => {
     if (!queue || !user?.id) return [];
@@ -219,18 +229,19 @@ export default function Dashboard() {
     : undefined;
 
   const refreshAll = async () => {
-    setRefreshStatus("Refreshing all sections…");
+    setRefreshStatus("Refreshing dashboard data…");
     const results = await Promise.allSettled([
       queueQuery.refetch(),
       followupsQuery.refetch(),
       activityQuery.refetch(),
       alertsQuery.refetch(),
+      financialQuery.refetch(),
     ]);
     const failed = results.filter(result => result.status === "rejected" || result.value.isError).length;
     setRefreshStatus(failed ? `${failed} section${failed === 1 ? "" : "s"} could not refresh.` : "Refresh complete.");
   };
 
-  const updatedAt = [queue, followupsData, activityData, alertsData]
+  const updatedAt = [queue, followupsData, activityData, alertsData, financialData]
     .map(data => data?.generatedAt)
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
@@ -239,123 +250,138 @@ export default function Dashboard() {
   const followupsLoading = !user?.id || !user.role || followupsQuery.isLoading;
   const activityLoading = !user?.id || !user.role || activityQuery.isLoading;
   const alertsLoading = !user?.id || !user.role || alertsQuery.isLoading;
+  const financialLoading = !user?.id || !user.role || financialQuery.isLoading;
+  const financialError = identityMismatch(financialQuery.data, user)
+    ? new Error("This response does not match the signed-in account.")
+    : financialQuery.error;
 
   return (
-    <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace">
-      <div className="mx-auto max-w-[1680px] space-y-4 pb-8" data-testid="agent-dashboard">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#d4d0c8] px-3 py-2 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+    <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace" neu>
+      <div className="ff-neu-dashboard" data-testid="agent-dashboard">
+        <div className="ff-neu-dashboard-toolbar">
           <div>
-            <p className="text-xs text-[#444]">{updatedAt ? `Updated ${displayDate(updatedAt)}` : "Live work queue"}</p>
-            {refreshStatus && <p role="status" className="mt-0.5 text-[11px] text-[#555]">{refreshStatus}</p>}
+            <p className="ff-neu-updated">{updatedAt ? `Updated ${displayDate(updatedAt)}` : "Live work queue"}</p>
+            {refreshStatus && <p role="status" className="mt-1 text-xs text-[#77817e]">{refreshStatus}</p>}
           </div>
-          <Win95Button type="button" size="sm" variant="outline" onClick={refreshAll} disabled={isFetching || !user?.id || !user.role} data-testid="dashboard-refresh" className="h-8 gap-1.5 px-2 text-xs">
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
-          </Win95Button>
+          <NeuButton type="button" onClick={refreshAll} disabled={isFetching || !user?.id || !user.role} data-testid="dashboard-refresh" className="ff-neu-refresh">
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+          </NeuButton>
         </div>
 
-        <section aria-labelledby="my-queue-heading" data-testid="section-queue">
-          <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
-            <SectionHeading id="my-queue-heading" number="01" title="My Queue" count={queue ? queue.queueCount : undefined} />
+        <FinancialSummary
+          data={financialData}
+          isLoading={financialLoading}
+          error={financialError}
+          onRetry={() => financialQuery.refetch()}
+        />
+
+        <div className="mt-8 mb-4 flex items-end justify-between gap-3">
+          <div>
+            <p className="ff-neu-eyebrow">The work itself</p>
+            <h2 className="ff-neu-section-title">Operational queue</h2>
+          </div>
+          <span className="hidden text-xs text-[#8b9591] sm:inline">Each workstream loads independently</span>
+        </div>
+        <section aria-labelledby="my-queue-heading" data-testid="section-queue" className="mb-5">
+          <NeuCard className="ff-neu-work-section">
+            <SectionHeading id="my-queue-heading" number="01" title="My Queue" count={queue?.queueCount} />
             {queueLoading ? <QueueSkeleton /> : queueQuery.isError || identityMismatch(queueQuery.data, user) ? (
               <SectionError section="queue" error={queueQuery.error ?? new Error("This response does not match the signed-in account.")} retry={() => queueQuery.refetch()} />
             ) : queue ? visibleGroups.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-[#555]">No queue items assigned to you.</p>
+              <p className="ff-neu-empty-state">No queue items assigned to you.</p>
             ) : (
-              <div className={`overflow-x-auto p-3 ${isManager ? "queue-groups-scroll" : ""}`} data-testid="queue-groups">
-                <div className={isManager ? "flex min-w-max items-start gap-3" : "min-w-0"}>
+              <div className={`ff-neu-queue-scroll ${isManager ? "queue-groups-scroll" : ""}`} data-testid="queue-groups">
+                <div className={isManager ? "flex min-w-max items-start gap-4" : "min-w-0"}>
                   {visibleGroups.map(group => <QueueTable key={group.agentId ?? "unassigned"} group={group} go={go} />)}
                 </div>
               </div>
             ) : <QueueSkeleton />}
-          </div>
+          </NeuCard>
         </section>
 
-        <section aria-labelledby="followups-heading" data-testid="section-followups">
-          <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+        <section aria-labelledby="followups-heading" data-testid="section-followups" className="mb-5">
+          <NeuCard className="ff-neu-work-section">
             <SectionHeading id="followups-heading" number="02" title="My Follow-ups" count={followupsData?.totalCount} />
             {followupsLoading ? <TableSkeleton testId="followups-loading" rows={4} columns={6} /> : followupsQuery.isError || identityMismatch(followupsQuery.data, user) ? (
               <SectionError section="followups" error={followupsQuery.error ?? new Error("This response does not match the signed-in account.")} retry={() => followupsQuery.refetch()} />
             ) : followupsData ? <>
-              <div className="overflow-x-auto">
-                <table className="ff-data-table w-full min-w-[680px]" data-testid="followups-table">
-                  <thead><tr><th>Follow-up</th><th>Carrier</th><th>Status</th><th>Priority</th><th>Due date</th><th>Source</th></tr></thead>
-                  <tbody>{orderedFollowups.length ? orderedFollowups.map(task => (
-                    <tr key={`${task.source}-${task.id}`} data-testid="followup-row">
-                      <td className="font-semibold"><a href={task.href} onClick={event => { event.preventDefault(); go(task.href); }} className="text-[#087c8d] underline-offset-2 hover:underline">{task.title}</a></td>
-                      <td>{task.carrierName ?? "—"}</td><td><span className="ff-badge ff-badge-pending">{task.status.replace(/_/g, " ")}</span></td>
-                      <td>{task.priority}</td>
-                      <td className="whitespace-nowrap font-mono text-xs">{task.dueDate ? displayDate(task.dueDate) : "No due date"}</td>
-                      <td>{task.source}</td>
-                    </tr>
-                  )) : <EmptyRow columns={6}>No follow-ups assigned to you.</EmptyRow>}</tbody>
-                </table>
-              </div>
+              <NeuTable className="ff-neu-table w-full min-w-[700px]" data-testid="followups-table">
+                <thead><tr><th>Follow-up</th><th>Carrier</th><th>Status</th><th>Priority</th><th>Due date</th><th>Source</th></tr></thead>
+                <tbody>{orderedFollowups.length ? orderedFollowups.map(task => (
+                  <tr key={`${task.source}-${task.id}`} data-testid="followup-row">
+                    <td className="font-semibold"><a href={task.href} onClick={event => { event.preventDefault(); go(task.href); }} className="text-[#168f99] underline-offset-2 hover:underline">{task.title}</a></td>
+                    <td>{task.carrierName ?? "—"}</td><td><NeuBadge tone="warning">{task.status.replace(/_/g, " ")}</NeuBadge></td>
+                    <td>{task.priority}</td>
+                    <td className="whitespace-nowrap font-mono text-xs">{task.dueDate ? displayDate(task.dueDate) : "No due date"}</td>
+                    <td>{task.source}</td>
+                  </tr>
+                )) : <EmptyRow columns={6}>No follow-ups assigned to you.</EmptyRow>}</tbody>
+              </NeuTable>
               {followupsData.totalCount > orderedFollowups.length && (
-                <div className="flex items-center justify-between gap-3 border-t border-[#a0a0a0] bg-[#f4f2ed] px-3 py-2 text-[11px]">
-                  <span className="font-mono text-[#555]">Showing {orderedFollowups.length} of {followupsData.totalCount}</span>
-                  <a href="/follow-up" onClick={event => { event.preventDefault(); go("/follow-up"); }} className="font-bold text-[#087c8d] underline underline-offset-2">View more</a>
+                <div className="ff-neu-table-footer">
+                  <span>Showing {orderedFollowups.length} of {followupsData.totalCount}</span>
+                  <button type="button" onClick={() => go("/follow-up")} className="ff-neu-text-link">View more <ArrowUpRight className="h-3 w-3" /></button>
                 </div>
               )}
             </> : <TableSkeleton testId="followups-loading" rows={4} columns={6} />}
-          </div>
+          </NeuCard>
         </section>
 
-        <section aria-labelledby="activity-heading" data-testid="section-activity">
-          <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+        <section aria-labelledby="activity-heading" data-testid="section-activity" className="mb-5">
+          <NeuCard className="ff-neu-work-section">
             <SectionHeading id="activity-heading" number="03" title="Team Activity" count={activityData?.activity.length} />
             {activityLoading ? <TableSkeleton testId="activity-loading" rows={4} columns={4} /> : activityQuery.isError || identityMismatch(activityQuery.data, user) ? (
               <SectionError section="activity" error={activityQuery.error ?? new Error("This response does not match the signed-in account.")} retry={() => activityQuery.refetch()} />
             ) : activityData ? (
-              <div className="overflow-x-auto">
-                <table className="ff-data-table w-full min-w-[560px]" data-testid="activity-table">
-                  <thead><tr><th>Who</th><th>Action</th><th>When</th><th>Record</th></tr></thead>
-                  <tbody>{activityData.activity.length ? activityData.activity.map(event => (
-                    <tr key={event.id} data-testid="activity-row">
-                      <td className="font-semibold">{event.who}</td><td>{event.action}</td><td className="whitespace-nowrap font-mono text-xs">{displayDate(event.when)}</td>
-                      <td>{event.href ? <a href={event.href} onClick={e => { e.preventDefault(); go(event.href!); }} className="inline-flex items-center gap-1 text-[#087c8d] underline-offset-2 hover:underline">Open <ArrowUpRight className="h-3 w-3" /></a> : "—"}</td>
-                    </tr>
-                  )) : <EmptyRow columns={4}>No recent team activity.</EmptyRow>}</tbody>
-                </table>
-              </div>
+              <NeuTable className="ff-neu-table w-full min-w-[580px]" data-testid="activity-table">
+                <thead><tr><th>Who</th><th>Action</th><th>When</th><th>Record</th></tr></thead>
+                <tbody>{activityData.activity.length ? activityData.activity.map(event => (
+                  <tr key={event.id} data-testid="activity-row">
+                    <td className="font-semibold">{event.who}</td><td>{event.action}</td><td className="whitespace-nowrap font-mono text-xs">{displayDate(event.when)}</td>
+                    <td>{event.href ? <button type="button" onClick={() => go(event.href!)} className="ff-neu-text-link">Open <ArrowUpRight className="h-3 w-3" /></button> : "—"}</td>
+                  </tr>
+                )) : <EmptyRow columns={4}>No recent team activity.</EmptyRow>}</tbody>
+              </NeuTable>
             ) : <TableSkeleton testId="activity-loading" rows={4} columns={4} />}
-          </div>
+          </NeuCard>
         </section>
 
         <section aria-labelledby="alerts-heading" data-testid="section-alerts">
-          <div className="overflow-hidden border-2 border-[#808080] bg-[#ece9e2] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8)]">
+          <NeuCard className="ff-neu-work-section">
             <SectionHeading id="alerts-heading" number="04" title="Alerts" count={alertTotal} />
-            {alertsLoading ? <div className="space-y-3 p-3" data-testid="alerts-loading" aria-label="Loading alerts">
-              <div className="h-12 animate-pulse border border-[#a0a0a0] bg-[#dedbd3]" />
-              <TableSkeleton testId="alerts-loading-table" rows={3} columns={5} />
-            </div> : alertsQuery.isError || identityMismatch(alertsQuery.data, user) ? (
+            {alertsLoading ? <div data-testid="alerts-loading"><TableSkeleton testId="alerts-loading-table" rows={3} columns={5} /></div> : alertsQuery.isError || identityMismatch(alertsQuery.data, user) ? (
               <SectionError section="alerts" error={alertsQuery.error ?? new Error("This response does not match the signed-in account.")} retry={() => alertsQuery.refetch()} />
             ) : alertsData ? <>
-              <div className="grid grid-cols-2 gap-px border-b border-[#a0a0a0] bg-[#a0a0a0]">
-                {countKinds.map(([kind, label]) => <div key={kind} className="bg-[#f4f2ed] px-3 py-2">
-                  <p className="font-mono text-lg font-bold text-[#087c8d]">{alertsData.alertCounts[kind]}</p><p className="text-[11px] text-[#555]">{label}</p>
+              <div className="grid grid-cols-2 gap-px px-4 pt-3">
+                {countKinds.map(([kind, label]) => <div key={kind} className="ff-neu-alert-count">
+                  <p className="font-mono text-lg font-bold text-[#168f99]">{alertsData.alertCounts[kind]}</p><p className="text-[11px] text-[#77817e]">{label}</p>
                 </div>)}
               </div>
-              <div className="overflow-x-auto">
-                <table className="ff-data-table w-full min-w-[650px]" data-testid="alerts-table">
-                  <thead><tr><th>Kind</th><th>Alert</th><th>Detail</th><th>Time</th><th>Link</th></tr></thead>
-                  <tbody>{alertsData.alerts.length ? alertsData.alerts.map(alert => (
-                    <tr key={alert.id} data-testid="alert-row">
-                      <td><span className="ff-badge ff-badge-overdue">{alert.kind.replace(/_/g, " ")}</span></td>
-                      <td className="font-semibold">{alert.title}</td>
-                      <td>{alert.detail}</td>
-                      <td className="whitespace-nowrap font-mono text-xs">{displayDate(alert.when)}</td>
-                      <td><a href={alert.href} onClick={event => { event.preventDefault(); go(alert.href); }} className="inline-flex items-center gap-1 text-[#087c8d] underline-offset-2 hover:underline">Open <ArrowUpRight className="h-3 w-3" /></a></td>
-                    </tr>
-                  )) : <EmptyRow columns={5}>No alerts</EmptyRow>}</tbody>
-                </table>
-              </div>
+              <NeuTable className="ff-neu-table w-full min-w-[680px]" data-testid="alerts-table">
+                <thead><tr><th>Kind</th><th>Alert</th><th>Detail</th><th>Time</th><th>Link</th></tr></thead>
+                <tbody>{alertsData.alerts.length ? alertsData.alerts.map(alert => (
+                  <tr key={alert.id} data-testid="alert-row">
+                    <td><NeuBadge tone="warning">{alert.kind.replace(/_/g, " ")}</NeuBadge></td>
+                    <td className="font-semibold">{alert.title}</td>
+                    <td>{alert.detail}</td>
+                    <td className="whitespace-nowrap font-mono text-xs">{displayDate(alert.when)}</td>
+                    <td><button type="button" onClick={() => go(alert.href)} className="ff-neu-text-link">Open <ArrowUpRight className="h-3 w-3" /></button></td>
+                  </tr>
+                )) : <EmptyRow columns={5}>No alerts</EmptyRow>}</tbody>
+              </NeuTable>
             </> : <div data-testid="alerts-loading"><TableSkeleton testId="alerts-loading-table" rows={3} columns={5} /></div>}
-          </div>
+          </NeuCard>
         </section>
 
-        <p className="flex items-center gap-1.5 text-[11px] text-[#555]"><Clock3 className="h-3.5 w-3.5" /> Queue ages include their basis; follow-ups are ordered by due date.</p>
+        <WorkShortcuts
+          followupCount={followupsData?.totalCount}
+          onViewFollowups={() => go("/follow-up")}
+          pendingActions={financialData?.kpis.pendingActions}
+          onViewActions={() => go("/invoices")}
+        />
+
+        <p className="ff-neu-dashboard-note"><Clock3 className="h-3.5 w-3.5" /> Queue ages include their basis; follow-ups are ordered by due date.</p>
       </div>
-      <style>{`.queue-groups-scroll{overscroll-behavior-x:contain;scrollbar-width:thin}.queue-groups-scroll>div>div{width:min(720px,82vw);flex:0 0 min(720px,82vw)}@media(max-width:767px){.queue-groups-scroll>div>div{width:calc(100vw - 78px);flex-basis:calc(100vw - 78px)}}`}</style>
     </AppShell>
   );
 }

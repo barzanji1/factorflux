@@ -1,6 +1,13 @@
 export type DashboardSection = "queue" | "followups" | "activity" | "alerts";
 export type DashboardViewer = { id: string; role: "employee" | "manager" | "admin" };
 export type DashboardMeta = { generatedAt: string; viewer: DashboardViewer };
+export type DashboardFinancial = DashboardMeta & {
+  kpis: {
+    readyToFund: number; inReview: number; openFollowups: number;
+    aging60Plus: number; fundedThisWeek: number; pendingActions: number;
+  };
+  months: { month: string; invoiced: number; collected: number }[];
+};
 export type DashboardQueueItem = {
   id: number; invoiceNumber: string; carrierName: string; brokerName: string; status: string;
   ageDays: number | null; ageBasis: string; actions: string[]; href: string;

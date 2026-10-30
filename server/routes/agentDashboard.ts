@@ -31,6 +31,6 @@ export function registerAgentDashboardRoutes(app: Express, requireAuth: RequestH
     }
   };
   app.get("/api/agent-dashboard", requireAuth, handler());
-  for (const section of ["queue", "followups", "activity", "alerts"] as const)
+  for (const section of ["queue", "followups", "activity", "alerts", "financial"] as const)
     app.get(`/api/agent-dashboard/${section}`, requireAuth, handler(section));
 }

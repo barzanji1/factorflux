@@ -3,7 +3,7 @@ name: Agent Dashboard policy
 description: Default work-queue landing page, no project-management UI, and dashboard-specific manager visibility.
 ---
 
-The Agent Dashboard is the default staff landing page and a work queue, not a project-management tool. No boards, cards, drag-and-drop, or sprints.
+The Agent Dashboard is the default staff landing page and a work queue, not a project-management tool. No boards, kanban cards, task drag-and-drop, or sprints. Neumorphic section/KPI cards and a draggable KPI carousel are explicitly approved.
 
 **Why:** The user explicitly required agents to see what needs action and click through to existing operational pages.
 

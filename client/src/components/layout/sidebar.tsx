@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import {
   LifeBuoy, Settings2, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
   RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, MessageCircle,
+  ChevronDown, Pin, PinOff,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import ItSupportBell from "@/components/it-support/ItSupportBell";
@@ -50,6 +51,13 @@ const sidebarScrollPositions = {
   desktop: 0,
   mobile: 0,
 };
+const SIDEBAR_PIN_KEY = "factorflux-sidebar-pinned";
+
+function readSidebarPinned() {
+  if (typeof window === "undefined") return false;
+  try { return window.localStorage.getItem(SIDEBAR_PIN_KEY) === "true"; }
+  catch { return false; }
+}
 
 type CurrentUser = {
   id: string;
@@ -210,7 +218,20 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   });
   const previousChannelUnreadRef = useRef<Record<string, number> | null>(null);
   const navRef = useRef<HTMLElement>(null);
+  const [pinned, setPinned] = useState(readSidebarPinned);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const [focusExpanded, setFocusExpanded] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const expanded = mobile || pinned || hoverExpanded || focusExpanded;
   const scrollPositionKey = mobile ? "mobile" : "desktop";
+
+  const togglePinned = () => {
+    setPinned(previous => {
+      const next = !previous;
+      try { window.localStorage.setItem(SIDEBAR_PIN_KEY, String(next)); } catch { /* Storage may be disabled. */ }
+      return next;
+    });
+  };
 
   // Build display user entirely from auth context — never fall back to hardcoded admin values
   const user: CurrentUser = {
@@ -288,28 +309,34 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
 
   return (
     <aside
+      onMouseEnter={() => !mobile && setHoverExpanded(true)}
+      onMouseLeave={() => !mobile && setHoverExpanded(false)}
+      onFocusCapture={() => !mobile && setFocusExpanded(true)}
+      onBlurCapture={event => {
+        if (!mobile && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setFocusExpanded(false);
+          setHoverExpanded(false);
+        }
+      }}
       className={cn(
-        "w-[230px] shrink-0 flex flex-col",
-        "bg-[#c0c0c0] border-r-2 border-[#808080]",
-        mobile ? "h-full" : "hidden h-screen md:flex"
+        "ff-neu-sidebar relative z-30 flex shrink-0 flex-col",
+        expanded ? "ff-neu-sidebar-expanded" : "ff-neu-sidebar-collapsed",
+        mobile ? "h-full w-[248px]" : "hidden h-[100dvh] md:flex"
       )}
+      aria-label="Primary navigation"
     >
       {/* Brand */}
-      <div className="border-b-2 border-[#808080] px-3 py-4">
-        <FactorFluxLogo markSrc="/images/ff-logo-emboss.png" />
-        <div className="min-w-0">
-          <p className="truncate pl-11 text-[10px] text-[#444] mt-0.5">
-            Freight Factoring OS
-          </p>
-          <p className="truncate pl-11 text-[8px] font-semibold uppercase tracking-[0.08em] text-[#5a5a5a]">
-            Trucking Pros Financial
-          </p>
-        </div>
+      <div className="ff-neu-sidebar-brand">
+        <FactorFluxLogo markSrc="/images/ff-logo-emboss.png" showWordmark={expanded} />
+        {expanded && <div className="min-w-0 pl-11">
+          <p className="truncate text-[10px] text-[#747e7a]">Freight Factoring OS</p>
+          <p className="truncate text-[8px] font-semibold uppercase tracking-[0.08em] text-[#87918d]">Trucking Pros Financial</p>
+        </div>}
       </div>
 
       {/* User */}
-      <div className="border-b-2 border-[#808080] px-3 py-2.5">
-        <div className="ff-sidebar-user-card flex items-center gap-2.5 rounded-[4px] border-2 border-[#fff] border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] px-2.5 py-2 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.8),inset_-1px_-1px_2px_rgba(0,0,0,0.3)]">
+      <div className="ff-neu-sidebar-user-wrap">
+        <div className={`ff-neu-sidebar-user ${expanded ? "" : "is-compact"}`} title={expanded ? undefined : `${user.firstName} ${user.lastName} — ${user.jobTitle}`}>
           {user.profileImageUrl ? (
             <img
               src={user.profileImageUrl}
@@ -317,19 +344,19 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
               className="h-7 w-7 shrink-0 rounded-full border border-[#808080] object-cover"
             />
           ) : (
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#098b9f] text-[11px] font-bold text-white">
+              <div className="ff-neu-sidebar-initials">
               {(user.firstName[0] || "A")}{(user.lastName[0] || "U")}
             </div>
           )}
-          <div className="min-w-0 flex-1">
+          {expanded && <div className="min-w-0 flex-1">
              <p className="truncate text-[12px] font-semibold text-[#1a1a1a] leading-none">
               {user.firstName} {user.lastName}
             </p>
              <p className="truncate text-[10px] text-[#444] mt-0.5">
               {user.jobTitle || "Employee"}
             </p>
-          </div>
-           <div className="h-2 w-2 shrink-0 rounded-full bg-[#27aab8]" />
+          </div>}
+          {expanded && <div className="h-2 w-2 shrink-0 rounded-full bg-[#27aab8]" />}
         </div>
       </div>
 
@@ -339,15 +366,24 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         onScroll={(event) => {
           sidebarScrollPositions[scrollPositionKey] = event.currentTarget.scrollTop;
         }}
-        className="flex-1 overflow-y-auto px-2.5 py-3 ff-sidebar-scroll"
+        className="ff-neu-sidebar-nav flex-1 overflow-y-auto ff-sidebar-scroll"
+        aria-label="Application sections"
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredSections.map(section => (
-            <div key={section.title}>
-               <p className="mb-1.5 px-2 text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-[#2f2f2f]">
-                {section.title}
-              </p>
-              <div className="space-y-[2px]">
+            <div key={section.title} className="ff-neu-sidebar-group">
+              <button
+                type="button"
+                className="ff-neu-sidebar-group-toggle"
+                onClick={() => setOpenSections(current => ({ ...current, [section.title]: !(current[section.title] ?? true) }))}
+                aria-expanded={openSections[section.title] ?? true}
+                aria-label={`${section.title} section`}
+                title={expanded ? undefined : `${section.title} section`}
+              >
+                <span className="ff-neu-sidebar-group-label">{expanded ? section.title : <span className="ff-neu-group-marker">{section.title.slice(0, 1)}</span>}</span>
+                {expanded && <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSections[section.title] === false ? "-rotate-90" : ""}`} />}
+              </button>
+              {(openSections[section.title] ?? true) && <div className="space-y-1">
                 {section.items.map(item => {
                   const active = isRouteActive(location, item.href);
                   const Icon = item.icon;
@@ -357,9 +393,12 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                       type="button"
                       onClick={() => navigateTo(item.href)}
                       aria-current={active ? "page" : undefined}
+                      title={expanded ? undefined : item.name}
+                      aria-label={item.name}
                       className={cn(
-                         "ff-sidebar-button group flex min-h-10 w-full items-center gap-2 px-2.5 py-2 text-left transition-colors duration-100",
-                         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#098b9f]",
+                          "ff-neu-sidebar-button group flex min-h-10 w-full items-center gap-2 text-left transition-colors duration-100",
+                          expanded ? "px-3 py-2" : "justify-center px-1 py-2",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]",
                         active
                            ? "text-[#1a1a1a]"
                            : "text-[#1f1f1f]"
@@ -369,12 +408,12 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                         "h-[14px] w-[14px] shrink-0 transition-colors",
                          active ? "text-[#087c8d]" : "text-[#454545] group-hover:text-[#087c8d]"
                       )} />
-                       <span className="truncate text-[13.5px] font-semibold leading-none tracking-[-0.01em]">
+                       {expanded && <span className="truncate text-[13px] font-semibold leading-none tracking-[-0.01em]">
                         {item.name}
-                      </span>
+                      </span>}
                           {item.name === "IT Support" && <ItSupportBell />}
                           {item.name === "Portal Submissions" && portalSubmissionsTotal > 0 && <span
-                           className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white"
+                            className={`ff-neu-sidebar-badge ${expanded ? "ml-auto" : "absolute right-0 top-0"}`}
                            title={portalSubmissionsBadgeLabel}
                            aria-label={portalSubmissionsBadgeLabel}
                          >
@@ -383,21 +422,32 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                     </button>
                   );
                 })}
-              </div>
+              </div>}
             </div>
           ))}
         </div>
       </nav>
 
       {/* Footer */}
-       <div className="border-t-2 border-[#808080] px-4 py-3">
-        <div className="flex items-center justify-between">
+      <div className="ff-neu-sidebar-footer">
+        <button
+          type="button"
+          className={`ff-neu-pin-button ${expanded ? "" : "justify-center"}`}
+          onClick={togglePinned}
+          aria-pressed={pinned}
+          aria-label={pinned ? "Unpin sidebar" : "Pin sidebar expanded"}
+          title={pinned ? "Unpin sidebar" : "Pin sidebar expanded"}
+        >
+          {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+          {expanded && <span>{pinned ? "Pinned open" : "Pin sidebar"}</span>}
+        </button>
+        {expanded && <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
              <div className="h-1.5 w-1.5 rounded-full bg-[#098b9f]" />
              <span className="text-[9.5px] text-[#444]">Systems nominal</span>
           </div>
            <span className="text-[9.5px] font-mono text-[#444]">v2.0</span>
-        </div>
+        </div>}
       </div>
     </aside>
   );

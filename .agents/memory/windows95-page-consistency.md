@@ -3,15 +3,15 @@ name: Windows 95 page consistency
 description: Visual consistency rule for internal FactorFlux pages and controls.
 ---
 
-Use the shared Windows 95 page shell, cards, stats, controls, tabs, tables, badges, and filter chips for authenticated internal pages. Treat Audit Trail as the reference implementation and extract its patterns rather than redesigning them independently.
+Use the shared Windows 95 content shell, controls, tables, and filter chips for authenticated internal pages except the Agent Dashboard. The shared sidebar and dashboard content now use neumorphism; other page content remains Win95.
 
 **Why:** A page assembled directly from generic primitives drifted away from the established application theme and duplicated the title outside the shared header.
 
-**How to apply:** Put breadcrumb, title, subtitle, global search, New menu, notifications, and user controls in the shared page shell. Do not render a second body H1. Keep page data, actions, routes, and permissions unchanged when migrating visual surfaces.
+**How to apply:** Preserve the shared header actions and existing data, routes, and permissions. Treat Audit Trail as the content reference for pages not explicitly approved for migration.
 
 The login page is the explicit exception: use a circular neumorphic card on desktop and mobile, without Win95 bevels. On mobile keep 20px margins and scale the contents proportionally; only below 320px may it become a fully rounded pill, never a square or ordinary rounded rectangle. Keep the login logo unlinked. Successful sign-in uses a 1200ms Y-axis coin-flip spin with perspective before dashboard navigation, never an upside-down Z-axis rotation; failed sign-in shakes it instead.
 
-**Why:** The user explicitly requested neumorphic styling for login only; authenticated internal pages must retain their existing Win95 style.
+**Why:** The user initially requested login as the sole exception, then explicitly approved the Agent Dashboard and shared sidebar migration while leaving other page content unchanged.
 
 **How to apply:** Scope login styling to the login page so shared retro rules cannot override it and the exception cannot affect internal pages.
 
@@ -21,8 +21,8 @@ Login hierarchy is company-first: Trucking Pros Financial is the largest, boldes
 
 **How to apply:** Preserve clear branding-to-form spacing and at least 40px desktop background clearance when adjusting the login layout.
 
-The reusable neumorphic system is opt-in and review-only, not a replacement theme for existing pages. Its admin preview must stay isolated from the Win95 shell and absent from sidebar navigation.
+The reusable neumorphic system remains opt-in outside the approved dashboard and shared sidebar. Its admin preview must stay isolated from the Win95 shell and absent from sidebar navigation.
 
-**Why:** The user requested a separate component library for team review before any page migration.
+**Why:** The user requested review before migration and subsequently approved only dashboard content and the global sidebar.
 
 **How to apply:** Do not apply the library to existing pages without a new explicit request; use Tailwind classes rather than global CSS overrides.

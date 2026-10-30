@@ -12,7 +12,7 @@ import { invoiceWork, unacknowledgedCodes } from "./agentDashboardWork";
 
 export const DASHBOARD_LIMIT = 20;
 type Store = typeof db;
-export async function dashboardQuery<T>(section: DashboardSection, label: string, work: PromiseLike<T>): Promise<T> {
+export async function dashboardQuery<T>(section: DashboardSection | "financial", label: string, work: PromiseLike<T>): Promise<T> {
   const start = performance.now();
   let ok = false;
   try { const result = await work; ok = true; return result; }
