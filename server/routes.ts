@@ -6722,6 +6722,10 @@ Trucking Pros Financial Team
           progress: tasks.progress,
           progressUpdatedAt: tasks.progressUpdatedAt,
           progressUpdatedBy: tasks.progressUpdatedBy,
+          confirmationInvoiceId: tasks.confirmationInvoiceId,
+          invoiceNumber: invoices.invoiceNumber,
+          brokerId: brokers.id,
+          brokerName: brokers.name,
           assignedAgent: { id: userTable.id, firstName: userTable.firstName, lastName: userTable.lastName, profileImageUrl: userTable.profileImageUrl },
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
@@ -6731,7 +6735,9 @@ Trucking Pros Financial Team
           },
         })
         .from(tasks)
-        .leftJoin(clients, eq(tasks.clientId, clients.id))
+        .leftJoin(invoices, eq(tasks.confirmationInvoiceId, invoices.id))
+        .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+        .leftJoin(clients, eq(sql`coalesce(${tasks.clientId}, ${invoices.clientId})`, clients.id))
         .leftJoin(userTable, eq(tasks.assignedTo, userTable.id))
         .where(visibility)
         .orderBy(tasks.createdAt);

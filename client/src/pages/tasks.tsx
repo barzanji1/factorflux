@@ -1,48 +1,40 @@
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { type ComponentPropsWithoutRef, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-
+import {
+  Briefcase, CalendarDays, Check,
+  CheckSquare, ChevronDown, ChevronRight, Clock3, Edit3, FileText,
+  ListTodo, Loader2, Pause, Play, Plus, Search, SlidersHorizontal, Target,
+  Trash2, UserRound, X,
+} from "lucide-react";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import {
-  CheckSquare,
-  AlertTriangle,
-  Phone,
-  Pause,
-  Play,
-  Plus,
-  Edit,
-  Trash2,
-  Calendar,
-  User,
-  ArrowRight,
-  Target,
-  Briefcase,
-  Clock3,
-  Sparkles,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Popover, PopoverContent as BasePopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
+import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuTab, NeuTabList, NeuTabs } from "@/styles/neu/components";
+import { TasksOverview } from "@/components/tasks/tasks-overview";
+import { isTaskOverdue, taskCalendarDate, taskDueDate } from "@shared/task-analytics";
+
+const PAGE_SIZE = 20;
+
+// Portaled pickers must sit above the task dialog, not behind its controls.
+function PopoverContent({ className, ...props }: ComponentPropsWithoutRef<typeof BasePopoverContent>) {
+  return <BasePopoverContent {...props} className={cn("!pointer-events-auto !z-[70]", className)} />;
+}
 
 const taskFormSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  title: z.string().trim().min(1, "Title is required"),
   description: z.string().optional(),
   type: z.enum(["chargeback", "followup", "call", "task", "processing"]),
   priority: z.enum(["low", "medium", "high", "urgent"]),
@@ -52,9 +44,15 @@ const taskFormSchema = z.object({
   assignedTo: z.string().nullable().optional(),
   progress: z.number().int().min(0).max(100).default(0),
 });
-
 type TaskFormData = z.infer<typeof taskFormSchema>;
 
+interface Person {
+  id?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  profileImageUrl?: string | null;
+}
 interface Task {
   id: number;
   title: string;
@@ -62,97 +60,218 @@ interface Task {
   type: string;
   priority: string;
   status: string;
-  dueDate?: string;
-  clientId?: number;
+  dueDate?: string | null;
+  clientId?: number | null;
   assignedTo?: string | null;
   createdBy?: string | null;
   progress: number;
   progressUpdatedAt?: string | null;
-  progressUpdater?: { firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null;
-  assignedAgent?: { id: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null;
-  creator?: { firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null;
+  progressUpdater?: Person | null;
+  assignedAgent?: Person | null;
+  creator?: Person | null;
   createdAt: string;
   updatedAt: string;
-  client?: {
-    id: number;
-    name: string;
-  };
+  client?: { id: number; name: string };
+  confirmationInvoiceId?: number | null;
+  invoiceNumber?: string | null;
+  brokerId?: number | null;
+  brokerName?: string | null;
+  carrier?: { id?: number; name?: string | null } | null;
+  carrierId?: number | null;
+  carrierName?: string | null;
+}
+interface Agent extends Person { id: string; role: string }
+type Scope = "all" | "assigned-to-me" | "created-by-me";
+type Category = "all" | "chargebacks" | "followups" | "held" | "working" | "calls" | "manual";
+
+const CATEGORY_OPTIONS: Array<{ value: Category; label: string }> = [
+  { value: "all", label: "All tasks" },
+  { value: "chargebacks", label: "Chargebacks" },
+  { value: "followups", label: "Follow-ups" },
+  { value: "held", label: "Held" },
+  { value: "working", label: "Working" },
+  { value: "calls", label: "Calls" },
+  { value: "manual", label: "Manual tasks" },
+];
+
+function personName(person?: Person | null) {
+  return person ? [person.firstName, person.lastName].filter(Boolean).join(" ") || "Unknown agent" : "Unassigned";
+}
+function personInitials(person?: Person | null) {
+  if (!person) return "—";
+  const initials = [person.firstName?.trim()?.[0], person.lastName?.trim()?.[0]].filter(Boolean).join("");
+  return initials.toUpperCase() || "U";
+}
+function taskDateLabel(value?: string | null, dueDate = false) {
+  const normalized = dueDate ? taskDueDate(value) : taskCalendarDate(value);
+  if (!normalized) return "No due date";
+  const date = new Date(`${normalized}T12:00:00`);
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+function priorityRank(priority: string) {
+  return ({ urgent: 0, high: 1, medium: 2, low: 3 } as Record<string, number>)[priority] ?? 4;
+}
+function statusLabel(status: string) {
+  return status === "in_progress" ? "In progress" : status === "todo" ? "Open" : status.charAt(0).toUpperCase() + status.slice(1);
+}
+function statusTone(status: string): "neutral" | "accent" | "success" | "warning" {
+  if (status === "completed") return "success";
+  if (status === "in_progress") return "accent";
+  if (status === "held") return "warning";
+  return "neutral";
+}
+
+function TaskCard({
+  task, completed = false, isManager, onEdit, onDelete, onStatus, onProgress, onOpenDetail,
+}: {
+  task: Task;
+  completed?: boolean;
+  isManager: boolean;
+  onEdit: (task: Task, focusAssignee?: boolean) => void;
+  onDelete: (task: Task) => void;
+  onStatus: (task: Task, status: string) => void;
+  onProgress: (taskId: number, progress: number) => Promise<void>;
+  onOpenDetail: (task: Task) => void;
+}) {
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [progressDraft, setProgressDraft] = useState(task.progress || 0);
+  const overdue = !completed && isTaskOverdue(task, new Date());
+  const carrierName = task.carrier?.name || task.carrierName;
+  const carrierId = task.carrier?.id ?? task.carrierId;
+  const priorityColor = ["high", "urgent"].includes(task.priority) ? "#b3534a" : task.priority === "medium" ? "#b27a2b" : "#8b9697";
+  const progressColor = progressDraft >= 100 ? "#347d69" : progressDraft >= 60 ? "#27aab8" : "#a87932";
+
+  return (
+    <NeuCard pressed={completed} data-testid={`task-card-${task.id}`} className={cn(
+      "relative overflow-hidden p-4 sm:p-5",
+      completed && "opacity-75",
+    )}>
+      <span aria-hidden="true" className="absolute inset-y-4 left-0 w-1 rounded-r-full" style={{ backgroundColor: priorityColor }} />
+      <div className="flex flex-col gap-4 pl-2 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={cn("text-left text-base font-bold leading-6 text-[#354548] hover:text-[#168d98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]", completed && "line-through")}
+              onClick={() => onOpenDetail(task)}
+              aria-label={`Open task ${task.title}`}
+              data-testid={`task-title-${task.id}`}
+            >{task.title}</button>
+            <NeuBadge className="capitalize">{task.type.replace(/_/g, " ")}</NeuBadge>
+            <NeuBadge tone={task.priority === "urgent" || task.priority === "high" ? "warning" : "neutral"} className={cn(["urgent", "high"].includes(task.priority) && "!text-[#a64f46]")}>
+              {task.priority}
+            </NeuBadge>
+          </div>
+          {task.description && <p className="mt-1.5 max-w-4xl text-sm leading-5 text-[#728082]">{task.description}</p>}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {task.confirmationInvoiceId && (
+              <Link href={`/invoices/${task.confirmationInvoiceId}`} className="no-underline">
+                <NeuBadge tone="accent" className="cursor-pointer hover:text-[#147f89]"><FileText className="mr-1 h-3 w-3" />Invoice {task.invoiceNumber || `#${task.confirmationInvoiceId}`}</NeuBadge>
+              </Link>
+            )}
+            {task.client && <Link href={`/clients/${task.client.id}`} className="no-underline"><NeuBadge className="cursor-pointer hover:text-[#168d98]"><Briefcase className="mr-1 h-3 w-3" />{task.client.name}</NeuBadge></Link>}
+            {carrierName && (carrierId
+              ? <Link href={`/carriers/${carrierId}`} className="no-underline"><NeuBadge className="cursor-pointer hover:text-[#168d98]">Carrier · {carrierName}</NeuBadge></Link>
+              : <NeuBadge>Carrier · {carrierName}</NeuBadge>)}
+            {task.brokerName && (task.brokerId
+              ? <Link href={`/brokers/${task.brokerId}`} className="no-underline"><NeuBadge className="cursor-pointer hover:text-[#168d98]">Broker · {task.brokerName}</NeuBadge></Link>
+              : <NeuBadge>Broker · {task.brokerName}</NeuBadge>)}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="flex items-center gap-2" title={personName(task.assignedAgent)}>
+              <Avatar className="h-8 w-8 shadow-[2px_2px_5px_#b8b8b8,-2px_-2px_5px_#ffffff]">
+                <AvatarImage src={task.assignedAgent?.profileImageUrl || undefined} alt="" />
+                <AvatarFallback className="bg-[#d1e4e2] text-[10px] font-bold text-[#347d69]">{personInitials(task.assignedAgent)}</AvatarFallback>
+              </Avatar>
+              <div className="leading-tight">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#879294]">Assigned to</p>
+                <p className="mt-0.5 text-xs font-semibold text-[#526164]">{personName(task.assignedAgent)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[#687779]">
+              <CalendarDays className="h-3.5 w-3.5" />
+              <span>Due {taskDateLabel(task.dueDate, true)}</span>
+              {overdue && <NeuBadge tone="warning" className="!text-[#a64f46]">Overdue</NeuBadge>}
+            </div>
+            <Popover open={progressOpen} onOpenChange={(open) => { setProgressOpen(open); if (open) setProgressDraft(task.progress || 0); }}>
+              <PopoverTrigger asChild>
+                <button type="button" className="flex min-w-[150px] items-center gap-2 text-left" aria-label={`Edit progress for ${task.title}`}>
+                  <span className="h-1.5 w-24 overflow-hidden rounded-full bg-[#c7c7c7]"><span className="block h-full rounded-full" style={{ width: `${task.progress || 0}%`, background: progressColor }} /></span>
+                  <span className="font-mono text-[11px] text-[#708082]">{task.progress || 0}%</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 border-0 bg-[#e0e0e0] p-4 text-[#354548] shadow-[7px_7px_16px_#b8b8b8,-7px_-7px_16px_#ffffff]" onClick={event => event.stopPropagation()}>
+                <p className="mb-3 text-xs font-semibold">Progress · {progressDraft}%</p>
+                <Slider value={[progressDraft]} min={0} max={100} step={1} onValueChange={([value]) => setProgressDraft(value)} onValueCommit={async ([value]) => {
+                  try { await onProgress(task.id, value); setProgressOpen(false); }
+                  catch { /* parent reports the save error */ }
+                }} />
+                <p className="mt-2 text-[10px] text-[#879294]">Changes save when you release the slider.</p>
+              </PopoverContent>
+            </Popover>
+            <span className="flex items-center gap-1 text-[11px] text-[#8a9697]"><Clock3 className="h-3 w-3" />Added {taskDateLabel(task.createdAt)}</span>
+            {task.progressUpdater && <span className="text-[11px] text-[#879294]">Progress updated by {personName(task.progressUpdater)}{task.progressUpdatedAt ? ` · ${taskDateLabel(task.progressUpdatedAt)}` : ""}</span>}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:max-w-[280px] lg:justify-end">
+          <NeuBadge tone={statusTone(task.status)} className={cn(task.status === "held" && "!text-[#a64f46]")}>{statusLabel(task.status)}</NeuBadge>
+          {task.status === "todo" && <NeuButton onClick={() => onStatus(task, "in_progress")} aria-label={`Start ${task.title}`} data-testid={`button-start-${task.id}`} className="min-h-9 rounded-lg px-3 text-xs"><Play className="h-3.5 w-3.5" />Start</NeuButton>}
+          {task.status === "held" && <NeuButton onClick={() => onStatus(task, "in_progress")} aria-label={`Resume ${task.title}`} data-testid={`button-resume-${task.id}`} className="min-h-9 rounded-lg px-3 text-xs"><Play className="h-3.5 w-3.5" />Resume</NeuButton>}
+          {task.status === "in_progress" && <NeuButton onClick={() => onStatus(task, "held")} aria-label={`Pause ${task.title}`} data-testid={`button-hold-${task.id}`} className="min-h-9 rounded-lg px-3 text-xs"><Pause className="h-3.5 w-3.5" />Pause</NeuButton>}
+          {!completed && <NeuButton variant="accent" onClick={() => onStatus(task, "completed")} aria-label={`Complete ${task.title}`} data-testid={`button-complete-${task.id}`} className="min-h-9 rounded-lg px-3 text-xs"><Check className="h-3.5 w-3.5" />Complete</NeuButton>}
+          {isManager && !completed && <NeuButton onClick={() => onEdit(task, true)} aria-label={`Reassign ${task.title}`} data-testid={`button-reassign-${task.id}`} className="min-h-9 rounded-lg px-3 text-xs"><UserRound className="h-3.5 w-3.5" />Reassign</NeuButton>}
+          <NeuButton onClick={() => onEdit(task)} aria-label={`Edit ${task.title}`} data-testid={`button-edit-${task.id}`} className="min-h-9 rounded-lg px-3 text-xs"><Edit3 className="h-3.5 w-3.5" />Edit</NeuButton>
+          {isManager && <NeuButton onClick={() => onDelete(task)} aria-label={`Delete ${task.title}`} data-testid={`button-delete-${task.id}`} className="min-h-9 rounded-lg px-3 text-xs text-[#a64f46]"><Trash2 className="h-3.5 w-3.5" /><span className="sr-only sm:not-sr-only">Delete</span></NeuButton>}
+        </div>
+      </div>
+    </NeuCard>
+  );
 }
 
 export default function Tasks() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const isManager = user?.role === "manager" || user?.role === "admin";
-  const [scope, setScope] = useState<"all" | "assigned-to-me" | "created-by-me">(isManager ? "all" : "assigned-to-me");
-  const [progressTask, setProgressTask] = useState<number | null>(null);
-  const [progressDrafts, setProgressDrafts] = useState<Record<number, number>>({});
+  const [scope, setScope] = useState<Scope>(isManager ? "all" : "assigned-to-me");
+  const [category, setCategory] = useState<Category>("all");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
+  const [sort, setSort] = useState("due");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [completedExpanded, setCompletedExpanded] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("chargebacks");
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const handledTaskQuery = useRef<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: tasks = [], isLoading, isError } = useQuery<Task[]>({
+  const { data: tasks = [], isLoading, isError, refetch } = useQuery<Task[]>({
     queryKey: ["/api/tasks", { scope }],
     queryFn: async () => {
-      const res = await fetch(`/api/tasks?scope=${scope}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load tasks");
-      return res.json();
+      const response = await fetch(`/api/tasks?scope=${scope}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load tasks");
+      return response.json();
     },
   });
-  const { data: agents = [] } = useQuery<Array<{ id: string; firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; role: string }>>({ queryKey: ["/api/users"] });
-
-  const { data: clients = [] } = useQuery<Array<{ id: number; name: string }>>({
-    queryKey: ["/api/clients", { all: true }],
-  });
+  const { data: agents = [] } = useQuery<Agent[]>({ queryKey: ["/api/users"] });
+  const { data: clients = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients", { all: true }] });
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskFormSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      type: "task",
-      priority: "medium",
-      status: "todo",
-      dueDate: "",
-      progress: 0,
-      assignedTo: user?.role === "employee" ? user.id : null,
-    },
+    defaultValues: { title: "", description: "", type: "task", priority: "medium", status: "todo", dueDate: "", progress: 0, assignedTo: user?.role === "employee" ? user.id : null },
   });
-
-  const todayChargebacks = tasks.filter(
-    (task) =>
-      task.type === "chargeback" &&
-      task.createdAt &&
-      new Date(task.createdAt).toDateString() === new Date().toDateString()
-  );
-
-  const todayFollowups = tasks.filter(
-    (task) =>
-      task.type === "followup" &&
-      task.createdAt &&
-      new Date(task.createdAt).toDateString() === new Date().toDateString()
-  );
-
-  const myFollowups = tasks.filter((task) => task.type === "followup");
-  const heldTasks = tasks.filter((task) => task.status === "held");
-  const currentlyWorking = tasks.filter((task) => task.status === "in_progress");
-  const processingCalls = tasks.filter(
-    (task) => task.type === "call" && task.status !== "completed"
-  );
-  const myTasks = tasks.filter((task) => task.type === "task");
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: TaskFormData) => {
-      const response = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
+      const response = await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(data) });
       if (!response.ok) throw new Error("Failed to create task");
       return response.json();
     },
@@ -160,25 +279,13 @@ export default function Tasks() {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       setIsTaskDialogOpen(false);
       form.reset();
-      toast({ title: "Success", description: "Task created successfully" });
+      toast({ title: "Task created", description: "The work item is now in the queue." });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create task",
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: "Could not create task", description: "Try again in a moment.", variant: "destructive" }),
   });
-
   const updateTaskMutation = useMutation({
-    mutationFn: async (data: { id: number; updates: Partial<TaskFormData> }) => {
-      const response = await fetch(`/api/tasks/${data.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data.updates),
-      });
+    mutationFn: async ({ id, updates }: { id: number; updates: Partial<TaskFormData> }) => {
+      const response = await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(updates) });
       if (!response.ok) throw new Error("Failed to update task");
       return response.json();
     },
@@ -187,848 +294,266 @@ export default function Tasks() {
       setEditingTask(null);
       setIsTaskDialogOpen(false);
       form.reset();
-      toast({ title: "Success", description: "Task updated successfully" });
+      toast({ title: "Task updated", description: "Your changes have been saved." });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update task",
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: "Could not update task", description: "Try again in a moment.", variant: "destructive" }),
   });
-
   const deleteTaskMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/tasks/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const response = await fetch(`/api/tasks/${id}`, { method: "DELETE", credentials: "include" });
       if (!response.ok) throw new Error("Failed to delete task");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      toast({ title: "Success", description: "Task deleted successfully" });
+      toast({ title: "Task deleted", description: "The work item was removed." });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete task",
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: "Could not delete task", description: "Try again in a moment.", variant: "destructive" }),
   });
 
-  const onSubmit = (data: TaskFormData) => {
+  function openCreateDialog(taskType?: string) {
+    setEditingTask(null);
+    form.reset({ title: "", description: "", type: (taskType as TaskFormData["type"]) || "task", priority: "medium", status: "todo", dueDate: "", progress: 0, assignedTo: user?.role === "employee" ? user.id : null });
+    setAgentSearch("");
+    setAssigneePickerOpen(false);
+    setIsTaskDialogOpen(true);
+  }
+  function openEditDialog(task: Task) {
+    setEditingTask(task);
+    form.reset({
+      title: task.title, description: task.description || "", type: task.type as TaskFormData["type"],
+      priority: task.priority as TaskFormData["priority"], status: task.status as TaskFormData["status"],
+      dueDate: taskDueDate(task.dueDate) || "", clientId: task.clientId ?? undefined, assignedTo: task.assignedTo ?? null, progress: task.progress || 0,
+    });
+    setAgentSearch("");
+    // Mount the modal's focus/pointer layer before opening its nested picker.
+    setAssigneePickerOpen(false);
+    setIsTaskDialogOpen(true);
+  }
+  function onSubmit(data: TaskFormData) {
     if (editingTask) {
       const updates: Partial<TaskFormData> = { ...data };
       if (!isManager) delete updates.assignedTo;
       updateTaskMutation.mutate({ id: editingTask.id, updates });
-    } else {
-      createTaskMutation.mutate(data);
+    } else createTaskMutation.mutate(data);
+  }
+  function updateTaskStatus(task: Task, status: string) {
+    updateTaskMutation.mutate({ id: task.id, updates: { status: status as TaskFormData["status"] } });
+  }
+  async function updateProgress(taskId: number, progress: number) {
+    const response = await fetch(`/api/tasks/${taskId}/progress`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ progress }) });
+    if (!response.ok) {
+      toast({ title: "Progress not saved", description: "Try again in a moment.", variant: "destructive" });
+      throw new Error("Failed to update progress");
     }
-  };
-
-  const openCreateDialog = (taskType?: string) => {
-    setEditingTask(null);
-    form.reset({
-      title: "",
-      description: "",
-      type: (taskType as any) || "task",
-      priority: "medium",
-      status: "todo",
-      dueDate: "",
-      progress: 0,
-      assignedTo: user?.role === "employee" ? user.id : null,
-    });
-    setAgentSearch("");
-    setAssigneePickerOpen(false);
-    setIsTaskDialogOpen(true);
-  };
-
-  const openEditDialog = (task: Task) => {
-    setEditingTask(task);
-    form.reset({
-      title: task.title,
-      description: task.description || "",
-      type: task.type as any,
-      priority: task.priority as any,
-      status: task.status as any,
-      dueDate: task.dueDate || "",
-      clientId: task.clientId,
-      assignedTo: task.assignedTo ?? null,
-      progress: task.progress || 0,
-    });
-    setIsTaskDialogOpen(true);
-  };
+    await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+  }
+  function requestDelete(task: Task) {
+    if (window.confirm(`Delete “${task.title}”? This cannot be undone.`)) deleteTaskMutation.mutate(task.id);
+  }
 
   const taskIdFromQuery = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("taskId");
   useEffect(() => {
-    if (!taskIdFromQuery || isLoading || handledTaskQuery.current === taskIdFromQuery) return;
-    if (!/^\d+$/.test(taskIdFromQuery)) return;
-    if (isManager && scope !== "all") {
-      setScope("all");
-      return;
-    }
+    if (!taskIdFromQuery || isLoading || handledTaskQuery.current === taskIdFromQuery || !/^\d+$/.test(taskIdFromQuery)) return;
+    if (isManager && scope !== "all") { setScope("all"); return; }
     const task = tasks.find(item => item.id === Number(taskIdFromQuery));
     if (!task) return;
     handledTaskQuery.current = taskIdFromQuery;
     openEditDialog(task);
   }, [taskIdFromQuery, isLoading, tasks, isManager, scope]);
 
-  const updateTaskStatus = (taskId: number, newStatus: string) => {
-    updateTaskMutation.mutate({ id: taskId, updates: { status: newStatus as any } });
-  };
+  const filtered = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase();
+    const from = createdFrom ? new Date(`${createdFrom}T00:00:00`).getTime() : null;
+    const to = createdTo ? new Date(`${createdTo}T23:59:59.999`).getTime() : null;
+    return tasks.filter(task => {
+      if (term && ![task.title, task.invoiceNumber ?? "", task.confirmationInvoiceId ? String(task.confirmationInvoiceId) : "", task.client?.name ?? "", task.brokerName ?? "", task.carrier?.name ?? "", task.carrierName ?? "", task.description ?? ""].some(value => value.toLocaleLowerCase().includes(term))) return false;
+      if (category === "chargebacks" && task.type !== "chargeback") return false;
+      if (category === "followups" && task.type !== "followup") return false;
+      if (category === "held" && task.status !== "held") return false;
+      if (category === "working" && task.status !== "in_progress") return false;
+      if (category === "calls" && (task.type !== "call" || task.status === "completed")) return false;
+      if (category === "manual" && !["task", "processing"].includes(task.type)) return false;
+      if (statusFilter === "open" && task.status === "completed") return false;
+      if (statusFilter === "in_progress" && task.status !== "in_progress") return false;
+      if (statusFilter === "completed" && task.status !== "completed") return false;
+      if (statusFilter === "held" && task.status !== "held") return false;
+      if (statusFilter === "overdue" && !isTaskOverdue(task, new Date())) return false;
+      if (assigneeFilter === "__unassigned" && task.assignedTo) return false;
+      if (assigneeFilter !== "all" && assigneeFilter !== "__unassigned" && task.assignedTo !== assigneeFilter) return false;
+      if (priorityFilter !== "all" && task.priority !== priorityFilter) return false;
+      const created = new Date(task.createdAt).getTime();
+      if (from !== null && (!Number.isFinite(created) || created < from)) return false;
+      if (to !== null && (!Number.isFinite(created) || created > to)) return false;
+      return true;
+    }).sort((a, b) => {
+      if (sort === "priority") return priorityRank(a.priority) - priorityRank(b.priority) || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (sort === "status") return a.status.localeCompare(b.status) || priorityRank(a.priority) - priorityRank(b.priority);
+      const ad = taskDueDate(a.dueDate) || "9999-12-31";
+      const bd = taskDueDate(b.dueDate) || "9999-12-31";
+      return ad.localeCompare(bd) || priorityRank(a.priority) - priorityRank(b.priority);
+    });
+  }, [tasks, search, category, statusFilter, assigneeFilter, priorityFilter, createdFrom, createdTo, sort]);
+  const activeTasks = filtered.filter(task => task.status !== "completed");
+  const completedTasks = filtered.filter(task => task.status === "completed");
+  const showCompletedAsPrimary = statusFilter === "completed";
+  const primaryTasks = activeTasks;
+  const visibleTasks = primaryTasks.slice(0, visibleCount);
+  const visibleCompleted = completedTasks.slice(0, visibleCount);
+  const hasFilters = !!search || category !== "all" || statusFilter !== "all" || assigneeFilter !== "all" || priorityFilter !== "all" || !!createdFrom || !!createdTo;
+  function resetFilters() {
+    setSearch(""); setCategory("all"); setStatusFilter("all"); setAssigneeFilter("all"); setPriorityFilter("all"); setCreatedFrom(""); setCreatedTo(""); setSort("due");
+  }
+  useEffect(() => { setVisibleCount(PAGE_SIZE); setCompletedExpanded(false); }, [search, category, statusFilter, assigneeFilter, priorityFilter, createdFrom, createdTo, sort, scope]);
+  useEffect(() => { if (showCompletedAsPrimary) setCompletedExpanded(true); }, [showCompletedAsPrimary]);
 
-  const updateProgress = async (taskId: number, progress: number) => {
-    const response = await fetch(`/api/tasks/${taskId}/progress`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ progress }) });
-    if (!response.ok) throw new Error("Failed to update progress");
-    await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-  };
-
-  const agentName = (agent?: { firstName?: string | null; lastName?: string | null } | null) =>
-    agent ? [agent.firstName, agent.lastName].filter(Boolean).join(" ") || "Unknown agent" : "Unassigned";
-  const progressColor = (value: number) => value >= 100 ? "bg-emerald-500" : value >= 76 ? "bg-blue-500" : value >= 51 ? "bg-yellow-500" : value >= 26 ? "bg-orange-500" : "bg-red-500";
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "urgent":
-        return "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300";
-      case "high":
-        return "bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300";
-      case "medium":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300";
-      case "low":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300";
-      default:
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300";
-      case "in_progress":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300";
-      case "held":
-        return "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300";
-      case "todo":
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-      default:
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "chargeback":
-        return <AlertTriangle className="h-4 w-4" />;
-      case "followup":
-        return <ArrowRight className="h-4 w-4" />;
-      case "call":
-        return <Phone className="h-4 w-4" />;
-      case "processing":
-        return <Briefcase className="h-4 w-4" />;
-      default:
-        return <CheckSquare className="h-4 w-4" />;
-    }
-  };
-
-  const TaskTable = ({ tasks }: { tasks: Task[] }) => (
-    <div className="space-y-4">
-       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
-        </div>
-       ) : isError ? <div className="py-16 text-center text-red-600">Unable to load tasks. Please try again.</div> : tasks.length > 0 ? (
-        <div className="custom-scrollbar overflow-x-auto rounded-[20px] border border-slate-100 dark:border-slate-800">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50/80 dark:bg-slate-900/40">
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Client</TableHead>
-                 <TableHead>Assigned To</TableHead>
-                 <TableHead>Progress</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {tasks.map((task) => (
-                <TableRow key={task.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {getTypeIcon(task.type)}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-slate-900 dark:text-white">
-                           <button className="text-left hover:text-blue-600" onClick={() => navigate(`/tasks/${task.id}`)}>{task.title}</button>
-                        </div>
-                        {task.description && (
-                          <div className="max-w-[280px] truncate text-xs text-slate-500 dark:text-slate-400">
-                            {task.description}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {task.type.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-
-                  <TableCell>
-                    <Badge className={cn("rounded-full px-2.5 py-1 font-semibold", getPriorityColor(task.priority))}>
-                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                    </Badge>
-                  </TableCell>
-
-                  <TableCell>
-                    <Badge className={cn("rounded-full px-2.5 py-1 font-semibold", getStatusColor(task.status))}>
-                      {task.status === "in_progress"
-                        ? "In Progress"
-                        : task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                    </Badge>
-                  </TableCell>
-
-                  <TableCell>{task.client?.name || "-"}</TableCell>
-                   <TableCell>
-                     <div className="flex items-center gap-2">
-                       <Avatar className="h-7 w-7"><AvatarImage src={task.assignedAgent?.profileImageUrl || undefined} /><AvatarFallback>{agentName(task.assignedAgent).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-                       <span className="text-sm">{agentName(task.assignedAgent)}</span>
-                     </div>
-                   </TableCell>
-                   <TableCell onClick={(event) => event.stopPropagation()}>
-                     <Popover open={progressTask === task.id} onOpenChange={(open) => setProgressTask(open ? task.id : null)}>
-                       <PopoverTrigger asChild><button className="w-32 text-left" aria-label={`Edit progress for ${task.title}`}>
-                         <div className="flex items-center gap-2"><div className="h-2 w-full overflow-hidden rounded-full bg-slate-200"><div className={cn("h-full transition-all", progressColor(task.progress || 0))} style={{ width: `${task.progress || 0}%` }} /></div><span className="text-xs font-medium">{task.progress || 0}%</span></div>
-                       </button></PopoverTrigger>
-                       <PopoverContent className="w-64" onClick={(event) => event.stopPropagation()}>
-                          <Slider
-                            value={[progressDrafts[task.id] ?? task.progress ?? 0]}
-                            min={0}
-                            max={100}
-                            step={1}
-                            onValueChange={([value]) => setProgressDrafts((current) => ({ ...current, [task.id]: value }))}
-                            onValueCommit={async ([value]) => {
-                              try {
-                                await updateProgress(task.id, value);
-                                setProgressDrafts((current) => {
-                                  const next = { ...current };
-                                  delete next[task.id];
-                                  return next;
-                                });
-                                setProgressTask(null);
-                              } catch {
-                                toast({ title: "Error", description: "Could not save progress", variant: "destructive" });
-                              }
-                            }}
-                          />
-                          <div className="mt-2 text-center text-sm">{progressDrafts[task.id] ?? task.progress ?? 0}%</div>
-                       </PopoverContent>
-                     </Popover>
-                   </TableCell>
-
-                  <TableCell>
-                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex gap-2">
-                      {task.status === "todo" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => updateTaskStatus(task.id, "in_progress")}
-                          className="h-9 w-9 rounded-xl p-0"
-                          data-testid={`button-start-${task.id}`}
-                        >
-                          <Play className="h-4 w-4 text-emerald-600" />
-                        </Button>
-                      )}
-
-                      {task.status === "in_progress" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => updateTaskStatus(task.id, "held")}
-                          className="h-9 w-9 rounded-xl p-0"
-                          data-testid={`button-hold-${task.id}`}
-                        >
-                          <Pause className="h-4 w-4 text-amber-600" />
-                        </Button>
-                      )}
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(task)}
-                        className="h-9 w-9 rounded-xl p-0"
-                        data-testid={`button-edit-${task.id}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-
-                      {isManager && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm("Are you sure you want to delete this task?")) {
-                              deleteTaskMutation.mutate(task.id);
-                            }
-                          }}
-                          className="h-9 w-9 rounded-xl p-0"
-                          data-testid={`button-delete-${task.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <div className="px-6 py-16 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-            <CheckSquare className="h-6 w-6" />
-          </div>
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-            No tasks found
-          </p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Add a task to start building this workflow queue.
-          </p>
-        </div>
-      )}
-    </div>
-  );
+  const agentName = (id?: string | null) => personName(agents.find(agent => agent.id === id));
+  const filteredAgents = agents.filter(agent => `${agent.firstName ?? ""} ${agent.lastName ?? ""} ${agent.email ?? ""}`.toLocaleLowerCase().includes(agentSearch.toLocaleLowerCase()));
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="flex h-full min-h-0 bg-[#e0e0e0]">
       <Sidebar />
-
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Tasks" subtitle="Workflow follow-ups, calls, and team assignments" group="Workspace" />
-
-        <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8">
-            {/* Header actions */}
-            <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Tasks" subtitle="Assigned operational work · freight factoring" group="Workspace" neu />
+        <NeuPageShell className="custom-scrollbar !min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1680px] space-y-5 p-4 md:p-7 xl:p-9">
+            <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
-                  Workflow center
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  Task Management
-                </h1>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Organize chargebacks, followups, calls, and active work queues
-                </p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#788789]">Operations / Work queue</p>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#354548] sm:text-3xl">Tasks</h1>
+                <p className="mt-1 max-w-2xl text-sm text-[#718082]">The next operational action, assigned to a person—not another project board.</p>
               </div>
+              <NeuButton variant="accent" onClick={() => openCreateDialog()} data-testid="button-create-task" className="min-h-11 rounded-xl px-4">
+                <Plus className="h-4 w-4" />Create Task
+              </NeuButton>
+            </div>
 
-              <Button
-                onClick={() => openCreateDialog()}
-                className="h-12 rounded-2xl bg-blue-600 px-5 text-white hover:bg-blue-700"
-                data-testid="button-create-task"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                New Task
-              </Button>
-            </section>
-
-            {/* Summary cards */}
-            <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Today's Chargebacks</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  {todayChargebacks.length}
-                </p>
-              </div>
-
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
-                  <ArrowRight className="h-5 w-5" />
-                </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Today's Followups</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  {todayFollowups.length}
-                </p>
-              </div>
-
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
-                  <Play className="h-5 w-5" />
-                </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Currently Working</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  {currentlyWorking.length}
-                </p>
-              </div>
-
-              <div className="rounded-[22px] border border-[hsl(var(--border))] bg-white p-5 shadow-md dark:bg-[hsl(var(--card))]">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400">
-                  <Phone className="h-5 w-5" />
-                </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Processing Calls</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  {processingCalls.length}
-                </p>
-              </div>
-            </section>
-
-            {/* Main card */}
-            <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                  Task Management
-                </CardTitle>
-                <CardDescription>
-                  Organize and track your workflow across different task categories
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="p-6">
-                <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Task scope">
-                  {isManager && <Button variant={scope === "all" ? "default" : "outline"} onClick={() => setScope("all")}>All Tasks</Button>}
-                  <Button variant={scope === "assigned-to-me" ? "default" : "outline"} onClick={() => setScope("assigned-to-me")}>My Tasks</Button>
-                  {isManager && <Button variant={scope === "created-by-me" ? "default" : "outline"} onClick={() => setScope("created-by-me")}>Created by Me</Button>}
-                </div>
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[20px] bg-slate-100 p-2 md:grid-cols-4 xl:grid-cols-7 dark:bg-slate-800">
-                    <TabsTrigger value="chargebacks" data-testid="tab-chargebacks" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        <span className="text-xs">Chargebacks</span>
-                      </div>
-                    </TabsTrigger>
-
-                    <TabsTrigger value="today-followups" data-testid="tab-today-followups" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span className="text-xs">Today's FU</span>
-                      </div>
-                    </TabsTrigger>
-
-                    <TabsTrigger value="my-followups" data-testid="tab-my-followups" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5" />
-                        <span className="text-xs">My FU</span>
-                      </div>
-                    </TabsTrigger>
-
-                    <TabsTrigger value="held" data-testid="tab-held" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <Pause className="h-3.5 w-3.5" />
-                        <span className="text-xs">Held</span>
-                      </div>
-                    </TabsTrigger>
-
-                    <TabsTrigger value="working" data-testid="tab-working" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <Play className="h-3.5 w-3.5" />
-                        <span className="text-xs">Working</span>
-                      </div>
-                    </TabsTrigger>
-
-                    <TabsTrigger value="calls" data-testid="tab-calls" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-3.5 w-3.5" />
-                        <span className="text-xs">Calls</span>
-                      </div>
-                    </TabsTrigger>
-
-                    <TabsTrigger value="my-tasks" data-testid="tab-my-tasks" className="rounded-xl">
-                      <div className="flex items-center gap-2">
-                        <Target className="h-3.5 w-3.5" />
-                        <span className="text-xs">My Tasks</span>
-                      </div>
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="chargebacks" className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5 text-red-600" />
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Today's Chargebacks
-                        </h3>
-                        <Badge variant="destructive">{todayChargebacks.length}</Badge>
-                      </div>
-
-                      <Button onClick={() => openCreateDialog("chargeback")} size="sm" data-testid="button-add-chargeback">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Chargeback
-                      </Button>
+            <TasksOverview tasks={tasks} isLoading={isLoading} isError={isError} onRetry={() => void refetch()} />
+            {isError ? null : (
+              <>
+                <NeuCard className="p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7c898a]">Queue controls</p>
+                      <h2 className="mt-1 text-lg font-semibold text-[#354548]">Find the next action</h2>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Task scope">
+                      {isManager && <NeuButton onClick={() => setScope("all")} aria-pressed={scope === "all"} className={cn("min-h-9 rounded-lg px-3 text-xs", scope === "all" && "bg-[#d5e7e5] text-[#168d98]")}>All work</NeuButton>}
+                      <NeuButton onClick={() => setScope("assigned-to-me")} aria-pressed={scope === "assigned-to-me"} className={cn("min-h-9 rounded-lg px-3 text-xs", scope === "assigned-to-me" && "bg-[#d5e7e5] text-[#168d98]")}>Assigned to me</NeuButton>
+                      {isManager && <NeuButton onClick={() => setScope("created-by-me")} aria-pressed={scope === "created-by-me"} className={cn("min-h-9 rounded-lg px-3 text-xs", scope === "created-by-me" && "bg-[#d5e7e5] text-[#168d98]")}>Created by me</NeuButton>}
+                    </div>
+                  </div>
+                  <NeuTabs value={category} onValueChange={value => setCategory(value as Category)} className="mt-4">
+                    <NeuTabList aria-label="Task categories" className="gap-1.5 overflow-x-auto">
+                      {CATEGORY_OPTIONS.map(option => <NeuTab key={option.value} value={option.value} data-testid={`tab-${option.value}`} className="min-h-9 whitespace-nowrap px-3 text-xs">{option.label}</NeuTab>)}
+                    </NeuTabList>
+                  </NeuTabs>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                    <label className="relative sm:col-span-2 xl:col-span-2">
+                      <span className="sr-only">Search tasks by title, invoice, client, carrier, or broker</span>
+                      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#829092]" />
+                      <NeuInput placeholder="Task, invoice #, carrier, broker…" value={search} onChange={event => setSearch(event.target.value)} className="pl-11" data-testid="input-search-tasks" />
+                    </label>
+                    <label><span className="sr-only">Status</span><NeuSelect value={statusFilter} onChange={event => setStatusFilter(event.target.value)} options={[
+                      { value: "all", label: "All statuses" }, { value: "open", label: "Open (unfinished)" }, { value: "in_progress", label: "In progress" }, { value: "held", label: "Held" }, { value: "completed", label: "Completed" }, { value: "overdue", label: "Overdue" },
+                    ]} /></label>
+                    <label><span className="sr-only">Assigned agent</span><NeuSelect value={assigneeFilter} onChange={event => setAssigneeFilter(event.target.value)} options={[{ value: "all", label: "All assignees" }, { value: "__unassigned", label: "Unassigned" }, ...agents.map(agent => ({ value: agent.id, label: personName(agent) }))]} /></label>
+                    <label><span className="sr-only">Priority</span><NeuSelect value={priorityFilter} onChange={event => setPriorityFilter(event.target.value)} options={[
+                      { value: "all", label: "All priorities" }, { value: "urgent", label: "Urgent" }, { value: "high", label: "High" }, { value: "medium", label: "Medium" }, { value: "low", label: "Low" },
+                    ]} /></label>
+                    <label><span className="sr-only">Sort tasks</span><NeuSelect value={sort} onChange={event => setSort(event.target.value)} options={[
+                      { value: "due", label: "Sort: Due date" }, { value: "priority", label: "Sort: Priority" }, { value: "status", label: "Sort: Status" },
+                    ]} /></label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#879294]"><CalendarDays className="h-3.5 w-3.5" />Created</span>
+                    <label className="flex items-center gap-2 text-xs text-[#728082]"><span>From</span><NeuInput aria-label="Created from date" type="date" value={createdFrom} onChange={event => setCreatedFrom(event.target.value)} className="min-h-9 w-auto px-3 py-1.5 text-xs" /></label>
+                    <label className="flex items-center gap-2 text-xs text-[#728082]"><span>To</span><NeuInput aria-label="Created through date" type="date" value={createdTo} onChange={event => setCreatedTo(event.target.value)} className="min-h-9 w-auto px-3 py-1.5 text-xs" /></label>
+                    {hasFilters && <NeuButton onClick={resetFilters} className="min-h-9 rounded-lg px-3 text-xs"><X className="h-3.5 w-3.5" />Clear filters</NeuButton>}
+                    <span className="ml-auto text-xs text-[#819092]">{filtered.length} {filtered.length === 1 ? "task" : "tasks"}</span>
+                  </div>
+                </NeuCard>
 
-                    <TaskTable tasks={todayChargebacks} />
-                  </TabsContent>
+                <section aria-label="Task list" className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                    <div>
+                    <h2 className="text-base font-semibold text-[#354548]">{showCompletedAsPrimary ? "Completed work" : "Open work"}</h2>
+                      <p className="mt-0.5 text-xs text-[#839092]">{showCompletedAsPrimary ? "Completed tasks matching your filters" : "Unfinished work, including held and in-progress items"}</p>
+                    </div>
+                    <NeuBadge>{showCompletedAsPrimary ? completedTasks.length : primaryTasks.length} {showCompletedAsPrimary ? "completed" : "open"}</NeuBadge>
+                  </div>
 
-                  <TabsContent value="today-followups" className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-blue-600" />
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Today's Followups
-                        </h3>
-                        <Badge variant="outline">{todayFollowups.length}</Badge>
+                  {isLoading ? (
+                    <div className="space-y-3" aria-label="Loading tasks">
+                      {[0, 1, 2].map(item => <NeuCard key={item} className="animate-pulse p-5"><div className="h-4 w-2/5 rounded-full bg-[#c7c7c7]" /><div className="mt-3 h-3 w-4/5 rounded-full bg-[#d0d0d0]" /><div className="mt-5 h-3 w-1/3 rounded-full bg-[#d0d0d0]" /></NeuCard>)}
+                    </div>
+                  ) : visibleTasks.length ? (
+                    <div className="space-y-3">
+                      {visibleTasks.map(task => <TaskCard key={task.id} task={task} completed={showCompletedAsPrimary} isManager={isManager} onEdit={openEditDialog} onDelete={requestDelete} onStatus={updateTaskStatus} onProgress={updateProgress} onOpenDetail={task => navigate(`/tasks/${task.id}`)} />)}
+                    </div>
+                  ) : showCompletedAsPrimary && completedTasks.length > 0 ? null : (
+                    <NeuCard className="px-5 py-12 text-center">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e0e0e0] text-[#7b898b] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+                        {hasFilters ? <SlidersHorizontal className="h-6 w-6" /> : <ListTodo className="h-6 w-6" />}
                       </div>
+                      <h3 className="mt-4 text-base font-semibold text-[#354548]">{hasFilters ? "No tasks match these filters" : "No open tasks"}</h3>
+                      <p className="mt-1 text-sm text-[#819092]">{hasFilters ? "Adjust the search or clear filters to see more work." : "Create one or check back later."}</p>
+                      {hasFilters ? <NeuButton onClick={resetFilters} className="mt-4 min-h-10 px-4 text-xs">Clear filters</NeuButton> : <NeuButton variant="accent" onClick={() => openCreateDialog()} className="mt-4 min-h-10 px-4 text-xs"><Plus className="h-4 w-4" />Create task</NeuButton>}
+                    </NeuCard>
+                  )}
 
-                      <Button onClick={() => openCreateDialog("followup")} size="sm" data-testid="button-add-followup">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Followup
-                      </Button>
+                  {completedTasks.length > 0 && (
+                    <NeuCard pressed className="p-4 sm:p-5">
+                      <button type="button" onClick={() => setCompletedExpanded(value => !value)} aria-expanded={completedExpanded} className="flex w-full items-center justify-between gap-3 text-left">
+                        <span className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#d2d9d8] text-[#718082]"><CheckSquare className="h-4 w-4" /></span><span><span className="block text-sm font-semibold text-[#526164]">{showCompletedAsPrimary ? "Completed work" : "Show completed"}</span><span className="mt-0.5 block text-xs text-[#879294]">{completedTasks.length} finished {completedTasks.length === 1 ? "task" : "tasks"}</span></span></span>
+                        {completedExpanded ? <ChevronDown className="h-4 w-4 text-[#839092]" /> : <ChevronRight className="h-4 w-4 text-[#839092]" />}
+                      </button>
+                      {completedExpanded && <div className="mt-4 space-y-3">{visibleCompleted.map(task => <TaskCard key={task.id} task={task} completed isManager={isManager} onEdit={openEditDialog} onDelete={requestDelete} onStatus={updateTaskStatus} onProgress={updateProgress} onOpenDetail={task => navigate(`/tasks/${task.id}`)} />)}</div>}
+                    </NeuCard>
+                  )}
+                  {(primaryTasks.length > visibleCount || (completedExpanded && completedTasks.length > visibleCount)) && (
+                    <div className="flex justify-center pt-2">
+                      <NeuButton onClick={() => setVisibleCount(count => count + PAGE_SIZE)} className="min-h-10 px-5 text-xs"><ChevronDown className="h-4 w-4" />Load 20 more</NeuButton>
                     </div>
-
-                    <TaskTable tasks={todayFollowups} />
-                  </TabsContent>
-
-                  <TabsContent value="my-followups" className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <User className="h-5 w-5 text-emerald-600" />
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                        My Followups
-                      </h3>
-                      <Badge variant="outline">{myFollowups.length}</Badge>
-                    </div>
-
-                    <TaskTable tasks={myFollowups} />
-                  </TabsContent>
-
-                  <TabsContent value="held" className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Pause className="h-5 w-5 text-amber-600" />
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                        Held Tasks
-                      </h3>
-                      <Badge variant="outline">{heldTasks.length}</Badge>
-                    </div>
-
-                    <TaskTable tasks={heldTasks} />
-                  </TabsContent>
-
-                  <TabsContent value="working" className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Play className="h-5 w-5 text-emerald-600" />
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                        Currently Working On
-                      </h3>
-                      <Badge variant="outline">{currentlyWorking.length}</Badge>
-                    </div>
-
-                    <TaskTable tasks={currentlyWorking} />
-                  </TabsContent>
-
-                  <TabsContent value="calls" className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-5 w-5 text-violet-600" />
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                          Processing Calls
-                        </h3>
-                        <Badge variant="outline">{processingCalls.length}</Badge>
-                      </div>
-
-                      <Button onClick={() => openCreateDialog("call")} size="sm" data-testid="button-add-call">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Call
-                      </Button>
-                    </div>
-
-                    <TaskTable tasks={processingCalls} />
-                  </TabsContent>
-
-                  <TabsContent value="my-tasks" className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Target className="h-5 w-5 text-indigo-600" />
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                          My Tasks
-                        </h3>
-                        <Badge variant="outline">{myTasks.length}</Badge>
-                      </div>
-
-                      <Button onClick={() => openCreateDialog("task")} size="sm" data-testid="button-add-task">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Task
-                      </Button>
-                    </div>
-
-                    <TaskTable tasks={myTasks} />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+                  )}
+                </section>
+              </>
+            )}
           </div>
-        </main>
+        </NeuPageShell>
 
-        <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]" data-testid="task-edit-dialog">
+        <Dialog open={isTaskDialogOpen} onOpenChange={open => {
+          setIsTaskDialogOpen(open);
+          if (!open) { setAssigneePickerOpen(false); setAgentSearch(""); }
+        }}>
+          <DialogContent showCloseButton={false} className="!max-h-[92dvh] !rounded-2xl !border-0 !bg-[#e0e0e0] !text-[#354548] !shadow-[9px_9px_20px_#b8b8b8,-9px_-9px_20px_#ffffff] sm:!max-w-[640px]" data-testid="task-edit-dialog">
+            <DialogClose asChild>
+              <NeuButton aria-label="Close task dialog" className="absolute right-4 top-4 !h-8 !min-h-8 !w-8 !rounded-full !p-0 !text-[#718082]">
+                <X className="h-4 w-4" />
+              </NeuButton>
+            </DialogClose>
             <DialogHeader>
-              <DialogTitle>{editingTask ? "Edit Task" : "Create New Task"}</DialogTitle>
-              <DialogDescription>
-                {editingTask ? "Update task information" : "Add a new task to your workflow"}
-              </DialogDescription>
+              <DialogTitle className="text-xl text-[#354548]">{editingTask ? "Edit task" : "Create a task"}</DialogTitle>
+              <DialogDescription className="text-[#728082]">{editingTask ? "Update the assignment and operational details." : "Capture the next action and assign clear ownership."}</DialogDescription>
             </DialogHeader>
-
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Task title..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Task description..." rows={3} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="chargeback">Chargeback</SelectItem>
-                            <SelectItem value="followup">Followup</SelectItem>
-                            <SelectItem value="call">Call</SelectItem>
-                            <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="task">Task</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField control={form.control} name="title" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Title</FormLabel><FormControl><NeuInput placeholder="e.g. Verify carrier invoice backup" {...field} className="placeholder:text-[#929b9c]" /></FormControl><FormMessage /></FormItem>} />
+                <FormField control={form.control} name="description" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Description</FormLabel><FormControl><Textarea placeholder="Add the context needed to complete the work…" rows={3} {...field} className="!resize-y !rounded-xl !border-0 !bg-[#e0e0e0] !text-[#354548] !shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff] placeholder:!text-[#929b9c]" /></FormControl><FormMessage /></FormItem>} />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField control={form.control} name="type" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Work type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="!min-h-11 !rounded-xl !border-0 !bg-[#e0e0e0] !text-[#354548] !shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="chargeback">Chargeback</SelectItem><SelectItem value="followup">Follow-up</SelectItem><SelectItem value="call">Call</SelectItem><SelectItem value="processing">Processing</SelectItem><SelectItem value="task">Manual task</SelectItem></SelectContent></Select><FormMessage /></FormItem>} />
+                  <FormField control={form.control} name="priority" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Priority</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="!min-h-11 !rounded-xl !border-0 !bg-[#e0e0e0] !text-[#354548] !shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]"><SelectValue placeholder="Select priority" /></SelectTrigger></FormControl><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select><FormMessage /></FormItem>} />
+                  <FormField control={form.control} name="status" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="!min-h-11 !rounded-xl !border-0 !bg-[#e0e0e0] !text-[#354548] !shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]"><SelectValue placeholder="Select status" /></SelectTrigger></FormControl><SelectContent><SelectItem value="todo">Open</SelectItem><SelectItem value="in_progress">In progress</SelectItem><SelectItem value="held">Held</SelectItem><SelectItem value="completed">Completed</SelectItem></SelectContent></Select><FormMessage /></FormItem>} />
+                  <FormField control={form.control} name="dueDate" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Due date</FormLabel><FormControl><NeuInput type="date" {...field} /></FormControl><FormMessage /></FormItem>} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="todo">To Do</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="held">Held</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Due Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="clientId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Client (Optional)</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(Number(value))}
-                        value={field.value?.toString()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select client (optional)" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id.toString()}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="assignedTo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assign To</FormLabel>
-                      <Popover
-                        open={assigneePickerOpen}
-                        onOpenChange={(open) => {
-                          setAssigneePickerOpen(open);
-                          if (!open) setAgentSearch("");
-                        }}
-                      >
-                        <PopoverTrigger asChild disabled={!isManager}>
-                          <FormControl>
-                            <Button type="button" variant="outline" className="w-full justify-start font-normal">
-                              {field.value
-                                ? agentName(agents.find((agent) => agent.id === field.value))
-                                : "Unassigned"}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-2">
-                          <Input
-                            value={agentSearch}
-                            onChange={(event) => setAgentSearch(event.target.value)}
-                            placeholder="Search active agents..."
-                            className="mb-2"
-                          />
-                          <div className="max-h-52 space-y-1 overflow-y-auto">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className="w-full justify-start"
-                              onClick={() => {
-                                field.onChange(null);
-                                setAssigneePickerOpen(false);
-                                setAgentSearch("");
-                              }}
-                            >
-                              Unassigned
-                            </Button>
-                            {agents
-                              .filter((agent) => `${agent.firstName || ""} ${agent.lastName || ""} ${agent.email || ""}`.toLowerCase().includes(agentSearch.toLowerCase()))
-                              .map((agent) => (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="w-full justify-start"
-                                  key={agent.id}
-                                  onClick={() => {
-                                    field.onChange(agent.id);
-                                    setAssigneePickerOpen(false);
-                                    setAgentSearch("");
-                                  }}
-                                >
-                                  {agentName(agent)}
-                                </Button>
-                              ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                      {!isManager && <p className="text-xs text-muted-foreground">Employees can only assign tasks to themselves.</p>}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="progress"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Progress: {field.value || 0}%</FormLabel>
-                      <FormControl><Slider min={0} max={100} step={1} value={[field.value || 0]} onValueChange={([value]) => field.onChange(value)} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsTaskDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createTaskMutation.isPending || updateTaskMutation.isPending}
-                  >
-                    {editingTask ? "Update Task" : "Create Task"}
-                  </Button>
+                <FormField control={form.control} name="clientId" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Client (optional)</FormLabel><Select onValueChange={value => field.onChange(value === "none" ? undefined : Number(value))} value={field.value?.toString() ?? "none"}><FormControl><SelectTrigger className="!min-h-11 !rounded-xl !border-0 !bg-[#e0e0e0] !text-[#354548] !shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]"><SelectValue placeholder="Choose a client" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">No client</SelectItem>{clients.map(client => <SelectItem key={client.id} value={client.id.toString()}>{client.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />
+                <FormField control={form.control} name="assignedTo" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Assigned to</FormLabel><Popover open={assigneePickerOpen} onOpenChange={open => { setAssigneePickerOpen(open); if (!open) setAgentSearch(""); }}><PopoverTrigger asChild><FormControl><NeuButton type="button" disabled={!isManager} className="!min-h-11 w-full justify-start !rounded-xl !border-0 !bg-[#e0e0e0] !text-[#526164] !shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]">{field.value ? agentName(field.value) : "Unassigned"}</NeuButton></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] !border-0 !bg-[#e0e0e0] p-2 !text-[#354548] !shadow-[7px_7px_16px_#b8b8b8,-7px_-7px_16px_#ffffff]"><NeuInput value={agentSearch} onChange={event => setAgentSearch(event.target.value)} placeholder="Search people…" className="mb-2 !rounded-lg" /><div className="max-h-56 space-y-1 overflow-y-auto"><button type="button" onClick={() => { field.onChange(null); setAssigneePickerOpen(false); setAgentSearch(""); }} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[#d4e6e5]">Unassigned</button>{filteredAgents.map(agent => <button type="button" key={agent.id} onClick={() => { field.onChange(agent.id); setAssigneePickerOpen(false); setAgentSearch(""); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#d4e6e5]"><Avatar className="h-7 w-7"><AvatarImage src={agent.profileImageUrl || undefined} /><AvatarFallback className="bg-[#d1e4e2] text-[10px] text-[#347d69]">{personInitials(agent)}</AvatarFallback></Avatar><span>{personName(agent)}</span></button>)}</div></PopoverContent></Popover>{!isManager && <p className="text-xs text-[#879294]">Assignments are managed by your team lead.</p>}<FormMessage /></FormItem>} />
+                <FormField control={form.control} name="progress" render={({ field }) => <FormItem><FormLabel className="text-[#526164]">Progress · {field.value || 0}%</FormLabel><FormControl><Slider min={0} max={100} step={1} value={[field.value || 0]} onValueChange={([value]) => field.onChange(value)} /></FormControl><FormMessage /></FormItem>} />
+                <div className="flex justify-end gap-2 border-t border-[#c7c7c7] pt-4">
+                  <NeuButton type="button" onClick={() => setIsTaskDialogOpen(false)} className="min-h-10 rounded-lg px-4 text-xs">Cancel</NeuButton>
+                  <NeuButton variant="accent" type="submit" disabled={createTaskMutation.isPending || updateTaskMutation.isPending} className="min-h-10 rounded-lg px-4 text-xs">
+                    {(createTaskMutation.isPending || updateTaskMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {editingTask ? "Save changes" : "Create task"}
+                  </NeuButton>
                 </div>
               </form>
             </Form>

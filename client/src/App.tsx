@@ -417,7 +417,7 @@ function Router() {
   }
 
   return (
-    <div className={`${location === "/" || location === "/invoices" || location.startsWith("/invoices/") || location === "/clients" || location === "/brokers" || location === "/documents" || /^\/(?:clients|carriers|brokers)\/\d+\/?$/.test(location) ? "ff-neu-root" : "ff-app-shell"} flex h-screen flex-col overflow-hidden`}>
+    <div className={`${location === "/" || location === "/invoices" || location.startsWith("/invoices/") || location === "/clients" || location === "/brokers" || location === "/documents" || location === "/tasks" || /^\/(?:clients|carriers|brokers)\/\d+\/?$/.test(location) ? "ff-neu-root" : "ff-app-shell"} flex h-screen flex-col overflow-hidden`}>
       <PermissionWatcher />
       <div className={chatPageActive ? "hidden" : "min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
         {routes}
