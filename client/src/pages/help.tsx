@@ -1,31 +1,22 @@
 import { cn } from "@/lib/utils";
 import { AppShell } from "@/components/layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Win95Tabs as Tabs,
-  Win95TabsContent as TabsContent,
-  Win95TabsList as TabsList,
-  Win95TabsTrigger as TabsTrigger,
-} from "@/components/win95";
+  NeuBadge,
+  NeuButton,
+  NeuCard,
+  NeuInput,
+  NeuSelect,
+  NeuTab,
+  NeuTabList,
+  NeuTabPanel,
+  NeuTable,
+  NeuTableBody,
+  NeuTableCell,
+  NeuTableHead,
+  NeuTableHeader,
+  NeuTableRow,
+  NeuTabs,
+} from "@/styles/neu";
 import {
   Accordion,
   AccordionContent,
@@ -156,113 +147,105 @@ function ContactTab() {
     <div className="space-y-6">
       {/* Contact Cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white text-center shadow-md dark:bg-[hsl(var(--card))]">
-          <CardHeader>
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+        <NeuCard className="p-5 text-center">
+          <div className="mb-4">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d9eeee] text-[#218f9b]">
               <Users className="h-6 w-6" />
             </div>
-            <CardTitle className="text-lg text-slate-900 dark:text-white">Primary Contact</CardTitle>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Main point of contact</p>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium text-blue-600 dark:text-blue-400">Dosh Barzanji</p>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <h3 className="text-lg font-semibold">Primary Contact</h3>
+            <p className="text-sm text-[#888]">Main point of contact</p>
+          </div>
+          <div className="space-y-2">
+            <p className="font-medium text-[#218f9b]">Dosh Barzanji</p>
+            <p className="text-sm text-[#777]">
               Email: <span className="font-medium">Dosh@truckingprosfinancial.com</span>
             </p>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-[#777]">
               Phone: <span className="font-medium">385-495-4962</span>
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Internal use only</p>
-          </CardContent>
-        </Card>
+            <p className="text-sm text-[#888]">Internal use only</p>
+          </div>
+        </NeuCard>
 
-        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white text-center shadow-md dark:bg-[hsl(var(--card))]">
-          <CardHeader>
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+        <NeuCard className="p-5 text-center">
+          <div className="mb-4">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d9eeee] text-[#218f9b]">
               <Mail className="h-6 w-6" />
             </div>
-            <CardTitle className="text-lg text-slate-900 dark:text-white">Support Email</CardTitle>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Client-facing support</p>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Support@Truckingprosfinancial.com</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Mon–Fri 7AM–3PM MST</p>
-          </CardContent>
-        </Card>
+            <h3 className="text-lg font-semibold">Support Email</h3>
+            <p className="text-sm text-[#888]">Client-facing support</p>
+          </div>
+          <div className="space-y-2">
+            <p className="break-all text-sm font-medium text-[#218f9b]">Support@Truckingprosfinancial.com</p>
+            <p className="text-sm text-[#888]">Mon–Fri 7AM–3PM MST</p>
+          </div>
+        </NeuCard>
 
-        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white text-center shadow-md dark:bg-[hsl(var(--card))]">
-          <CardHeader>
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400">
+        <NeuCard className="p-5 text-center">
+          <div className="mb-4">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d9eeee] text-[#218f9b]">
               <Phone className="h-6 w-6" />
             </div>
-            <CardTitle className="text-lg text-slate-900 dark:text-white">Emergency Line</CardTitle>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Urgent operational issues</p>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium text-red-600 dark:text-red-400">385-495-4962</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">24/7 availability</p>
-          </CardContent>
-        </Card>
+            <h3 className="text-lg font-semibold">Emergency Line</h3>
+            <p className="text-sm text-[#888]">Urgent operational issues</p>
+          </div>
+          <div className="space-y-2">
+            <p className="font-medium text-[#218f9b]">385-495-4962</p>
+            <p className="text-sm text-[#888]">24/7 availability</p>
+          </div>
+        </NeuCard>
       </div>
 
       {/* Send Message Form */}
-      <Card className="mx-auto max-w-2xl rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
-            <Send className="h-5 w-5" />
+      <NeuCard className="mx-auto max-w-2xl p-5 sm:p-6">
+        <div className="mb-5 border-b border-[#c9c9c9] pb-4">
+          <h3 className="flex items-center gap-2 text-lg font-semibold">
+            <Send className="h-5 w-5 text-[#27aab8]" />
             Send a Message
-          </CardTitle>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          </h3>
+          <p className="mt-1 text-sm text-[#888]">
             Email a client or carrier directly. All messages are logged.
           </p>
-        </CardHeader>
-        <CardContent className="p-6 space-y-4">
+        </div>
+        <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="mb-1.5 block text-sm font-medium text-[#555]">
                 Client / Carrier
               </label>
-              <Select
+              <NeuSelect
                 value={selectedClientId?.toString() ?? ""}
-                onValueChange={(v) => setSelectedClientId(Number(v))}
+                onChange={(e) => setSelectedClientId(Number(e.target.value))}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select client or carrier" />
-                </SelectTrigger>
-                <SelectContent>
+                <option value="" disabled>Select client or carrier</option>
                   {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id.toString()}>
+                    <option key={c.id} value={c.id.toString()}>
                       {c.name}
                       {c.email ? "" : " (no email)"}
-                    </SelectItem>
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
+              </NeuSelect>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="mb-1.5 block text-sm font-medium text-[#555]">
                 Message Type
               </label>
-              <Select value={messageType} onValueChange={setMessageType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="request_documents">Request Documents</SelectItem>
-                  <SelectItem value="payment_notice">Payment Notice</SelectItem>
-                  <SelectItem value="general_inquiry">General Inquiry</SelectItem>
-                  <SelectItem value="follow_up">Follow Up</SelectItem>
-                </SelectContent>
-              </Select>
+              <NeuSelect value={messageType} onChange={(e) => setMessageType(e.target.value)}>
+                <option value="" disabled>Select type</option>
+                <option value="request_documents">Request Documents</option>
+                <option value="payment_notice">Payment Notice</option>
+                <option value="general_inquiry">General Inquiry</option>
+                <option value="follow_up">Follow Up</option>
+              </NeuSelect>
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label className="mb-1.5 block text-sm font-medium text-[#555]">
               Subject
             </label>
-            <Input
+            <NeuInput
               placeholder="Message subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -271,20 +254,22 @@ function ContactTab() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label className="mb-1.5 block text-sm font-medium text-[#555]">
               Message
             </label>
-            <Textarea
+            <textarea
               placeholder="Type your message here..."
               rows={5}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={sendMutation.isPending}
+              className="min-h-32 w-full resize-y rounded-xl border-0 bg-[#e0e0e0] px-4 py-3 text-sm text-[#333] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff] placeholder:text-[#888] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]"
             />
           </div>
 
-          <Button
-            className="h-11 w-full rounded-xl"
+          <NeuButton
+            variant="accent"
+            className="w-full"
             disabled={!canSend}
             onClick={() => sendMutation.mutate()}
           >
@@ -293,74 +278,74 @@ function ContactTab() {
             ) : (
               <><Send className="mr-2 h-4 w-4" /> Send Message</>
             )}
-          </Button>
-        </CardContent>
-      </Card>
+          </NeuButton>
+        </div>
+      </NeuCard>
 
       {/* Sent Messages Log */}
       {selectedClientId && (
-        <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
-              <MessageCircle className="h-5 w-5" />
+        <NeuCard className="overflow-hidden p-5">
+          <div className="mb-5 border-b border-[#c9c9c9] pb-4">
+            <h3 className="flex items-center gap-2 text-lg font-semibold">
+              <MessageCircle className="h-5 w-5 text-[#27aab8]" />
               Sent Messages
-            </CardTitle>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            </h3>
+            <p className="text-sm text-[#888]">
               Message history for {clients.find((c) => c.id === selectedClientId)?.name}
             </p>
-          </CardHeader>
-          <CardContent className="p-0">
+          </div>
+          <div>
             {messagesLoading ? (
-              <div className="flex items-center justify-center py-10 gap-2 text-slate-500">
+              <div className="flex items-center justify-center gap-2 py-10 text-[#777]">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading messages...
               </div>
             ) : sentMessages.length === 0 ? (
-              <div className="py-10 text-center text-slate-500 text-sm">
+              <div className="py-10 text-center text-sm text-[#777]">
                 No messages sent to this client yet.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <NeuTable>
+                <NeuTableHeader>
+                  <NeuTableRow>
+                    <NeuTableHead>Date</NeuTableHead>
+                    <NeuTableHead>Subject</NeuTableHead>
+                    <NeuTableHead>Type</NeuTableHead>
+                    <NeuTableHead>Status</NeuTableHead>
+                  </NeuTableRow>
+                </NeuTableHeader>
+                <NeuTableBody>
                   {sentMessages.map((msg: any) => (
-                    <TableRow key={msg.id}>
-                      <TableCell className="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    <NeuTableRow key={msg.id}>
+                      <NeuTableCell className="text-sm text-[#777]">
                         {new Date(msg.sentAt).toLocaleDateString()}{" "}
                         {new Date(msg.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </TableCell>
-                      <TableCell className="font-medium text-slate-900 dark:text-white max-w-[200px] truncate">
+                      </NeuTableCell>
+                      <NeuTableCell className="max-w-[200px] truncate font-medium">
                         {msg.subject}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs">
+                      </NeuTableCell>
+                      <NeuTableCell>
+                        <NeuBadge className="text-xs">
                           {MESSAGE_TYPE_LABELS[msg.messageType] || msg.messageType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
+                        </NeuBadge>
+                      </NeuTableCell>
+                      <NeuTableCell>
                         {msg.status === "sent" ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                          <span className="inline-flex items-center gap-1 text-sm font-medium text-[#347d69]">
                             <CheckCircle className="h-3.5 w-3.5" /> Sent
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 text-sm font-medium">
+                          <span className="inline-flex items-center gap-1 text-sm font-medium text-[#b55252]">
                             <XCircle className="h-3.5 w-3.5" /> Failed
                           </span>
                         )}
-                      </TableCell>
-                    </TableRow>
+                      </NeuTableCell>
+                    </NeuTableRow>
                   ))}
-                </TableBody>
-              </Table>
+                </NeuTableBody>
+              </NeuTable>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </NeuCard>
       )}
     </div>
   );
@@ -371,6 +356,7 @@ export default function HelpPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [featureSearchQuery, setFeatureSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [openFaq, setOpenFaq] = useState("");
 
   const quickStartGuides = [
     {
@@ -896,24 +882,25 @@ export default function HelpPage() {
       title="Support"
       subtitle="Find answers, explore features, and get support"
       group="Admin"
+      neu
     >
-      <div className="space-y-8">
-        <section className="rounded-[28px] border border-[hsl(var(--border))] bg-white p-6 shadow-md dark:bg-[hsl(var(--card))] lg:p-8">
+      <div className="space-y-7">
+        <section className="rounded-[28px] bg-[#e0e0e0] p-5 shadow-[-7px_-7px_16px_#ffffff,7px_7px_16px_#b8b8b8] sm:p-7">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-[0_18px_34px_rgba(37,99,235,0.22)]">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#27aab8] text-white shadow-[-5px_-5px_12px_#ffffff,5px_5px_12px_#b8b8b8]">
                 <HelpCircle className="h-8 w-8" />
               </div>
 
               <div>
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#e0e0e0] px-3 py-1 text-xs font-semibold text-[#218f9b] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">
                   Support hub
                 </div>
 
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
+                <h1 className="text-2xl font-bold tracking-tight text-[#333] lg:text-3xl">
                   FactorFlux Help Center
                 </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[#777]">
                   Learn the platform, explore system functions, search common
                   questions, and connect with support when you need help.
                 </p>
@@ -921,27 +908,27 @@ export default function HelpPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-[420px]">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-center dark:border-slate-800 dark:bg-slate-900/40">
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="rounded-2xl bg-[#e0e0e0] p-4 text-center shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+                <p className="text-sm text-[#888]">
                   Guides
                 </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="mt-1 text-2xl font-bold text-[#333]">
                   {quickStartGuides.length}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-center dark:border-slate-800 dark:bg-slate-900/40">
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="rounded-2xl bg-[#e0e0e0] p-4 text-center shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+                <p className="text-sm text-[#888]">
                   Features
                 </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="mt-1 text-2xl font-bold text-[#333]">
                   {systemFeatures.length}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-center dark:border-slate-800 dark:bg-slate-900/40">
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="rounded-2xl bg-[#e0e0e0] p-4 text-center shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+                <p className="text-sm text-[#888]">
                   FAQs
                 </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="mt-1 text-2xl font-bold text-[#333]">
                   {faqItems.length}
                 </p>
               </div>
@@ -949,85 +936,82 @@ export default function HelpPage() {
           </div>
         </section>
 
-        <Tabs defaultValue="guides" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="guides">
+        <NeuTabs defaultValue="guides" onValueChange={() => setOpenFaq("")} className="space-y-6">
+          <NeuTabList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            <NeuTab value="guides">
               <ClipboardCheck className="h-4 w-4" />
               Quick Start
-            </TabsTrigger>
-            <TabsTrigger value="features">
+            </NeuTab>
+            <NeuTab value="features">
               <Package className="h-4 w-4" />
               Features
-            </TabsTrigger>
-            <TabsTrigger value="faq">
+            </NeuTab>
+            <NeuTab value="faq">
               <HelpCircle className="h-4 w-4" />
               FAQ
-            </TabsTrigger>
-            <TabsTrigger value="contact">
+            </NeuTab>
+            <NeuTab value="contact">
               <MessageCircle className="h-4 w-4" />
               Contact
-            </TabsTrigger>
-            <TabsTrigger value="resources">
+            </NeuTab>
+            <NeuTab value="resources">
               <FileText className="h-4 w-4" />
               Resources
-            </TabsTrigger>
-          </TabsList>
+            </NeuTab>
+          </NeuTabList>
 
-          <TabsContent value="guides" className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <NeuTabPanel value="guides" unmountInactive className="space-y-6">
+            <div className="relative space-y-5 before:absolute before:bottom-8 before:left-10 before:top-8 before:w-px before:bg-[#b9dfe1]">
               {quickStartGuides.map((guide, index) => (
-                <Card
+                <NeuCard
                   key={index}
-                  className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]"
+                  className="relative p-5 sm:p-6"
                 >
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
-                        <guide.icon className="h-5 w-5" />
+                  <div className="mb-5 flex items-center gap-3 border-b border-[#c9c9c9] pb-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#27aab8] text-lg font-bold text-white">
+                        {index + 1}
                       </div>
                       <div>
-                        <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
+                        <h3 className="text-lg font-semibold text-[#333]">
                           {guide.title}
-                        </CardTitle>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        </h3>
+                        <p className="mt-1 text-sm text-[#888]">
                           {guide.description}
                         </p>
                       </div>
-                    </div>
-                  </CardHeader>
+                  </div>
 
-                  <CardContent className="p-6">
-                    <ol className="space-y-3">
+                  <div>
+                    <ol className="relative space-y-3 before:absolute before:bottom-3 before:left-[15px] before:top-3 before:w-px before:bg-[#b9dfe1]">
                       {guide.steps.map((step, stepIndex) => (
                         <li key={stepIndex} className="flex items-start gap-3">
-                          <div className="mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          <div className="relative z-[1] mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#27aab8] text-xs font-bold text-white shadow-[2px_2px_5px_#b8b8b8]">
                             {stepIndex + 1}
                           </div>
-                          <span className="text-sm text-slate-700 dark:text-slate-300">
+                          <span className="pt-1.5 text-sm font-medium text-[#555]">
                             {step}
                           </span>
                         </li>
                       ))}
                     </ol>
-                  </CardContent>
-                </Card>
+                  </div>
+                </NeuCard>
               ))}
             </div>
-          </TabsContent>
+          </NeuTabPanel>
 
-          <TabsContent value="features" className="space-y-6">
-            <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
-              <CardContent className="p-6">
+          <NeuTabPanel value="features" unmountInactive className="space-y-6">
+            <NeuCard className="p-6">
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h3 className="text-2xl font-bold">Today's Total</h3>
-                    <p className="mt-2 text-3xl font-bold">$124,656.28</p>
-                    <p className="mt-1 text-blue-100">
+                    <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-[#888]">Today's Total</h3>
+                    <p className="mt-2 text-3xl font-bold text-[#27aab8]">$124,656.28</p>
+                    <p className="mt-1 text-sm text-[#777]">
                       MenuID 60600 • Dosh Barzanji
                     </p>
                   </div>
 
-                  <div className="text-left text-blue-100 lg:text-right">
+                  <div className="text-left text-sm leading-7 text-[#666] lg:text-right">
                     <div>
                       ACH Cut-off Time:{" "}
                       <span className="font-bold">2:15 PM MST</span>
@@ -1038,287 +1022,263 @@ export default function HelpPage() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </NeuCard>
 
             <div className="space-y-4">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#888]" />
+                <NeuInput
                   placeholder="Search system features and functions..."
                   value={featureSearchQuery}
                   onChange={(e) => setFeatureSearchQuery(e.target.value)}
-                  className="h-12 rounded-2xl pl-11 pr-4"
+                  className="pl-11 pr-4"
                 />
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {categories.map((category) => (
-                  <Button
+                  <NeuButton
                     key={category}
-                    variant={
-                      selectedCategory === category ? "default" : "outline"
-                    }
-                    size="sm"
+                    variant={selectedCategory === category ? "accent" : "default"}
                     onClick={() => setSelectedCategory(category)}
-                    className="rounded-xl text-xs"
+                    className="min-h-9 rounded-xl px-3 py-1.5 text-xs"
                   >
                     {category}
-                  </Button>
+                  </NeuButton>
                 ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredFeatures.map((feature, index) => (
-                <Card
+                <NeuCard
                   key={index}
                   className={cn(
-                    "cursor-pointer rounded-[22px] border bg-white transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(37,99,235,0.10)] dark:bg-[hsl(var(--card))]",
-                    feature.status === "active"
-                      ? "border-l-4 border-l-emerald-500"
-                      : "border-l-4 border-l-amber-500"
+                    "cursor-pointer p-4 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[-9px_-9px_18px_#ffffff,9px_9px_18px_#b8b8b8]",
                   )}
                   onClick={() => setLocation(feature.route)}
+                  role="link"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setLocation(feature.route);
+                    }
+                  }}
+                  aria-label={`${feature.name}: ${feature.status}, ${feature.category}`}
                 >
-                  <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div
-                        className={cn(
-                          "flex h-10 w-10 items-center justify-center rounded-xl",
-                          feature.status === "active"
-                            ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
-                            : "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
-                        )}
-                      >
-                        <feature.icon className="h-4.5 w-4.5" />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d9eeee] text-[#218f9b]">
+                        <feature.icon className="h-[18px] w-[18px]" />
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex items-center justify-between gap-2">
-                          <h4 className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                          <h4 className="truncate text-sm font-semibold text-[#333]">
                             {feature.name}
                           </h4>
-                          <Badge
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                              feature.status === "active"
-                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
-                                : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
-                            )}
-                          >
+                          <NeuBadge tone={feature.status === "active" ? "success" : "warning"} className="px-2 py-0.5 text-[10px]">
                             {feature.status === "active" ? "Active" : "Planned"}
-                          </Badge>
+                          </NeuBadge>
                         </div>
 
-                        <p className="line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
+                        <p className="line-clamp-2 text-xs text-[#777]">
                           {feature.description}
                         </p>
 
                         <div className="mt-3 flex items-center justify-between">
-                          <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          <span className="text-xs font-medium text-[#218f9b]">
                             {feature.category}
                           </span>
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-[11px] text-[#888]">
                             {feature.route}
                           </span>
                         </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                </NeuCard>
               ))}
             </div>
 
             {filteredFeatures.length === 0 && (
-              <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-14 text-center dark:border-slate-800 dark:bg-slate-900/30">
-                <AlertCircle className="mx-auto mb-4 h-12 w-12 text-slate-400" />
-                <h3 className="text-lg font-medium text-slate-900 dark:text-white">
+              <NeuCard className="px-6 py-14 text-center">
+                <AlertCircle className="mx-auto mb-4 h-12 w-12 text-[#27aab8]" />
+                <h3 className="text-lg font-medium text-[#333]">
                   No features found
                 </h3>
-                <p className="mt-2 text-slate-500 dark:text-slate-400">
+                <p className="mt-2 text-[#888]">
                   Try adjusting your search terms or category filter.
                 </p>
-              </div>
+              </NeuCard>
             )}
 
-            <Card className="rounded-[22px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-              <CardContent className="p-4">
-                <h4 className="mb-3 font-medium text-slate-900 dark:text-white">
+            <NeuCard className="p-4">
+                <h4 className="mb-3 font-medium text-[#333]">
                   Feature Status
                 </h4>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                    <div className="h-3 w-3 rounded-full bg-[#347d69]" />
+                    <span className="text-sm text-[#777]">
                       Active - Available now
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-amber-500" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                    <div className="h-3 w-3 rounded-full bg-[#c28c3c]" />
+                    <span className="text-sm text-[#777]">
                       Planned - In development
                     </span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            </NeuCard>
+          </NeuTabPanel>
 
-          <TabsContent value="faq" className="space-y-6">
+          <NeuTabPanel value="faq" unmountInactive className="space-y-6">
             <div className="mx-auto max-w-4xl space-y-6">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#888]" />
+                <NeuInput
                   placeholder="Search frequently asked questions..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-12 rounded-2xl pl-11 pr-4"
+                  className="pl-11 pr-4"
                 />
               </div>
 
-              <Accordion type="single" collapsible className="space-y-3">
+              <Accordion type="single" collapsible value={openFaq} onValueChange={setOpenFaq} className="space-y-3">
                 {filteredFAQ.map((item, index) => (
-                  <AccordionItem
-                    key={index}
-                    value={`item-${index}`}
-                    className="rounded-[18px] border border-slate-200 bg-white px-4 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]"
-                  >
-                    <AccordionTrigger className="hover:no-underline">
-                      <span className="text-left font-medium text-slate-900 dark:text-white">
-                        {item.question}
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-4 text-slate-600 dark:text-slate-400">
-                      {item.answer}
-                    </AccordionContent>
-                  </AccordionItem>
+                  <NeuCard key={index} pressed={openFaq === `item-${index}`} className="px-4">
+                    <AccordionItem value={`item-${index}`} className="border-0">
+                      <AccordionTrigger className="gap-4 py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180 [&>svg]:text-[#27aab8] [&>svg]:transition-transform [&>svg]:duration-200">
+                        <span className="text-left font-semibold text-[#333]">{item.question}</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-sm leading-6 text-[#777] motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none">
+                        {item.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </NeuCard>
                 ))}
               </Accordion>
 
               {filteredFAQ.length === 0 && searchQuery && (
                 <div className="py-8 text-center">
-                  <p className="text-slate-500 dark:text-slate-400">
+                  <p className="text-[#777]">
                     No results found for "{searchQuery}". Try different keywords
                     or contact support.
                   </p>
                 </div>
               )}
             </div>
-          </TabsContent>
+          </NeuTabPanel>
 
-          <TabsContent value="contact" className="space-y-6">
+          <NeuTabPanel value="contact" unmountInactive className="space-y-6">
             <ContactTab />
-          </TabsContent>
+          </NeuTabPanel>
 
-          <TabsContent value="resources" className="space-y-6">
+          <NeuTabPanel value="resources" unmountInactive className="space-y-6">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-                <CardHeader>
+              <NeuCard className="flex flex-col p-5">
+                <div className="mb-5 flex items-center gap-3">
                   <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-blue-600" />
+                    <FileText className="h-8 w-8 text-[#27aab8]" />
                     <div>
-                      <CardTitle className="text-slate-900 dark:text-white">
+                      <h3 className="font-semibold text-[#333]">
                         User Manual
-                      </CardTitle>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                      </h3>
+                      <p className="text-sm text-[#888]">
                         Complete system documentation
                       </p>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="w-full rounded-xl">
+                </div>
+                <div className="mt-auto">
+                  <NeuButton className="w-full">
                     Download PDF
-                  </Button>
-                </CardContent>
-              </Card>
+                  </NeuButton>
+                </div>
+              </NeuCard>
 
-              <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="h-8 w-8 text-emerald-600" />
+              <NeuCard className="flex flex-col p-5">
+                <div className="mb-5 flex items-center gap-3">
+                    <BarChart3 className="h-8 w-8 text-[#27aab8]" />
                     <div>
-                      <CardTitle className="text-slate-900 dark:text-white">
+                      <h3 className="font-semibold text-[#333]">
                         Video Tutorials
-                      </CardTitle>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                      </h3>
+                      <p className="text-sm text-[#888]">
                         Step-by-step video guides
                       </p>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="w-full rounded-xl">
+                </div>
+                <div className="mt-auto">
+                  <NeuButton className="w-full">
                     Watch Videos
-                  </Button>
-                </CardContent>
-              </Card>
+                  </NeuButton>
+                </div>
+              </NeuCard>
 
-              <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-                <CardHeader>
+              <NeuCard className="flex flex-col p-5">
+                <div className="mb-5 flex items-center gap-3">
                   <div className="flex items-center gap-3">
-                    <Settings className="h-8 w-8 text-violet-600" />
+                    <Settings className="h-8 w-8 text-[#27aab8]" />
                     <div>
-                      <CardTitle className="text-slate-900 dark:text-white">
+                      <h3 className="font-semibold text-[#333]">
                         System Status
-                      </CardTitle>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                      </h3>
+                      <p className="text-sm text-[#888]">
                         Check service availability
                       </p>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
+                </div>
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                    <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    <div className="h-3 w-3 rounded-full bg-[#347d69]" />
+                    <span className="text-sm font-medium text-[#347d69]">
                       All Systems Operational
                     </span>
                   </div>
-                </CardContent>
-              </Card>
+              </NeuCard>
             </div>
 
-            <Card className="rounded-[24px] border border-[hsl(var(--border))] bg-white shadow-md dark:bg-[hsl(var(--card))]">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="text-slate-900 dark:text-white">
+            <NeuCard className="p-5 sm:p-6">
+              <div className="mb-5 border-b border-[#c9c9c9] pb-4">
+                <h3 className="font-semibold text-[#333]">
                   Release Notes
-                </CardTitle>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                </h3>
+                <p className="text-sm text-[#888]">
                   Latest updates and improvements
                 </p>
-              </CardHeader>
-              <CardContent className="space-y-5 p-6">
-                <div className="border-l-4 border-blue-500 pl-4">
-                  <h4 className="font-medium text-slate-900 dark:text-white">
+              </div>
+              <div className="space-y-5">
+                <div className="border-l-4 border-[#27aab8] pl-4">
+                  <h4 className="font-medium text-[#333]">
                     Version 2.1.0 - Latest
                   </h4>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  <p className="mt-1 text-sm text-[#777]">
                     Enhanced document upload, improved fuel advance tracking,
                     and new help center
                   </p>
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-2 text-xs text-[#888]">
                     Released: September 2025
                   </p>
                 </div>
 
-                <div className="border-l-4 border-slate-300 pl-4 dark:border-slate-700">
-                  <h4 className="font-medium text-slate-900 dark:text-white">
+                <div className="border-l-4 border-[#bbb] pl-4">
+                  <h4 className="font-medium text-[#333]">
                     Version 2.0.0
                   </h4>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  <p className="mt-1 text-sm text-[#777]">
                     Major UI refresh, new authentication system, and expanded
                     broker management
                   </p>
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-2 text-xs text-[#888]">
                     Released: August 2025
                   </p>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
+            </NeuCard>
+          </NeuTabPanel>
+        </NeuTabs>
       </div>
     </AppShell>
   );
