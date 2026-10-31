@@ -138,7 +138,7 @@ export function MentionAutocomplete({
           id={listboxId}
           role="listbox"
           aria-label="Mention a teammate"
-          className="absolute bottom-[calc(100%+0.35rem)] left-0 z-50 max-h-56 w-[min(20rem,90vw)] overflow-auto border-2 border-[#808080] bg-[#efeee9] p-1 shadow-[2px_2px_0_#777]"
+          className="absolute bottom-[calc(100%+0.5rem)] left-0 z-50 max-h-56 w-[min(20rem,90vw)] overflow-auto rounded-2xl bg-[#e0e0e0] p-2 shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8]"
         >
           {matches.map((user, index) => (
             <li
@@ -148,12 +148,12 @@ export function MentionAutocomplete({
               aria-selected={index === activeIndex}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => choose(user)}
-                className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs ${index === activeIndex ? "bg-[#dff5f6]" : "hover:bg-[#e5e3dc]"}`}
+                className={`flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs transition-colors ${index === activeIndex ? "bg-[#27aab8]/10 text-[#176a73]" : "hover:bg-[#27aab8]/[0.06]"}`}
             >
                 <ChatAvatar name={user.name} profileImageUrl={user.profileImageUrl} className="h-7 w-7 text-[9px]" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-[#222]">{user.name}</span>
-                  <span className="block truncate font-mono text-[10px] text-[#17626a]">@{cleanHandle(user.handle)}</span>
+                  <span className="block truncate font-semibold text-[#333]">{user.name}</span>
+                  <span className="block truncate font-mono text-[10px] text-[#208894]">@{cleanHandle(user.handle)}</span>
                 </span>
             </li>
           ))}

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, CornerDownRight, Send, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
 import { MentionAutocomplete, type ChatUser } from "./MentionAutocomplete";
@@ -8,6 +7,7 @@ import { MessageBody, type MessageMention } from "./MessageBody";
 import { ChatAvatar } from "./ChatAvatar";
 import { GifPicker } from "./GifPicker";
 import { gifMessage, type ChatGif } from "@shared/chat-gif";
+import { NeuButton } from "@/styles/neu/components";
 
 export type ChatMessage = {
   id: string | number;
@@ -205,21 +205,21 @@ export function ThreadPanel({
   };
 
   return (
-    <aside className="ff-chat-thread-panel absolute inset-0 z-20 flex min-h-0 min-w-0 flex-col border-l-2 border-[#808080] bg-[#f5f4ef] md:static md:inset-auto md:z-auto md:w-[340px] md:max-w-[42%] md:shrink-0" aria-label="Message thread" data-testid="chat-thread-panel">
-      <header className="flex h-9 shrink-0 items-center gap-2 border-b border-[#a4a29b] bg-[#d4d0c8] px-2">
-        <button type="button" onClick={onClose} aria-label="Close thread" className="flex h-6 w-6 items-center justify-center hover:bg-[#bcbab3]"><ArrowLeft className="h-4 w-4" /></button>
-        <span className="min-w-0 flex-1 truncate text-xs font-bold">Thread</span>
-        <button type="button" onClick={onClose} aria-label="Close thread" className="flex h-6 w-6 items-center justify-center hover:bg-[#bcbab3]"><X className="h-3.5 w-3.5" /></button>
+    <aside className="absolute inset-0 z-20 flex min-h-0 min-w-0 flex-col rounded-2xl bg-[#e0e0e0] p-3 shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] md:static md:inset-auto md:z-auto md:w-[360px] md:max-w-[45%] md:shrink-0" aria-label="Message thread" data-testid="chat-thread-panel">
+      <header className="mb-2 flex h-10 shrink-0 items-center gap-2 border-b border-[#c7c7c7] px-1 pb-2">
+        <NeuButton type="button" onClick={onClose} aria-label="Close thread" className="!min-h-8 !w-8 !rounded-lg !p-0"><ArrowLeft className="h-4 w-4" /></NeuButton>
+        <span className="min-w-0 flex-1 truncate text-sm font-bold">Thread</span>
+        <NeuButton type="button" onClick={onClose} aria-label="Close thread" className="!min-h-8 !w-8 !rounded-lg !p-0"><X className="h-3.5 w-3.5" /></NeuButton>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {loading && !parent ? <div className="space-y-3" aria-label="Loading thread">{[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse bg-[#dfded8]" />)}</div>
-          : error && !parent ? <div role="alert" className="p-3 text-xs text-[#8b3030]"><AlertCircle className="mb-2 h-4 w-4" />{error}<Button onClick={() => setRequestVersion((version) => version + 1)} variant="outline" className="mt-2 h-7 rounded-sm text-xs">Retry</Button></div>
+        {loading && !parent ? <div className="space-y-3" aria-label="Loading thread">{[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-[#d7d7d7]" />)}</div>
+          : error && !parent ? <div role="alert" className="p-3 text-xs text-[#8b3030]"><AlertCircle className="mb-2 h-4 w-4" />{error}<NeuButton onClick={() => setRequestVersion((version) => version + 1)} className="mt-2 !min-h-8 !rounded-lg !px-3 text-xs">Retry</NeuButton></div>
             : parent && <>
               <div className="mb-3 flex gap-1.5 border-b border-[#c9c7c0] pb-3" data-testid="chat-thread-parent">
                 <ChatAvatar name={parent.senderName} profileImageUrl={parent.senderProfileImageUrl} />
                 <div className="min-w-0 flex-1">
-                <div className="mb-1 flex flex-wrap items-baseline gap-1 text-[10px] text-[#777]"><strong className="text-[#444]">{parent.senderName}</strong><span>{timeLabel(parent.createdAt)}</span>{parent.mentions?.some((mention) => String(mention.userId) === String(currentUserId)) && <span className="rounded-sm border border-[#c99732] bg-[#fff0b8] px-1 font-bold text-[#684c08]">Mentioned you</span>}<span className="ml-auto text-[#17626a]">Original message</span></div>
-                <div className="ff-team-chat-message ff-team-chat-message-other inline-block whitespace-pre-wrap break-words px-2 py-1 leading-snug text-xs"><MessageBody body={parent.body} mentions={parent.mentions} channelId={channelId} rootMessageId={rootId} /></div>
+                <div className="mb-1 flex flex-wrap items-baseline gap-1 text-[10px] text-[#888]"><strong className="text-[#444]">{parent.senderName}</strong><span>{timeLabel(parent.createdAt)}</span>{parent.mentions?.some((mention) => String(mention.userId) === String(currentUserId)) && <span className="rounded-full bg-[#f2e7c9] px-2 py-0.5 font-bold text-[#684c08]">Mentioned you</span>}<span className="ml-auto text-[#208894]">Original message</span></div>
+                <div className={cn("inline-block whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 leading-snug text-xs", String(parent.senderId) === String(currentUserId) && "bg-[#27aab8]/[0.08]")}><MessageBody body={parent.body} mentions={parent.mentions} channelId={channelId} rootMessageId={rootId} /></div>
                 </div>
               </div>
               {replies.map((reply) => (
@@ -227,8 +227,8 @@ export function ThreadPanel({
                   <CornerDownRight className="mt-1 h-3 w-3 shrink-0 text-[#85837d]" />
                   <ChatAvatar name={reply.senderName} profileImageUrl={reply.senderProfileImageUrl} />
                   <div className="min-w-0 flex-1">
-                    <div className="mb-0.5 flex flex-wrap items-baseline gap-1 text-[10px] text-[#777]"><strong className="text-[#444]">{reply.senderName}</strong><span>{timeLabel(reply.createdAt)}</span>{reply.mentions?.some((mention) => String(mention.userId) === String(currentUserId)) && <span className="rounded-sm border border-[#c99732] bg-[#fff0b8] px-1 font-bold text-[#684c08]">Mentioned you</span>}</div>
-                    <div className="whitespace-pre-wrap break-words text-xs leading-snug"><MessageBody body={reply.body} mentions={reply.mentions} channelId={channelId} rootMessageId={rootId} /></div>
+                    <div className="mb-0.5 flex flex-wrap items-baseline gap-1 text-[10px] text-[#888]"><strong className="text-[#444]">{reply.senderName}</strong><span>{timeLabel(reply.createdAt)}</span>{reply.mentions?.some((mention) => String(mention.userId) === String(currentUserId)) && <span className="rounded-full bg-[#f2e7c9] px-2 py-0.5 font-bold text-[#684c08]">Mentioned you</span>}</div>
+                    <div className={cn("whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-snug", String(reply.senderId) === String(currentUserId) && "bg-[#27aab8]/[0.08]")}><MessageBody body={reply.body} mentions={reply.mentions} channelId={channelId} rootMessageId={rootId} /></div>
                   </div>
                 </article>
               ))}
@@ -238,8 +238,8 @@ export function ThreadPanel({
             </>}
       </div>
       {error && parent && <div role="alert" className="mx-2 mb-1 flex items-center gap-1 text-[10px] text-[#8b3030]"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}</div>}
-      <div className="border-t border-[#808080] bg-[#d4d0c8] p-1.5">
-        <div className="flex items-end gap-1">
+      <div className="mt-2 rounded-xl bg-[#e0e0e0] p-2 shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]">
+        <div className="flex items-end gap-2">
           <MentionAutocomplete
             value={draft}
             onChange={setDraft}
@@ -249,10 +249,10 @@ export function ThreadPanel({
             disabled={sending}
             onDirectoryRefresh={() => { void refreshUserDirectory(); }}
             data-testid="chat-thread-composer"
-            className="ff-team-chat-input h-8 min-h-8 flex-1 resize-none overflow-hidden px-1.5 py-1 text-[11px] outline-none"
+            className="!min-h-10 flex-1 resize-none overflow-hidden !border-0 !bg-transparent px-2 py-2 text-sm !text-[#333] outline-none placeholder:!text-[#888] !shadow-none focus-visible:!outline-none"
           />
           <GifPicker key={`${channelId}-${rootId}`} onSelect={sendGif} disabled={sending} />
-          <Button onClick={submitReply} disabled={!draft.trim() || sending} aria-label="Send reply" data-testid="chat-send-reply" className="h-8 w-8 shrink-0 p-0"><Send className="h-3.5 w-3.5" /></Button>
+          <NeuButton variant="accent" onClick={submitReply} disabled={!draft.trim() || sending} aria-label="Send reply" data-testid="chat-send-reply" className="!min-h-9 !w-9 !rounded-lg !p-0"><Send className="h-4 w-4" /></NeuButton>
         </div>
       </div>
     </aside>

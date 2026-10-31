@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data";
-import { AlertCircle, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, Users, X, CornerDownRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertCircle, ArrowLeft, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, Users, X, CornerDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useChatFontSize } from "@/hooks/useChatFontSize";
@@ -23,6 +22,7 @@ import { GifPicker } from "@/components/team-chat/GifPicker";
 import { gifMessage, type ChatGif } from "@shared/chat-gif";
 import { ThreadPanel, type ChatMessage } from "@/components/team-chat/ThreadPanel";
 import { ChatAvatar } from "@/components/team-chat/ChatAvatar";
+import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuSelect } from "@/styles/neu/components";
 
 type Channel = {
   id: string | number;
@@ -138,6 +138,7 @@ function ChatPanel({ active }: ChatPanelProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
+  const [mobileShowChannels, setMobileShowChannels] = useState(false);
   const [channelNameDraft, setChannelNameDraft] = useState("");
   const [channelNameError, setChannelNameError] = useState("");
   const [creatingChannel, setCreatingChannel] = useState(false);
@@ -186,6 +187,7 @@ function ChatPanel({ active }: ChatPanelProps) {
     setDraft(channelId === null ? "" : draftsByChannelRef.current[String(channelId)] || "");
     setThreadRootId(null);
     setHighlightMessageId(null);
+    setMobileShowChannels(false);
   };
 
   const refreshMentionUsers = useCallback(async (channelId: string | number) => {
@@ -653,80 +655,85 @@ function ChatPanel({ active }: ChatPanelProps) {
   };
 
   return (
-    <div
-      className="ff-team-chat relative flex h-full min-h-0 min-w-0 flex-col bg-[#d4d0c8]"
+    <NeuPageShell
+      className="ff-team-chat relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden !bg-[#e0e0e0] p-3 text-[#333] [&_button]:!rounded-xl [&_select]:!rounded-xl sm:p-4"
       data-chat-font-size={fontSize}
       aria-label="Team Chat"
     >
-      <header className="ff-team-chat-header flex w-full shrink-0 flex-wrap items-center gap-2 border-2 border-[#808080] border-b-0 px-2 py-1 text-white shadow-[inset_1px_1px_#fff] sm:px-3">
-        <MessageCircle className="h-4 w-4 shrink-0" />
-        <span className="ff-team-chat-title shrink-0 font-bold">Team Chat</span>
-        {selected && <span className="ff-team-chat-current-channel min-w-0 flex-1 truncate text-[#dff5f6]">— {selectedLabel}</span>}
+      <header className="mb-3 flex w-full shrink-0 flex-wrap items-center gap-2 px-1">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e0e0e0] text-[#27aab8] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
+          <MessageCircle className="h-4 w-4 shrink-0" />
+        </span>
+        {!selected && !mobileShowChannels && <NeuButton type="button" onClick={() => setMobileShowChannels(true)} aria-label="Show channels" className="!min-h-8 !px-2 md:hidden"><ArrowLeft className="h-4 w-4" />Channels</NeuButton>}
+        <span className="shrink-0 text-sm font-bold tracking-tight text-[#333]">Team Chat</span>
+        {selected && <span className="min-w-0 flex-1 truncate text-sm text-[#777]">/ {selectedLabel}</span>}
         <label className="sr-only" htmlFor="team-chat-font-size">Chat text size</label>
-        <select
+        <NeuSelect
           id="team-chat-font-size"
           aria-label="Chat text size"
           value={fontSize}
           onChange={(event) => setFontSize(event.target.value as "small" | "medium" | "large")}
-          className="ff-team-chat-size-select shrink-0"
+          className="!min-h-8 !w-auto !rounded-lg !px-2 !py-1 text-xs"
         >
           <option value="small">Small</option>
           <option value="medium">Medium</option>
           <option value="large">Large</option>
-        </select>
+        </NeuSelect>
         <label className="sr-only" htmlFor="team-chat-notification-sound">Chat notification sound</label>
-        <select
+        <NeuSelect
           id="team-chat-notification-sound"
           aria-label="Chat notification sound"
           value={notificationMode}
           onChange={(event) => setNotificationMode(event.target.value as "chime" | "voice" | "muted")}
           title={'Voice plays the original AI-generated recording saying "You have got a message" (the actual clip says "You’ve got a message").'}
-          className="ff-team-chat-sound-select shrink-0"
+          className="!min-h-8 !w-auto !rounded-lg !px-2 !py-1 text-xs"
         >
           <option value="chime">Chime</option>
           <option value="voice">Voice</option>
           <option value="muted">Mute</option>
-        </select>
+        </NeuSelect>
       </header>
-      {preferenceError && <div role="alert" className="ff-team-chat-preference-error flex shrink-0 items-start gap-2 border-x-2 border-[#808080] bg-[#fff3d6] px-2 py-1.5 text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{preferenceError}</span></div>}
-      {notificationPreferenceError && <div role="alert" className="ff-team-chat-preference-error flex shrink-0 items-start gap-2 border-x-2 border-[#808080] bg-[#fff3d6] px-2 py-1.5 text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notificationPreferenceError}</span></div>}
-      <div className="flex min-h-0 w-full flex-1 overflow-hidden border-2 border-[#808080] bg-[#d4d0c8] shadow-[inset_1px_1px_#fff]">
-        <aside className="ff-team-chat-channels flex w-[40%] min-w-[128px] shrink-0 flex-col md:w-[260px]">
-          <div className="flex h-10 items-center justify-between gap-1 border-b-2 border-[#808080] bg-[#dff5f6] px-1">
-            <button type="button" onClick={() => setPickerOpen(true)} title="New direct message" aria-label="New direct message" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-[#098b9f] text-white hover:bg-[#087c8d]"><Plus className="h-4 w-4" /></button>
-            <button type="button" onClick={() => { setChannelNameDraft(""); setChannelNameError(""); setChannelDialogOpen(true); }} className="flex h-7 min-w-0 items-center justify-center gap-1 rounded-sm border border-[#8bbfc1] bg-[#f7ffff] px-2 text-[10px] font-bold text-[#17626a] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]">
-              <Plus className="h-3 w-3 shrink-0" /><span className="truncate">New Channel</span>
-            </button>
+      {preferenceError && <div role="alert" className="mb-2 flex shrink-0 items-start gap-2 rounded-xl bg-[#f4e9d1] px-3 py-2 text-xs text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{preferenceError}</span></div>}
+      {notificationPreferenceError && <div role="alert" className="mb-2 flex shrink-0 items-start gap-2 rounded-xl bg-[#f4e9d1] px-3 py-2 text-xs text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notificationPreferenceError}</span></div>}
+      <div className="flex min-h-0 w-full flex-1 gap-4">
+        <NeuCard className={cn("flex w-full min-w-0 flex-col overflow-hidden p-3 md:w-[270px] md:shrink-0", mobileShowChannels ? "flex" : "hidden md:flex")}>
+          <div className="mb-3 flex items-center justify-between gap-2 px-1">
+            <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-[#777]">Channels</h2>
+            <div className="flex gap-2">
+              <NeuButton type="button" onClick={() => setPickerOpen(true)} title="New direct message" aria-label="New direct message" className="!min-h-8 !rounded-lg !px-2 text-[11px] text-[#208894]"><Users className="h-3.5 w-3.5" /><span className="sr-only">New DM</span></NeuButton>
+              <NeuButton type="button" onClick={() => { setChannelNameDraft(""); setChannelNameError(""); setChannelDialogOpen(true); }} aria-label="Create channel" title="Create channel" className="!min-h-8 !rounded-lg !px-2 text-[11px] text-[#208894]"><Plus className="h-3.5 w-3.5" /><span className="sr-only">Channel</span></NeuButton>
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-2">
-            {loadingChannels ? <div className="space-y-2 p-1">{[1, 2, 3, 4].map((item) => <div key={item} className="h-12 animate-pulse bg-[#d4d0c8]" />)}</div>
-              : error && !channels.length ? <div className="p-4 text-center text-xs text-[#7c3535]"><AlertCircle className="mx-auto mb-2 h-6 w-6" />{error}<Button onClick={loadChannels} variant="outline" className="mt-3 h-7 rounded-sm text-xs">Retry</Button></div>
+          <div className="flex-1 space-y-3 overflow-y-auto p-1">
+            {loadingChannels ? <div className="space-y-3 p-1" aria-label="Loading channels">{[1, 2, 3, 4].map((item) => <div key={item} className="h-11 animate-pulse rounded-xl bg-[#d7d7d7]" />)}</div>
+              : error && !channels.length ? <div className="p-4 text-center text-xs text-[#7c3535]"><AlertCircle className="mx-auto mb-2 h-6 w-6" />{error}<NeuButton onClick={loadChannels} className="mt-3 !min-h-8 !rounded-lg !px-3 text-xs">Retry</NeuButton></div>
               : !visibleChannels.length ? <div className="p-3 text-center text-[10px] text-[#555]"><MessageCircle className="mx-auto mb-2 h-6 w-6 text-[#098b9f]" />No conversations</div>
               : visibleChannels.map((channel) => {
                 const isDirect = channel.type === "direct" || Boolean(channel.directName);
                  const label = isDirect ? channel.directName || channel.name : `#${channel.name}`;
-                     return <button key={channel.id} onClick={() => selectChannel(channel.id)} title={label} aria-label={label} data-testid={`chat-channel-${channel.id}`} className={cn("ff-team-chat-channel relative flex h-11 w-full items-center justify-start gap-2 px-2 text-left", String(selectedId) === String(channel.id) && "ff-team-chat-channel-active")}>
-                   {isDirect ? <ChatAvatar name={label} profileImageUrl={channel.directProfileImageUrl} className="h-8 w-8 text-[10px]" /> : <span className="ff-team-chat-avatar flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold"><Hash className="h-4 w-4" /></span>}
-                     <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#1a1a1a]">{label}</span>
-                   {channel.unreadCount > 0 && <span className="ff-team-chat-unread absolute right-1 top-1" aria-label={`${channel.unreadCount} unread`}>{channel.unreadCount > 9 ? "9+" : channel.unreadCount}</span>}
+                      return <button key={channel.id} onClick={() => selectChannel(channel.id)} title={label} aria-label={label} data-testid={`chat-channel-${channel.id}`} className={cn("relative flex h-11 w-full items-center justify-start gap-2 rounded-xl px-2 text-left text-[#444] transition-[transform,box-shadow,color] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8]", String(selectedId) === String(channel.id) ? "bg-[#e0e0e0] text-[#208894] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" : "bg-[#e0e0e0] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1] hover:text-[#208894]")}>
+                    {isDirect ? <ChatAvatar name={label} profileImageUrl={channel.directProfileImageUrl} className="h-8 w-8 text-[10px]" /> : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e0e0e0] text-[#27aab8] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><Hash className="h-4 w-4" /></span>}
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{label}</span>
+                    {channel.unreadCount > 0 && <NeuBadge tone="accent" className="absolute right-1 top-1 !bg-[#27aab8] !px-2 !py-0.5 !text-[10px] !text-white !shadow-none" aria-label={`${channel.unreadCount} unread`}>{channel.unreadCount > 9 ? "9+" : channel.unreadCount}</NeuBadge>}
                 </button>;
               })}
           </div>
-        </aside>
+        </NeuCard>
 
-          <section className="ff-team-chat-thread relative flex min-w-0 flex-1 flex-col bg-white" data-testid="chat-conversation">
+          <NeuCard className={cn("relative min-w-0 flex-1 flex-col overflow-hidden p-3", mobileShowChannels ? "hidden md:flex" : "flex")} data-testid="chat-conversation">
             {selected ? <div className="flex min-h-0 min-w-0 flex-1">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <header className="flex h-9 shrink-0 items-center gap-2 border-b border-[#808080] bg-[#d4d0c8] px-2">
-             {selectedIsDirect ? <ChatAvatar name={selectedLabel} profileImageUrl={selected.directProfileImageUrl} /> : <span className="flex h-6 w-6 items-center justify-center rounded-sm bg-[#8bbfc1] text-[#154c51]"><Hash className="h-3 w-3" /></span>}
-              <div className="min-w-0"><h2 className="truncate text-xs font-bold text-[#1a1a1a]">{selectedLabel}</h2></div>
-             <MoreHorizontal className="ml-auto h-4 w-4 text-[#777]" />
+              <header className="mb-2 flex min-h-10 shrink-0 items-center gap-2 border-b border-[#c7c7c7] px-1 pb-2">
+             <NeuButton type="button" onClick={() => setMobileShowChannels(true)} aria-label="Back to channels" className="!min-h-8 !rounded-lg !px-2 text-xs md:hidden"><ArrowLeft className="h-4 w-4" /> Channels</NeuButton>
+             {selectedIsDirect ? <ChatAvatar name={selectedLabel} profileImageUrl={selected.directProfileImageUrl} /> : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#e0e0e0] text-[#27aab8] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><Hash className="h-3 w-3" /></span>}
+              <div className="min-w-0"><h2 className="truncate text-sm font-bold text-[#333]">{selectedLabel}</h2></div>
+             <MoreHorizontal className="ml-auto h-4 w-4 text-[#888]" />
           </header>
-           <div className="flex-1 overflow-y-auto px-2 py-2">
-            {loadingMessages && !messages.length ? <div className="space-y-4">{[1, 2, 3].map((item) => <div key={item} className={cn("h-14 animate-pulse bg-[#d9d8d2]", item % 2 === 0 ? "ml-auto max-w-[60%]" : "max-w-[55%]")} />)}</div>
+            <div className="flex-1 overflow-y-auto px-2 py-2">
+             {loadingMessages && !messages.length ? <div className="space-y-4" aria-label="Loading messages">{[1, 2, 3].map((item) => <div key={item} className={cn("h-12 animate-pulse rounded-xl bg-[#d7d7d7]", item % 2 === 0 ? "ml-auto max-w-[60%]" : "max-w-[55%]")} />)}</div>
                 : messages.length ? messages.map((message) => <div key={message.id} id={`chat-message-${message.id}`} data-testid="chat-root-message" className={cn("mb-2 flex gap-1.5", String(message.senderId) === String(user?.id) ? "justify-end" : "justify-start", String(message.id) === highlightMessageId && "rounded-sm bg-[#fff0b8] p-1")}>
                  <ChatAvatar name={message.senderName} profileImageUrl={message.senderProfileImageUrl} className={cn(String(message.senderId) === String(user?.id) && "order-2")} />
-                    <div className={cn("max-w-[84%] min-w-0", String(message.senderId) === String(user?.id) && "text-right")}><div className="ff-team-chat-message-meta mb-0.5 flex flex-wrap items-baseline gap-1 text-[#777]"><span className="font-semibold text-[#4e5554]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span>{message.mentions?.some((mention) => String(mention.userId) === String(user?.id)) && <span className="rounded-sm border border-[#c99732] bg-[#fff0b8] px-1 font-bold text-[#684c08]">Mentioned you</span>}</div><div
+                     <div className={cn("max-w-[84%] min-w-0", String(message.senderId) === String(user?.id) && "text-right")}><div className="mb-0.5 flex flex-wrap items-baseline gap-1 text-[10px] text-[#888]"><span className="font-bold text-[#444]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span>{message.mentions?.some((mention) => String(mention.userId) === String(user?.id)) && <NeuBadge tone="warning" className="!px-2 !py-0.5 !text-[9px]">Mentioned you</NeuBadge>}</div><div
                       role="button" tabIndex={0} aria-label={`Open reply thread for ${message.senderName}'s message`}
                       onClick={(event) => { if (!(event.target as HTMLElement).closest("a")) setThreadRootId(message.id); }}
                       onKeyDown={(event) => {
@@ -734,34 +741,34 @@ function ChatPanel({ active }: ChatPanelProps) {
                           event.preventDefault(); setThreadRootId(message.id);
                         }
                       }}
-                      className={cn("ff-team-chat-message inline-block max-w-full cursor-pointer whitespace-pre-wrap break-words px-2 py-1 leading-snug focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]", String(message.senderId) === String(user?.id) ? "ff-team-chat-message-user" : "ff-team-chat-message-other")}><MessageBody body={message.body} mentions={message.mentions} channelId={message.channelId} rootMessageId={message.id} /></div>
+                       className={cn("inline-block max-w-full cursor-pointer whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 leading-snug focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8]", String(message.senderId) === String(user?.id) ? "bg-[#27aab8]/[0.08]" : "bg-transparent")}><MessageBody body={message.body} mentions={message.mentions} channelId={message.channelId} rootMessageId={message.id} /></div>
                       <div className={cn("mt-1 flex items-center gap-2 text-[10px]", String(message.senderId) === String(user?.id) && "justify-end")}>
-                        <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-reply-${message.id}`} aria-label={`Reply to ${message.senderName}'s message`} className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 font-semibold text-[#17626a] hover:bg-[#dff5f6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f]"><CornerDownRight className="h-3 w-3" />Reply</button>
-                        {message.replyCount > 0 && <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-replies-${message.id}`} className="inline-flex items-center gap-1 rounded-sm border border-[#9eb9b9] bg-[#e8f3f1] px-1.5 py-0.5 font-semibold text-[#17626a] hover:bg-[#d6eae7]">{message.replyCount} {message.replyCount === 1 ? "reply" : "replies"}</button>}
+                         <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-reply-${message.id}`} aria-label={`Reply to ${message.senderName}'s message`} className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold text-[#208894] transition-colors hover:bg-[#27aab8]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8]"><CornerDownRight className="h-3 w-3" />Reply</button>
+                         {message.replyCount > 0 && <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-replies-${message.id}`} className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold text-[#208894] hover:bg-[#27aab8]/10">{message.replyCount} {message.replyCount === 1 ? "reply" : "replies"}</button>}
                       </div>
                     </div>
               </div>) : <div className="flex h-full flex-col items-center justify-center text-center text-[#707371]"><MessageCircle className="mb-3 h-10 w-10 text-[#8bbfc1]" /><p className="font-semibold">No messages here yet</p><p className="mt-1 text-xs">Send the first note to this conversation.</p></div>}
             <div ref={bottomRef} />
           </div>
-            <div className="border-t border-[#808080] bg-[#d4d0c8] p-1.5"><div className="relative flex items-center gap-1">
-              <MentionAutocomplete value={draft} onChange={(value) => { setDraft(value); draftsByChannelRef.current[String(selected.id)] = value; }} users={mentionUsers} onDirectoryRefresh={() => { void refreshMentionUsers(selected.id); }} onSubmit={submitMessage} placeholder={`Message ${selected.directName || selected.name}...`} textareaRef={(node) => { textareaRef.current = node; }} data-testid="chat-message-composer" className="ff-team-chat-input h-8 min-h-8 flex-1 resize-none overflow-hidden px-1.5 py-1 text-[11px] outline-none" />
+            <div className="mt-2 rounded-xl bg-[#e0e0e0] p-2 shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]"><div className="relative flex items-center gap-2">
+              <MentionAutocomplete value={draft} onChange={(value) => { setDraft(value); draftsByChannelRef.current[String(selected.id)] = value; }} users={mentionUsers} onDirectoryRefresh={() => { void refreshMentionUsers(selected.id); }} onSubmit={submitMessage} placeholder={`Message ${selected.directName || selected.name}...`} textareaRef={(node) => { textareaRef.current = node; }} data-testid="chat-message-composer" className="!min-h-10 flex-1 resize-none overflow-hidden !border-0 !bg-transparent px-2 py-2 text-sm !text-[#333] outline-none placeholder:!text-[#888] !shadow-none focus-visible:!outline-none" />
               <GifPicker key={String(selected.id)} onSelect={sendGif} />
-              <div ref={emojiPickerRef} className="relative shrink-0"><Button type="button" variant="outline" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="ff-team-chat-icon-button h-8 w-8 p-0"><Smile className="h-4 w-4" /></Button>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 w-[min(352px,calc(100vw-2.5rem))] max-h-[min(420px,60vh)] overflow-auto rounded-xl border-2 border-[#808080] bg-white shadow-lg"><Picker data={emojiPickerData} onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><Button onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="h-8 w-8 shrink-0 p-0"><Send className="h-3.5 w-3.5" /></Button></div></div>
+              <div ref={emojiPickerRef} className="shrink-0"><NeuButton type="button" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="!min-h-9 !w-9 !rounded-lg !p-0 text-[#27aab8]"><Smile className="h-4 w-4" /></NeuButton>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 max-h-[min(420px,calc(100dvh-26rem))] w-[min(352px,calc(100vw-2.5rem))] max-w-full overflow-auto rounded-2xl bg-[#e0e0e0] p-2 shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] [--rgb-background:224,224,224] [--rgb-input:224,224,224] [--rgb-color:51,51,51] [--rgb-accent:39,170,184] [&_em-emoji-picker]:!w-full"><Picker data={emojiPickerData} dynamicWidth onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><NeuButton variant="accent" onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="!min-h-9 !w-9 !rounded-lg !p-0"><Send className="h-4 w-4" /></NeuButton></div></div>
             </div>
             {threadRootId !== null && <ThreadPanel channelId={selected.id} rootId={threadRootId} currentUserId={user?.id} active={active} onClose={() => setThreadRootId(null)} onChanged={() => { void loadMessages(); }} highlightedMessageId={highlightMessageId} />}
             </div> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
-         </section>
+          </NeuCard>
         </div>
-       {error && channels.length > 0 && <div className="absolute bottom-1 left-1 right-1 z-30 flex items-center gap-2 bg-[#fff3d6] px-1.5 py-1 text-[10px] text-[#8b4141]"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}<button onClick={() => setError("")} aria-label="Dismiss" className="ml-auto"><X className="h-3 w-3" /></button></div>}
+       {error && channels.length > 0 && <div role="alert" className="absolute bottom-1 left-1 right-1 z-30 flex items-center gap-2 rounded-xl bg-[#f4e9d1] px-3 py-2 text-xs text-[#8b4141] shadow-[0_3px_10px_#aaa]"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}<button onClick={() => setError("")} aria-label="Dismiss" className="ml-auto rounded-full p-1 hover:bg-[#eadbbd]"><X className="h-3 w-3" /></button></div>}
         {channelDialogOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/35 p-4" onMouseDown={(event) => event.currentTarget === event.target && closeChannelDialog()}>
-          <section role="dialog" aria-modal="true" aria-labelledby="new-channel-title" aria-describedby="new-channel-help" className="w-full max-w-sm border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]">
+           <section role="dialog" aria-modal="true" aria-labelledby="new-channel-title" aria-describedby="new-channel-help" className="w-full max-w-sm rounded-2xl bg-[#e0e0e0] p-5 text-[#333] shadow-[-8px_-8px_18px_#fff,8px_8px_18px_#b8b8b8]">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">Team space</p><h2 id="new-channel-title" className="text-base font-bold text-[#1a1a1a]">Create a channel</h2></div>
-              <button type="button" onClick={closeChannelDialog} disabled={creatingChannel} aria-label="Close create channel dialog" className="rounded-sm p-1 text-[#555] hover:bg-[#c0c0c0] disabled:opacity-50"><X className="h-4 w-4" /></button>
+               <NeuButton type="button" onClick={closeChannelDialog} disabled={creatingChannel} aria-label="Close create channel dialog" className="!min-h-8 !w-8 !rounded-lg !p-0 text-[#666]"><X className="h-4 w-4" /></NeuButton>
             </div>
             <form onSubmit={submitNewChannel}>
               <label htmlFor="new-channel-name" className="mb-1 block text-xs font-semibold text-[#333]">Channel name</label>
-              <div className="flex items-center border-2 border-[#808080] bg-white px-2 focus-within:border-[#098b9f]">
+               <div className="flex items-center rounded-xl bg-[#e0e0e0] px-3 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] focus-within:outline focus-within:outline-2 focus-within:outline-[#27aab8]">
                 <span aria-hidden="true" className="mr-1 text-sm font-bold text-[#098b9f]">#</span>
                 <input
                   ref={channelNameInputRef}
@@ -775,21 +782,21 @@ function ChatPanel({ active }: ChatPanelProps) {
                   aria-invalid={Boolean(channelNameError)}
                   aria-describedby={channelNameError ? "new-channel-error" : "new-channel-help"}
                   placeholder="project-updates"
-                  className="min-w-0 flex-1 bg-transparent py-2 text-sm text-[#1a1a1a] outline-none placeholder:text-[#999]"
+                   className="min-w-0 flex-1 bg-transparent py-3 text-sm text-[#333] outline-none placeholder:text-[#888]"
                 />
               </div>
               <p id="new-channel-help" className="mt-2 text-[11px] leading-relaxed text-[#555]">Public channels are visible to all staff. Spaces become hyphens; names support letters, numbers, hyphens, and underscores (50 characters max).</p>
               {channelNameError && <p id="new-channel-error" role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-[#8b3030]"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{channelNameError}</p>}
               {channelNameDraft.trim() && <p className="mt-2 text-[10px] text-[#777]">Channel address: <span className="font-mono text-[#17626a]">#{normalizedChannelName}</span></p>}
               <div className="mt-5 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={closeChannelDialog} disabled={creatingChannel} className="h-8 rounded-sm px-3 text-xs">Cancel</Button>
-                <Button type="submit" disabled={creatingChannel} className="h-8 min-w-24 rounded-sm px-3 text-xs">{creatingChannel ? "Creating…" : "Create channel"}</Button>
+                 <NeuButton type="button" onClick={closeChannelDialog} disabled={creatingChannel} className="!min-h-9 !rounded-lg !px-4 text-xs">Cancel</NeuButton>
+                 <NeuButton type="submit" variant="accent" disabled={creatingChannel} className="!min-h-9 !rounded-lg !px-4 text-xs">{creatingChannel ? "Creating…" : "Create channel"}</NeuButton>
               </div>
             </form>
-          </section>
+           </section>
         </div>}
-        {pickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/30 p-4" onMouseDown={(event) => event.currentTarget === event.target && setPickerOpen(false)}><div className="w-full max-w-md border-2 border-[#808080] bg-[#d4d0c8] p-4 shadow-[3px_3px_0_#555]"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#557277]">New conversation</p><h2 className="font-bold">Message a teammate</h2></div><button onClick={() => setPickerOpen(false)}><X className="h-4 w-4" /></button></div><div className="max-h-72 overflow-y-auto border-2 border-[#808080] bg-[#efeee9]">{users.length ? users.map((user) => <button key={user.id} onClick={() => startDirect(user.id)} className="flex w-full items-center gap-3 border-b border-[#c4c3bd] px-3 py-3 text-left last:border-0 hover:bg-[#dff5f6]"><ChatAvatar name={user.name} profileImageUrl={user.profileImageUrl} className="h-8 w-8 text-[10px]" /><span><span className="block text-sm font-semibold">{user.name}</span><span className="block text-[10px] uppercase text-[#777]">{user.role || "Team member"}</span></span></button>) : <p className="p-5 text-center text-xs text-[#666]">No teammates available.</p>}</div></div></div>}
-    </div>
+         {pickerOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#333]/20 p-4" onMouseDown={(event) => event.currentTarget === event.target && setPickerOpen(false)}><div role="dialog" aria-modal="true" aria-labelledby="staff-picker-title" className="w-full max-w-md rounded-2xl bg-[#e0e0e0] p-5 shadow-[-8px_-8px_18px_#fff,8px_8px_18px_#b8b8b8]"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#208894]">New conversation</p><h2 id="staff-picker-title" className="font-bold">Message a teammate</h2></div><NeuButton type="button" onClick={() => setPickerOpen(false)} aria-label="Close teammate picker" className="!min-h-8 !w-8 !rounded-lg !p-0"><X className="h-4 w-4" /></NeuButton></div><div className="max-h-72 overflow-y-auto rounded-xl bg-[#e0e0e0] p-2 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">{users.length ? users.map((user) => <button key={user.id} onClick={() => startDirect(user.id)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-[#27aab8]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8]"><ChatAvatar name={user.name} profileImageUrl={user.profileImageUrl} className="h-8 w-8 text-[10px]" /><span><span className="block text-sm font-semibold">{user.name}</span><span className="block text-[10px] uppercase text-[#777]">{user.role || "Team member"}</span></span></button>) : <p className="p-5 text-center text-xs text-[#666]">No teammates available.</p>}</div></div></div>}
+    </NeuPageShell>
   );
 }
 
@@ -822,8 +829,8 @@ export function TeamChatWorkspace() {
     )}>
       {active && <Sidebar />}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {active && <TopNav title="Team Chat" subtitle="Conversations across your team" group="Workspace" />}
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+        {active && <TopNav title="Team Chat" subtitle="Conversations across your team" group="Workspace" neu />}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#e0e0e0]">
           <ChatPanel active={active} />
         </main>
       </div>

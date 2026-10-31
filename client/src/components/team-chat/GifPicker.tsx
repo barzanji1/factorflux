@@ -1,8 +1,9 @@
 import { useEffect, useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { queryClient } from "@/lib/queryClient";
+import { NeuButton } from "@/styles/neu/components";
 import { giphyApiUrl, safeGiphyGif, type ChatGif, type ProviderGif } from "@shared/chat-gif";
 
 export async function fetchGifs<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -65,16 +66,16 @@ export function GifPicker({ onSelect, disabled = false }: { onSelect: (gif: Chat
   }
   return <Popover open={open} onOpenChange={(value) => { if (!posting) { setOpen(value); setSendError(""); if (!value) queryClient.removeQueries({ queryKey: ["/api/chat/gifs", "search"] }); } }}>
     <PopoverTrigger asChild>
-      <Button type="button" variant="outline" disabled={disabled || posting} aria-label="Choose GIF" data-testid="chat-gif-button" className="ff-team-chat-icon-button h-8 shrink-0 px-1.5 text-[10px] font-bold">GIF</Button>
+      <NeuButton type="button" disabled={disabled || posting} aria-label="Choose GIF" data-testid="chat-gif-button" className="!min-h-9 shrink-0 !rounded-lg !px-2 text-[10px] font-bold text-[#208894]">GIF</NeuButton>
     </PopoverTrigger>
-    <PopoverContent side="top" align="end" className="w-[min(352px,calc(100vw-2rem))] rounded-none bg-[#d4d0c8] p-2" aria-label="GIF picker" data-testid="chat-gif-picker">
-      <label className="mb-1 block text-xs font-bold" htmlFor={searchId}>Search GIFs · G-rated only</label>
-      <input id={searchId} type="search" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search GIPHY…" className="ff-team-chat-input mb-2 w-full px-2 py-1 text-sm" />
-      <div className="h-60 overflow-y-auto border-2 border-[#808080] bg-white p-1" aria-busy={results.isFetching || posting}>
+    <PopoverContent side="top" align="end" className="w-[min(352px,calc(100vw-2rem))] rounded-2xl border-0 bg-[#e0e0e0] p-3 text-[#333] shadow-[-8px_-8px_18px_#fff,8px_8px_18px_#b8b8b8]" aria-label="GIF picker" data-testid="chat-gif-picker">
+      <div className="mb-2 flex items-center justify-between gap-2"><label className="block text-xs font-bold" htmlFor={searchId}>Search GIFs · G-rated only</label><NeuButton type="button" onClick={() => setOpen(false)} aria-label="Close GIF picker" className="!min-h-7 !w-7 !rounded-lg !p-0"><X className="h-3.5 w-3.5" /></NeuButton></div>
+      <input id={searchId} type="search" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search GIPHY…" className="mb-2 w-full rounded-xl border-0 bg-[#e0e0e0] px-3 py-2 text-sm text-[#333] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]" />
+      <div className="h-60 overflow-y-auto rounded-xl bg-[#e0e0e0] p-2 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" aria-busy={results.isFetching || posting}>
         {(results.isLoading || query !== search.trim()) ? <p role="status" className="p-2 text-xs">Loading GIFs…</p>
-          : results.isError ? <div role="alert" className="p-2 text-xs">{results.error.message}<Button size="sm" variant="outline" onClick={() => void results.refetch()} className="mt-2">Retry</Button></div>
+          : results.isError ? <div role="alert" className="p-2 text-xs">{results.error.message}<NeuButton onClick={() => void results.refetch()} className="mt-2 !min-h-8 !rounded-lg !px-3 text-xs">Retry</NeuButton></div>
             : !results.data?.length ? <p className="p-2 text-xs">No G-rated GIFs found.</p>
-              : <div className="grid grid-cols-2 gap-1">{results.data.map(gif => <button key={gif.id} type="button" disabled={posting || disabled} onClick={() => void select(gif)} aria-label={`Send GIF: ${gif.title}`} data-testid={`chat-gif-${gif.id}`} className="border-2 border-transparent p-0.5 hover:border-[#098b9f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#098b9f] disabled:opacity-50">
+              : <div className="grid grid-cols-2 gap-2">{results.data.map(gif => <button key={gif.id} type="button" disabled={posting || disabled} onClick={() => void select(gif)} aria-label={`Send GIF: ${gif.title}`} data-testid={`chat-gif-${gif.id}`} className="rounded-lg p-1 transition-transform hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8] disabled:opacity-50">
                 <img src={gif.previewUrl} alt={gif.title} loading="lazy" referrerPolicy="no-referrer" className="h-24 w-full object-contain" />
               </button>)}</div>}
       </div>

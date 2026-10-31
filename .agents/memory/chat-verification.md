@@ -20,3 +20,9 @@ Browser interaction checks must assert that the document and intended input have
 **Why:** Dialog transitions and viewport changes can redirect a pointer/keyboard sequence away from the intended input. A focused element in an inactive document, or key events without native default activation, can also falsely suggest a broken control.
 
 **How to apply:** Wait for dismissed dialogs to release pointer capture and confirm document focus, input focus/value, and native activation when testing controls. For hidden/inert panels, make the destination interactive before moving focus into it; focusing an inert descendant fails silently.
+
+Assert that isolated browser fixtures are active before testing message sends, not just that their injection was requested.
+
+**Why:** Browser protocol calls can fail without throwing in a thin driver; a disabled Page domain can leave real chat transport active instead of installing new-document fixtures.
+
+**How to apply:** Check protocol errors and an in-page fixture marker before any Send interaction. Stop if either check fails; never send verification messages to live staff.
