@@ -1,212 +1,285 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
-import { useLocation, useSearch } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  Brain,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Eye,
+  FileQuestion,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Search,
+  Sparkles,
+  UserCheck,
+  BookOpen,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Eye,
-  Download,
-  RefreshCw,
-  ChevronDown,
-  ChevronRight,
-  Search,
-  Sparkles,
-  BookOpen,
-  UserCheck,
-  FileText,
-  AlertTriangle,
-  CheckCircle2,
-  Loader2,
-  SlidersHorizontal,
-  Brain,
-  FileQuestion,
-} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import type { Document } from "@shared/schema";
 import { CompressionInfo } from "@/components/documents/compression-info";
+import { DocumentsOverview } from "@/components/documents/documents-overview";
 import { documentClassification, documentClassificationLabel } from "@shared/document-display";
+import {
+  NeuBadge,
+  NeuButton,
+  NeuCard,
+  NeuInput,
+  NeuPageShell,
+  NeuSelect,
+  NeuTable,
+  NeuTableBody,
+  NeuTableCell,
+  NeuTableHead,
+  NeuTableHeader,
+  NeuTableRow,
+} from "@/styles/neu/components";
 
-// ─── Extended document type with AI fields ────────────────────────────────────
 interface AIDocument extends Omit<Document, "aiClassifiedAt"> {
   ocrJob?: { id: number; status: string; errorMessage: string | null; parserName: string | null } | null;
-  aiDocumentType:             string | null;
+  aiDocumentType: string | null;
   aiClassificationConfidence: string | null;
-  aiClassificationSignals:    string[] | null;
-  allClassificationScores:    Record<string, number> | null;
-  classificationSource:       "rules" | "ai" | "agent" | null;
-  aiClassifiedAt:             string | null;
-  aiClassificationModel:      string | null;
+  aiClassificationSignals: string[] | null;
+  allClassificationScores: Record<string, number> | null;
+  classificationSource: "rules" | "ai" | "agent" | null;
+  aiClassifiedAt: string | null;
+  aiClassificationModel: string | null;
+  invoiceNumber?: string | null;
+  carrierName?: string | null;
+  carrierId?: number | null;
+  ocrConfidence: number | null;
+  processingState?: "pending" | "processing" | "processed" | "failed";
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  rate_confirmation: "Rate Confirmation",
-  bill_of_lading:    "Bill of Lading",
-  proof_of_delivery: "Proof of Delivery",
-  lumper_receipt:    "Lumper Receipt",
-  invoice:           "Invoice",
-  freight_invoice:   "Freight Invoice",
-  receipt:           "Receipt",
-  driver_id:         "Driver ID",
-  carrier_setup:     "Carrier Setup",
-  other:             "Other",
-};
-
-const DOC_TYPE_COLORS: Record<string, string> = {
-  rate_confirmation: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
-  bill_of_lading:    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
-  proof_of_delivery: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
-  lumper_receipt:    "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
-  invoice:           "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
-  freight_invoice:   "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
-  receipt:           "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300",
-  other:             "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
-};
-
-const BAR_COLORS: Record<string, string> = {
-  rate_confirmation: "bg-blue-500",
-  bill_of_lading:    "bg-violet-500",
-  proof_of_delivery: "bg-emerald-500",
-  lumper_receipt:    "bg-orange-500",
-  freight_invoice:   "bg-indigo-500",
-  receipt:           "bg-teal-500",
-  other:             "bg-slate-400",
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function typeLabel(v: string | null | undefined) {
-  if (!v) return "Unclassified";
-  return documentClassificationLabel(v);
+interface ExtractionSummary {
+  textPreview: string;
+  confidence: number | null;
+  fields: Array<{ name: string; value: string; confidence: number | null }>;
 }
 
-function fileSize(bytes: number) {
-  if (!bytes) return "—";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+const PAGE_SIZE = 25;
+const TYPE_OPTIONS = [
+  ["all", "All classifications"],
+  ["rate_confirmation", "Rate Confirmation"],
+  ["invoice", "Freight Invoice"],
+  ["freight_invoice", "Freight Invoice (legacy)"],
+  ["commercial_invoice", "Commercial Invoice"],
+  ["bill_of_lading", "Bill of Lading"],
+  ["bol", "Bill of Lading (legacy)"],
+  ["proof_of_delivery", "Proof of Delivery"],
+  ["pod", "Proof of Delivery (legacy)"],
+  ["lumper_receipt", "Lumper Receipt"],
+  ["receipt", "Receipt"],
+  ["driver_id", "Driver ID"],
+  ["carrier_setup", "Carrier Setup"],
+  ["noa", "Notice of Assignment"],
+  ["release_letter", "Release Letter"],
+  ["other", "Other"],
+] as const;
+
+function typeLabel(type: string | null | undefined) {
+  return type ? documentClassificationLabel(type) : "Unclassified";
 }
 
-function confidenceColor(score: number) {
-  if (score >= 0.80) return "bg-emerald-500";
-  if (score >= 0.60) return "bg-amber-400";
-  if (score >= 0.40) return "bg-orange-500";
-  return "bg-red-500";
+function dateValue(value: unknown) {
+  if (!value) return "";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
 }
 
-function confidenceTextColor(score: number) {
-  if (score >= 0.80) return "text-emerald-600 dark:text-emerald-400";
-  if (score >= 0.60) return "text-amber-600 dark:text-amber-400";
-  if (score >= 0.40) return "text-orange-600 dark:text-orange-400";
-  return "text-red-600 dark:text-red-400";
+function parseConfidence(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const number = typeof value === "number" ? value : Number.parseFloat(value);
+  return Number.isFinite(number) ? number : null;
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SourceBadge({ source, model }: { source: string | null; model?: string | null }) {
-  if (source === "ai") return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge className="gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 cursor-default">
-            <Sparkles className="h-2.5 w-2.5" /> AI
-          </Badge>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">{model ?? "Claude Haiku"}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-  if (source === "agent") return (
-    <Badge className="gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-      <UserCheck className="h-2.5 w-2.5" /> Agent
-    </Badge>
-  );
-  return (
-    <Badge className="gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-      <BookOpen className="h-2.5 w-2.5" /> Rules
-    </Badge>
-  );
+function documentConfidence(doc: AIDocument) {
+  return doc.ocrConfidence !== undefined
+    ? parseConfidence(doc.ocrConfidence)
+    : parseConfidence(doc.classificationConfidence);
 }
 
 function ConfidenceBar({ score }: { score: number }) {
-  const pct = Math.round(score * 100);
+  const percent = Math.max(0, Math.min(100, Math.round(score * 100)));
+  const color = score >= 0.8 ? "bg-[#347d69]" : score >= 0.6 ? "bg-[#b27a2b]" : "bg-[#ad5c50]";
   return (
-    <div className="flex items-center gap-2 min-w-[90px]">
-      <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-        <div
-          className={cn("h-full rounded-full transition-all", confidenceColor(score))}
-          style={{ width: `${pct}%` }}
-        />
+    <div className="flex min-w-[110px] items-center gap-2" aria-label={`Confidence ${percent}%`}>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#c8c8c8]">
+        <div className={cn("h-full rounded-full", color)} style={{ width: `${percent}%` }} />
       </div>
-      <span className={cn("text-[11px] font-semibold w-8 text-right shrink-0", confidenceTextColor(score))}>
-        {pct}%
-      </span>
+      <span className="w-9 text-right font-mono text-xs font-semibold text-[#526164]">{percent}%</span>
     </div>
   );
 }
 
-function AllScoresRow({ scores }: { scores: Record<string, number> }) {
-  const sorted = Object.entries(scores).sort(([, a], [, b]) => b - a).slice(0, 7);
-  const max = sorted[0]?.[1] ?? 1;
+function SourceBadge({ source, model }: { source: string | null; model?: string | null }) {
+  const tone = source === "agent" ? "success" : source === "ai" ? "accent" : "neutral";
+  const Icon = source === "agent" ? UserCheck : source === "ai" ? Sparkles : BookOpen;
+  const label = source === "agent" ? "Agent" : source === "ai" ? "AI" : "Rules";
   return (
-    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-      {sorted.map(([t, s]) => (
-        <div key={t} className="flex items-center gap-2">
-          <span className="w-28 shrink-0 text-[11px] text-slate-500 dark:text-slate-400 truncate">
-            {typeLabel(t)}
-          </span>
-          <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-            <div
-              className={cn("h-full rounded-full", BAR_COLORS[t] ?? "bg-slate-400")}
-              style={{ width: `${max > 0 ? Math.round((s / max) * 100) : 0}%` }}
-            />
+    <span title={source === "ai" ? model ?? "AI classification" : undefined}>
+      <NeuBadge tone={tone} className="gap-1 whitespace-nowrap"><Icon className="h-3 w-3" />{label}</NeuBadge>
+    </span>
+  );
+}
+
+function Scores({ scores }: { scores: Record<string, number> }) {
+  const entries = Object.entries(scores).sort(([, a], [, b]) => b - a);
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {entries.map(([name, score]) => (
+        <div key={name} className="grid grid-cols-[minmax(100px,1fr)_2fr_42px] items-center gap-2 text-xs">
+          <span className="truncate text-[#647275]">{typeLabel(name)}</span>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[#c7c7c7]">
+            <div className="h-full rounded-full bg-[#27aab8]" style={{ width: `${Math.max(0, Math.min(100, score * 100))}%` }} />
           </div>
-          <span className="w-8 shrink-0 text-right text-[11px] font-medium text-slate-600 dark:text-slate-300">
-            {Math.round(s * 100)}%
-          </span>
+          <span className="text-right font-mono text-[#59696b]">{Math.round(score * 100)}%</span>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Document row ─────────────────────────────────────────────────────────────
+function ExtractionDetails({ doc }: { doc: AIDocument }) {
+  const { data, isLoading, isError, refetch } = useQuery<ExtractionSummary>({
+    queryKey: ["/api/documents", doc.id, "extraction-summary"],
+    enabled: true,
+    queryFn: async () => {
+      const response = await fetch(`/api/documents/${doc.id}/extraction-summary`, { credentials: "include" });
+      if (!response.ok) throw new Error("Extraction summary could not be loaded");
+      return response.json();
+    },
+  });
+  const fields = useMemo(() => {
+    const recognized: Array<{ label: string; aliases: string[] }> = [
+      { label: "Invoice number", aliases: ["invoicenumber"] },
+      { label: "Load number", aliases: ["loadnumber", "loadid"] },
+      { label: "Amount", aliases: ["amount", "invoiceamount", "total"] },
+      { label: "Broker", aliases: ["brokername"] },
+    ];
+    const normalized = (data?.fields ?? []).map(field => ({
+      field,
+      key: field.name.replace(/[^a-z0-9]/gi, "").toLowerCase(),
+    }));
+    const mapped = recognized.flatMap(({ label, aliases }) => {
+      const found = normalized.find(item => aliases.includes(item.key));
+      return found ? [{ label, field: found.field, key: found.key }] : [];
+    });
+    const mappedKeys = new Set(mapped.map(item => item.key));
+    const generic = normalized
+      .filter(item => !mappedKeys.has(item.key))
+      .map(({ field, key }) => ({
+        label: field.name.replace(/[_-]+/g, " ").replace(/\b\w/g, letter => letter.toUpperCase()),
+        field,
+        key,
+      }));
+    return [...mapped, ...generic];
+  }, [data?.fields]);
+  const confidence = data?.confidence ?? null;
+  const tone = confidence === null ? "neutral" : confidence >= 0.8 ? "success" : confidence >= 0.6 ? "warning" : "neutral";
+  const confidenceLabel = confidence === null
+    ? "Unavailable"
+    : `${confidence >= 0.8 ? "High" : confidence >= 0.6 ? "Medium" : "Low"} · ${Math.round(confidence * 100)}%`;
 
-function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
+  return (
+    <NeuCard className="my-3 whitespace-normal p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7c898a]">Document extraction</p>
+          <h3 className="mt-1 break-all text-sm font-semibold text-[#354548]">{doc.originalName}</h3>
+        </div>
+        <NeuBadge tone={tone}>OCR confidence: {confidenceLabel}</NeuBadge>
+      </div>
+      {isLoading ? (
+        <div className="mt-4 space-y-2" aria-label="Loading extraction summary">
+          <div className="h-3 w-4/5 animate-pulse rounded bg-[#c9c9c9]" />
+          <div className="h-3 w-2/3 animate-pulse rounded bg-[#c9c9c9]" />
+        </div>
+      ) : isError ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#dedede] p-3">
+          <p className="text-sm text-[#80544b]">Extraction details could not be loaded.</p>
+          <NeuButton onClick={() => refetch()} className="min-h-10 px-3 text-xs"><RefreshCw className="h-3.5 w-3.5" />Retry details</NeuButton>
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+            <section>
+              <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[0.13em] text-[#7c898a]">OCR preview</h4>
+              <p className="min-h-16 whitespace-pre-wrap break-words rounded-xl bg-[#dedede] p-3 text-xs leading-5 text-[#526164]">
+                {data?.textPreview || "No OCR text was returned."}
+              </p>
+            </section>
+            <section>
+              <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[0.13em] text-[#7c898a]">Recognized fields</h4>
+              <dl className="grid grid-cols-2 gap-2">
+                {fields.map(({ label, field }) => (
+                  <div key={label} className="min-w-0 rounded-xl bg-[#dedede] p-3">
+                    <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#859092]">{label}</dt>
+                    <dd className="mt-1 break-words text-sm font-medium text-[#354548]">{field?.value || "Unavailable"}</dd>
+                    <dd className="mt-2">
+                      <NeuBadge
+                        tone={field?.confidence == null ? "neutral" : field.confidence >= .8 ? "success" : field.confidence >= .6 ? "warning" : "neutral"}
+                        className={cn("text-[10px]", field?.confidence != null && field.confidence < .6 && "bg-red-100 text-red-700")}
+                      >
+                        {field?.confidence == null ? "Confidence unavailable" : `${field.confidence >= .8 ? "High" : field.confidence >= .6 ? "Medium" : "Low"} · ${Math.round(field.confidence * 100)}%`}
+                      </NeuBadge>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </div>
+          {doc.invoiceId && (
+            <Link href={`/invoices/${doc.invoiceId}`} className="mt-3 inline-flex text-xs font-semibold text-[#168d98] underline underline-offset-2">
+              Open linked invoice {doc.invoiceNumber ? `#${doc.invoiceNumber}` : `#${doc.invoiceId}`}
+            </Link>
+          )}
+        </>
+      )}
+      {(doc.allClassificationScores || doc.aiClassificationSignals?.length || doc.aiClassificationModel) && (
+        <div className="mt-5 border-t border-[#c5c5c5] pt-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#7c898a]">Classification evidence</h4>
+            {doc.aiClassificationModel && <span className="text-xs text-[#718083]">Model: {doc.aiClassificationModel}</span>}
+          </div>
+          {doc.allClassificationScores && <Scores scores={doc.allClassificationScores} />}
+          {!!doc.aiClassificationSignals?.length && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {doc.aiClassificationSignals.map((signal, index) => <NeuBadge key={`${signal}-${index}`}>{signal}</NeuBadge>)}
+            </div>
+          )}
+        </div>
+      )}
+      <div className="mt-4 border-t border-[#c5c5c5] pt-3">
+        <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
+      </div>
+    </NeuCard>
+  );
+}
+
+function DocumentRow({ doc, focusTargetId, onView, onDownload }: {
   doc: AIDocument;
+  focusTargetId: number | null;
   onView: (id: number) => void;
   onDownload: (id: number) => void;
-  focusTargetId: number | null;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
-
-  const displayType   = documentClassification(doc);
-  const confidence    = doc.classificationConfidence ? parseFloat(doc.classificationConfidence) : null;
-  const source        = doc.classificationSource ?? "rules";
-  const hasBreakdown  = !!(doc.allClassificationScores || (doc.aiClassificationSignals?.length));
+  const displayType = documentClassification(doc);
+  const confidence = documentConfidence(doc);
+  const source = doc.classificationSource ?? "rules";
+  const processingState = doc.processingState ?? doc.status;
   const retryMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/load-documents/${doc.id}/retry-extraction`, {}),
     onSuccess: () => {
@@ -216,7 +289,6 @@ function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
     },
     onError: (error: Error) => toast({ title: "OCR retry failed", description: error.message, variant: "destructive" }),
   });
-
   const reclassifyMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/load-documents/${doc.id}/ai-classify`, {}),
     onSuccess: () => {
@@ -225,197 +297,105 @@ function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
     },
     onError: () => toast({ title: "Error", description: "Re-classification failed.", variant: "destructive" }),
   });
+  const statusTone = processingState === "processed" ? "success" : processingState === "failed" ? "warning" : "neutral";
+  const invoiceHref = doc.invoiceId ? `/invoices/${doc.invoiceId}` : null;
+  const carrierHref = doc.carrierId ? `/carriers/${doc.carrierId}` : null;
 
   return (
     <>
-      {/* ── Main row ──────────────────────────────────────────────────────── */}
-      <tr
+      <NeuTableRow
         id={`document-row-${doc.id}`}
         data-testid={`document-row-${doc.id}`}
         tabIndex={-1}
-        className={cn(
-          "border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group focus:outline focus:outline-2 focus:outline-[#087c8d]",
-          focusTargetId === doc.id && "bg-[#e5f1ef] outline outline-2 outline-[#087c8d] outline-offset-[-2px]",
-        )}
+        className={cn("focus:outline focus:outline-2 focus:outline-[#168d98]", focusTargetId === doc.id && "bg-[#cfe4e3] outline outline-2 outline-[#168d98]")}
       >
-
-        {/* Expand toggle + filename */}
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              onClick={() => setExpanded(v => !v)}
-              disabled={!hasBreakdown}
-              className={cn(
-                "shrink-0 rounded p-0.5 transition-colors",
-                hasBreakdown
-                  ? "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                  : "text-slate-200 dark:text-slate-700 cursor-default",
-              )}
+        <NeuTableCell className="max-w-[300px]">
+          <div className="flex min-w-0 items-start gap-2">
+            <NeuButton
+              onClick={() => setExpanded(value => !value)}
+              aria-label={`${expanded ? "Collapse" : "Expand"} extraction details for ${doc.originalName}`}
+              aria-expanded={expanded}
+              className="h-9 min-h-9 w-9 shrink-0 rounded-lg p-0"
             >
-              {expanded
-                ? <ChevronDown className="h-3.5 w-3.5" />
-                : <ChevronRight className="h-3.5 w-3.5" />}
-            </button>
-            <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </NeuButton>
+            <FileText className="mt-2 h-4 w-4 shrink-0 text-[#718083]" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100 max-w-[220px]">
-                {doc.originalName}
-              </p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                {fileSize(doc.size)} · {doc.invoiceId ? `Invoice #${doc.invoiceId}` : doc.loadId ? `Load #${doc.loadId}` : "No link"}
+              <p className="break-all text-sm font-semibold text-[#354548]" title={doc.originalName}>{doc.originalName}</p>
+              <p className="mt-1 text-[11px] text-[#7c898a]">
+                {doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : "Size unavailable"}
               </p>
               <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
             </div>
           </div>
-        </td>
-
-        {/* Classification type */}
-        <td className="px-4 py-3">
-          {displayType ? (
-            <Badge className={cn(
-              "rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
-              DOC_TYPE_COLORS[displayType] ?? DOC_TYPE_COLORS.other,
-            )}>
-              {typeLabel(displayType)}
-            </Badge>
-          ) : (
-            <span className="text-[11px] text-slate-400 italic">Not classified</span>
-          )}
-        </td>
-
-        {/* Confidence */}
-        <td className="px-4 py-3 w-36">
-          {confidence !== null
-            ? <ConfidenceBar score={confidence} />
-            : <span className="text-[11px] text-slate-400">—</span>}
-        </td>
-
-        {/* Source */}
-        <td className="px-4 py-3">
-          <SourceBadge source={source} model={doc.aiClassificationModel} />
-        </td>
-
-        {/* Status */}
-        <td className="px-4 py-3">
-          <Badge className={cn(
-            "rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize",
-            doc.status === "processed"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
-              : doc.status === "processing"
-              ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
-              : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300",
-          )}>
-            {doc.status}
-          </Badge>
-          {(doc.ocrJob?.status === "failed" || doc.status === "failed") && (
-            <div className="mt-2 max-w-[260px]" data-testid={`ocr-failed-${doc.id}`}>
-              <p className="text-xs text-red-700" role="status">
-                OCR failed: {doc.ocrJob?.errorMessage ?? "Extraction failed"}
-              </p>
-              <Button size="sm" variant="outline" className="mt-1 gap-1"
-                disabled={retryMutation.isPending || doc.status !== "failed"}
-                onClick={() => retryMutation.mutate()} data-testid={`ocr-retry-${doc.id}`}>
-                <RefreshCw className={cn("h-3 w-3", retryMutation.isPending && "animate-spin")} />
-                {retryMutation.isPending ? "Retrying…" : "Retry"}
-              </Button>
-            </div>
-          )}
-        </td>
-
-        {/* Uploaded */}
-        <td className="px-4 py-3 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-          {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : "—"}
-        </td>
-
-        {/* Actions */}
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost" size="sm"
-                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
-                    onClick={() => reclassifyMutation.mutate()}
-                    disabled={reclassifyMutation.isPending}
-                  >
-                    {reclassifyMutation.isPending
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <RefreshCw className="h-3.5 w-3.5" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">Re-classify with AI</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost" size="sm"
-                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
-                    data-testid={`document-view-${doc.id}`}
-                    onClick={() => onView(doc.id)}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">View document</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost" size="sm"
-                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
-                    onClick={() => onDownload(doc.id)}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">Download</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+        </NeuTableCell>
+        <NeuTableCell>
+          <div className="flex flex-col items-start gap-1.5">
+              <NeuBadge className={cn(
+                displayType === "rate_confirmation" && "bg-blue-100 text-blue-800",
+                ["invoice", "freight_invoice", "carrier_invoice", "commercial_invoice"].includes(displayType) && "bg-violet-100 text-violet-800",
+                ["bol", "bol_pod", "bill_of_lading", "pod", "proof_of_delivery"].includes(displayType) && "bg-emerald-100 text-emerald-800",
+                displayType === "noa" && "bg-amber-100 text-amber-800",
+              )}>{typeLabel(displayType)}</NeuBadge>
+            <SourceBadge source={source} model={doc.aiClassificationModel} />
           </div>
-        </td>
-      </tr>
-
-      {/* ── Expanded breakdown row ─────────────────────────────────────────── */}
-      {expanded && hasBreakdown && (
-        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30">
-          <td colSpan={7} className="px-10 py-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
-              {/* All-scores chart */}
-              {doc.allClassificationScores && Object.keys(doc.allClassificationScores).length > 0 && (
-                <div className="flex-1 min-w-0">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    All Type Scores
-                  </p>
-                  <AllScoresRow scores={doc.allClassificationScores} />
-                </div>
-              )}
-
-              {/* Signals */}
-              {doc.aiClassificationSignals && doc.aiClassificationSignals.length > 0 && (
-                <div className="sm:max-w-xs">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Matched Signals
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {doc.aiClassificationSignals.map((s, i) => (
-                      <span key={i} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                  {doc.aiClassificationModel && (
-                    <p className="mt-2 text-[10px] text-slate-400">Engine: {doc.aiClassificationModel}</p>
-                  )}
-                </div>
-              )}
-            </div>
+        </NeuTableCell>
+        <NeuTableCell>{confidence === null ? <span className="text-xs text-[#899394]">Unavailable</span> : <ConfidenceBar score={confidence} />}</NeuTableCell>
+        <NeuTableCell>
+          <div className="flex min-w-[120px] flex-col gap-1 text-xs">
+            {invoiceHref ? <Link href={invoiceHref} className="font-semibold text-[#168d98] underline underline-offset-2">{doc.invoiceNumber ? `Invoice ${doc.invoiceNumber}` : `Invoice #${doc.invoiceId}`}</Link> : <span className="text-[#879294]">No linked invoice</span>}
+            {carrierHref ? <Link href={carrierHref} className="text-[#536467] underline decoration-[#aab5b5] underline-offset-2">{doc.carrierName || `Carrier #${doc.carrierId}`}</Link> : doc.carrierName ? <span className="text-[#536467]">{doc.carrierName}</span> : null}
+          </div>
+        </NeuTableCell>
+        <NeuTableCell>
+          <div className="flex min-w-[145px] flex-col items-start gap-2">
+            <NeuBadge tone={processingState === "processing" ? "warning" : statusTone} className={cn(processingState === "failed" && "bg-red-100 text-red-700")}>{processingState}</NeuBadge>
+            {processingState === "failed" && (
+              <div data-testid={`ocr-failed-${doc.id}`} className="max-w-[260px]">
+                <p className="text-xs leading-4 text-[#9d5149]" role="status">OCR failed: {doc.ocrJob?.errorMessage ?? "Extraction failed"}</p>
+                <NeuButton
+                  className="mt-2 min-h-9 rounded-lg px-3 text-xs"
+                  disabled={retryMutation.isPending || doc.status !== "failed"}
+                  onClick={() => retryMutation.mutate()}
+                  data-testid={`ocr-retry-${doc.id}`}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", retryMutation.isPending && "animate-spin")} />
+                  {retryMutation.isPending ? "Retrying" : "Retry OCR"}
+                </NeuButton>
+              </div>
+            )}
+          </div>
+        </NeuTableCell>
+        <NeuTableCell className="whitespace-nowrap text-xs text-[#667679]">{dateValue(doc.createdAt) || "Unavailable"}</NeuTableCell>
+        <NeuTableCell>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <NeuButton
+              onClick={() => onView(doc.id)}
+              data-testid={`document-view-${doc.id}`}
+              aria-label={`View ${doc.originalName}`}
+              className="h-10 min-h-10 rounded-lg px-3 text-xs"
+            ><Eye className="h-4 w-4" /><span className="sr-only sm:not-sr-only">View</span></NeuButton>
+            <NeuButton
+              onClick={() => onDownload(doc.id)}
+              aria-label={`Download ${doc.originalName}`}
+              className="h-10 min-h-10 rounded-lg px-3 text-xs"
+            ><Download className="h-4 w-4" /><span className="sr-only sm:not-sr-only">Download</span></NeuButton>
+            <NeuButton
+              onClick={() => reclassifyMutation.mutate()}
+              disabled={reclassifyMutation.isPending}
+              aria-label={`Reclassify ${doc.originalName}`}
+              className="h-10 min-h-10 rounded-lg px-3 text-xs"
+            >
+              {reclassifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="sr-only sm:not-sr-only">Reclassify</span>
+            </NeuButton>
+          </div>
+        </NeuTableCell>
+      </NeuTableRow>
+      {expanded && (
+        <tr className="bg-[#d9d9d9]">
+          <td colSpan={7} className="px-3 sm:px-5">
+            <ExtractionDetails doc={doc} />
           </td>
         </tr>
       )}
@@ -423,107 +403,129 @@ function DocumentRow({ doc, onView, onDownload, focusTargetId }: {
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
-
 export default function Documents() {
   const [, navigate] = useLocation();
   const queryString = useSearch();
-  const queryDocumentId = new URLSearchParams(queryString).get("documentId");
-  const requestedDocumentId = queryDocumentId && /^\d+$/.test(queryDocumentId) ? Number(queryDocumentId) : null;
+  const requestedValue = new URLSearchParams(queryString).get("documentId");
+  const requestedDocumentId = requestedValue && /^\d+$/.test(requestedValue) ? Number(requestedValue) : null;
   const handledFocusId = useRef<number | null>(null);
   const pendingFocusId = useRef<number | null>(null);
+  const preserveFocusPage = useRef(false);
   const { toast } = useToast();
   const qc = useQueryClient();
-
-  const [search,     setSearch]     = useState("");
+  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [srcFilter,  setSrcFilter]  = useState("all");
+  const [srcFilter, setSrcFilter] = useState("all");
   const [confFilter, setConfFilter] = useState("all");
-
-  const { data: documents = [], isLoading } = useQuery<AIDocument[]>({
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [page, setPage] = useState(1);
+  const { data: documents = [], isLoading, isError, refetch } = useQuery<AIDocument[]>({
     queryKey: ["/api/documents"],
     refetchInterval: 5000,
   });
 
-  // ── Batch re-classify all docs that have no AI result yet ──────────────────
   const batchMutation = useMutation({
     mutationFn: async () => {
-      const pending = documents.filter(d => !d.aiClassificationModel && d.status === "processed");
-      await Promise.allSettled(
-        pending.map(d => apiRequest("POST", `/api/load-documents/${d.id}/ai-classify`, {}))
-      );
+      const pending = documents.filter(doc => !doc.aiClassificationModel && doc.status === "processed");
+      await Promise.allSettled(pending.map(doc => apiRequest("POST", `/api/load-documents/${doc.id}/ai-classify`, {})));
     },
     onSuccess: () => {
-      toast({ title: "Batch complete", description: "All documents re-classified." });
+      toast({ title: "Batch complete", description: "All eligible documents were re-classified." });
       qc.invalidateQueries({ queryKey: ["/api/documents"] });
     },
   });
 
-  // ── View / Download ────────────────────────────────────────────────────────
   const handleView = (id: number) => {
     window.open(`/api/documents/${id}/view`, "_blank", "noopener,noreferrer");
   };
 
-  const handleDownload = async (id: number) => {
-    try {
-      const r = await fetch(`/api/documents/${id}/download`, { credentials: "include" });
-      if (!r.ok) throw new Error();
-      const a = Object.assign(document.createElement("a"), {
-        href: URL.createObjectURL(await r.blob()),
-        download: `document_${id}`,
-      });
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      toast({ title: "Downloaded" });
-    } catch {
-      toast({ title: "Error", description: "Download failed.", variant: "destructive" });
-    }
+  const handleDownload = (id: number) => {
+    const anchor = Object.assign(document.createElement("a"), {
+      href: `/api/documents/${id}/download`,
+      rel: "noopener noreferrer",
+    });
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   };
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  const total         = documents.length;
-  const aiCount       = documents.filter(d => d.classificationSource === "ai").length;
-  const rulesCount    = documents.filter(d => d.classificationSource === "rules" || !d.classificationSource).length;
-  const agentCount    = documents.filter(d => d.classificationSource === "agent").length;
-  const lowConf       = documents.filter(d => {
-    const c = d.classificationConfidence ? parseFloat(d.classificationConfidence) : null;
-    return c !== null && c < 0.6;
-  }).length;
-
-  // ── Filtered docs ──────────────────────────────────────────────────────────
-  const filtered = documents.filter(doc => {
-    const displayType = documentClassification(doc);
-    const conf        = doc.classificationConfidence ? parseFloat(doc.classificationConfidence) : null;
-    const src         = doc.classificationSource ?? "rules";
-
-    if (search && !doc.originalName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (typeFilter !== "all" && displayType !== typeFilter) return false;
-    if (srcFilter  !== "all" && src !== srcFilter) return false;
-    if (confFilter === "high"   && (conf === null || conf <  0.8))  return false;
-    if (confFilter === "medium" && (conf === null || conf >= 0.8 || conf < 0.6)) return false;
-    if (confFilter === "low"    && (conf === null || conf >= 0.6))  return false;
+  const filtered = useMemo(() => documents.filter(doc => {
+    const classification = documentClassification(doc);
+    const confidence = documentConfidence(doc);
+    const source = doc.classificationSource ?? "rules";
+    const processingState = doc.processingState ?? doc.status;
+    const term = search.trim().toLocaleLowerCase();
+    if (term && ![
+      doc.originalName,
+      doc.invoiceNumber ?? "",
+      doc.carrierName ?? "",
+      doc.invoiceId ? String(doc.invoiceId) : "",
+    ].some(value => value.toLocaleLowerCase().includes(term))) return false;
+    if (typeFilter !== "all") {
+      const group: Record<string, string[]> = {
+        invoice: ["invoice", "freight_invoice"],
+        freight_invoice: ["invoice", "freight_invoice"],
+        bill_of_lading: ["bill_of_lading", "bol"],
+        bol: ["bill_of_lading", "bol"],
+        proof_of_delivery: ["proof_of_delivery", "pod"],
+        pod: ["proof_of_delivery", "pod"],
+      };
+      if (!(group[typeFilter] ?? [typeFilter]).includes(classification)) return false;
+    }
+    if (srcFilter !== "all" && source !== srcFilter) return false;
+    if (statusFilter !== "all" && processingState !== statusFilter) return false;
+    if (confFilter === "high" && (confidence === null || confidence < 0.8)) return false;
+    if (confFilter === "medium" && (confidence === null || confidence < 0.6 || confidence >= 0.8)) return false;
+    if (confFilter === "low" && (confidence === null || confidence >= 0.6)) return false;
+    const created = doc.createdAt ? new Date(doc.createdAt).getTime() : Number.NaN;
+    if (fromDate && (!Number.isFinite(created) || created < new Date(`${fromDate}T00:00:00`).getTime())) return false;
+    if (toDate && (!Number.isFinite(created) || created > new Date(`${toDate}T23:59:59.999`).getTime())) return false;
     return true;
-  });
+  }), [documents, search, typeFilter, srcFilter, statusFilter, confFilter, fromDate, toDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageDocuments = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    if (preserveFocusPage.current) {
+      preserveFocusPage.current = false;
+      return;
+    }
+    setPage(1);
+  }, [search, typeFilter, srcFilter, confFilter, statusFilter, fromDate, toDate]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   useEffect(() => {
     if (requestedDocumentId === null || isLoading || handledFocusId.current === requestedDocumentId) return;
-    if (!documents.some(doc => doc.id === requestedDocumentId)) return;
+    const index = documents.findIndex(doc => doc.id === requestedDocumentId);
+    if (index < 0) return;
     handledFocusId.current = requestedDocumentId;
     pendingFocusId.current = requestedDocumentId;
+    preserveFocusPage.current = true;
     setSearch("");
     setTypeFilter("all");
     setSrcFilter("all");
     setConfFilter("all");
+    setStatusFilter("all");
+    setFromDate("");
+    setToDate("");
+    setPage(Math.floor(index / PAGE_SIZE) + 1);
   }, [requestedDocumentId, documents, isLoading]);
 
   useEffect(() => {
     const id = pendingFocusId.current;
-    if (id === null || isLoading || !filtered.some(doc => doc.id === id)) return;
+    if (id === null || isLoading || !pageDocuments.some(doc => doc.id === id)) return;
     const row = document.getElementById(`document-row-${id}`);
     if (!row) return;
     row.scrollIntoView({ block: "center", behavior: "smooth" });
     row.focus({ preventScroll: true });
     pendingFocusId.current = null;
-  }, [filtered, isLoading]);
+  }, [pageDocuments, isLoading]);
 
   const clearDocumentFocus = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
@@ -531,189 +533,173 @@ export default function Documents() {
     setTypeFilter("all");
     setSrcFilter("all");
     setConfFilter("all");
+    setStatusFilter("all");
+    setFromDate("");
+    setToDate("");
+    setPage(1);
     navigate("/documents");
   };
 
+  const exportCsv = () => {
+    const headers = ["Filename", "Classification", "Invoice number", "Carrier", "Confidence", "Processing state", "Uploaded"];
+    const cell = (value: unknown) => {
+      let text = String(value ?? "");
+      if (/^[\u0000-\u0020]*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const rows = filtered.map(doc => [
+      doc.originalName,
+      typeLabel(documentClassification(doc)),
+      doc.invoiceNumber ?? (doc.invoiceId ? String(doc.invoiceId) : ""),
+      doc.carrierName ?? "",
+      documentConfidence(doc) === null ? "" : `${Math.round(documentConfidence(doc)! * 100)}%`,
+      doc.processingState ?? doc.status,
+      doc.createdAt ?? "",
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(cell).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = Object.assign(document.createElement("a"), { href: url, download: "factorflux-documents.csv" });
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setTypeFilter("all");
+    setSrcFilter("all");
+    setConfFilter("all");
+    setStatusFilter("all");
+    setFromDate("");
+    setToDate("");
+  };
+
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="flex h-full min-h-0 bg-[#e0e0e0]">
       <Sidebar />
-
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav
-          title="Documents"
-          subtitle="AI-powered classification center"
-          group="Workspace"
-        />
-
-        <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="Document Work Queue" subtitle="Paperwork integrity · OCR exceptions · classification review" group="Workspace" neu />
+        <NeuPageShell className="custom-scrollbar !min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1680px] space-y-5 p-4 md:p-7 xl:p-9">
             {requestedDocumentId !== null && (
-              <div data-testid="document-focus-notice" className="flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#ece9e2] px-3 py-2 text-xs">
-                <span>Focused document #{requestedDocumentId}. If OCR failed, its existing Retry action is in view.</span>
-                <a href="/documents" onClick={clearDocumentFocus} data-testid="documents-show-all" className="font-semibold text-[#087c8d] underline underline-offset-2">Show all documents</a>
-              </div>
+              <NeuCard data-testid="document-focus-notice" className="flex flex-wrap items-center justify-between gap-3 p-3">
+                <span className="text-xs text-[#526164]">Focused document #{requestedDocumentId}. OCR exceptions and retry controls are available in its row.</span>
+                <a href="/documents" onClick={clearDocumentFocus} data-testid="documents-show-all" className="text-xs font-semibold text-[#168d98] underline underline-offset-2">Show all documents</a>
+              </NeuCard>
             )}
+            <DocumentsOverview />
 
-            {/* ── Stats row ──────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-              {[
-                { label: "Total Documents",    value: total,      icon: <FileText className="h-4 w-4" />,    color: "text-slate-600 dark:text-slate-300",   bg: "bg-slate-100 dark:bg-slate-800" },
-                { label: "AI Classified",       value: aiCount,    icon: <Sparkles className="h-4 w-4" />,    color: "text-purple-600 dark:text-purple-400",  bg: "bg-purple-50 dark:bg-purple-950/40" },
-                { label: "Rules Engine",        value: rulesCount, icon: <BookOpen className="h-4 w-4" />,    color: "text-slate-600 dark:text-slate-300",   bg: "bg-slate-100 dark:bg-slate-800" },
-                { label: "Agent Overrides",     value: agentCount, icon: <UserCheck className="h-4 w-4" />,  color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
-                { label: "Low Confidence",      value: lowConf,    icon: <AlertTriangle className="h-4 w-4" />, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
-              ].map(s => (
-                <div key={s.label} className="ff-dashboard-card p-4">
-                  <div className={cn("mb-2 flex h-8 w-8 items-center justify-center rounded-lg", s.bg, s.color)}>
-                    {s.icon}
-                  </div>
-                  <p className="ff-stat-value text-2xl tracking-tight">{s.value}</p>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
+            <NeuCard className="p-4 sm:p-5">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-[#758587]">Document register</p>
+                  <h2 className="mt-1 text-lg font-semibold text-[#354548]">Review incoming paperwork</h2>
                 </div>
-              ))}
-            </div>
-
-            {/* ── Toolbar ────────────────────────────────────────────────── */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-[180px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                <Input
-                  placeholder="Search by filename…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="pl-8 h-9 text-sm"
-                />
+                <div className="flex flex-wrap gap-2">
+                  <NeuButton onClick={exportCsv} disabled={filtered.length === 0} className="min-h-10 px-3 text-xs"><Download className="h-4 w-4" />Export filtered CSV</NeuButton>
+                  <NeuButton
+                    onClick={() => batchMutation.mutate()}
+                    disabled={batchMutation.isPending || !documents.some(doc => !doc.aiClassificationModel && doc.status === "processed")}
+                    variant="accent"
+                    className="min-h-10 px-3 text-xs"
+                  >
+                    {batchMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Reclassify eligible
+                  </NeuButton>
+                </div>
               </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <label className="relative sm:col-span-2">
+                  <span className="sr-only">Search filename, invoice number, or carrier</span>
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#788b8d]" />
+                  <NeuInput placeholder="Filename, invoice number, or carrier…" value={search} onChange={event => setSearch(event.target.value)} className="pl-11" data-testid="input-search-documents" />
+                </label>
+                <label>
+                  <span className="sr-only">Classification type</span>
+                  <NeuSelect value={typeFilter} onChange={event => setTypeFilter(event.target.value)} aria-label="Classification type">
+                    {TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </NeuSelect>
+                </label>
+                <label>
+                  <span className="sr-only">Classification source</span>
+                  <NeuSelect value={srcFilter} onChange={event => setSrcFilter(event.target.value)} aria-label="Classification source">
+                    <option value="all">All sources</option><option value="ai">AI only</option><option value="rules">Rules only</option><option value="agent">Agent only</option>
+                  </NeuSelect>
+                </label>
+                <label>
+                  <span className="sr-only">Processing status</span>
+                  <NeuSelect value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label="Processing status">
+                    <option value="all">All processing states</option><option value="pending">Pending</option><option value="processing">Processing</option><option value="processed">Processed</option><option value="failed">Failed OCR</option>
+                  </NeuSelect>
+                </label>
+                <label>
+                  <span className="sr-only">OCR confidence</span>
+                  <NeuSelect value={confFilter} onChange={event => setConfFilter(event.target.value)} aria-label="OCR confidence">
+                    <option value="all">All confidence</option><option value="high">High · 80% and above</option><option value="medium">Medium · 60–79%</option><option value="low">Low · below 60%</option>
+                  </NeuSelect>
+                </label>
+                <label className="flex items-center gap-2 rounded-xl bg-[#e0e0e0] px-3 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#788b8d]">From</span>
+                  <NeuInput type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} aria-label="Uploaded from date" className="min-h-10 px-1 shadow-none" />
+                </label>
+                <label className="flex items-center gap-2 rounded-xl bg-[#e0e0e0] px-3 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#788b8d]">To</span>
+                  <NeuInput type="date" value={toDate} onChange={event => setToDate(event.target.value)} aria-label="Uploaded to date" className="min-h-10 px-1 shadow-none" />
+                </label>
+                <div className="flex flex-wrap items-center gap-2 xl:col-span-4">
+                  <span className="text-xs text-[#758587]">{filtered.length.toLocaleString()} matching documents</span>
+                  <NeuButton onClick={clearFilters} className="min-h-9 rounded-lg px-3 text-xs">Clear filters</NeuButton>
+                </div>
+              </div>
+            </NeuCard>
 
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9 w-44 text-sm">
-                  <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
-                  <SelectValue placeholder="All types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All types</SelectItem>
-                  <SelectItem value="rate_confirmation">Rate Confirmation</SelectItem>
-                  <SelectItem value="bill_of_lading">Bill of Lading</SelectItem>
-                  <SelectItem value="proof_of_delivery">Proof of Delivery</SelectItem>
-                  <SelectItem value="lumper_receipt">Lumper Receipt</SelectItem>
-                  <SelectItem value="invoice">Invoice</SelectItem>
-                  <SelectItem value="receipt">Receipt</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={srcFilter} onValueChange={setSrcFilter}>
-                <SelectTrigger className="h-9 w-36 text-sm">
-                  <Brain className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
-                  <SelectValue placeholder="All sources" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All sources</SelectItem>
-                  <SelectItem value="ai">AI only</SelectItem>
-                  <SelectItem value="rules">Rules only</SelectItem>
-                  <SelectItem value="agent">Agent only</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={confFilter} onValueChange={setConfFilter}>
-                <SelectTrigger className="h-9 w-40 text-sm">
-                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
-                  <SelectValue placeholder="All confidence" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All confidence</SelectItem>
-                  <SelectItem value="high">High (≥80%)</SelectItem>
-                  <SelectItem value="medium">Medium (60–80%)</SelectItem>
-                  <SelectItem value="low">Low (&lt;60%)</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-sm ml-auto"
-                onClick={() => batchMutation.mutate()}
-                disabled={batchMutation.isPending}
-              >
-                {batchMutation.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Sparkles className="h-3.5 w-3.5 text-purple-500" />}
-                Re-classify all
-              </Button>
-            </div>
-
-            {/* ── Table ──────────────────────────────────────────────────── */}
-            <div className="ff-card ff-table-container overflow-hidden">
+            <NeuCard className="min-h-0 overflow-hidden p-3 sm:p-5">
               {isLoading ? (
-                <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading documents…
+                <div className="space-y-3 p-3" aria-label="Loading documents">
+                  {[1, 2, 3, 4, 5].map(row => <div key={row} className="flex animate-pulse items-center gap-4"><div className="h-9 w-9 rounded-lg bg-[#c9c9c9]" /><div className="h-4 flex-1 rounded bg-[#c9c9c9]" /><div className="h-4 w-1/5 rounded bg-[#c9c9c9]" /></div>)}
+                </div>
+              ) : isError ? (
+                <div className="flex flex-col items-center py-14 text-center">
+                  <AlertTriangle className="mb-3 h-8 w-8 text-[#ad5c50]" />
+                  <p className="font-semibold text-[#354548]">Documents did not load</p>
+                  <p className="mt-1 text-sm text-[#758587]">The queue could not be refreshed. Try again.</p>
+                  <NeuButton onClick={() => refetch()} className="mt-4 min-h-10 px-4 text-xs"><RefreshCw className="h-4 w-4" />Retry loading</NeuButton>
                 </div>
               ) : filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
-                    <FileQuestion className="h-6 w-6 text-slate-400" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                    {documents.length === 0 ? "No documents uploaded yet" : "No documents match your filters"}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {documents.length === 0
-                      ? "Upload documents through an invoice to see AI classification here."
-                      : "Try adjusting the search or filters above."}
-                  </p>
+                <div className="flex flex-col items-center py-14 text-center">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#d9d9d9]"><FileQuestion className="h-6 w-6 text-[#788b8d]" /></div>
+                  <p className="font-semibold text-[#354548]">{documents.length === 0 ? "No documents in the queue" : "No documents match these filters"}</p>
+                  <p className="mt-1 max-w-md text-sm text-[#758587]">{documents.length === 0 ? "Documents attached to invoices appear here for OCR and classification review." : "Adjust search, date, status, or confidence filters to widen the queue."}</p>
+                  {documents.length > 0 && <NeuButton onClick={clearFilters} className="mt-4 min-h-10 px-4 text-xs">Clear filters</NeuButton>}
                 </div>
               ) : (
-                <table className="ff-data-table w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Document
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Classification
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Confidence
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Source
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Status
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Uploaded
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(doc => (
-                      <DocumentRow
-                        key={doc.id}
-                        doc={doc}
-                        onView={handleView}
-                        onDownload={handleDownload}
-                        focusTargetId={requestedDocumentId}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                <>
+                  <NeuTable className="min-w-[1100px]">
+                    <NeuTableHeader>
+                      <tr>
+                        {["Filename", "Classification", "Confidence", "Linked invoice / carrier", "Processing state", "Uploaded", "Actions"].map(title => <NeuTableHead key={title}>{title}</NeuTableHead>)}
+                      </tr>
+                    </NeuTableHeader>
+                    <NeuTableBody>
+                      {pageDocuments.map(doc => <DocumentRow key={doc.id} doc={doc} focusTargetId={requestedDocumentId} onView={handleView} onDownload={handleDownload} />)}
+                    </NeuTableBody>
+                  </NeuTable>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#c5c5c5] px-1 pt-3">
+                    <span className="text-xs text-[#758587]">
+                      Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} filtered · {documents.length} total
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <NeuButton onClick={() => setPage(value => Math.max(1, value - 1))} disabled={currentPage <= 1 || isLoading} className="min-h-10 px-3 text-xs">Previous</NeuButton>
+                      <span className="px-2 text-xs text-[#758587]">Page {currentPage} of {totalPages}</span>
+                      <NeuButton onClick={() => setPage(value => Math.min(totalPages, value + 1))} disabled={currentPage >= totalPages || isLoading} className="min-h-10 px-3 text-xs">Next</NeuButton>
+                    </div>
+                  </div>
+                </>
               )}
-
-              {/* Footer count */}
-              {!isLoading && filtered.length > 0 && (
-                <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-2.5 text-[11px] text-slate-400">
-                  Showing {filtered.length} of {documents.length} document{documents.length !== 1 ? "s" : ""}
-                </div>
-              )}
-            </div>
-
+            </NeuCard>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
     </div>
   );

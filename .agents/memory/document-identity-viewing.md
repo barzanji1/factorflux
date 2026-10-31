@@ -19,4 +19,4 @@ Use an explicit desktop viewport for live invoice UI tests and check tab activat
 
 **Why:** Chromium's small default viewport clips the overflowing tab bar behind the fixed layout, making coordinate-based tab clicks unreliable even when the tab exists.
 
-**How to apply:** Verify the active tab state; keyboard activation is a valid way to enter the paperwork tab. Continue using real pointer input to verify the document View buttons.
+**How to apply:** Verify the active tab state; keyboard activation is a valid way to enter the paperwork tab. Continue using real pointer input to verify the document View buttons. After smooth deep-link scrolling, wait for scrolling to settle and reacquire the target bounds before dispatching pointer events; stale coordinates can miss a working button.

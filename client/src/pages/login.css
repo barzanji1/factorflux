@@ -6,6 +6,7 @@
   --login-muted: #718184;
   --login-teal: #178b91;
   --login-teal-dark: #116f76;
+  --login-control-height: 40px;
   display: grid;
   min-height: 100vh;
   min-height: 100dvh;
@@ -33,7 +34,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
   border: 0 !important;
   border-radius: 50% !important;
   background: #e0e0e0 !important;
@@ -154,7 +155,7 @@
 .ff-login-page .ff-login-input {
   display: block;
   width: 100%;
-  height: 40px;
+  height: var(--login-control-height);
   border: 0 !important;
   border-radius: 13px !important;
   background: #e0e0e0 !important;
@@ -223,7 +224,8 @@
 .ff-login-page .ff-login-submit {
   display: inline-flex;
   width: 100%;
-  min-height: 47px;
+  min-height: var(--login-control-height);
+  height: var(--login-control-height);
   align-items: center;
   justify-content: center;
   margin-top: 3px;
@@ -355,46 +357,61 @@
     min-height: 0;
     aspect-ratio: 1;
     border-radius: 50% !important;
-    padding: 7vw 10vw !important;
+    padding: 4vw 12vw 8vw !important;
     box-shadow:
       12px 12px 26px #bebebe,
       -12px -12px 26px #ffffff,
       inset 1px 1px 1px rgba(255, 255, 255, 0.46) !important;
   }
 
+  .ff-login-brand img,
   .ff-login-brand svg {
-    width: 64px;
-    height: 64px;
+    width: 48px;
+    height: 48px;
   }
 
   .ff-login-brand > div:first-child {
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
 
   .ff-login-page .ff-login-product {
-    font-size: 4cqw;
+    font-size: clamp(10px, 2.85vw, 14px);
   }
 
   .ff-login-page .ff-login-tagline {
-    font-size: 3.4cqw;
+    font-size: clamp(9px, 2.4vw, 12px);
   }
 
   .ff-login-page .ff-login-brand .ff-login-company {
-    margin-top: 5px;
-    font-size: 6.8cqw;
+    margin-top: 4px;
+    font-size: clamp(17px, 4.65vw, 25px);
   }
 
   .ff-login-content {
-    margin-top: 5cqw;
+    margin-top: 2.8cqw;
   }
 
   .ff-login-form {
-    gap: 2cqw;
+    gap: 1.6cqw;
+  }
+
+  .ff-login-form > div {
+    min-width: 0;
+  }
+
+  .ff-login-form > div > * + * {
+    margin-top: 3px !important;
+  }
+
+  .ff-login-form [id$="-form-item-message"] {
+    font-size: clamp(10px, 2.7vw, 12px);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
   }
 
   .ff-login-page .ff-login-input {
-    height: 12cqw;
-    font-size: 4.5cqw;
+    height: var(--login-control-height);
+    font-size: clamp(12px, 3.2vw, 14px);
     padding-left: 30px !important;
     border-radius: 10px !important;
   }
@@ -412,28 +429,42 @@
   }
 
   .ff-login-page .ff-login-submit {
-    min-height: 13cqw;
-    height: 13cqw;
-    font-size: 4.4cqw;
-    margin-top: 2px;
+    min-height: var(--login-control-height);
+    height: var(--login-control-height);
+    font-size: clamp(12px, 3.2vw, 14px);
+    margin-top: 1px;
     border-radius: 10px !important;
   }
 
   .ff-login-support-wrap {
-    margin-top: 2cqw;
+    margin-top: 1.5cqw;
     line-height: 1;
   }
 
   .ff-login-support {
-    font-size: 3.2cqw;
+    font-size: clamp(9px, 2.4vw, 12px);
   }
 
   .ff-login-error {
-    font-size: 3.7cqw;
+    min-width: 0;
+    font-size: clamp(10px, 2.8vw, 12px);
+    overflow-wrap: anywhere;
+  }
+
+  .ff-login-error:not(:empty) {
+    margin-top: 4px;
+  }
+
+  .ff-login-page {
+    --login-control-height: 34px;
   }
 }
 
 @media (max-width: 319px) {
+  .ff-login-page {
+    --login-control-height: 32px;
+  }
+
   .ff-login-page .ff-login-card {
     height: auto;
     min-height: 360px;
@@ -448,8 +479,8 @@
   }
 
   .ff-login-page .ff-login-submit {
-    min-height: 36px;
-    height: 36px;
+    min-height: var(--login-control-height);
+    height: var(--login-control-height);
     font-size: 12px;
   }
 

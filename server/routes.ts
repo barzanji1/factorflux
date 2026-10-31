@@ -40,6 +40,7 @@ import { registerDumpStatementRoutes } from "./routes/dumpStatements";
 import { agingReportFiltersSchema, groupAgingRows } from "../shared/aging-report";
 import { readCarrierFinancial } from "./services/carrierFinancial";
 import { readBrokerFinancial } from "./services/brokerFinancial";
+import { readDocumentStats, documentListMetadata, readDocumentExtractionSummary } from "./services/documentAnalytics";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
@@ -1958,6 +1959,29 @@ ${message}
   });
 
   // Documents
+  app.get("/api/documents/stats", requireAuth, async (req: any, res) => {
+    try {
+      res.json(await readDocumentStats(req.user));
+    } catch (error) {
+      console.error("Error reading document stats:", error);
+      res.status(500).json({ message: "Unable to load document statistics" });
+    }
+  });
+
+  app.get("/api/documents/:id/extraction-summary", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647) return res.status(400).json({ message: "Invalid document id" });
+      if (!await employeeCanAccessDocument(req, id)) return res.status(403).json({ message: "You may only access documents for your own invoices" });
+      const document = await storage.getDocument(id);
+      if (!document) return res.status(404).json({ message: "Document not found" });
+      res.json(await readDocumentExtractionSummary(id));
+    } catch (error) {
+      console.error("Error reading document extraction summary:", error);
+      res.status(500).json({ message: "Unable to load document extraction details" });
+    }
+  });
+
   app.get("/api/documents", requireAuth, async (req: any, res) => {
     try {
       const { load, invoice, entityType, entityId } = req.query;
@@ -1987,7 +2011,8 @@ ${message}
         .where(inArray(docExtractionJobs.documentId, documents.map(document => document.id)))
         .orderBy(docExtractionJobs.documentId, desc(docExtractionJobs.id)) : [];
       const latestJobs = new Map(jobs.map(job => [job.documentId, job]));
-      res.json(documents.map(document => ({ ...document, ocrJob: latestJobs.get(document.id) ?? null })));
+      const metadata = await documentListMetadata(documents.map(document => document.id));
+      res.json(documents.map(document => ({ ...document, ocrJob: latestJobs.get(document.id) ?? null, ...metadata.get(document.id) })));
     } catch (error) {
       console.error("Error fetching documents:", error);
       res.status(500).json({ message: "Failed to fetch documents" });
