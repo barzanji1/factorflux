@@ -1,19 +1,17 @@
-import { useMemo, useState } from "react";
+import { forwardRef, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent as BaseSelectContent, SelectItem, SelectTrigger as BaseSelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuStatCard, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { Download, FileText, Layers3, Plus, PlusCircle, Receipt, X } from "lucide-react";
 
 type Broker = { id: number; name: string; status?: string };
@@ -45,12 +43,26 @@ const date = (value?: string) => value ? new Date(value).toLocaleDateString("en-
 const shortDate = (value?: string) => value ? new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
 
 function FieldLabel({ children, required = false }: { children: React.ReactNode; required?: boolean }) {
-  return <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-[#63767d]">{children}{required && <span className="ml-1 text-[#b14c38]">*</span>}</label>;
+  return <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-[#666666]">{children}{required && <span className="ml-1 text-[#1596a2]">*</span>}</label>;
 }
 
 function LoadingRows() {
-  return <div className="space-y-2 p-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-11 animate-pulse bg-[#eef2f1]" />)}</div>;
+  return <div className="space-y-3 p-5" aria-label="Loading batches">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-11 animate-pulse rounded-[12px] bg-[#d5d5d5] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]" />)}</div>;
 }
+
+function SelectContent(props: React.ComponentPropsWithoutRef<typeof BaseSelectContent>) {
+  return <BaseSelectContent {...props} className={cn(props.className, "!pointer-events-auto [&&]:!rounded-[12px] !border-0 !bg-[#e0e0e0] !shadow-[-7px_-7px_16px_#ffffff,7px_7px_16px_#b8b8b8]")} />;
+}
+
+const SelectTrigger = forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<typeof BaseSelectTrigger>>(
+  (props, ref) => <BaseSelectTrigger {...props} ref={ref} className={cn(
+    props.className,
+    "[&&]:!rounded-[12px] [&&]:!border-0 [&&]:!bg-[#e0e0e0]",
+    "[&&]:!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+    "[&&]:focus:!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+  )} />,
+);
+SelectTrigger.displayName = "BulkInvoiceSelectTrigger";
 
 export default function BulkInvoices() {
   const { toast } = useToast();
@@ -208,91 +220,128 @@ export default function BulkInvoices() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#d4d0c8] text-[#263b44]">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 bg-[#e0e0e0] text-[#333333]">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav title="Bulk invoices" subtitle="High-volume haul ticket entry" group="Operations" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
-          <div className="mx-auto max-w-[1580px] space-y-3 p-3 md:p-5">
-            <section className="ff-card ff-bulk-surface flex flex-wrap items-center justify-between gap-3 border border-[#718087] bg-[#edf2f1] px-3 py-2 shadow-[1px_1px_0_#fff]">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center border border-[#098b9f] bg-[#d9edf0] text-[#087d8d]"><Layers3 className="h-5 w-5" /></div>
-                <div><h2 className="text-lg font-bold tracking-tight text-[#203a46]">Bulk invoice batches</h2><p className="text-[10px] uppercase tracking-[0.14em] text-[#667a80]">Broker ledger · {batches.length} batches on file</p></div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <TopNav title="Bulk invoices" subtitle="High-volume haul ticket entry" group="Operations" neu />
+        <NeuPageShell className="custom-scrollbar min-h-0 flex-1 overflow-auto">
+          <div className="mx-auto max-w-[1580px] space-y-5 p-4 md:p-7">
+            <NeuCard className="flex flex-wrap items-center justify-between gap-4 rounded-[16px] px-5 py-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#e0e0e0] text-[#27aab8] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]"><Layers3 className="h-5 w-5" /></div>
+                <div><h2 className="text-xl font-bold tracking-tight text-[#333333]">Bulk invoice batches</h2><p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[#777777]">Broker ledger · {batches.length} batches on file</p></div>
               </div>
-              <Button onClick={openCreate} className="ff-new-bulk-button h-auto gap-1.5 rounded-none bg-[#087d8d] p-2 text-[11px] text-white hover:bg-[#066b79]"><Plus className="h-4 w-4" />New Bulk Invoice</Button>
+              <NeuButton variant="accent" onClick={openCreate} className="min-h-10 rounded-[12px] px-4 text-xs"><Plus className="h-4 w-4" />New Bulk Invoice</NeuButton>
+            </NeuCard>
+
+            <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+              {[
+                ["Batches", batches.length],
+                ["Tickets entered", batches.reduce((s, b) => s + Number(b.invoiceCount || 0), 0)],
+                ["Ledger value", money(batches.reduce((s, b) => s + Number(b.totalRate || 0), 0))],
+                ["Latest batch", batches[0] ? date(batches[0].createdAt) : "—"],
+              ].map(([label, value]) => <NeuStatCard key={String(label)} label={String(label)} value={value} className="min-h-[120px] rounded-[16px] p-4 [&>div:last-child>p:first-child]:text-[#27aab8] [&>div:last-child>p:first-child]:text-2xl" />)}
             </section>
 
-            <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
-              {[["Batches", batches.length, "text-[#087d8d]"], ["Tickets entered", batches.reduce((s, b) => s + Number(b.invoiceCount || 0), 0), "text-[#42616c]"], ["Ledger value", money(batches.reduce((s, b) => s + Number(b.totalRate || 0), 0)), "text-[#167152]"], ["Latest batch", batches[0] ? date(batches[0].createdAt) : "—", "text-[#946316]"]].map(([label, value, color]) => <div key={String(label)} className="ff-dashboard-card ff-bulk-surface px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-wider text-[#718187]">{label}</p><p className={cn("mt-1 text-base font-bold", color)}>{value}</p></div>)}
-            </section>
-
-            <section className="ff-card ff-bulk-surface overflow-hidden">
-              <div className="flex items-center justify-between border-b border-[#b8c2c4] bg-[#f0f4f3] px-3 py-2"><div><h3 className="text-[12px] font-bold text-[#263b44]">Recent batches</h3><p className="text-[10px] text-[#718187]">Select a batch to inspect its tickets or download the invoice packet.</p></div><span className="font-mono text-[10px] text-[#718187]">{sortedBatches.length ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, sortedBatches.length)} / ${sortedBatches.length}` : "0 / 0"}</span></div>
-              {isLoading ? <LoadingRows /> : isError ? <div className="p-10 text-center"><p className="text-sm font-bold text-[#9c4343]">Batch ledger unavailable</p><Button variant="outline" size="sm" onClick={() => refetch()} className="mt-3 rounded-sm">Retry</Button></div> : !visibleBatches.length ? <div className="p-12 text-center"><Receipt className="mx-auto mb-2 h-8 w-8 text-[#9aa7ab]" /><p className="text-sm font-bold text-[#52666d]">No bulk batches yet</p><p className="mt-1 text-xs text-[#718187]">Start with the first broker haul report.</p><Button onClick={openCreate} size="sm" className="mt-4 rounded-sm bg-[#087d8d]">Create a batch</Button></div> : <div className="ff-table-container overflow-x-auto"><table className="ff-data-table min-w-[820px]"><thead><tr><th>Broker</th><th>Ticket numbers</th><th>By agent</th><th>Date</th><th className="text-right">Tickets</th><th className="text-right">Total rate</th><th className="text-right">PDF</th></tr></thead><tbody>{visibleBatches.map((batch) => <tr key={batch.id} onClick={() => setDetail(batch)} className="cursor-pointer"><td><div className="font-bold text-[#263b44]">{batch.brokerName || brokerMap.get(batch.brokerId) || "Unknown broker"}</div><div className="font-mono text-[10px] text-[#9aa7ab]">BATCH-{String(batch.id).padStart(5, "0")}</div></td><td className="max-w-[290px] truncate font-mono text-[11px] text-[#52666d]">{(batch.ticketNumbers || []).join(", ") || "No ticket numbers"}</td><td className="whitespace-nowrap">{batch.createdByName || "Agent"}</td><td className="whitespace-nowrap text-[#63767d]">{shortDate(batch.reportDateStart)}–{shortDate(batch.reportDateEnd)}</td><td className="text-right font-mono">{batch.invoiceCount}</td><td className="text-right font-mono font-bold text-[#167152]">{money(batch.totalRate)}</td><td className="text-right"><Button variant="outline" size="sm" title="Download PDF" aria-label="Download batch PDF" onClick={(event) => { event.stopPropagation(); downloadPdf(batch.id); }} className="h-7 w-7 p-0 text-[#087d8d]"><FileText className="h-4 w-4" /></Button></td></tr>)}</tbody></table></div>}
-              {pageCount > 1 && <div className="flex items-center justify-between border-t border-[#d4dcde] bg-[#f7f9f8] px-3 py-2"><p className="text-[10px] text-[#718187]">Page {page} of {pageCount}</p><div className="flex gap-1"><Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="h-7 rounded-sm px-2 text-[10px]">Previous</Button>{Array.from({ length: pageCount }, (_, i) => i + 1).slice(Math.max(0, page - 2), page + 1).map((number) => <Button key={number} variant={number === page ? "default" : "outline"} size="sm" onClick={() => setPage(number)} className="h-7 min-w-7 rounded-sm px-2 text-[10px]">{number}</Button>)}<Button variant="outline" size="sm" disabled={page === pageCount} onClick={() => setPage((p) => p + 1)} className="h-7 rounded-sm px-2 text-[10px]">Next</Button></div></div>}
-            </section>
+            <NeuCard className="overflow-hidden rounded-[16px] p-3 sm:p-5">
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
+                <div><h3 className="text-base font-bold text-[#333333]">Recent batches</h3><p className="mt-1 text-xs text-[#777777]">Select a batch to inspect its tickets or download the invoice packet.</p></div>
+                <span className="font-mono text-[11px] text-[#777777]">{sortedBatches.length ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, sortedBatches.length)} / ${sortedBatches.length}` : "0 / 0"}</span>
+              </div>
+              {isLoading ? <LoadingRows /> : isError ? <div className="p-10 text-center"><p className="text-sm font-bold text-[#9c4343]">Batch ledger unavailable</p><NeuButton onClick={() => refetch()} className="mt-4 min-h-9 rounded-[12px] px-4 text-xs">Retry</NeuButton></div> : !visibleBatches.length ? <div className="p-12 text-center"><Receipt className="mx-auto mb-3 h-8 w-8 text-[#1696a3]" /><p className="text-sm font-bold text-[#444444]">No bulk batches yet</p><p className="mt-1 text-xs text-[#777777]">Start with the first broker haul report.</p><NeuButton variant="accent" onClick={openCreate} className="mt-5 min-h-9 rounded-[12px] px-4 text-xs">Create a batch</NeuButton></div> : (
+                <NeuTable className="min-w-[820px]">
+                  <NeuTableHeader><tr><NeuTableHead>Broker</NeuTableHead><NeuTableHead>Ticket numbers</NeuTableHead><NeuTableHead>By agent</NeuTableHead><NeuTableHead>Date</NeuTableHead><NeuTableHead className="text-right">Tickets</NeuTableHead><NeuTableHead className="text-right">Total rate</NeuTableHead><NeuTableHead className="text-right">PDF</NeuTableHead></tr></NeuTableHeader>
+                  <NeuTableBody>{visibleBatches.map((batch) => <NeuTableRow key={batch.id} onClick={() => setDetail(batch)} className="cursor-pointer">
+                    <NeuTableCell><div className="font-bold text-[#444444]">{batch.brokerName || brokerMap.get(batch.brokerId) || "Unknown broker"}</div><div className="mt-1 font-mono text-[10px] text-[#888888]">BATCH-{String(batch.id).padStart(5, "0")}</div></NeuTableCell>
+                    <NeuTableCell className="max-w-[290px] truncate font-mono text-[11px] text-[#666666]">{(batch.ticketNumbers || []).join(", ") || "No ticket numbers"}</NeuTableCell>
+                    <NeuTableCell>{batch.createdByName || "Agent"}</NeuTableCell><NeuTableCell className="text-[#666666]">{shortDate(batch.reportDateStart)}–{shortDate(batch.reportDateEnd)}</NeuTableCell>
+                    <NeuTableCell className="text-right font-mono">{batch.invoiceCount}</NeuTableCell><NeuTableCell className="text-right font-mono font-bold text-[#25806b]">{money(batch.totalRate)}</NeuTableCell>
+                    <NeuTableCell className="text-right"><NeuButton title="Download PDF" aria-label="Download batch PDF" onClick={(event) => { event.stopPropagation(); downloadPdf(batch.id); }} className="min-h-9 w-9 rounded-[12px] p-0 text-[#1696a3]"><FileText className="h-4 w-4" /></NeuButton></NeuTableCell>
+                  </NeuTableRow>)}</NeuTableBody>
+                </NeuTable>
+              )}
+              {pageCount > 1 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#c9c9c9] pt-4"><p className="text-xs text-[#777777]">Page {page} of {pageCount}</p><div className="flex gap-2"><NeuButton disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="min-h-9 rounded-[12px] px-3 text-xs">Previous</NeuButton>{Array.from({ length: pageCount }, (_, i) => i + 1).slice(Math.max(0, page - 2), page + 1).map((number) => <NeuButton key={number} variant={number === page ? "accent" : "default"} onClick={() => setPage(number)} className="min-h-9 min-w-9 rounded-[12px] px-3 text-xs">{number}</NeuButton>)}<NeuButton disabled={page === pageCount} onClick={() => setPage((p) => p + 1)} className="min-h-9 rounded-[12px] px-3 text-xs">Next</NeuButton></div></div>}
+            </NeuCard>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="ff-bulk-surface max-h-[92vh] max-w-5xl overflow-y-auto border-2 border-[#808080] bg-[#d4d0c8] p-0">
-          <DialogHeader className="border-b-2 border-[#808080] bg-[#c0c0c0] px-4 py-3 pr-12"><DialogTitle className="text-sm font-bold text-[#1a1a1a]">New Bulk Invoice · ticket entry</DialogTitle></DialogHeader>
-          <form onSubmit={form.handleSubmit(submit)} className="space-y-4 p-4">
-            <div className="ff-bulk-surface grid gap-3 border-2 border-[#fff] border-r-[#808080] border-b-[#808080] bg-[#eef3f1] p-3 md:grid-cols-[1.5fr_1fr_1fr]">
-              <div><FieldLabel required>Broker</FieldLabel><Select value={form.watch("brokerId")} onValueChange={(v) => form.setValue("brokerId", v, { shouldValidate: true })}><SelectTrigger className="ff-bulk-input h-9 bg-white"><SelectValue placeholder={brokersLoading ? "Loading brokers…" : "Select broker"} /></SelectTrigger><SelectContent>{brokers.map((broker) => <SelectItem key={broker.id} value={String(broker.id)}>{broker.name}</SelectItem>)}</SelectContent></Select>{form.formState.errors.brokerId && <p className="mt-1 text-[10px] text-[#a33131]">{form.formState.errors.brokerId.message}</p>}</div>
-              <div><FieldLabel required>Report date start</FieldLabel><Input type="date" className="ff-bulk-input h-9" {...form.register("reportDateStart")} />{form.formState.errors.reportDateStart && <p className="mt-1 text-[10px] text-[#a33131]">{form.formState.errors.reportDateStart.message}</p>}</div>
-              <div><FieldLabel required>Report date end</FieldLabel><Input type="date" className="ff-bulk-input h-9" {...form.register("reportDateEnd")} />{form.formState.errors.reportDateEnd && <p className="mt-1 text-[10px] text-[#a33131]">{form.formState.errors.reportDateEnd.message}</p>}</div>
+        <DialogContent showCloseButton={false} className="max-h-[92dvh] max-w-5xl grid-cols-1 overflow-y-auto !rounded-[16px] !border-0 !bg-[#e0e0e0] p-0 text-[#333333] !shadow-[-10px_-10px_24px_#ffffff,10px_10px_24px_#b8b8b8] [&>*]:min-w-0">
+          <DialogHeader className="sticky top-0 z-10 flex-row items-start justify-between gap-3 rounded-t-[16px] bg-[#e0e0e0] px-5 py-4 shadow-[0_5px_10px_-9px_#777777] sm:px-7">
+            <div><DialogTitle className="text-lg font-bold">New Bulk Invoice · ticket entry</DialogTitle><DialogDescription className="mt-1 text-xs text-[#777777]">Enter a broker report and its individual carrier haul tickets.</DialogDescription></div>
+            <DialogClose asChild><NeuButton aria-label="Close bulk invoice form" className="min-h-9 h-9 w-9 shrink-0 rounded-full p-0"><X className="h-4 w-4" /></NeuButton></DialogClose>
+          </DialogHeader>
+          <form onSubmit={form.handleSubmit(submit)} className="space-y-5 px-5 pb-6 sm:px-7">
+            <NeuCard className="grid gap-4 rounded-[16px] p-4 md:grid-cols-[1.5fr_1fr_1fr]">
+              <div><FieldLabel required>Broker</FieldLabel><Select value={form.watch("brokerId")} onValueChange={(v) => form.setValue("brokerId", v, { shouldValidate: true })}><SelectTrigger className="h-10 rounded-[12px] border-0 bg-[#e0e0e0] text-sm text-[#333333] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff] transition-shadow focus-visible:ring-2 focus-visible:ring-[#27aab8]"><SelectValue placeholder={brokersLoading ? "Loading brokers…" : "Select broker"} /></SelectTrigger><SelectContent className="rounded-[12px] border-0 bg-[#e0e0e0] text-[#333333] shadow-[-7px_-7px_16px_#ffffff,7px_7px_16px_#b8b8b8]">{brokers.map((broker) => <SelectItem key={broker.id} value={String(broker.id)} className="rounded-[8px] focus:bg-[#d4eeee] focus:text-[#245e63]">{broker.name}</SelectItem>)}</SelectContent></Select>{form.formState.errors.brokerId && <p className="mt-1 text-[10px] text-[#a34141]">{form.formState.errors.brokerId.message}</p>}</div>
+              <div><FieldLabel required>Report date start</FieldLabel><NeuInput type="date" className="h-10 min-h-10 rounded-[12px] px-3 text-xs" {...form.register("reportDateStart")} />{form.formState.errors.reportDateStart && <p className="mt-1 text-[10px] text-[#a34141]">{form.formState.errors.reportDateStart.message}</p>}</div>
+              <div><FieldLabel required>Report date end</FieldLabel><NeuInput type="date" className="h-10 min-h-10 rounded-[12px] px-3 text-xs" {...form.register("reportDateEnd")} />{form.formState.errors.reportDateEnd && <p className="mt-1 text-[10px] text-[#a34141]">{form.formState.errors.reportDateEnd.message}</p>}</div>
+            </NeuCard>
+            <div className="flex flex-wrap items-end justify-between gap-3"><div><h3 className="text-sm font-bold text-[#444444]">Haul tickets</h3><p className="mt-1 text-xs text-[#777777]">One row becomes one carrier invoice.</p></div><NeuButton type="button" onClick={() => append({ carrierId: "", ticketNumber: "", loadNumber: "", rate: 0 })} className="min-h-9 rounded-[12px] px-4 text-xs"><PlusCircle className="h-4 w-4" />Add row</NeuButton></div>
+            <div className="overflow-x-auto rounded-[16px] bg-[#e0e0e0] p-2 shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]">
+              <div className="min-w-[700px]">
+                <div className="grid grid-cols-[1.4fr_1fr_1fr_130px_40px] gap-2 px-2 pb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-[#777777]"><span>Carrier</span><span>Ticket #</span><span>Load #</span><span>Rate $</span><span /></div>
+                {fields.map((field, index) => <div key={field.id} className="grid grid-cols-[1.4fr_1fr_1fr_130px_40px] items-start gap-2 border-t border-[#c9c9c9] px-2 py-3">
+                  <div><Select value={form.watch(`items.${index}.carrierId`)} onValueChange={(v) => form.setValue(`items.${index}.carrierId`, v, { shouldValidate: true })}><SelectTrigger className="h-9 rounded-[12px] border-0 bg-[#e0e0e0] text-[11px] text-[#333333] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff] focus-visible:ring-2 focus-visible:ring-[#27aab8]"><SelectValue placeholder="Select carrier" /></SelectTrigger><SelectContent className="rounded-[12px] border-0 bg-[#e0e0e0] text-[#333333] shadow-[-7px_-7px_16px_#ffffff,7px_7px_16px_#b8b8b8]">{carriers.map((carrier) => <SelectItem key={carrier.id} value={String(carrier.id)} className="rounded-[8px] focus:bg-[#d4eeee] focus:text-[#245e63]">{carrier.name}</SelectItem>)}</SelectContent></Select>{form.formState.errors.items?.[index]?.carrierId && <p className="mt-1 text-[10px] text-[#a34141]">Required</p>}</div>
+                  <div><NeuInput className="h-9 min-h-9 rounded-[12px] px-3 font-mono text-[11px]" placeholder="TK-10482" {...form.register(`items.${index}.ticketNumber`)} />{form.formState.errors.items?.[index]?.ticketNumber && <p className="mt-1 text-[10px] text-[#a34141]">Required</p>}</div>
+                  <div><NeuInput className="h-9 min-h-9 rounded-[12px] px-3 font-mono text-[11px]" placeholder="LD-8841" {...form.register(`items.${index}.loadNumber`)} /></div>
+                  <div><NeuInput type="number" step="0.01" min="0" className="h-9 min-h-9 rounded-[12px] px-3 text-right font-mono text-[11px]" placeholder="0.00" {...form.register(`items.${index}.rate`, { valueAsNumber: true })} />{form.formState.errors.items?.[index]?.rate && <p className="mt-1 text-[10px] text-[#a34141]">Required</p>}</div>
+                  <NeuButton type="button" disabled={fields.length === 1} onClick={() => remove(index)} title="Remove row" aria-label="Remove ticket row" className="min-h-9 h-9 w-9 rounded-[12px] p-0 text-[#a34141]"><X className="h-4 w-4" /></NeuButton>
+                </div>)}
+              </div>
             </div>
-            <Separator />
-            <div className="flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-[12px] font-bold text-[#263b44]">Haul tickets</h3><p className="text-[10px] text-[#718187]">One row becomes one carrier invoice.</p></div><Button type="button" variant="outline" size="sm" onClick={() => append({ carrierId: "", ticketNumber: "", loadNumber: "", rate: 0 })} className="h-8 gap-1 rounded-sm text-[10px]"><PlusCircle className="h-3.5 w-3.5" />Add row</Button></div>
-            <div className="ff-bulk-surface overflow-x-auto border border-[#9eabad] bg-white"><div className="min-w-[700px]"><div className="grid grid-cols-[1.4fr_1fr_1fr_130px_34px] gap-2 border-b border-[#b8c2c4] bg-[#404040] px-2 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-white"><span>Carrier</span><span>Ticket #</span><span>Load #</span><span>Rate $</span><span /></div>{fields.map((field, index) => <div key={field.id} className="ff-bulk-dynamic-row grid grid-cols-[1.4fr_1fr_1fr_130px_34px] items-start gap-2 border-b border-[#e1e6e7] px-2 py-2 last:border-b-0"><div><Select value={form.watch(`items.${index}.carrierId`)} onValueChange={(v) => form.setValue(`items.${index}.carrierId`, v, { shouldValidate: true })}><SelectTrigger className="ff-bulk-input h-8 text-[11px]"><SelectValue placeholder="Select carrier" /></SelectTrigger><SelectContent>{carriers.map((carrier) => <SelectItem key={carrier.id} value={String(carrier.id)}>{carrier.name}</SelectItem>)}</SelectContent></Select>{form.formState.errors.items?.[index]?.carrierId && <p className="mt-1 text-[10px] text-[#a33131]">Required</p>}</div><div><Input className="ff-bulk-input h-8 font-mono text-[11px]" placeholder="TK-10482" {...form.register(`items.${index}.ticketNumber`)} />{form.formState.errors.items?.[index]?.ticketNumber && <p className="mt-1 text-[10px] text-[#a33131]">Required</p>}</div><div><Input className="ff-bulk-input h-8 font-mono text-[11px]" placeholder="LD-8841" {...form.register(`items.${index}.loadNumber`)} /></div><div><Input type="number" step="0.01" min="0" className="ff-bulk-input h-8 text-right font-mono text-[11px]" placeholder="0.00" {...form.register(`items.${index}.rate`, { valueAsNumber: true })} />{form.formState.errors.items?.[index]?.rate && <p className="mt-1 text-[10px] text-[#a33131]">Required</p>}</div><Button type="button" variant="ghost" size="sm" disabled={fields.length === 1} onClick={() => remove(index)} title="Remove row" aria-label="Remove ticket row" className="h-8 w-8 p-0 text-[#9c4343] hover:bg-[#fff0ed]"><X className="h-4 w-4" /></Button></div>)}</div></div>
-            {form.formState.errors.items?.root && <p className="text-[10px] text-[#a33131]">{form.formState.errors.items.root.message}</p>}
-            <div className="ff-bulk-surface flex flex-wrap items-center justify-between border border-[#9eabad] bg-[#eef3f1] px-3 py-2"><span className="text-[10px] uppercase tracking-[0.12em] text-[#63767d]">{fields.length} ticket{fields.length === 1 ? "" : "s"} queued</span><span className="font-mono text-sm font-bold text-[#167152]">Running total {money(runningTotal)}</span></div>
-            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-sm">Cancel</Button><Button type="submit" disabled={createMutation.isPending || preflightLoading} className="gap-2 rounded-sm bg-[#087d8d] text-white hover:bg-[#066b79]"><Receipt className="h-4 w-4" />{preflightLoading ? "Checking alerts…" : createMutation.isPending ? "Creating invoices…" : "Create batch & invoices"}</Button></div>
+            {form.formState.errors.items?.root && <p className="text-xs text-[#a34141]">{form.formState.errors.items.root.message}</p>}
+            <NeuCard pressed className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] px-4 py-3"><span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#666666]">{fields.length} ticket{fields.length === 1 ? "" : "s"} queued</span><span className="font-mono text-sm font-bold text-[#168b91]">Running total {money(runningTotal)}</span></NeuCard>
+            <div className="flex justify-end gap-2"><NeuButton type="button" onClick={() => setCreateOpen(false)} className="min-h-10 rounded-[12px] px-4">Cancel</NeuButton><NeuButton type="submit" variant="accent" disabled={createMutation.isPending || preflightLoading} className="min-h-10 rounded-[12px] px-4"><Receipt className="h-4 w-4" />{preflightLoading ? "Checking alerts…" : createMutation.isPending ? "Creating invoices…" : "Create batch & invoices"}</NeuButton></div>
           </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={preflightOpen} onOpenChange={setPreflightOpen}>
-        <DialogContent className="ff-bulk-surface max-h-[84vh] max-w-2xl overflow-y-auto border-2 border-[#808080] bg-[#d4d0c8] p-1 shadow-[4px_4px_0_#404040]">
-          <div className="flex items-center justify-between bg-[#000080] px-3 py-2 text-white">
-            <DialogTitle className="text-sm font-bold">Bulk Invoice Preflight</DialogTitle>
-            <button type="button" onClick={() => setPreflightOpen(false)} aria-label="Close preflight alerts" className="border-2 border-white bg-[#c0c0c0] px-2 font-bold leading-5 text-black">×</button>
-          </div>
-          <div className="space-y-3 bg-[#c0c0c0] p-4 text-sm">
-            <p className="text-xs text-[#404040]">Review the carrier and broker checks for each ticket before creating the batch.</p>
-            {preflightLoading && <p className="border border-gray-500 bg-white px-3 py-2">Checking all ticket rows…</p>}
-            {preflightError && <p role="alert" className="border border-red-700 bg-red-100 px-3 py-2 text-red-900">{preflightError}</p>}
-            {preflightAlerts.map((alert, index) => (
-              <section key={`${alert.code}-${index}`} className={cn(
-                "border-2 p-3",
-                alert.severity === "block" ? "border-red-800 bg-red-100 text-red-950" : alert.severity === "ack" ? "border-[#777] bg-[#eee] text-black" : "border-blue-700 bg-blue-100 text-blue-950",
-              )}>
-                <strong className="block">{alert.severity === "block" ? "BLOCK — " : alert.severity === "ack" ? "ACKNOWLEDGEMENT REQUIRED — " : "INFORMATION — "}{alert.title || alert.code}</strong>
-                <p className="mt-1">{alert.message}</p>
-                {(alert.link || alert.invoiceId) && <a className="mt-2 inline-block font-bold text-blue-800 underline" href={alert.link || `/invoices/${alert.invoiceId}`} target={alert.link?.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{alert.invoiceNumber ? `View invoice ${alert.invoiceNumber}` : "View matching invoice"}</a>}
-                {!!alert.affectedItems?.length && <div className="mt-2 border-t border-current/30 pt-2"><p className="text-[10px] font-bold uppercase tracking-wide">Affected tickets</p><ul className="mt-1 list-inside list-disc space-y-0.5 text-xs">{alert.affectedItems.map((item) => <li key={item}>{item}</li>)}</ul></div>}
-                {alert.severity === "ack" && <div className="mt-3 border-t border-gray-400 pt-2">
-                  <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={!!acknowledgements[alert.code]?.acknowledged} onChange={(event) => setAcknowledgements((current) => ({ ...current, [alert.code]: { acknowledged: event.target.checked, reason: current[alert.code]?.reason ?? "" } }))} />I have reviewed and acknowledge this alert</label>
-                  <label className="mt-2 block text-xs">Reason (optional)<textarea value={acknowledgements[alert.code]?.reason ?? ""} onChange={(event) => setAcknowledgements((current) => ({ ...current, [alert.code]: { acknowledged: !!current[alert.code]?.acknowledged, reason: event.target.value } }))} className="mt-1 min-h-16 w-full border border-gray-500 bg-white p-2 text-sm" /></label>
+        <DialogContent showCloseButton={false} className="max-h-[84dvh] max-w-2xl grid-cols-1 overflow-y-auto !rounded-[16px] !border-0 !bg-[#e0e0e0] p-5 text-[#333333] !shadow-[-10px_-10px_24px_#ffffff,10px_10px_24px_#b8b8b8] sm:p-6 [&>*]:min-w-0">
+          <DialogHeader className="flex-row items-start justify-between gap-3">
+            <div><DialogTitle className="text-lg font-bold">Bulk Invoice Preflight</DialogTitle><DialogDescription className="mt-1 text-xs text-[#777777]">Review carrier and broker checks for each ticket before creating the batch.</DialogDescription></div>
+            <DialogClose asChild><NeuButton aria-label="Close preflight alerts" className="min-h-9 h-9 w-9 shrink-0 rounded-full p-0"><X className="h-4 w-4" /></NeuButton></DialogClose>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            {preflightLoading && <NeuCard pressed className="rounded-[12px] px-4 py-3 text-xs text-[#666666]">Checking all ticket rows…</NeuCard>}
+            {preflightError && <NeuCard role="alert" className="rounded-[12px] border border-[#d6b1ab] bg-[#f4e5e2] px-4 py-3 text-sm text-[#843f39]">{preflightError}</NeuCard>}
+            {preflightAlerts.map((alert, index) => {
+              const tone = alert.severity === "block" ? "warning" : alert.severity === "ack" ? "accent" : "neutral";
+              const blockStyle = alert.severity === "block" ? "bg-[#f1e4e1]" : alert.severity === "ack" ? "bg-[#e3f0f0]" : "bg-[#e7e9e7]";
+              return <NeuCard key={`${alert.code}-${index}`} className={cn("rounded-[14px] p-4", blockStyle)}>
+                <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm">{alert.title || alert.code}</strong><NeuBadge tone={tone}>{alert.severity === "block" ? "Block" : alert.severity === "ack" ? "Acknowledgement required" : "Information"}</NeuBadge></div>
+                <p className="mt-2 text-sm leading-relaxed text-[#555555]">{alert.message}</p>
+                {(alert.link || alert.invoiceId) && <a className="mt-2 inline-block text-xs font-bold text-[#168b91] underline underline-offset-2" href={alert.link || `/invoices/${alert.invoiceId}`} target={alert.link?.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{alert.invoiceNumber ? `View invoice ${alert.invoiceNumber}` : "View matching invoice"}</a>}
+                {!!alert.affectedItems?.length && <div className="mt-3 border-t border-[#888888]/25 pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-[#666666]">Affected tickets</p><ul className="mt-1 list-inside list-disc space-y-0.5 text-xs text-[#555555]">{alert.affectedItems.map((item) => <li key={item}>{item}</li>)}</ul></div>}
+                {alert.severity === "ack" && <div className="mt-3 border-t border-[#888888]/25 pt-3">
+                  <label className="flex cursor-pointer items-start gap-2 text-xs font-semibold text-[#444444]"><input type="checkbox" className="mt-0.5 accent-[#27aab8]" checked={!!acknowledgements[alert.code]?.acknowledged} onChange={(event) => setAcknowledgements((current) => ({ ...current, [alert.code]: { acknowledged: event.target.checked, reason: current[alert.code]?.reason ?? "" } }))} />I have reviewed and acknowledge this alert</label>
+                  <label className="mt-3 block text-xs font-semibold text-[#666666]">Reason (optional)<textarea value={acknowledgements[alert.code]?.reason ?? ""} onChange={(event) => setAcknowledgements((current) => ({ ...current, [alert.code]: { acknowledged: !!current[alert.code]?.acknowledged, reason: event.target.value } }))} className="mt-1.5 min-h-20 w-full rounded-[12px] border-0 bg-[#e0e0e0] p-3 text-sm font-normal text-[#333333] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8]" /></label>
                 </div>}
-              </section>
-            ))}
-            {nearDuplicateAlert && isManager && <label className="flex items-start gap-2 border-2 border-amber-700 bg-amber-100 p-3 text-amber-950"><input type="checkbox" checked={overrideNearDuplicate} onChange={(event) => setOverrideNearDuplicate(event.target.checked)} /><span><strong>Manager override:</strong> allow creation despite the near-duplicate alert.</span></label>}
-            {preflightAlerts.length === 0 && !preflightLoading && !preflightError && <p className="border border-gray-500 bg-white px-3 py-2">No active preflight alerts.</p>}
-            <div className="flex justify-end gap-2 border-t border-gray-500 pt-3">
-              <Button type="button" variant="outline" onClick={() => setPreflightOpen(false)} className="rounded-none border-2 border-white bg-[#c0c0c0] text-black shadow-[1px_1px_0_#333] hover:bg-[#d0d0d0]">Close</Button>
-              <Button type="button" disabled={preflightLoading || createMutation.isPending || !pendingPayload || unresolvedBlock || unacknowledged || Boolean(preflightError && !preflightAlerts.length)} onClick={continueAfterPreflight} className="rounded-none border-2 border-white bg-[#087d8d] text-white shadow-[1px_1px_0_#333] hover:bg-[#066b79]">{createMutation.isPending ? "Creating…" : "Acknowledge & create batch"}</Button>
+              </NeuCard>;
+            })}
+            {nearDuplicateAlert && isManager && <NeuCard className="rounded-[14px] bg-[#f4eadb] p-4 text-[#73501e]"><label className="flex cursor-pointer items-start gap-2"><input type="checkbox" className="mt-1 accent-[#27aab8]" checked={overrideNearDuplicate} onChange={(event) => setOverrideNearDuplicate(event.target.checked)} /><span className="text-sm"><strong>Manager override:</strong> allow creation despite the near-duplicate alert.</span></label></NeuCard>}
+            {preflightAlerts.length === 0 && !preflightLoading && !preflightError && <NeuCard pressed className="rounded-[12px] px-4 py-3 text-xs text-[#666666]">No active preflight alerts.</NeuCard>}
+            <div className="flex flex-wrap justify-end gap-2 border-t border-[#c9c9c9] pt-4">
+              <NeuButton type="button" onClick={() => setPreflightOpen(false)} className="min-h-10 rounded-[12px] px-4">Close</NeuButton>
+              <NeuButton type="button" variant="accent" disabled={preflightLoading || createMutation.isPending || !pendingPayload || unresolvedBlock || unacknowledged || Boolean(preflightError && !preflightAlerts.length)} onClick={continueAfterPreflight} className="min-h-10 rounded-[12px] px-4">{createMutation.isPending ? "Creating…" : "Acknowledge & create batch"}</NeuButton>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(detail)} onOpenChange={(open) => !open && setDetail(null)}>
-        <DialogContent className="ff-bulk-surface max-h-[90vh] max-w-4xl overflow-y-auto border-2 border-[#808080] bg-[#d4d0c8] p-0">
-          <DialogHeader className="flex-row items-start justify-between border-b-2 border-[#808080] bg-[#c0c0c0] px-4 py-3 pr-12"><div><DialogTitle className="text-sm font-bold text-[#1a1a1a]">{activeDetail?.brokerName || "Bulk invoice batch"}</DialogTitle><p className="mt-1 text-[10px] text-[#444]">Report {shortDate(activeDetail?.reportDateStart)}–{shortDate(activeDetail?.reportDateEnd)} · created by {activeDetail?.createdByName || "Agent"}</p></div><Button variant="outline" size="sm" onClick={() => activeDetail && downloadPdf(activeDetail.id)} className="h-8 gap-1 rounded-sm text-[10px]"><Download className="h-3.5 w-3.5" />Download PDF</Button></DialogHeader>
-          <div className="p-4">{detailQuery.isLoading ? <LoadingRows /> : <><div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">{[["Tickets", activeDetail?.invoiceCount || 0], ["Total rate", money(activeDetail?.totalRate)], ["Report start", date(activeDetail?.reportDateStart)], ["Created", date(activeDetail?.createdAt)]].map(([label, value]) => <div key={String(label)} className="ff-dashboard-card ff-bulk-surface px-2 py-2"><p className="text-[9px] uppercase tracking-wider text-[#718187]">{label}</p><p className="mt-1 text-[12px] font-bold">{value}</p></div>)}</div><div className="ff-table-container ff-bulk-surface overflow-x-auto border border-[#9eabad] bg-white"><table className="ff-data-table min-w-[650px]"><thead><tr><th>Carrier</th><th>Ticket #</th><th>Load #</th><th className="text-right">Rate</th><th>Invoice #</th></tr></thead><tbody>{(activeDetail?.items || []).map((item) => <tr key={item.id}><td>{item.carrierName}</td><td className="font-mono">{item.ticketNumber}</td><td className="font-mono">{item.loadNumber}</td><td className="text-right font-mono font-bold">{money(item.rate)}</td><td className="font-mono text-[#63767d]">{item.invoiceNumber || "Created"}</td></tr>)}</tbody></table>{!activeDetail?.items?.length && <p className="p-8 text-center text-xs text-[#718187]">Ticket detail is not available for this batch.</p>}</div></>}</div>
+        <DialogContent showCloseButton={false} className="max-h-[90dvh] max-w-4xl grid-cols-1 overflow-y-auto !rounded-[16px] !border-0 !bg-[#e0e0e0] p-0 text-[#333333] !shadow-[-10px_-10px_24px_#ffffff,10px_10px_24px_#b8b8b8] [&>*]:min-w-0">
+          <DialogHeader className="flex-row items-start justify-between gap-3 rounded-t-[16px] px-5 py-4 shadow-[0_5px_10px_-9px_#777777] sm:px-6">
+            <div><DialogTitle className="text-lg font-bold">{activeDetail?.brokerName || "Bulk invoice batch"}</DialogTitle><DialogDescription className="mt-1 text-xs text-[#777777]">BATCH-{String(activeDetail?.id || detail?.id || 0).padStart(5, "0")} · Report {shortDate(activeDetail?.reportDateStart)}–{shortDate(activeDetail?.reportDateEnd)} · created by {activeDetail?.createdByName || "Agent"}</DialogDescription></div>
+            <div className="flex shrink-0 items-center gap-2"><NeuButton onClick={() => activeDetail && downloadPdf(activeDetail.id)} className="min-h-9 rounded-[12px] px-3 text-xs"><Download className="h-4 w-4" /><span className="hidden sm:inline">Download PDF</span></NeuButton><DialogClose asChild><NeuButton aria-label="Close batch details" className="min-h-9 h-9 w-9 rounded-full p-0"><X className="h-4 w-4" /></NeuButton></DialogClose></div>
+          </DialogHeader>
+          <div className="space-y-4 px-5 pb-6 sm:px-6">{detailQuery.isLoading ? <LoadingRows /> : <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{[["Tickets", activeDetail?.invoiceCount || 0], ["Total rate", money(activeDetail?.totalRate)], ["Report start", date(activeDetail?.reportDateStart)], ["Created", date(activeDetail?.createdAt)]].map(([label, value]) => <NeuCard key={String(label)} className="rounded-[14px] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-[#1696a3]">{label}</p><p className="mt-2 text-sm font-bold text-[#444444]">{value}</p></NeuCard>)}</div>
+            <NeuTable className="min-w-[650px]"><NeuTableHeader><tr><NeuTableHead>Carrier</NeuTableHead><NeuTableHead>Ticket #</NeuTableHead><NeuTableHead>Load #</NeuTableHead><NeuTableHead className="text-right">Rate</NeuTableHead><NeuTableHead>Invoice #</NeuTableHead></tr></NeuTableHeader><NeuTableBody>{(activeDetail?.items || []).map((item) => <NeuTableRow key={item.id}><NeuTableCell>{item.carrierName}</NeuTableCell><NeuTableCell className="font-mono">{item.ticketNumber}</NeuTableCell><NeuTableCell className="font-mono">{item.loadNumber}</NeuTableCell><NeuTableCell className="text-right font-mono font-bold">{money(item.rate)}</NeuTableCell><NeuTableCell className="font-mono text-[#666666]">{item.invoiceNumber || "Created"}</NeuTableCell></NeuTableRow>)}</NeuTableBody></NeuTable>
+            {!activeDetail?.items?.length && <p className="rounded-[12px] p-8 text-center text-xs text-[#777777]">Ticket detail is not available for this batch.</p>}
+          </>}</div>
         </DialogContent>
       </Dialog>
     </div>

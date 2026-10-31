@@ -9,6 +9,12 @@ Team Chat autocomplete must contain only real, active staff. Example handles are
 
 **How to apply:** Use isolated browser fixtures and rolled-back database writes to verify mentions and bell notifications. Distinguish those checks from live authenticated verification.
 
+Authenticated browser checks must keep sign-in and navigation on the same origin and verify an actual JSON identity response plus protected app content, not HTTP 200 alone.
+
+**Why:** A headless Preview proxy returned intermediary host-header error text while login cookies belonged to loopback. These harness failures falsely looked like inaccessible application screens.
+
+**How to apply:** Confirm the browser origin, the real login flow's session initialization, and the rendered protected route before interaction tests. Do not change application authentication to accommodate a test harness.
+
 Use real pointer event sequences for pointer-driven browser controls rather than assuming a programmatic click exercises the control.
 
 **Why:** A bell-menu fixture falsely failed because its trigger opens on pointer-down; a synthetic click alone did not exercise the actual interaction.
