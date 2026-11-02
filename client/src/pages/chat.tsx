@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data";
-import { AlertCircle, ArrowLeft, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, Users, X, CornerDownRight } from "lucide-react";
+import { AlertCircle, ArrowLeft, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useChatFontSize } from "@/hooks/useChatFontSize";
@@ -17,10 +17,10 @@ import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { MentionAutocomplete, type ChatUser } from "@/components/team-chat/MentionAutocomplete";
-import { MessageBody } from "@/components/team-chat/MessageBody";
 import { GifPicker } from "@/components/team-chat/GifPicker";
 import { gifMessage, type ChatGif } from "@shared/chat-gif";
-import { ThreadPanel, type ChatMessage } from "@/components/team-chat/ThreadPanel";
+import type { ChatMessage } from "@/components/team-chat/ThreadPanel";
+import { ChatMessageItem } from "@/components/team-chat/ChatMessageItem";
 import { ChatAvatar } from "@/components/team-chat/ChatAvatar";
 import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuSelect } from "@/styles/neu/components";
 
@@ -115,8 +115,6 @@ async function getMessagesAfter(channelId: string | number, startingCursor: numb
     cursor = nextCursor;
   }
 }
-
-const timeLabel = (date: string) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(date));
 
 type ChatPanelProps = {
   active: boolean;
@@ -731,23 +729,16 @@ function ChatPanel({ active }: ChatPanelProps) {
           </header>
             <div className="flex-1 overflow-y-auto px-2 py-2">
              {loadingMessages && !messages.length ? <div className="space-y-4" aria-label="Loading messages">{[1, 2, 3].map((item) => <div key={item} className={cn("h-12 animate-pulse rounded-xl bg-[#d7d7d7]", item % 2 === 0 ? "ml-auto max-w-[60%]" : "max-w-[55%]")} />)}</div>
-                : messages.length ? messages.map((message) => <div key={message.id} id={`chat-message-${message.id}`} data-testid="chat-root-message" className={cn("mb-2 flex gap-1.5", String(message.senderId) === String(user?.id) ? "justify-end" : "justify-start", String(message.id) === highlightMessageId && "rounded-sm bg-[#fff0b8] p-1")}>
-                 <ChatAvatar name={message.senderName} profileImageUrl={message.senderProfileImageUrl} className={cn(String(message.senderId) === String(user?.id) && "order-2")} />
-                     <div className={cn("max-w-[84%] min-w-0", String(message.senderId) === String(user?.id) && "text-right")}><div className="mb-0.5 flex flex-wrap items-baseline gap-1 text-[10px] text-[#888]"><span className="font-bold text-[#444]">{message.senderName}</span><span>{timeLabel(message.createdAt)}</span>{message.mentions?.some((mention) => String(mention.userId) === String(user?.id)) && <NeuBadge tone="warning" className="!px-2 !py-0.5 !text-[9px]">Mentioned you</NeuBadge>}</div><div
-                      role="button" tabIndex={0} aria-label={`Open reply thread for ${message.senderName}'s message`}
-                      onClick={(event) => { if (!(event.target as HTMLElement).closest("a")) setThreadRootId(message.id); }}
-                      onKeyDown={(event) => {
-                        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-                          event.preventDefault(); setThreadRootId(message.id);
-                        }
-                      }}
-                       className={cn("inline-block max-w-full cursor-pointer whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 leading-snug focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8]", String(message.senderId) === String(user?.id) ? "bg-[#27aab8]/[0.08]" : "bg-transparent")}><MessageBody body={message.body} mentions={message.mentions} channelId={message.channelId} rootMessageId={message.id} /></div>
-                      <div className={cn("mt-1 flex items-center gap-2 text-[10px]", String(message.senderId) === String(user?.id) && "justify-end")}>
-                         <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-reply-${message.id}`} aria-label={`Reply to ${message.senderName}'s message`} className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold text-[#208894] transition-colors hover:bg-[#27aab8]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8]"><CornerDownRight className="h-3 w-3" />Reply</button>
-                         {message.replyCount > 0 && <button type="button" onClick={() => setThreadRootId(message.id)} data-testid={`chat-replies-${message.id}`} className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold text-[#208894] hover:bg-[#27aab8]/10">{message.replyCount} {message.replyCount === 1 ? "reply" : "replies"}</button>}
-                      </div>
-                    </div>
-              </div>) : <div className="flex h-full flex-col items-center justify-center text-center text-[#707371]"><MessageCircle className="mb-3 h-10 w-10 text-[#8bbfc1]" /><p className="font-semibold">No messages here yet</p><p className="mt-1 text-xs">Send the first note to this conversation.</p></div>}
+                : messages.length ? messages.map((message) => <ChatMessageItem
+                  key={message.id}
+                  message={message}
+                  currentUserId={user?.id}
+                  currentUserRole={user?.role}
+                  active={active}
+                  onChanged={() => { void loadMessages(); }}
+                  initiallyExpanded={String(threadRootId) === String(message.id)}
+                  highlightedMessageId={highlightMessageId}
+                />) : <div className="flex h-full flex-col items-center justify-center text-center text-[#707371]"><MessageCircle className="mb-3 h-10 w-10 text-[#8bbfc1]" /><p className="font-semibold">No messages here yet</p><p className="mt-1 text-xs">Send the first note to this conversation.</p></div>}
             <div ref={bottomRef} />
           </div>
             <div className="mt-2 rounded-xl bg-[#e0e0e0] p-2 shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]"><div className="relative flex items-center gap-2">
@@ -755,7 +746,6 @@ function ChatPanel({ active }: ChatPanelProps) {
               <GifPicker key={String(selected.id)} onSelect={sendGif} />
               <div ref={emojiPickerRef} className="shrink-0"><NeuButton type="button" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="!min-h-9 !w-9 !rounded-lg !p-0 text-[#27aab8]"><Smile className="h-4 w-4" /></NeuButton>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 max-h-[min(420px,calc(100dvh-26rem))] w-[min(352px,calc(100vw-2.5rem))] max-w-full overflow-auto rounded-2xl bg-[#e0e0e0] p-2 shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] [--rgb-background:224,224,224] [--rgb-input:224,224,224] [--rgb-color:51,51,51] [--rgb-accent:39,170,184] [&_em-emoji-picker]:!w-full"><Picker data={emojiPickerData} dynamicWidth onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><NeuButton variant="accent" onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="!min-h-9 !w-9 !rounded-lg !p-0"><Send className="h-4 w-4" /></NeuButton></div></div>
             </div>
-            {threadRootId !== null && <ThreadPanel channelId={selected.id} rootId={threadRootId} currentUserId={user?.id} active={active} onClose={() => setThreadRootId(null)} onChanged={() => { void loadMessages(); }} highlightedMessageId={highlightMessageId} />}
             </div> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
           </NeuCard>
         </div>

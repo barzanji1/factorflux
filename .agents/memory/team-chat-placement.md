@@ -9,6 +9,12 @@ Team Chat belongs in the sidebar and opens as a full page in the main content ar
 
 **How to apply:** Future chat changes must retain this placement and existing notification behavior, including sounds while working elsewhere in the app.
 
+Reply threads belong inline beneath their parent message, not in a separate side panel. Keep threads collapsed initially, with a reply count and latest-reply preview.
+
+**Why:** The user requested inline, indented conversations while retaining the existing neumorphic chat styling and readable main stream.
+
+**How to apply:** Preserve inline thread placement in future chat redesigns; replies must not appear as new top-level channel messages.
+
 Chat text size is a personal preference for the entire Team Chat view, not an application-wide font setting and not a shared conversation setting.
 
 **Why:** The user explicitly requested that agents choose Small / Medium / Large independently and that another agent's view and the rest of the app remain unaffected.

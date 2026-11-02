@@ -6,7 +6,7 @@ import { db, pool } from "../db";
 import { chatChannels, chatMembers, chatMessages, notifications, users, userPermissions } from "@shared/schema";
 import {
   chatPostSchema, createChatMessage, getChatThread, getMentionStaff,
-  isRealActiveStaff, resolveMentions, staffWithHandles,
+  isRealActiveStaff, resolveMentions, staffWithHandles, editChatMessage, deleteChatMessage, visibleChatMessage,
 } from "./chatMessaging";
 
 after(async () => { await pool.end(); });
@@ -138,4 +138,61 @@ test("real database: a failed bell write rolls back the message too", async () =
     await createChatMessage(broken, channel.id, senderId, { body });
   }), error => error === failure);
   assert.equal((await db.select().from(chatMessages).where(eq(chatMessages.body, body))).length, 0);
+});
+
+test("real database: edits preserve original; author-only edits, scoped management deletes, soft deletion and live threads", async () => {
+  const [author, peer, manager, admin, outsider] = Array.from({ length: 5 }, () => randomUUID());
+  const rollback = new Error("Rollback message audit fixtures");
+  await assert.rejects(db.transaction(async tx => {
+    await tx.insert(users).values([
+      { id: author, firstName: "AuditAuthor", role: "employee", status: "active" },
+      { id: peer, firstName: "AuditPeer", role: "employee", status: "active" },
+      { id: manager, firstName: "AuditManager", role: "manager", status: "active" },
+      { id: admin, firstName: "AuditAdmin", role: "admin", status: "active" },
+      { id: outsider, firstName: "AuditOutside", role: "admin", status: "active" },
+    ]);
+    const [channel] = await tx.insert(chatChannels).values({ name: `audit-${randomUUID()}`, type: "direct" }).returning();
+    await tx.insert(chatMembers).values([author, peer, manager, admin].map(userId => ({ channelId: channel.id, userId })));
+    const root = await createChatMessage(tx, channel.id, author, { body: "Original topic" });
+    const reply = await createChatMessage(tx, channel.id, peer, { body: "Original reply", parentMessageId: root.id });
+    for (const actor of [peer, manager, admin]) {
+      await assert.rejects(editChatMessage(tx, channel.id, root.id, actor, { body: "Unauthorized" }), /Only the author/);
+    }
+    await assert.rejects(editChatMessage(tx, channel.id, root.id, outsider, { body: "Unauthorized" }), /access required/);
+    await assert.rejects(deleteChatMessage(tx, channel.id, root.id, peer), /Only the author or a manager/);
+    await assert.rejects(deleteChatMessage(tx, channel.id, root.id, outsider), /access required/);
+    await assert.rejects(editChatMessage(tx, channel.id, root.id, author, { body: "   " }));
+    await assert.rejects(editChatMessage(tx, channel.id, root.id, author, { body: "x", senderId: peer }));
+    await editChatMessage(tx, channel.id, root.id, author, { body: "First edit" });
+    await editChatMessage(tx, channel.id, root.id, author, { body: "Second edit" });
+    const [audit] = await tx.select().from(chatMessages).where(eq(chatMessages.id, root.id));
+    assert.equal(audit.originalText, "Original topic");
+    assert.equal(audit.body, "Second edit");
+    assert(audit.editedAt instanceof Date);
+    await editChatMessage(tx, channel.id, reply.id, peer, { body: "Updated reply" });
+    let thread = await getChatThread(tx, channel.id, root.id, author);
+    assert.equal(thread.parent.replyCount, 1);
+    assert.equal(thread.parent.latestReply?.body, "Updated reply");
+    assert(thread.replies[0].editedAt);
+    await deleteChatMessage(tx, channel.id, reply.id, manager);
+    thread = await getChatThread(tx, channel.id, root.id, author);
+    assert.equal(thread.replies.length, 0);
+    assert.equal(thread.parent.replyCount, 0);
+    assert.equal(thread.parent.latestReply, null);
+    const [deleted] = await tx.select().from(chatMessages).where(eq(chatMessages.id, reply.id));
+    assert.equal(deleted.deletedBy, manager);
+    assert(deleted.deletedAt instanceof Date);
+    assert.equal(deleted.originalText, "Original reply");
+    await assert.rejects(editChatMessage(tx, channel.id, reply.id, peer, { body: "Resurrect" }), /not found/);
+    const secondReply = await createChatMessage(tx, channel.id, peer, { body: "Keep for audit", parentMessageId: root.id });
+    await deleteChatMessage(tx, channel.id, root.id, admin);
+    assert.equal((await tx.select().from(chatMessages).where(and(eq(chatMessages.channelId, channel.id), visibleChatMessage))).length, 0);
+    assert.equal((await tx.select().from(chatMessages).where(eq(chatMessages.id, secondReply.id))).length, 1, "deleting a parent retains reply audit data");
+    await assert.rejects(getChatThread(tx, channel.id, root.id, author), /Thread not found/);
+    await assert.rejects(createChatMessage(tx, channel.id, author, { body: "New reply", parentMessageId: root.id }), /not found/);
+    const own = await createChatMessage(tx, channel.id, author, { body: "Own delete" });
+    await deleteChatMessage(tx, channel.id, own.id, author);
+    throw rollback;
+  }), error => error === rollback);
+  assert.equal((await db.select().from(users).where(eq(users.id, author))).length, 0);
 });

@@ -60,7 +60,7 @@ import { ClientEmailError, clientEmailSchema, sendClientEmail } from "./services
 import { SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO } from "./emailConfig";
 import {
   assertChatMembership, chatMessageSelection, ChatMessageError,
-  createChatMessage, getChatThread, getMentionStaff,
+  createChatMessage, getChatThread, getMentionStaff, editChatMessage, deleteChatMessage, visibleChatMessage,
 } from "./services/chatMessaging";
 import {
   ChatChannelNameConflict,
@@ -5386,7 +5386,7 @@ ${message}
         }).from(chatMembers).innerJoin(users, eq(users.id, chatMembers.userId))
           .where(eq(chatMembers.channelId, channel.id));
         const unread = await db.select({ count: count() }).from(chatMessages)
-          .where(and(eq(chatMessages.channelId, channel.id),
+          .where(and(eq(chatMessages.channelId, channel.id), visibleChatMessage,
             membership?.lastReadAt ? sql`${chatMessages.createdAt} > ${membership.lastReadAt}` : sql`true`));
         const directOther = channel.type === "direct" ? members.find(member => member.id !== userId) : undefined;
         return {
@@ -5511,7 +5511,7 @@ ${message}
           ? and(eq(chatMessages.channelId, channelId), gt(chatMessages.createdAt, after))
           : and(eq(chatMessages.channelId, channelId), sql`${chatMessages.parentMessageId} IS NULL`);
       const messages = await db.select(chatMessageSelection).from(chatMessages).innerJoin(users, eq(users.id, chatMessages.senderId))
-        .where(messageFilter)
+        .where(and(messageFilter, visibleChatMessage))
         .orderBy(...(afterId !== undefined
           ? [asc(chatMessages.id)]
           : [desc(chatMessages.createdAt), desc(chatMessages.id)]))
@@ -5572,12 +5572,42 @@ ${message}
     }
   });
 
+  app.patch("/api/chat/channels/:id/messages/:messageId", chatPermission, async (req: any, res) => {
+    try {
+      const channelId = chatChannelIdSchema.parse(req.params.id);
+      const messageId = chatChannelIdSchema.parse(req.params.messageId);
+      await assertChatMembership(db, channelId, req.user.id);
+      if (typeof req.body?.body === "string" && req.body.body.includes("[giphy:")) {
+        await giphy.validateMessage(req.body.body);
+      }
+      res.json(await db.transaction(tx => editChatMessage(tx, channelId, messageId, req.user.id, req.body)));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid message" });
+      if (error instanceof ChatMessageError || error instanceof GiphyError) return res.status(error.statusCode).json({ message: error.message });
+      console.error("Error editing chat message:", error);
+      res.status(500).json({ message: "Failed to edit chat message" });
+    }
+  });
+
+  app.delete("/api/chat/channels/:id/messages/:messageId", chatPermission, async (req: any, res) => {
+    try {
+      const channelId = chatChannelIdSchema.parse(req.params.id);
+      const messageId = chatChannelIdSchema.parse(req.params.messageId);
+      res.json(await db.transaction(tx => deleteChatMessage(tx, channelId, messageId, req.user.id)));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid message ID" });
+      if (error instanceof ChatMessageError) return res.status(error.statusCode).json({ message: error.message });
+      console.error("Error deleting chat message:", error);
+      res.status(500).json({ message: "Failed to delete chat message" });
+    }
+  });
+
   app.get("/api/chat/unread-count", chatPermission, async (req: any, res) => {
     try {
       await ensurePublicChatMembership(req.user.id);
       const rows = await db.select({ count: count() }).from(chatMessages)
         .innerJoin(chatMembers, and(eq(chatMembers.channelId, chatMessages.channelId), eq(chatMembers.userId, req.user.id)))
-        .where(sql`${chatMembers.lastReadAt} IS NULL OR ${chatMessages.createdAt} > ${chatMembers.lastReadAt}`);
+        .where(and(visibleChatMessage, sql`${chatMembers.lastReadAt} IS NULL OR ${chatMessages.createdAt} > ${chatMembers.lastReadAt}`));
       const unreadCount = Number(rows[0]?.count ?? 0);
       res.json({ count: unreadCount, unreadCount });
     } catch (error) {

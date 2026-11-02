@@ -20,6 +20,8 @@ export type ChatMessage = {
   parentMessageId: number | null;
   mentions: MessageMention[];
   replyCount: number;
+  editedAt?: string | null;
+  latestReply?: { id: string | number; body: string; senderName: string; senderProfileImageUrl?: string | null; createdAt: string } | null;
 };
 
 async function getThreadPage(channelId: string | number, messageId: string | number, afterId: number) {

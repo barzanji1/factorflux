@@ -2677,13 +2677,16 @@ export const chatMessages = pgTable("chat_messages", {
   mentions: jsonb("mentions").$type<ChatMention[]>().default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   editedAt: timestamp("edited_at"),
+  originalText: text("original_text"),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by").references(() => users.id),
 }, (table) => [
   index("chat_messages_channel_created_idx").on(table.channelId, table.createdAt),
   index("chat_messages_thread_idx").on(table.channelId, table.parentMessageId, table.id),
 ]);
 
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
-  id: true, createdAt: true, editedAt: true,
+  id: true, createdAt: true, editedAt: true, originalText: true, deletedAt: true, deletedBy: true,
 }).extend({ body: z.string().trim().min(1).max(10000) });
 export type ChatChannel = typeof chatChannels.$inferSelect;
 export type ChatMember = typeof chatMembers.$inferSelect;
