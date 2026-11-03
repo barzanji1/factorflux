@@ -33,6 +33,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
 import ChargebackReport from "@/components/reports/chargeback-report";
 import AgingReport from "@/components/reports/aging-report";
+import { CustomizeColumns, useReportColumns, type ReportColumn, type SavedTemplate } from "@/components/reports/report-customization";
 import {
   Win95Tabs,
   Win95TabsList,
@@ -135,6 +136,17 @@ type AgentRow = { agentId: string | null; agentName: string; count: number; tota
 function AgentTab() {
   const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
   const [end,   setEnd  ] = useState(format(new Date(), "yyyy-MM-dd"));
+  const { user } = useAuth();
+  const columns: ReportColumn[] = [
+    { key: "agent", label: "Agent" }, { key: "invoices", label: "Invoices" }, { key: "totalAmount", label: "Total volume" },
+    { key: "totalFunded", label: "Total funded" }, { key: "avgDaysToFund", label: "Avg days to fund" }, { key: "fundedPct", label: "Funded %" },
+  ];
+  const prefs = useReportColumns("agent", user?.id, columns, { start, end });
+  const applyTemplate = (template: SavedTemplate) => {
+    const filters = prefs.applyTemplate(template);
+    if (filters.start) setStart(filters.start);
+    if (filters.end) setEnd(filters.end);
+  };
 
   const { data = [], isLoading } = useQuery<AgentRow[]>({
     queryKey: ["/api/reports/agent", start, end],
@@ -148,45 +160,50 @@ function AgentTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <DateRange start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
-        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("agent_report.csv", sorted.map(r => ({ agent: r.agentName, invoices: r.count, total_amount: r.totalAmount.toFixed(2), total_funded: r.totalFunded.toFixed(2), avg_days_to_fund: r.avgDaysToFund ?? "" })))}>
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
+        <div className="flex gap-2"><CustomizeColumns columns={columns} visible={prefs.visible} onChange={prefs.setVisible} templates={prefs.templates} onSave={prefs.saveTemplate} onApply={applyTemplate} onDelete={prefs.deleteTemplate} />
+        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("agent_report.csv", sorted.map(r => {
+          const pct = r.totalAmount > 0 ? (r.totalFunded / r.totalAmount) * 100 : 0;
+          const values: Record<string, unknown> = { agent: r.agentName, invoices: r.count, totalAmount: r.totalAmount.toFixed(2), totalFunded: r.totalFunded.toFixed(2), avgDaysToFund: r.avgDaysToFund ?? "", fundedPct: `${pct.toFixed(0)}%` };
+          return Object.fromEntries(columns.filter(c => prefs.visible.includes(c.key)).map(c => [c.label, values[c.key]]));
+        }))}>
+          <Download className="h-3.5 w-3.5" /> Export visible
+        </Button></div>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
         <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              {["Agent", "Invoices", "Total Volume", "Total Funded", "Avg Days to Fund", "Funded %"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{h}</th>
+              {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
+                <th key={c.key} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{c.label}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {isLoading ? <SkeletonRows cols={6} /> : sorted.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">No data for selected range.</td></tr>
+            {isLoading ? <SkeletonRows cols={prefs.visible.length} /> : sorted.length === 0 ? (
+              <tr><td colSpan={prefs.visible.length} className="px-4 py-12 text-center text-sm text-slate-400">No data for selected range.</td></tr>
             ) : sorted.map(row => {
               const pct = row.totalAmount > 0 ? (row.totalFunded / row.totalAmount) * 100 : 0;
               return (
                 <tr key={row.agentId ?? "unassigned"} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{row.agentName}</td>
-                  <td className="px-4 py-3 tabular-nums">{row.count}</td>
-                  <td className="px-4 py-3 tabular-nums font-medium">{fmt(row.totalAmount)}</td>
-                  <td className="px-4 py-3">
+                  {prefs.visible.includes("agent") && <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{row.agentName}</td>}
+                  {prefs.visible.includes("invoices") && <td className="px-4 py-3 tabular-nums">{row.count}</td>}
+                  {prefs.visible.includes("totalAmount") && <td className="px-4 py-3 tabular-nums font-medium">{fmt(row.totalAmount)}</td>}
+                  {prefs.visible.includes("totalFunded") && <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700">
                         <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${maxFunded > 0 ? (row.totalFunded / maxFunded) * 100 : 0}%` }} />
                       </div>
                       <span className="tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{fmt(row.totalFunded)}</span>
                     </div>
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">{row.avgDaysToFund != null ? `${row.avgDaysToFund}d` : "—"}</td>
-                  <td className="px-4 py-3">
+                  </td>}
+                  {prefs.visible.includes("avgDaysToFund") && <td className="px-4 py-3 tabular-nums">{row.avgDaysToFund != null ? `${row.avgDaysToFund}d` : "—"}</td>}
+                  {prefs.visible.includes("fundedPct") && <td className="px-4 py-3">
                     <span className={cn("text-[11px] font-semibold px-1.5 py-0.5 rounded",
                       pct >= 80 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" :
                       pct >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" :
                                   "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
                     )}>{pct.toFixed(0)}%</span>
-                  </td>
+                  </td>}
                 </tr>
               );
             })}
@@ -204,6 +221,13 @@ type BrokerRow = { brokerId: number | null; debtorId: number | null; brokerName:
 function BrokerTab() {
   const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
   const [end,   setEnd  ] = useState(format(new Date(), "yyyy-MM-dd"));
+  const { user } = useAuth();
+  const columns: ReportColumn[] = [
+    { key: "brokerName", label: "Broker" }, { key: "invoiceCount", label: "Invoices" }, { key: "totalVolume", label: "Total volume" },
+    { key: "outstanding", label: "Outstanding" }, { key: "paid", label: "Paid" }, { key: "creditLimit", label: "Credit limit" }, { key: "avgDaysToPay", label: "Avg days to pay" },
+  ];
+  const prefs = useReportColumns("broker", user?.id, columns, { start, end });
+  const applyTemplate = (template: SavedTemplate) => { const f = prefs.applyTemplate(template); if (f.start) setStart(f.start); if (f.end) setEnd(f.end); };
 
   const { data = [], isLoading } = useQuery<BrokerRow[]>({
     queryKey: ["/api/reports/broker", start, end],
@@ -214,40 +238,44 @@ function BrokerTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <DateRange start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
-        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("broker_report.csv", data.map(r => ({ broker: r.brokerName, invoices: r.invoiceCount, total_volume: r.totalVolume.toFixed(2), outstanding: r.outstanding.toFixed(2), paid: r.paid.toFixed(2), credit_limit: r.creditLimit ?? "", avg_days_to_pay: r.avgDaysToPay ?? "" })))}>
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
+        <div className="flex gap-2"><CustomizeColumns columns={columns} visible={prefs.visible} onChange={prefs.setVisible} templates={prefs.templates} onSave={prefs.saveTemplate} onApply={applyTemplate} onDelete={prefs.deleteTemplate} />
+        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("broker_report.csv", data.map(r => {
+          const values: Record<string, unknown> = { brokerName: r.brokerName, invoiceCount: r.invoiceCount, totalVolume: r.totalVolume.toFixed(2), outstanding: r.outstanding.toFixed(2), paid: r.paid.toFixed(2), creditLimit: r.creditLimit ?? "", avgDaysToPay: r.avgDaysToPay ?? "" };
+          return Object.fromEntries(columns.filter(c => prefs.visible.includes(c.key)).map(c => [c.label, values[c.key]]));
+        }))}>
+          <Download className="h-3.5 w-3.5" /> Export visible
+        </Button></div>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
         <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              {["Broker", "Invoices", "Total Volume", "Outstanding", "Paid", "Credit Limit", "Avg Days to Pay"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
+              {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
+                <th key={c.key} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap">{c.label}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {isLoading ? <SkeletonRows cols={7} /> : data.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">No data for selected range.</td></tr>
+            {isLoading ? <SkeletonRows cols={prefs.visible.length} /> : data.length === 0 ? (
+              <tr><td colSpan={prefs.visible.length} className="px-4 py-12 text-center text-sm text-slate-400">No data for selected range.</td></tr>
             ) : data.map((row, index) => {
               const utilizationPct = row.creditLimit && row.creditLimit > 0 ? (row.outstanding / row.creditLimit) * 100 : null;
               return (
                 <tr key={`${row.debtorId ?? "unknown"}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{row.brokerName}</td>
-                  <td className="px-4 py-3 tabular-nums">{row.invoiceCount}</td>
-                  <td className="px-4 py-3 tabular-nums font-medium">{fmt(row.totalVolume)}</td>
-                  <td className="px-4 py-3">
+                  {prefs.visible.includes("brokerName") && <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{row.brokerName}</td>}
+                  {prefs.visible.includes("invoiceCount") && <td className="px-4 py-3 tabular-nums">{row.invoiceCount}</td>}
+                  {prefs.visible.includes("totalVolume") && <td className="px-4 py-3 tabular-nums font-medium">{fmt(row.totalVolume)}</td>}
+                  {prefs.visible.includes("outstanding") && <td className="px-4 py-3">
                     <span className={cn("tabular-nums font-semibold", row.outstanding > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400")}>{fmt(row.outstanding)}</span>
                     {utilizationPct != null && (
                       <div className="mt-1 w-16 h-1 rounded-full bg-slate-100 dark:bg-slate-700">
                         <div className={cn("h-1 rounded-full", utilizationPct > 80 ? "bg-red-500" : utilizationPct > 50 ? "bg-amber-400" : "bg-emerald-500")} style={{ width: `${Math.min(utilizationPct, 100)}%` }} />
                       </div>
                     )}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(row.paid)}</td>
-                  <td className="px-4 py-3 tabular-nums text-slate-500">{row.creditLimit != null ? fmt(row.creditLimit) : "—"}</td>
-                  <td className="px-4 py-3 tabular-nums">{row.avgDaysToPay != null ? `${row.avgDaysToPay}d` : "—"}</td>
+                  </td>}
+                  {prefs.visible.includes("paid") && <td className="px-4 py-3 tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(row.paid)}</td>}
+                  {prefs.visible.includes("creditLimit") && <td className="px-4 py-3 tabular-nums text-slate-500">{row.creditLimit != null ? fmt(row.creditLimit) : "—"}</td>}
+                  {prefs.visible.includes("avgDaysToPay") && <td className="px-4 py-3 tabular-nums">{row.avgDaysToPay != null ? `${row.avgDaysToPay}d` : "—"}</td>}
                 </tr>
               );
             })}
@@ -265,6 +293,13 @@ type CarrierRow = { clientId: number; carrierName: string; invoiceCount: number;
 function CarrierTab() {
   const [start, setStart] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
   const [end,   setEnd  ] = useState(format(new Date(), "yyyy-MM-dd"));
+  const { user } = useAuth();
+  const columns: ReportColumn[] = [
+    { key: "carrierName", label: "Carrier" }, { key: "invoiceCount", label: "Invoices" }, { key: "totalFunded", label: "Total funded" },
+    { key: "outstanding", label: "Outstanding" }, { key: "avgInvoiceSize", label: "Avg invoice size" },
+  ];
+  const prefs = useReportColumns("carrier", user?.id, columns, { start, end });
+  const applyTemplate = (template: SavedTemplate) => { const f = prefs.applyTemplate(template); if (f.start) setStart(f.start); if (f.end) setEnd(f.end); };
 
   const { data = [], isLoading } = useQuery<CarrierRow[]>({
     queryKey: ["/api/reports/carrier", start, end],
@@ -275,29 +310,33 @@ function CarrierTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <DateRange start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
-        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("carrier_report.csv", data.map(r => ({ carrier: r.carrierName, invoices: r.invoiceCount, total_funded: r.totalFunded.toFixed(2), outstanding: r.outstanding.toFixed(2), avg_invoice: r.avgInvoiceSize.toFixed(2) })))}>
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
+        <div className="flex gap-2"><CustomizeColumns columns={columns} visible={prefs.visible} onChange={prefs.setVisible} templates={prefs.templates} onSave={prefs.saveTemplate} onApply={applyTemplate} onDelete={prefs.deleteTemplate} />
+        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("carrier_report.csv", data.map(r => {
+          const values: Record<string, unknown> = { carrierName: r.carrierName, invoiceCount: r.invoiceCount, totalFunded: r.totalFunded.toFixed(2), outstanding: r.outstanding.toFixed(2), avgInvoiceSize: r.avgInvoiceSize.toFixed(2) };
+          return Object.fromEntries(columns.filter(c => prefs.visible.includes(c.key)).map(c => [c.label, values[c.key]]));
+        }))}>
+          <Download className="h-3.5 w-3.5" /> Export visible
+        </Button></div>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
         <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              {["Carrier", "Invoices", "Total Funded", "Outstanding", "Avg Invoice Size"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
+              {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
+                <th key={c.key} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap">{c.label}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {isLoading ? <SkeletonRows cols={5} /> : data.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-400">No data for selected range.</td></tr>
+            {isLoading ? <SkeletonRows cols={prefs.visible.length} /> : data.length === 0 ? (
+              <tr><td colSpan={prefs.visible.length} className="px-4 py-12 text-center text-sm text-slate-400">No data for selected range.</td></tr>
             ) : data.map(row => (
               <tr key={row.clientId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{row.carrierName}</td>
-                <td className="px-4 py-3 tabular-nums">{row.invoiceCount}</td>
-                <td className="px-4 py-3 tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{fmt(row.totalFunded)}</td>
-                <td className="px-4 py-3 tabular-nums text-amber-600 dark:text-amber-400 font-medium">{fmt(row.outstanding)}</td>
-                <td className="px-4 py-3 tabular-nums text-slate-500">{fmt(row.avgInvoiceSize)}</td>
+                {prefs.visible.includes("carrierName") && <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{row.carrierName}</td>}
+                {prefs.visible.includes("invoiceCount") && <td className="px-4 py-3 tabular-nums">{row.invoiceCount}</td>}
+                {prefs.visible.includes("totalFunded") && <td className="px-4 py-3 tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{fmt(row.totalFunded)}</td>}
+                {prefs.visible.includes("outstanding") && <td className="px-4 py-3 tabular-nums text-amber-600 dark:text-amber-400 font-medium">{fmt(row.outstanding)}</td>}
+                {prefs.visible.includes("avgInvoiceSize") && <td className="px-4 py-3 tabular-nums text-slate-500">{fmt(row.avgInvoiceSize)}</td>}
               </tr>
             ))}
           </tbody>
@@ -312,27 +351,35 @@ function CarrierTab() {
 type DailyAR = { totalAR: number; outstanding: number; collectedToday: number; newToday: number; date: string };
 
 function DailyARTab() {
+  const { user } = useAuth();
   const { data, isLoading } = useQuery<DailyAR>({ queryKey: ["/api/reports/daily-ar"] });
+  const columns: ReportColumn[] = [{ key: "date", label: "Date" }, { key: "totalAR", label: "Total AR" }, { key: "outstanding", label: "Outstanding" }, { key: "collectedToday", label: "Collected today" }, { key: "newToday", label: "New today" }];
+  const prefs = useReportColumns("daily-ar", user?.id, columns, {});
+  const applyTemplate = (template: SavedTemplate) => { prefs.applyTemplate(template); };
   const collectRate = data && data.totalAR > 0 ? (data.collectedToday / data.totalAR) * 100 : 0;
-  const csvRow = data ? [{ date: format(new Date(data.date), "yyyy-MM-dd"), total_ar: data.totalAR.toFixed(2), outstanding: data.outstanding.toFixed(2), collected_today: data.collectedToday.toFixed(2), new_today: data.newToday.toFixed(2) }] : [];
+  const csvRow = data ? [Object.fromEntries(columns.filter(c => prefs.visible.includes(c.key)).map(c => [c.label, ({
+    date: format(new Date(data.date), "yyyy-MM-dd"), totalAR: data.totalAR.toFixed(2), outstanding: data.outstanding.toFixed(2),
+    collectedToday: data.collectedToday.toFixed(2), newToday: data.newToday.toFixed(2),
+  } as Record<string, string>)[c.key]]))] : [];
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500 dark:text-slate-400">Snapshot as of {format(new Date(), "MMMM d, yyyy")}</p>
+        <div className="flex gap-2"><CustomizeColumns columns={columns} visible={prefs.visible} onChange={prefs.setVisible} templates={prefs.templates} onSave={prefs.saveTemplate} onApply={applyTemplate} onDelete={prefs.deleteTemplate} />
         <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv("daily_ar.csv", csvRow)}>
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
+          <Download className="h-3.5 w-3.5" /> Export visible
+        </Button></div>
       </div>
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="ff-reports-surface h-28 bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatTile label="Total AR"        value={fmtShort(data?.totalAR ?? 0)}        color="blue"  />
-            <StatTile label="Outstanding"     value={fmtShort(data?.outstanding ?? 0)}    color="amber" />
-            <StatTile label="Collected Today" value={fmtShort(data?.collectedToday ?? 0)} color="green" />
-            <StatTile label="New Today"       value={fmtShort(data?.newToday ?? 0)}       color="slate" />
+            {prefs.visible.includes("totalAR") && <StatTile label="Total AR" value={fmtShort(data?.totalAR ?? 0)} color="blue" />}
+            {prefs.visible.includes("outstanding") && <StatTile label="Outstanding" value={fmtShort(data?.outstanding ?? 0)} color="amber" />}
+            {prefs.visible.includes("collectedToday") && <StatTile label="Collected Today" value={fmtShort(data?.collectedToday ?? 0)} color="green" />}
+            {prefs.visible.includes("newToday") && <StatTile label="New Today" value={fmtShort(data?.newToday ?? 0)} color="slate" />}
           </div>
 
           <Card className="border border-slate-200 dark:border-slate-700">
@@ -351,8 +398,8 @@ function DailyARTab() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="border border-slate-200 dark:border-slate-700">
+          {(prefs.visible.includes("collectedToday") || prefs.visible.includes("outstanding")) && <div className="grid grid-cols-2 gap-3">
+            {prefs.visible.includes("collectedToday") && <Card className="border border-slate-200 dark:border-slate-700">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-2">
                   <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -362,8 +409,8 @@ function DailyARTab() {
                   <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{fmt(data?.collectedToday ?? 0)}</p>
                 </div>
               </CardContent>
-            </Card>
-            <Card className="border border-slate-200 dark:border-slate-700">
+            </Card>}
+            {prefs.visible.includes("outstanding") && <Card className="border border-slate-200 dark:border-slate-700">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-2">
                   <TrendingDown className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -373,8 +420,8 @@ function DailyARTab() {
                   <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{fmt(data?.outstanding ?? 0)}</p>
                 </div>
               </CardContent>
-            </Card>
-          </div>
+            </Card>}
+          </div>}
         </>
       )}
     </div>
@@ -388,6 +435,10 @@ type MonthlyData = { year: number; months: MonthRow[] };
 
 function MonthlyTab() {
   const [year, setYear] = useState(new Date().getFullYear());
+  const { user } = useAuth();
+  const columns: ReportColumn[] = [{ key: "label", label: "Month" }, { key: "invoiceCount", label: "Invoices" }, { key: "totalVolume", label: "Volume" }, { key: "totalAdvanced", label: "Advanced" }, { key: "totalFees", label: "Fees" }, { key: "feeRate", label: "Fee rate" }];
+  const prefs = useReportColumns("monthly", user?.id, columns, { year: String(year) });
+  const applyTemplate = (template: SavedTemplate) => { const f = prefs.applyTemplate(template); if (f.year && /^\d{4}$/.test(f.year)) setYear(Number(f.year)); };
 
   const { data, isLoading } = useQuery<MonthlyData>({
     queryKey: ["/api/reports/monthly", year],
@@ -411,9 +462,13 @@ function MonthlyTab() {
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 w-12 text-center">{year}</span>
           <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => setYear(y => y + 1)}>›</Button>
         </div>
-        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv(`monthly_${year}.csv`, months.map(m => ({ month: m.label, invoices: m.invoiceCount, volume: m.totalVolume.toFixed(2), advanced: m.totalAdvanced.toFixed(2), fees: m.totalFees.toFixed(2) })))}>
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
+        <div className="flex gap-2"><CustomizeColumns columns={columns} visible={prefs.visible} onChange={prefs.setVisible} templates={prefs.templates} onSave={prefs.saveTemplate} onApply={applyTemplate} onDelete={prefs.deleteTemplate} />
+        <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => exportCsv(`monthly_${year}.csv`, months.map(m => {
+          const values: Record<string, unknown> = { label: m.label, invoiceCount: m.invoiceCount, totalVolume: m.totalVolume.toFixed(2), totalAdvanced: m.totalAdvanced.toFixed(2), totalFees: m.totalFees.toFixed(2), feeRate: m.totalVolume > 0 ? `${((m.totalFees / m.totalVolume) * 100).toFixed(2)}%` : "" };
+          return Object.fromEntries(columns.filter(c => prefs.visible.includes(c.key)).map(c => [c.label, values[c.key]]));
+        }))}>
+          <Download className="h-3.5 w-3.5" /> Export visible
+        </Button></div>
       </div>
 
       <div className="grid grid-cols-4 gap-3">
@@ -457,35 +512,35 @@ function MonthlyTab() {
         <table className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              {["Month", "Invoices", "Volume", "Advanced", "Fees", "Fee Rate"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{h}</th>
+              {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
+                <th key={c.key} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{c.label}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {isLoading ? <SkeletonRows cols={6} rows={12} /> : months.map(m => {
+            {isLoading ? <SkeletonRows cols={prefs.visible.length} rows={12} /> : months.map(m => {
               const feeRate = m.totalVolume > 0 ? (m.totalFees / m.totalVolume) * 100 : 0;
               const isCur = m.month === curMonth && year === curYear;
               return (
                 <tr key={m.month} className={cn("hover:bg-slate-50 dark:hover:bg-slate-800/40", isCur && "font-semibold bg-blue-50/40 dark:bg-blue-950/10")}>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{m.label} {year}</td>
-                  <td className="px-4 py-3 tabular-nums">{m.invoiceCount || "—"}</td>
-                  <td className="px-4 py-3 tabular-nums">{m.totalVolume > 0 ? fmt(m.totalVolume) : "—"}</td>
-                  <td className="px-4 py-3 tabular-nums text-emerald-600 dark:text-emerald-400">{m.totalAdvanced > 0 ? fmt(m.totalAdvanced) : "—"}</td>
-                  <td className="px-4 py-3 tabular-nums text-blue-600 dark:text-blue-400">{m.totalFees > 0 ? fmt(m.totalFees) : "—"}</td>
-                  <td className="px-4 py-3 tabular-nums text-slate-500">{m.totalVolume > 0 ? `${feeRate.toFixed(2)}%` : "—"}</td>
+                  {prefs.visible.includes("label") && <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{m.label} {year}</td>}
+                  {prefs.visible.includes("invoiceCount") && <td className="px-4 py-3 tabular-nums">{m.invoiceCount || "—"}</td>}
+                  {prefs.visible.includes("totalVolume") && <td className="px-4 py-3 tabular-nums">{m.totalVolume > 0 ? fmt(m.totalVolume) : "—"}</td>}
+                  {prefs.visible.includes("totalAdvanced") && <td className="px-4 py-3 tabular-nums text-emerald-600 dark:text-emerald-400">{m.totalAdvanced > 0 ? fmt(m.totalAdvanced) : "—"}</td>}
+                  {prefs.visible.includes("totalFees") && <td className="px-4 py-3 tabular-nums text-blue-600 dark:text-blue-400">{m.totalFees > 0 ? fmt(m.totalFees) : "—"}</td>}
+                  {prefs.visible.includes("feeRate") && <td className="px-4 py-3 tabular-nums text-slate-500">{m.totalVolume > 0 ? `${feeRate.toFixed(2)}%` : "—"}</td>}
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 font-semibold">
-              <td className="px-4 py-3 text-slate-700 dark:text-slate-200">Total {year}</td>
-              <td className="px-4 py-3 tabular-nums">{totalInvoices || "—"}</td>
-              <td className="px-4 py-3 tabular-nums">{fmt(totalVol)}</td>
-              <td className="px-4 py-3 tabular-nums text-emerald-600 dark:text-emerald-400">{fmt(totalAdvanced)}</td>
-              <td className="px-4 py-3 tabular-nums text-blue-600 dark:text-blue-400">{fmt(totalFees)}</td>
-              <td className="px-4 py-3 tabular-nums text-slate-500">{totalVol > 0 ? `${((totalFees / totalVol) * 100).toFixed(2)}%` : "—"}</td>
+                  {prefs.visible.includes("label") && <td className="px-4 py-3 text-slate-700 dark:text-slate-200">Total {year}</td>}
+                  {prefs.visible.includes("invoiceCount") && <td className="px-4 py-3 tabular-nums">{totalInvoices || "—"}</td>}
+                  {prefs.visible.includes("totalVolume") && <td className="px-4 py-3 tabular-nums">{fmt(totalVol)}</td>}
+                  {prefs.visible.includes("totalAdvanced") && <td className="px-4 py-3 tabular-nums text-emerald-600 dark:text-emerald-400">{fmt(totalAdvanced)}</td>}
+                  {prefs.visible.includes("totalFees") && <td className="px-4 py-3 tabular-nums text-blue-600 dark:text-blue-400">{fmt(totalFees)}</td>}
+                  {prefs.visible.includes("feeRate") && <td className="px-4 py-3 tabular-nums text-slate-500">{totalVol > 0 ? `${((totalFees / totalVol) * 100).toFixed(2)}%` : "—"}</td>}
             </tr>
           </tfoot>
         </table>
@@ -650,7 +705,24 @@ function AgentPerformanceTab() {
     setFilters(next);
   };
   const onAgentChange = (id: string) => changeFilters({ agentId: id });
-  const csv = rows.map(r => ({ agent: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "—", role: r.role ?? "", invoices: r.invoicesProcessed ?? r.invoiceCount ?? 0, volume_funded: r.fundedVolume ?? r.totalVolumeFunded ?? r.totalFunded ?? 0, avg_days_to_fund: r.averageDaysToFund ?? r.avgDaysToFund ?? "", reviews: Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0), hours: r.hoursWorked ?? r.clockHoursWorked ?? 0 }));
+  const performanceColumns: ReportColumn[] = [
+    { key: "agent", label: "Agent" }, { key: "role", label: "Role" }, { key: "invoices", label: "Invoices" },
+    { key: "volume_funded", label: "Volume funded" }, { key: "avg_days_to_fund", label: "Avg days" }, { key: "reviews", label: "Reviews" }, { key: "hours", label: "Hours" },
+  ];
+  const reportPrefs = useReportColumns("agent-performance", user?.id, performanceColumns, { start, end, agentId });
+  const applyReportTemplate = (template: SavedTemplate) => {
+    const saved = reportPrefs.applyTemplate(template);
+    changeFilters({ start: saved.start ?? start, end: saved.end ?? end, agentId: saved.agentId ?? agentId });
+  };
+  const csv = rows.map(r => {
+    const values: Record<string, unknown> = {
+      agent: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "—", role: r.role ?? "",
+      invoices: r.invoicesProcessed ?? r.invoiceCount ?? 0, volume_funded: r.fundedVolume ?? r.totalVolumeFunded ?? r.totalFunded ?? 0,
+      avg_days_to_fund: r.averageDaysToFund ?? r.avgDaysToFund ?? "",
+      reviews: Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0), hours: r.hoursWorked ?? r.clockHoursWorked ?? 0,
+    };
+    return Object.fromEntries(performanceColumns.filter(c => reportPrefs.visible.includes(c.key)).map(c => [c.label, values[c.key]]));
+  });
   return <div className="space-y-4" data-testid="agent-performance-detail" data-agent-id={agentId} data-context={contextKey}>
     <div className="ff-card ff-reports-surface flex flex-wrap items-end gap-2 p-3">
       {/* Reset browser-owned calendar state on external input changes, not on
@@ -659,19 +731,23 @@ function AgentPerformanceTab() {
       <span className="mb-2 text-xs text-slate-400">to</span>
       <div key={JSON.stringify([user?.id, user?.role, agentId, start, "through"])}><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Through</label><Input aria-label="Through date" data-testid="performance-through-date" type="date" value={end} onChange={e => changeFilters({ end: e.target.value })} className="h-8 w-36 text-xs" /></div>
       <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Employee</label><Select value={agentId} open={agentMenuOpen} onOpenChange={setAgentMenuOpen} onValueChange={onAgentChange}><SelectTrigger data-testid="performance-agent-select" disabled={!optionsReady} className="h-8 w-48 text-xs"><SelectValue key={contextKey}>{optionsReady ? (agentId === "all" ? "All Agents" : (() => { const agent = agentOptions.find(r => String(r.userId ?? r.id) === agentId); return agent ? `${agent.firstName ?? ""} ${agent.lastName ?? ""}`.trim() || agent.email : "Employee unavailable"; })()) : "Refreshing agents…"}</SelectValue></SelectTrigger><SelectContent key={contextKey}><SelectItem value="all">All Agents</SelectItem>{agentOptions.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div>
-      <Button data-testid="performance-csv" disabled={!reportReady || !rows.length} size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("agent_performance.csv", csv)}><Download className="h-3.5 w-3.5" /> CSV</Button>
+      <CustomizeColumns columns={performanceColumns} visible={reportPrefs.visible} onChange={reportPrefs.setVisible} templates={reportPrefs.templates} onSave={reportPrefs.saveTemplate} onApply={applyReportTemplate} onDelete={reportPrefs.deleteTemplate} />
+      <Button data-testid="performance-csv" disabled={!reportReady || !rows.length} size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("agent_performance.csv", csv)}><Download className="h-3.5 w-3.5" /> Visible CSV</Button>
       {manager && <Button data-testid="performance-issue-warning" disabled={!reportReady || !optionsReady} size="sm" className="h-8 gap-1.5" onClick={() => { setWarningForm(emptyWarningDraft()); createWarning.reset(); activeWarningSession.current += 1; setWarningSession(activeWarningSession.current); setWarningOpen(true); }}><AlertTriangle className="h-3.5 w-3.5" /> Issue warning</Button>}
     </div>
     {(rangeError || query.error || agentOptionsQuery.error || warningQuery.error) && <p role="alert" className="text-sm text-red-700">{rangeError || (query.error || agentOptionsQuery.error || warningQuery.error)?.message}</p>}
     <Card key={contextKey} className="overflow-hidden border border-slate-200 dark:border-slate-700">
       <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[850px] text-sm">
-        <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Agent","Role","Invoices","Volume funded","Avg days","Reviews","Hours"].map(h => <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>)}</tr></thead>
-        <tbody className="divide-y">{enabled && query.isFetching ? <SkeletonRows cols={7} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelectedAgentId(String(r.userId ?? r.id))} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20">
-          <td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td><td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td>
-          <td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td><td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.fundedVolume ?? r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td>
-          <td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td>
-          <td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td><td className="px-4 py-3 tabular-nums">{r.hoursWorked ?? r.clockHoursWorked ?? "—"}</td>
-        </tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">{rangeError ? "Choose a valid date range to load the report." : query.error ? "Report unavailable." : "No agents found for this period."}</td></tr>}</tbody>
+        <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{performanceColumns.filter(c => reportPrefs.visible.includes(c.key)).map(c => <th key={c.key} className="whitespace-nowrap px-4 py-3">{c.label}</th>)}</tr></thead>
+        <tbody className="divide-y">{enabled && query.isFetching ? <SkeletonRows cols={reportPrefs.visible.length} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelectedAgentId(String(r.userId ?? r.id))} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20">
+          {reportPrefs.visible.includes("agent") && <td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td>}
+          {reportPrefs.visible.includes("role") && <td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td>}
+          {reportPrefs.visible.includes("invoices") && <td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td>}
+          {reportPrefs.visible.includes("volume_funded") && <td className="px-4 py-3 tabular-nums font-semibold">{fmt(Number(r.fundedVolume ?? r.totalVolumeFunded ?? r.totalFunded ?? 0))}</td>}
+          {reportPrefs.visible.includes("avg_days_to_fund") && <td className="px-4 py-3 tabular-nums">{r.averageDaysToFund ?? r.avgDaysToFund ?? "—"}{(r.averageDaysToFund ?? r.avgDaysToFund) != null ? "d" : ""}</td>}
+          {reportPrefs.visible.includes("reviews") && <td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td>}
+          {reportPrefs.visible.includes("hours") && <td className="px-4 py-3 tabular-nums">{r.hoursWorked ?? r.clockHoursWorked ?? "—"}</td>}
+        </tr>) : <tr><td colSpan={reportPrefs.visible.length} className="px-4 py-12 text-center text-slate-500">{rangeError ? "Choose a valid date range to load the report." : query.error ? "Report unavailable." : "No agents found for this period."}</td></tr>}</tbody>
       </table></div>
     </Card>
     <Card key={`warnings:${contextKey}`} data-testid="performance-warnings" className="border border-slate-200 dark:border-slate-700">
@@ -758,6 +834,23 @@ function CarrierArTab() {
   const [selection, setSelection] = useState<{ carrierId: string; brokerId: string } | null>(null);
   const [report, setReport] = useState<CarrierBrokerReportDef | null>(null);
   const [agingPdfDays, setAgingPdfDays] = useState("1");
+  const { user } = useAuth();
+  const arColumns: ReportColumn[] = [
+    { key: "invoiceNumber", label: "Invoice #" }, { key: "loadNumber", label: "Load #" }, { key: "amount", label: "Amount" },
+    { key: "fundedDate", label: "Funded date" }, { key: "ageDays", label: "Age" }, { key: "status", label: "Status" },
+    { key: "chargebackStatus", label: "Chargeback" }, { key: "shortPayAmount", label: "Short pay amount" }, { key: "outstanding", label: "Outstanding" },
+    { key: "collected", label: "Collected" },
+  ];
+  const arPrefs = useReportColumns("carrier-ar", user?.id, arColumns, { carrierId, brokerId, reportId: report?.id ?? "" });
+  const applyArTemplate = (template: SavedTemplate) => {
+    const saved = arPrefs.applyTemplate(template);
+    const nextCarrier = saved.carrierId ?? carrierId, nextBroker = saved.brokerId ?? brokerId;
+    setCarrierId(nextCarrier); setBrokerId(nextBroker);
+    if (nextCarrier && nextBroker) {
+      setSelection({ carrierId: nextCarrier, brokerId: nextBroker });
+      setReport(CARRIER_BROKER_REPORTS.find(item => item.id === saved.reportId) ?? report);
+    }
+  };
   const { data: carriersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/clients", { all: true }] });
   const { data: brokersData = [] } = useQuery<Array<{ id: number; name: string }>>({ queryKey: ["/api/brokers", { all: true }] });
   const carriers = Array.isArray(carriersData) ? carriersData : [];
@@ -788,13 +881,16 @@ function CarrierArTab() {
   const selectedCarrier = carriers.find(item => String(item.id) === selection?.carrierId);
   const selectedBroker = brokers.find(item => String(item.id) === selection?.brokerId);
   const reset = () => { setCarrierId(""); setBrokerId(""); setSelection(null); setReport(null); };
-  const csvRows = rows.map(row => ({
-    invoice_number: row.invoiceNumber, load_number: row.loadNumber ?? "", amount: row.amount,
-    funded_date: row.fundedDate ?? "", age_days: row.ageDays, status: row.status,
-    account_status: row.accountStatus ?? "", chargeback_status: row.chargebackStatus,
-    collected: row.collected ?? row.appliedAmount ?? 0, total_outstanding: row.outstanding,
-    short_pay_amount: row.shortPayAmount ?? 0,
-  }));
+  const csvRows = rows.map(row => {
+    const values: Record<string, unknown> = {
+      invoiceNumber: row.invoiceNumber, loadNumber: row.loadNumber ?? "", amount: row.amount,
+      fundedDate: row.fundedDate ?? "", ageDays: row.ageDays,
+      status: report?.id === "aging-status-1" && row.accountStatus ? row.accountStatus : row.status,
+      chargebackStatus: row.chargebackStatus, collected: row.collected ?? row.appliedAmount ?? 0,
+      outstanding: row.outstanding, shortPayAmount: row.shortPayAmount ?? 0,
+    };
+    return Object.fromEntries(arColumns.filter(column => arPrefs.visible.includes(column.key)).map(column => [column.label, values[column.key]]));
+  });
   const pdfParams = report ? new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(params)), reportType: report.endpoint, title: report.title }).toString() : "";
 
   return <div className="space-y-5">
@@ -831,21 +927,23 @@ function CarrierArTab() {
       <CardHeader className="flex flex-row items-center justify-between gap-3 border-b">
         <div><CardTitle className="text-base">{report.title}</CardTitle><p className="mt-1 text-xs text-slate-500">{selectedCarrier?.name} · {selectedBroker?.name}</p></div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={!rows.length} onClick={() => exportCsv(`${report.id}.csv`, csvRows)}><Download className="mr-1 h-3.5 w-3.5" />CSV</Button>
+          <CustomizeColumns columns={arColumns} visible={arPrefs.visible} onChange={arPrefs.setVisible} templates={arPrefs.templates} onSave={arPrefs.saveTemplate} onApply={applyArTemplate} onDelete={arPrefs.deleteTemplate} />
+          <Button size="sm" variant="outline" disabled={!rows.length} onClick={() => exportCsv(`${report.id}.csv`, csvRows)}><Download className="mr-1 h-3.5 w-3.5" />Visible CSV</Button>
           <Button size="sm" variant="outline" disabled={!rows.length} asChild><a href={`/api/reports/carrier-broker-pdf?${pdfParams}`} target="_blank" rel="noreferrer"><FileText className="mr-1 h-3.5 w-3.5" />PDF</a></Button>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         {reportQuery.isLoading ? <div className="h-48 animate-pulse bg-slate-100 dark:bg-slate-800" /> : reportQuery.isError ? <div className="p-10 text-center text-sm text-red-600">Unable to generate this report.</div> :
           <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[900px] text-sm">
-            <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{["Invoice #","Load #","Amount","Funded Date","Age","Status","Chargeback", report.endpoint === "short-pay" ? "Short Pay Amount" : "Outstanding"].map(head => <th key={head} className="px-4 py-3">{head}</th>)}</tr></thead>
+            <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{arColumns.filter(column => arPrefs.visible.includes(column.key) && (column.key !== "shortPayAmount" || report.endpoint === "short-pay") && (column.key !== "outstanding" || report.endpoint !== "short-pay")).map(column => <th key={column.key} className="px-4 py-3">{column.key === "outstanding" && report.endpoint === "short-pay" ? "Short Pay Amount" : column.label}</th>)}</tr></thead>
             <tbody className="divide-y">{rows.length ? rows.map(row => <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-              <td className="px-4 py-3 font-semibold">{row.invoiceNumber}</td><td className="px-4 py-3">{row.loadNumber || "—"}</td>
-              <td className="px-4 py-3 tabular-nums">{fmt(Number(row.amount))}</td><td className="px-4 py-3">{row.fundedDate ? format(new Date(row.fundedDate), "MMM d, yyyy") : "—"}</td>
-              <td className="px-4 py-3 tabular-nums">{row.ageDays}d</td><td className="px-4 py-3 capitalize">{(report.id === "aging-status-1" && row.accountStatus ? row.accountStatus : row.status).replace(/_/g, " ")}</td>
-              <td className="px-4 py-3 capitalize">{(row.chargebackStatus || "none").replace(/_/g, " ")}</td><td className="px-4 py-3 font-semibold tabular-nums">{fmt(Number(report.endpoint === "short-pay" ? row.shortPayAmount ?? row.outstanding : row.outstanding))}</td>
+              {arColumns.filter(column => arPrefs.visible.includes(column.key) && (column.key !== "shortPayAmount" || report.endpoint === "short-pay") && (column.key !== "outstanding" || report.endpoint !== "short-pay")).map(column => {
+                const value = column.key === "status" && report.id === "aging-status-1" && row.accountStatus ? row.accountStatus : (row as unknown as Record<string, unknown>)[column.key];
+                const actual = report.endpoint === "short-pay" && column.key === "outstanding" ? row.shortPayAmount ?? row.outstanding : value;
+                return <td key={column.key} className="px-4 py-3 tabular-nums">{["amount", "outstanding", "shortPayAmount", "collected"].includes(column.key) ? fmt(Number(actual ?? 0)) : column.key === "fundedDate" && actual ? format(new Date(String(actual)), "MMM d, yyyy") : column.key === "ageDays" ? `${actual ?? "—"}d` : String(actual ?? "—").replace(/_/g, " ")}</td>;
+              })}
             </tr>) : <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-500">No invoices match this report.</td></tr>}</tbody>
-            {reportQuery.data?.summary && <tfoot><tr className="border-t-2 bg-slate-50 font-semibold dark:bg-slate-800/60"><td colSpan={2} className="px-4 py-3">Totals · {reportQuery.data.summary.count} invoices</td><td className="px-4 py-3 tabular-nums">{fmt(reportQuery.data.summary.totalAmount)}</td><td colSpan={4} /><td className="px-4 py-3 tabular-nums">{fmt(report.endpoint === "short-pay" ? reportQuery.data.summary.totalShortPay ?? reportQuery.data.summary.totalOutstanding : reportQuery.data.summary.totalOutstanding)}</td></tr></tfoot>}
+            {reportQuery.data?.summary && <tfoot><tr className="border-t-2 bg-slate-50 font-semibold dark:bg-slate-800/60">{arColumns.filter(column => arPrefs.visible.includes(column.key)).map((column, index) => <td key={column.key} className="px-4 py-3 tabular-nums">{index === 0 ? `Totals · ${reportQuery.data!.summary.count} invoices` : column.key === "amount" ? fmt(reportQuery.data!.summary.totalAmount) : column.key === "outstanding" || column.key === "shortPayAmount" ? fmt(report.endpoint === "short-pay" ? reportQuery.data!.summary.totalShortPay ?? reportQuery.data!.summary.totalOutstanding : reportQuery.data!.summary.totalOutstanding) : ""}</td>)}</tr></tfoot>}
           </table></div>}
       </CardContent>
     </Card>}
@@ -909,6 +1007,7 @@ const GLOBAL_REPORT_GROUPS: Array<{ title: string; accent: string; reports: Glob
 
 function GlobalReportsTab() {
   const [reportId, setReportId] = useState<string | null>(null);
+  const { user } = useAuth();
   const reportQuery = useQuery<GlobalReportResponse>({
     queryKey: ["/api/reports/global", reportId],
     queryFn: async () => {
@@ -919,6 +1018,12 @@ function GlobalReportsTab() {
     enabled: !!reportId,
   });
   const report = reportQuery.data;
+  const globalColumns: ReportColumn[] = (report?.columns ?? []).map(column => ({ key: column.key, label: column.label }));
+  const globalPrefs = useReportColumns(`global-${reportId ?? "none"}`, user?.id, globalColumns, { reportId: reportId ?? "" });
+  const applyGlobalTemplate = (template: SavedTemplate) => {
+    const saved = globalPrefs.applyTemplate(template);
+    if (saved.reportId) setReportId(saved.reportId);
+  };
   const formatCell = (value: string | number | null, column: GlobalReportColumn) => {
     if (value == null || value === "") return "—";
     if (column.type === "money") return fmt(Number(value));
@@ -931,7 +1036,7 @@ function GlobalReportsTab() {
     return String(value).replace(/_/g, " ");
   };
   const csvRows = report?.rows.map(row => Object.fromEntries(
-    report.columns.map(column => [column.label, row[column.key] ?? ""]),
+    report.columns.filter(column => globalPrefs.visible.includes(column.key)).map(column => [column.label, row[column.key] ?? ""]),
   )) ?? [];
 
   return <div className="space-y-5">
@@ -962,7 +1067,8 @@ function GlobalReportsTab() {
           {report && <p className="mt-1 text-xs text-slate-500">{report.summary.count.toLocaleString()} records · {fmt(report.summary.totalAmount)}</p>}
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button size="sm" variant="outline" disabled={!report?.rows.length} onClick={() => exportCsv(`${reportId}.csv`, csvRows)}><Download className="mr-1 h-3.5 w-3.5" />CSV</Button>
+          <CustomizeColumns columns={globalColumns} visible={globalPrefs.visible} onChange={globalPrefs.setVisible} templates={globalPrefs.templates} onSave={globalPrefs.saveTemplate} onApply={applyGlobalTemplate} onDelete={globalPrefs.deleteTemplate} />
+          <Button size="sm" variant="outline" disabled={!report?.rows.length} onClick={() => exportCsv(`${reportId}.csv`, csvRows)}><Download className="mr-1 h-3.5 w-3.5" />Visible CSV</Button>
           <Button size="sm" variant="outline" disabled={!report?.rows.length} asChild>
             <a href={`/api/reports/global/${reportId}/pdf`} target="_blank" rel="noreferrer"><FileText className="mr-1 h-3.5 w-3.5" />PDF</a>
           </Button>
@@ -973,11 +1079,11 @@ function GlobalReportsTab() {
           : reportQuery.isError ? <div className="p-12 text-center text-sm text-red-600">Unable to generate this report.</div>
           : report ? <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-max text-sm">
             <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">
-              {report.columns.map(column => <th key={column.key} className="whitespace-nowrap px-4 py-3">{column.label}</th>)}
+              {report.columns.filter(column => globalPrefs.visible.includes(column.key)).map(column => <th key={column.key} className="whitespace-nowrap px-4 py-3">{column.label}</th>)}
             </tr></thead>
             <tbody className="divide-y dark:divide-slate-800">{report.rows.length ? report.rows.map((row, index) => <tr key={String(row.id ?? row.invoiceNumber ?? index)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-              {report.columns.map(column => <td key={column.key} className={cn("max-w-xs whitespace-nowrap px-4 py-3 capitalize", ["money", "number"].includes(column.type ?? "") && "text-right tabular-nums", column.key === "invoiceNumber" && "font-semibold")}>{formatCell(row[column.key], column)}</td>)}
-            </tr>) : <tr><td colSpan={report.columns.length} className="px-4 py-14 text-center text-slate-500">No records match this report.</td></tr>}</tbody>
+              {report.columns.filter(column => globalPrefs.visible.includes(column.key)).map(column => <td key={column.key} className={cn("max-w-xs whitespace-nowrap px-4 py-3 capitalize", ["money", "number"].includes(column.type ?? "") && "text-right tabular-nums", column.key === "invoiceNumber" && "font-semibold")}>{formatCell(row[column.key], column)}</td>)}
+            </tr>) : <tr><td colSpan={globalPrefs.visible.length} className="px-4 py-14 text-center text-slate-500">No records match this report.</td></tr>}</tbody>
           </table></div> : null}
       </CardContent>
     </Card>}

@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
-import { ZodError } from "zod";
-import { buildChargebackReport, chargebackReportCsv, searchChargebackReportDirectory } from "../services/chargebackReport";
+import { ZodError, z } from "zod";
+import { buildChargebackReport, chargebackReportCsv, chargebackCsvColumns, searchChargebackReportDirectory } from "../services/chargebackReport";
 
 export function registerChargebackReportRoutes(app: Express, requireReports: RequestHandler,
   build: typeof buildChargebackReport = buildChargebackReport,
@@ -14,9 +14,13 @@ export function registerChargebackReportRoutes(app: Express, requireReports: Req
   });
   for (const csv of [false, true]) app.get(`/api/reports/chargeback${csv ? ".csv" : ""}`, requireReports, async (req, res) => {
     try {
-      const report = await build(req.query);
+      const { columns, ...filters } = req.query;
+      const selected = columns === undefined ? undefined : z.string().transform(value => value.split(","))
+        .refine(value => value.length > 0 && new Set(value).size === value.length && value.every(key => key in chargebackCsvColumns),
+          "Choose valid export columns.").parse(columns);
+      const report = await build(filters);
       res.set("Cache-Control", "no-store");
-      if (csv) res.type("text/csv").attachment("Trucking_Pros_Financial_Chargeback_Report.csv").send(chargebackReportCsv(report));
+      if (csv) res.type("text/csv").attachment("Trucking_Pros_Financial_Chargeback_Report.csv").send(chargebackReportCsv(report, selected));
       else res.json(report);
     } catch (error) {
       if (error instanceof ZodError) return res.status(400).json({ message: error.errors[0]?.message ?? "Invalid report filters." });

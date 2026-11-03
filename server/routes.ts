@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerChargebackResolutionRoutes } from "./routes/chargebackResolutions";
 import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
 import { registerOcrIntakeRoutes } from "./routes/ocrIntake";
@@ -4355,44 +4356,7 @@ ${message}
     }
   });
 
-  app.post("/api/invoices/:id/chargeback/refunds", requireManagerOrAdmin, async (req: any, res) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid invoice id" });
-      const body = z.object({
-        amount: z.coerce.number().positive(),
-        refundDate: z.coerce.date().optional(),
-        method: z.string().trim().min(1).max(80),
-        reference: z.string().trim().max(200).optional().nullable(),
-        notes: z.string().trim().max(2000).optional().nullable(),
-      }).parse(req.body);
-      const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).limit(1);
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      const [refund] = await db.insert(invoiceRefunds).values({
-        invoiceId: id, amount: body.amount.toFixed(2), refundDate: body.refundDate ?? new Date(),
-        method: body.method, reference: body.reference ?? null, notes: body.notes ?? null, createdBy: req.user.id,
-      }).returning();
-      await db.insert(invoiceChargebackEvents).values({
-        invoiceId: id, eventType: "refunded", reason: body.notes ?? null, actorId: req.user.id,
-        metadata: { refundId: refund.id, amount: refund.amount, method: refund.method, reference: refund.reference },
-      });
-      await db.insert(eventLedger).values({
-        entityType: "invoice", entityId: id, eventType: "chargeback_refunded", actorType: "user", actorId: req.user.id,
-        payloadJson: {
-          refundId: refund.id,
-          amount: refund.amount,
-          method: refund.method,
-          reference: refund.reference,
-          reason: refund.notes,
-        },
-      });
-      res.status(201).json(refund);
-    } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
-      console.error("Error recording invoice refund:", error);
-      res.status(500).json({ message: "Failed to record invoice refund" });
-    }
-  });
+  registerChargebackResolutionRoutes(app, requireAuth, employeeCanAccessInvoice);
 
   // ─── Document Rules (admin-configurable checklist) ───────────────────────
   app.get("/api/document-rules", requireAuth, async (_req, res) => {

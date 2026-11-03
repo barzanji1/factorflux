@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmationStatusBadge, type ConfirmationStatus } from "@/components/broker-confirmation/confirmation-status";
 import { Win95Tabs, Win95TabsList, Win95TabsTrigger } from "@/components/win95";
+import { useAuth } from "@/hooks/useAuth";
+import { CustomizeColumns, useReportColumns, type ReportColumn, type SavedTemplate } from "./report-customization";
 
 type FilterState = {
   search: string;
@@ -71,8 +73,16 @@ function moneyFieldError(value: unknown) {
 }
 
 export default function AgingReport() {
+  const { user } = useAuth();
   const [view, setView] = useState<"carrier" | "broker">("carrier");
   const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const columns: ReportColumn[] = [
+    { key: "entity", label: view === "carrier" ? "Carrier" : "Broker" },
+    { key: "invoiceCount", label: "Invoices" },
+    ...AGING_COLUMNS.map(column => ({ key: column.key, label: column.label })),
+    { key: "total", label: "Total" },
+  ];
+  const prefs = useReportColumns("aging", user?.id, columns, { ...filters, view });
   const parsedFilters = useMemo(() => agingReportFiltersSchema.safeParse({
     ...filters,
     view,
@@ -117,6 +127,26 @@ export default function AgingReport() {
   };
   const exportBlocked = !validFilters || reportQuery.isFetching || reportQuery.isError || !report;
   const entityLabel = view === "carrier" ? "Carrier" : "Broker";
+  const visibleColumns = columns.filter(column => prefs.visible.includes(column.key));
+  const exportVisible = () => {
+    if (!report || !validFilters) return;
+    const cell = (row: typeof report.rows[number], key: string): string | number => {
+      if (key === "entity") return row.name;
+      if (key === "invoiceCount") return row.invoiceCount;
+      if (key === "total") return row.total;
+      return row.buckets[key as keyof typeof row.buckets];
+    };
+    const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const csv = [visibleColumns.map(column => csvCell(column.label)).join(","), ...report.rows.map(row => visibleColumns.map(column => csvCell(cell(row, column.key))).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `Trucking_Pros_Financial_aging_${view}_${filters.startDate || "all"}_${filters.endDate || "all"}.csv`; anchor.click(); URL.revokeObjectURL(url);
+  };
+  const applyTemplate = (template: SavedTemplate) => {
+    const saved = prefs.applyTemplate(template);
+    const nextView = saved.view === "broker" ? "broker" : saved.view === "carrier" ? "carrier" : view;
+    setView(nextView);
+    setFilters(old => ({ ...old, ...Object.fromEntries(Object.entries(saved).filter(([key, value]) => key in old && typeof value === "string")) }));
+  };
 
   return (
     <section className="space-y-3 text-[#26383b]" aria-labelledby="aging-report-title">
@@ -126,15 +156,17 @@ export default function AgingReport() {
             <h2 id="aging-report-title" className="text-sm font-bold">Aging Report</h2>
             <p className="mt-0.5 text-[11px] text-slate-600">Receivables aged from the funded date, using the America/Denver calendar.</p>
           </div>
+          <CustomizeColumns columns={columns} visible={prefs.visible} onChange={prefs.setVisible} templates={prefs.templates}
+            onSave={prefs.saveTemplate} onApply={applyTemplate} onDelete={prefs.deleteTemplate} />
           <Button
             data-testid="aging-export"
             size="sm"
             variant="outline"
             className="h-8 rounded-none border-[#777] bg-[#efede5] text-xs"
             disabled={exportBlocked}
-            onClick={() => report && validFilters && saveCsv(report, validFilters)}
+            onClick={exportVisible}
           >
-            <Download className="mr-1.5 h-3.5 w-3.5" /> Export CSV
+            <Download className="mr-1.5 h-3.5 w-3.5" /> Export visible columns
           </Button>
         </header>
 
@@ -261,25 +293,16 @@ export default function AgingReport() {
             <div className="overflow-x-auto">
               <table className="ff-data-table w-full min-w-[830px] text-xs">
                 <thead><tr className="border-b border-slate-300 bg-[#e9e6dd] text-left text-[10px] uppercase tracking-wide text-slate-600">
-                  <th scope="col" className="min-w-[190px] px-3 py-2">{entityLabel}</th>
-                  <th scope="col" className="px-3 py-2 text-right">Invoices</th>
-                  {AGING_COLUMNS.map(column => <th key={column.key} scope="col" className="whitespace-nowrap px-3 py-2 text-right">{column.label}</th>)}
-                  <th scope="col" className="px-3 py-2 text-right">Total</th>
+                  {visibleColumns.map(column => <th key={column.key} scope="col" className={`whitespace-nowrap px-3 py-2 ${column.key !== "entity" ? "text-right" : "min-w-[190px]"}`}>{column.label}</th>)}
                 </tr></thead>
                 <tbody className="divide-y divide-slate-200">
                   {report.rows.map(row => <tr key={row.id} data-testid="aging-group-row" className="hover:bg-[#e8f2f1]">
-                    <th scope="row" className="max-w-[290px] truncate px-3 py-2 text-left font-semibold" title={row.name}>{row.name}</th>
-                    <td className="px-3 py-2 text-right tabular-nums">{row.invoiceCount.toLocaleString()}</td>
-                    {AGING_COLUMNS.map(column => <td key={column.key} className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{money(row.buckets[column.key])}</td>)}
-                    <td className="whitespace-nowrap px-3 py-2 text-right font-bold tabular-nums">{money(row.total)}</td>
+                    {visibleColumns.map(column => <td key={column.key} className={`whitespace-nowrap px-3 py-2 ${column.key === "entity" ? "max-w-[290px] truncate font-semibold" : "text-right tabular-nums"}`} title={column.key === "entity" ? row.name : undefined}>{column.key === "entity" ? row.name : column.key === "invoiceCount" ? row.invoiceCount.toLocaleString() : money(column.key === "total" ? row.total : row.buckets[column.key as keyof typeof row.buckets])}</td>)}
                   </tr>)}
                   {!report.rows.length && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No eligible receivables match these filters.</td></tr>}
                 </tbody>
                 <tfoot><tr className="border-t-2 border-[#808080] bg-[#e5e1d7] font-bold" data-testid="aging-grand-total">
-                  <th scope="row" className="px-3 py-2 text-left">Total</th>
-                  <td className="px-3 py-2 text-right tabular-nums">{report.totals.invoiceCount.toLocaleString()}</td>
-                  {AGING_COLUMNS.map(column => <td key={column.key} className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{money(report.totals.buckets[column.key])}</td>)}
-                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{money(report.totals.total)}</td>
+                  {visibleColumns.map(column => <td key={column.key} className={`whitespace-nowrap px-3 py-2 ${column.key === "entity" ? "font-bold" : "text-right font-bold tabular-nums"}`}>{column.key === "entity" ? "Total" : column.key === "invoiceCount" ? report.totals.invoiceCount.toLocaleString() : money(column.key === "total" ? report.totals.total : report.totals.buckets[column.key as keyof typeof report.totals.buckets])}</td>)}
                 </tr></tfoot>
               </table>
             </div>

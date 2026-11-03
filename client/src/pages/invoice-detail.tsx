@@ -1,6 +1,7 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import ChargebackLifecycle from "@/components/invoices/chargeback-lifecycle";
 import Sidebar from "@/components/layout/sidebar";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import { documentClassification, documentClassificationLabel } from "@shared/document-display";
@@ -1271,7 +1272,7 @@ export default function InvoiceDetail() {
                          <div className="space-y-5">
                            <NeuCard className="flex flex-wrap items-center justify-between gap-3 p-5">
                             <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Chargeback Status</p>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Chargeback Schedule</p>
                                <Badge className={cn("mt-2 capitalize", detail.chargeback.status === "charged" ? "bg-red-600" : detail.chargeback.status === "extended" ? "bg-emerald-600" : "bg-amber-600")}>{detail.chargeback.status}</Badge>
                                <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">Chargeback date: <strong>{fmtDate(detail.chargeback.chargebackDate)}</strong></p>
                             </div>
@@ -1297,7 +1298,7 @@ export default function InvoiceDetail() {
                                })}</div>
                             ) : <p className="text-sm text-slate-400">No extension history.</p>}
                           </div>
-                            <NeuCard className="p-4"><div className="flex justify-between text-sm"><span>Refunded</span><strong>{fmtCurrency(detail.chargeback.refundedAmount)}</strong></div>{detail.chargeback.refunds?.length ? <div className="mt-3 space-y-2">{detail.chargeback.refunds.map((refund: any) => <div key={refund.id} className="flex justify-between border-t pt-2 text-xs"><span>{fmtDate(refund.refundDate)} · {refund.method} · {refund.reference || "No reference"}<br /><span className="text-slate-400">{refund.createdByUser?.firstName || "Team"} {refund.createdByUser?.lastName || ""}</span></span><strong>{fmtCurrency(refund.amount)}</strong></div>)}</div> : <p className="mt-2 text-xs text-slate-400">No refunds recorded.</p>}</NeuCard>
+                            <ChargebackLifecycle key={detail.id} invoiceId={Number(detail.id)} />
                          </div>
                     </NeuTabPanel>
 

@@ -511,9 +511,9 @@ const invoiceTimelineEventFormats: Record<string, TimelineEventFormat> = {
   },
   chargeback_refunded: {
     category: "payment",
-    title: () => "Chargeback refund recorded",
+    title: () => "Chargeback refunded",
     description: payload => withTimelineReason(
-      `${timelineText(payload.amount, "Refund")} recorded via ${timelineText(payload.method, "unspecified method")}${payload.reference ? ` · ${payload.reference}` : ""}`,
+      `$${timelineText(payload.amount, "0")} returned to ${timelineText(payload.carrierName, "carrier")} on ${payload.refundDate ? String(payload.refundDate).slice(0, 10) : "the recorded date"}${payload.reference ? `, payment ref ${payload.reference}` : ""}`,
       payload,
     ),
   },

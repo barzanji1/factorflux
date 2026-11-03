@@ -10,7 +10,10 @@ export const chargebackReportFiltersSchema = z.object({
   endDate: z.preprocess(optional, day.optional()),
   carrierId: z.preprocess(optional, z.coerce.number().int().positive().optional()),
   brokerId: z.preprocess(optional, z.coerce.number().int().positive().optional()),
-  status: z.enum(["all", "open", "collected", "written_off", "applied"]).optional().default("all"),
+  invoiceId: z.preprocess(optional, z.coerce.number().int().positive().optional()),
+  status: z.enum(["all", "open", "collected", "refunded", "resolved", "written_off", "applied"]).optional().default("all"),
+  section: z.enum(["chargebacks", "shortPays", "deductions"]).optional(),
+  deductionType: z.enum(["all", "fee_adjustment", "reserve_movement", "offset"]).optional().default("all"),
   minAmount: z.preprocess(optional, z.coerce.number().finite().nonnegative().max(999999999999.99).optional()),
   maxAmount: z.preprocess(optional, z.coerce.number().finite().nonnegative().max(999999999999.99).optional()),
 }).strict().superRefine((value, ctx) => {
@@ -36,9 +39,17 @@ export interface ChargebackReportRow {
   amount: number | null;
   outstanding: number;
   reason: string;
-  status: "open" | "collected" | "written_off" | "applied";
+  status: "open" | "collected" | "refunded" | "resolved" | "written_off" | "applied";
   kind: string;
   amountSource: string;
+  refundDate: string | null;
+  refundedAmount: number;
+  netChargeback: number | null;
+  paymentReference: string | null;
+  recoveredAmount: number;
+  originalShortPay: number;
+  collectedAmount: number;
+  writtenOffAmount: number;
 }
 export interface ChargebackReportTotals {
   count: number;
@@ -47,6 +58,12 @@ export interface ChargebackReportTotals {
   amount: number;
   outstanding: number;
   unknownAmounts: number;
+  refunded: number;
+  collected: number;
+  writtenOff: number;
+  recovered: number;
+  netOutstanding: number;
+  byType: Record<string, number>;
 }
 export interface ChargebackReport {
   chargebacks: ChargebackReportRow[];

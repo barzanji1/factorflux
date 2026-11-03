@@ -387,6 +387,10 @@ export const invoices = pgTable("invoices", {
     enum: ["none", "scheduled", "extended", "charged"],
   }).default("none").notNull(),
   chargebackExtendedBy: varchar("chargeback_extended_by").references(() => users.id),
+  // Resolution is separate from the scheduler's none/scheduled/extended/charged state.
+  chargebackResolutionStatus: varchar("chargeback_resolution_status", {
+    enum: ["open", "collected", "refunded", "written_off"],
+  }),
   chargebackExtendedAt: timestamp("chargeback_extended_at"),
   chargebackExtensionReason: text("chargeback_extension_reason"),
   chargebackExtensionDate: timestamp("chargeback_extension_date"),
@@ -500,6 +504,11 @@ export const invoiceRefunds = pgTable("invoice_refunds", {
   method: varchar("method").notNull(),
   reference: varchar("reference"),
   notes: text("notes"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  idempotencyKey: uuid("idempotency_key").unique(),
+  reserveCreditAmount: decimal("reserve_credit_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  emailStatus: varchar("email_status", { enum: ["pending", "sent", "failed"] }).notNull().default("pending"),
+  emailError: text("email_error"),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
@@ -616,6 +625,20 @@ export const invoiceStatusHistory = pgTable("invoice_status_history", {
   reason: text("reason"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const shortPayResolutions = pgTable("short_pay_resolutions", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "restrict" }).notNull(),
+  originalShortPay: decimal("original_short_pay", { precision: 12, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  resolutionDate: timestamp("resolution_date").notNull(),
+  reference: varchar("reference").notNull(),
+  kind: varchar("kind", { enum: ["recovered", "written_off"] }).notNull(),
+  cashApplicationId: integer("cash_application_id").references(() => cashApplications.id),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  idempotencyKey: uuid("idempotency_key").notNull().unique(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, table => [index("short_pay_resolutions_invoice_idx").on(table.invoiceId, table.resolutionDate)]);
 
 export const eventLedger = pgTable("event_ledger", {
   id: serial("id").primaryKey(),
@@ -1381,6 +1404,7 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true, createdAt: true, updatedAt: true,
   brokerConfirmationStatus: true, brokerConfirmedAt: true, brokerConfirmationToken: true,
   confirmationSentAt: true, confirmationRemindedCount: true, assignedFollowupAgentId: true,
+  chargebackResolutionStatus: true,
 }).extend({
   branchId: optionalInvoiceBranchSchema,
   buyout: optionalInvoiceBuyoutSchema,
