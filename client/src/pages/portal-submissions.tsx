@@ -1,44 +1,64 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Eye, Download, FileText, Search, X, AlertTriangle, MessageCircle, Check, UserCheck } from "lucide-react";
+import { Textarea as BaseTextarea } from "@/components/ui/textarea";
+import { Dialog, DialogClose, DialogContent as BaseDialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton-rows";
-import { LoadTypeBadge } from "@/components/load-type";
 import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
 import { CompressionInfo } from "@/components/documents/compression-info";
-import {
-  Win95Tabs as Tabs,
-  Win95TabsContent as TabsContent,
-  Win95TabsList as TabsList,
-  Win95TabsTrigger as TabsTrigger,
-} from "@/components/win95";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import CarrierChatThread from "@/components/carriers/CarrierChatThread";
+import {
+  NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuStatCard,
+  NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell,
+  NeuTableHead, NeuTableHeader, NeuTableRow,
+} from "@/styles/neu/components";
+import {
+  AlertTriangle, Check, Download, Eye, FileText, MessageCircle, Search, UserCheck, X,
+} from "lucide-react";
 
-interface Doc { id: number; documentType: string; originalName: string; mimeType?: string; size?: number; originalSize?: number; compressedSize?: number; }
+interface Doc {
+  id: number;
+  documentType: string;
+  originalName: string;
+  mimeType?: string;
+  size?: number;
+  originalSize?: number;
+  compressedSize?: number;
+}
 interface Submission {
-  id: number; portalUserId: number; companyName?: string;
-  invoiceNumber?: string; loadNumber?: string; brokerName?: string;
-  carrierId?: number; brokerId?: number; branchId?: number; branchName?: string;
-  loadType?: string; code?: string; lumper?: boolean; driverName?: string;
-  bankAccountId?: number; bankAccount?: { bankName: string; nickname: string; lastFour: string };
-  instructionsSubject?: string; instructionsDetails?: string;
-  amount?: string; paymentType?: string; status: string; notes?: string;
-  reviewedAt?: string | null; reviewedBy?: string | null;
-  submittedAt?: string; documents?: Doc[];
+  id: number;
+  portalUserId: number;
+  companyName?: string;
+  invoiceNumber?: string;
+  loadNumber?: string;
+  brokerName?: string;
+  carrierId?: number;
+  brokerId?: number;
+  branchId?: number;
+  branchName?: string;
+  loadType?: string;
+  code?: string;
+  lumper?: boolean;
+  driverName?: string;
+  bankAccountId?: number;
+  bankAccount?: { bankName: string; nickname: string; lastFour: string };
+  instructionsSubject?: string;
+  instructionsDetails?: string;
+  amount?: string;
+  paymentType?: string;
+  status: string;
+  notes?: string;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  submittedAt?: string;
+  documents?: Doc[];
 }
 interface CarrierChatSummary {
   carrierId: string | number;
@@ -62,15 +82,24 @@ interface PortalUser {
 }
 
 const STATUS_OPTS = ["submitted", "under_review", "approved", "funded", "rejected"];
-const STATUS_BADGE: Record<string, JSX.Element> = {
-  submitted:    <Badge className="bg-blue-100 text-blue-700 border-0">Submitted</Badge>,
-  under_review: <Badge className="bg-amber-100 text-amber-700 border-0">Under Review</Badge>,
-  approved:     <Badge className="bg-emerald-100 text-emerald-700 border-0">Approved</Badge>,
-  funded:       <Badge className="bg-purple-100 text-purple-700 border-0">Funded</Badge>,
-  rejected:     <Badge className="bg-red-100 text-red-700 border-0">Rejected</Badge>,
+const STATUS_TONE: Record<string, "neutral" | "accent" | "success" | "warning"> = {
+  submitted: "accent",
+  under_review: "warning",
+  approved: "success",
+  funded: "success",
+  rejected: "neutral",
 };
 const DOC_LABEL: Record<string, string> = {
-  rate_confirmation: "Rate Conf.", bol: "BOL", lumper_receipt: "Lumper", other: "Other",
+  rate_confirmation: "Rate confirmation",
+  bol: "Bill of lading",
+  lumper_receipt: "Lumper receipt",
+  other: "Other",
+};
+const prettyStatus = (status: string) => status.replaceAll("_", " ");
+const dateOnly = (value?: string | null) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
 };
 const formatChatTime = (value?: string | null) => {
   if (!value) return "";
@@ -78,6 +107,24 @@ const formatChatTime = (value?: string | null) => {
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toLocaleDateString([], { month: "short", day: "numeric" });
 };
+const dayFloor = (value: string) => value ? new Date(`${value}T00:00:00`).getTime() : null;
+const dayCeiling = (value: string) => value ? new Date(`${value}T23:59:59.999`).getTime() : null;
+
+function Textarea({ className, ...props }: ComponentProps<typeof BaseTextarea>) {
+  return <BaseTextarea {...props} className={cn(className, "[&&]:!rounded-xl [&&]:!border-0 [&&]:!bg-[#e0e0e0] [&&]:!text-[#333] [&&]:!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]")} />;
+}
+
+function DialogContent({ className, children, ...props }: ComponentProps<typeof BaseDialogContent>) {
+  return (
+    <BaseDialogContent {...props} showCloseButton={false} className={cn(className,
+      "grid-cols-1 [&>*]:min-w-0 !border-0 !bg-[#e0e0e0] !shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] [&>div:first-child]:pr-10")}>
+      {children}
+      <DialogClose asChild>
+        <NeuButton aria-label="Close dialog" className="absolute right-4 top-4 !h-8 !min-h-8 !w-8 !rounded-full !p-0 hover:text-[#27aab8]"><X className="h-4 w-4" /></NeuButton>
+      </DialogClose>
+    </BaseDialogContent>
+  );
+}
 
 export default function PortalSubmissionsPage() {
   const [location, setLocation] = useLocation();
@@ -89,8 +136,15 @@ export default function PortalSubmissionsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [registrationSearch, setRegistrationSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [registrationStatus, setRegistrationStatus] = useState("pending");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [registrationStartDate, setRegistrationStartDate] = useState("");
+  const [registrationEndDate, setRegistrationEndDate] = useState("");
   const [detail, setDetail] = useState<Submission | null>(null);
+  const [registrationDetail, setRegistrationDetail] = useState<PortalUser | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState("");
   const [createInvoiceOpen, setCreateInvoiceOpen] = useState(false);
@@ -99,14 +153,24 @@ export default function PortalSubmissionsPage() {
   const [rejectingRegistration, setRejectingRegistration] = useState<PortalUser | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [chatCarrier, setChatCarrier] = useState<{ id: number; name?: string; mcNumber?: string | null } | null>(null);
+  const [inlineCarrier, setInlineCarrier] = useState<{ id: number; name?: string; mcNumber?: string | null } | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const { data: submissions = [], isLoading } = useQuery<Submission[]>({
+  const {
+    data: submissions = [],
+    isLoading,
+    isError: submissionsError,
+    refetch: refetchSubmissions,
+  } = useQuery<Submission[]>({
     queryKey: ["/api/carrier-portal/submissions"],
     refetchInterval: 30000,
     enabled: canUsePortal,
   });
-  const { data: carrierChats = [] } = useQuery<CarrierChatSummary[]>({
+  const {
+    data: carrierChats = [],
+    isError: chatListError,
+    refetch: refetchChatList,
+  } = useQuery<CarrierChatSummary[]>({
     queryKey: ["/api/carrier-chat"],
     queryFn: async () => {
       const response = await fetch("/api/carrier-chat", { credentials: "include" });
@@ -130,8 +194,13 @@ export default function PortalSubmissionsPage() {
     refetchInterval: 30000,
     enabled: canUsePortal,
   });
-  const unreviewedCount = unreviewedCountData?.count ?? submissions.filter(item => !item.reviewedAt).length;
-  const { data: portalUsers = [], isLoading: portalUsersLoading } = useQuery<PortalUser[]>({
+  const unreviewedCount = unreviewedCountData?.count ?? submissions.filter((item) => !item.reviewedAt).length;
+  const {
+    data: portalUsers = [],
+    isLoading: portalUsersLoading,
+    isError: registrationsError,
+    refetch: refetchPortalUsers,
+  } = useQuery<PortalUser[]>({
     queryKey: ["/api/carrier-portal/users"],
     refetchInterval: 30000,
     enabled: canUsePortal,
@@ -141,7 +210,7 @@ export default function PortalSubmissionsPage() {
     refetchInterval: 30000,
     enabled: canUsePortal,
   });
-  const pendingRegistrations = portalUsers.filter((user) => user.status === "pending");
+  const pendingRegistrations = portalUsers.filter((portalUser) => portalUser.status === "pending");
   const pendingCount = pendingCountData?.count ?? pendingRegistrations.length;
   const chatSummaries = useMemo(() => {
     const grouped = new Map<string, CarrierChatSummary>();
@@ -162,28 +231,53 @@ export default function PortalSubmissionsPage() {
     });
     return Array.from(grouped.values()).sort((a, b) => new Date(b.lastMessageAt || 0).getTime() - new Date(a.lastMessageAt || 0).getTime());
   }, [carrierChats]);
-  const carrierUnreadById = useMemo(() => new Map(chatSummaries.map((chat) => [String(chat.carrierId), Number(chat.unreadCount || 0)])), [chatSummaries]);
+  const carrierUnreadById = useMemo(
+    () => new Map(chatSummaries.map((chat) => [String(chat.carrierId), Number(chat.unreadCount || 0)])),
+    [chatSummaries],
+  );
 
   useEffect(() => {
     if (!canUsePortal && canUseChat) setActiveTab("messages");
   }, [canUsePortal, canUseChat]);
 
   useEffect(() => {
-    const requested = new URLSearchParams(location.includes("?") ? location.slice(location.indexOf("?") + 1) : "").get("carrierId");
+    const query = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
+    const requested = new URLSearchParams(query).get("carrierId");
     if (!requested || !canUseChat) return;
     const id = Number(requested);
     if (!Number.isInteger(id) || id <= 0) return;
     const summary = chatSummaries.find((chat) => String(chat.carrierId) === requested);
-    setChatCarrier({ id, name: summary?.carrierName || undefined, mcNumber: summary?.mcNumber });
+    setActiveTab("messages");
+    setChatCarrier(null);
+    setInlineCarrier({ id, name: summary?.carrierName || undefined, mcNumber: summary?.mcNumber });
   }, [location, canUseChat, chatSummaries]);
 
   const openChat = (carrierId: string | number, summary?: CarrierChatSummary) => {
     const id = Number(carrierId);
     if (!Number.isInteger(id) || !canUseChat) return;
+    setInlineCarrier(null);
     setChatCarrier({ id, name: summary?.carrierName || undefined, mcNumber: summary?.mcNumber });
   };
   const closeChat = () => {
     setChatCarrier(null);
+    const [pathname, queryString = ""] = location.split("?");
+    const params = new URLSearchParams(queryString);
+    params.delete("carrierId");
+    const query = params.toString();
+    setLocation(query ? `${pathname}?${query}` : pathname);
+  };
+  const selectInlineChat = (carrierId: string | number, summary?: CarrierChatSummary) => {
+    const id = Number(carrierId);
+    if (!Number.isInteger(id) || !canUseChat) return;
+    setChatCarrier(null);
+    setInlineCarrier({ id, name: summary?.carrierName || undefined, mcNumber: summary?.mcNumber });
+    const [pathname, queryString = ""] = location.split("?");
+    const params = new URLSearchParams(queryString);
+    params.set("carrierId", String(id));
+    setLocation(`${pathname}?${params.toString()}`);
+  };
+  const closeInlineChat = () => {
+    setInlineCarrier(null);
     const [pathname, queryString = ""] = location.split("?");
     const params = new URLSearchParams(queryString);
     params.delete("carrierId");
@@ -233,9 +327,11 @@ export default function PortalSubmissionsPage() {
       if (!response.ok) throw new Error(body.message || "Unable to mark submission reviewed");
       return body as Submission;
     },
-    onSuccess: updated => {
-      queryClient.setQueryData<Submission[]>(["/api/carrier-portal/submissions"], current =>
-        current?.map(item => item.id === updated.id ? { ...item, reviewedAt: updated.reviewedAt, reviewedBy: updated.reviewedBy } : item),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Submission[]>(["/api/carrier-portal/submissions"], (current) =>
+        current?.map((item) => item.id === updated.id
+          ? { ...item, reviewedAt: updated.reviewedAt, reviewedBy: updated.reviewedBy }
+          : item),
       );
       queryClient.invalidateQueries({ queryKey: ["/api/portal-submissions/unreviewed-count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/carrier-portal/submissions"] });
@@ -244,385 +340,439 @@ export default function PortalSubmissionsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status, notes }: { id: number; status: string; notes: string }) => {
-      const res = await fetch(`/api/carrier-portal/submissions/${id}`, {
+      const response = await fetch(`/api/carrier-portal/submissions/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ status, notes }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Update failed");
-      return json;
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message || "Update failed");
+      return body;
     },
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["/api/carrier-portal/submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/portal-submissions/unreviewed-count"] });
-      setDetail((prev) => prev ? { ...prev, ...updated } : prev);
+      setDetail((previous) => previous ? { ...previous, ...updated } : previous);
       toast({ title: "Submission updated" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
 
-  const filtered = submissions.filter((s) => {
-    const matchStatus = filterStatus === "all" || s.status === filterStatus;
-    const matchReview = !showUnreviewedOnly || !s.reviewedAt;
-    const q = search.toLowerCase();
-    const matchSearch = !q || [s.companyName, s.invoiceNumber, s.loadNumber, s.brokerName]
-      .some((v) => v?.toLowerCase().includes(q));
-    return matchStatus && matchReview && matchSearch;
+  const filtered = submissions.filter((submission) => {
+    const statusMatches = filterStatus === "all" || submission.status === filterStatus;
+    const reviewMatches = !showUnreviewedOnly || !submission.reviewedAt;
+    const query = search.toLowerCase();
+    const searchMatches = !query || [
+      submission.companyName, submission.invoiceNumber, submission.loadNumber, submission.brokerName,
+      String(submission.id), String(submission.carrierId || ""),
+    ].some((value) => value?.toLowerCase().includes(query));
+    const submitted = submission.submittedAt ? new Date(submission.submittedAt).getTime() : NaN;
+    const afterStart = dayFloor(startDate) == null || (Number.isFinite(submitted) && submitted >= dayFloor(startDate)!);
+    const beforeEnd = dayCeiling(endDate) == null || (Number.isFinite(submitted) && submitted <= dayCeiling(endDate)!);
+    return statusMatches && reviewMatches && searchMatches && afterStart && beforeEnd;
   }).sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+  const filteredRegistrations = pendingRegistrations.filter((registration) => {
+    const query = registrationSearch.toLowerCase();
+    const searchMatches = !query || [
+      registration.companyName, registration.mcNumber, registration.dotNumber, registration.email,
+      registration.phone, registration.phoneNumber, String(registration.id),
+    ].some((value) => value?.toLowerCase().includes(query));
+    const statusMatches = registrationStatus === "all" || registration.status === registrationStatus;
+    const created = registration.createdAt ? new Date(registration.createdAt).getTime() : NaN;
+    const afterStart = dayFloor(registrationStartDate) == null || (Number.isFinite(created) && created >= dayFloor(registrationStartDate)!);
+    const beforeEnd = dayCeiling(registrationEndDate) == null || (Number.isFinite(created) && created <= dayCeiling(registrationEndDate)!);
+    return searchMatches && statusMatches && afterStart && beforeEnd;
+  });
 
-  function openDetail(s: Submission) {
-    setDetail(s);
-    setEditNotes(s.notes || "");
-    setEditStatus(s.status);
-    if (!s.reviewedAt) reviewMutation.mutate(s.id);
+  function openDetail(submission: Submission) {
+    setDetail(submission);
+    setEditNotes(submission.notes || "");
+    setEditStatus(submission.status);
+    if (!submission.reviewedAt) reviewMutation.mutate(submission.id);
   }
-
   function reviewIndicator(submission: Submission) {
-    if (submission.reviewedAt) return <Badge className="rounded-full border-0 bg-slate-200 text-slate-700">REVIEWED</Badge>;
-    const age = Date.now() - new Date(submission.submittedAt || 0).getTime();
-    if (age <= 24 * 60 * 60 * 1000) return <Badge className="rounded-full border-0 bg-blue-100 text-blue-700">NEW</Badge>;
-    return <Badge className="rounded-full border-0 bg-amber-100 text-amber-800">PENDING</Badge>;
+    if (submission.reviewedAt) return <NeuBadge>Reviewed</NeuBadge>;
+    const submitted = new Date(submission.submittedAt || 0).getTime();
+    if (Date.now() - submitted <= 24 * 60 * 60 * 1000) return <NeuBadge tone="accent">New</NeuBadge>;
+    return <NeuBadge tone="warning">Pending review</NeuBadge>;
   }
+  const statusBadge = (status: string) => (
+    <NeuBadge tone={STATUS_TONE[status] || "neutral"} className={cn("capitalize", status === "rejected" && "text-[#943b3b]")}>{prettyStatus(status)}</NeuBadge>
+  );
+  const submissionStats = [
+    { label: "Total Submissions", value: submissions.length, icon: <FileText className="h-5 w-5" /> },
+    { label: "Pending Review", value: unreviewedCount, icon: <AlertTriangle className="h-5 w-5" /> },
+    { label: "Approved", value: submissions.filter((submission) => submission.status === "approved").length, icon: <Check className="h-5 w-5" /> },
+    { label: "Rejected", value: submissions.filter((submission) => submission.status === "rejected").length, icon: <X className="h-5 w-5" /> },
+  ];
 
   return (
-    <div className="ff-portal-submissions flex h-screen bg-[#d4d0c8]">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Portal Submissions" subtitle="Invoice submissions from the carrier portal" group="Workspace" />
-        <main className="custom-scrollbar flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {unreviewedCount > 0 && (
+        <TopNav title="Portal Submissions" subtitle="Invoice submissions from the carrier portal" group="Workspace" neu />
+        <NeuPageShell className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-auto px-4 py-5 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-[1480px] space-y-6">
+            {canUsePortal && (
+              <section aria-label="Submission overview" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {submissionStats.map((stat) => (
+                  <NeuStatCard
+                    key={stat.label}
+                    label={stat.label}
+                    value={<span className="text-[#2196a3]">{stat.value}</span>}
+                    icon={stat.icon}
+                    className="min-h-32 p-4"
+                  />
+                ))}
+              </section>
+            )}
+
+            {canUsePortal && unreviewedCount > 0 && (
               <button
                 type="button"
                 onClick={() => {
+                  setActiveTab("submissions");
                   setShowUnreviewedOnly(true);
                   window.setTimeout(() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
                 }}
-                className="ff-portal-submission-surface flex w-full items-center gap-3 border border-amber-300 bg-amber-50 px-4 py-3 text-left text-amber-900 shadow-sm transition-colors hover:bg-amber-100"
+                className="w-full text-left"
               >
-                <AlertTriangle className="h-5 w-5 shrink-0 text-orange-600" />
-                <span className="font-semibold">⚠ {unreviewedCount} new carrier submission{unreviewedCount === 1 ? "" : "s"} require review</span>
+                <NeuCard className="flex items-center gap-3 px-4 py-3 text-[#8a6426]">
+                  <AlertTriangle className="h-5 w-5 shrink-0" />
+                  <span className="text-sm font-semibold">{unreviewedCount} carrier submission{unreviewedCount === 1 ? "" : "s"} need review</span>
+                </NeuCard>
               </button>
             )}
-
-            {pendingCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveTab("registrations")}
-                className="ff-portal-submission-surface flex w-full items-center gap-3 border border-blue-300 bg-blue-50 px-4 py-3 text-left text-blue-900 shadow-sm transition-colors hover:bg-blue-100"
-              >
-                <UserCheck className="h-5 w-5 shrink-0 text-blue-600" />
-                <span className="font-semibold">⚠ {pendingCount} carrier{pendingCount === 1 ? "" : "s"} pending approval</span>
+            {canUsePortal && pendingCount > 0 && (
+              <button type="button" onClick={() => setActiveTab("registrations")} className="w-full text-left">
+                <NeuCard className="flex items-center gap-3 px-4 py-3 text-[#267b82]">
+                  <UserCheck className="h-5 w-5 shrink-0" />
+                  <span className="text-sm font-semibold">{pendingCount} carrier{pendingCount === 1 ? "" : "s"} pending registration review</span>
+                </NeuCard>
               </button>
             )}
 
             {!canUseHub ? (
-              <div className="ff-portal-submission-surface border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-                Portal Submissions or Chat permission is required to access this page.
-              </div>
-            ) : <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                {canUsePortal && <TabsTrigger value="submissions">
-                    <FileText className="h-4 w-4" />
-                    Submissions
-                  </TabsTrigger>}
-                {canUsePortal && <TabsTrigger value="registrations">
-                    <UserCheck className="h-4 w-4" />
-                    Pending Registrations
-                    {pendingCount > 0 && <Badge className="ml-2 h-5 min-w-5 justify-center bg-red-600 px-1 text-[10px] text-white">{pendingCount}</Badge>}
-                  </TabsTrigger>}
-                {canUseChat && <TabsTrigger value="messages">
-                    <MessageCircle className="h-4 w-4" />
-                    Messages
-                  </TabsTrigger>}
-              </TabsList>
+              <NeuCard className="p-6 text-sm text-[#8b4e4e]">Portal Submissions or Chat permission is required to access this page.</NeuCard>
+            ) : (
+              <NeuTabs value={activeTab} onValueChange={setActiveTab}>
+                <NeuTabList className="w-fit max-w-full">
+                  {canUsePortal && <NeuTab value="submissions"><FileText className="h-4 w-4" />Submissions{unreviewedCount > 0 && <NeuBadge tone="accent" className="px-2 py-0.5">{unreviewedCount}</NeuBadge>}</NeuTab>}
+                  {canUsePortal && (
+                    <NeuTab value="registrations">
+                      <UserCheck className="h-4 w-4" />Pending Registrations
+                      {pendingCount > 0 && <NeuBadge tone="accent" className="px-2 py-0.5">{pendingCount}</NeuBadge>}
+                    </NeuTab>
+                  )}
+                  {canUseChat && <NeuTab value="messages"><MessageCircle className="h-4 w-4" />Messages{chatSummaries.some(chat => Number(chat.unreadCount) > 0) && <NeuBadge tone="accent" className="px-2 py-0.5">{chatSummaries.reduce((sum, chat) => sum + Number(chat.unreadCount || 0), 0)}</NeuBadge>}</NeuTab>}
+                </NeuTabList>
 
-              {canUsePortal && <TabsContent value="submissions">
-                {/* Filters */}
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Search by company, invoice, load, or broker…"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="pl-9"
-                    />
-                    {search && (
-                      <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-                      </button>
-                    )}
-                  </div>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-full sm:w-44">
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {STATUS_OPTS.map((s) => (
-                        <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {showUnreviewedOnly && <Button variant="outline" onClick={() => setShowUnreviewedOnly(false)}>Showing unreviewed · Clear</Button>}
-                </div>
-
-                {/* Table */}
-                <Card ref={tableRef} className="ff-portal-submission-surface mt-6 border border-[hsl(var(--border))]">
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Carrier Submissions
-                    </CardTitle>
-                    <CardDescription>{filtered.length} submission{filtered.length !== 1 ? "s" : ""}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {isLoading ? (
-                      <SkeletonRows rows={6} cols={6} />
-                    ) : filtered.length === 0 ? (
-                      <EmptyState icon={FileText} title="No submissions" description="Submissions from carriers will appear here." />
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Carrier</TableHead>
-                              <TableHead>Load / Invoice</TableHead>
-                              <TableHead>Broker</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Review</TableHead>
-                              <TableHead>Submitted</TableHead>
-                              <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filtered.map((s) => (
-                              <TableRow key={s.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40" onClick={() => openDetail(s)}>
-                                 <TableCell className="font-medium">{s.companyName || `Portal User #${s.portalUserId}`}</TableCell>
-                                <TableCell>
-                                  <p className="text-sm">{s.loadNumber || "—"}</p>
-                                  {s.invoiceNumber && <p className="text-xs text-slate-400">{s.invoiceNumber}</p>}
-                                </TableCell>
-                                <TableCell className="text-sm">{s.brokerName || "—"}</TableCell>
-                                <TableCell className="text-right font-mono text-sm">
-                                  {s.amount ? `$${parseFloat(s.amount).toLocaleString()}` : "—"}
-                                </TableCell>
-                                <TableCell>{STATUS_BADGE[s.status]}</TableCell>
-                                <TableCell>{reviewIndicator(s)}</TableCell>
-                                <TableCell className="text-xs text-slate-500">
-                                  {s.submittedAt ? new Date(s.submittedAt).toLocaleDateString() : "—"}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                     aria-label={!s.carrierId ? "Message carrier unavailable: no linked carrier" : canUseChat ? "Message carrier" : "Message carrier unavailable: Chat permission required"}
-                                     title={!s.carrierId ? "No linked carrier for this submission" : canUseChat ? "Message carrier" : "Chat permission required"}
-                                     disabled={!s.carrierId || !canUseChat}
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                       if (s.carrierId) openChat(s.carrierId, chatSummaries.find((item) => String(item.carrierId) === String(s.carrierId)) || { carrierId: s.carrierId, carrierName: s.companyName });
-                                     }}
-                                  >
-                                    <MessageCircle className="h-4 w-4" />
-                                     {!!s.carrierId && carrierUnreadById.get(String(s.carrierId)) ? (
-                                       <Badge className="h-5 min-w-5 justify-center rounded-full bg-[#b54444] px-1 text-[10px] text-white">
-                                         {(carrierUnreadById.get(String(s.carrierId)) || 0) > 9 ? "9+" : carrierUnreadById.get(String(s.carrierId))}
-                                       </Badge>
-                                     ) : null}
-                                     {!s.carrierId && <span className="sr-only">No linked carrier for this submission</span>}
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openDetail(s); }}>
-                                    Review
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                {canUsePortal && (
+                  <NeuTabPanel value="submissions" className="space-y-5 p-4 sm:p-6">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                      <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#888]" />
+                        <NeuInput
+                          aria-label="Search submissions"
+                          placeholder="Search carrier, invoice, load, broker, or ID"
+                          value={search}
+                          onChange={(event) => setSearch(event.target.value)}
+                          className="pl-9 pr-10"
+                        />
+                        {!!search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#777]"><X className="h-4 w-4" /></button>}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>}
+                      <NeuSelect aria-label="Filter submission status" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} className="lg:w-48">
+                        <option value="all">All statuses</option>
+                        {STATUS_OPTS.map((status) => <option key={status} value={status}>{prettyStatus(status)}</option>)}
+                      </NeuSelect>
+                      <div className="grid grid-cols-2 gap-2 lg:w-[19rem]">
+                        <NeuInput aria-label="Submitted from date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="px-2 text-xs" />
+                        <NeuInput aria-label="Submitted through date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="px-2 text-xs" />
+                      </div>
+                      {showUnreviewedOnly && <NeuButton onClick={() => setShowUnreviewedOnly(false)} className="min-h-10 px-3 py-2 text-xs">Clear review filter</NeuButton>}
+                    </div>
 
-              {canUsePortal && <TabsContent value="registrations">
-                <Card className="ff-portal-submission-surface border border-[hsl(var(--border))]">
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <CardTitle className="flex items-center gap-2">
-                      <UserCheck className="h-5 w-5" />
-                      Pending Registrations
-                    </CardTitle>
-                    <CardDescription>{pendingRegistrations.length} registration{pendingRegistrations.length !== 1 ? "s" : ""} awaiting approval</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {portalUsersLoading ? (
-                      <SkeletonRows rows={4} cols={7} />
-                    ) : pendingRegistrations.length === 0 ? (
-                      <EmptyState icon={UserCheck} title="No pending registrations" description="New carrier portal registrations will appear here." />
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Company</TableHead>
-                              <TableHead>MC</TableHead>
-                              <TableHead>DOT</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Phone</TableHead>
-                              <TableHead>Registered</TableHead>
-                              <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {pendingRegistrations.map((registration) => (
-                              <TableRow key={registration.id}>
-                                <TableCell className="font-medium">{registration.companyName || "—"}</TableCell>
-                                <TableCell>{registration.mcNumber || "—"}</TableCell>
-                                <TableCell>{registration.dotNumber || "—"}</TableCell>
-                                <TableCell className="whitespace-nowrap">{registration.email || "—"}</TableCell>
-                                <TableCell>{registration.phone || registration.phoneNumber || "—"}</TableCell>
-                                <TableCell className="whitespace-nowrap text-xs text-slate-500">
-                                  {registration.createdAt ? new Date(registration.createdAt).toLocaleDateString() : "—"}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      size="sm"
-                                      onClick={() => registrationMutation.mutate({ id: registration.id, action: "approve" })}
-                                      disabled={registrationMutation.isPending}
+                    <div ref={tableRef} className="space-y-3">
+                      <div className="flex flex-wrap items-end justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.13em] text-[#888]">Intake queue</p>
+                          <h2 className="mt-1 text-xl font-semibold">Carrier submissions</h2>
+                        </div>
+                        <p className="text-sm text-[#777]">{filtered.length} shown · {submissions.length} total</p>
+                      </div>
+                      {submissionsError ? (
+                        <NeuCard className="p-6 text-center">
+                          <p className="text-sm text-[#8b4e4e]">Submissions could not be loaded.</p>
+                          <NeuButton onClick={() => void refetchSubmissions()} className="mt-3 min-h-9 px-3 py-1.5 text-xs">Try again</NeuButton>
+                        </NeuCard>
+                      ) : isLoading ? <SkeletonRows rows={5} cols={9} /> : filtered.length === 0 ? (
+                        <NeuCard className="p-8 text-center">
+                          <EmptyState icon={FileText} title="No submissions" description="No carrier submissions match these filters." />
+                        </NeuCard>
+                      ) : (
+                        <NeuTable>
+                          <NeuTableHeader>
+                            <NeuTableRow className="hover:bg-transparent">
+                              <NeuTableHead>ID</NeuTableHead><NeuTableHead>Carrier</NeuTableHead>
+                              <NeuTableHead>Invoice #</NeuTableHead><NeuTableHead>Load #</NeuTableHead>
+                              <NeuTableHead className="text-right">Amount</NeuTableHead><NeuTableHead>Submitted</NeuTableHead>
+                              <NeuTableHead>Status</NeuTableHead><NeuTableHead>Docs</NeuTableHead><NeuTableHead>Actions</NeuTableHead>
+                            </NeuTableRow>
+                          </NeuTableHeader>
+                          <NeuTableBody>
+                            {filtered.map((submission) => (
+                              <NeuTableRow key={submission.id} onClick={() => openDetail(submission)} className="cursor-pointer">
+                                <NeuTableCell className="font-mono text-xs">#{submission.id}</NeuTableCell>
+                                <NeuTableCell className="max-w-52 truncate font-semibold">{submission.companyName || `Portal User #${submission.portalUserId}`}</NeuTableCell>
+                                <NeuTableCell>{submission.invoiceNumber || "—"}</NeuTableCell>
+                                <NeuTableCell>{submission.loadNumber || "—"}</NeuTableCell>
+                                <NeuTableCell className="text-right font-mono">{submission.amount ? `$${Number.parseFloat(submission.amount).toLocaleString()}` : "—"}</NeuTableCell>
+                                <NeuTableCell>{dateOnly(submission.submittedAt)}</NeuTableCell>
+                                <NeuTableCell>{statusBadge(submission.status)}</NeuTableCell>
+                                <NeuTableCell><NeuBadge>{submission.documents?.length || 0}</NeuBadge></NeuTableCell>
+                                <NeuTableCell>
+                                  <div className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+                                    <NeuButton onClick={() => openDetail(submission)} className="min-h-8 px-2.5 py-1 text-xs">View</NeuButton>
+                                    <NeuButton onClick={() => { openDetail(submission); setEditStatus("approved"); }} className="min-h-8 px-2.5 py-1 text-xs">Approve</NeuButton>
+                                    <NeuButton onClick={() => { openDetail(submission); setEditStatus("rejected"); }} className="min-h-8 px-2.5 py-1 text-xs text-[#943b3b]">Reject</NeuButton>
+                                    <NeuButton
+                                      title={!submission.carrierId ? "No linked carrier for this submission" : canUseChat ? "Message carrier" : "Chat permission required"}
+                                      aria-label="Message carrier"
+                                      disabled={!submission.carrierId || !canUseChat}
+                                      onClick={() => submission.carrierId && openChat(
+                                        submission.carrierId,
+                                        chatSummaries.find((chat) => String(chat.carrierId) === String(submission.carrierId))
+                                          || { carrierId: submission.carrierId, carrierName: submission.companyName },
+                                      )}
+                                      className="min-h-8 px-2.5 py-1 text-xs"
                                     >
-                                      {registrationMutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Check className="mr-1 h-4 w-4" />}
-                                      Approve
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => { setRejectingRegistration(registration); setRejectionReason(""); }}
-                                      disabled={registrationMutation.isPending}
-                                    >
-                                      <X className="mr-1 h-4 w-4" />
-                                      Reject
-                                    </Button>
+                                      <MessageCircle className="h-3.5 w-3.5" />
+                                      {!!submission.carrierId && carrierUnreadById.get(String(submission.carrierId)) ? carrierUnreadById.get(String(submission.carrierId)) : ""}
+                                    </NeuButton>
                                   </div>
-                                </TableCell>
-                              </TableRow>
+                                </NeuTableCell>
+                              </NeuTableRow>
                             ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>}
+                          </NeuTableBody>
+                        </NeuTable>
+                      )}
+                    </div>
+                  </NeuTabPanel>
+                )}
 
-              {canUseChat && <TabsContent value="messages">
-                <Card className="ff-portal-submission-surface border border-[hsl(var(--border))]">
-                  <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                    <CardTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5" />Carrier Messages</CardTitle>
-                    <CardDescription>{chatSummaries.length} conversation{chatSummaries.length === 1 ? "" : "s"}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {chatSummaries.length === 0 ? (
-                      <EmptyState icon={MessageCircle} title="No carrier conversations" description="Messages from carriers will appear here." />
+                {canUsePortal && (
+                  <NeuTabPanel value="registrations" className="space-y-5 p-4 sm:p-6">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                      <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#888]" />
+                        <NeuInput aria-label="Search registrations" placeholder="Search company, MC, email, or phone" value={registrationSearch} onChange={(event) => setRegistrationSearch(event.target.value)} className="pl-9" />
+                      </div>
+                      <NeuSelect aria-label="Filter registration status" value={registrationStatus} onChange={(event) => setRegistrationStatus(event.target.value)} className="lg:w-48">
+                        <option value="pending">Pending registrations</option>
+                        <option value="all">All loaded statuses</option>
+                      </NeuSelect>
+                      <div className="grid grid-cols-2 gap-2 lg:w-[19rem]">
+                        <NeuInput aria-label="Registered from date" type="date" value={registrationStartDate} onChange={(event) => setRegistrationStartDate(event.target.value)} className="px-2 text-xs" />
+                        <NeuInput aria-label="Registered through date" type="date" value={registrationEndDate} onChange={(event) => setRegistrationEndDate(event.target.value)} className="px-2 text-xs" />
+                      </div>
+                    </div>
+                    <div className="flex items-end justify-between gap-3">
+                      <div><p className="text-xs font-bold uppercase tracking-[0.13em] text-[#888]">Carrier accounts</p><h2 className="mt-1 text-xl font-semibold">Pending registrations</h2></div>
+                      <p className="text-sm text-[#777]">{filteredRegistrations.length} awaiting review</p>
+                    </div>
+                    {registrationsError ? (
+                      <NeuCard className="p-6 text-center">
+                        <p className="text-sm text-[#8b4e4e]">Registrations could not be loaded.</p>
+                        <NeuButton onClick={() => void refetchPortalUsers()} className="mt-3 min-h-9 px-3 py-1.5 text-xs">Try again</NeuButton>
+                      </NeuCard>
+                    ) : portalUsersLoading ? <SkeletonRows rows={4} cols={7} /> : filteredRegistrations.length === 0 ? (
+                      <NeuCard className="p-8 text-center"><EmptyState icon={UserCheck} title="No registrations" description="No pending carrier registrations match these filters." /></NeuCard>
                     ) : (
-                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {chatSummaries.map((chat) => {
-                          const last = typeof chat.lastMessage === "string" ? chat.lastMessage : chat.lastMessage?.message || "";
-                          const lastAt = chat.lastMessageAt || (typeof chat.lastMessage === "object" ? chat.lastMessage?.createdAt : null);
-                          return (
-                            <button key={String(chat.carrierId)} type="button" onClick={() => openChat(chat.carrierId, chat)} className="flex w-full items-center gap-3 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dff5f6] text-sm font-semibold text-[#087d8d]">{(chat.carrierName || "C").slice(0, 1).toUpperCase()}</div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between gap-2"><p className="truncate font-medium">{chat.carrierName || "Carrier"}</p><span className="shrink-0 text-[11px] text-slate-400">{formatChatTime(lastAt)}</span></div>
-                                <p className="text-xs text-slate-500">{chat.mcNumber ? `MC ${chat.mcNumber}` : "Carrier"}</p>
-                                <p className="truncate text-xs text-slate-500">{last || "No messages yet"}</p>
-                              </div>
-                              {!!chat.unreadCount && <Badge className="h-5 min-w-5 justify-center rounded-full bg-[#b54444] px-1 text-[10px] text-white">{chat.unreadCount > 9 ? "9+" : chat.unreadCount}</Badge>}
-                            </button>
-                          );
-                        })}
+                      <NeuTable>
+                        <NeuTableHeader>
+                          <NeuTableRow className="hover:bg-transparent">
+                            <NeuTableHead>Carrier</NeuTableHead><NeuTableHead>MC #</NeuTableHead>
+                            <NeuTableHead>Contact email</NeuTableHead><NeuTableHead>Phone</NeuTableHead>
+                            <NeuTableHead>Submitted</NeuTableHead><NeuTableHead>Status</NeuTableHead><NeuTableHead>Actions</NeuTableHead>
+                          </NeuTableRow>
+                        </NeuTableHeader>
+                        <NeuTableBody>
+                          {filteredRegistrations.map((registration) => (
+                            <NeuTableRow key={registration.id}>
+                              <NeuTableCell className="font-semibold">{registration.companyName || "—"}</NeuTableCell>
+                              <NeuTableCell>{registration.mcNumber || "—"}</NeuTableCell>
+                              <NeuTableCell>{registration.email || "—"}</NeuTableCell>
+                              <NeuTableCell>{registration.phone || registration.phoneNumber || "—"}</NeuTableCell>
+                              <NeuTableCell>{dateOnly(registration.createdAt)}</NeuTableCell>
+                              <NeuTableCell><NeuBadge tone="warning" className="capitalize">{prettyStatus(registration.status)}</NeuBadge></NeuTableCell>
+                              <NeuTableCell>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <NeuButton onClick={() => setRegistrationDetail(registration)} className="min-h-8 px-2.5 py-1 text-xs">View details</NeuButton>
+                                  <NeuButton onClick={() => registrationMutation.mutate({ id: registration.id, action: "approve" })} disabled={registrationMutation.isPending} className="min-h-8 px-2.5 py-1 text-xs">
+                                    <Check className="h-3.5 w-3.5" />Approve
+                                  </NeuButton>
+                                  <NeuButton onClick={() => { setRejectingRegistration(registration); setRejectionReason(""); }} disabled={registrationMutation.isPending} className="min-h-8 px-2.5 py-1 text-xs">
+                                    <X className="h-3.5 w-3.5" />Reject
+                                  </NeuButton>
+                                </div>
+                              </NeuTableCell>
+                            </NeuTableRow>
+                          ))}
+                        </NeuTableBody>
+                      </NeuTable>
+                    )}
+                  </NeuTabPanel>
+                )}
+
+                {canUseChat && (
+                  <NeuTabPanel value="messages" className="p-3 sm:p-5">
+                    {chatListError ? (
+                      <NeuCard className="p-8 text-center">
+                        <p className="text-sm text-[#8b4e4e]">Carrier conversations could not be loaded.</p>
+                        <NeuButton onClick={() => void refetchChatList()} className="mt-3 min-h-9 px-3 py-1.5 text-xs">Try again</NeuButton>
+                      </NeuCard>
+                    ) : chatSummaries.length === 0 ? (
+                      <NeuCard className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
+                        <MessageCircle className="mb-3 h-8 w-8 text-[#27aab8]" />
+                        <p className="font-semibold">No messages</p>
+                        <p className="mt-1 text-sm text-[#888]">Carrier conversations will appear here.</p>
+                      </NeuCard>
+                    ) : (
+                      <div className="grid min-h-[560px] min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(250px,0.82fr)_minmax(0,1.7fr)]">
+                        <NeuCard className="min-h-0 overflow-hidden p-3">
+                          <div className="mb-3 flex items-center justify-between px-1">
+                            <div><p className="text-xs font-bold uppercase tracking-[0.13em] text-[#888]">Inbox</p><h2 className="font-semibold">Carrier messages</h2></div>
+                            <NeuBadge>{chatSummaries.length}</NeuBadge>
+                          </div>
+                          <div className="max-h-[68vh] space-y-2 overflow-y-auto p-1">
+                            {chatSummaries.map((chat) => {
+                              const last = typeof chat.lastMessage === "string" ? chat.lastMessage : chat.lastMessage?.message || "";
+                              const lastAt = chat.lastMessageAt || (typeof chat.lastMessage === "object" ? chat.lastMessage?.createdAt : null);
+                              const active = inlineCarrier?.id === Number(chat.carrierId);
+                              const initials = (chat.carrierName || "Carrier").split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+                              return (
+                                <button
+                                  key={String(chat.carrierId)}
+                                  type="button"
+                                  onClick={() => selectInlineChat(chat.carrierId, chat)}
+                                  aria-pressed={active}
+                                  className={`flex w-full min-w-0 items-center gap-3 rounded-xl p-3 text-left transition-[transform,box-shadow] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8] ${active ? "bg-[#e0e0e0] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]" : "bg-[#e0e0e0] shadow-[-4px_-4px_8px_#fff,4px_4px_8px_#c1c1c1]"}`}
+                                >
+                                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#d4e7e7] text-sm font-semibold text-[#267b82]">{initials}</span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-semibold">{chat.carrierName || "Carrier"}</span><span className="shrink-0 text-[10px] text-[#888]">{formatChatTime(lastAt)}</span></span>
+                                    <span className="block text-xs text-[#777]">{chat.mcNumber ? `MC ${chat.mcNumber}` : "Carrier conversation"}</span>
+                                    <span className="mt-1 block truncate text-xs text-[#777]">{last || "No messages yet"}</span>
+                                  </span>
+                                  {!!chat.unreadCount && <NeuBadge tone="accent" className="px-2 py-0.5">{chat.unreadCount > 9 ? "9+" : chat.unreadCount}</NeuBadge>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </NeuCard>
+                        <NeuCard className="flex min-h-[520px] min-w-0 flex-col overflow-hidden p-1">
+                          {inlineCarrier ? (
+                            <CarrierChatThread
+                              key={`inline-${inlineCarrier.id}`}
+                              carrierId={inlineCarrier.id}
+                              carrierName={inlineCarrier.name}
+                              mcNumber={inlineCarrier.mcNumber}
+                              neu
+                            />
+                          ) : (
+                            <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+                              <MessageCircle className="mb-3 h-8 w-8 text-[#27aab8]" />
+                              <p className="font-semibold">Choose a conversation</p>
+                              <p className="mt-1 text-sm text-[#888]">Select a carrier to view the thread and reply.</p>
+                            </div>
+                          )}
+                        </NeuCard>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              </TabsContent>}
-            </Tabs>}
+                  </NeuTabPanel>
+                )}
+              </NeuTabs>
+            )}
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
-      {/* Registration rejection dialog */}
       <Dialog open={!!rejectingRegistration} onOpenChange={(open) => {
         if (!open && !registrationMutation.isPending) {
           setRejectingRegistration(null);
           setRejectionReason("");
         }
       }}>
-        <DialogContent className="ff-portal-submission-surface max-w-lg">
+        <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Reject carrier registration</DialogTitle>
-            <DialogDescription>
-              Provide a reason for rejecting {rejectingRegistration?.companyName || "this registration"}. The reason will be sent to the carrier.
-            </DialogDescription>
+            <DialogDescription className="text-[#777]">Provide a reason for rejecting {rejectingRegistration?.companyName || "this registration"}. The reason will be sent to the carrier.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <label htmlFor="registration-rejection-reason" className="text-sm font-medium">
-              Rejection reason <span className="text-red-600">*</span>
-            </label>
-            <Textarea
-              id="registration-rejection-reason"
-              value={rejectionReason}
-              onChange={(event) => setRejectionReason(event.target.value)}
-              placeholder="Explain why this registration cannot be approved…"
-              rows={4}
-              className="resize-none"
-              required
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setRejectingRegistration(null)} disabled={registrationMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
+          <label htmlFor="registration-rejection-reason" className="text-sm font-medium">Rejection reason <span className="text-[#a44]">*</span></label>
+          <Textarea
+            id="registration-rejection-reason"
+            value={rejectionReason}
+            onChange={(event) => setRejectionReason(event.target.value)}
+            placeholder="Explain why this registration cannot be approved"
+            rows={4}
+            className="min-w-0 resize-none rounded-xl border-0 bg-[#e0e0e0] text-[#333] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]"
+            required
+          />
+          <div className="flex flex-wrap justify-end gap-2">
+            <NeuButton onClick={() => setRejectingRegistration(null)} disabled={registrationMutation.isPending} className="min-h-9 px-3 py-1.5 text-xs">Cancel</NeuButton>
+            <NeuButton
+              variant="accent"
               onClick={() => {
-                if (rejectingRegistration && rejectionReason.trim()) {
-                  registrationMutation.mutate({
-                    id: rejectingRegistration.id,
-                    action: "reject",
-                    reason: rejectionReason.trim(),
-                  });
-                }
+                if (rejectingRegistration && rejectionReason.trim()) registrationMutation.mutate({
+                  id: rejectingRegistration.id, action: "reject", reason: rejectionReason.trim(),
+                });
               }}
               disabled={!rejectionReason.trim() || registrationMutation.isPending}
-            >
-              {registrationMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Reject registration
-            </Button>
+              className="min-h-9 px-3 py-1.5 text-xs"
+            >Reject registration</NeuButton>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Detail Dialog */}
-      <Dialog open={!!detail} onOpenChange={(o) => { if (!o) setDetail(null); }}>
-        <DialogContent className="ff-portal-submission-surface max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!registrationDetail} onOpenChange={(open) => !open && setRegistrationDetail(null)}>
+        <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>
-              Submission #{detail?.id} — {detail?.companyName || `Portal User #${detail?.portalUserId}`}
-            </DialogTitle>
-            <DialogDescription>Review documents and update submission status.</DialogDescription>
+            <DialogTitle>{registrationDetail?.companyName || "Carrier registration"}</DialogTitle>
+            <DialogDescription className="text-[#777]">Submitted carrier details available for this registration.</DialogDescription>
           </DialogHeader>
+          {registrationDetail && (
+            <NeuCard className="grid min-w-0 grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+              {[
+                ["Company", registrationDetail.companyName],
+                ["MC number", registrationDetail.mcNumber],
+                ["DOT number", registrationDetail.dotNumber],
+                ["Contact email", registrationDetail.email],
+                ["Phone", registrationDetail.phone || registrationDetail.phoneNumber],
+                ["Registered", registrationDetail.createdAt ? new Date(registrationDetail.createdAt).toLocaleString() : null],
+                ["Status", prettyStatus(registrationDetail.status)],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <p className="text-xs text-[#888]">{label}</p>
+                  <p className="break-words text-sm font-medium">{value || "—"}</p>
+                </div>
+              ))}
+            </NeuCard>
+          )}
+        </DialogContent>
+      </Dialog>
 
+      <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto overflow-x-hidden rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Submission #{detail?.id} — {detail?.companyName || `Portal User #${detail?.portalUserId}`}</DialogTitle>
+            <DialogDescription className="text-[#777]">Review the submitted details and attached documents.</DialogDescription>
+          </DialogHeader>
           {detail && (
-            <div className="space-y-5">
-              {/* Load Info */}
-              <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="min-w-0 space-y-4">
+              <NeuCard className="grid min-w-0 grid-cols-1 gap-4 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 {[
+                  ["Carrier", detail.companyName || `Portal User #${detail.portalUserId}`],
                   ["Load #", detail.loadNumber],
                   ["Invoice #", detail.invoiceNumber],
                   ["Broker", detail.brokerName],
@@ -630,120 +780,107 @@ export default function PortalSubmissionsPage() {
                   ["Code", detail.code],
                   ["Lumper", detail.lumper == null ? "—" : detail.lumper ? "Yes" : "No"],
                   ["Driver", detail.driverName],
-                  ["Bank Account", detail.bankAccount ? `${detail.bankAccount.nickname} · ${detail.bankAccount.bankName} ••••${detail.bankAccount.lastFour}` : "—"],
-                  ["Amount", detail.amount ? `$${parseFloat(detail.amount).toLocaleString()}` : "—"],
+                  ["Bank account", detail.bankAccount ? `${detail.bankAccount.nickname} · ${detail.bankAccount.bankName} ••••${detail.bankAccount.lastFour}` : "—"],
+                  ["Amount", detail.amount ? `$${Number.parseFloat(detail.amount).toLocaleString()}` : "—"],
                   ["Payment", detail.paymentType],
                   ["Submitted", detail.submittedAt ? new Date(detail.submittedAt).toLocaleString() : "—"],
-                ].map(([k, v]) => (
-                  <div key={k}>
-                    <p className="text-xs text-slate-400">{k}</p>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">{v || "—"}</p>
+                  ["Load type", detail.loadType],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <p className="text-xs text-[#888]">{label}</p>
+                    <p className="break-words font-medium">{value || "—"}</p>
                   </div>
                 ))}
-              </div>
-
-              <div className="ff-portal-submission-surface flex items-center justify-between border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
-                <div>
-                  <p className="text-xs text-slate-500">Load Type</p>
-                  <LoadTypeBadge value={detail.loadType} />
-                </div>
-                <Button onClick={() => {
-                  if (!detail.reviewedAt) reviewMutation.mutate(detail.id);
-                  setCreateInvoiceOpen(true);
-                }} disabled={!detail.carrierId || !detail.brokerId || !detail.branchId}>
-                  Create Invoice from Submission
-                </Button>
-              </div>
+              </NeuCard>
 
               {(detail.instructionsSubject || detail.instructionsDetails) && (
-                <div className="ff-portal-submission-surface border border-slate-200 p-3">
-                  <p className="text-xs font-semibold text-slate-500">Instructions</p>
-                  {detail.instructionsSubject && <p className="mt-1 font-medium">{detail.instructionsSubject}</p>}
-                  {detail.instructionsDetails && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{detail.instructionsDetails}</p>}
-                </div>
+                <NeuCard className="p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#888]">Carrier instructions</p>
+                  {detail.instructionsSubject && <p className="mt-2 font-semibold">{detail.instructionsSubject}</p>}
+                  {detail.instructionsDetails && <p className="mt-1 whitespace-pre-wrap text-sm text-[#555]">{detail.instructionsDetails}</p>}
+                </NeuCard>
               )}
 
-              {/* Documents */}
-              {detail.documents && detail.documents.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 mb-2">Documents ({detail.documents.length})</p>
-                  <div className="space-y-1.5">
-                    {detail.documents.map((doc) => (
-                      <div key={doc.id} className="ff-portal-submission-surface flex items-center gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2">
-                        <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                        <div className="min-w-0 flex-1"><span className="text-sm truncate">{doc.originalName}</span><CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} /></div>
-                        <Badge variant="outline" className="text-[10px] px-1.5">{DOC_LABEL[doc.documentType] || doc.documentType}</Badge>
-                        <a href={`/api/portal/submissions/${detail.id}/documents/${doc.id}/view`} target="_blank" rel="noreferrer"
-                          className="p-1 text-slate-400 hover:text-blue-600" title="View">
-                          <Eye className="h-4 w-4" />
-                        </a>
-                        <a href={`/api/portal/submissions/${detail.id}/documents/${doc.id}/download`}
-                          className="p-1 text-slate-400 hover:text-blue-600" title="Download">
-                          <Download className="h-4 w-4" />
-                        </a>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#888]">Submitted documents</p><p className="mt-1 text-sm text-[#777]">{detail.documents?.length || 0} attached</p></div>
+                <NeuButton
+                  variant="accent"
+                  onClick={() => {
+                    if (!detail.reviewedAt) reviewMutation.mutate(detail.id);
+                    setCreateInvoiceOpen(true);
+                  }}
+                  disabled={!detail.carrierId || !detail.brokerId || !detail.branchId}
+                  className="min-h-9 px-3 py-1.5 text-xs"
+                >Create invoice</NeuButton>
+              </div>
+              {detail.documents?.length ? (
+                <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                  {detail.documents.map((doc) => (
+                    <NeuCard key={doc.id} className="flex min-w-0 items-center gap-3 p-3">
+                      <FileText className="h-5 w-5 shrink-0 text-[#27aab8]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold" title={doc.originalName}>{doc.originalName}</p>
+                        <p className="text-xs capitalize text-[#888]">{DOC_LABEL[doc.documentType] || doc.documentType}</p>
+                        <CompressionInfo originalSize={doc.originalSize} compressedSize={doc.compressedSize} />
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex shrink-0 gap-1.5">
+                        <NeuButton onClick={() => window.open(`/api/portal/submissions/${detail.id}/documents/${doc.id}/view`, "_blank", "noopener,noreferrer")} className="min-h-8 px-2 py-1 text-xs" aria-label={`View ${doc.originalName}`} title="View">
+                          <Eye className="h-3.5 w-3.5" />
+                        </NeuButton>
+                        <NeuButton onClick={() => { window.location.href = `/api/portal/submissions/${detail.id}/documents/${doc.id}/download`; }} className="min-h-8 px-2 py-1 text-xs" aria-label={`Download ${doc.originalName}`} title="Download">
+                          <Download className="h-3.5 w-3.5" />
+                        </NeuButton>
+                      </div>
+                    </NeuCard>
+                  ))}
                 </div>
+              ) : (
+                <NeuCard className="p-4 text-center text-sm text-[#888]">No documents were attached to this submission.</NeuCard>
               )}
 
-              {/* Status + Notes Update */}
-              <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Update Submission</p>
-                <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Status</label>
-                  <Select value={editStatus} onValueChange={setEditStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTS.map((s) => (
-                        <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <NeuCard className="space-y-3 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#888]">Review record</p><div className="mt-2">{reviewIndicator(detail)}</div></div>
+                  {detail.reviewedBy && <p className="text-xs text-[#888]">Reviewed by {detail.reviewedBy}</p>}
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Notes (visible to carrier)</label>
+                  <label htmlFor="submission-status" className="mb-1 block text-xs text-[#777]">Submission status</label>
+                  <NeuSelect id="submission-status" value={editStatus} onChange={(event) => setEditStatus(event.target.value)}>
+                    {STATUS_OPTS.map((status) => <option key={status} value={status}>{prettyStatus(status)}</option>)}
+                  </NeuSelect>
+                </div>
+                <div>
+                  <label htmlFor="submission-notes" className="mb-1 block text-xs text-[#777]">Notes visible to carrier</label>
                   <Textarea
+                    id="submission-notes"
                     value={editNotes}
-                    onChange={(e) => setEditNotes(e.target.value)}
+                    onChange={(event) => setEditNotes(event.target.value)}
                     rows={3}
-                    placeholder="Add notes for the carrier…"
-                    className="resize-none"
+                    placeholder="Add notes for the carrier"
+                    className="min-w-0 resize-none rounded-xl border-0 bg-[#e0e0e0] text-[#333] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]"
                   />
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setDetail(null)}>Close</Button>
-                  <Button
-                    onClick={() => updateMutation.mutate({ id: detail.id, status: editStatus, notes: editNotes })}
-                    disabled={updateMutation.isPending}
-                  >
-                    {updateMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : "Save Changes"}
-                  </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <NeuButton variant="accent" onClick={() => updateMutation.mutate({ id: detail.id, status: editStatus, notes: editNotes })} disabled={updateMutation.isPending} className="min-h-9 px-3 py-1.5 text-xs">
+                    {updateMutation.isPending ? "Saving…" : editStatus === "approved" ? "Approve submission" : editStatus === "rejected" ? "Reject submission" : "Save changes"}
+                  </NeuButton>
                 </div>
-              </div>
+              </NeuCard>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
       <Sheet open={!!chatCarrier} onOpenChange={(open) => !open && closeChat()}>
-        <SheetContent side="right" className="ff-portal-submission-surface flex w-full flex-col sm:max-w-xl">
+        <SheetContent side="right" className="flex w-full flex-col !border-0 !bg-[#e0e0e0] text-[#333] !shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] sm:max-w-xl [&&>button]:!rounded-full [&&>button]:!border-0 [&&>button]:!bg-[#e0e0e0] [&&>button]:!shadow-[-4px_-4px_8px_#fff,4px_4px_8px_#b8b8b8] [&&>button]:hover:!text-[#27aab8]">
           <SheetHeader className="shrink-0 pr-8">
             <SheetTitle>Carrier messages</SheetTitle>
-            <SheetDescription>
-              {chatCarrier?.name ? `Conversation with ${chatCarrier.name}.` : "Agent-to-carrier conversation."}
-            </SheetDescription>
+            <SheetDescription className="text-[#777]">{chatCarrier?.name ? `Conversation with ${chatCarrier.name}.` : "Agent-to-carrier conversation."}</SheetDescription>
           </SheetHeader>
-          {chatCarrier && (
-            <CarrierChatThread
-              carrierId={chatCarrier.id}
-              carrierName={chatCarrier.name}
-              mcNumber={chatCarrier.mcNumber}
-            />
-          )}
+          {chatCarrier && <CarrierChatThread carrierId={chatCarrier.id} carrierName={chatCarrier.name} mcNumber={chatCarrier.mcNumber} />}
         </SheetContent>
       </Sheet>
+
       {detail && (
         <CreateInvoiceModal
           open={createInvoiceOpen}
