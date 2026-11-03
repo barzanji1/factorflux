@@ -5,26 +5,41 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectItem, SelectValue,
 } from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Plus, Edit, UserX, Phone, Mail, Search, Headset } from "lucide-react";
+import {
+  OperationsBadge,
+  OperationsButton as Button,
+  OperationsCard as Card,
+  OperationsDialogContent as DialogContent,
+  OperationsInput as Input,
+  OperationsSelectContent as SelectContent,
+  OperationsSelectTrigger as SelectTrigger,
+} from "@/components/operations/operations-controls";
+import {
+  NeuPageShell,
+  NeuStatCard,
+  NeuTable as Table,
+  NeuTableBody as TableBody,
+  NeuTableCell as TableCell,
+  NeuTableHead as TableHead,
+  NeuTableHeader as TableHeader,
+  NeuTableRow as TableRow,
+} from "@/styles/neu/components";
+import "@/components/operations/operations-neu.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,11 +190,11 @@ export default function Dispatchers() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="ff-dispatchers-page flex h-screen overflow-hidden bg-[#d4d0c8]">
+    <div className="operations-neu-page ff-dispatchers-page flex min-h-[100dvh] overflow-hidden">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav title="Dispatchers" />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <TopNav title="Dispatchers" neu />
+        <NeuPageShell className="!min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -205,17 +220,12 @@ export default function Dispatchers() {
               { label: "Active Dispatchers", value: dispatchers.filter((d) => d.status === "active").length },
               { label: "Carrier Linked", value: dispatchers.filter((d) => d.carrierId !== null).length },
             ].map((stat) => (
-              <Card key={stat.label} className="ff-dashboard-card ff-dispatchers-surface">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><Headset className="h-5 w-5" /></div>
-                  <div><p className="text-xs text-muted-foreground">{stat.label}</p><p className="text-xl font-bold text-[#087d8d]">{stat.value}</p></div>
-                </CardContent>
-              </Card>
+              <NeuStatCard key={stat.label} label={stat.label} value={stat.value} icon={<Headset className="h-5 w-5" />} className="operations-neu-surface min-h-32 p-4" />
             ))}
           </div>
 
           {/* Filters */}
-          <Card className="ff-dispatchers-surface">
+            <Card className="operations-neu-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <div className="relative flex-1 min-w-[200px]">
@@ -253,7 +263,7 @@ export default function Dispatchers() {
           </Card>
 
           {/* Table */}
-          <Card className="ff-table-container ff-dispatchers-surface overflow-hidden">
+          <Card className="ff-table-container operations-neu-surface overflow-hidden">
             <CardContent className="p-0">
               <Table className="ff-data-table">
                 <TableHeader>
@@ -300,15 +310,15 @@ export default function Dispatchers() {
                         </TableCell>
                         <TableCell>
                           {d.carrierId ? (
-                            <span className="ff-badge ff-badge-submitted">{carrierMap[d.carrierId] ?? `#${d.carrierId}`}</span>
+                            <OperationsBadge className="ff-badge ff-badge-submitted">{carrierMap[d.carrierId] ?? `#${d.carrierId}`}</OperationsBadge>
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <span className={`ff-badge ${d.status === "active" ? "ff-badge-funded" : "ff-badge-draft"}`}>
+                          <OperationsBadge className={`ff-badge ${d.status === "active" ? "ff-badge-funded" : "ff-badge-draft"}`}>
                             {d.status === "active" ? "Active" : "Inactive"}
-                          </span>
+                          </OperationsBadge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -340,12 +350,12 @@ export default function Dispatchers() {
               </Table>
             </CardContent>
           </Card>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="ff-dispatchers-surface max-w-lg">
+        <DialogContent className="operations-neu-dialog max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Dispatcher" : "Add Dispatcher"}</DialogTitle>
           </DialogHeader>

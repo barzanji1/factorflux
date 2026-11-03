@@ -1,27 +1,25 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { useRiskToast as useToast } from "@/components/risk/risk-controls";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow, format, differenceInDays } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CardContent } from "@/components/ui/card";
+import { RiskCard as Card, RiskButton as Button, RiskInput as Input, RiskDialogContent as DialogContent, RiskSelectContent as SelectContent, RiskSelectTrigger as SelectTrigger, RiskStatCard, RiskBadge, RiskTable } from "@/components/risk/risk-controls";
+import { NeuPageShell } from "@/styles/neu/components";
+import "@/components/risk/risk-neu.css";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
-  SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -71,9 +69,9 @@ function DaysBadge({ days }: { days: number }) {
     days <= 7 ? "ff-badge-pending" :
                 "ff-badge-rejected";
   return (
-    <span className={cn("ff-badge gap-1", color)}>
+    <RiskBadge className={cn("ff-badge gap-1", color)}>
       <Clock className="h-2.5 w-2.5" /> {days}d
-    </span>
+    </RiskBadge>
   );
 }
 
@@ -222,11 +220,11 @@ export default function HeldQueue() {
   const uniqueReasons = Array.from(new Set(held.map(i => i.heldReason).filter(Boolean)));
 
   return (
-    <div className="ff-held-page flex h-screen bg-[#d4d0c8]">
+    <div className="risk-neu-page ff-held-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav title="Held Queue" subtitle="Invoices blocked from funding" />
-        <main className="flex-1 overflow-auto p-6">
+      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+        <TopNav title="Held Queue" subtitle="Invoices blocked from funding" neu />
+        <NeuPageShell className="!min-h-0 flex-1 overflow-auto p-6">
           <div className="max-w-7xl mx-auto space-y-5">
 
             {/* Header */}
@@ -249,15 +247,7 @@ export default function HeldQueue() {
                 { label: "Total Amount Held",     value: fmt(totalDollar),          icon: DollarSign,   color: "text-red-600 dark:text-red-400",        bg: "bg-red-50 dark:bg-red-950/20"        },
                 { label: "Avg Days on Hold",      value: `${avgDays.toFixed(1)}d`,  icon: BarChart3,    color: "text-slate-600 dark:text-slate-400",    bg: "bg-slate-100 dark:bg-slate-800"      },
               ].map(s => (
-                <Card key={s.label} className="ff-dashboard-card ff-held-surface border border-slate-200 dark:border-slate-700">
-                  <CardContent className="p-4">
-                    <div className={cn("inline-flex items-center justify-center rounded-lg p-2 mb-2", s.bg)}>
-                      <s.icon className={cn("h-4 w-4", s.color)} />
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
-                    <p className={cn("text-lg font-bold mt-0.5", s.color)}>{s.value}</p>
-                  </CardContent>
-                </Card>
+                <RiskStatCard key={s.label} label={s.label} value={s.value} icon={<s.icon className={cn("h-5 w-5", s.color)} />} className="min-h-32 p-4" />
               ))}
             </div>
 
@@ -270,7 +260,7 @@ export default function HeldQueue() {
             )}
 
             {/* Filters */}
-            <div className="ff-card ff-held-surface flex flex-wrap items-center gap-2 p-3">
+            <Card className="ff-card ff-held-surface flex flex-wrap items-center gap-2 p-3">
               <div className="relative flex-1 min-w-[200px] max-w-xs">
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <Input
@@ -292,12 +282,12 @@ export default function HeldQueue() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Card>
 
             {/* Table */}
             <Card className="ff-table-container ff-held-surface border border-slate-200 dark:border-slate-700 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="ff-data-table w-full text-sm">
+                <RiskTable className="ff-data-table w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                       {["Invoice #", "Carrier", "Broker", "Amount", "Hold Reason", "Held Date", "Held By", "Days on Hold", "Action"].map(h => (
@@ -348,10 +338,10 @@ export default function HeldQueue() {
                             {fmt(inv.amount)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="ff-badge ff-badge-hold gap-1">
+                            <RiskBadge className="ff-badge ff-badge-hold gap-1">
                               <AlertTriangle className="h-2.5 w-2.5" />
                               {inv.heldReason ?? "Unspecified"}
-                            </span>
+                            </RiskBadge>
                             {!!inv.heldFor?.length && <p className="mt-1 text-xs capitalize">Held for: {inv.heldFor.join(", ")}</p>}
                             {inv.heldNotes && (
                               <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">{inv.heldNotes}</p>
@@ -380,11 +370,11 @@ export default function HeldQueue() {
                       );
                     })}
                   </tbody>
-                </table>
+                </RiskTable>
               </div>
             </Card>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       {releaseTarget && (

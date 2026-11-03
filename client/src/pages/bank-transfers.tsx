@@ -5,20 +5,30 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent, FundingDropdownMenuContent as DropdownMenuContent } from "@/components/funding/funding-controls";
+import { CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
+import {
+  NeuTable as Table,
+  NeuTableBody as TableBody,
+  NeuTableCell as TableCell,
+  NeuTableHead as TableHead,
+  NeuTableHeader as TableHeader,
+  NeuTableRow as TableRow,
+} from "@/styles/neu/components";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Plus, MoreHorizontal, Download, Landmark,
 } from "lucide-react";
+import "@/components/funding/funding-neu.css";
+import { NeuPageShell } from "@/styles/neu/components";
+import { FundingBadge } from "@/components/funding/funding-badge";
+import { FundingStatCard } from "@/components/funding/funding-stat-card";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +79,8 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? { label: status, className: "ff-badge-draft" };
-  return <span className={`ff-badge ${cfg.className}`}>{cfg.label}</span>;
+  const tone = status === "completed" ? "success" : status === "failed" ? "warning" : status === "processing" ? "accent" : "neutral";
+  return <FundingBadge tone={tone} className={`ff-badge ${cfg.className}`}>{cfg.label}</FundingBadge>;
 }
 
 function fmt(n: string | number) {
@@ -227,11 +238,11 @@ export default function BankTransfers() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="ff-bank-transfers-page flex h-screen overflow-hidden bg-[#d4d0c8]">
+    <div className="funding-neu-page ff-bank-transfers-page flex h-screen overflow-hidden bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav title="Bank Transfers" />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <TopNav title="Bank Transfers" neu />
+        <NeuPageShell className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -257,18 +268,8 @@ export default function BankTransfers() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Card className="ff-dashboard-card ff-bank-transfers-surface">
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><Landmark className="h-5 w-5" /></div>
-                <div><p className="text-xs text-muted-foreground">Filtered Transfers</p><p className="text-xl font-bold">{filtered.length}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="ff-dashboard-card ff-bank-transfers-surface">
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><Download className="h-5 w-5" /></div>
-                <div><p className="text-xs text-muted-foreground">Filtered Total</p><p className="text-xl font-bold text-[#087d8d]">{fmt(totalFiltered)}</p></div>
-              </CardContent>
-            </Card>
+            <FundingStatCard label="Filtered Transfers" value={filtered.length} icon={<Landmark className="h-5 w-5" />} className="min-h-32 p-4" />
+            <FundingStatCard label="Filtered Total" value={fmt(totalFiltered)} icon={<Download className="h-5 w-5" />} className="min-h-32 p-4" />
           </div>
 
           {/* Filters */}
@@ -413,12 +414,12 @@ export default function BankTransfers() {
               </Table>
             </CardContent>
           </Card>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* New / Edit Transfer Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="ff-bank-transfers-surface max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="funding-neu-dialog ff-bank-transfers-surface max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Transfer" : "New Transfer"}</DialogTitle>
           </DialogHeader>

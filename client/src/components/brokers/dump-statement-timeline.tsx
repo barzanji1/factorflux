@@ -6,6 +6,8 @@ import { NeuBadge, NeuButton } from "@/styles/neu/components";
 interface StatementHistoryEvent {
   id: number;
   eventType: string;
+  noteId?: number | null;
+  noteAction?: string | null;
   createdAt: string;
   label: string;
   statementId: string | null;
@@ -50,7 +52,7 @@ function eventTone(event: StatementHistoryEvent, neuStyle = false) {
   return "border-[#80a6a9] bg-[#e6f1ef] text-[#245b60]";
 }
 
-export default function DumpStatementTimeline({ brokerId, neuStyle = false }: { brokerId: number; neuStyle?: boolean }) {
+export default function DumpStatementTimeline({ brokerId, neuStyle = false, onOpenNote }: { brokerId: number; neuStyle?: boolean; onOpenNote?: (noteId: number | null) => void }) {
   const query = useQuery<StatementHistoryEvent[]>({
     queryKey: ["/api/brokers", brokerId, "statement-history"],
     queryFn: async ({ signal }) => {
@@ -104,7 +106,7 @@ export default function DumpStatementTimeline({ brokerId, neuStyle = false }: { 
   return (
     <section aria-label="Dump statement timeline" className="space-y-3" data-testid="dump-statement-timeline">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className={`font-bold ${neuStyle ? "text-[#354548]" : "text-slate-800"}`}>Dump statement history</h3>
+        <h3 className={`font-bold ${neuStyle ? "text-[#354548]" : "text-slate-800"}`}>{onOpenNote ? "Broker activity" : "Dump statement history"}</h3>
         <span className={`text-xs ${neuStyle ? "text-[#758587]" : "text-slate-500"}`}>{events.length} {events.length === 1 ? "event" : "events"}</span>
       </div>
       <ol className={neuStyle ? "relative space-y-2 border-l-2 border-[#78c0c4] pl-4 sm:pl-5" : "space-y-3"}>
@@ -126,6 +128,11 @@ export default function DumpStatementTimeline({ brokerId, neuStyle = false }: { 
                       {amount && <span>Total balance {amount}</span>}
                     </div>
                     {event.error && <p className="mt-2 text-sm text-[#a34e48]">{event.error}</p>}
+                    {event.noteId && onOpenNote && (
+                      <NeuButton className="mt-2 min-h-8 px-3 text-xs" onClick={() => onOpenNote(event.noteAction === "delete" ? null : event.noteId!)}>
+                        {event.noteAction === "delete" ? "Open notes" : "View note"}
+                      </NeuButton>
+                    )}
                   </div>
                 </div>
                 {event.downloadUrl && (

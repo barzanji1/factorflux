@@ -6,8 +6,8 @@ import { format } from "date-fns";
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pause, Play, RefreshCw, Search, ShieldAlert, StopCircle, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { CollectionRunFailure, runBrokerCollections } from "@/lib/brokerCollections";
-import { Win95Button as Button, Win95Card as Card } from "@/components/win95";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RecoveryBadge, RecoveryButton as Button, RecoveryCard as Card, RecoveryInput as Input, RecoverySelect as Select, RecoveryDialogContent as DialogContent, RecoveryTable } from "@/components/recovery/recovery-controls";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { CollectionRow as QueueRow, CollectionEvent, CollectionQueue as QueueResponse,
   CollectionDetail as DetailResponse, CollectionSettings as Settings, CollectionRunResult } from "@shared/broker-collections";
 
@@ -149,11 +149,11 @@ export default function CollectionsAutomation() {
               if (e.target.checked && currentSettings.mode === "live") setPending({ kind: "global-live" });
               else settingsMutation.mutate({ enabled: e.target.checked, mode: currentSettings.mode });
             }} /> Enabled</label>
-            <select aria-label="Global automation mode" className="h-8 border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white px-2 text-xs" value={currentSettings.mode} disabled={settingsMutation.isPending} onChange={e => {
+            <Select aria-label="Global automation mode" className="h-8 min-w-[120px] px-2 text-xs" value={currentSettings.mode} disabled={settingsMutation.isPending} onChange={e => {
               const mode = e.target.value as Settings["mode"];
               if (mode === "live" && currentSettings.enabled) setPending({ kind: "global-live" });
               else settingsMutation.mutate({ enabled: currentSettings.enabled, mode });
-            }}><option value="dry_run">Dry run</option><option value="live">Live</option></select>
+            }}><option value="dry_run">Dry run</option><option value="live">Live</option></Select>
             <Button size="sm" variant="outline" className="h-8" disabled={runMutation.isPending} onClick={() => runMutation.mutate()}>{runMutation.isPending ? "Running…" : "Run now"}</Button>
           </div>}
         </div>}
@@ -175,8 +175,8 @@ export default function CollectionsAutomation() {
           </div>
           <form onSubmit={submitSearch} className="flex gap-1 md:ml-auto">
             <label className="sr-only" htmlFor="collections-search">Search broker, invoice, or load</label>
-            <div className="relative"><Search className="absolute left-2 top-2 h-3.5 w-3.5 text-[#666]" /><input id="collections-search" value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Broker, invoice, load…" className="h-8 w-full border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white pl-7 pr-2 text-xs md:w-56" /></div>
-            <Button size="sm" className="h-8" type="submit">Search</Button>
+            <div className="relative min-w-0"><Search className="absolute left-2 top-2 h-3.5 w-3.5 text-[#666]" /><Input id="collections-search" value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Broker, invoice, load…" className="h-8 w-full pl-7 pr-2 text-xs md:w-56" /></div>
+            <Button size="sm" variant="accent" className="h-8" type="submit">Search</Button>
           </form>
         </div>
 
@@ -184,11 +184,11 @@ export default function CollectionsAutomation() {
           : queue.error ? <div role="alert" className="p-5 text-sm text-[#8b1d16]"><AlertCircle className="mr-1 inline h-4 w-4" />{(queue.error as Error).message}<Button className="ml-2 h-7" size="sm" onClick={() => queue.refetch()}>Retry</Button></div>
           : !rows.length ? <div className="p-9 text-center"><div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center border-2 border-l-white border-t-white border-r-[#808080] border-b-[#808080] bg-[#d4d0c8]"><Clock3 className="h-5 w-5 text-[#555]" /></div><p className="text-sm font-bold text-[#333]">No collections in this view</p><p className="mt-1 text-xs text-[#666]">Try another phase or search term. No records have been added here.</p></div>
           : <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] border-collapse text-left text-xs">
+            <RecoveryTable className="w-full min-w-[1040px] border-collapse text-left text-xs">
               <thead className="bg-[#d4d0c8] text-[#333]"><tr>{["Invoice / broker", "Phase", "Next scheduled", "Attempts · VP / RPS", "Controls", ""].map((h, i) => <th key={i} className="border-b-2 border-[#808080] px-3 py-2 font-bold">{h}</th>)}</tr></thead>
               <tbody>{rows.map(row => <tr key={row.invoiceId} className="border-b border-[#c5c1b8] odd:bg-[#f7f6f2] hover:bg-[#eaf3f2]">
                 <td className="px-3 py-2.5"><Link href={`/invoices/${row.invoiceId}`} className="font-bold text-[#087f8c] underline">{row.invoiceNumber}</Link><div className="mt-0.5 text-[#333]">{row.broker || "Broker not listed"}</div><div className="text-[10px] text-[#666]">Load {row.loadNumber || "—"} · Carrier {row.carrier || "—"}</div></td>
-                <td className="px-3 py-2.5"><span className={`inline-block border px-1.5 py-0.5 text-[10px] font-bold ${row.phase === "paid" ? "border-[#468b55] bg-[#e5f1e7] text-[#235f31]" : row.escalatedPhase || row.lastError ? "border-[#a34139] bg-[#f8e6e4] text-[#84251d]" : "border-[#858078] bg-[#ece9e2] text-[#42403b]"}`}>{phaseLabel(row)}</span><div className="mt-1 text-[10px] font-bold uppercase text-[#666]">{row.mode === "dry_run" ? "SIMULATED" : "LIVE"}{row.paused ? " · paused" : ""}</div>{row.lastError && <div className="mt-1 max-w-64 whitespace-normal break-words text-[10px] text-[#a12b22]">Error: {row.lastError}</div>}</td>
+                 <td className="px-3 py-2.5"><RecoveryBadge tone={row.phase === "paid" ? "success" : row.escalatedPhase || row.lastError ? "warning" : "neutral"} className="px-2 py-1 text-[10px]">{phaseLabel(row)}</RecoveryBadge><div className="mt-1 text-[10px] font-bold uppercase text-[#666]">{row.mode === "dry_run" ? "SIMULATED" : "LIVE"}{row.paused ? " · paused" : ""}</div>{row.lastError && <div className="mt-1 max-w-64 whitespace-normal break-words text-[10px] text-[#a12b22]">Error: {row.lastError}</div>}</td>
                 <td className="px-3 py-2.5 text-[#333]">{dateLabel(row.nextActionAt)}</td>
                 <td className="px-3 py-2.5 font-mono text-[#333]">{row.vpAttempts} VP <span className="text-[#888]">/</span> {row.rpsAttempts} RPS{row.escalatedPhase && <div className="mt-1 font-sans text-[10px] font-bold text-[#8c271e]">Escalated to Alan</div>}</td>
                 <td className="px-3 py-2.5"><div className="flex flex-wrap gap-1">
@@ -197,12 +197,12 @@ export default function CollectionsAutomation() {
                   {["vp", "rps"].includes(row.phase) && (row.paused
                     ? <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ invoiceId: row.invoiceId, action: "resume" })}><Play className="mr-1 h-3 w-3" />Resume</Button>
                     : <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ invoiceId: row.invoiceId, action: "pause" })}><Pause className="mr-1 h-3 w-3" />Pause</Button>)}
-                  {row.phase !== "paid" && row.phase !== "stopped" && <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={actionMutation.isPending} onClick={() => requestAction(row.invoiceId, "stop")}><StopCircle className="mr-1 h-3 w-3" />Stop</Button>}
+                  {row.phase !== "paid" && row.phase !== "stopped" && <Button size="sm" variant="destructive" className="h-7 px-2 text-[10px]" disabled={actionMutation.isPending} onClick={() => requestAction(row.invoiceId, "stop")}><StopCircle className="mr-1 h-3 w-3" />Stop</Button>}
                   {row.canManage && row.mode === "dry_run" && row.phase !== "paid" && row.phase !== "stopped" && <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => requestAction(row.invoiceId, "start_live")}>Start live…</Button>}
                 </div></td>
                 <td className="px-3 py-2.5"><Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => setSelectedId(row.invoiceId)}>Audit</Button></td>
               </tr>)}</tbody>
-            </table>
+            </RecoveryTable>
           </div>}
         {!queue.isLoading && !queue.error && <div className="flex items-center justify-between border-t border-[#c5c1b8] bg-[#ece9e2] px-3 py-2 text-[11px] text-[#555]"><span>{queue.data?.total ?? 0} collection records · page {page} of {totalPages}</span><div className="flex gap-1"><Button variant="outline" size="sm" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><ChevronLeft className="h-3 w-3" />Previous</Button><Button variant="outline" size="sm" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next<ChevronRight className="h-3 w-3" /></Button></div></div>}
       </Card>
@@ -216,7 +216,7 @@ export default function CollectionsAutomation() {
               <div className="border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white p-3 text-xs text-[#444]"><strong>{detail.data?.row.broker || "Broker not listed"}</strong> · {phaseLabel(detail.data!.row)} · {detail.data?.row.mode === "dry_run" ? "SIMULATED (not sent)" : "LIVE"}<div className="mt-1">VP confirmed: {dateLabel(detail.data?.row.vpConfirmedAt ?? null)} · Workflow paid: {dateLabel(detail.data?.row.paidAt ?? null)}</div></div>
               {!detail.data?.events.length ? <p className="py-4 text-center text-xs text-[#666]">No audit events recorded.</p>
                 : <div className="space-y-2">{detail.data.events.map(event => <article key={event.id} className="border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white p-3 text-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[#333]">{event.step} · {event.phase.toUpperCase()}</strong><span className={`border px-1.5 py-0.5 font-bold uppercase ${event.mode === "dry_run" || outcomeLabel(event) === "SIMULATED" ? "border-[#9a7700] bg-[#fff4ce] text-[#685000]" : "border-[#858078] bg-[#ece9e2] text-[#444]"}`}>{outcomeLabel(event)}</span></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[#333]">{event.step} · {event.phase.toUpperCase()}</strong><RecoveryBadge tone={event.mode === "dry_run" || outcomeLabel(event) === "SIMULATED" ? "warning" : "neutral"} className="px-2 py-1 text-[10px] uppercase">{outcomeLabel(event)}</RecoveryBadge></div>
                   <div className="mt-1 text-[#555]">Occurred {dateLabel(event.occurredAt)}{event.scheduledAt && ` · Scheduled ${dateLabel(event.scheduledAt)}`}{event.recipient && ` · To ${event.recipient}`}</div>
                   {event.providerMessageId && <div className="mt-1 font-mono text-[10px] text-[#555]">Provider ID: {event.providerMessageId}</div>}
                   {event.error && <div className="mt-1 text-[#a12b22]">Error: {event.error}</div>}

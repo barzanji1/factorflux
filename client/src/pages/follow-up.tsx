@@ -5,32 +5,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import {
-  PageShell,
-  Win95Badge as Badge,
-  Win95Button as Button,
-  Win95Card as Card,
-  Win95CardContent as CardContent,
-  Win95Input as Input,
-  Win95Select as Select,
-  Win95SelectContent as SelectContent,
-  Win95SelectItem as SelectItem,
-  Win95SelectTrigger as SelectTrigger,
-  Win95SelectValue as SelectValue,
-  Win95StatCard,
-  Win95Table,
-  Win95TableBody,
-  Win95TableCell,
-  Win95TableHead,
-  Win95TableHeader,
-  Win95TableRow,
-  Win95Tabs as Tabs,
-  Win95TabsContent as TabsContent,
-  Win95TabsList as TabsList,
-  Win95TabsTrigger as TabsTrigger,
-} from "@/components/win95";
+  RecoveryPageFrame as PageShell, RecoveryBadge as Badge, RecoveryButton as Button,
+  RecoveryCard as Card, RecoveryCardContent as CardContent, RecoveryInput as Input, RecoverySelectContent as SelectContent,
+  RecoverySelectTrigger as SelectTrigger, RecoveryStatCard as Win95StatCard,
+  RecoveryTable as Win95Table, RecoveryTableBody as Win95TableBody,
+  RecoveryTableCell as Win95TableCell, RecoveryTableHead as Win95TableHead,
+  RecoveryTableHeader as Win95TableHeader, RecoveryTableRow as Win95TableRow,
+  RecoveryTabs as Tabs, RecoveryTabsContent as TabsContent, RecoveryTabList as TabsList,
+  RecoveryTab as TabsTrigger, RecoveryDialogContent as DialogContent, useRecoveryToast,
+} from "@/components/recovery/recovery-controls";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
+import "@/components/recovery/recovery-neu.css";
 import {
   Clock, Plus, Search, Calendar, AlertCircle, CheckCircle, User, FileText,
   Mail, Zap, CheckCheck, RefreshCw, ChevronDown, ChevronUp, Ban, SkipForward,
@@ -42,10 +30,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import ConfirmationFollowUpQueue from "@/components/broker-confirmation/follow-up-queue";
 import CollectionsAutomation from "@/components/broker-confirmation/collections-automation";
+import EntityNotes from "@/components/shared/EntityNotes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,7 +180,7 @@ function TemplateDialog({
   initial?: BrokerFollowUpTemplate | null;
   onSaved: () => void;
 }) {
-  const { toast } = useToast();
+  const { toast } = useRecoveryToast();
   const [preview, setPreview] = useState(false);
   const isEdit = !!initial;
 
@@ -249,7 +237,7 @@ function TemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => { onOpenChange(v); if (!v) resetForm(); }}>
-      <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="recovery-neu-dialog sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Template" : "New Template"}</DialogTitle>
         </DialogHeader>
@@ -436,7 +424,7 @@ function ReminderTimeline({
   onCadenceChange: (cfg: CadenceConfig) => void;
 }) {
   const qc = useQueryClient();
-  const { toast } = useToast();
+  const { toast } = useRecoveryToast();
   const [editingCadence, setEditingCadence] = useState(false);
   const [localCadence, setLocalCadence] = useState<CadenceConfig>(
     cadenceConfig ?? {
@@ -670,49 +658,34 @@ function ReminderTimeline({
                     <span className="text-[12.5px] font-semibold text-slate-800 dark:text-white">
                       {reminderTypeLabel(r.reminderType)}
                     </span>
-                    <span className={cn(
-                      "ff-badge gap-1 capitalize",
-                      REMINDER_STATUS_COLOR[r.status],
-                    )}>
+                    <Badge className={cn("gap-1 capitalize", REMINDER_STATUS_COLOR[r.status])}>
                       {r.status === "sent" && <CheckCheck className="mr-0.5 h-2.5 w-2.5" />}
                       {r.status === "canceled" && <Ban className="mr-0.5 h-2.5 w-2.5" />}
                       {r.status === "skipped" && <SkipForward className="mr-0.5 h-2.5 w-2.5" />}
                       {r.status === "paused" && <Pause className="mr-0.5 h-2.5 w-2.5" />}
                       {r.status}
-                    </span>
+                    </Badge>
                     {r.editedAt && <span className="rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-300">Edited</span>}
                     {/* Delivery status badge */}
                     {r.status === "sent" && (() => {
                       const ds = r.deliveryStatus;
                       if (!ds || ds === "pending") return (
-                        <span className="ff-badge ff-badge-draft gap-1">
-                          🕐 Pending
-                        </span>
+                        <Badge className="ff-badge-draft gap-1">Pending</Badge>
                       );
                       if (ds === "delivered") return (
-                        <span className="ff-badge ff-badge-funded gap-1">
-                          ✅ Delivered
-                        </span>
+                        <Badge className="ff-badge-funded gap-1">Delivered</Badge>
                       );
                       if (ds === "bounced") return (
-                        <span className="ff-badge ff-badge-rejected gap-1">
-                          ❌ Bounced
-                        </span>
+                        <Badge className="ff-badge-rejected gap-1">Bounced</Badge>
                       );
                       if (ds === "failed") return (
-                        <span className="ff-badge ff-badge-rejected gap-1">
-                          ❌ Failed
-                        </span>
+                        <Badge className="ff-badge-rejected gap-1">Failed</Badge>
                       );
                       if (ds === "spam") return (
-                        <span className="ff-badge ff-badge-pending gap-1">
-                          ⚠ Spam
-                        </span>
+                        <Badge className="ff-badge-pending gap-1">Spam</Badge>
                       );
                       if (ds === "unsubscribed") return (
-                        <span className="ff-badge ff-badge-draft gap-1">
-                          Unsubscribed
-                        </span>
+                        <Badge className="ff-badge-draft gap-1">Unsubscribed</Badge>
                       );
                       return null;
                     })()}
@@ -802,36 +775,6 @@ function ReminderTimeline({
   );
 }
 
-// ─── Inline note editor ───────────────────────────────────────────────────────
-
-function NoteEditor({
-  bfu, onSave, saving,
-}: { bfu: BrokerFollowUp; onSave: (notes: string) => void; saving: boolean }) {
-  const [notes, setNotes] = useState(bfu.notes ?? "");
-  return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Agent Notes</p>
-      <Textarea
-        value={notes}
-        onChange={e => setNotes(e.target.value)}
-        rows={3}
-        placeholder="Add notes about this follow-up…"
-        className="text-[12px] resize-none"
-      />
-      <Button
-        size="sm"
-        variant="outline"
-        className="mt-1.5 h-7 px-3 text-[11px]"
-        disabled={saving || notes === (bfu.notes ?? "")}
-        onClick={() => onSave(notes)}
-      >
-        {saving ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
-        Save Notes
-      </Button>
-    </div>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function FollowUpPage() {
@@ -851,7 +794,7 @@ export default function FollowUpPage() {
   const [tplDialogOpen, setTplDialogOpen] = useState(false);
   const [editingTpl, setEditingTpl]       = useState<BrokerFollowUpTemplate | null>(null);
   const [previewTpl, setPreviewTpl]       = useState<BrokerFollowUpTemplate | null>(null);
-  const { toast }  = useToast();
+  const { toast }  = useRecoveryToast();
   const qc = useQueryClient();
 
   const form = useForm<z.infer<typeof followUpSchema>>({
@@ -896,15 +839,6 @@ export default function FollowUpPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
       toast({ title: "Acknowledged", description: "Broker follow-up marked as acknowledged" });
-    },
-  });
-
-  const saveNotesMutation = useMutation({
-    mutationFn: ({ id, notes }: { id: number; notes: string }) =>
-      apiRequest("PATCH", `/api/broker-follow-ups/${id}`, { notes }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/broker-follow-ups"] });
-      toast({ title: "Saved", description: "Notes saved" });
     },
   });
 
@@ -1006,14 +940,14 @@ export default function FollowUpPage() {
       group="Recovery"
     >
       {deliverySummary && deliverySummary.total > 0 && (
-        <div className="ff-badge ff-badge-rejected gap-1.5">
-          ❌ {deliverySummary.total} delivery issue{deliverySummary.total !== 1 ? "s" : ""} —&nbsp;
+      <Badge className="ff-badge-rejected gap-1.5">
+          {deliverySummary.total} delivery issue{deliverySummary.total !== 1 ? "s" : ""} —&nbsp;
           {deliverySummary.bounced > 0 && `${deliverySummary.bounced} bounced`}
           {deliverySummary.bounced > 0 && deliverySummary.failed > 0 && ", "}
           {deliverySummary.failed > 0 && `${deliverySummary.failed} failed`}
           {(deliverySummary.bounced > 0 || deliverySummary.failed > 0) && deliverySummary.spam > 0 && ", "}
           {deliverySummary.spam > 0 && `${deliverySummary.spam} spam`}
-        </div>
+        </Badge>
       )}
 
       <Dialog open={isAddingFollowUp} onOpenChange={setIsAddingFollowUp}>
@@ -1255,7 +1189,7 @@ export default function FollowUpPage() {
               </TabsContent>
 
               {/* ── Broker automations ────────────────────────────────────────── */}
-              <TabsContent value="broker" className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
+              <TabsContent value="broker" className="recovery-neu-surface border-0 p-4">
                 <div className="flex items-start gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                   <Zap className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
                   <p className="text-[12.5px] text-orange-800 dark:text-orange-300">
@@ -1345,32 +1279,32 @@ export default function FollowUpPage() {
                             </div>
                             {/* Trigger */}
                             <div>
-                              <span className={cn(
-                                "ff-badge gap-1",
+                              <Badge className={cn(
+                                "gap-1",
                                 bfu.triggerType === "auto"
                                   ? "ff-followups-source-rules"
                                   : "ff-followups-source-agent",
                               )}>
                                 {bfu.triggerType === "auto" ? <Zap className="h-3 w-3" /> : <User className="h-3 w-3" />}
                                 {bfu.triggerType === "auto" ? "Rules" : "Agent"}
-                              </span>
+                              </Badge>
                             </div>
                             {/* Status */}
                             <div>
-                              <span className={cn(
-                                "ff-badge gap-1 capitalize",
+                              <Badge className={cn(
+                                "gap-1 capitalize",
                                 BFU_STATUS_COLOR[bfu.status] ?? "bg-gray-50 text-gray-600 border-gray-200",
                               )}>
                                 {bfu.status === "acknowledged" && <CheckCheck className="h-3 w-3" />}
                                 {bfu.status === "sent" && <Mail className="h-3 w-3" />}
                                 {bfu.status}
-                              </span>
+                              </Badge>
                             </div>
                             {/* Cadence paused badge */}
                             {cadence?.paused && (
-                              <span className="ff-badge ff-badge-pending gap-1">
+                              <Badge className="ff-badge-pending gap-1">
                                 <Pause className="h-2.5 w-2.5" /> Paused
-                              </span>
+                              </Badge>
                             )}
                             {/* Created */}
                             <div className="ml-auto text-[11px] text-slate-400 whitespace-nowrap">
@@ -1406,11 +1340,10 @@ export default function FollowUpPage() {
                                       {bfu.body}
                                     </pre>
                                   </div>
-                                  <NoteEditor
-                                    bfu={bfu}
-                                    onSave={notes => saveNotesMutation.mutate({ id: bfu.id, notes })}
-                                    saving={saveNotesMutation.isPending}
-                                  />
+                                  {bfu.notes && <div className="rounded-xl bg-[#e0e0e0] p-3 text-xs shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">
+                                    <p className="mb-1 font-semibold text-[#777]">Legacy follow-up note · read-only</p>
+                                    <p className="whitespace-pre-wrap">{bfu.notes}</p>
+                                  </div>}
                                   {/* Timestamps */}
                                   <div className="grid grid-cols-2 gap-2 text-[12px]">
                                     {bfu.sentAt && (
@@ -1452,6 +1385,9 @@ export default function FollowUpPage() {
                                   </Button>
                                 </div>
                               </div>
+                              <div className="mt-5">
+                                <EntityNotes key={`followup:${bfu.id}`} entityType="followup" entityId={bfu.id} />
+                              </div>
                             </div>
                           )}
                         </Card>
@@ -1462,7 +1398,7 @@ export default function FollowUpPage() {
               </TabsContent>
 
               {/* ── Templates tab ─────────────────────────────────────────── */}
-              <TabsContent value="templates" className="bg-white rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] p-4">
+              <TabsContent value="templates" className="recovery-neu-surface border-0 p-4">
                 {/* Header row */}
                 <div className="flex items-center justify-between">
                   <div>
@@ -1502,12 +1438,11 @@ export default function FollowUpPage() {
                     return (
                       <div key={tt}>
                         <div className="flex items-center gap-2 mb-2">
-                          <span className={cn(
-                            "ff-badge",
+                          <Badge className={cn(
                             TRIGGER_TYPE_COLORS[tt],
                           )}>
                             {TRIGGER_TYPE_LABELS[tt]}
-                          </span>
+                          </Badge>
                           <span className="text-[11px] text-slate-400">{group.length} template{group.length !== 1 ? "s" : ""}</span>
                         </div>
                         <div className="space-y-2">
@@ -1525,9 +1460,9 @@ export default function FollowUpPage() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="text-[13px] font-semibold text-slate-900 dark:text-white">{tpl.name}</span>
                                       {tpl.isDefault && (
-                                        <span className="ff-badge ff-badge-submitted gap-1">
+                                        <Badge className="ff-badge-submitted gap-1">
                                           <Star className="h-2.5 w-2.5" /> Default
-                                        </span>
+                                        </Badge>
                                       )}
                                     </div>
                                     <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
@@ -1637,9 +1572,9 @@ export default function FollowUpPage() {
                         {TRIGGER_TYPE_LABELS[previewTpl.triggerType]}
                       </span>
                       {previewTpl.isDefault && (
-                        <span className="ff-badge ff-badge-submitted gap-1">
+                        <Badge className="ff-badge-submitted gap-1">
                           <Star className="h-2.5 w-2.5" /> Default
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     <div className="overflow-hidden rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">

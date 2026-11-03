@@ -5,17 +5,34 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Edit, PowerOff, Search, Truck as TruckIcon } from "lucide-react";
+import {
+  OperationsBadge,
+  OperationsButton as Button,
+  OperationsCard as Card,
+  OperationsDialogContent as DialogContent,
+  OperationsInput as Input,
+  OperationsSelectContent as SelectContent,
+  OperationsSelectTrigger as SelectTrigger,
+} from "@/components/operations/operations-controls";
+import {
+  NeuPageShell,
+  NeuStatCard,
+  NeuTable as Table,
+  NeuTableBody as TableBody,
+  NeuTableCell as TableCell,
+  NeuTableHead as TableHead,
+  NeuTableHeader as TableHeader,
+  NeuTableRow as TableRow,
+} from "@/styles/neu/components";
+import "@/components/operations/operations-neu.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,7 +82,7 @@ function StatusBadge({ status }: { status: string }) {
     "out-of-service": { label: "Out of Service", className: "ff-badge-rejected" },
   };
   const badge = map[status] ?? { label: status, className: "ff-badge-draft" };
-  return <span className={`ff-badge ${badge.className}`}>{badge.label}</span>;
+  return <OperationsBadge className={`ff-badge ${badge.className}`}>{badge.label}</OperationsBadge>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -213,11 +230,11 @@ export default function Trucks() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="ff-trucks-page flex h-screen overflow-hidden bg-[#d4d0c8]">
+    <div className="operations-neu-page ff-trucks-page flex min-h-[100dvh] overflow-hidden">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav title="Trucks" />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <TopNav title="Trucks" neu />
+        <NeuPageShell className="!min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -243,17 +260,12 @@ export default function Trucks() {
               { label: "Active Trucks", value: truckList.filter((truck) => truck.status === "active").length },
               { label: "Out of Service", value: truckList.filter((truck) => truck.status === "out-of-service").length },
             ].map((stat) => (
-              <Card key={stat.label} className="ff-dashboard-card ff-trucks-surface">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><TruckIcon className="h-5 w-5" /></div>
-                  <div><p className="text-xs text-muted-foreground">{stat.label}</p><p className="text-xl font-bold text-[#087d8d]">{stat.value}</p></div>
-                </CardContent>
-              </Card>
+              <NeuStatCard key={stat.label} label={stat.label} value={stat.value} icon={<TruckIcon className="h-5 w-5" />} className="operations-neu-surface min-h-32 p-4" />
             ))}
           </div>
 
           {/* Filters */}
-          <Card className="ff-trucks-surface">
+          <Card className="operations-neu-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <div className="relative flex-1 min-w-[180px]">
@@ -305,7 +317,7 @@ export default function Trucks() {
           </Card>
 
           {/* Table */}
-          <Card className="ff-table-container ff-trucks-surface overflow-hidden">
+          <Card className="ff-table-container operations-neu-surface overflow-hidden">
             <CardContent className="p-0">
               <Table className="ff-data-table">
                 <TableHeader>
@@ -347,10 +359,10 @@ export default function Trucks() {
                         <TableCell className="text-sm">{t.licensePlate ?? "—"}</TableCell>
                         <TableCell className="text-sm">{t.state ?? "—"}</TableCell>
                         <TableCell className="text-sm">
-                          {t.carrierId ? <span className="ff-badge ff-badge-submitted">{carrierMap[t.carrierId] ?? `#${t.carrierId}`}</span> : "—"}
+                          {t.carrierId ? <OperationsBadge className="ff-badge ff-badge-submitted">{carrierMap[t.carrierId] ?? `#${t.carrierId}`}</OperationsBadge> : "—"}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {t.dispatcherId ? <span className="ff-badge ff-badge-approved">{dispatcherMap[t.dispatcherId] ?? `#${t.dispatcherId}`}</span> : "—"}
+                          {t.dispatcherId ? <OperationsBadge className="ff-badge ff-badge-approved">{dispatcherMap[t.dispatcherId] ?? `#${t.dispatcherId}`}</OperationsBadge> : "—"}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={t.status} />
@@ -380,12 +392,12 @@ export default function Trucks() {
               </Table>
             </CardContent>
           </Card>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="ff-trucks-surface max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="operations-neu-dialog max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Truck" : "Add Truck"}</DialogTitle>
           </DialogHeader>

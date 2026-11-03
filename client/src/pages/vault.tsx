@@ -1,15 +1,12 @@
 import { useState } from "react";
+import { AdminPageShell, Button, Input, Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, DialogContent, AlertDialogContent, SelectContent, useAdminToast, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin-neu/adapters";
+import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Shield,
   Lock,
@@ -25,9 +22,8 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
+import { TopNav } from "@/components/admin-neu/adapters";
 
 const vaultFormSchema = z.object({
   clientId: z.number().min(1, "Client is required"),
@@ -90,7 +86,7 @@ export default function VaultPage() {
   const [deleteTarget, setDeleteTarget] = useState<VaultEntry | null>(null);
   const [revealedValues, setRevealedValues] = useState<Record<number, string | null>>({});
   const [revealingId, setRevealingId] = useState<number | null>(null);
-  const { toast } = useToast();
+  const { toast } = useAdminToast();
   const queryClient = useQueryClient();
 
   const { data: clients = [] } = useQuery<Array<{ id: number; name: string }>>({
@@ -262,11 +258,11 @@ export default function VaultPage() {
   };
 
   return (
-    <div className="ff-vault-page flex h-screen bg-[#d4d0c8]">
+    <div className="ff-vault-page flex h-[100dvh] min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Vault" subtitle="Secure storage for confidential carrier and client records" group="Admin" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <AdminPageShell className="custom-scrollbar flex-1 overflow-auto">
           <div className="container mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center space-x-4">
@@ -623,7 +619,7 @@ export default function VaultPage() {
               </AlertDialogContent>
             </AlertDialog>
           </div>
-        </main>
+        </AdminPageShell>
       </div>
     </div>
   );

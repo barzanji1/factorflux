@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import EntityNotes from "@/components/shared/EntityNotes";
 
 type Task = {
   id: number; title: string; description?: string; type: string; priority: string;
@@ -58,6 +59,7 @@ export default function TaskDetail() {
     <Card><CardHeader><CardTitle className="text-2xl">{task.title}</CardTitle><p className="text-muted-foreground">{task.description || "No description provided."}</p></CardHeader><CardContent className="space-y-6">
       <div><div className="mb-2 flex justify-between text-sm font-medium"><span>Progress</span><span>{draftProgress}%</span></div><Progress value={draftProgress} className="h-5" /><Slider className="mt-5" min={0} max={100} step={1} value={[draftProgress]} disabled={saving} onValueChange={([value]) => setDraftProgress(value)} onValueCommit={([value]) => saveProgress(value)} /><p className="mt-2 text-xs text-muted-foreground">{saving ? "Saving…" : "Changes save immediately"}</p></div>
       <div className="grid gap-4 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Assigned to</p><div className="mt-1 flex items-center gap-2"><Avatar className="h-8 w-8"><AvatarImage src={task.assignedAgent?.profileImageUrl} /><AvatarFallback>{name(task.assignedAgent).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>{name(task.assignedAgent)}</div></div><div><p className="text-xs text-muted-foreground">Created by</p><p>{name(task.creator)}</p></div><div><p className="text-xs text-muted-foreground">Status</p><p className="capitalize">{task.status.replace("_", " ")}</p></div><div><p className="text-xs text-muted-foreground">Priority / Type</p><p className="capitalize">{task.priority} · {task.type}</p></div><div><p className="text-xs text-muted-foreground">Last progress update</p><p>{task.progressUpdatedAt ? new Date(task.progressUpdatedAt).toLocaleString() : "Not updated yet"}{task.progressUpdater ? ` by ${name(task.progressUpdater)}` : ""}</p></div><div><p className="text-xs text-muted-foreground">Due date</p><p>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No due date"}</p></div></div>
-    </CardContent></Card>
+     </CardContent></Card>
+     <EntityNotes key={`task:${task.id}`} entityType="task" entityId={task.id} />
   </div></main></div></div>;
 }

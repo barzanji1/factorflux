@@ -8,23 +8,18 @@ import { z } from "zod";
 import { format } from "date-fns";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent } from "@/components/funding/funding-controls";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
-  SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import {
@@ -51,6 +46,10 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import "@/components/funding/funding-neu.css";
+import { FundingStatCard } from "@/components/funding/funding-stat-card";
+import { NeuPageShell, NeuTable } from "@/styles/neu/components";
+import { FundingBadge } from "@/components/funding/funding-badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,13 +111,13 @@ const newEntrySchema = z.object({
 function StatusBadge({ status }: { status: LockboxEntry["status"] }) {
   const cfg = STATUS_CONFIG[status];
   return (
-    <span className={cn(
-      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold",
-      cfg.bg, cfg.border, cfg.text,
-    )}>
+    <FundingBadge
+      tone={status === "matched" ? "success" : status === "unmatched" || status === "exception" ? "warning" : "accent"}
+      className={cn("inline-flex items-center gap-1 border px-2 py-0.5 text-[10.5px] font-semibold", cfg.bg, cfg.border, cfg.text)}
+    >
       <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", cfg.dot)} />
       {cfg.label}
-    </span>
+    </FundingBadge>
   );
 }
 
@@ -205,7 +204,7 @@ function MatchModal({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="funding-neu-dialog max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-4 w-4 text-blue-500" />
@@ -355,7 +354,7 @@ function NewEntryDialog({ onClose, onCreated }: { onClose: () => void; onCreated
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="funding-neu-dialog sm:max-w-md">
         <DialogHeader><DialogTitle>New Lockbox Entry</DialogTitle></DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(v => create.mutate(v))} className="space-y-4">
@@ -471,11 +470,11 @@ export default function Lockbox() {
   const exceptionCount = entries.filter(e => e.status === "exception").length;
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="funding-neu-page flex h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav title="Lockbox" subtitle="Match incoming payments to open invoices" />
-        <main className="flex-1 overflow-auto p-6">
+        <TopNav title="Lockbox" subtitle="Match incoming payments to open invoices" neu />
+        <NeuPageShell className="flex-1 overflow-auto p-6">
           <div className="max-w-7xl mx-auto space-y-5">
 
             {/* Header */}
@@ -502,15 +501,13 @@ export default function Lockbox() {
                 { label: "Matched ($)",     value: fmt(totalMatched),   icon: CheckCircle2,  color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/20" },
                 { label: "Exceptions",      value: String(exceptionCount), icon: AlertTriangle, color: "text-red-600 dark:text-red-400",     bg: "bg-red-50 dark:bg-red-950/20"    },
               ].map(s => (
-                <Card key={s.label} className="border border-slate-200 dark:border-slate-700">
-                  <CardContent className="p-4">
-                    <div className={cn("inline-flex items-center justify-center rounded-lg p-2 mb-2", s.bg)}>
-                      <s.icon className={cn("h-4 w-4", s.color)} />
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
-                    <p className={cn("text-lg font-bold mt-0.5", s.color)}>{s.value}</p>
-                  </CardContent>
-                </Card>
+                <FundingStatCard
+                  key={s.label}
+                  label={s.label}
+                  value={s.value}
+                  icon={<s.icon className="h-4 w-4" />}
+                  className="min-h-32 p-4"
+                />
               ))}
             </div>
 
@@ -554,7 +551,7 @@ export default function Lockbox() {
             {/* Table */}
             <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <NeuTable className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                       {["Received Date", "Payor", "Amount", "Bank Reference", "Payor Reference", "Status", "Actions"].map(h => (
@@ -651,11 +648,11 @@ export default function Lockbox() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </NeuTable>
               </div>
             </Card>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* Modals */}

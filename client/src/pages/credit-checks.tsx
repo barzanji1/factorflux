@@ -1,26 +1,24 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { useRiskToast as useToast } from "@/components/risk/risk-controls";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RiskCard as Card, RiskButton as Button, RiskInput as Input, RiskDialogContent as DialogContent, RiskSelectContent as SelectContent, RiskSelectTrigger as SelectTrigger, RiskStatCard, RiskBadge, RiskTable } from "@/components/risk/risk-controls";
+import { NeuPageShell } from "@/styles/neu/components";
+import "@/components/risk/risk-neu.css";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
-  SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -174,11 +172,11 @@ export default function CreditChecks() {
   }
 
   return (
-    <div className="ff-credit-checks-page flex h-screen bg-[#d4d0c8]">
+    <div className="risk-neu-page ff-credit-checks-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Credit Review" subtitle="Broker and debtor risk assessments with approval indicators" group="Risk" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <TopNav title="Credit Review" subtitle="Broker and debtor risk assessments with approval indicators" group="Risk" neu />
+        <NeuPageShell className="!min-h-0 custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
 
             {/* Stats Row */}
@@ -190,12 +188,7 @@ export default function CreditChecks() {
                 { label: "Declined", value: stats.declined, color: "red" },
                 { label: "High / Critical", value: stats.highRisk, color: "orange" },
               ].map(s => (
-                <Card key={s.label} className="ff-dashboard-card ff-credit-checks-surface border border-slate-200 bg-white dark:border-slate-800">
-                  <CardContent className="p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{s.value}</p>
-                  </CardContent>
-                </Card>
+                <RiskStatCard key={s.label} label={s.label} value={s.value} className="min-h-32 p-4" />
               ))}
             </div>
 
@@ -252,7 +245,7 @@ export default function CreditChecks() {
                   </div>
                 ) : (
                   <div className="custom-scrollbar overflow-x-auto">
-                    <table className="ff-data-table w-full min-w-[880px]">
+                    <RiskTable className="ff-data-table w-full min-w-[880px]">
                       <thead>
                         <tr className="border-b border-slate-200/70 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/40">
                           {["Entity", "Type", "Risk Score", "Risk Tier", "Credit Limit", "Avg Days to Pay", "Status", "Actions"].map(h => (
@@ -281,10 +274,10 @@ export default function CreditChecks() {
                               <td className="px-5 py-4 w-36">{scoreBar(c.riskScore)}</td>
                               <td className="px-5 py-4">
                                 {risk ? (
-                                  <span className={cn("ff-badge gap-1.5", risk.badge)}>
+                                  <RiskBadge className={cn("ff-badge gap-1.5", risk.badge)}>
                                     <RiskIcon className="h-3 w-3" />
                                     {risk.label}
-                                  </span>
+                                  </RiskBadge>
                                 ) : <span className="text-slate-400 text-sm">—</span>}
                               </td>
                               <td className="px-5 py-4 text-sm font-semibold text-slate-900 dark:text-white">
@@ -298,10 +291,10 @@ export default function CreditChecks() {
                                 ) : "—"}
                               </td>
                               <td className="px-5 py-4">
-                                <span className={cn("ff-badge gap-1.5", status.color)}>
+                                <RiskBadge className={cn("ff-badge gap-1.5", status.color)}>
                                   <StatusIcon className="h-3 w-3" />
                                   {status.label}
-                                </span>
+                                </RiskBadge>
                               </td>
                               <td className="px-5 py-4">
                                 <div className="flex gap-1.5">
@@ -331,13 +324,13 @@ export default function CreditChecks() {
                           );
                         })}
                       </tbody>
-                    </table>
+                    </RiskTable>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* New Check Dialog */}

@@ -5,19 +5,37 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, MoreHorizontal, MailOpen, Send, Eye, CheckCheck } from "lucide-react";
+import {
+  OperationsBadge,
+  OperationsButton as Button,
+  OperationsCard as Card,
+  OperationsDialogContent as DialogContent,
+  OperationsDropdownMenuContent as DropdownMenuContent,
+  OperationsInput as Input,
+  OperationsSelectContent as SelectContent,
+  OperationsSelectTrigger as SelectTrigger,
+} from "@/components/operations/operations-controls";
+import {
+  NeuPageShell,
+  NeuStatCard,
+  NeuTable as Table,
+  NeuTableBody as TableBody,
+  NeuTableCell as TableCell,
+  NeuTableHead as TableHead,
+  NeuTableHeader as TableHeader,
+  NeuTableRow as TableRow,
+} from "@/styles/neu/components";
+import "@/components/operations/operations-neu.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +89,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function Chip({ label, cls }: { label: string; cls: string }) {
-  return <span className={`ff-badge ${cls}`}>{label}</span>;
+  return <OperationsBadge className={`ff-badge ${cls}`}>{label}</OperationsBadge>;
 }
 
 function buildTemplate(
@@ -279,11 +297,11 @@ export default function ReleaseLetters() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="ff-release-letters-page flex h-screen overflow-hidden bg-[#d4d0c8]">
+    <div className="operations-neu-page ff-release-letters-page flex min-h-[100dvh] overflow-hidden">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <TopNav title="Release Letters" />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <TopNav title="Release Letters" neu />
+        <NeuPageShell className="!min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -296,7 +314,7 @@ export default function ReleaseLetters() {
                 <p className="text-sm text-muted-foreground">{filtered.length} letter{filtered.length !== 1 ? "s" : ""}</p>
               </div>
             </div>
-            <Button onClick={openGenerate} className="gap-2">
+            <Button variant="accent" onClick={openGenerate} className="gap-2">
               <Plus className="h-4 w-4" /> Generate Letter
             </Button>
           </div>
@@ -307,17 +325,12 @@ export default function ReleaseLetters() {
               { label: "Sent Letters", value: letters.filter((letter) => letter.status === "sent").length },
               { label: "Acknowledged", value: letters.filter((letter) => letter.status === "acknowledged").length },
             ].map((stat) => (
-              <Card key={stat.label} className="ff-dashboard-card ff-release-letters-surface">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center bg-[#e5f6f8] text-[#087d8d]"><MailOpen className="h-5 w-5" /></div>
-                  <div><p className="text-xs text-muted-foreground">{stat.label}</p><p className="text-xl font-bold text-[#087d8d]">{stat.value}</p></div>
-                </CardContent>
-              </Card>
+              <NeuStatCard key={stat.label} label={stat.label} value={stat.value} icon={<MailOpen className="h-5 w-5" />} className="operations-neu-surface min-h-32 p-4" />
             ))}
           </div>
 
           {/* Filters */}
-          <Card className="ff-release-letters-surface">
+          <Card className="operations-neu-surface">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3">
                 <Select value={carrierFilter} onValueChange={setCarrierFilter}>
@@ -348,7 +361,7 @@ export default function ReleaseLetters() {
           </Card>
 
           {/* Table */}
-          <Card className="ff-table-container ff-release-letters-surface overflow-hidden">
+          <Card className="ff-table-container operations-neu-surface overflow-hidden">
             <CardContent className="p-0">
               <Table className="ff-data-table">
                 <TableHeader>
@@ -414,12 +427,12 @@ export default function ReleaseLetters() {
               </Table>
             </CardContent>
           </Card>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* Generate Letter Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="ff-release-letters-surface max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="operations-neu-dialog max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Generate Release Letter</DialogTitle>
           </DialogHeader>
@@ -528,7 +541,7 @@ export default function ReleaseLetters() {
 
       {/* Preview Dialog */}
       <Dialog open={!!previewLetter} onOpenChange={() => setPreviewLetter(null)}>
-        <DialogContent className="ff-release-letters-surface max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="operations-neu-dialog max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               Release Letter Preview
@@ -574,7 +587,7 @@ export default function ReleaseLetters() {
 
       {/* Send Email Dialog */}
       <Dialog open={sendDialogId !== null} onOpenChange={() => { setSendDialogId(null); setSendEmailState(""); }}>
-        <DialogContent className="ff-release-letters-surface max-w-md">
+        <DialogContent className="operations-neu-dialog max-w-md">
           <DialogHeader>
             <DialogTitle>Send Release Letter</DialogTitle>
           </DialogHeader>

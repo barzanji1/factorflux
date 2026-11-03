@@ -9,10 +9,8 @@ import {
   type AgingReportFilters,
   type GroupedAgingReport,
 } from "@shared/aging-report";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { RecoveryButton as Button, RecoveryInput as Input, RecoveryTabs as Win95Tabs, RecoveryTabList as Win95TabsList, RecoveryTab as Win95TabsTrigger, RecoveryTable, RecoveryCard } from "@/components/recovery/recovery-controls";
 import { ConfirmationStatusBadge, type ConfirmationStatus } from "@/components/broker-confirmation/confirmation-status";
-import { Win95Tabs, Win95TabsList, Win95TabsTrigger } from "@/components/win95";
 import { useAuth } from "@/hooks/useAuth";
 import { CustomizeColumns, useReportColumns, type ReportColumn, type SavedTemplate } from "./report-customization";
 
@@ -150,8 +148,8 @@ export default function AgingReport() {
 
   return (
     <section className="space-y-3 text-[#26383b]" aria-labelledby="aging-report-title">
-      <div className="overflow-hidden border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f4f1e8] shadow-[inset_1px_1px_0_#fff]">
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#808080] bg-[#c9dfe2] px-3 py-2">
+      <RecoveryCard className="overflow-hidden">
+        <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
           <div>
             <h2 id="aging-report-title" className="text-sm font-bold">Aging Report</h2>
             <p className="mt-0.5 text-[11px] text-slate-600">Receivables aged from the funded date, using the America/Denver calendar.</p>
@@ -170,7 +168,7 @@ export default function AgingReport() {
           </Button>
         </header>
 
-        <div className="border-b border-[#808080] bg-[#e9e6dd] px-3 pt-2">
+        <div className="px-3 pt-2">
           <Win95Tabs value={view} onValueChange={changeView}>
             <Win95TabsList aria-label="Group aging report">
               <Win95TabsTrigger value="carrier" data-testid="aging-view-carrier">By Carrier</Win95TabsTrigger>
@@ -260,17 +258,17 @@ export default function AgingReport() {
             </Button>
           </div>
         </div>
-        <p className="border-t border-slate-300 bg-[#efede5] px-3 py-2 text-[10px] leading-relaxed text-slate-600">
+        <p className="px-4 py-3 text-[10px] leading-relaxed text-slate-600">
           Only funded or held invoices with a funded date and positive outstanding balance are included. “All eligible statuses” means Funded and Held only. Current is funding day 0; 90+ begins on day 91.
         </p>
-      </div>
+      </RecoveryCard>
 
       {!parsedFilters.success ? (
         <div data-testid="aging-validation-error" role="alert" className="border border-amber-600 bg-[#fff3cc] px-4 py-3 text-xs text-[#604b16]">
           Correct the highlighted filters to load this report.
         </div>
       ) : showLoading ? (
-        <div data-testid="aging-loading" aria-label="Loading aging report" className="overflow-hidden border border-[#808080] bg-[#f4f1e8]">
+        <div data-testid="aging-loading" aria-label="Loading aging report" className="recovery-neu-surface overflow-hidden">
           <div className="h-9 animate-pulse border-b border-[#808080] bg-[#dce6e3]" />
           {[0, 1, 2, 3].map(row => <div key={row} className="h-10 animate-pulse border-b border-slate-200 bg-[#ebe8df]" />)}
         </div>
@@ -284,14 +282,14 @@ export default function AgingReport() {
         </div>
       ) : report ? (
         <>
-          <section data-testid="aging-grouped-table" aria-label={`${view === "carrier" ? "Carrier" : "Broker"} aging totals`}
-            className="overflow-hidden border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f4f1e8]">
-            <header className="flex items-center justify-between border-b border-[#808080] bg-[#d9e7e9] px-3 py-2">
+          <RecoveryCard data-testid="aging-grouped-table" aria-label={`${view === "carrier" ? "Carrier" : "Broker"} aging totals`}
+            className="overflow-hidden">
+            <header className="flex items-center justify-between px-4 py-3">
               <h3 className="text-xs font-bold uppercase tracking-wide text-[#183b45]">Aging by {view}</h3>
               <span className="font-mono text-[11px] text-slate-600">{report.totals.invoiceCount.toLocaleString()} invoices</span>
             </header>
             <div className="overflow-x-auto">
-              <table className="ff-data-table w-full min-w-[830px] text-xs">
+              <RecoveryTable className="ff-data-table w-full min-w-[830px] text-xs">
                 <thead><tr className="border-b border-slate-300 bg-[#e9e6dd] text-left text-[10px] uppercase tracking-wide text-slate-600">
                   {visibleColumns.map(column => <th key={column.key} scope="col" className={`whitespace-nowrap px-3 py-2 ${column.key !== "entity" ? "text-right" : "min-w-[190px]"}`}>{column.label}</th>)}
                 </tr></thead>
@@ -304,17 +302,17 @@ export default function AgingReport() {
                 <tfoot><tr className="border-t-2 border-[#808080] bg-[#e5e1d7] font-bold" data-testid="aging-grand-total">
                   {visibleColumns.map(column => <td key={column.key} className={`whitespace-nowrap px-3 py-2 ${column.key === "entity" ? "font-bold" : "text-right font-bold tabular-nums"}`}>{column.key === "entity" ? "Total" : column.key === "invoiceCount" ? report.totals.invoiceCount.toLocaleString() : money(column.key === "total" ? report.totals.total : report.totals.buckets[column.key as keyof typeof report.totals.buckets])}</td>)}
                 </tr></tfoot>
-              </table>
+              </RecoveryTable>
             </div>
-          </section>
+          </RecoveryCard>
 
-          <section data-testid="confirmation-aging-table" className="overflow-hidden border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f4f1e8]">
-            <header className="border-b border-[#808080] bg-[#d9e7e9] px-3 py-2">
+          <RecoveryCard data-testid="confirmation-aging-table" className="overflow-hidden">
+            <header className="px-4 py-3">
               <h3 className="text-xs font-bold uppercase tracking-wide text-[#183b45]">Invoice Funding &amp; Broker Confirmation</h3>
               <p className="mt-0.5 text-[10px] text-slate-600">Invoice details match the filters and eligible receivables in the grouped report above.</p>
             </header>
             <div className="overflow-x-auto">
-              <table className="ff-data-table w-full min-w-[940px] text-xs">
+              <RecoveryTable className="ff-data-table w-full min-w-[940px] text-xs">
                 <thead><tr className="border-b border-slate-300 bg-[#e9e6dd] text-left text-[10px] uppercase tracking-wide text-slate-600">
                   {["Invoice", "Carrier", "Broker", "Amount", "Outstanding", "Age", "Funded", "Confirmation status"].map((label, index) =>
                     <th key={label} scope="col" className={`whitespace-nowrap px-3 py-2 ${index === 3 || index === 4 ? "text-right" : ""}`}>{label}</th>)}
@@ -328,13 +326,13 @@ export default function AgingReport() {
                     <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{money(Number(invoice.outstanding))}</td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums">{invoice.ageDays}d</td>
                     <td className="whitespace-nowrap px-3 py-2">{fundedDate(invoice.fundedAt)}</td>
-                    <td className="px-3 py-2"><ConfirmationStatusBadge status={invoice.confirmationStatus as ConfirmationStatus} /></td>
+                    <td className="px-3 py-2"><ConfirmationStatusBadge status={invoice.confirmationStatus as ConfirmationStatus} neuStyle /></td>
                   </tr>)}
                   {!report.invoices.length && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No eligible invoice details match these filters.</td></tr>}
                 </tbody>
-              </table>
+              </RecoveryTable>
             </div>
-          </section>
+          </RecoveryCard>
         </>
       ) : null}
     </section>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Win95Button as Button, Win95Card as Card, Win95Input as Input } from "@/components/win95";
+import { Button, Card, Input } from "@/components/admin-neu/adapters";
 import { AlertCircle, Settings2 } from "lucide-react";
 
 interface Settings { maxReminders: number; reminderDays: [number, number, number]; publicBaseUrl: string; chargebackWarningDays: number; dumpStatementIntervalDays: number }

@@ -4,24 +4,19 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FundingButton as Button, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent } from "@/components/funding/funding-controls";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FFEmpty } from "@/components/ui/ff-empty";
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
-  SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -36,6 +31,10 @@ import {
   XCircle,
   AlertTriangle,
 } from "lucide-react";
+import "@/components/funding/funding-neu.css";
+import { FundingStatCard } from "@/components/funding/funding-stat-card";
+import { NeuPageShell, NeuTable } from "@/styles/neu/components";
+import { FundingBadge } from "@/components/funding/funding-badge";
 
 type CashApplication = {
   id: number;
@@ -119,7 +118,8 @@ function StatusBadge({ status }: { status: CashApplication["status"] }) {
     fully_applied:     "Applied",
     overpaid:          "Overpaid",
   };
-  return <span className={map[status]}>{labels[status]}</span>;
+  const tone = status === "fully_applied" ? "success" : status === "overpaid" ? "warning" : "neutral";
+  return <FundingBadge tone={tone} className={map[status]}>{labels[status]}</FundingBadge>;
 }
 
 export default function CashApplication() {
@@ -233,11 +233,11 @@ export default function CashApplication() {
   const needsAttention = stats.unapplied + stats.partial + stats.overpaid;
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))]">
+    <div className="funding-neu-page flex h-screen bg-[hsl(var(--background))]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Cash Matching" subtitle="Match incoming payments to loads — handle short-pays, overpays, and reconciliation" group="Funding" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <TopNav title="Cash Matching" subtitle="Match incoming payments to loads — handle short-pays, overpays, and reconciliation" group="Funding" neu />
+        <NeuPageShell className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
 
             {/* Stats strip */}
@@ -249,23 +249,7 @@ export default function CashApplication() {
                 { label: "Partial",         value: stats.partial,   warn: stats.partial > 0 },
                 { label: "Overpaid",        value: stats.overpaid,  warn: stats.overpaid > 0 },
               ].map(s => (
-                <div
-                  key={s.label}
-                  className={cn(
-                    "rounded-[12px] border px-4 py-3",
-                    s.warn
-                      ? "border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/10"
-                      : "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]"
-                  )}
-                >
-                  <p className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
-                  <p className={cn(
-                    "mt-0.5 text-[22px] font-bold tracking-tight",
-                    s.warn ? "text-amber-700 dark:text-amber-400" : "text-slate-900 dark:text-white"
-                  )}>
-                    {s.value}
-                  </p>
-                </div>
+                <FundingStatCard key={s.label} label={s.label} value={s.value} className="min-h-32 p-4" />
               ))}
             </div>
 
@@ -327,7 +311,7 @@ export default function CashApplication() {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="ff-data-table w-full min-w-[820px]">
+                  <NeuTable className="ff-data-table w-full min-w-[820px]">
                     <thead>
                       <tr>
                         <th>Reference</th>
@@ -393,7 +377,7 @@ export default function CashApplication() {
                         );
                       })}
                     </tbody>
-                  </table>
+                  </NeuTable>
                 </div>
               )}
 
@@ -408,12 +392,12 @@ export default function CashApplication() {
               )}
             </div>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* Record Payment Dialog */}
       <Dialog open={showNewPayment} onOpenChange={setShowNewPayment}>
-        <DialogContent className="max-w-lg rounded-2xl">
+        <DialogContent className="funding-neu-dialog max-w-lg rounded-2xl">
           <DialogHeader><DialogTitle>Record Incoming Payment</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -473,7 +457,7 @@ export default function CashApplication() {
 
       {/* Apply to Invoices Dialog */}
       <Dialog open={showApplyDialog} onOpenChange={setShowApplyDialog}>
-        <DialogContent className="max-w-2xl rounded-2xl">
+        <DialogContent className="funding-neu-dialog max-w-2xl rounded-2xl">
           <DialogHeader>
             <DialogTitle>Match Payment: {selectedPayment?.paymentReference}</DialogTitle>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">

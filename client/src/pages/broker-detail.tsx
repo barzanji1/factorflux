@@ -9,10 +9,11 @@ import TopNav from "@/components/layout/top-nav";
 import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
 import BrokerEditDialog from "@/components/brokers/broker-edit-dialog";
 import DumpStatementTimeline from "@/components/brokers/dump-statement-timeline";
+import EntityNotes from "@/components/shared/EntityNotes";
 import { BrokerFinancialOverview } from "@/components/brokers/broker-financial-overview";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Award, AlertTriangle, Ban, Building2, CheckCircle2, Clock, Edit2, MapPin, MessageSquare, Plus, ReceiptText, RefreshCw, Send, Trash2 } from "lucide-react";
+import { Award, AlertTriangle, Ban, Building2, CheckCircle2, Clock, Edit2, MapPin, MessageSquare, Plus, ReceiptText, RefreshCw, Trash2 } from "lucide-react";
 import type { Broker } from "@shared/schema";
 
 const TERMS_LABEL: Record<string, string> = {
@@ -193,10 +194,10 @@ export default function BrokerDetail() {
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "admin" || user?.role === "manager";
   const [profileTab, setProfileTab] = useState("overview");
+  const [focusNoteId, setFocusNoteId] = useState<number | null>(null);
   const [editingBroker, setEditingBroker] = useState<Broker | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [statusDialog, setStatusDialog] = useState(false);
-  const [noteText, setNoteText] = useState("");
   const [branchDialog, setBranchDialog] = useState(false);
   const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
   const [branchForm, setBranchForm] = useState({
@@ -250,15 +251,6 @@ export default function BrokerDetail() {
       setStatusDialog(false);
     },
     onError: () => toast({ title: "Failed to update status", variant: "destructive" }),
-  });
-  const notesMutation = useMutation({
-    mutationFn: (notes: string) => apiRequest("PATCH", `/api/brokers/${brokerId}`, { notes }),
-    onSuccess: () => {
-      toast({ title: "Notes saved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/brokers", brokerId] });
-      setNoteText("");
-    },
-    onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
   });
   const branchPayload = () => ({
     branchName: branchForm.branchName.trim(),
@@ -532,22 +524,12 @@ export default function BrokerDetail() {
 
                   <NeuTabPanel value="notes" unmountInactive className="mt-0 p-4 md:p-5">
                     <div className="mb-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#758587]">Internal record</p><h2 className="mt-1 text-lg font-semibold">Broker notes</h2></div>
-                    {broker.notes ? (
-                      <NeuCard className="mb-5 whitespace-pre-wrap p-4 text-sm leading-6">{broker.notes}</NeuCard>
-                    ) : (
-                      <NeuCard className="mb-5 p-5 text-sm text-[#758587]">No notes have been recorded for this broker.</NeuCard>
-                    )}
-                    {isAdmin ? (
-                      <form className="space-y-3" onSubmit={event => { event.preventDefault(); if (noteText.trim()) notesMutation.mutate(noteText); }}>
-                        <label htmlFor="broker-note-input" className="text-sm font-semibold">{broker.notes ? "Replace notes" : "Add notes"}</label>
-                        <textarea id="broker-note-input" value={noteText} onChange={event => setNoteText(event.target.value)} placeholder="Add internal notes about this broker..." rows={4} className="w-full rounded-xl border-0 bg-[#e0e0e0] px-4 py-3 text-sm text-[#354548] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]" />
-                        <NeuButton type="submit" variant="accent" disabled={notesMutation.isPending || !noteText.trim()} className="min-h-10 px-4 text-xs"><Send className="h-4 w-4" />{notesMutation.isPending ? "Saving…" : "Save notes"}</NeuButton>
-                      </form>
-                    ) : <p className="text-xs text-[#758587]">Only managers and administrators can update broker notes.</p>}
+                    {broker.notes && <NeuCard className="mb-5 whitespace-pre-wrap p-4 text-sm leading-6"><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#758587]">Legacy profile note · read-only</p>{broker.notes}</NeuCard>}
+                    <EntityNotes key={`broker:${brokerId}`} entityType="broker" entityId={brokerId} focusNoteId={focusNoteId} onFocused={() => setFocusNoteId(null)} />
                   </NeuTabPanel>
 
                   <NeuTabPanel value="credit" unmountInactive className="mt-0 p-4 md:p-5"><CreditScorePanel brokerId={brokerId} canRecalculate={isAdmin} /></NeuTabPanel>
-                  <NeuTabPanel value="timeline" unmountInactive className="mt-0 p-4 md:p-5"><DumpStatementTimeline brokerId={brokerId} neuStyle /></NeuTabPanel>
+                  <NeuTabPanel value="timeline" unmountInactive className="mt-0 p-4 md:p-5"><DumpStatementTimeline brokerId={brokerId} neuStyle onOpenNote={noteId => { setFocusNoteId(noteId ?? 0); setProfileTab("notes"); }} /></NeuTabPanel>
                 </NeuTabs>
               </>
             )}

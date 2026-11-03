@@ -1,37 +1,34 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { useRiskToast as useToast } from "@/components/risk/risk-controls";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RiskCard as Card, RiskButton as Button, RiskBadge as Badge, RiskInput as Input, RiskDialogContent as DialogContent, RiskStatCard } from "@/components/risk/risk-controls";
+import { NeuPageShell } from "@/styles/neu/components";
+import "@/components/risk/risk-neu.css";
 import {
-  Win95Tabs as Tabs,
-  Win95TabsContent as TabsContent,
-  Win95TabsList as TabsList,
-  Win95TabsTrigger as TabsTrigger,
-  win95TabsListClassName,
-  win95TabsTriggerClassName,
-} from "@/components/win95";
+  RiskTabs as Tabs,
+  RiskTabPanel as TabsContent,
+  RiskTabList as TabsList,
+  RiskTab as TabsTrigger,
+} from "@/components/risk/risk-controls";
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  RiskTable as Table,
+  RiskTableBody as TableBody,
+  RiskTableCell as TableCell,
+  RiskTableHead as TableHead,
+  RiskTableHeader as TableHeader,
+  RiskTableRow as TableRow,
+} from "@/components/risk/risk-controls";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -404,11 +401,11 @@ export default function FmcsaAuthority() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))]">
+    <div className="risk-neu-page flex h-screen overflow-hidden bg-[hsl(var(--background))]">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <TopNav title="FMCSA Monitor" subtitle="Carrier authority status, safety ratings, and compliance alerts" group="Risk" />
-        <main className="flex-1 overflow-y-auto p-6">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopNav title="FMCSA Monitor" subtitle="Carrier authority status, safety ratings, and compliance alerts" group="Risk" neu />
+        <NeuPageShell className="!min-h-0 flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-7xl space-y-6">
 
             {/* Header */}
@@ -423,6 +420,7 @@ export default function FmcsaAuthority() {
               </div>
               {canConfigureKey && (
                 <Button
+                  variant="accent"
                   onClick={() => runMutation.mutate()}
                   disabled={runMutation.isPending}
                   className="gap-2"
@@ -595,15 +593,7 @@ export default function FmcsaAuthority() {
                 { label: "Issues", value: stats.issues, icon: AlertTriangle, color: "text-orange-500" },
                 { label: "Open Alerts", value: stats.openAlerts, icon: Bell, color: "text-purple-600" },
               ].map(s => (
-                <Card key={s.label}>
-                  <CardContent className="flex items-center gap-3 py-4">
-                    <s.icon className={cn("h-8 w-8 shrink-0", s.color)} />
-                    <div>
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{s.value}</p>
-                      <p className="text-xs text-slate-500">{s.label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <RiskStatCard key={s.label} label={s.label} value={s.value} icon={<s.icon className={cn("h-5 w-5", s.color)} />} className="min-h-32 p-4" />
               ))}
             </div>
 
@@ -635,40 +625,40 @@ export default function FmcsaAuthority() {
                       onChange={e => setSearch(e.target.value)}
                     />
                   </div>
-                  <div className={win95TabsListClassName}>
+                  <Tabs value={filterType} onValueChange={value => setFilterType(value as typeof filterType)}>
+                    <TabsList aria-label="Entity type">
                     {(["all", "broker", "debtor", "carrier"] as const).map(t => {
                       const active = filterType === t;
                       return (
-                        <button
+                        <TabsTrigger
                           key={t}
-                          type="button"
+                          value={t}
                           aria-pressed={active}
                           data-state={active ? "active" : "inactive"}
-                          onClick={() => setFilterType(t)}
-                          className={win95TabsTriggerClassName}
                         >
                           {t === "all" ? "All Types" : t === "broker" ? "Brokers" : t === "debtor" ? "Debtors" : "Carriers"}
-                        </button>
+                        </TabsTrigger>
                       );
                     })}
-                  </div>
-                  <div className={win95TabsListClassName}>
+                    </TabsList>
+                  </Tabs>
+                  <Tabs value={filterStatus} onValueChange={value => setFilterStatus(value as typeof filterStatus)}>
+                    <TabsList aria-label="Authority status">
                     {(["all", "active", "inactive", "issues"] as const).map(s => {
                       const active = filterStatus === s;
                       return (
-                        <button
+                        <TabsTrigger
                           key={s}
-                          type="button"
+                          value={s}
                           aria-pressed={active}
                           data-state={active ? "active" : "inactive"}
-                          onClick={() => setFilterStatus(s)}
-                          className={win95TabsTriggerClassName}
                         >
                           {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-                        </button>
+                        </TabsTrigger>
                       );
                     })}
-                  </div>
+                    </TabsList>
+                  </Tabs>
                 </div>
 
                 {/* Table */}
@@ -778,6 +768,7 @@ export default function FmcsaAuthority() {
                                 {expanded && (
                                   <TableRow key={`${c.id}-history`}>
                                     <TableCell colSpan={7} className="bg-slate-50 dark:bg-slate-800/30 px-6 py-3">
+                                      <Card className="risk-neu-pressed p-4">
                                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                                         Check History — {c.entityName}
                                       </p>
@@ -856,6 +847,7 @@ export default function FmcsaAuthority() {
                                           ))}
                                         </div>
                                       )}
+                                      </Card>
                                     </TableCell>
                                   </TableRow>
                                 )}
@@ -1061,7 +1053,7 @@ export default function FmcsaAuthority() {
             </Tabs>
 
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* Resolve Dialog */}

@@ -140,7 +140,7 @@ export function ClientEmailComposer({
       setSelectedTemplate(null);
       draftSignature.current = "";
       requestId.current = getRequestId();
-      toast({ title: "Email sent", description: `Message sent to ${selectedClient?.email}.` });
+      toast({ title: "Email sent", description: `Message sent to ${selectedClient?.email}.`, className: "email-neu-toast" });
     },
     onSettled: () => {
       if (selectedClient) queryClient.invalidateQueries({ queryKey: ["/api/clients", selectedClient.id, "email-log"] });
@@ -161,7 +161,7 @@ export function ClientEmailComposer({
     ? personalizeEmail(body, selectedClient.name)
     : "";
   return <Dialog open={open} onOpenChange={value => { if (!sendMutation.isPending) onOpenChange(value); }}>
-    <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto rounded-sm border-2 border-[#7c8582] bg-[#e8eeeb] p-0 shadow-[4px_4px_0_rgba(39,54,56,.25)]">
+    <DialogContent className="email-neu-dialog max-h-[92dvh] max-w-2xl overflow-y-auto p-0">
       <DialogHeader className="border-b border-[#b8c3bf] bg-[#d6e2de] px-5 py-4">
         <DialogTitle className="flex items-center gap-2 text-base text-[#203a46]"><Mail className="h-4 w-4 text-[#087f8e]" />Email client</DialogTitle>
         <DialogDescription className="text-xs text-[#596d70]">Send-only communication to the assigned client, with optional CC recipients.</DialogDescription>
@@ -172,7 +172,7 @@ export function ClientEmailComposer({
             {clientsLoading ? <div className="h-10 animate-pulse border border-[#c4cfcc] bg-[#dce4e1]" />
               : clientsError ? <div role="alert" className="flex items-center justify-between border border-[#d2a6a0] bg-[#fff1ee] p-2 text-xs text-[#8d3f36]"><span>Client list could not be loaded.</span><Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button></div>
                   : clients.length === 0 ? <div className="border border-[#c4cfcc] bg-[#f4f7f5] p-3 text-sm text-[#596d70]">{user?.role === "employee" ? <><p className="font-semibold text-[#334c50]">No clients assigned to you</p><p className="mt-1">Ask an administrator to assign a client before sending email.</p></> : "No clients available for email."}</div>
-                 : <Select value={clientId} onValueChange={changeClient} disabled={sendMutation.isPending}><SelectTrigger id="client-email-recipient" className="rounded-sm bg-white"><SelectValue placeholder="Choose a client…" /></SelectTrigger><SelectContent>{clients.map((client) => <SelectItem key={client.id} value={String(client.id)}>{client.name}</SelectItem>)}</SelectContent></Select>}
+                  : <Select value={clientId} onValueChange={changeClient} disabled={sendMutation.isPending}><SelectTrigger id="client-email-recipient" className="min-h-11 rounded-xl border-0 bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><SelectValue placeholder="Choose a client…" /></SelectTrigger><SelectContent className="rounded-xl border-0 bg-[#e0e0e0] shadow-[4px_4px_12px_#b8b8b8]">{clients.map((client) => <SelectItem key={client.id} value={String(client.id)}>{client.name}</SelectItem>)}</SelectContent></Select>}
           </div>}
         {selectedClient && <div className={`flex items-start gap-2 border p-2.5 text-xs ${isValidEmail(selectedClient.email) ? "border-[#b7cfca] bg-[#f1f7f4] text-[#345c54]" : "border-[#d6b076] bg-[#fff8e9] text-[#805f26]"}`}>
           {isValidEmail(selectedClient.email) ? <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}

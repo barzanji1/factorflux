@@ -1,17 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { AdminPageShell, Card, Badge, Button, DialogContent, Input, useAdminToast } from "@/components/admin-neu/adapters";
+import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { TopNav } from "@/components/admin-neu/adapters";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   GripVertical, Settings2, Zap, ChevronRight, CheckCircle2,
@@ -176,7 +173,7 @@ function StageCard({
           : "opacity-0",
       )} />
 
-      <div
+      <Card
         draggable={!disabled}
         onDragStart={e => onDragStart(e, index)}
         onDragEnd={onDragEnd}
@@ -257,14 +254,14 @@ function StageCard({
                 {stage.label}
               </span>
               {stage.autoAdvance && (
-                <span className="ff-badge ff-workflow-auto">
+                <Badge className="ff-badge ff-workflow-auto">
                   <Zap className="h-2.5 w-2.5" /> Auto
-                </span>
+                </Badge>
               )}
               {stage.requiresApproval && (
-                <span className="ff-badge ff-workflow-gated">
+                <Badge className="ff-badge ff-workflow-gated">
                   <Shield className="h-2.5 w-2.5" /> Gated
-                </span>
+                </Badge>
               )}
               <span className="ff-badge ff-badge-draft">
                 SLA {slaLabel(stage.slaHours)}
@@ -390,7 +387,7 @@ function StageCard({
             <DocRulesHint stageId={stage.id} />
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -438,7 +435,7 @@ function PipelinePreview({
   const totalActive = enabled.reduce((s, x) => s + (stageCounts[x.id] ?? 0), 0);
 
   return (
-    <div className="ff-workflow-surface">
+    <Card className="ff-workflow-surface ff-workflow-preview">
       <div className="border-b border-slate-100 dark:border-slate-800 px-5 py-3">
         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Live Pipeline Preview</p>
       </div>
@@ -508,7 +505,7 @@ function PipelinePreview({
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -518,7 +515,7 @@ const MAX_HISTORY = 30;
 
 export default function WorkflowBuilder() {
   const { user } = useAuth();
-  const { toast } = useToast();
+  const { toast } = useAdminToast();
   const isManager = user?.role === "manager" || user?.role === "admin";
 
   // ── Server config ───────────────────────────────────────────────────────────
@@ -704,7 +701,7 @@ export default function WorkflowBuilder() {
   const enabledCount = stages.filter(s => s.enabled).length;
 
   return (
-    <div className="ff-workflow-page flex h-screen bg-[#d4d0c8]">
+    <div className="ff-workflow-page flex h-[100dvh] min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
@@ -713,7 +710,7 @@ export default function WorkflowBuilder() {
           group="Admin"
         />
 
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <AdminPageShell className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1200px] p-6 xl:p-8">
 
             {/* ── Top bar ───────────────────────────────────────────────────── */}
@@ -962,7 +959,7 @@ export default function WorkflowBuilder() {
               </div>
             </div>
           </div>
-        </main>
+        </AdminPageShell>
       </div>
 
       {/* Reset confirmation dialog */}

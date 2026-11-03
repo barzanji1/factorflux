@@ -14,6 +14,7 @@ import { SkeletonRows } from "@/components/ui/skeleton-rows";
 import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import CarrierChatThread from "@/components/carriers/CarrierChatThread";
+import EntityNotes from "@/components/shared/EntityNotes";
 import {
   NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuStatCard,
   NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell,
@@ -866,6 +867,7 @@ export default function PortalSubmissionsPage() {
                   </NeuButton>
                 </div>
               </NeuCard>
+              <EntityNotes key={`submission:${detail.id}`} entityType="submission" entityId={detail.id} />
             </div>
           )}
         </DialogContent>

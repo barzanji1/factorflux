@@ -3,15 +3,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent } from "@/components/funding/funding-controls";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, FileText, Pencil, Plus, RotateCcw } from "lucide-react";
+import "@/components/funding/funding-neu.css";
+import { NeuPageShell, NeuTable } from "@/styles/neu/components";
 
 type RecordValue = Record<string, any>;
 type FormState = {
@@ -152,18 +153,18 @@ export default function FuelAdvanceTracking() {
     save.mutate();
   };
 
-  return <div className="ff-fuel-advance-page flex min-h-screen bg-[#d4d0c8] text-[#263b44]">
+  return <div className="funding-neu-page ff-fuel-advance-page flex min-h-screen bg-[#d4d0c8] text-[#263b44]">
     <Sidebar />
     <div className="flex min-w-0 flex-1 flex-col">
-      <TopNav title="Fuel Advance Tracking" subtitle="Review and submit carrier advances" group="Funding" />
-      <main className="flex-1 overflow-auto p-3 md:p-5"><div className="mx-auto max-w-[1600px] space-y-3">
+      <TopNav title="Fuel Advance Tracking" subtitle="Review and submit carrier advances" group="Funding" neu />
+      <NeuPageShell className="flex-1 overflow-auto p-3 md:p-5"><div className="mx-auto max-w-[1600px] space-y-3">
         <div className="ff-card ff-fuel-advance-surface flex flex-wrap items-center justify-between gap-2 border border-[#718087] bg-white p-3">
           <div><h2 className="font-bold">Fuel Advances</h2><p className="text-xs text-[#63767d]">Advances, fees, deposits and payment status</p></div>
           <Button onClick={openCreate}><Plus className="mr-1 h-4 w-4" />New advance</Button>
         </div>
         <Card className="ff-fuel-advance-surface overflow-hidden border-[#9eabad]">
           <CardHeader className="pb-2"><div className="flex items-center justify-between"><CardTitle className="text-sm">Advance ledger</CardTitle><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search records..." className="h-8 max-w-xs" /></div></CardHeader>
-          <CardContent className="p-0"><div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[1500px] text-left text-[11px]">
+          <CardContent className="p-0"><div className="overflow-x-auto"><NeuTable className="ff-data-table w-full min-w-[1500px] text-left text-[11px]">
             <thead className="bg-[#f0f4f3] text-[9px] uppercase text-[#63767d]"><tr>{["Carrier", "Broker", "Load", "Code", "Rate", "%", "Factored", "Fees", "Method", "DV", "Reference#", "Delivering date", "Date", "Agent", "Paid", "Account", "Actions"].map((heading) => <th key={heading} className="whitespace-nowrap px-2 py-2">{heading}</th>)}</tr></thead>
             <tbody>{isLoading ? <tr><td colSpan={17} className="p-8 text-center">Loading advances…</td></tr> : filtered.map((row) => <tr key={row.id} className="border-t border-[#e1e6e7]">
               <td className="px-2 py-2">{valueOf(row, "carrierName", "carrier")}</td><td className="px-2 py-2">{valueOf(row, "brokerName", "broker")}</td>
@@ -174,7 +175,7 @@ export default function FuelAdvanceTracking() {
               <td className="px-2 py-2"><Checkbox aria-label={`Paid status for ${valueOf(row, "loadNumber", "loadId")}`} checked={!!row.paid} onCheckedChange={(checked) => toggle.mutate({ id: row.id, field: "paid", value: checked === true })} /></td><td className="px-2 py-2">{valueOf(row, "account", "accountNumber")}</td>
               <td className="px-2 py-2"><span className="flex gap-1"><Button variant="outline" size="sm" title="Edit" onClick={() => openEdit(row)}><Pencil className="h-3.5 w-3.5" /></Button><Link href={`/fuel-advance/${row.id}`}><Button variant="outline" size="sm" title="View details"><Eye className="h-3.5 w-3.5" /></Button></Link><a href={`/api/fuel-advances/${row.id}/deposit-slip`} target="_blank" rel="noreferrer"><Button variant="outline" size="sm" title="Open deposit slip"><FileText className="h-3.5 w-3.5" /></Button></a></span></td>
             </tr>)}</tbody>
-          </table></div>{!isLoading && !filtered.length && <p className="p-8 text-center text-sm text-[#63767d]">No fuel advances found.</p>}</CardContent>
+          </NeuTable></div>{!isLoading && !filtered.length && <p className="p-8 text-center text-sm text-[#63767d]">No fuel advances found.</p>}</CardContent>
         </Card>
         {formOpen && <Card className="ff-fuel-advance-surface border-[#718087]"><CardHeader><CardTitle className="text-base">{editing ? "Edit fuel advance" : "New fuel advance"}</CardTitle></CardHeader><CardContent>
           <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -190,7 +191,7 @@ export default function FuelAdvanceTracking() {
             <div className="flex gap-2 sm:col-span-2 lg:col-span-3"><Button type="submit" disabled={save.isPending}>Submit</Button><Button type="button" variant="outline" onClick={() => setForm(emptyForm())}><RotateCcw className="mr-1 h-4 w-4" />Reset</Button><Button type="button" variant="outline" onClick={() => { setFormOpen(false); setEditing(null); }}>Cancel</Button></div>
           </form>
         </CardContent></Card>}
-      </div></main>
+      </div></NeuPageShell>
     </div>
   </div>;
 }

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { registerChargebackResolutionRoutes } from "./routes/chargebackResolutions";
+import { registerEntityNoteRoutes } from "./routes/entityNotes";
 import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
 import { registerOcrIntakeRoutes } from "./routes/ocrIntake";
@@ -98,7 +99,6 @@ import {
   brokerBranches,
   fuelAdvances,
   invoices,
-  invoiceNotes,
   invoiceChargebackEvents,
   invoiceRefunds,
   payouts,
@@ -909,6 +909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/users", "chat"],
     ["/api/email", "admin"],
     ["/api/test", "admin"],
+    ["/api/notes", "all_authenticated"],
     ["/api/admin", "admin"],
   ];
   app.use("/api", (req: any, res: any, next: any) => {
@@ -4046,26 +4047,7 @@ ${message}
     }
   });
 
-  app.post("/api/invoices/:id/notes", requireAuth, async (req: any, res) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "Invalid invoice id" });
-      if (!await employeeCanAccessInvoice(req, id)) return res.status(403).json({ message: "You may only add notes to your own submitted invoices" });
-      const body = z.object({ body: z.string().trim().min(1).max(10000) }).parse(req.body);
-      const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).limit(1);
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      const [note] = await db.insert(invoiceNotes).values({ invoiceId: id, body: body.body, createdBy: req.user.id }).returning();
-      await db.insert(eventLedger).values({
-        entityType: "invoice", entityId: id, eventType: "invoice_note_added", actorType: "user", actorId: req.user.id,
-        payloadJson: { noteId: note.id, body: note.body },
-      });
-      res.status(201).json(note);
-    } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message });
-      console.error("Error adding invoice note:", error);
-      res.status(500).json({ message: "Failed to add invoice note" });
-    }
-  });
+  registerEntityNoteRoutes(app, requireAuth);
 
   // ─── Invoice timeline (merged events) ────────────────────────────────────
   app.get("/api/invoices/:id/timeline", requireAuth, async (req, res) => {

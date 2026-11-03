@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { Win95Button as Button, Win95Card as Card } from "@/components/win95";
-import { ConfirmationStatusBadge, type ConfirmationStatus } from "./confirmation-status";
+import { RecoveryButton as Button, RecoveryCard as Card, RecoveryBadge } from "@/components/recovery/recovery-controls";
+import type { ConfirmationStatus } from "./confirmation-status";
 import { AlertCircle, ArrowRight, RefreshCw } from "lucide-react";
 
 interface QueueItem {
@@ -35,15 +35,15 @@ export default function ConfirmationFollowUpQueue() {
           <div className="flex flex-wrap items-center gap-2">
             <Link href={`/invoices/${item.invoiceId}`} data-testid="confirmation-followup-invoice" className="font-bold text-[#087f8c] underline">{item.invoiceNumber} <ArrowRight className="inline h-3 w-3" /></Link>
             <span className="text-xs text-[#555]">{item.brokerName}</span>
-            <span className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase ${item.priority === "urgent" ? "border-red-700 bg-red-100 text-red-800" : "border-amber-700 bg-amber-100 text-amber-800"}`}>{item.priority}</span>
-            <ConfirmationStatusBadge status={item.confirmationStatus} />
+          <RecoveryBadge tone={item.priority === "urgent" ? "warning" : "accent"} className="px-2 py-1 text-[10px] uppercase">{item.priority}</RecoveryBadge>
+            <RecoveryBadge data-testid={`confirmation-status-${item.confirmationStatus}`} tone={item.confirmationStatus === "confirmed" ? "success" : item.confirmationStatus === "sent" ? "accent" : item.confirmationStatus === "disputed" ? "warning" : "neutral"} className="px-2 py-1 text-[10px] uppercase">{item.confirmationStatus}</RecoveryBadge>
           </div>
           <p className="mt-1 text-sm font-semibold text-[#222]">{item.title}</p>
           {item.description && <p className="text-xs text-[#666]">{item.description}</p>}
           <p className="mt-1 text-[11px] text-[#555]">Assigned: {item.agentName || "Unassigned"} · Due {new Date(item.dueDate).toLocaleDateString()}</p>
         </div>
         <label className="text-xs font-bold text-[#555]">Task status
-          <select data-testid="confirmation-followup-status" value={item.status} disabled={mutation.isPending} onChange={e => mutation.mutate({ id: item.id, status: e.target.value as QueueItem["status"] })} className="mt-1 block h-9 rounded-sm border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white px-2">
+          <select data-testid="confirmation-followup-status" value={item.status} disabled={mutation.isPending} onChange={e => mutation.mutate({ id: item.id, status: e.target.value as QueueItem["status"] })} className="recovery-neu-select mt-1 block h-9 rounded-xl px-2">
             <option value="todo">To do</option><option value="in_progress">In progress</option><option value="completed">Completed</option>
           </select>
         </label>

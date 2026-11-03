@@ -1,18 +1,19 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  PageShell,
-  Win95Button as Button,
-  Win95Card as Card,
-  Win95CardContent as CardContent,
-  Win95Input as Input,
-  Win95Select as Select,
-  Win95SelectContent as SelectContent,
-  Win95SelectItem as SelectItem,
-  Win95SelectTrigger as SelectTrigger,
-  Win95SelectValue as SelectValue,
-  Win95StatCard,
-} from "@/components/win95";
+  RiskPageFrame as PageShell,
+  RiskButton as Button,
+  RiskCard as Card,
+  RiskInput as Input,
+  RiskSelectContent as SelectContent,
+  RiskSelectTrigger as SelectTrigger,
+  RiskStatCard,
+  RiskTable,
+  RiskBadge,
+} from "@/components/risk/risk-controls";
+import { CardContent } from "@/components/ui/card";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
+import "@/components/risk/risk-neu.css";
 import {
   ClipboardList,
   Search,
@@ -389,7 +390,7 @@ export default function AuditLog() {
                 { label: "Today", value: unified.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString()).length },
                 { label: "System Events", value: unified.filter(e => e.actorType === "system").length },
                 { label: "User Actions", value: unified.filter(e => e.actorType === "user").length },
-              ].map(s => <Win95StatCard key={s.label} label={s.label} value={s.value} />)}
+              ].map(s => <RiskStatCard key={s.label} label={s.label} value={s.value} />)}
             </div>
 
             {/* Main Log */}
@@ -399,7 +400,7 @@ export default function AuditLog() {
                   <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                     <ClipboardList className="h-5 w-5 text-slate-500" />
                     Event Logs
-                    <span className="ff-badge ff-badge-draft ml-2">{filtered.length}</span>
+                    <RiskBadge className="ff-badge ff-badge-draft ml-2">{filtered.length}</RiskBadge>
                   </h2>
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
@@ -460,7 +461,7 @@ export default function AuditLog() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="ff-data-table w-full min-w-[980px]">
+                    <RiskTable className="ff-data-table w-full min-w-[980px]">
                       <thead><tr>
                         {["Action", "Entity", "Details", "User", "Timestamp", ""].map((heading, index) => (
                           <th key={`${heading}-${index}`} className={index === 5 ? "w-12" : ""}>{heading}</th>
@@ -474,8 +475,8 @@ export default function AuditLog() {
                         return (
                           <>
                             <tr key={e.id}>
-                              <td><span className={`ff-badge ${actionBadge(e.actionType)}`}><Icon className="h-3 w-3" />{formatEventType(e.actionType)}</span></td>
-                              <td><span className={`ff-badge ${ENTITY_COLOR[e.entityType] ?? "ff-badge-draft"}`}>{e.entityType} #{e.entityId}</span></td>
+                              <td><RiskBadge className={`ff-badge ${actionBadge(e.actionType)}`}><Icon className="h-3 w-3" />{formatEventType(e.actionType)}</RiskBadge></td>
+                              <td><RiskBadge className={`ff-badge ${ENTITY_COLOR[e.entityType] ?? "ff-badge-draft"}`}>{e.entityType} #{e.entityId}</RiskBadge></td>
                               <td><p className="font-semibold">{e.title}</p><p className="text-xs text-slate-500">{e.detail}</p></td>
                               <td><span className="flex items-center gap-1 text-xs"><User className="h-3 w-3" />{e.actorName ?? e.actorType}</span></td>
                               <td className="font-mono text-xs tabular-nums"><div>{new Date(e.createdAt).toLocaleString()}</div><div className="text-slate-500">{timeAgo(e.createdAt)}</div></td>
@@ -483,10 +484,10 @@ export default function AuditLog() {
                             </tr>
                             {isExpanded && (
                               <tr key={`${e.id}-detail`}><td colSpan={6} className="!bg-[#f0f0f0]">
-                                 <div className="ff-card ff-audit-surface ff-audit-detail p-4">
+                                 <Card className="ff-card ff-audit-surface ff-audit-detail risk-neu-pressed p-4">
                                    <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">{detailView.title}</p>
                                    <div className="overflow-hidden rounded-xl border-2 border-[#808080] bg-white">
-                                     <table className="w-full text-xs">
+                                     <RiskTable className="w-full text-xs">
                                        <tbody>
                                          {detailView.rows.map(row => (
                                            <tr key={row.label} className="border-b border-slate-200 last:border-b-0">
@@ -499,16 +500,16 @@ export default function AuditLog() {
                                            </tr>
                                          ))}
                                        </tbody>
-                                     </table>
+                                     </RiskTable>
                                    </div>
-                                </div>
+                                </Card>
                               </td></tr>
                             )}
                           </>
                         );
                       })}
                       </tbody>
-                    </table>
+                    </RiskTable>
                   </div>
                 )}
               </CardContent>

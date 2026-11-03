@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Clock3, MailWarning, RotateCcw } from "lucide-react";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuSelect } from "@/styles/neu/components";
+import EntityNotes from "@/components/shared/EntityNotes";
 
 type Lifecycle = {
   invoiceId: number; carrierName: string; originalAmount: number | null;
@@ -118,6 +119,9 @@ export default function ChargebackLifecycle({ invoiceId, onChanged }: { invoiceI
       {!!lifecycle.refunds.length && <div className="mt-4 border-t border-[#c0c0c0] pt-3"><h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-[#666]">Refund ledger</h4>
         <div className="space-y-2">{lifecycle.refunds.map(refund => <div key={refund.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 border-b border-[#cecece] pb-2 text-xs last:border-0"><span>{dateLabel(refund.refundDate)} · {refund.reference || "No payment reference"}{refund.approvedBy && <span className="block text-[#666]">Approved by {refund.approverName || refund.approvedBy}</span>}{refund.actorName && <span className="block text-[#666]">Recorded by {refund.actorName}</span>}{refund.notes && <span className="block text-[#666]">{refund.notes}</span>}{refund.emailStatus && refund.emailStatus !== "sent" && <span role="status" className="block text-[#963b31]">Carrier notification {refund.emailStatus}: {refund.emailError || "Awaiting delivery confirmation"}</span>}</span><strong className="font-mono">{money(refund.amount)}</strong></div>)}</div>
       </div>}
+      <div className="border-t border-[#c0c0c0] px-4 py-4">
+        <EntityNotes key={`chargeback:${invoiceId}`} entityType="chargeback" entityId={invoiceId} />
+      </div>
     </div>
     {open && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#263638]/40 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !mutation.isPending) setOpen(false); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="refund-title" className="w-full max-w-lg rounded-2xl bg-[#e0e0e0] p-5 shadow-[8px_8px_24px_#777,-6px_-6px_20px_#fff]">

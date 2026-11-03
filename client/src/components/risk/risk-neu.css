@@ -1,0 +1,264 @@
+/* Opt-in neumorphic skin for Risk pages and their own Radix portals only. */
+.risk-neu-page.risk-neu-page.risk-neu-page,
+.risk-neu-page.risk-neu-page.risk-neu-page main {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+}
+
+.risk-neu-page main { min-height: 0; }
+
+.risk-neu-page main .risk-neu-surface,
+.risk-neu-dialog.risk-neu-dialog.risk-neu-dialog,
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog,
+body:has(.risk-neu-page) [role="listbox"].risk-neu-select {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.risk-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.risk-neu-page main textarea,
+.risk-neu-page main [role="combobox"],
+.risk-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.risk-neu-dialog textarea,
+.risk-neu-dialog [role="combobox"],
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog textarea,
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog [role="combobox"] {
+  min-width: 0;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+.risk-neu-page main input::placeholder,
+.risk-neu-page main textarea::placeholder,
+.risk-neu-dialog input::placeholder,
+.risk-neu-dialog textarea::placeholder { color: #888 !important; }
+
+.risk-neu-page main button:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]),
+.risk-neu-dialog button:not([data-radix-collection-item]),
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog button:not([data-radix-collection-item]) {
+  border-color: #d1d1d1 !important;
+  border-radius: 12px !important;
+  background-color: #e0e0e0 !important;
+  color: #444 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+}
+
+.risk-neu-page main button:hover:not(:disabled),
+.risk-neu-dialog button:hover:not(:disabled),
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog button:hover:not(:disabled) {
+  color: #168d99 !important;
+}
+
+.risk-neu-page main button:active:not(:disabled),
+.risk-neu-dialog button:active:not(:disabled) {
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.risk-neu-page main button.risk-neu-accent,
+.risk-neu-dialog button.risk-neu-accent,
+body:has(.risk-neu-page) [role="dialog"] button.risk-neu-accent {
+  background: #27aab8 !important;
+  color: #fff !important;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
+}
+.risk-neu-page main button.risk-neu-accent:hover:not(:disabled),
+.risk-neu-dialog button.risk-neu-accent:hover:not(:disabled) {
+  background: #2398a4 !important;
+  color: #fff !important;
+}
+.risk-neu-page main button.risk-neu-danger,
+.risk-neu-dialog button.risk-neu-danger {
+  background: #b94e4e !important;
+  color: #fff !important;
+}
+
+.risk-neu-page main table {
+  color: #333 !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+.risk-neu-page main thead,
+.risk-neu-page main thead tr {
+  background: #d7d7d7 !important;
+  color: #666 !important;
+}
+.risk-neu-page main th {
+  border-color: #c9c9c9 !important;
+  color: #777 !important;
+  font-size: 10px !important;
+  letter-spacing: .12em !important;
+  text-transform: uppercase;
+}
+.risk-neu-page main td,
+.risk-neu-page main th { border-bottom-color: #c9c9c9 !important; }
+.risk-neu-page main tbody tr:hover { background: #d9e8e8 !important; }
+
+.risk-neu-page main .risk-neu-badge {
+  border: 0 !important;
+  background: #e0e0e0 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+}
+.risk-neu-page main .risk-neu-badge.ff-badge-draft { color: #475569 !important; }
+.risk-neu-page main .risk-neu-badge.ff-badge-pending { color: #92400e !important; }
+.risk-neu-page main .risk-neu-badge.ff-badge-submitted { color: #1e40af !important; }
+.risk-neu-page main .risk-neu-badge.ff-badge-approved { color: #155e75 !important; }
+.risk-neu-page main .risk-neu-badge.ff-badge-funded { color: #065f46 !important; }
+.risk-neu-page main .risk-neu-badge.ff-badge-rejected { color: #991b1b !important; }
+.risk-neu-page main .risk-neu-badge.ff-badge-hold { color: #7f5b1a !important; }
+
+.risk-neu-select[role="listbox"],
+body:has(.risk-neu-page) [data-radix-popper-content-wrapper] [role="listbox"],
+body:has(.risk-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+}
+body:has(.risk-neu-page) [data-radix-popper-content-wrapper] [role="option"],
+body:has(.risk-neu-page) [data-radix-popper-content-wrapper] [role="menuitem"] { color: #444 !important; }
+
+.risk-neu-dialog.risk-neu-dialog.risk-neu-dialog > button.ff-btn-secondary:has(> span.sr-only),
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
+  width: 36px !important;
+  height: 36px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #e0e0e0 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+}
+
+body:has(.risk-neu-page) [data-sonner-toaster] [data-sonner-toast],
+body:has(.risk-neu-page) [data-radix-toast-viewport] [role="status"],
+body:has(.risk-neu-page) [data-radix-toast-viewport] [role="alert"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.risk-neu-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+@media (max-width: 767px) {
+  .risk-neu-page main { padding: 1rem !important; }
+  .risk-neu-page main > div:first-child { flex-wrap: wrap; gap: .75rem; }
+  .risk-neu-page main > div > div:first-child { flex-wrap: wrap; gap: .75rem; }
+  .risk-neu-page main .flex.flex-wrap { min-width: 0; }
+  .risk-neu-page main [role="combobox"] { min-width: 0; max-width: 100%; }
+  .risk-neu-page main table { min-width: max-content; }
+  .risk-neu-dialog .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Reassert surfaces after the app's legacy Win95 border normalization. */
+.risk-neu-page.risk-neu-page.risk-neu-page main .risk-neu-surface,
+.risk-neu-dialog.risk-neu-dialog.risk-neu-dialog,
+body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog {
+  border: 0 !important;
+  border-radius: 16px !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main .risk-neu-surface {
+  background: #e0e0e0 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main .risk-neu-surface > [class~="space-y-1.5"] {
+  border: 0 !important;
+  border-radius: 16px 16px 0 0 !important;
+  background: #e0e0e0 !important;
+  box-shadow: none !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main .risk-neu-pressed {
+  background: #e0e0e0 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.risk-neu-page.risk-neu-page.risk-neu-page main textarea,
+.risk-neu-page.risk-neu-page.risk-neu-page main [role="combobox"],
+.risk-neu-page.risk-neu-page.risk-neu-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main [role="tablist"] {
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main [role="tab"] {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main [role="tab"][aria-selected="true"] {
+  color: #168d99 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page .ff-top-nav button:not([class~="rounded-full"]) {
+  border: 0 !important;
+  border-radius: 12px !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main .risk-neu-pressed > .border-2 {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+}
+
+.risk-neu-toast.risk-neu-toast.risk-neu-toast {
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main button.risk-neu-accent,
+.risk-neu-dialog.risk-neu-dialog.risk-neu-dialog button.risk-neu-accent {
+  background: #27aab8 !important;
+  color: #fff !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main button.risk-neu-danger,
+.risk-neu-dialog.risk-neu-dialog.risk-neu-dialog button.risk-neu-danger {
+  background: #b94e4e !important;
+  color: #fff !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page main [class*="border-t-white"] {
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
+}
+
+.risk-neu-page.risk-neu-page.risk-neu-page .ff-review-rating-track {
+  border: 0 !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  background: #d7d7d7 !important;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff !important;
+}

@@ -2,7 +2,6 @@ import { db } from "../db";
 import {
   invoices,
   invoiceStatusHistory,
-  invoiceNotes,
   invoiceChargebackEvents,
   invoiceRefunds,
   eventLedger,
@@ -25,7 +24,7 @@ import {
   activities,
   creditChecks,
 } from "../../shared/schema";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import { decryptVault } from "./vaultCrypto";
 
 // ─── Stage definitions ─────────────────────────────────────────────────────
@@ -235,14 +234,6 @@ export async function getInvoiceDetail(invoiceId: number) {
     existing.push(reminder);
     remindersByFollowUp.set(reminder.followUpId, existing);
   }
-  const invoiceNoteRows = await db.select().from(invoiceNotes)
-    .where(eq(invoiceNotes.invoiceId, invoiceId)).orderBy(desc(invoiceNotes.createdAt));
-  const noteAuthorIds = invoiceNoteRows.map(note => note.createdBy).filter(Boolean) as string[];
-  const noteAuthors = noteAuthorIds.length
-    ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
-      .from(users).where(inArray(users.id, noteAuthorIds))
-    : [];
-  const noteAuthorMap = new Map(noteAuthors.map(user => [user.id, user]));
   const chargebackEvents = await db.select().from(invoiceChargebackEvents)
     .where(eq(invoiceChargebackEvents.invoiceId, invoiceId)).orderBy(desc(invoiceChargebackEvents.createdAt));
   const chargebackActorIds = chargebackEvents.map(event => event.actorId).filter(Boolean) as string[];
@@ -368,7 +359,6 @@ export async function getInvoiceDetail(invoiceId: number) {
           deliveryStatus: reminder.deliveryStatus, editedBy: reminder.editedBy,
         })),
       })),
-      notes: invoiceNoteRows.map(note => ({ ...note, createdByUser: noteAuthorMap.get(note.createdBy) ?? null })),
     },
     chargeback: {
       status: inv.chargebackStatus,
@@ -468,8 +458,18 @@ const invoiceTimelineEventFormats: Record<string, TimelineEventFormat> = {
   },
   invoice_note_added: {
     category: "collection",
-    title: () => "Invoice note added",
-    description: payload => timelineText(payload.body, "A note was added to the invoice"),
+    title: () => "Note added",
+    description: () => "View the note in the Notes section",
+  },
+  invoice_note_edited: {
+    category: "collection",
+    title: () => "Note edited",
+    description: () => "View the updated note in the Notes section",
+  },
+  invoice_note_deleted: {
+    category: "collection",
+    title: () => "Note deleted",
+    description: () => "The note was removed from the Notes section",
   },
   invoice_aging_alert_triggered: {
     category: "system",
@@ -607,8 +607,8 @@ export function formatInvoiceTimelineEvent(eventType: string, payload: Record<st
   };
 }
 
-export async function getInvoiceTimeline(invoiceId: number): Promise<TimelineEvent[]> {
-  const ledgerEvents = await db
+export async function getInvoiceTimeline(invoiceId: number, store: Pick<typeof db, "select"> = db): Promise<TimelineEvent[]> {
+  const ledgerEvents = await store
     .select()
     .from(eventLedger)
     .where(and(eq(eventLedger.entityType, "invoice"), eq(eventLedger.entityId, invoiceId)))
@@ -617,6 +617,7 @@ export async function getInvoiceTimeline(invoiceId: number): Promise<TimelineEve
   const events = ledgerEvents.map((event): TimelineEvent => {
     const payload = (event.payloadJson as Record<string, unknown>) ?? {};
     const formatted = formatInvoiceTimelineEvent(event.eventType, payload);
+    const noteAction = ({ invoice_note_added: "add", invoice_note_edited: "edit", invoice_note_deleted: "delete" } as Record<string, string>)[event.eventType];
     return {
       id: `ledger-${event.id}`,
       timestamp: event.createdAt,
@@ -624,16 +625,21 @@ export async function getInvoiceTimeline(invoiceId: number): Promise<TimelineEve
       title: formatted.title,
       description: formatted.description,
       actorId: event.actorId,
-      meta: { ...payload, actorType: event.actorType },
+      meta: noteAction
+        ? { noteId: payload.noteId, noteAction, actorType: event.actorType }
+        : { ...payload, actorType: event.actorType },
     };
   });
   const actorIds = Array.from(new Set(events.map(event => event.actorId).filter(id => id && id !== "system"))) as string[];
   if (!actorIds.length) return events;
-  const actorRows = await db.select({
+  const actorRows = await store.select({
     id: users.id,
     name: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
     email: users.email,
   }).from(users).where(inArray(users.id, actorIds));
   const actorMap = new Map(actorRows.map(actor => [actor.id, actor]));
-  return events.map(event => ({ ...event, actor: event.actorId ? actorMap.get(event.actorId) ?? null : null }));
+  return events.map(event => {
+    const actor = event.actorId ? actorMap.get(event.actorId) ?? null : null;
+    return { ...event, actor, title: event.meta?.noteAction ? `${event.title} by ${actor?.name?.trim() || (event.actorId === "system" ? "System" : "Former staff member")}` : event.title };
+  });
 }

@@ -24,9 +24,10 @@ import { LoadTypeBadge, LoadTypeToggleGroup } from "@/components/load-type";
 import { ProcessorAssignment } from "@/components/assignments/processor-assignment";
 import { ClientEmailComposer } from "@/components/client-email/client-email-composer";
 import { ClientEmailLog } from "@/components/client-email/client-email-log";
+import EntityNotes from "@/components/shared/EntityNotes";
 import { CarrierFinancialOverview } from "@/components/carriers/carrier-financial-overview";
 import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
-import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, MessageSquare, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
 function ProfileSection(props: Parameters<typeof BaseProfileSection>[0]) {
   return <BaseProfileSection {...props} neuStyle />;
@@ -169,7 +170,6 @@ export default function ClientDetail() {
   const [showAccount, setShowAccount] = useState(false);
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const revealTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
-  const [note, setNote] = useState("");
   const [agingDays, setAgingDays] = useState("1");
   const [bank, setBank] = useState({ bankName: "", accountType: "checking", paymentType: "ACH", routingNumber: "", accountNumber: "", nickname: "" });
   const [listDialog, setListDialog] = useState<"email" | "phone" | "rule" | "monitor" | "message" | "truck" | "task" | null>(null);
@@ -233,7 +233,6 @@ export default function ClientDetail() {
     : false;
   const saveBank = useMutation({ mutationFn: () => apiRequest(editingBank ? "PATCH" : "POST", editingBank ? `/api/vault/${editingBank.id}` : "/api/vault", { clientId, ...(!editingBank ? { dataType: "bank_account" } : {}), label: bank.nickname || bank.bankName, value: JSON.stringify(bank), notes: null }), onSuccess: () => { setBankOpen(false); setEditingBank(null); qc.invalidateQueries({ queryKey: ["/api/carriers", clientId, "bank-accounts"] }); toast({ title: "Bank account saved to Vault" }); }, onError: () => toast({ title: "Could not save bank account", variant: "destructive" }) });
   const deleteBank = useMutation({ mutationFn: (bankId: number) => apiRequest("DELETE", `/api/vault/${bankId}?clientId=${clientId}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/carriers", clientId, "bank-accounts"] }); toast({ title: "Bank account removed" }); } });
-  const saveNote = () => { if (note.trim()) { updateClient.mutate({ notes: note.trim() }); setNote(""); } };
   const uploadDocument = async (category: string, file: File) => { const form = new FormData(); form.append("file", file); form.append("documentCategory", category); try { const response = await fetch(`/api/clients/${clientId}/documents`, { method: "POST", body: form, credentials: "include" }); if (!response.ok) throw new Error(); toast({ title: `${category} uploaded` }); qc.invalidateQueries({ queryKey: ["/api/clients", clientId, "documents"] }); } catch { toast({ title: "Document upload failed", variant: "destructive" }); } };
   const downloadDocument = (doc: any) => { const link = document.createElement("a"); link.href = `/api/documents/${doc.id}/download`; link.target = "_blank"; link.click(); };
   const revealBank = async (bankId: number) => {
@@ -311,6 +310,7 @@ export default function ClientDetail() {
           <NeuTabs value={profileTab} onValueChange={setProfileTab} className="carrier-neu-tabs">
             <NeuTabList>
               <NeuTab value="profile">Profile</NeuTab>
+              <NeuTab value="notes">Notes</NeuTab>
               <NeuTab value="communications">Communications</NeuTab>
               {canUseCarrierChat && <NeuTab value="messages">Messages</NeuTab>}
             </NeuTabList>
@@ -393,11 +393,14 @@ export default function ClientDetail() {
               <ProfileSection title="Preferred brokers"><MiniTable columns={["Broker", "Reference"]} rows={((onboarding.preferredBrokers || []) as any[]).map((broker) => [broker.name || broker, broker.mcNumber || "Onboarding"]) } empty="No preferred brokers are recorded" /></ProfileSection>
               <ProfileSection title="UCC">{docs(["UCC-1-UT Initial Financing Statement", "UCC-3-UT Continuation"])}</ProfileSection>
               <ProfileSection title="Other documents">{docs(["Other Documents", "Envelope", "Logo"])}</ProfileSection>
-              <ProfileSection title="Notes" eyebrow="Internal record"><div className="space-y-2">{client.notes && <div className="rounded-xl bg-[#e0e0e0] p-3 text-[12px] shadow-[inset_3px_3px_7px_#b8b8b8,inset_-3px_-3px_7px_#ffffff] whitespace-pre-wrap">{client.notes}</div>}{isManager ? <><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Add an internal note..." className="w-full rounded-xl border-0 bg-[#e0e0e0] p-3 text-[12px] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff] outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]" /><ProfileActionButton onClick={saveNote} disabled={!note.trim() || updateClient.isPending} size="sm"><MessageSquare className="mr-1 h-3.5 w-3.5" />Save note</ProfileActionButton></> : !client.notes && <EmptyState label="No internal notes are recorded" />}</div></ProfileSection>
               <ProfileSection title="Invoices" eyebrow="Funding activity" action={<ProfileActionButton onClick={() => setInvoiceOpen(true)} size="sm"><Plus className="h-3 w-3" />Create invoice</ProfileActionButton>}><MiniTable columns={["Invoice", "Date", "Amount", "Status"]} rows={clientInvoices.map((invoice) => [<a key={invoice.id} className="font-semibold text-[#168d98] hover:underline" href={`/invoices/${invoice.id}`}>{invoice.invoiceNumber}</a>, date(invoice.invoiceDate || invoice.createdAt), money(invoice.amount), <NeuBadge key={`status-${invoice.id}`} tone={["paid", "settled"].includes(invoice.status) ? "success" : ["rejected", "void"].includes(invoice.status) ? "warning" : "accent"}>{invoice.status}</NeuBadge>])} empty="No invoices are recorded for this carrier" /></ProfileSection>
               <ProfileSection title="Aging report" className="scroll-mt-4" ><div id="aging-report" className="space-y-3"><p className="text-[11px] text-[#718187]">Download open funded invoices in the carrier aging format.</p><AgingPdfDownload carrierId={clientId} minDays={agingDays} onMinDaysChange={setAgingDays} compact /></div></ProfileSection>
             </div>
             </div>
+            </NeuTabPanel>
+            <NeuTabPanel value="notes" unmountInactive className="space-y-4">
+              {client.notes && <ProfileSection title="Legacy profile note" eyebrow="Read-only · preserved from the carrier record"><p className="whitespace-pre-wrap text-[12px] leading-5">{client.notes}</p></ProfileSection>}
+              <EntityNotes key={`carrier:${clientId}`} entityType="carrier" entityId={clientId} />
             </NeuTabPanel>
             <NeuTabPanel value="communications" unmountInactive className="space-y-3">
                {hasPermission("client_email") && <div className="flex flex-wrap items-center justify-between gap-3 border border-[#b7c6c1] bg-[#eaf1ee] px-3 py-3">

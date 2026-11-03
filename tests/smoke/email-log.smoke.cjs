@@ -46,6 +46,11 @@ function fixture(url, method) {
   if (path === "/api/auth/user") return { result: activeUser };
   if (path === "/api/email-log/agents") return { result: [{ id: "mgr-17", name: "Morgan Pike" }, { id: "agent-9", name: "Maria Jensen" }] };
   if (path === "/api/email-log/integration-status") return { result: { webhookConfigured: false } };
+  if (path === "/api/email-log/summary") return { result: {
+    totals: { sent: 24, delivered: 2, bounced: 0, failed: 2 },
+    weeks: [{ week: "2025-02-10", delivered: 2, unsuccessful: 2 }],
+    entityTypes: [{ entityType: "invoice", count: 25 }, { entityType: "carrier", count: 1 }],
+  } };
   if (path === "/api/email-log" && method === "GET") {
     let filtered = rows;
     if (params.get("q")) filtered = filtered.filter(row => `${row.subject} ${row.toAddresses.join(" ")}`.toLowerCase().includes(params.get("q").toLowerCase()));
@@ -120,6 +125,8 @@ let chrome, ws, stage = "initializing";
     throw new Error(`Timed out: ${expression}; body=${String(await evaluate("document.body?.innerText||''")).slice(0, 700)}; calls=${JSON.stringify(calls)}`);
   };
   const click = async expression => {
+    await evaluate(`(${expression})?.scrollIntoView({block:"center",behavior:"instant"})`);
+    await sleep(300);
     const p = await evaluate(`(()=>{const e=${expression};if(!e)throw Error("Missing target");e.scrollIntoView({block:"center"});const r=e.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);
     await cdp("Input.dispatchMouseEvent", { type: "mousePressed", ...p, button: "left", clickCount: 1 });
     await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", ...p, button: "left", clickCount: 1 });
@@ -130,6 +137,19 @@ let chrome, ws, stage = "initializing";
   stage = "manager list";
   await cdp("Page.navigate", { url: `${app}/email-log` });
   await until(`document.querySelector('[data-testid="email-log-table"]') !== null`);
+  await until(`document.querySelector('[data-testid="email-log-weekly-chart"] svg') !== null && document.querySelector('[data-testid="email-log-entity-chart"] svg') !== null`);
+  assert(calls.some(call => call.path === "/api/email-log/summary" && !new URLSearchParams(call.search).has("page")), "summary ignores table pagination");
+  assert(await evaluate(`document.body.innerText.toLowerCase().includes("total sent") && document.body.innerText.includes("Delivered")`), "summary stat cards are shown");
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-testid="email-log-weekly-chart"]')).borderRadius`), "16px", "card overrides legacy square normalization");
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-testid="email-log-search"]')).borderTopWidth`), "0px", "input has no legacy bevel border");
+  const overviewShot = await cdp("Page.captureScreenshot", { format: "png" });
+  fs.writeFileSync("/tmp/email-log-overview.png", Buffer.from(overviewShot.data, "base64"));
+  await cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await sleep(400);
+  assert(await evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), "mobile layout contains horizontal overflow");
+  const mobileShot = await cdp("Page.captureScreenshot", { format: "png" });
+  fs.writeFileSync("/tmp/email-log-mobile.png", Buffer.from(mobileShot.data, "base64"));
+  await cdp("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   assert(await evaluate(`document.body.innerText.includes("Delivery tracking is not configured")`), "webhook warning is shown");
   assert.equal(await evaluate(`document.querySelectorAll('[data-testid="email-log-row"]').length`), 25, "first page renders 25 rows");
   assert(await evaluate(`document.querySelector('[data-testid="email-log-row"]').innerText.includes("Morgan Pike")`), "human sender label is visible");
@@ -174,9 +194,11 @@ let chrome, ws, stage = "initializing";
   if (await evaluate(`document.querySelector('[data-testid="email-log-row"]').getAttribute("aria-expanded")!=="true"`)) await click(`document.querySelector('[data-testid="email-log-row"]')`);
   await until(`document.querySelector('[data-testid="email-log-resend"]') !== null`);
   assert.equal(await evaluate(`document.querySelector('[data-testid="email-log-resend"]').disabled`), false, "manager can resend when permitted");
-  await evaluate(`window.confirm=()=>true`);
   const listCallsBeforeResend = calls.filter(call => call.path === "/api/email-log" && call.method === "GET").length;
   await click(`document.querySelector('[data-testid="email-log-resend"]')`);
+  await until(`document.querySelector('[role="dialog"]') !== null`);
+  assert.equal(writes.length, 0, "opening confirmation does not send");
+  await click(`document.querySelector('[data-testid="email-log-resend-confirm"]')`);
   await until(`document.querySelector('[data-testid="email-log-action-message"]') !== null`);
   for (let i = 0; i < 80 && calls.filter(call => call.path === "/api/email-log" && call.method === "GET").length <= listCallsBeforeResend; i++) await sleep(100);
   assert(writes.some(write => write.method === "POST" && write.path.endsWith("/resend")), "resend POST creates a new log entry");

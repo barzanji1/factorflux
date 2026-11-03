@@ -1,21 +1,20 @@
 import { useState, useRef, useEffect, useLayoutEffect, type KeyboardEvent, type Ref } from "react";
+import { AdminPageShell, Card, Button, AlertDialogContent, useAdminToast } from "@/components/admin-neu/adapters";
+import "@/components/admin-neu/admin-neu-page.css";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import { Button } from "@/components/ui/button";
+import { TopNav } from "@/components/admin-neu/adapters";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   AlertCircle,
@@ -200,7 +199,7 @@ function MessageBubble({
 }
 
 export default function AIAssistant() {
-  const { toast } = useToast();
+  const { toast } = useAdminToast();
   const [, setLocation] = useLocation();
   const routeSearch = useSearch();
   const { permissions, user } = useAuth();
@@ -331,7 +330,8 @@ export default function AIAssistant() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Earl" />
-        <div className="ff-earl-chat m-4 flex min-h-0 flex-1 flex-col overflow-hidden md:m-6">
+        <AdminPageShell className="flex min-h-0 flex-1 overflow-hidden !p-0">
+        <Card className="ff-earl-chat m-4 flex min-h-0 flex-1 flex-col overflow-hidden md:m-6">
           <div className="ff-earl-header flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="ff-earl-assistant-avatar flex h-10 w-10 items-center justify-center rounded-full">
@@ -432,13 +432,14 @@ export default function AIAssistant() {
                   </div>
                 )}
               </div>
-              <Button onClick={() => send()} disabled={!input.trim() || isBusy} size="icon" className="h-11 w-11 flex-shrink-0" aria-label="Send message">
+              <Button variant="accent" onClick={() => send()} disabled={!input.trim() || isBusy} size="icon" className="h-11 w-11 flex-shrink-0" aria-label="Send message">
                 <Send className="h-4 w-4" />
               </Button>
             </div>
             <p className="mx-auto mt-2 max-w-2xl text-center text-[11px] text-muted-foreground">AI responses are for guidance only. Always verify critical information.</p>
           </div>
-        </div>
+        </Card>
+        </AdminPageShell>
       </div>
 
       <AlertDialog open={Boolean(confirmation)} onOpenChange={(open) => !open && !confirmMutation.isPending && setConfirmation(null)}>

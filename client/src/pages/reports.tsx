@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  RecoveryPageFrame, RecoveryCard as Card, RecoveryButton as Button, RecoveryInput as Input, RecoveryBadge,
+  RecoveryTabs as Win95Tabs, RecoveryTabList as Win95TabsList, RecoveryTab as Win95TabsTrigger,
+  RecoveryStatCard, RecoveryTable, RecoveryDialogContent as DialogContent,
+} from "@/components/recovery/recovery-controls";
+import "@/components/recovery/recovery-neu.css";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -29,16 +31,11 @@ import {
   X,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
 import ChargebackReport from "@/components/reports/chargeback-report";
 import AgingReport from "@/components/reports/aging-report";
 import { CustomizeColumns, useReportColumns, type ReportColumn, type SavedTemplate } from "@/components/reports/report-customization";
-import {
-  Win95Tabs,
-  Win95TabsList,
-  Win95TabsTrigger,
-} from "@/components/win95";
 import { Link, useSearch } from "wouter";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -88,21 +85,8 @@ type TabId = typeof TABS[number]["id"];
 
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
-function StatTile({ label, value, sub, color = "blue" }: { label: string; value: string; sub?: string; color?: string }) {
-  const colors: Record<string, string> = {
-    blue:  "bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400",
-    green: "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400",
-    amber: "bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400",
-    red:   "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400",
-    slate: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
-  };
-  return (
-    <div className={cn("ff-card ff-reports-surface p-4", colors[color])}>
-      <p className="text-xs font-medium opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-[#098b9f]">{value}</p>
-      {sub && <p className="text-[11px] opacity-60 mt-0.5">{sub}</p>}
-    </div>
-  );
+function StatTile({ label, value, sub, color: _color = "blue" }: { label: string; value: string; sub?: string; color?: string }) {
+  return <RecoveryStatCard label={label} value={value} detail={sub} className="min-h-32 p-4" />;
 }
 
 function DateRange({ start, end, onChange }: { start: string; end: string; onChange: (s: string, e: string) => void }) {
@@ -170,7 +154,7 @@ function AgentTab() {
         </Button></div>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="ff-data-table w-full text-sm">
+        <RecoveryTable className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
@@ -208,7 +192,7 @@ function AgentTab() {
               );
             })}
           </tbody>
-        </table>
+        </RecoveryTable>
       </Card>
     </div>
   );
@@ -247,7 +231,7 @@ function BrokerTab() {
         </Button></div>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="ff-data-table w-full text-sm">
+        <RecoveryTable className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
@@ -280,7 +264,7 @@ function BrokerTab() {
               );
             })}
           </tbody>
-        </table>
+        </RecoveryTable>
       </Card>
     </div>
   );
@@ -319,7 +303,7 @@ function CarrierTab() {
         </Button></div>
       </div>
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="ff-data-table w-full text-sm">
+        <RecoveryTable className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
@@ -340,7 +324,7 @@ function CarrierTab() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </RecoveryTable>
       </Card>
     </div>
   );
@@ -482,11 +466,11 @@ function MonthlyTab() {
         <CardContent className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">Monthly Volume — {year}</p>
           {isLoading ? (
-            <div className="flex items-end gap-2 h-32">
+            <Card className="recovery-neu-chart flex h-32 items-end gap-2 rounded-xl px-3 pt-4 pb-2">
               {Array.from({ length: 12 }).map((_, i) => <div key={i} className="flex-1 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" style={{ height: `${30 + Math.random() * 60}%` }} />)}
-            </div>
+            </Card>
           ) : (
-            <div className="flex items-end gap-1.5 h-36">
+            <Card className="recovery-neu-chart flex h-36 items-end gap-1.5 rounded-xl px-3 pt-4 pb-2">
               {months.map(m => {
                 const pct = (m.totalVolume / maxVol) * 100;
                 const isCur = m.month === curMonth && year === curYear;
@@ -503,13 +487,13 @@ function MonthlyTab() {
                   </div>
                 );
               })}
-            </div>
+            </Card>
           )}
         </CardContent>
       </Card>
 
       <Card className="border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <table className="ff-data-table w-full text-sm">
+        <RecoveryTable className="ff-data-table w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {columns.filter(c => prefs.visible.includes(c.key)).map(c => (
@@ -543,7 +527,7 @@ function MonthlyTab() {
                   {prefs.visible.includes("feeRate") && <td className="px-4 py-3 tabular-nums text-slate-500">{totalVol > 0 ? `${((totalFees / totalVol) * 100).toFixed(2)}%` : "—"}</td>}
             </tr>
           </tfoot>
-        </table>
+        </RecoveryTable>
       </Card>
     </div>
   );
@@ -600,9 +584,9 @@ function InvoiceDrilldown({ open, onOpenChange, title, invoices }: { open: boole
     <DialogHeader className="border-b border-slate-200 px-6 py-5 dark:border-slate-700"><DialogTitle>{title}</DialogTitle><DialogDescription>Invoice activity for the selected reporting period.</DialogDescription></DialogHeader>
     <div className="max-h-[60vh] overflow-auto p-6">
       {!invoices?.length ? <div className="py-12 text-center text-sm text-slate-500">No invoice detail was returned for this selection.</div> :
-        <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[640px] text-sm"><thead><tr className="border-b text-left text-[10px] uppercase tracking-wider text-slate-500">{["Invoice","Status","Amount","Funded","Date"].map(h => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>
+        <div className="overflow-x-auto"><RecoveryTable className="ff-data-table w-full min-w-[640px] text-sm"><thead><tr className="border-b text-left text-[10px] uppercase tracking-wider text-slate-500">{["Invoice","Status","Amount","Funded","Date"].map(h => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>
           <tbody className="divide-y">{invoices.map((inv, i) => <tr key={String(inv.id ?? i)}><td className="px-3 py-2 font-semibold">{String(inv.invoiceNumber ?? inv.number ?? inv.id ?? "—")}</td><td className="px-3 py-2">{String(inv.status ?? "—")}</td><td className="px-3 py-2 tabular-nums">{inv.amount != null ? fmt(Number(inv.amount)) : "—"}</td><td className="px-3 py-2 tabular-nums">{inv.fundedAmount != null ? fmt(Number(inv.fundedAmount)) : "—"}</td><td className="px-3 py-2">{String(inv.createdAt ?? inv.date ?? "—")}</td></tr>)}</tbody>
-        </table></div>}
+        </RecoveryTable></div>}
     </div>
   </DialogContent></Dialog>;
 }
@@ -737,7 +721,7 @@ function AgentPerformanceTab() {
     </div>
     {(rangeError || query.error || agentOptionsQuery.error || warningQuery.error) && <p role="alert" className="text-sm text-red-700">{rangeError || (query.error || agentOptionsQuery.error || warningQuery.error)?.message}</p>}
     <Card key={contextKey} className="overflow-hidden border border-slate-200 dark:border-slate-700">
-      <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[850px] text-sm">
+      <div className="overflow-x-auto"><RecoveryTable className="ff-data-table w-full min-w-[850px] text-sm">
         <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{performanceColumns.filter(c => reportPrefs.visible.includes(c.key)).map(c => <th key={c.key} className="whitespace-nowrap px-4 py-3">{c.label}</th>)}</tr></thead>
         <tbody className="divide-y">{enabled && query.isFetching ? <SkeletonRows cols={reportPrefs.visible.length} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelectedAgentId(String(r.userId ?? r.id))} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20">
           {reportPrefs.visible.includes("agent") && <td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td>}
@@ -748,13 +732,13 @@ function AgentPerformanceTab() {
           {reportPrefs.visible.includes("reviews") && <td className="px-4 py-3 tabular-nums">{Number(r.carrierReviewsCompleted ?? 0) + Number(r.brokerReviewsCompleted ?? 0)}</td>}
           {reportPrefs.visible.includes("hours") && <td className="px-4 py-3 tabular-nums">{r.hoursWorked ?? r.clockHoursWorked ?? "—"}</td>}
         </tr>) : <tr><td colSpan={reportPrefs.visible.length} className="px-4 py-12 text-center text-slate-500">{rangeError ? "Choose a valid date range to load the report." : query.error ? "Report unavailable." : "No agents found for this period."}</td></tr>}</tbody>
-      </table></div>
+      </RecoveryTable></div>
     </Card>
     <Card key={`warnings:${contextKey}`} data-testid="performance-warnings" className="border border-slate-200 dark:border-slate-700">
       <CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings · history</CardTitle><span className="text-xs text-slate-500">{enabled && warningQuery.isFetching ? "Refreshing…" : `${warnings.length} recorded`}</span></CardHeader>
       <CardContent className="space-y-2 p-3">{enabled && warningQuery.isFetching ? <div>Loading warnings…</div> : warnings.length ? warnings.map(w => <div key={w.id} className="ff-card ff-reports-surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><span className={`ff-badge ${w.severity === "final" ? "ff-badge-rejected" : w.severity === "written" ? "ff-badge-pending" : "ff-badge-draft"} uppercase`}>{w.severity}</span></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div>
-        <div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <span className="ff-badge ff-badge-funded gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</span> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" disabled={pendingAcknowledgements.has(w.id)} onClick={() => acknowledge.mutate({ id: w.id, context: contextKey })}>Acknowledge</Button> : <span className="ff-badge ff-badge-pending">Pending</span>}</div>
+        <div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><RecoveryBadge className={`${w.severity === "final" ? "ff-badge-rejected" : w.severity === "written" ? "ff-badge-pending" : "ff-badge-draft"} uppercase`}>{w.severity}</RecoveryBadge></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div>
+        <div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <RecoveryBadge className="ff-badge-funded gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</RecoveryBadge> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" disabled={pendingAcknowledgements.has(w.id)} onClick={() => acknowledge.mutate({ id: w.id, context: contextKey })}>Acknowledge</Button> : <RecoveryBadge className="ff-badge-pending">Pending</RecoveryBadge>}</div>
       </div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">{rangeError ? "Choose a valid date range." : warningQuery.error ? "Warnings unavailable." : "No written warnings in scope."}</div>}
       {acknowledge.error && acknowledge.variables?.context === contextKey && <p role="alert" className="text-sm text-red-700">{acknowledge.error.message}</p>}</CardContent>
     </Card>
@@ -934,7 +918,7 @@ function CarrierArTab() {
       </CardHeader>
       <CardContent className="p-0">
         {reportQuery.isLoading ? <div className="h-48 animate-pulse bg-slate-100 dark:bg-slate-800" /> : reportQuery.isError ? <div className="p-10 text-center text-sm text-red-600">Unable to generate this report.</div> :
-          <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[900px] text-sm">
+          <div className="overflow-x-auto"><RecoveryTable className="ff-data-table w-full min-w-[900px] text-sm">
             <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{arColumns.filter(column => arPrefs.visible.includes(column.key) && (column.key !== "shortPayAmount" || report.endpoint === "short-pay") && (column.key !== "outstanding" || report.endpoint !== "short-pay")).map(column => <th key={column.key} className="px-4 py-3">{column.key === "outstanding" && report.endpoint === "short-pay" ? "Short Pay Amount" : column.label}</th>)}</tr></thead>
             <tbody className="divide-y">{rows.length ? rows.map(row => <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
               {arColumns.filter(column => arPrefs.visible.includes(column.key) && (column.key !== "shortPayAmount" || report.endpoint === "short-pay") && (column.key !== "outstanding" || report.endpoint !== "short-pay")).map(column => {
@@ -944,7 +928,7 @@ function CarrierArTab() {
               })}
             </tr>) : <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-500">No invoices match this report.</td></tr>}</tbody>
             {reportQuery.data?.summary && <tfoot><tr className="border-t-2 bg-slate-50 font-semibold dark:bg-slate-800/60">{arColumns.filter(column => arPrefs.visible.includes(column.key)).map((column, index) => <td key={column.key} className="px-4 py-3 tabular-nums">{index === 0 ? `Totals · ${reportQuery.data!.summary.count} invoices` : column.key === "amount" ? fmt(reportQuery.data!.summary.totalAmount) : column.key === "outstanding" || column.key === "shortPayAmount" ? fmt(report.endpoint === "short-pay" ? reportQuery.data!.summary.totalShortPay ?? reportQuery.data!.summary.totalOutstanding : reportQuery.data!.summary.totalOutstanding) : ""}</td>)}</tr></tfoot>}
-          </table></div>}
+          </RecoveryTable></div>}
       </CardContent>
     </Card>}
   </div>;
@@ -1077,14 +1061,14 @@ function GlobalReportsTab() {
       <CardContent className="p-0">
         {reportQuery.isLoading ? <div className="h-56 animate-pulse bg-slate-100 dark:bg-slate-800" />
           : reportQuery.isError ? <div className="p-12 text-center text-sm text-red-600">Unable to generate this report.</div>
-          : report ? <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-max text-sm">
+          : report ? <div className="overflow-x-auto"><RecoveryTable className="ff-data-table w-full min-w-max text-sm">
             <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">
               {report.columns.filter(column => globalPrefs.visible.includes(column.key)).map(column => <th key={column.key} className="whitespace-nowrap px-4 py-3">{column.label}</th>)}
             </tr></thead>
             <tbody className="divide-y dark:divide-slate-800">{report.rows.length ? report.rows.map((row, index) => <tr key={String(row.id ?? row.invoiceNumber ?? index)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
               {report.columns.filter(column => globalPrefs.visible.includes(column.key)).map(column => <td key={column.key} className={cn("max-w-xs whitespace-nowrap px-4 py-3 capitalize", ["money", "number"].includes(column.type ?? "") && "text-right tabular-nums", column.key === "invoiceNumber" && "font-semibold")}>{formatCell(row[column.key], column)}</td>)}
             </tr>) : <tr><td colSpan={globalPrefs.visible.length} className="px-4 py-14 text-center text-slate-500">No records match this report.</td></tr>}</tbody>
-          </table></div> : null}
+          </RecoveryTable></div> : null}
       </CardContent>
     </Card>}
   </div>;
@@ -1100,12 +1084,8 @@ export default function Reports() {
   useEffect(() => { setActiveTab(validTab ?? "global"); }, [validTab]);
 
   return (
-    <div className="ff-reports-page flex h-screen bg-[#d4d0c8]">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav title="Reports" subtitle="Financial reporting and analytics" />
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-5">
+    <RecoveryPageFrame title="Reports" subtitle="Financial reporting and analytics" group="Recovery" className="ff-reports-page">
+        <div className="max-w-7xl mx-auto space-y-5">
 
             <div className="flex items-start justify-between">
               <div>
@@ -1145,8 +1125,6 @@ export default function Reports() {
             </div>
 
           </div>
-        </main>
-      </div>
-    </div>
+    </RecoveryPageFrame>
   );
 }

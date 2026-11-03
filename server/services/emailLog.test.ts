@@ -7,7 +7,7 @@ import { db, pool } from "../db";
 import { emailLog, emailRetryPayloads } from "../../shared/schema";
 import { createResendTransport, SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO, type ResendEmailParams } from "../resendTransport.js";
 import { claimEmailRetry, createEmailLogRecorder, emailPreview, processResendEvent, type EmailStore } from "./emailLogService";
-import { listEmailLog, readEmailLog } from "./emailLogReader";
+import { listEmailLog, readEmailLog, summarizeEmailLog } from "./emailLogReader";
 import { verifyResendWebhook } from "./resendWebhook";
 import { registerEmailLogRoutes } from "../routes/emailLog";
 import { currentEmailActor, emailActorContext } from "./emailContext";
@@ -28,6 +28,32 @@ function message(): ResendEmailParams {
     html: "<h1>Hello</h1><p>Please review your invoice.</p>", idempotencyKey: `fixture/${randomUUID()}`,
     emailLog: { templateName: "fixture", entityType: "invoice", entityId: 123, sentByUserId: null } };
 }
+
+test("summary uses all filtered emails across pagination, UTC weeks and entity types without exposing messages", async () => fixture(async store => {
+  const subject = `Summary fixture ${randomUUID()}`;
+  await store.insert(emailLog).values(
+    (["sent", "delivered", "bounced", "failed", "complained"] as const).map((status, index) => ({
+      direction: "outbound" as const, fromAddress: "fixture@example.test",
+      toAddresses: ["private@example.test"], subject, bodyPreview: "Private preview",
+      status, entityType: index < 3 ? "invoice" : "broker",
+      createdAt: new Date("2026-10-20T18:00:00Z"),
+    })),
+  );
+  const summary = await summarizeEmailLog({ q: subject, from: "2026-10-20", to: "2026-10-20", pageSize: 1 }, store);
+  assert.deepEqual(summary.totals, { sent: 4, delivered: 1, bounced: 1, failed: 1 });
+  assert.deepEqual(summary.weeks, [{ week: "2026-10-19", delivered: 1, unsuccessful: 2 }]);
+  assert.deepEqual(summary.entityTypes.sort((a, b) => String(a.entityType).localeCompare(String(b.entityType))),
+    [{ entityType: "broker", count: 2 }, { entityType: "invoice", count: 3 }]);
+  const broker = await summarizeEmailLog({ q: subject, entityType: "broker" }, store);
+  assert.equal(broker.totals.sent, 1);
+  const delivered = await summarizeEmailLog({ q: subject, status: "delivered" }, store);
+  assert.equal(delivered.totals.delivered, 1);
+  const none = await summarizeEmailLog({ q: subject, from: "2026-10-21" }, store);
+  assert.deepEqual(none.totals, { sent: 0, delivered: 0, bounced: 0, failed: 0 });
+  assert.deepEqual(none.weeks, []);
+  assert.ok(!JSON.stringify(summary).includes("private@example.test"));
+  assert.ok(!JSON.stringify(summary).includes("Private preview"));
+}));
 
 test("preview is plain text, capped at 200 and redacts credentials and bearer confirmation links", () => {
   const preview = emailPreview({ html: `<style>secret css</style><script>script secret</script><h1>Hello &amp; hi</h1><p>Temporary Password: NEVER-SHOW</p><p>/api/broker-confirm/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</p>${"long ".repeat(100)}` });
@@ -173,7 +199,12 @@ test("HTTP endpoints allow staff reads, reject staff retries/edits, verify publi
   const staff = { "x-fixture-role": "employee", "Content-Type": "application/json" };
   try {
     assert.equal((await fetch(`${base}/api/email-log`)).status, 401);
+    assert.equal((await fetch(`${base}/api/email-log/summary`)).status, 401);
     assert.equal((await fetch(`${base}/api/email-log`, { headers: staff })).status, 200);
+    const summary = await fetch(`${base}/api/email-log/summary?q=${encodeURIComponent(params.subject)}`, { headers: staff });
+    assert.equal(summary.status, 200);
+    assert.equal((await summary.json()).totals.failed, 1);
+    assert.equal((await fetch(`${base}/api/email-log/summary?from=2026-02-30`, { headers: staff })).status, 400);
     assert.equal((await fetch(`${base}/api/email-log/agents`, { headers: staff })).status, 200);
     assert.equal((await fetch(`${base}/api/email-log/integration-status`, { headers: staff })).status, 200);
     assert.equal((await fetch(`${base}/api/email-log/${row.id}/resend`, { method: "POST", headers: staff, body: "{}" })).status, 403);

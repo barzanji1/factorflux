@@ -29,6 +29,7 @@ import TopNav from "@/components/layout/top-nav";
 import type { Document } from "@shared/schema";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import { DocumentsOverview } from "@/components/documents/documents-overview";
+import EntityNotes from "@/components/shared/EntityNotes";
 import { documentClassification, documentClassificationLabel } from "@shared/document-display";
 import {
   NeuBadge,
@@ -396,6 +397,7 @@ function DocumentRow({ doc, focusTargetId, onView, onDownload }: {
         <tr className="bg-[#d9d9d9]">
           <td colSpan={7} className="px-3 sm:px-5">
             <ExtractionDetails doc={doc} />
+            <EntityNotes key={`document:${doc.id}`} entityType="document" entityId={doc.id} />
           </td>
         </tr>
       )}

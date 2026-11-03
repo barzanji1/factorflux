@@ -10,6 +10,7 @@ import TopNav from "@/components/layout/top-nav";
 import RecordDetail, {
   DetailRow, DetailSection, EmptyTab,
 } from "@/components/layout/record-detail";
+import EntityNotes from "@/components/shared/EntityNotes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -330,6 +331,7 @@ export default function PayoutDetail() {
                 },
               ]}
             />
+            {payout && <EntityNotes key={`payout:${payoutId}`} entityType="payout" entityId={payoutId} />}
           </div>
         </main>
       </div>

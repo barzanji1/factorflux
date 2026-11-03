@@ -4,15 +4,12 @@ import { useLocation } from "wouter";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { FFBadge } from "@/components/ui/ff-badge";
 import { FFEmpty } from "@/components/ui/ff-empty";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent } from "@/components/funding/funding-controls";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +17,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import type { Invoice } from "@shared/schema";
 import { Search, Eye, AlertTriangle, SquareCheck, Square, ChevronRight } from "lucide-react";
+import "@/components/funding/funding-neu.css";
+import { NeuPageShell, NeuTable, NeuTabs, NeuTabList, NeuTab } from "@/styles/neu/components";
+import { FundingStatCard } from "@/components/funding/funding-stat-card";
+import { FundingBadge } from "@/components/funding/funding-badge";
+import { FundingStatusBadge } from "@/components/funding/funding-status-badge";
 
 // ── Sticky-state hook (persists tab across navigations) ───────────────────────
 function useStickyState<T>(key: string, def: T) {
@@ -236,11 +238,11 @@ export default function Factoring() {
   );
 
   return (
-    <div className="flex h-screen">
+    <div className="funding-neu-page flex h-screen">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Funding Queue" subtitle="Review, approve, and advance factored loads" group="Funding" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <TopNav title="Funding Queue" subtitle="Review, approve, and advance factored loads" group="Funding" neu />
+        <NeuPageShell className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] space-y-5 p-6 xl:p-8">
 
             {/* ── Summary strip ──────────────────────────────────────────── */}
@@ -251,11 +253,7 @@ export default function Factoring() {
                 { label: "Ready to Fund", value: counts.approved ?? 0, sub: "approved, pending advance", warn: false },
                 { label: "Held",          value: counts.held ?? 0, sub: "rejected / blocked", warn: (counts.held ?? 0) > 0 },
               ].map(s => (
-                <div key={s.label} className="ff-card px-4 py-3">
-                  <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
-                  <p className={cn("mt-0.5 text-[22px] font-bold tracking-tight", s.warn ? "text-red-600 dark:text-red-400" : "text-[#098b9f]")}>{s.value}</p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500">{s.sub}</p>
-                </div>
+                <FundingStatCard key={s.label} label={s.label} value={s.value} detail={s.sub} className="min-h-32 p-4" />
               ))}
             </div>
             <Card className="overflow-hidden">
@@ -263,7 +261,7 @@ export default function Factoring() {
                 <div><h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white"><AlertTriangle className="h-4 w-4 text-amber-500" /> Aging Alerts</h2><p className="text-[11px] text-slate-500">Funded invoices requiring collections follow-up</p></div>
                 <div className="flex gap-1">{(["pending", "resolved"] as const).map(view => <button key={view} onClick={() => setAgingView(view)} className={cn("rounded-full px-3 py-1 text-[11px] font-semibold capitalize", agingView === view ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-600 dark:bg-slate-800")}>{view}</button>)}</div>
               </div>
-              {agingAlerts.length === 0 ? <p className="px-5 py-7 text-[12px] text-slate-400">No {agingView} aging alerts.</p> : <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[680px]"><thead><tr><th>Invoice</th><th>Carrier</th><th>Broker</th><th>Days Funded</th><th>Alert</th><th className="pr-5">Action</th></tr></thead><tbody>{agingAlerts.map(alert => { const urgent = alert.alertType === "day_90"; return <tr key={alert.id}><td><button onClick={() => go(`/invoices/${alert.invoiceId}`)} className="font-mono font-semibold text-blue-700 hover:underline dark:text-blue-400">{alert.invoiceNumber}</button></td><td>{alert.carrier ?? "—"}</td><td>{alert.broker ?? "—"}</td><td>{ageDays(alert.fundedAt) ?? "—"}d</td><td><span className={cn("rounded-full px-2 py-1 text-[10px] font-bold", urgent ? "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300")}>{urgent ? "90 DAY PAST DUE" : "60 DAY"}</span></td><td className="pr-5">{agingView === "pending" && <Button size="sm" onClick={() => acknowledgeAging.mutate(alert.id)} disabled={acknowledgeAging.isPending} className="h-7 text-[11px]">Acknowledge</Button>}</td></tr>; })}</tbody></table></div>}
+              {agingAlerts.length === 0 ? <p className="px-5 py-7 text-[12px] text-slate-400">No {agingView} aging alerts.</p> : <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[680px]"><thead><tr><th>Invoice</th><th>Carrier</th><th>Broker</th><th>Days Funded</th><th>Alert</th><th className="pr-5">Action</th></tr></thead><tbody>{agingAlerts.map(alert => { const urgent = alert.alertType === "day_90"; return <tr key={alert.id}><td><button onClick={() => go(`/invoices/${alert.invoiceId}`)} className="font-mono font-semibold text-blue-700 hover:underline dark:text-blue-400">{alert.invoiceNumber}</button></td><td>{alert.carrier ?? "—"}</td><td>{alert.broker ?? "—"}</td><td>{ageDays(alert.fundedAt) ?? "—"}d</td><td><FundingBadge tone={urgent ? "warning" : "accent"}>{urgent ? "90 DAY PAST DUE" : "60 DAY"}</FundingBadge></td><td className="pr-5">{agingView === "pending" && <Button size="sm" onClick={() => acknowledgeAging.mutate(alert.id)} disabled={acknowledgeAging.isPending} className="h-7 text-[11px]">Acknowledge</Button>}</td></tr>; })}</tbody></table></div>}
             </Card>
 
             {/* ── Queue card ─────────────────────────────────────────────── */}
@@ -272,31 +270,15 @@ export default function Factoring() {
               {/* Sticky filter bar */}
               <div className="sticky top-0 z-10 border-b border-slate-100 bg-white dark:border-slate-800">
                 <div className="flex flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex flex-wrap gap-1.5">
-                    {QUEUE_TABS.map(tab => {
-                      const count = counts[tab.id] ?? 0;
-                      const isActive = activeTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => { setActiveTab(tab.id); setSelected(new Set()); }}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors",
-                            isActive
-                              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
-                          )}
-                        >
-                          {!isActive && <span className={cn("h-1.5 w-1.5 rounded-full", tab.dot)} />}
-                          {tab.label}
-                          <span className={cn("text-[10px]", isActive ? "opacity-70" : "opacity-60")}>
-                            {count}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <NeuTabs value={activeTab} onValueChange={value => { setActiveTab(value as QTabId); setSelected(new Set()); }} className="w-auto">
+                    <NeuTabList className="gap-1.5">
+                      {QUEUE_TABS.map(tab => (
+                        <NeuTab key={tab.id} value={tab.id} className="flex items-center gap-1.5 px-3 text-[11.5px]">
+                          {tab.label}<span className="text-[10px] opacity-60">{counts[tab.id] ?? 0}</span>
+                        </NeuTab>
+                      ))}
+                    </NeuTabList>
+                  </NeuTabs>
                   <div className="relative shrink-0">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <Input
@@ -351,7 +333,7 @@ export default function Factoring() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="ff-data-table w-full min-w-[720px]">
+                  <NeuTable className="ff-data-table w-full min-w-[720px]">
                     <thead>
                       <tr>
                         <th className="w-9 pl-5">
@@ -398,7 +380,7 @@ export default function Factoring() {
                               {fmt(inv.amount)}
                             </td>
                             <td><AgeBadge date={inv.submittedAt} /></td>
-                            <td><FFBadge status={inv.status} size="sm" /></td>
+                            <td><FundingStatusBadge status={inv.status} size="sm" /></td>
                             <td className="text-slate-500 dark:text-slate-400">
                               {inv.submittedAt ? new Date(inv.submittedAt).toLocaleDateString() : "—"}
                             </td>
@@ -429,7 +411,7 @@ export default function Factoring() {
                         );
                       })}
                     </tbody>
-                  </table>
+                  </NeuTable>
                 </div>
               )}
 
@@ -444,12 +426,12 @@ export default function Factoring() {
               )}
             </Card>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* ── Reason dialog ─────────────────────────────────────────────────── */}
       <Dialog open={!!reasonDlg} onOpenChange={o => !o && setReasonDlg(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="funding-neu-dialog max-w-sm">
           <DialogHeader>
             <DialogTitle>
               {reasonDlg?.tid === "reject"        ? "Reject Invoice"         :

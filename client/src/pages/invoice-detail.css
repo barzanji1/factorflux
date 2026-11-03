@@ -21,6 +21,34 @@
   box-shadow: -10px -10px 22px #fff, 10px 10px 22px #b8b8b8 !important;
 }
 
+.ff-invoice-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
+  top: 1rem;
+  right: 1rem;
+  display: inline-flex;
+  width: 2.15rem;
+  height: 2.15rem;
+  align-items: center;
+  justify-content: center;
+  border: 0 !important;
+  border-radius: 50% !important;
+  color: #5b6967 !important;
+  background: #e0e0e0 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
+  opacity: 1 !important;
+}
+
+.ff-invoice-neu-dialog > button.ff-btn-secondary:has(> span.sr-only):hover {
+  color: #168c98 !important;
+}
+
+.ff-invoice-neu-toast {
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+}
+
 .ff-invoice-neu-dialog :is(textarea, .ff-invoice-select-trigger) {
   border: 0 !important;
   border-radius: 12px !important;

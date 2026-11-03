@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
-import { brokers, brokerDumpStatements, eventLedger } from "../../shared/schema";
+import { brokers, brokerDumpStatements, eventLedger, users } from "../../shared/schema";
 import { getSignedDownloadUrl } from "../services/s3Service";
 
 type Store = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -15,10 +15,15 @@ export function registerDumpStatementRoutes(app: Express, requireAuth: RequestHa
       if (!broker) return res.status(404).json({ message: "Broker not found." });
       const rows = await store.select({
         id: eventLedger.id, eventType: eventLedger.eventType, createdAt: eventLedger.createdAt,
-        label: sql<string>`coalesce(${eventLedger.payloadJson}->>'label',${eventLedger.eventType})`,
+        label: sql<string>`case when ${eventLedger.eventType} like 'entity_note_%'
+          then 'Note ' || replace(${eventLedger.eventType},'entity_note_','') || ' by ' || coalesce(nullif(concat_ws(' ',${users.firstName},${users.lastName}),''),'Former staff member')
+          else coalesce(${eventLedger.payloadJson}->>'label',${eventLedger.eventType}) end`,
+        noteId: sql<number | null>`(${eventLedger.payloadJson}->>'noteId')::integer`,
+        noteAction: sql<string | null>`${eventLedger.payloadJson}->>'noteAction'`,
         statementId: brokerDumpStatements.id, totalBalance: brokerDumpStatements.totalBalance,
         invoiceCount: sql<number | null>`(${eventLedger.payloadJson}->>'invoiceCount')::integer`,
-        status: sql<string>`case when ${eventLedger.eventType} = 'broker_dump_statement_sent' then 'sent'
+        status: sql<string>`case when ${eventLedger.eventType} like 'entity_note_%' then 'note'
+          when ${eventLedger.eventType} = 'broker_dump_statement_sent' then 'sent'
           when ${eventLedger.eventType} = 'broker_dump_statement_skipped' then 'skipped'
           when ${brokerDumpStatements.status} = 'uncertain' then 'uncertain' else 'failed' end`,
         messageId: brokerDumpStatements.messageId,
@@ -26,8 +31,10 @@ export function registerDumpStatementRoutes(app: Express, requireAuth: RequestHa
         stored: brokerDumpStatements.pdfStoredAt,
       }).from(eventLedger).leftJoin(brokerDumpStatements,
         and(eq(brokerDumpStatements.brokerId, brokerId), sql`${brokerDumpStatements.id} = ${eventLedger.payloadJson}->>'statementId'`))
+        .leftJoin(users, eq(users.id, eventLedger.actorId))
         .where(and(eq(eventLedger.entityType, "broker"), eq(eventLedger.entityId, brokerId),
-          inArray(eventLedger.eventType, ["broker_dump_statement_sent", "broker_dump_statement_failed", "broker_dump_statement_skipped"])))
+          inArray(eventLedger.eventType, ["broker_dump_statement_sent", "broker_dump_statement_failed", "broker_dump_statement_skipped",
+            "entity_note_added", "entity_note_edited", "entity_note_deleted"])))
         .orderBy(desc(eventLedger.createdAt), desc(eventLedger.id)).limit(100);
       res.set("Cache-Control", "no-store").json(rows.map(({ stored, ...row }) => ({
         ...row, downloadUrl: stored && row.statementId ? `/api/brokers/${brokerId}/dump-statements/${row.statementId}/download` : null,

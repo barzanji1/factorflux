@@ -71,7 +71,7 @@ export function EmailTemplatePicker({
         ? <div role="alert" className="flex items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-2 text-[10px] text-[#8d433a]"><span>{(templatesQuery.error as Error).message}</span><Button type="button" size="sm" variant="outline" onClick={() => void templatesQuery.refetch()}>Retry</Button></div>
         : <select id={id} value={value || "none"} disabled={disabled}
             onChange={(event) => onChange(event.target.value === "none" ? null : templatesQuery.data?.find((template) => template.id === event.target.value) || null)}
-            className="h-8 w-full rounded-sm border-2 border-[#9aa7a5] bg-white px-2 text-xs text-[#203a46] shadow-[inset_1px_1px_0_#808080] focus:outline-none focus:ring-1 focus:ring-[#087f8e] disabled:opacity-50">
+            className="h-10 w-full rounded-xl border-0 bg-[#e0e0e0] px-3 text-xs text-[#344244] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] focus:outline-none focus:ring-2 focus:ring-[#27aab8] disabled:opacity-50">
           <option value="none">No template</option>
           {(templatesQuery.data || []).map((template) => <option key={template.id} value={template.id}>{template.name}{template.kind === "custom" ? " · Shared" : ""}</option>)}
         </select>}
@@ -79,7 +79,7 @@ export function EmailTemplatePicker({
     {selected && <p className="text-[10px] text-[#657977]">{selected.kind === "custom" ? "Shared custom template" : "Built-in template"} · starting text remains editable.</p>}
 
     <Dialog open={dialogOpen} onOpenChange={(open) => { if (!saveMutation.isPending) setDialogOpen(open); }}>
-      <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto rounded-sm border-2 border-[#7c8582] bg-[#e8eeeb] p-0 shadow-[4px_4px_0_rgba(39,54,56,.25)]">
+      <DialogContent className="email-neu-dialog max-h-[92dvh] max-w-lg overflow-y-auto p-0">
         <DialogHeader className="border-b border-[#b8c3bf] bg-[#d6e2de] px-4 py-3 text-left">
           <DialogTitle className="text-sm font-bold text-[#203a46]">Add shared custom template</DialogTitle>
           <DialogDescription className="text-[10px] text-[#596d70]">Save reusable starting text for both client email composers. Your current draft is unchanged until you select the saved template.</DialogDescription>

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { emailLog, emailLogEvents, emailRetryPayloads, users } from "../../shared/schema";
 import { claimEmailRetry, EmailLogError, processResendEvent, type EmailStore } from "../services/emailLogService";
-import { listEmailLog, readEmailLog } from "../services/emailLogReader";
+import { listEmailLog, readEmailLog, summarizeEmailLog } from "../services/emailLogReader";
 import { verifyResendWebhook } from "../services/resendWebhook";
 import { getSignedDownloadUrl } from "../services/s3Service";
 import { sendResendEmail, SYSTEM_EMAIL_FROM, SYSTEM_EMAIL_REPLY_TO } from "../resendTransport.js";
@@ -52,6 +52,7 @@ export function registerEmailLogRoutes(app: Express, deps: {
       .from(users).innerJoin(emailLog, eq(emailLog.sentByUserId, users.id)).orderBy(sql`"name"`, users.id));
   }));
   app.get("/api/email-log", deps.requireAuth, wrap(async (req, res) => res.json(await listEmailLog(req.query, manage(req), store))));
+  app.get("/api/email-log/summary", deps.requireAuth, wrap(async (req, res) => res.json(await summarizeEmailLog(req.query, store))));
   app.get("/api/email-log/:id", deps.requireAuth, wrap(async (req, res) => res.json(await readEmailLog(id.parse(req.params.id), manage(req), store))));
   app.get("/api/email-log/:id/attachments/:index", deps.requireAuth, wrap(async (req, res) => {
     const log = await readEmailLog(id.parse(req.params.id), manage(req), store);

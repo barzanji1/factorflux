@@ -1,0 +1,171 @@
+/* Operations-only neumorphic layer; intentionally does not touch shared app chrome. */
+.operations-neu-page.operations-neu-page.operations-neu-page,
+.operations-neu-page.operations-neu-page.operations-neu-page main {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+}
+
+.operations-neu-page main { min-height: 0; }
+
+.operations-neu-page.operations-neu-page.operations-neu-page main .operations-neu-surface,
+.operations-neu-dialog.operations-neu-dialog.operations-neu-dialog,
+body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.operations-neu-page.operations-neu-page.operations-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.operations-neu-page.operations-neu-page.operations-neu-page main textarea,
+.operations-neu-page.operations-neu-page.operations-neu-page main [role="combobox"],
+.operations-neu-dialog.operations-neu-dialog.operations-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.operations-neu-dialog.operations-neu-dialog.operations-neu-dialog textarea,
+.operations-neu-dialog.operations-neu-dialog.operations-neu-dialog [role="combobox"],
+body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog textarea,
+body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog [role="combobox"] {
+  min-width: 0;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+.operations-neu-page main input::placeholder,
+.operations-neu-page main textarea::placeholder,
+.operations-neu-dialog input::placeholder,
+.operations-neu-dialog textarea::placeholder { color: #888 !important; }
+
+.operations-neu-page.operations-neu-page.operations-neu-page main button:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]),
+.operations-neu-dialog.operations-neu-dialog.operations-neu-dialog button:not([data-radix-collection-item]),
+body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog button:not([data-radix-collection-item]) {
+  border-color: #d1d1d1 !important;
+  border-radius: 12px !important;
+  background-color: #e0e0e0 !important;
+  color: #444 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+}
+
+.operations-neu-page main button:hover:not(:disabled),
+.operations-neu-dialog button:hover:not(:disabled),
+body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog button:hover:not(:disabled) {
+  color: #168d99 !important;
+}
+
+.operations-neu-page main button:active:not(:disabled),
+.operations-neu-dialog button:active:not(:disabled) {
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.operations-neu-page main button.operations-neu-accent,
+.operations-neu-dialog button.operations-neu-accent,
+body:has(.operations-neu-page) [role="dialog"] button.operations-neu-accent {
+  background: #27aab8 !important;
+  color: #fff !important;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
+}
+.operations-neu-page main button.operations-neu-accent:hover:not(:disabled),
+.operations-neu-dialog button.operations-neu-accent:hover:not(:disabled) {
+  background: #2398a4 !important;
+  color: #fff !important;
+}
+.operations-neu-page main button.operations-neu-danger,
+.operations-neu-dialog button.operations-neu-danger {
+  background: #b94e4e !important;
+  color: #fff !important;
+}
+
+.operations-neu-page main table {
+  color: #333 !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+.operations-neu-page main thead,
+.operations-neu-page main thead tr {
+  background: #d7d7d7 !important;
+  color: #666 !important;
+}
+.operations-neu-page main th {
+  border-color: #c9c9c9 !important;
+  color: #777 !important;
+  font-size: 10px !important;
+  letter-spacing: .12em !important;
+  text-transform: uppercase;
+}
+.operations-neu-page main td,
+.operations-neu-page main th { border-bottom-color: #c9c9c9 !important; }
+.operations-neu-page main tbody tr:hover { background: #d9e8e8 !important; }
+
+.operations-neu-page main .operations-neu-badge {
+  border: 0 !important;
+  background: #e0e0e0 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+}
+.operations-neu-page main .operations-neu-badge.ff-badge-draft { color: #475569 !important; }
+.operations-neu-page main .operations-neu-badge.ff-badge-pending { color: #92400e !important; }
+.operations-neu-page main .operations-neu-badge.ff-badge-submitted { color: #1e40af !important; }
+.operations-neu-page main .operations-neu-badge.ff-badge-approved { color: #155e75 !important; }
+.operations-neu-page main .operations-neu-badge.ff-badge-funded { color: #065f46 !important; }
+.operations-neu-page main .operations-neu-badge.ff-badge-rejected { color: #991b1b !important; }
+.operations-neu-page main .operations-neu-badge.ff-badge-hold { color: #5b21b6 !important; }
+
+.operations-neu-select[role="listbox"],
+.operations-neu-menu[role="menu"],
+body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="listbox"],
+body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+}
+.operations-neu-menu [role="menuitem"],
+body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="option"],
+body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menuitem"] { color: #444 !important; }
+
+.operations-neu-dialog.operations-neu-dialog.operations-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
+  width: 36px !important;
+  height: 36px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #e0e0e0 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+}
+
+body:has(.operations-neu-page) [data-sonner-toaster] [data-sonner-toast],
+body:has(.operations-neu-page) [data-radix-toast-viewport] [role="status"],
+body:has(.operations-neu-page) [data-radix-toast-viewport] [role="alert"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.operations-neu-page.operations-neu-page.operations-neu-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+@media (max-width: 767px) {
+  .operations-neu-page main { padding: 1rem !important; }
+  .operations-neu-page main > div:first-child { flex-wrap: wrap; gap: .75rem; }
+  .operations-neu-page main .flex.flex-wrap { min-width: 0; }
+  .operations-neu-page main [role="combobox"] { min-width: 0; max-width: 100%; }
+  .operations-neu-page main table { min-width: max-content; }
+  .operations-neu-dialog .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Global legacy normalization forces square borders; reinstate the neu surfaces locally. */
+.operations-neu-page.operations-neu-page.operations-neu-page main .operations-neu-surface,
+.operations-neu-dialog.operations-neu-dialog.operations-neu-dialog {
+  border: 0 !important;
+  border-radius: 16px !important;
+}

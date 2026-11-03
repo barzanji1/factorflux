@@ -2,6 +2,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import ChargebackLifecycle from "@/components/invoices/chargeback-lifecycle";
+import EntityNotes from "@/components/shared/EntityNotes";
 import Sidebar from "@/components/layout/sidebar";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import { documentClassification, documentClassificationLabel } from "@shared/document-display";
@@ -465,7 +466,10 @@ export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { toast } = useToast();
+  const { toast: showToast } = useToast();
+  const toast = (options: Parameters<typeof showToast>[0]) => showToast({
+    ...options, className: cn("ff-invoice-neu-toast", options.className),
+  });
   const qc = useQueryClient();
   const invoiceId = Number(id);
   const isManager = user?.role === "manager" || user?.role === "admin";
@@ -485,7 +489,8 @@ export default function InvoiceDetail() {
   const [chargebackExtensionDate, setChargebackExtensionDate] = useState("");
   const [chargebackReason, setChargebackReason] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
-  const [collectionNote, setCollectionNote] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [focusNoteId, setFocusNoteId] = useState<number | null>(null);
   const [uploadingDocumentType, setUploadingDocumentType] = useState<string | null>(null);
   const [previewDocument, setPreviewDocument] = useState<any | null>(null);
   const [editValues, setEditValues] = useState({ amount: "", loadNumber: "", debtorId: "", brokerId: "", paymentType: "ACH", bankAccountId: "" });
@@ -672,17 +677,6 @@ export default function InvoiceDetail() {
       setReviewNotes(""); setReviewStatus("needs_revision");
     },
     onError: () => toast({ title: "Error saving note", variant: "destructive" }),
-  });
-
-  const noteMutation = useMutation({
-    mutationFn: async (body: string) => (await apiRequest("POST", `/api/invoices/${invoiceId}/notes`, { body })).json(),
-    onSuccess: () => {
-      setCollectionNote("");
-      toast({ title: "Collection note added" });
-      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });
-      qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "timeline"] });
-    },
-    onError: (error: any) => toast({ title: "Could not add note", description: error.message, variant: "destructive" }),
   });
 
   const documentTypeMutation = useMutation({
@@ -897,7 +891,7 @@ export default function InvoiceDetail() {
 
                 {/* ── Tabs ──────────────────────────────────────────────── */}
                 <NeuCard className="overflow-hidden">
-                     <NeuTabs defaultValue="overview">
+                     <NeuTabs value={activeTab} onValueChange={setActiveTab}>
                     <div className="border-b border-slate-100 px-6 pt-5 dark:border-slate-800">
                         <NeuTabList className="ff-invoice-tabs custom-scrollbar flex h-auto w-full gap-1 overflow-x-auto">
                          {[
@@ -1378,13 +1372,11 @@ export default function InvoiceDetail() {
                               </NeuCard>
                             </div>
                           )}
-                          {detail.notes && (
-                            <div>
-                              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Notes</h3>
-                              <NeuCard className="p-4 text-sm">{detail.notes}</NeuCard>
-                            </div>
-                          )}
                         </div>
+                      </div>
+                      <div className="mt-6" id="invoice-notes-anchor">
+                        <EntityNotes key={`invoice:${invoiceId}`} entityType="invoice" entityId={invoiceId} focusNoteId={focusNoteId}
+                          onFocused={() => setFocusNoteId(null)} />
                       </div>
                     </NeuTabPanel>
 
@@ -1778,11 +1770,13 @@ export default function InvoiceDetail() {
                              </div>
                             </NeuCard>
                          )}
-                          <NeuCard className="p-4">
-                           <div className="mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-semibold">Collection notes</h3><span className="text-xs text-slate-400">Append-only</span></div>
-                           <div className="flex gap-2"><Textarea value={collectionNote} onChange={e => setCollectionNote(e.target.value)} placeholder="Record a call, promise to pay, or collection context…" rows={2} /><Button disabled={!collectionNote.trim() || noteMutation.isPending} onClick={() => noteMutation.mutate(collectionNote.trim())}>{noteMutation.isPending ? "Saving…" : "Add note"}</Button></div>
-                            <div className="mt-4 space-y-2">{(detail.collectionsDetail?.notes ?? []).map((note: any) => <div key={note.id} className="border-t border-slate-200 pt-2 text-xs dark:border-slate-700"><p className="whitespace-pre-wrap">{note.body}</p><p className="mt-1 text-slate-400">{note.createdByUser?.firstName || "Team"} {note.createdByUser?.lastName || ""} · {fmtDate(note.createdAt)}</p></div>)}</div>
-                          </NeuCard>
+                           <NeuCard className="flex flex-col gap-2 p-4">
+                             <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-[#168c98]" /><h3 className="text-sm font-semibold">Team invoice notes</h3></div>
+                             <p className="text-xs text-slate-500">Notes are shared across the invoice workspace and managed in Overview.</p>
+                             <NeuButton className="w-fit" onClick={() => { setFocusNoteId(-1); setActiveTab("overview"); }}>
+                               Open invoice notes
+                             </NeuButton>
+                           </NeuCard>
                        </div>
                      </NeuTabPanel>
 
@@ -1883,18 +1877,29 @@ export default function InvoiceDetail() {
                       ) : (
                         <div className="relative space-y-0">
                           <div className="absolute left-[26px] top-4 bottom-4 w-px bg-slate-100 dark:bg-slate-800" />
-                           {(timeline?.length ? timeline : detail.timeline).map((event: any) => (
+                            {(timeline?.length ? timeline : detail.timeline).map((event: any) => (
                             <div key={event.id} className="relative flex gap-4 pb-5">
                               <div className="relative z-10 mt-0.5 shrink-0"><TimelineIcon category={event.category} /></div>
                               <NeuCard className="flex-1 px-4 py-3">
                                 <div className="flex items-start justify-between gap-3">
-                                  <p className="text-sm font-semibold text-slate-800 dark:text-white">{event.title}</p>
+                                   <p className="text-sm font-semibold text-slate-800 dark:text-white">{event.title}</p>
                                   <time className="shrink-0 text-[11px] text-slate-400">
                                      {event.timestamp ? new Date(event.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""}
                                   </time>
                                 </div>
-                                {event.description && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{event.description}</p>}
+                                {event.description && !((event.metadata ?? event.meta)?.noteId != null || (event.metadata ?? event.meta)?.noteAction) && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{event.description}</p>}
                                   {(event.actor?.name || event.actor?.firstName || event.actorUser?.name || event.actorUser?.firstName || event.actorName || event.actorId || event.meta?.actorType === "system") && <p className="mt-1 text-[11px] text-slate-400">By {event.actor?.name || [event.actor?.firstName, event.actor?.lastName].filter(Boolean).join(" ") || event.actorUser?.name || [event.actorUser?.firstName, event.actorUser?.lastName].filter(Boolean).join(" ") || event.actorName || event.actorId || "System"}</p>}
+                                   {((event.metadata ?? event.meta)?.noteId != null || (event.metadata ?? event.meta)?.noteAction) && (
+                                     <NeuButton className="mt-2 min-h-8 px-2.5 py-1 text-[11px] text-[#168c98]"
+                                       onClick={() => {
+                                         const metadata = event.metadata ?? event.meta ?? {};
+                                         const isDeleted = String(metadata.noteAction ?? "").toLowerCase().includes("delet");
+                                         setFocusNoteId(isDeleted ? -1 : Number(metadata.noteId));
+                                         setActiveTab("overview");
+                                       }}>
+                                       {String((event.metadata ?? event.meta)?.noteAction ?? "").toLowerCase().includes("delet") ? "Open notes" : "View note"}
+                                     </NeuButton>
+                                   )}
                               </NeuCard>
                             </div>
                           ))}

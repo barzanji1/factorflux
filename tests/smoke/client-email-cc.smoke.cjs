@@ -85,7 +85,7 @@ let chrome, ws;
     await cdp("Input.insertText", { text });
     await until(`document.getElementById(${JSON.stringify(id)}).value===${JSON.stringify(text)}`);
   };
-  await cdp("Page.navigate", { url: `https://${process.env.REPLIT_DEV_DOMAIN}/client-email` });
+  await cdp("Page.navigate", { url: `${process.env.TEST_APP_URL || "http://127.0.0.1:5000"}/client-email` });
   await until(`!!${button("Compose email")}`);
   await click(button("Compose email"));
   await until(`!!document.getElementById('client-email-recipient')`);

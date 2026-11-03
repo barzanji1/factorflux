@@ -1,26 +1,24 @@
 import { useState } from "react";
+import { AdminPageShell, Card, Button, Input, Badge, DialogContent, AlertDialogContent, SelectContent, useAdminToast, StatCard } from "@/components/admin-neu/adapters";
+import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { TopNav } from "@/components/admin-neu/adapters";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   FileCheck, Plus, Pencil, Trash2, GripVertical, Shield, CheckCircle2,
@@ -180,7 +178,7 @@ function RuleDialog({
 
 export default function DocumentRules() {
   const { user } = useAuth();
-  const { toast } = useToast();
+  const { toast } = useAdminToast();
   const qc = useQueryClient();
   const isAdmin = user?.role === "admin";
   const isManager = user?.role === "manager" || isAdmin;
@@ -231,12 +229,12 @@ export default function DocumentRules() {
   const approvalRules = filteredRules.filter(r => r.requiredForStage === "approve");
 
   return (
-    <div className="ff-rules-page flex h-screen bg-[#d4d0c8]">
+    <div className="ff-rules-page flex h-[100dvh] min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Rules" subtitle="Configure required documents for load approval and funding" group="Admin" />
 
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <AdminPageShell className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1000px] p-6 xl:p-8">
 
             {/* Header */}
@@ -262,10 +260,7 @@ export default function DocumentRules() {
                 { label: "Required", value: rules.filter(rule => rule.required).length },
                 { label: "Inactive", value: rules.filter(rule => !rule.active).length },
               ].map(stat => (
-                <div key={stat.label} className="ff-rules-surface ff-stat-card p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
-                  <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
-                </div>
+                <StatCard key={stat.label} label={stat.label} value={stat.value} className="ff-rules-surface ff-stat-card min-h-0 p-4" />
               ))}
             </div>
 
@@ -336,7 +331,7 @@ export default function DocumentRules() {
               </div>
             )}
           </div>
-        </main>
+        </AdminPageShell>
       </div>
 
       {/* Add dialog */}
@@ -393,7 +388,7 @@ function RuleGroup({
   onToggle: (id: number, field: string, value: boolean) => void;
 }) {
   return (
-    <div className="ff-rules-surface overflow-hidden bg-white">
+    <Card className="ff-rules-surface overflow-hidden bg-white">
       <div className={cn(
         "flex items-center gap-2 border-b px-5 py-4",
         color === "blue" ? "border-blue-100 bg-blue-50/60 dark:border-blue-900/30 dark:bg-blue-950/10" : "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/30 dark:bg-emerald-950/10",
@@ -489,6 +484,6 @@ function RuleGroup({
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

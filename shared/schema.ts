@@ -469,16 +469,19 @@ export const invoicePreflightSettings = pgTable("invoice_preflight_settings", {
   check("invoice_preflight_settings_singleton_check", sql`${table.id} = 1`),
 ]);
 
-// Append-only notes keep invoice collection context separate from the mutable
-// invoice.notes field while preserving who entered each note and when.
-export const invoiceNotes = pgTable("invoice_notes", {
+export const ENTITY_NOTE_TYPES = ["invoice", "carrier", "broker", "document", "chargeback", "followup", "task", "submission", "load", "payout"] as const;
+export const entityNotes = pgTable("entity_notes", {
   id: serial("id").primaryKey(),
-  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
-  body: text("body").notNull(),
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  entityType: varchar("entity_type", { enum: ENTITY_NOTE_TYPES }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  noteText: text("note_text").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
 }, (table) => [
-  index("invoice_notes_invoice_idx").on(table.invoiceId, table.createdAt),
+  index("entity_notes_entity_idx").on(table.entityType, table.entityId),
 ]);
 
 // Immutable chargeback lifecycle events support extension history and audit
@@ -643,7 +646,7 @@ export const shortPayResolutions = pgTable("short_pay_resolutions", {
 export const eventLedger = pgTable("event_ledger", {
   id: serial("id").primaryKey(),
   entityType: varchar("entity_type", {
-    enum: ["client", "debtor", "broker", "invoice", "load", "document", "user", "system"],
+    enum: ["client", "debtor", "broker", "invoice", "load", "document", "user", "system", "carrier", "chargeback", "followup", "task", "submission", "payout"],
   }).notNull(),
   entityId: integer("entity_id").notNull(),
   eventType: varchar("event_type").notNull(),
@@ -676,6 +679,8 @@ export const activities = pgTable("activities", {
     downloadPath?: string;
     originalName?: string;
     mimeType?: string;
+    noteId?: number;
+    noteAction?: string;
   }>(),
 
   createdAt: timestamp("created_at").defaultNow(),

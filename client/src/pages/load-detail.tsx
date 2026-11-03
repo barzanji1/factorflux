@@ -13,6 +13,7 @@ import {
   User, Clock, ReceiptText,
 } from "lucide-react";
 import DocumentIntakeZone from "@/components/documents/document-intake-zone";
+import EntityNotes from "@/components/shared/EntityNotes";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
@@ -346,6 +347,7 @@ export default function LoadDetail() {
                   </div>
                 </div>
               </div>
+              <EntityNotes key={`load:${loadId}`} entityType="load" entityId={loadId} />
             </div>
           )}
         </main>

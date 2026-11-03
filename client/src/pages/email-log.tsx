@@ -4,12 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  PageShell,
-  Win95Button as Button,
-  Win95Card as Card,
-  Win95Input as Input,
-} from "@/components/win95";
+  NeuBadge, NeuButton, NeuCard as Card, NeuCard, NeuInput as Input,
+  NeuPageShell, NeuSelect, NeuStatCard, NeuTable, NeuTableBody, NeuTableCell,
+  NeuTableHead, NeuTableHeader, NeuTableRow,
+} from "@/styles/neu";
+import { EmailLogCharts, type EmailLogSummary } from "@/components/client-email/email-log-charts";
+import "@/components/client-email/email-neu.css";
 import {
   AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download,
   Mail, Paperclip, RefreshCw, Search, Send, ShieldCheck,
@@ -51,7 +53,7 @@ type ResendResult = { messageId: string; emailLogId: string; warning?: string | 
 const PAGE_SIZE = 25;
 const ENTITY_TYPES: EntityType[] = ["invoice", "carrier", "broker", "chargeback", "followup"];
 const STATUSES: EmailStatus[] = ["sent", "delivered", "bounced", "complained", "failed"];
-const inputClass = "h-9 rounded-sm border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white px-2 text-xs text-[#222] shadow-[inset_1px_1px_2px_rgba(0,0,0,.16)] outline-none focus:ring-2 focus:ring-[#087f8c]/30";
+const inputClass = "min-h-10 rounded-xl px-3 text-xs";
 const emailIdKey = (id: string | number) => String(id);
 
 function dateString(date: Date) {
@@ -62,11 +64,6 @@ function prettyDate(value: string | null) {
 }
 function humanize(value: string) {
   return value.replace(/[_-]/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
-}
-function statusStyle(status: string) {
-  if (status === "delivered") return "border-[#71947b] bg-[#dcebdd] text-[#285536]";
-  if (status === "bounced" || status === "failed" || status === "complained") return "border-[#b8786e] bg-[#f4dfdb] text-[#812f25]";
-  return "border-[#b3954e] bg-[#f5edce] text-[#6b5416]";
 }
 function addressList(addresses: string[]) {
   return addresses.length ? addresses.join(", ") : "—";
@@ -95,6 +92,7 @@ export default function EmailLog() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [resendTarget, setResendTarget] = useState<EmailLogRow | null>(null);
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"success" | "warning" | "error">("success");
 
@@ -106,9 +104,23 @@ export default function EmailLog() {
     if (search.trim()) query.set("q", search.trim());
     return query.toString();
   }, [from, to, page, entityType, status, agentId, search, monthAgo, today]);
+  const summaryParams = useMemo(() => {
+    const query = new URLSearchParams({ from: from || monthAgo, to: to || today });
+    if (entityType) query.set("entityType", entityType);
+    if (status) query.set("status", status);
+    if (agentId) query.set("agentId", agentId);
+    if (search.trim()) query.set("q", search.trim());
+    return query.toString();
+  }, [from, to, entityType, status, agentId, search, monthAgo, today]);
   const listQuery = useQuery<EmailList>({
     queryKey: ["/api/email-log", params],
     queryFn: async () => (await apiRequest("GET", `/api/email-log?${params}`)).json(),
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const summaryQuery = useQuery<EmailLogSummary>({
+    queryKey: ["/api/email-log/summary", summaryParams],
+    queryFn: async () => (await apiRequest("GET", `/api/email-log/summary?${summaryParams}`)).json(),
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -140,6 +152,7 @@ export default function EmailLog() {
       return response.json();
     },
     onSuccess: async (result) => {
+      setResendTarget(null);
       if (result.warning) {
         setActionTone("warning");
         setActionMessage(`Resend accepted by the email provider, but entity sync needs attention: ${result.warning}`);
@@ -188,41 +201,53 @@ export default function EmailLog() {
   };
   const retryResend = (row: EmailLogRow) => {
     if (!row.canResend || row.inProgress || !isManager) return;
-    if (window.confirm(`Create a new resend for “${row.subject}”? This will send another email.`)) {
-      resend.mutate(emailIdKey(row.id));
-    }
+    setResendTarget(row);
   };
 
   return (
-    <PageShell title="Email Log" subtitle="Trace outbound messages across invoices, carriers, and recovery work" group="Communications" contentClassName="space-y-4">
+    <NeuPageShell className="email-neu email-log-page space-y-5 px-3 py-4 sm:px-5 sm:py-6 xl:px-8">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#788587]">Communications / outbound</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-[#344244]">Email log</h1><p className="mt-1 text-sm text-[#747f81]">Trace outbound messages across invoices, carriers, and recovery work.</p></div>
+        <NeuBadge tone="accent" className="px-3 py-1.5">Read-only history</NeuBadge>
+      </header>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {([
+          ["Total sent", summaryQuery.data?.totals.sent ?? "—", "Accepted by provider", "accent"],
+          ["Delivered", summaryQuery.data?.totals.delivered ?? "—", "Delivery confirmed", "success"],
+          ["Bounced", summaryQuery.data?.totals.bounced ?? "—", "Address rejected", "warning"],
+          ["Failed", summaryQuery.data?.totals.failed ?? "—", "Send not accepted", "error"],
+        ] as const).map(([label, value, detail, tone]) => <NeuStatCard key={label} label={label} value={<span className={tone === "success" ? "text-[#248f92]" : tone === "warning" ? "text-[#c77b3e]" : tone === "error" ? "text-[#ba554d]" : "text-[#3b8589]"}>{summaryQuery.isLoading ? <span className="inline-block h-8 w-16 animate-pulse rounded-lg bg-[#d0d0d0]" /> : value}</span>} detail={detail} className="min-h-32 p-4 [&_p.text-3xl]:text-2xl" />)}
+      </div>
+      {summaryQuery.error && <div role="alert" data-testid="email-log-summary-error" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] px-4 py-3 text-xs text-[#a3483e] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]"><span>Summary charts and totals could not be loaded: {(summaryQuery.error as Error).message}</span><NeuButton className="min-h-9 px-3 text-xs" variant="accent" onClick={() => void summaryQuery.refetch()}>Retry summary</NeuButton></div>}
+      <EmailLogCharts data={summaryQuery.data} loading={summaryQuery.isLoading} error={summaryQuery.error ? (summaryQuery.error as Error).message : undefined} onRetry={() => void summaryQuery.refetch()} from={from} to={to} />
       {!integrationQuery.isLoading && integrationQuery.data?.webhookConfigured === false && (
-        <div data-testid="email-log-webhook-warning" role="status" className="flex items-start gap-2 border-2 border-[#b3954e] bg-[#fff4cf] px-3 py-2.5 text-xs text-[#614a12] shadow-[1px_1px_0_#808080]">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div data-testid="email-log-webhook-warning" role="status" className="flex items-start gap-3 rounded-2xl bg-[#e0e0e0] px-4 py-3 text-xs text-[#765f30] shadow-[inset_4px_4px_8px_#c7bca3,inset_-4px_-4px_8px_#fff9eb]">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#bb8742]" />
           <span><strong>Delivery tracking is not configured.</strong> Email status updates may not appear until the delivery webhook is enabled.</span>
         </div>
       )}
 
       {requestedEmailId && (
-        <div data-testid="email-focus-notice" className="flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#ece9e2] px-3 py-2 text-xs">
+        <div data-testid="email-focus-notice" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] px-4 py-3 text-xs shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
           <span>{detailQuery.error ? `Email #${requestedEmailId} could not be loaded.` : detailQuery.isLoading ? `Loading email #${requestedEmailId}…` : `Email #${requestedEmailId} is expanded, including outside the current filters or page.`}</span>
           <div className="flex items-center gap-3">
-            {detailQuery.error && <Button size="sm" variant="outline" onClick={() => detailQuery.refetch()}>Retry</Button>}
+            {detailQuery.error && <NeuButton className="min-h-9 px-3 text-xs" onClick={() => detailQuery.refetch()}>Retry</NeuButton>}
             <a href="/email-log" onClick={clearEmailFocus} data-testid="email-log-show-all" className="font-semibold text-[#087f8c] underline underline-offset-2">Show all email</a>
           </div>
         </div>
       )}
-      <Card className="overflow-hidden rounded-sm border-2 border-[#808080] bg-[#f4f4f4] shadow-[2px_2px_0_#808080]">
-        <div className="flex flex-wrap items-center gap-2 border-b-2 border-[#808080] bg-[#d4d0c8] px-3 py-2.5">
-          <div className="flex h-7 w-7 items-center justify-center border-2 border-l-white border-t-white border-r-[#808080] border-b-[#808080] bg-[#e8e5dd]"><Mail className="h-4 w-4 text-[#087f8c]" /></div>
+      <Card className="overflow-hidden rounded-2xl p-0">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[#c9cece] px-4 py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e0e0e0] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><Mail className="h-4 w-4 text-[#168f9b]" /></div>
           <div className="mr-auto">
             <p className="text-sm font-bold leading-tight text-[#222]">Outbound message history</p>
             <p className="text-[10px] text-[#555]">Search recipient and subject · {total.toLocaleString()} records</p>
           </div>
-          <Button data-testid="email-log-refresh" size="sm" variant="outline" className="h-8 gap-1 px-2" onClick={() => listQuery.refetch()}>
+          <NeuButton data-testid="email-log-refresh" className="min-h-9 rounded-xl px-3 text-xs" variant="accent" onClick={() => { void listQuery.refetch(); void summaryQuery.refetch(); }}>
             <RefreshCw className="h-3.5 w-3.5" />Refresh
-          </Button>
+          </NeuButton>
         </div>
-        <div className="grid grid-cols-1 gap-2 border-b border-[#a5a5a5] bg-[#e8e5dd] p-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid grid-cols-1 gap-3 border-b border-[#c9cece] p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <label className="text-[10px] font-bold uppercase tracking-wide text-[#555]">From
             <Input aria-label="From date" data-testid="email-log-from" type="date" value={from} onChange={e => resetPage(setFrom, e.target.value)} className={`${inputClass} mt-1`} />
           </label>
@@ -230,25 +255,25 @@ export default function EmailLog() {
             <Input aria-label="To date" data-testid="email-log-to" type="date" value={to} onChange={e => resetPage(setTo, e.target.value)} className={`${inputClass} mt-1`} />
           </label>
           <label className="text-[10px] font-bold uppercase tracking-wide text-[#555]">Entity
-            <select aria-label="Filter by entity" data-testid="email-log-entity" value={entityType} onChange={e => resetPage(setEntityType, e.target.value)} className={`${inputClass} mt-1 w-full`}>
+            <NeuSelect aria-label="Filter by entity" data-testid="email-log-entity" value={entityType} onChange={e => resetPage(setEntityType, e.target.value)} className={`${inputClass} mt-1`}>
               <option value="">All entities</option>{ENTITY_TYPES.map(type => <option key={type} value={type}>{humanize(type)}</option>)}
-            </select>
+            </NeuSelect>
           </label>
           <label className="text-[10px] font-bold uppercase tracking-wide text-[#555]">Delivery status
-            <select aria-label="Filter by status" data-testid="email-log-status" value={status} onChange={e => resetPage(setStatus, e.target.value)} className={`${inputClass} mt-1 w-full`}>
+            <NeuSelect aria-label="Filter by status" data-testid="email-log-status" value={status} onChange={e => resetPage(setStatus, e.target.value)} className={`${inputClass} mt-1`}>
               <option value="">All statuses</option>{STATUSES.map(item => <option key={item} value={item}>{humanize(item)}</option>)}
-            </select>
+            </NeuSelect>
           </label>
           <label className="text-[10px] font-bold uppercase tracking-wide text-[#555]">Sent by
-            <select aria-label="Filter by agent" data-testid="email-log-agent" value={agentId} onChange={e => resetPage(setAgentId, e.target.value)} className={`${inputClass} mt-1 w-full`} disabled={agentsQuery.isLoading || !!agentsQuery.error}>
+            <NeuSelect aria-label="Filter by agent" data-testid="email-log-agent" value={agentId} onChange={e => resetPage(setAgentId, e.target.value)} className={`${inputClass} mt-1`} disabled={agentsQuery.isLoading || !!agentsQuery.error}>
               <option value="">All senders</option>{agentsQuery.isLoading && <option disabled>Loading senders…</option>}<option value="system">System</option>{(agentsQuery.data ?? []).map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-            </select>
+            </NeuSelect>
             {agentsQuery.error && <span role="status" className="mt-1 block text-[9px] font-normal normal-case text-[#8a3028]">Sender list unavailable; retry the page to reload.</span>}
           </label>
           <label className="text-[10px] font-bold uppercase tracking-wide text-[#555] sm:col-span-2">Recipient or subject
             <span className="relative mt-1 block">
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#666]" />
-              <Input aria-label="Search recipient or subject" data-testid="email-log-search" value={search} onChange={e => resetPage(setSearch, e.target.value)} placeholder="Type an address or subject…" className={`${inputClass} pl-7`} />
+            <Input aria-label="Search recipient or subject" data-testid="email-log-search" value={search} onChange={e => resetPage(setSearch, e.target.value)} placeholder="Type an address or subject…" className={`${inputClass} pl-8`} />
             </span>
           </label>
         </div>
@@ -264,44 +289,43 @@ export default function EmailLog() {
               <AlertTriangle className="h-7 w-7 text-[#a54135]" />
               <p className="text-sm font-bold text-[#333]">Email history could not be loaded</p>
               <p className="max-w-lg text-xs text-[#666]">{(listQuery.error as Error).message || "The service is temporarily unavailable."}</p>
-              <Button size="sm" variant="outline" onClick={() => listQuery.refetch()}>Retry</Button>
+              <NeuButton className="min-h-9 px-3 text-xs" onClick={() => listQuery.refetch()}>Retry</NeuButton>
             </div>
           ) : displayRows.length === 0 ? (
             <div data-testid="email-log-empty" className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-6 text-center">
-              <div className="flex h-12 w-12 items-center justify-center border-2 border-[#808080] bg-[#e7e4dc] shadow-[inset_1px_1px_0_white]"><Mail className="h-5 w-5 text-[#777]" /></div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><Mail className="h-5 w-5 text-[#168f9b]" /></div>
               <p className="text-sm font-bold text-[#333]">No outbound messages in this view</p>
               <p className="max-w-sm text-xs text-[#666]">Try widening the date range or clearing one of the filters.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table data-testid="email-log-table" className="w-full min-w-[1000px] border-collapse text-left text-xs">
-                <thead className="bg-[#dedbd3] text-[10px] uppercase tracking-wide text-[#444]">
-                  <tr>{["Date", "Direction", "To", "Subject", "Entity", "Status", "Sent by"].map(label => <th key={label} className="border-b-2 border-[#888] px-3 py-2 font-bold">{label}</th>)}</tr>
-                </thead>
-                <tbody>
+              <NeuTable data-testid="email-log-table" className="min-w-[1000px] text-xs">
+                <NeuTableHeader className="text-[10px] uppercase tracking-wide">
+                  <tr>{["Date", "Direction", "To", "Subject", "Entity", "Status", "Sent by"].map(label => <NeuTableHead key={label} className="px-3 py-3 text-[#667274]">{label}</NeuTableHead>)}</tr>
+                </NeuTableHeader>
+                <NeuTableBody>
                   {displayRows.map(row => {
                     const expanded = expandedId === emailIdKey(row.id);
                     const detail = expanded ? detailQuery.data : null;
-                    return <FragmentRow key={row.id}>
-                      <tr data-testid="email-log-row" data-email-id={emailIdKey(row.id)} aria-expanded={expanded} aria-label={`Email log: ${row.subject}`} tabIndex={0} role="button" onClick={() => toggleExpanded(row.id)} onKeyDown={event => {
+                     return <FragmentRow key={row.id}>
+                       <NeuTableRow data-testid="email-log-row" data-email-id={emailIdKey(row.id)} aria-expanded={expanded} aria-label={`Email log: ${row.subject}`} tabIndex={0} role="button" onClick={() => toggleExpanded(row.id)} onKeyDown={event => {
                         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggleExpanded(row.id); }
-                      }} className={`cursor-pointer border-b border-[#d2cfc7] text-[#292929] hover:bg-[#e7f0ee] focus:bg-[#e7f0ee] focus:outline focus:outline-1 focus:outline-[#087f8c] ${expanded ? "bg-[#dce8e6]" : "bg-[#f7f6f2]"}`}>
-                        <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[10px] tabular-nums">{prettyDate(row.createdAt)}</td>
-                        <td className="px-3 py-2.5"><span className="inline-flex items-center gap-1 border border-[#8ba2a2] bg-[#e1eeee] px-1.5 py-0.5 text-[10px] text-[#27565c]"><Send className="h-3 w-3" />Outbound</span></td>
-                        <td className="max-w-[210px] truncate px-3 py-2.5" title={addressList(row.toAddresses)}>{addressList(row.toAddresses)}</td>
-                        <td className="max-w-[260px] px-3 py-2.5"><span className="flex items-center gap-1.5"><ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} /><span className="truncate font-semibold">{row.subject || "(no subject)"}</span></span></td>
-                        <td className="px-3 py-2.5">{row.entityUrl && row.entityType && row.entityId ? <a href={row.entityUrl} onClick={e => e.stopPropagation()} className="font-semibold text-[#087f8c] underline decoration-dotted underline-offset-2 hover:text-[#075b63]">{humanize(row.entityType)} #{row.entityId}</a> : <span className="text-[#777]">{row.entityType && row.entityId ? `${humanize(row.entityType)} #${row.entityId}` : "—"}</span>}</td>
-                        <td className="px-3 py-2.5"><span data-testid={`email-log-status-${row.status}`} className={`inline-flex whitespace-nowrap border px-1.5 py-0.5 text-[10px] font-bold ${statusStyle(row.status)}`}>{humanize(row.status)}</span></td>
-                        <td className="px-3 py-2.5">{row.sentByName || (row.sentByUserId ? "Unknown sender" : "System")}</td>
-                      </tr>
-                      {expanded && <tr data-testid="email-log-detail"><td colSpan={7} className="border-b-2 border-[#808080] bg-[#ebe9e2] p-3">
-                        {detailQuery.isLoading ? <div className="h-20 animate-pulse border-2 border-[#aaa] bg-[#f6f5f1]" aria-label="Loading message detail" /> : detailQuery.error ? <div role="alert" className="flex items-center gap-2 border border-[#ad6a60] bg-[#f6e2df] p-2 text-xs text-[#812f25]">{(detailQuery.error as Error).message}<Button size="sm" variant="outline" onClick={() => detailQuery.refetch()}>Retry</Button></div> : detail ? (
+                       }} className={`cursor-pointer focus:outline focus:outline-1 focus:outline-[#27aab8] ${expanded ? "bg-[#d7e4e2]" : ""}`}>
+                         <NeuTableCell className="px-3 py-3 font-mono text-[10px] tabular-nums">{prettyDate(row.createdAt)}</NeuTableCell>
+                         <NeuTableCell className="px-3 py-3"><NeuBadge tone="accent" className="gap-1 px-2 py-1 text-[10px]"><Send className="h-3 w-3" />Outbound</NeuBadge></NeuTableCell>
+                         <NeuTableCell className="max-w-[210px] truncate px-3 py-3" title={addressList(row.toAddresses)}>{addressList(row.toAddresses)}</NeuTableCell>
+                         <NeuTableCell className="max-w-[260px] px-3 py-3"><span className="flex items-center gap-1.5"><ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} /><span className="truncate font-semibold">{row.subject || "(no subject)"}</span></span></NeuTableCell>
+                         <NeuTableCell className="px-3 py-3">{row.entityUrl && row.entityType && row.entityId ? <a href={row.entityUrl} onClick={e => e.stopPropagation()} className="font-semibold text-[#168f9b] hover:text-[#075b63]"><NeuBadge tone="accent">{humanize(row.entityType)} #{row.entityId}</NeuBadge></a> : <span className="text-[#777]">{row.entityType && row.entityId ? `${humanize(row.entityType)} #${row.entityId}` : "—"}</span>}</NeuTableCell>
+                         <NeuTableCell className="px-3 py-3"><NeuBadge data-testid={`email-log-status-${row.status}`} tone={row.status === "delivered" ? "accent" : row.status === "bounced" || row.status === "failed" || row.status === "complained" ? "warning" : "neutral"} className={`${row.status === "failed" || row.status === "complained" ? "text-[#ba554d]" : row.status === "bounced" ? "text-[#c77b3e]" : ""} px-2 py-1 text-[10px]`}>{humanize(row.status)}</NeuBadge></NeuTableCell>
+                         <NeuTableCell className="px-3 py-3">{row.sentByName || (row.sentByUserId ? "Unknown sender" : "System")}</NeuTableCell>
+                       </NeuTableRow>
+                       {expanded && <tr data-testid="email-log-detail"><td colSpan={7} className="bg-[#e0e0e0] p-4">
+                        {detailQuery.isLoading ? <div className="h-20 animate-pulse rounded-xl bg-[#d2d2d2]" aria-label="Loading message detail" /> : detailQuery.error ? <div role="alert" className="flex items-center gap-2 rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#812f25] shadow-[inset_4px_4px_8px_#d1b6b2,inset_-4px_-4px_8px_#fff]">{(detailQuery.error as Error).message}<NeuButton className="min-h-9 px-3 text-xs" onClick={() => detailQuery.refetch()}>Retry</NeuButton></div> : detail ? (
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,.8fr)]">
-                            <section className="border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white p-3">
+                             <NeuCard pressed className="p-4">
                               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#ccc] pb-2">
                                 <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-[#666]">Message</p><h3 className="mt-1 break-words text-sm font-bold text-[#222]">{detail.subject || "(no subject)"}</h3></div>
                                 {isManager && detail.status === "failed" && <div className="flex flex-col items-end gap-1">
-                                  <Button data-testid="email-log-resend" size="sm" disabled={!detail.canResend || detail.inProgress || resend.isPending} title={!detail.canResend ? (detail.resendDisabledReason || "This message cannot be safely resent.") : detail.inProgress ? "A resend is already in progress." : undefined} onClick={() => retryResend(detail)}><RefreshCw className="mr-1 h-3.5 w-3.5" />{resend.isPending ? "Resending…" : "Resend"}</Button>
+                                   <NeuButton data-testid="email-log-resend" className="min-h-9 px-3 text-xs" variant="accent" disabled={!detail.canResend || detail.inProgress || resend.isPending} title={!detail.canResend ? (detail.resendDisabledReason || "This message cannot be safely resent.") : detail.inProgress ? "A resend is already in progress." : undefined} onClick={() => retryResend(detail)}><RefreshCw className="h-3.5 w-3.5" />{resend.isPending ? "Resending…" : "Resend"}</NeuButton>
                                   {(!detail.canResend || detail.inProgress) && <p data-testid="email-log-resend-reason" className="max-w-64 text-right text-[10px] text-[#8a3028]">{detail.resendDisabledReason || (detail.inProgress ? "A resend is already in progress." : "This message cannot be safely resent.")}</p>}
                                 </div>}
                               </div>
@@ -318,13 +342,13 @@ export default function EmailLog() {
                               {!!detail.attachments.length && <div className="mt-3 border-t border-[#ccc] pt-2">
                                 <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-[#666]"><Paperclip className="h-3 w-3" />Attachments ({detail.attachments.length})</p>
                                 <ul className="space-y-1">{detail.attachments.map((attachment, index) => <li key={`${attachment.filename}-${index}`} className="flex flex-wrap items-center gap-x-2 text-xs">
-                                  {attachment.s3_key ? <a data-testid="email-log-attachment" href={`/api/email-log/${encodeURIComponent(detail.id)}/attachments/${index}`} className="font-semibold text-[#087f8c] underline underline-offset-2" onClick={e => e.stopPropagation()}><Download className="mr-1 inline h-3 w-3" />{attachment.filename}</a> : <span data-testid="email-log-attachment-unavailable" className="font-semibold text-[#666]">{attachment.filename} — Unavailable</span>}
+                                   {attachment.s3_key ? <a data-testid="email-log-attachment" href={`/api/email-log/${encodeURIComponent(detail.id)}/attachments/${index}`} className="inline-flex items-center rounded-lg px-3 py-2 font-semibold text-[#168f9b] shadow-[-3px_-3px_7px_#fff,3px_3px_7px_#b8b8b8] hover:text-[#075b63]" onClick={e => e.stopPropagation()}><Download className="mr-1 inline h-3 w-3" />{attachment.filename}</a> : <span data-testid="email-log-attachment-unavailable" className="font-semibold text-[#666]">{attachment.filename} — Unavailable</span>}
                                   <span className="text-[10px] text-[#777]">{attachment.size.toLocaleString()} bytes</span>
                                 </li>)}</ul>
                               </div>}
                               {detail.error && <p className="mt-3 border border-[#ad6a60] bg-[#f6e2df] p-2 text-xs text-[#812f25]"><strong>Delivery error:</strong> {detail.error}</p>}
-                            </section>
-                            <section className="border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-[#f8f7f3] p-3">
+                             </NeuCard>
+                             <NeuCard pressed className="p-4">
                               <h3 className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#555]"><Clock3 className="h-3.5 w-3.5" />Delivery timeline</h3>
                               {detail.events.length ? <ol data-testid="email-log-events" className="space-y-3">
                                 {detail.events.map(event => <li key={event.id} className="relative border-l-2 border-[#087f8c] pb-1 pl-3 last:border-l-transparent">
@@ -335,29 +359,51 @@ export default function EmailLog() {
                                 </li>)}
                               </ol> : <p className="text-xs text-[#777]">No delivery events have been recorded.</p>}
                               {detail.statusUpdatedAt && <p className="mt-3 border-t border-[#ccc] pt-2 text-[10px] text-[#666]">Status updated {prettyDate(detail.statusUpdatedAt)}</p>}
-                            </section>
+                             </NeuCard>
                           </div>
                         ) : null}
                       </td></tr>}
                     </FragmentRow>;
                   })}
-                </tbody>
-              </table>
-            </div>
+                </NeuTableBody>
+              </NeuTable>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t-2 border-[#808080] bg-[#d4d0c8] px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#c9cece] px-4 py-3">
           <p data-testid="email-log-pagination-label" className="text-[10px] text-[#444]">{total ? `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total.toLocaleString()}` : "Showing 0 records"}</p>
           <div className="flex items-center gap-2">
-            <Button data-testid="email-log-prev" size="sm" variant="outline" disabled={page <= 1 || loading} onClick={() => setPage(value => Math.max(1, value - 1))}><ChevronLeft className="mr-1 h-3.5 w-3.5" />Previous</Button>
+            <NeuButton data-testid="email-log-prev" className="min-h-9 px-3 text-xs" disabled={page <= 1 || loading} onClick={() => setPage(value => Math.max(1, value - 1))}><ChevronLeft className="h-3.5 w-3.5" />Previous</NeuButton>
             <span data-testid="email-log-page" className="min-w-16 text-center font-mono text-[10px] text-[#333]">Page {page} / {pageCount}</span>
-            <Button data-testid="email-log-next" size="sm" variant="outline" disabled={page >= pageCount || loading} onClick={() => setPage(value => value + 1)}>Next<ChevronRight className="ml-1 h-3.5 w-3.5" /></Button>
+            <NeuButton data-testid="email-log-next" className="min-h-9 px-3 text-xs" disabled={page >= pageCount || loading} onClick={() => setPage(value => value + 1)}>Next<ChevronRight className="h-3.5 w-3.5" /></NeuButton>
           </div>
         </div>
       </Card>
-      <div className="flex items-center gap-1.5 px-1 text-[10px] text-[#666]"><ShieldCheck className="h-3 w-3 text-[#087f8c]" />Email records are read-only. Resending, when available, creates a separate log entry.</div>
+      <div className="flex items-center gap-1.5 px-1 text-[10px] text-[#747f81]"><ShieldCheck className="h-3 w-3 text-[#168f9b]" />Email records are read-only. Resending, when available, creates a separate log entry.</div>
       {integrationQuery.error && <p role="status" className="text-[10px] text-[#7a4c12]">Delivery integration status could not be checked.</p>}
-    </PageShell>
+      <Dialog open={!!resendTarget} onOpenChange={(open) => { if (!resend.isPending && !open) setResendTarget(null); }}>
+        <DialogContent data-testid="email-log-resend-confirm-dialog" className="email-neu-dialog max-h-[92dvh] max-w-lg overflow-y-auto p-0">
+          <DialogHeader className="border-b border-[#c9cece] px-5 py-4 text-left">
+            <DialogTitle className="flex items-center gap-2 text-base text-[#344244]"><AlertTriangle className="h-4 w-4 text-[#c77b3e]" />Confirm resend</DialogTitle>
+            <DialogDescription className="text-xs text-[#687577]">This creates a separate email log entry and sends another message. Confirm the recipient and subject before proceeding.</DialogDescription>
+          </DialogHeader>
+          {resendTarget && <div className="space-y-3 p-5">
+            <div className="rounded-xl bg-[#e0e0e0] p-4 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-[#7b8789]">Subject</p>
+              <p className="mt-1 break-words text-sm font-semibold text-[#344244]">{resendTarget.subject || "(no subject)"}</p>
+              <p className="mt-3 text-[9px] font-bold uppercase tracking-wider text-[#7b8789]">Recipient</p>
+              <p className="mt-1 break-all text-xs text-[#4d5c5e]">{addressList(resendTarget.toAddresses)}</p>
+            </div>
+            {resend.error && <p role="alert" className="rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#a3483e] shadow-[inset_4px_4px_8px_#d1b6b2,inset_-4px_-4px_8px_#fff]">{(resend.error as Error).message}</p>}
+          </div>}
+          <DialogFooter className="border-t border-[#c9cece] px-5 py-3">
+            <NeuButton className="min-h-10 px-4 text-xs" disabled={resend.isPending} onClick={() => setResendTarget(null)}>Cancel</NeuButton>
+            <NeuButton data-testid="email-log-resend-confirm" variant="accent" className="min-h-10 px-4 text-xs" disabled={!resendTarget?.canResend || resendTarget.inProgress || resend.isPending} onClick={() => { if (resendTarget && isManager && resendTarget.canResend && !resendTarget.inProgress) resend.mutate(emailIdKey(resendTarget.id)); }}>
+              <RefreshCw className="h-3.5 w-3.5" />{resend.isPending ? "Resending…" : "Send another email"}
+            </NeuButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </NeuPageShell>
   );
 }
 

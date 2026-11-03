@@ -13,6 +13,7 @@ import type { BroadcastClient, BroadcastDetail, BroadcastDraftInput, BroadcastFi
 import { federalHolidays, isoToLocalDateTime, localDateTimeToIso } from "../../../../shared/holiday-scheduling";
 import { HolidayYearPlanner } from "@/components/client-email/holiday-year-planner";
 import { ScheduledBroadcasts, type ScheduledBroadcast } from "@/components/client-email/scheduled-broadcasts";
+import { NeuBadge } from "@/styles/neu";
 
 type BroadcastOptions = { statuses: string[]; agents: { id: string; name: string }[] };
 type RecipientResponse = { clients: BroadcastClient[]; counts: { matched: number; sendable: number; skipped: number } };
@@ -29,20 +30,6 @@ const scheduledLabel = (value: string, zone: string) => {
     return `${value} · ${zone}`;
   }
 };
-const statusTone: Record<string, string> = {
-  draft: "border-[#d5b77b] bg-[#fff7e7] text-[#866322]",
-  scheduled: "border-[#a8c5ca] bg-[#edf6f7] text-[#326572]",
-  queued: "border-[#a8c5ca] bg-[#edf6f7] text-[#326572]",
-  sending: "border-[#a8c5ca] bg-[#edf6f7] text-[#326572]",
-  completed: "border-[#8bbcaf] bg-[#e6f4ed] text-[#28644f]",
-  cancelled: "border-[#c2c9c7] bg-[#f1f3f2] text-[#5b6968]",
-  sent: "border-[#8bbcaf] bg-[#e6f4ed] text-[#28644f]",
-  failed: "border-[#d1a19a] bg-[#fff0ed] text-[#97473f]",
-  skipped: "border-[#d5b77b] bg-[#fff7e7] text-[#866322]",
-  pending: "border-[#c2c9c7] bg-[#f1f3f2] text-[#5b6968]",
-  unconfirmed: "border-[#d5b77b] bg-[#fff7e7] text-[#866322]",
-};
-
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, credentials: "include" });
   const result = await response.json().catch(() => ({}));
@@ -51,7 +38,8 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function StatusTag({ value }: { value: string }) {
-  return <span className={`inline-flex border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${statusTone[value] || statusTone.pending}`}>{value}</span>;
+  const tone = value === "sent" || value === "completed" ? "success" : value === "failed" ? "warning" : value === "scheduled" || value === "queued" || value === "sending" ? "accent" : "neutral";
+  return <NeuBadge tone={tone} className={`px-2 py-0.5 text-[9px] uppercase tracking-wide ${value === "failed" ? "text-[#a3483e]" : ""}`}>{value}</NeuBadge>;
 }
 
 export function EmailBroadcast() {
@@ -312,7 +300,7 @@ export function EmailBroadcast() {
   };
   const statusOptions = optionsQuery.data?.statuses || [];
 
-  return <section className="border border-[#899795] bg-[#edf2ef] shadow-[1px_1px_0_#fff]">
+  return <section className="email-neu-panel border border-[#899795] bg-[#edf2ef] shadow-[1px_1px_0_#fff]">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#c4cfcb] bg-[#dfe8e4] px-3 py-3">
       <div className="flex items-center gap-2"><div className="flex h-8 w-8 items-center justify-center border border-[#8fb3ae] bg-[#dcebe6] text-[#087f8e]"><Users className="h-4 w-4" /></div><div><h2 className="text-sm font-bold text-[#263f48]">Client broadcast</h2><p className="text-[10px] text-[#697c7d]">Admin desk · individual client emails</p></div></div>
       <span className="border border-[#c9b77c] bg-[#fff8e9] px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-[#765f30]">Admin only</span>
@@ -323,11 +311,11 @@ export function EmailBroadcast() {
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><p><strong>Broadcast safety.</strong> Each client gets an individual email through the TPF sender and monitored Reply-To. CC and BCC are never used. Sends are spaced by at least 2 seconds globally (about 30 per minute). “Sent” means provider accepted the message, not that it was delivered.</p>
         </div>
         <div className="space-y-2">
-          <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-[#758582]">01 / Audience</p><h3 className="text-xs font-bold text-[#304a52]">Choose all clients or narrow the group</h3></div>
+            <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-[#758582]">01 / Audience</p><h3 className="text-xs font-bold text-[#304a52]">Choose all clients or narrow the group</h3></div>
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="space-y-1"><Label htmlFor="broadcast-search" className="text-[10px]">Client search</Label><Input id="broadcast-search" value={search} disabled={inputsDisabled} onChange={(e) => setSearch(e.target.value)} maxLength={200} placeholder="Name or email…" className="h-9 rounded-sm bg-white text-xs" /></div>
-            <div className="space-y-1"><Label htmlFor="broadcast-status" className="text-[10px]">Client status</Label><Select value={status || "all"} disabled={inputsDisabled} onValueChange={(value) => setStatus(value === "all" ? "" : value)}><SelectTrigger id="broadcast-status" className="h-9 rounded-sm bg-white text-xs"><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{statusOptions.map((option) => <SelectItem key={option} value={option}>{option.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1 sm:col-span-2"><Label htmlFor="broadcast-agent" className="text-[10px]">Assigned processor</Label><Select value={assignedProcessor || "all"} disabled={inputsDisabled} onValueChange={(value) => setAssignedProcessor(value === "all" ? "" : value)}><SelectTrigger id="broadcast-agent" className="h-9 rounded-sm bg-white text-xs"><SelectValue placeholder="All processors" /></SelectTrigger><SelectContent><SelectItem value="all">All processors</SelectItem>{(optionsQuery.data?.agents || []).map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><Label htmlFor="broadcast-status" className="text-[10px]">Client status</Label><Select value={status || "all"} disabled={inputsDisabled} onValueChange={(value) => setStatus(value === "all" ? "" : value)}><SelectTrigger id="broadcast-status" className="h-10 rounded-xl border-0 bg-[#e0e0e0] text-xs shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent className="rounded-xl border-0 bg-[#e0e0e0] shadow-[4px_4px_12px_#b8b8b8]"><SelectItem value="all">All statuses</SelectItem>{statusOptions.map((option) => <SelectItem key={option} value={option}>{option.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1 sm:col-span-2"><Label htmlFor="broadcast-agent" className="text-[10px]">Assigned processor</Label><Select value={assignedProcessor || "all"} disabled={inputsDisabled} onValueChange={(value) => setAssignedProcessor(value === "all" ? "" : value)}><SelectTrigger id="broadcast-agent" className="h-10 rounded-xl border-0 bg-[#e0e0e0] text-xs shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><SelectValue placeholder="All processors" /></SelectTrigger><SelectContent className="rounded-xl border-0 bg-[#e0e0e0] shadow-[4px_4px_12px_#b8b8b8]"><SelectItem value="all">All processors</SelectItem>{(optionsQuery.data?.agents || []).map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           {optionsQuery.isLoading ? <div className="h-8 animate-pulse bg-[#dce5e1]" /> : optionsQuery.error ? <div role="alert" className="flex items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-2 text-[10px] text-[#8d433a]"><span>{optionsQuery.error.message}</span><Button size="sm" variant="outline" onClick={() => void optionsQuery.refetch()}>Retry</Button></div> : null}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border border-[#c6d0cd] bg-[#f8faf8] px-3 py-2 text-[10px] text-[#536a6d]">
@@ -429,7 +417,7 @@ export function EmailBroadcast() {
     </div>
 
     {preview && <Dialog open={confirmOpen} onOpenChange={(value) => { if (!confirmMutation.isPending) setConfirmOpen(value); }}>
-      <DialogContent className="max-h-[92dvh] max-w-xl overflow-y-auto rounded-sm border-2 border-[#7c8582] bg-[#e8eeeb] p-0 shadow-[4px_4px_0_rgba(39,54,56,.25)]">
+      <DialogContent className="email-neu-dialog max-h-[92dvh] max-w-xl overflow-y-auto p-0">
         <DialogHeader className="border-b border-[#b8c3bf] bg-[#d6e2de] px-4 py-3 text-left">
           <DialogTitle className="flex items-center gap-2 text-sm font-bold text-[#203a46]"><AlertCircle className="h-4 w-4 text-[#a26e27]" />{(preview.broadcast as ScheduledBroadcast).scheduledAt ? "Confirm scheduled broadcast" : "Confirm broadcast"}</DialogTitle>
           <DialogDescription className="mt-1 text-[10px] text-[#596d70]">{(preview.broadcast as ScheduledBroadcast).scheduledAt ? "This is the final review. Confirmation saves the schedule; it does not send immediately." : "This is the final review. Confirmation queues individual client emails."}</DialogDescription>

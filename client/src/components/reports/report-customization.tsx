@@ -66,7 +66,7 @@ export function CustomizeColumns({ columns, visible, onChange, templates, onSave
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState("");
   const activeTemplate = templates.find(t => t.id === templateId);
-  return <div className="relative">
+  return <div className="recovery-neu-customization relative">
     <NeuButton aria-expanded={open} className="min-h-9 rounded-lg px-3 text-xs" onClick={() => setOpen(v => !v)}><Columns3 className="h-4 w-4" />Customize columns</NeuButton>
     {open && <div className="absolute right-0 z-40 mt-2 w-[min(340px,calc(100vw-2rem))] rounded-xl bg-[#e0e0e0] p-3 shadow-[6px_6px_16px_#aaa,-5px_-5px_14px_#fff]">
       <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#707070]">Visible columns</p>

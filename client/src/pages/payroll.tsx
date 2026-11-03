@@ -1,22 +1,18 @@
 import { useState } from "react";
+import { AdminPageShell, Button, Input, Badge, Card, CardContent, DialogContent, SelectContent, useAdminToast, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, StatCard } from "@/components/admin-neu/adapters";
+import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Sidebar from "@/components/layout/sidebar";
-import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { TopNav } from "@/components/admin-neu/adapters";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, MoreHorizontal, Download, BadgeDollarSign, Trash2, PlusCircle, LockKeyhole } from "lucide-react";
 
@@ -121,7 +117,7 @@ function exportCSV(entries: PayrollEntry[], userMap: Record<string, string>) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Payroll() {
-  const { toast } = useToast();
+  const { toast } = useAdminToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PayrollEntry | null>(null);
   const [empFilter, setEmpFilter] = useState("all");
@@ -259,11 +255,11 @@ export default function Payroll() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="ff-payroll-page flex h-screen overflow-hidden bg-[#d4d0c8]">
+    <div className="ff-payroll-page flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav title="Payroll" />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <AdminPageShell className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -295,12 +291,7 @@ export default function Payroll() {
               { label: "Net Payroll", value: fmt(totals.net) },
               { label: "Paid Entries", value: String(filtered.filter((entry) => entry.status === "paid").length) },
             ].map((stat) => (
-              <Card key={stat.label} className="ff-payroll-surface ff-stat-card">
-                <CardContent className="p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
-                  <p className="ff-stat-value mt-1 text-2xl">{stat.value}</p>
-                </CardContent>
-              </Card>
+              <StatCard key={stat.label} label={stat.label} value={stat.value} className="ff-payroll-surface ff-stat-card min-h-0 p-4" />
             ))}
           </div>
 
@@ -423,7 +414,7 @@ export default function Payroll() {
               </Table>
             </CardContent>
           </Card>
-        </main>
+        </AdminPageShell>
       </div>
 
       {/* Dialog */}

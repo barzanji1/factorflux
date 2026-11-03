@@ -1,0 +1,300 @@
+/* Funding-only neumorphic skin. Deliberately scoped away from the app sidebar. */
+.funding-neu-page.funding-neu-page.funding-neu-page,
+.funding-neu-page.funding-neu-page.funding-neu-page main {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+}
+
+.funding-neu-page main {
+  min-height: 0;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page .funding-neu-surface,
+.funding-neu-page.funding-neu-page.funding-neu-page main [class*="ff-card"],
+.funding-neu-page.funding-neu-page.funding-neu-page main [class*="ff-dashboard-card"],
+.funding-neu-page.funding-neu-page.funding-neu-page main [class*="rounded-xl"][class*="border"],
+.funding-neu-page.funding-neu-page.funding-neu-page main [class*="rounded-[16px]"][class*="bg-white"],
+.funding-neu-dialog {
+  background-color: #e0e0e0 !important;
+  color: #333 !important;
+  border-color: #d1d1d1 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.funding-neu-page.funding-neu-page.funding-neu-page main textarea,
+.funding-neu-page.funding-neu-page.funding-neu-page main select,
+.funding-neu-page.funding-neu-page.funding-neu-page main [role="combobox"],
+.funding-neu-page.funding-neu-page.funding-neu-page main .funding-neu-select,
+.funding-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.funding-neu-dialog textarea,
+.funding-neu-dialog [role="combobox"],
+.funding-neu-dialog .funding-neu-select {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main .funding-neu-select[role="combobox"],
+.funding-neu-dialog .funding-neu-select[role="combobox"],
+.funding-neu-page.funding-neu-page.funding-neu-page main [role="combobox"] {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+.funding-neu-select[role="listbox"],
+.funding-neu-menu[role="menu"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main input::placeholder,
+.funding-neu-page.funding-neu-page.funding-neu-page main textarea::placeholder,
+.funding-neu-dialog input::placeholder,
+.funding-neu-dialog textarea::placeholder {
+  color: #888 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button:not([role="checkbox"]):not([role="tab"]):not([data-radix-collection-item]):not([class*="bg-red-"]):not([class*="destructive"]),
+.funding-neu-dialog button:not([data-radix-collection-item]):not([class*="bg-red-"]):not([class*="destructive"]) {
+  border-color: #d1d1d1 !important;
+  border-radius: 12px !important;
+  background-color: #e0e0e0 !important;
+  color: #444 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button:hover:not(:disabled),
+.funding-neu-dialog button:hover:not(:disabled) {
+  color: #168d99 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button:active:not(:disabled),
+.funding-neu-dialog button:active:not(:disabled) {
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button[class*="bg-blue-"],
+.funding-neu-page.funding-neu-page.funding-neu-page main button[class*="bg-emerald-"],
+.funding-neu-page.funding-neu-page.funding-neu-page main button[class*="bg-primary"],
+.funding-neu-dialog button[class*="bg-blue-"],
+.funding-neu-dialog button[class*="bg-emerald-"],
+.funding-neu-dialog button[class*="bg-primary"] {
+  background: #27aab8 !important;
+  color: #fff !important;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-accent,
+.funding-neu-dialog button.funding-neu-accent,
+body:has(.funding-neu-page) [role="dialog"] button.funding-neu-accent {
+  background: #27aab8 !important;
+  color: #fff !important;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger,
+.funding-neu-dialog button.funding-neu-danger,
+body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger {
+  background: #b94e4e !important;
+  color: #fff !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger:hover:not(:disabled),
+.funding-neu-dialog button.funding-neu-danger:hover:not(:disabled),
+body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger:hover:not(:disabled) {
+  background: #a94343 !important;
+  color: #fff !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main table,
+.funding-neu-page.funding-neu-page.funding-neu-page main .ff-data-table {
+  color: #333 !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main thead,
+.funding-neu-page.funding-neu-page.funding-neu-page main thead tr {
+  background: #d7d7d7 !important;
+  color: #666 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main th {
+  border-color: #c9c9c9 !important;
+  color: #777 !important;
+  font-size: 10px !important;
+  letter-spacing: .12em !important;
+  text-transform: uppercase;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main td,
+.funding-neu-page.funding-neu-page.funding-neu-page main th {
+  border-bottom-color: #c9c9c9 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main tbody tr:hover {
+  background: #d9e8e8 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main [class*="ff-badge"],
+.funding-neu-page.funding-neu-page.funding-neu-page main [class*="rounded-full"][class*="text-"][class*="px-"] {
+  border-color: transparent !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main [role="tablist"],
+.funding-neu-page.funding-neu-page.funding-neu-page main [role="tablist"] button,
+.funding-neu-page.funding-neu-page.funding-neu-page main button[data-state="active"],
+.funding-neu-page.funding-neu-page.funding-neu-page main button[aria-pressed="true"] {
+  border: 0 !important;
+  border-radius: 12px !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main [role="tablist"] {
+  background: #e0e0e0 !important;
+  box-shadow: 4px 4px 9px #c1c1c1, -4px -4px 9px #fff !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main [role="tablist"] button[aria-selected="true"],
+.funding-neu-page.funding-neu-page.funding-neu-page main button[data-state="active"],
+.funding-neu-page.funding-neu-page.funding-neu-page main button[aria-pressed="true"] {
+  color: #168d99 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="listbox"],
+body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menu"],
+body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [data-radix-menu-content],
+.funding-neu-dialog {
+  border-color: #d1d1d1 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.funding-neu-dialog.funding-neu-dialog.funding-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
+  width: 36px !important;
+  height: 36px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #e0e0e0 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+}
+
+body:has(.funding-neu-page) [data-sonner-toaster] [data-sonner-toast],
+body:has(.funding-neu-page) [data-radix-toast-viewport] [role="status"],
+body:has(.funding-neu-page) [data-radix-toast-viewport] [role="alert"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+.funding-neu-toast {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+body:has(.funding-neu-page) [role="dialog"] {
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+}
+
+body:has(.funding-neu-page) [role="dialog"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.funding-neu-page) [role="dialog"] textarea,
+body:has(.funding-neu-page) [role="dialog"] [role="combobox"],
+body:has(.funding-neu-page) [role="dialog"] .funding-neu-select {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}
+
+body:has(.funding-neu-page) [role="dialog"] button:not([class*="bg-red-"]):not([class*="destructive"]) {
+  border-color: #d1d1d1 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  color: #444 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+}
+
+body:has(.funding-neu-page) [role="dialog"] button:hover:not(:disabled) {
+  color: #168d99 !important;
+}
+
+body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menuitem"],
+body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="option"] {
+  color: #444 !important;
+}
+
+body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="listbox"],
+body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+}
+
+@media (max-width: 767px) {
+  .funding-neu-page main > div { padding-inline: 1rem !important; }
+  .funding-neu-page main > div:first-child,
+  .funding-neu-page main > div > div:first-child {
+    flex-wrap: wrap;
+  }
+  .funding-neu-page main input[type="date"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .ff-bank-transfers-page main .flex.items-center.gap-2 {
+    flex-wrap: wrap;
+  }
+}
+
+/* Global Win95 normalization is deliberately overridden only on Funding pages. */
+.funding-neu-page.funding-neu-page.funding-neu-page main .funding-neu-surface {
+  border: 0 !important;
+  border-radius: 16px !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main .funding-neu-stat .text-3xl {
+  color: #168d99 !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger,
+.funding-neu-dialog.funding-neu-dialog.funding-neu-dialog button.funding-neu-danger {
+  background: #b94e4e !important;
+  color: #fff !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page.funding-neu-page .ff-top-nav button:not([class~="rounded-full"]) {
+  border: 0 !important;
+  border-radius: 12px !important;
+}
+
+.funding-neu-page.funding-neu-page.funding-neu-page.funding-neu-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+}

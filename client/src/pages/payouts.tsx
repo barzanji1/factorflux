@@ -3,21 +3,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent } from "@/components/funding/funding-controls";
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
+  CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+  NeuTable as Table,
+  NeuTableBody as TableBody,
+  NeuTableCell as TableCell,
+  NeuTableHead as TableHead,
+  NeuTableHeader as TableHeader,
+  NeuTableRow as TableRow,
+} from "@/styles/neu/components";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectItem, SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
@@ -31,6 +34,10 @@ import {
   Settings2, Loader2, RefreshCw, Info, ExternalLink,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import "@/components/funding/funding-neu.css";
+import { FundingStatCard } from "@/components/funding/funding-stat-card";
+import { NeuPageShell } from "@/styles/neu/components";
+import { FundingBadge } from "@/components/funding/funding-badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PayoutSettings {
@@ -83,7 +90,8 @@ const STATUS_ORDER = ["pending_advance", "advance_paid", "reserve_pending", "res
 
 function StatusBadge({ status }: { status: string }) {
   const meta = STATUS_META[status] ?? { label: status, color: "bg-slate-100 text-slate-600" };
-  return <Badge className={`${meta.color} rounded-full border-0 font-medium`}>{meta.label}</Badge>;
+  const tone = status === "complete" ? "success" : status === "reserve_pending" || status === "pending_advance" ? "warning" : status === "advance_paid" ? "accent" : "neutral";
+  return <FundingBadge tone={tone} className={`${meta.color} rounded-full border-0 font-medium`}>{meta.label}</FundingBadge>;
 }
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -244,11 +252,11 @@ export default function Payouts() {
   };
 
   return (
-    <div className="ff-payments-page flex h-screen bg-[#d4d0c8]">
+    <div className="funding-neu-page ff-payments-page flex h-screen bg-[#d4d0c8]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopNav title="Payouts" subtitle="Advance disbursements and reserve management" group="Funding" />
-        <main className="custom-scrollbar flex-1 overflow-auto p-6">
+        <TopNav title="Payouts" subtitle="Advance disbursements and reserve management" group="Funding" neu />
+        <NeuPageShell className="custom-scrollbar flex-1 overflow-auto p-6">
           <div className="max-w-7xl mx-auto space-y-6">
 
             {/* Header row */}
@@ -308,17 +316,13 @@ export default function Payouts() {
                   bg: "bg-emerald-50 dark:bg-emerald-950/30",
                 },
               ].map((stat) => (
-                <Card key={stat.label} className="ff-dashboard-card ff-payments-surface border border-[hsl(var(--border))]">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${stat.bg}`}>
-                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
-                      <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <FundingStatCard
+                  key={stat.label}
+                  label={stat.label}
+                  value={stat.value}
+                  icon={<stat.icon className="h-5 w-5" />}
+                  className="min-h-32 p-4"
+                />
               ))}
             </div>
 
@@ -444,12 +448,12 @@ export default function Payouts() {
               </CardContent>
             </Card>
           </div>
-        </main>
+        </NeuPageShell>
       </div>
 
       {/* ── Settings Modal ─────────────────────────────────────────────────── */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="ff-payments-surface sm:max-w-[460px]">
+        <DialogContent className="funding-neu-dialog ff-payments-surface sm:max-w-[460px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5" />
@@ -523,7 +527,7 @@ export default function Payouts() {
 
       {/* ── Create Payout Modal ────────────────────────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="ff-payments-surface sm:max-w-[500px]">
+        <DialogContent className="funding-neu-dialog ff-payments-surface sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />

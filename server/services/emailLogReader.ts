@@ -44,10 +44,9 @@ function serialize(value: Selected, manager: boolean) {
     entityUrl: entityUrl(row.entityType, row.entityId), canResend: manager && !reason, resendDisabledReason: reason,
     inProgress: retry?.state === "sending" && !!retry.lockUntil && retry.lockUntil > new Date() };
 }
-export async function listEmailLog(input: unknown, manager: boolean, store: EmailStore = db) {
-  const filter = emailLogFilters.parse(input);
+function emailLogWhere(filter: z.infer<typeof emailLogFilters>) {
   const term = filter.q ? `%${filter.q.replace(/[\\%_]/g, "\\$&")}%` : undefined;
-  const where = and(
+  return and(
     filter.from ? sql`${emailLog.createdAt} >= ((${filter.from}::date)::timestamp AT TIME ZONE 'America/Denver') AT TIME ZONE 'UTC'` : undefined,
     filter.to ? sql`${emailLog.createdAt} < ((${filter.to}::date + interval '1 day') AT TIME ZONE 'America/Denver') AT TIME ZONE 'UTC'` : undefined,
     filter.entityType ? eq(emailLog.entityType, filter.entityType) : undefined,
@@ -55,11 +54,38 @@ export async function listEmailLog(input: unknown, manager: boolean, store: Emai
     filter.agentId ? filter.agentId === "system" ? sql`${emailLog.sentByUserId} IS NULL` : eq(emailLog.sentByUserId, filter.agentId) : undefined,
     term ? or(ilike(emailLog.subject, term), sql`array_to_string(${emailLog.toAddresses} || ${emailLog.ccAddresses}, ' ') ILIKE ${term}`) : undefined,
   );
+}
+export async function listEmailLog(input: unknown, manager: boolean, store: EmailStore = db) {
+  const filter = emailLogFilters.parse(input);
+  const where = emailLogWhere(filter);
   const [count] = await store.select({ total: sql<string>`count(*)` }).from(emailLog).where(where);
   const rows = await store.select(selection).from(emailLog).leftJoin(users, eq(users.id, emailLog.sentByUserId))
     .leftJoin(emailRetryPayloads, eq(emailRetryPayloads.emailLogId, emailLog.id)).where(where)
     .orderBy(desc(emailLog.createdAt), desc(emailLog.id)).limit(filter.pageSize).offset((filter.page - 1) * filter.pageSize);
   return { rows: rows.map(row => serialize(row, manager)), total: Number(count.total), page: filter.page, pageSize: filter.pageSize };
+}
+// Aggregate the entire filtered result, never just the current table page.
+// Only counts leave the database; no recipient addresses or message bodies.
+export async function summarizeEmailLog(input: unknown, store: EmailStore = db) {
+  const filter = emailLogFilters.parse(input);
+  const where = emailLogWhere(filter);
+  const week = sql<string>`to_char(date_trunc('week', ${emailLog.createdAt}), 'YYYY-MM-DD')`;
+  const [[totals], weeks, entityTypes] = await Promise.all([
+    store.select({
+      sent: sql<number>`count(*) filter (where ${emailLog.status} <> 'failed')::int`,
+      delivered: sql<number>`count(*) filter (where ${emailLog.status} = 'delivered')::int`,
+      bounced: sql<number>`count(*) filter (where ${emailLog.status} = 'bounced')::int`,
+      failed: sql<number>`count(*) filter (where ${emailLog.status} = 'failed')::int`,
+    }).from(emailLog).where(where),
+    store.select({
+      week,
+      delivered: sql<number>`count(*) filter (where ${emailLog.status} = 'delivered')::int`,
+      unsuccessful: sql<number>`count(*) filter (where ${emailLog.status} in ('bounced', 'failed'))::int`,
+    }).from(emailLog).where(where).groupBy(week).orderBy(week),
+    store.select({ entityType: emailLog.entityType, count: sql<number>`count(*)::int` })
+      .from(emailLog).where(where).groupBy(emailLog.entityType),
+  ]);
+  return { totals, weeks, entityTypes };
 }
 export async function readEmailLog(id: number, manager: boolean, store: EmailStore = db) {
   const [row] = await store.select(selection).from(emailLog).leftJoin(users, eq(users.id, emailLog.sentByUserId))

@@ -1,0 +1,302 @@
+/* Scoped, page-owned Neu treatment. Legacy shell rules are intentionally outranked only here. */
+.ff-admin-page.ff-admin-page.ff-admin-page,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page,
+.ff-vault-page.ff-vault-page.ff-vault-page,
+.ff-rules-page.ff-rules-page.ff-rules-page,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page,
+.ff-earl-page.ff-earl-page.ff-earl-page {
+  background:#e0e0e0!important;color:#383838!important;
+}
+.admin-neu-page-shell { min-height:0; background:#e0e0e0!important; color:#383838!important; }
+.ff-admin-page main,.ff-payroll-page main,.ff-expenses-page main,.ff-vault-page main,.ff-rules-page main,.ff-workflow-page main {
+  background:#e0e0e0!important;color:#383838!important;min-height:0;
+}
+.ff-admin-page main .admin-neu-surface,
+.ff-payroll-page main .admin-neu-surface,
+.ff-expenses-page main .admin-neu-surface,
+.ff-vault-page main .admin-neu-surface,
+.ff-rules-page main .admin-neu-surface,
+.ff-workflow-page main .admin-neu-surface,
+.ff-admin-page main .ff-admin-surface,
+.ff-payroll-page main .ff-payroll-surface,
+.ff-expenses-page main .ff-expenses-surface,
+.ff-vault-page main .ff-vault-surface,
+.ff-rules-page main .ff-rules-surface,
+.ff-workflow-page main .ff-workflow-surface,
+body:has(.ff-admin-page) [role="dialog"].admin-neu-dialog,
+body:has(.ff-admin-page) [role="alertdialog"].admin-neu-dialog,
+body:has(.ff-payroll-page) [role="dialog"].admin-neu-dialog,
+body:has(.ff-expenses-page) [role="dialog"].admin-neu-dialog,
+body:has(.ff-vault-page) [role="dialog"].admin-neu-dialog,
+body:has(.ff-vault-page) [role="alertdialog"].admin-neu-dialog,
+body:has(.ff-rules-page) [role="dialog"].admin-neu-dialog,
+body:has(.ff-rules-page) [role="alertdialog"].admin-neu-dialog,
+body:has(.ff-workflow-page) [role="dialog"].admin-neu-dialog,
+body:has(.ff-earl-page) [role="alertdialog"].admin-neu-dialog,
+body:has(.ff-admin-page) [role="listbox"].admin-neu-select,
+body:has(.ff-payroll-page) [role="listbox"].admin-neu-select,
+body:has(.ff-expenses-page) [role="listbox"].admin-neu-select,
+body:has(.ff-vault-page) [role="listbox"].admin-neu-select,
+body:has(.ff-rules-page) [role="listbox"].admin-neu-select {
+  background:#e0e0e0!important;color:#383838!important;border:0!important;border-radius:16px!important;
+  box-shadow:-7px -7px 16px #fff,7px 7px 16px #b8b8b8!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main .admin-neu-surface,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main .admin-neu-surface,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main .admin-neu-surface,
+.ff-vault-page.ff-vault-page.ff-vault-page main .admin-neu-surface,
+.ff-rules-page.ff-rules-page.ff-rules-page main .admin-neu-surface,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main .admin-neu-surface,
+.ff-admin-page.ff-admin-page.ff-admin-page main .ff-admin-surface,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main .ff-payroll-surface,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main .ff-expenses-surface,
+.ff-vault-page.ff-vault-page.ff-vault-page main .ff-vault-surface,
+.ff-rules-page.ff-rules-page.ff-rules-page main .ff-rules-surface,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main .ff-workflow-surface {
+  border:0!important;border-radius:16px!important;background:#e0e0e0!important;
+  box-shadow:-7px -7px 16px #fff,7px 7px 16px #b8b8b8!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main .ff-admin-surface.ff-admin-chart,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main .ff-workflow-surface.ff-workflow-chart,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main .ff-workflow-surface.ff-workflow-preview,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main .ff-workflow-preview-stage {
+  border:0!important;border-radius:16px!important;background:#e0e0e0!important;
+  box-shadow:inset 5px 5px 10px #b8b8b8,inset -5px -5px 10px #fff!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main .ff-admin-surface > [class~="space-y-1.5"],
+.ff-admin-page.ff-admin-page.ff-admin-page main .ff-admin-surface > .ff-card-header,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main .ff-payroll-surface > [class~="space-y-1.5"],
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main .ff-payroll-surface > .ff-card-header,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main .ff-expenses-surface > [class~="space-y-1.5"],
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main .ff-expenses-surface > .ff-card-header,
+.ff-vault-page.ff-vault-page.ff-vault-page main .ff-vault-surface > [class~="space-y-1.5"],
+.ff-vault-page.ff-vault-page.ff-vault-page main .ff-vault-surface > .ff-card-header {
+  border:0!important;border-radius:16px 16px 0 0!important;background:#e0e0e0!important;box-shadow:none!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-vault-page.ff-vault-page.ff-vault-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-rules-page.ff-rules-page.ff-rules-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-admin-page.ff-admin-page.ff-admin-page main textarea,.ff-payroll-page.ff-payroll-page.ff-payroll-page main textarea,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main textarea,.ff-vault-page.ff-vault-page.ff-vault-page main textarea,
+.ff-rules-page.ff-rules-page.ff-rules-page main textarea,.ff-workflow-page.ff-workflow-page.ff-workflow-page main textarea,
+.ff-admin-page.ff-admin-page.ff-admin-page main [role="combobox"],.ff-payroll-page.ff-payroll-page.ff-payroll-page main [role="combobox"],
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main [role="combobox"],.ff-vault-page.ff-vault-page.ff-vault-page main [role="combobox"],
+.ff-rules-page.ff-rules-page.ff-rules-page main [role="combobox"],
+.ff-admin-page.ff-admin-page.ff-admin-page .ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  min-width:0;border:0!important;border-radius:12px!important;background:#e0e0e0!important;color:#383838!important;
+  box-shadow:inset 5px 5px 10px #b8b8b8,inset -5px -5px 10px #fff!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main input::placeholder,.ff-admin-page.ff-admin-page.ff-admin-page main textarea::placeholder,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main input::placeholder,.ff-expenses-page.ff-expenses-page.ff-expenses-page main input::placeholder {color:#888!important}
+.ff-admin-page.ff-admin-page.ff-admin-page main button:where(:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]):not([role="tab"]):not([role="switch"])),
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main button:where(:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]):not([role="tab"]):not([role="switch"])),
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main button:where(:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]):not([role="tab"]):not([role="switch"])),
+.ff-vault-page.ff-vault-page.ff-vault-page main button:where(:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]):not([role="tab"]):not([role="switch"])),
+.ff-rules-page.ff-rules-page.ff-rules-page main button:where(:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]):not([role="tab"]):not([role="switch"])),
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main button:where(:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]):not([role="tab"]):not([role="switch"])),
+body:has(.ff-admin-page) [role="dialog"].admin-neu-dialog button:where(:not([data-radix-collection-item]):not([role="switch"])),
+body:has(.ff-admin-page) [role="alertdialog"].admin-neu-dialog button:where(:not([data-radix-collection-item])),
+body:has(.ff-payroll-page) [role="dialog"].admin-neu-dialog button:where(:not([data-radix-collection-item])),
+body:has(.ff-expenses-page) [role="dialog"].admin-neu-dialog button:where(:not([data-radix-collection-item])),
+body:has(.ff-vault-page) [role="dialog"].admin-neu-dialog button:where(:not([data-radix-collection-item])),
+body:has(.ff-vault-page) [role="alertdialog"].admin-neu-dialog button:where(:not([data-radix-collection-item])),
+body:has(.ff-rules-page) [role="dialog"].admin-neu-dialog button:where(:not([data-radix-collection-item]):not([role="switch"])),
+body:has(.ff-rules-page) [role="alertdialog"].admin-neu-dialog button:where(:not([data-radix-collection-item])),
+body:has(.ff-workflow-page) [role="dialog"].admin-neu-dialog button:where(:not([data-radix-collection-item]):not([role="switch"])),
+body:has(.ff-earl-page) [role="alertdialog"].admin-neu-dialog button:where(:not([data-radix-collection-item])) {
+  border:0!important;border-radius:12px!important;background:#e0e0e0!important;color:#444!important;
+  box-shadow:-4px -4px 9px #fff,4px 4px 9px #c1c1c1!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main button.admin-neu-accent,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main button.admin-neu-accent,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main button.admin-neu-accent,
+.ff-vault-page.ff-vault-page.ff-vault-page main button.admin-neu-accent,
+.ff-rules-page.ff-rules-page.ff-rules-page main button.admin-neu-accent,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main button.admin-neu-accent,
+body:has(.ff-admin-page) .admin-neu-dialog button.admin-neu-accent,
+body:has(.ff-payroll-page) .admin-neu-dialog button.admin-neu-accent,
+body:has(.ff-expenses-page) .admin-neu-dialog button.admin-neu-accent,
+body:has(.ff-vault-page) .admin-neu-dialog button.admin-neu-accent,
+body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-accent,
+body:has(.ff-workflow-page) .admin-neu-dialog button.admin-neu-accent,
+.ff-admin-page.ff-admin-page.ff-admin-page main button.admin-neu-danger,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main button.admin-neu-danger,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main button.admin-neu-danger,
+.ff-vault-page.ff-vault-page.ff-vault-page main button.admin-neu-danger,
+.ff-rules-page.ff-rules-page.ff-rules-page main button.admin-neu-danger,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main button.admin-neu-danger,
+body:has(.ff-admin-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-payroll-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-expenses-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-vault-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-workflow-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-earl-page) .admin-neu-dialog button.admin-neu-accent {
+  background:#27aab8!important;color:#fff!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main button.admin-neu-danger,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main button.admin-neu-danger,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main button.admin-neu-danger,
+.ff-vault-page.ff-vault-page.ff-vault-page main button.admin-neu-danger,
+.ff-rules-page.ff-rules-page.ff-rules-page main button.admin-neu-danger,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page main button.admin-neu-danger,
+body:has(.ff-admin-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-expenses-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-vault-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-danger {background:#b94e4e!important;color:#fff!important}
+.ff-admin-page.ff-admin-page.ff-admin-page main table,.ff-payroll-page.ff-payroll-page.ff-payroll-page main table,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main table,.ff-vault-page.ff-vault-page.ff-vault-page main table {color:#383838!important;border-collapse:separate!important;border-spacing:0!important}
+.ff-admin-page.ff-admin-page.ff-admin-page main thead,.ff-admin-page.ff-admin-page.ff-admin-page main thead tr,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main thead,.ff-payroll-page.ff-payroll-page.ff-payroll-page main thead tr,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main thead,.ff-expenses-page.ff-expenses-page.ff-expenses-page main thead tr,
+.ff-vault-page.ff-vault-page.ff-vault-page main thead,.ff-vault-page.ff-vault-page.ff-vault-page main thead tr {
+  background:#d7d7d7!important;color:#666!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main th,.ff-payroll-page.ff-payroll-page.ff-payroll-page main th,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main th,.ff-vault-page.ff-vault-page.ff-vault-page main th {
+  border-color:#c9c9c9!important;color:#777!important;font-size:10px!important;letter-spacing:.12em!important;text-transform:uppercase
+}
+.ff-admin-page.ff-admin-page.ff-admin-page main td,.ff-admin-page.ff-admin-page.ff-admin-page main th,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page main td,.ff-payroll-page.ff-payroll-page.ff-payroll-page main th,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page main td,.ff-expenses-page.ff-expenses-page.ff-expenses-page main th,
+.ff-vault-page.ff-vault-page.ff-vault-page main td,.ff-vault-page.ff-vault-page.ff-vault-page main th {border-bottom-color:#c9c9c9!important}
+.ff-admin-page main tbody tr:hover,.ff-payroll-page main tbody tr:hover,.ff-expenses-page main tbody tr:hover,.ff-vault-page main tbody tr:hover {background:#d9e8e8!important}
+.ff-admin-page main .admin-neu-badge,.ff-payroll-page main .admin-neu-badge,.ff-expenses-page main .admin-neu-badge,
+.ff-vault-page main .admin-neu-badge,.ff-rules-page main .admin-neu-badge {border:0!important;background:#e0e0e0!important}
+.ff-admin-page main .admin-neu-badge.ff-badge-funded,.ff-payroll-page main .admin-neu-badge.ff-badge-funded,
+.ff-expenses-page main .admin-neu-badge.ff-badge-funded,.ff-vault-page main .admin-neu-badge.ff-badge-funded {color:#347d69!important}
+.ff-admin-page main .admin-neu-badge.ff-badge-submitted,.ff-payroll-page main .admin-neu-badge.ff-badge-submitted,
+.ff-expenses-page main .admin-neu-badge.ff-badge-submitted,.ff-vault-page main .admin-neu-badge.ff-badge-submitted {color:#39717a!important}
+.ff-admin-page main .admin-neu-badge.ff-badge-pending,.ff-payroll-page main .admin-neu-badge.ff-badge-pending,
+.ff-expenses-page main .admin-neu-badge.ff-badge-pending,.ff-vault-page main .admin-neu-badge.ff-badge-pending {color:#9b6a22!important}
+.ff-admin-page main .admin-neu-badge.ff-badge-rejected,.ff-payroll-page main .admin-neu-badge.ff-badge-rejected,
+.ff-expenses-page main .admin-neu-badge.ff-badge-rejected,.ff-vault-page main .admin-neu-badge.ff-badge-rejected {color:#a14d4d!important}
+.ff-admin-page main .admin-neu-badge.ff-badge-draft,.ff-payroll-page main .admin-neu-badge.ff-badge-draft,
+.ff-expenses-page main .admin-neu-badge.ff-badge-draft,.ff-vault-page main .admin-neu-badge.ff-badge-draft {color:#696969!important}
+.ff-payroll-page.ff-payroll-page.ff-payroll-page [role="menuitem"].ff-payroll-action-paid {color:#168d99!important}
+.ff-admin-page.ff-admin-page.ff-admin-page main [role="tablist"] {border:0!important;border-radius:16px!important;background:#e0e0e0!important;box-shadow:-3px -3px 7px #fff,3px 3px 7px #c1c1c1!important}
+.ff-admin-page.ff-admin-page.ff-admin-page main [role="tab"] {border:0!important;border-radius:12px!important;background:#e0e0e0!important}
+.ff-admin-page.ff-admin-page.ff-admin-page main [role="tab"][aria-selected="true"] {color:#168d99!important;box-shadow:inset 4px 4px 8px #b8b8b8,inset -4px -4px 8px #fff!important}
+.ff-admin-page.ff-admin-page.ff-admin-page .ff-top-nav button,.ff-payroll-page.ff-payroll-page.ff-payroll-page .ff-top-nav button,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page .ff-top-nav button,.ff-vault-page.ff-vault-page.ff-vault-page .ff-top-nav button,
+.ff-rules-page.ff-rules-page.ff-rules-page .ff-top-nav button,.ff-workflow-page.ff-workflow-page.ff-workflow-page .ff-top-nav button,
+.ff-admin-page.ff-admin-page.ff-admin-page .ff-top-nav a[class*="ff-btn"],.ff-payroll-page.ff-payroll-page.ff-payroll-page .ff-top-nav a[class*="ff-btn"],
+.ff-expenses-page.ff-expenses-page.ff-expenses-page .ff-top-nav a[class*="ff-btn"],.ff-vault-page.ff-vault-page.ff-vault-page .ff-top-nav a[class*="ff-btn"],
+.ff-rules-page.ff-rules-page.ff-rules-page .ff-top-nav a[class*="ff-btn"],.ff-workflow-page.ff-workflow-page.ff-workflow-page .ff-top-nav a[class*="ff-btn"] {border:0!important;border-radius:12px!important}
+.ff-admin-page.ff-admin-page.ff-admin-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-payroll-page.ff-payroll-page.ff-payroll-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-expenses-page.ff-expenses-page.ff-expenses-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-vault-page.ff-vault-page.ff-vault-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-rules-page.ff-rules-page.ff-rules-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-workflow-page.ff-workflow-page.ff-workflow-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  min-width:0;border:0!important;border-radius:12px!important;background:#e0e0e0!important;color:#383838!important;
+  box-shadow:inset 5px 5px 10px #b8b8b8,inset -5px -5px 10px #fff!important
+}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-chat {background:#e0e0e0!important;border:0!important;border-radius:16px!important;box-shadow:-7px -7px 16px #fff,7px 7px 16px #b8b8b8!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-header,.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-chat > div:last-child {background:#e0e0e0!important;border-color:#c9c9c9!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-message-user {border:0!important;background:rgba(39,170,184,.07)!important;color:#31575a!important;box-shadow:none!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-message-assistant {border:0!important;background:transparent!important;color:#414141!important;box-shadow:none!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-assistant-avatar {background:#e0e0e0!important;box-shadow:-3px -3px 7px #fff,3px 3px 7px #c1c1c1!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-user-avatar {background:#c5e6e5!important;color:#35676b!important;box-shadow:-3px -3px 7px #fff,3px 3px 7px #c1c1c1!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-starter {border:0!important;border-radius:12px!important;background:#e0e0e0!important;box-shadow:-4px -4px 9px #fff,4px 4px 9px #c1c1c1!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-input {background:#e0e0e0!important;border:0!important;border-radius:12px!important;box-shadow:inset 5px 5px 10px #b8b8b8,inset -5px -5px 10px #fff!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-earl-emoji-picker {border:0!important;border-radius:16px!important;background:#e0e0e0!important;box-shadow:-5px -5px 12px #fff,5px 5px 12px #b8b8b8!important}
+.ff-earl-page.ff-earl-page.ff-earl-page main button:where(:not([role="checkbox"]):not([role="switch"])) {
+  border:0!important;border-radius:12px!important;background:#e0e0e0!important;
+  box-shadow:-4px -4px 9px #fff,4px 4px 9px #c1c1c1!important;
+}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-top-nav button,
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-top-nav a[class*="ff-btn"] {border:0!important;border-radius:12px!important}
+.ff-earl-page.ff-earl-page.ff-earl-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  border:0!important;border-radius:12px!important;background:#e0e0e0!important;
+  box-shadow:inset 5px 5px 10px #b8b8b8,inset -5px -5px 10px #fff!important;
+}
+.ff-earl-page.ff-earl-page.ff-earl-page button[aria-label="Send message"] {background:#27aab8!important;color:#fff!important}
+.ff-admin-page.ff-admin-page.ff-admin-page [role="switch"],
+.ff-rules-page.ff-rules-page.ff-rules-page [role="switch"],
+.ff-workflow-page.ff-workflow-page.ff-workflow-page [role="switch"] {
+  border:0!important;border-radius:999px!important;background:#d2d2d2!important;
+  box-shadow:inset 3px 3px 6px #b8b8b8,inset -3px -3px 6px #fff!important;
+}
+.ff-admin-page.ff-admin-page.ff-admin-page [role="switch"][data-state="checked"],
+.ff-rules-page.ff-rules-page.ff-rules-page [role="switch"][data-state="checked"],
+.ff-workflow-page.ff-workflow-page.ff-workflow-page [role="switch"][data-state="checked"] {
+  background:#27aab8!important;box-shadow:inset 2px 2px 5px #16838d,inset -2px -2px 5px #5bc3cc!important
+}
+.ff-admin-page.ff-admin-page.ff-admin-page [role="switch"] span,
+.ff-rules-page.ff-rules-page.ff-rules-page [role="switch"] span,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page [role="switch"] span {border-radius:50%;background:#e8e8e8!important;box-shadow:2px 2px 4px #a9a9a9!important}
+.ff-admin-page.ff-admin-page.ff-admin-page .ff-btn-danger,
+.ff-payroll-page.ff-payroll-page.ff-payroll-page .ff-btn-danger,
+.ff-expenses-page.ff-expenses-page.ff-expenses-page .ff-btn-danger,
+.ff-vault-page.ff-vault-page.ff-vault-page .ff-btn-danger,
+.ff-rules-page.ff-rules-page.ff-rules-page .ff-btn-danger,
+.ff-workflow-page.ff-workflow-page.ff-workflow-page .ff-btn-danger {background:#b94e4e!important;color:#fff!important}
+.ff-admin-page.ff-admin-page.ff-admin-page .ff-payroll-action-paid {color:#168d99!important}
+body:has(.ff-admin-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.ff-payroll-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.ff-expenses-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.ff-vault-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.ff-rules-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.ff-workflow-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body:has(.ff-admin-page) [role="dialog"].admin-neu-dialog textarea,
+body:has(.ff-payroll-page) [role="dialog"].admin-neu-dialog textarea,
+body:has(.ff-expenses-page) [role="dialog"].admin-neu-dialog textarea,
+body:has(.ff-vault-page) [role="dialog"].admin-neu-dialog textarea,
+body:has(.ff-rules-page) [role="dialog"].admin-neu-dialog textarea,
+body:has(.ff-workflow-page) [role="dialog"].admin-neu-dialog textarea,
+body:has(.ff-admin-page) [role="dialog"].admin-neu-dialog [role="combobox"],
+body:has(.ff-payroll-page) [role="dialog"].admin-neu-dialog [role="combobox"],
+body:has(.ff-expenses-page) [role="dialog"].admin-neu-dialog [role="combobox"],
+body:has(.ff-vault-page) [role="dialog"].admin-neu-dialog [role="combobox"],
+body:has(.ff-rules-page) [role="dialog"].admin-neu-dialog [role="combobox"],
+body:has(.ff-workflow-page) [role="dialog"].admin-neu-dialog [role="combobox"] {
+  min-width:0;border:0!important;border-radius:12px!important;background:#e0e0e0!important;color:#383838!important;
+  box-shadow:inset 5px 5px 10px #b8b8b8,inset -5px -5px 10px #fff!important
+}
+body:has(.ff-admin-page) [data-radix-popper-content-wrapper] [role="menu"],
+body:has(.ff-admin-page) [data-radix-popper-content-wrapper] [role="menuitem"],
+body:has(.ff-payroll-page) [data-radix-popper-content-wrapper] [role="menu"],
+body:has(.ff-payroll-page) [data-radix-popper-content-wrapper] [role="menuitem"],
+body:has(.ff-expenses-page) [data-radix-popper-content-wrapper] [role="menu"],
+body:has(.ff-expenses-page) [data-radix-popper-content-wrapper] [role="menuitem"],
+body:has(.ff-vault-page) [data-radix-popper-content-wrapper] [role="menu"],
+body:has(.ff-vault-page) [data-radix-popper-content-wrapper] [role="menuitem"],
+body:has(.ff-rules-page) [data-radix-popper-content-wrapper] [role="menu"],
+body:has(.ff-rules-page) [data-radix-popper-content-wrapper] [role="menuitem"] {
+  border:0!important;border-radius:12px!important;background:#e0e0e0!important;color:#444!important;
+  box-shadow:-6px -6px 14px #fff,6px 6px 14px #b8b8b8!important
+}
+body:has(.ff-admin-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert-dialog-action],
+body:has(.ff-vault-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert-dialog-action],
+body:has(.ff-rules-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert-dialog-action],
+body:has(.ff-earl-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert-dialog-action] {
+  background:#27aab8!important;color:#fff!important
+}
+.admin-neu-dialog.admin-neu-dialog.admin-neu-dialog > button.ff-btn-secondary:has(>span.sr-only) {width:36px!important;height:36px!important;min-height:0!important;padding:0!important;border:0!important;border-radius:50%!important;background:#e0e0e0!important;box-shadow:-3px -3px 7px #fff,3px 3px 7px #c1c1c1!important}
+.admin-neu-toast.admin-neu-toast.admin-neu-toast,body:has(.ff-admin-page) [data-sonner-toaster] [data-sonner-toast],
+body:has(.ff-payroll-page) [data-sonner-toaster] [data-sonner-toast],body:has(.ff-expenses-page) [data-sonner-toaster] [data-sonner-toast],
+body:has(.ff-vault-page) [data-sonner-toaster] [data-sonner-toast],body:has(.ff-rules-page) [data-sonner-toaster] [data-sonner-toast],
+body:has(.ff-workflow-page) [data-sonner-toaster] [data-sonner-toast],body:has(.ff-earl-page) [data-sonner-toaster] [data-sonner-toast] {
+  border:0!important;border-radius:14px!important;background:#e0e0e0!important;color:#333!important;box-shadow:-7px -7px 16px #fff,7px 7px 16px #b8b8b8!important
+}
+.admin-neu-button.admin-neu-button.admin-neu-button:active:not(:disabled) {
+  box-shadow:inset 4px 4px 8px #b8b8b8,inset -4px -4px 8px #fff!important;
+}
+.admin-neu-button.admin-neu-button.admin-neu-button:hover:not(:disabled):not(.admin-neu-accent):not(.admin-neu-danger) {
+  color:#168d99!important;
+}
+@media(max-width:767px) {
+  .ff-admin-page main,.ff-payroll-page main,.ff-expenses-page main,.ff-vault-page main,.ff-rules-page main,.ff-workflow-page main {padding:1rem!important}
+  .ff-admin-page main > div:first-child,.ff-payroll-page main > div:first-child,.ff-expenses-page main > div:first-child,.ff-vault-page main > div:first-child,.ff-rules-page main > div:first-child,.ff-workflow-page main > div:first-child {gap:.75rem}
+  .ff-admin-page main .ff-card-header {flex-wrap:wrap;align-items:flex-start;gap:.75rem}
+  .ff-admin-page main .ff-card-header > .flex {flex-wrap:wrap;min-width:0;max-width:100%}
+  .ff-admin-page main table,.ff-payroll-page main table,.ff-expenses-page main table,.ff-vault-page main table {min-width:max-content}
+  .admin-neu-dialog .grid {grid-template-columns:minmax(0,1fr)}
+  .ff-earl-page .ff-earl-chat {margin:.75rem!important}
+  .ff-earl-page .ff-earl-message {max-width:88%}
+}

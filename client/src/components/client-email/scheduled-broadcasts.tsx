@@ -1,5 +1,6 @@
 import { CalendarClock, Eye, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NeuBadge } from "@/styles/neu";
 import type { BroadcastSummary } from "../../../../shared/email-broadcast";
 
 export type ScheduledBroadcast = Omit<BroadcastSummary, "status"> & {
@@ -12,13 +13,6 @@ export type ScheduledBroadcast = Omit<BroadcastSummary, "status"> & {
   clientIds?: number[] | null;
 };
 
-const statusStyle: Record<string, string> = {
-  scheduled: "border-[#a8c5ca] bg-[#edf6f7] text-[#326572]",
-  draft: "border-[#d5b77b] bg-[#fff7e7] text-[#866322]",
-  queued: "border-[#a8c5ca] bg-[#edf6f7] text-[#326572]",
-  sending: "border-[#a8c5ca] bg-[#edf6f7] text-[#326572]",
-  failed: "border-[#d1a19a] bg-[#fff0ed] text-[#97473f]",
-};
 const zonedTime = (iso: string | null, zone: string) => {
   if (!iso) return "Time not set";
   try {
@@ -62,7 +56,7 @@ export function ScheduledBroadcasts({
               return <article key={item.id} className="border border-[#c6d0cd] bg-[#f8faf8]">
                 <div className="flex flex-wrap items-start gap-2 p-2.5">
                   <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex flex-wrap items-center gap-1.5"><span className={`inline-flex border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${statusStyle[item.status] || statusStyle.draft}`}>{item.status}</span><span className="font-mono text-[8px] text-[#758582]">rev {item.revision}</span></div>
+                    <div className="mb-1 flex flex-wrap items-center gap-1.5"><NeuBadge tone={item.status === "failed" ? "warning" : item.status === "scheduled" || item.status === "queued" || item.status === "sending" ? "accent" : item.status === "completed" ? "success" : "neutral"} className={`px-2 py-0.5 text-[8px] uppercase tracking-wide ${item.status === "failed" ? "text-[#a3483e]" : ""}`}>{item.status}</NeuBadge><span className="font-mono text-[8px] text-[#758582]">rev {item.revision}</span></div>
                     <p className="truncate text-[10px] font-bold text-[#304a52]">{item.subject || "(No subject)"}</p>
                     <p className="mt-0.5 text-[9px] font-semibold text-[#326572]">{zonedTime(item.scheduledAt, item.scheduleTimeZone || "America/Denver")} <span className="font-normal text-[#758582]">({item.scheduleTimeZone || "America/Denver"})</span></p>
                     <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-[9px] leading-relaxed text-[#657977]">{item.body}</p>

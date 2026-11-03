@@ -1,0 +1,166 @@
+.email-neu {
+  --email-surface: #e0e0e0;
+  --email-ink: #344244;
+  --email-muted: #747f81;
+}
+
+/* Outrank the internal shell's important Win95 normalization, locally only. */
+.ff-app-shell .email-neu.email-neu [class~="rounded-2xl"],
+.ff-app-shell .email-neu.email-neu [class~="rounded-3xl"] {
+  border-radius: 16px !important;
+}
+
+.ff-app-shell .email-neu.email-neu [class~="rounded-xl"] {
+  border-radius: 12px !important;
+}
+
+.ff-app-shell .email-neu.email-neu.email-neu input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.ff-app-shell .email-neu.email-neu textarea,
+.ff-app-shell .email-neu.email-neu select {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.ff-app-shell .email-neu button,
+.email-neu-dialog button {
+  border: 0 !important;
+  text-shadow: none !important;
+}
+
+.ff-app-shell .email-neu button:not(:disabled):hover,
+.email-neu-dialog button:not(:disabled):hover {
+  background-color: #27aab8 !important;
+  color: #fff !important;
+}
+
+.ff-app-shell .email-neu button:not(:disabled):active,
+.email-neu-dialog button:not(:disabled):active {
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.email-neu section {
+  border-color: transparent !important;
+  border-radius: 1.25rem;
+  background: var(--email-surface) !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
+}
+
+.email-neu section > header {
+  border-color: #c9cece !important;
+  background: transparent !important;
+}
+
+.email-neu input:not([type="checkbox"]),
+.email-neu textarea,
+.email-neu select {
+  min-height: 2.75rem;
+  border: 0 !important;
+  border-radius: .8rem !important;
+  background: #e0e0e0 !important;
+  color: #344244 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.email-neu textarea {
+  padding: .75rem 1rem !important;
+}
+
+.email-neu button {
+  border: 0 !important;
+  border-radius: .7rem;
+  background-color: #e0e0e0;
+  color: #344244;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+}
+
+.email-neu button[class*="bg-[#087f8e]"],
+.email-neu button[class*="bg-[#27aab8]"] {
+  background-color: #27aab8 !important;
+  color: #fff !important;
+}
+
+.email-neu button[class*="text-[#8d433a]"],
+.email-neu button[class*="text-red"] {
+  color: #a3483e !important;
+}
+
+.email-neu [role="alert"] {
+  border-radius: .8rem;
+}
+
+.email-neu-dialog {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  max-height: calc(100dvh - 2rem) !important;
+  overscroll-behavior: contain;
+  border: 0 !important;
+  border-radius: 1.25rem !important;
+  background: #e0e0e0 !important;
+  color: #344244 !important;
+  box-shadow: -10px -10px 24px rgba(255,255,255,.95), 10px 10px 24px rgba(142,148,148,.6) !important;
+}
+
+.email-neu-dialog > div[class*="border-b"],
+.email-neu-dialog > div[class*="border-t"] {
+  border-color: #c9cece !important;
+  background: #e0e0e0 !important;
+}
+
+.email-neu-dialog input:not([type="checkbox"]),
+.email-neu-dialog textarea,
+.email-neu-dialog select {
+  border: 0 !important;
+  border-radius: .8rem !important;
+  background: #e0e0e0 !important;
+  color: #344244 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+
+.email-neu-dialog button:not([aria-label="Close"]) {
+  border: 0 !important;
+  border-radius: .75rem;
+  background-color: #e0e0e0;
+  color: #344244;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+}
+
+.email-neu-dialog button[class*="bg-[#087f8e]"],
+.email-neu-dialog button[class*="bg-[#27aab8]"] {
+  background-color: #27aab8 !important;
+  color: #fff !important;
+}
+
+.email-neu-toast {
+  border: 0 !important;
+  border-radius: 1rem !important;
+  background: #e0e0e0 !important;
+  color: #344244 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+}
+
+.email-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
+  right: 1rem !important;
+  top: 1rem !important;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0 !important;
+  border-radius: 999px;
+  background: #e0e0e0 !important;
+  color: #168f9b !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  opacity: 1;
+}
+
+.email-neu-dialog > button.ff-btn-secondary:has(> span.sr-only):hover {
+  background: #27aab8 !important;
+  color: #fff !important;
+}
+
+.email-neu-dialog > button.ff-btn-secondary:has(> span.sr-only):hover svg,
+.email-neu-dialog > button.ff-btn-secondary:has(> span.sr-only):focus-visible svg {
+  color: inherit;
+}
