@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import { Loader2, FileText, ChevronDown, ChevronUp, Download, Eye, ReceiptText } from "lucide-react";
 import PortalLayout from "@/components/layout/portal-layout";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -108,9 +109,9 @@ export default function PortalSubmissions() {
                     </div>
 
                     {s.notes && (
-                      <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                      <NeuNotice severity="ack" className="text-sm">
                         <span className="font-semibold">Note from TPF: </span>{s.notes}
-                      </div>
+                      </NeuNotice>
                     )}
 
                     {s.documents && s.documents.length > 0 && (

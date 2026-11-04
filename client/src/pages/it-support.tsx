@@ -7,6 +7,7 @@ import { AdminPageShell, Badge as NeuBadge, Button, Card, CardContent, Input, Se
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { NeuTextarea } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import "@/components/admin-neu/admin-neu-page.css";
 import {
   AlertCircle, Bug, Check, ChevronRight, Clock3, Lightbulb, MessageSquareText,
@@ -158,7 +159,7 @@ export default function ItSupport() {
         <Button variant="accent" className="shrink-0 gap-2" onClick={() => { setPageMessage(""); setFormOpen((open) => !open); }}><Plus className="h-4 w-4" />Submit Request</Button>
       </header>
 
-      {pageMessage && <div role={messageError ? "alert" : "status"} className={`flex items-start gap-2 rounded-xl px-3 py-2 text-sm shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] ${messageError ? "bg-[#f0dfdc] text-[#812f25]" : "bg-[#dce9e5] text-[#315953]"}`}>{messageError ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <Check className="mt-0.5 h-4 w-4 shrink-0" />}{pageMessage}</div>}
+      {pageMessage && <NeuNotice severity={messageError ? "block" : "info"} role={messageError ? "alert" : "status"} className="flex items-start gap-2 text-sm">{messageError ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <Check className="mt-0.5 h-4 w-4 shrink-0" />}{pageMessage}</NeuNotice>}
       {metaQuery.isLoading && <Card><CardContent className="space-y-3"><div className="h-4 w-44 animate-pulse bg-[#dedbd4]" /><div className="h-3 w-2/3 animate-pulse bg-[#e8e6e1]" /></CardContent></Card>}
       {metaQuery.isError && <Card><CardContent className="flex items-center gap-3 text-sm text-[#812f25]"><AlertCircle className="h-5 w-5" />{(metaQuery.error as Error).message}<Button className="ml-auto" onClick={() => metaQuery.refetch()}>Retry</Button></CardContent></Card>}
 

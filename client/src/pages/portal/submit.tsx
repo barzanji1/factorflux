@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { displayLoadType } from "@shared/load-types";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 interface PortalUser { id: number; status: string; carrierId?: number | null; cargoType?: string | null; }
 interface Broker { id: number; name: string; }
@@ -243,19 +244,19 @@ export default function PortalSubmit() {
         </div>
 
         {(mutation.error || documentError) && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <NeuNotice severity="block" className="mb-4">
             {documentError || (mutation.error as Error)?.message}
-          </div>
+          </NeuNotice>
         )}
         {preflightError && (
-          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <NeuNotice severity="block" className="mb-4">
             Preflight check unavailable: {preflightError}
-          </div>
+          </NeuNotice>
         )}
         {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
-          <div key={alert.code} className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-            <strong>{alert.title}</strong> — {alert.message}
-          </div>
+          <NeuNotice key={alert.code} severity="info" title={alert.title} className="mb-3">
+            {alert.message}
+          </NeuNotice>
         ))}
 
         <Form {...form}>
@@ -348,9 +349,9 @@ export default function PortalSubmit() {
                         <SelectContent>{accounts.map(account => <SelectItem key={account.id} value={String(account.id)}>{account.nickname} · {account.bankName} ••••{account.lastFour}</SelectItem>)}</SelectContent>
                       </Select>
                     ) : (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      <NeuNotice severity="ack">
                         Please <Link href="/portal/profile" className="font-semibold underline">add a bank account in your profile</Link>.
-                      </div>
+                      </NeuNotice>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -413,12 +414,9 @@ export default function PortalSubmit() {
             </div>
             <div className="max-h-[65vh] space-y-3 overflow-y-auto p-4">
               {preflightAlerts.map(alert => (
-                <div key={alert.code} className={`border-2 bg-white p-3 ${alert.severity === "block" ? "border-red-700" : alert.severity === "ack" ? "border-amber-600" : "border-blue-700"}`}>
-                  <p className={`font-bold ${alert.severity === "block" ? "text-red-800" : alert.severity === "ack" ? "text-amber-800" : "text-blue-800"}`}>
-                    {alert.severity === "block" ? "BLOCK" : alert.severity === "ack" ? "ACKNOWLEDGMENT REQUIRED" : "INFORMATION"}: {alert.title}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-800">{alert.message}</p>
-                  {alert.link && <a href={alert.link} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm text-blue-700 underline">View details</a>}
+                <NeuNotice key={alert.code} severity={alert.severity} title={`${alert.severity === "block" ? "BLOCK" : alert.severity === "ack" ? "ACKNOWLEDGMENT REQUIRED" : "INFORMATION"}: ${alert.title}`}>
+                  <p className="mt-1 text-sm">{alert.message}</p>
+                  {alert.link && <a href={alert.link} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm underline">View details</a>}
                   {alert.severity === "ack" && (
                     <div className="mt-3 space-y-2">
                       <label className="flex items-center gap-2 text-sm">
@@ -439,7 +437,7 @@ export default function PortalSubmit() {
                       />
                     </div>
                   )}
-                </div>
+                </NeuNotice>
               ))}
               {preflightLoading && <p className="text-sm">Checking invoice…</p>}
             </div>

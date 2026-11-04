@@ -6,6 +6,7 @@ import Sidebar from "@/components/layout/sidebar";
 import { TopNav } from "@/components/admin-neu/adapters";
 import { PageInsights } from "@/components/PageInsights";
 import { NeuTextarea as Textarea } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -287,7 +288,7 @@ export default function DocumentRules() {
             </div>
 
             {/* Info banner */}
-            <div className="ff-rules-surface mb-5 flex items-start gap-3 border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+            <NeuNotice severity="info" className="mb-5 flex items-start gap-3">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
               <div className="text-xs text-blue-700 dark:text-blue-300">
                 <span className="font-semibold">How this works: </span>
@@ -295,7 +296,7 @@ export default function DocumentRules() {
                 Documents required for <strong>Approval</strong> must be present before the invoice can be approved.
                 The lifecycle engine checks these rules automatically and blocks transitions when documents are missing.
               </div>
-            </div>
+            </NeuNotice>
 
             {isLoading ? (
               <div className="space-y-3">

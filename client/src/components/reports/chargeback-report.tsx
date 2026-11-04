@@ -6,6 +6,7 @@ import { Link } from "wouter";
 import type { ChargebackReport, ChargebackReportRow } from "@shared/chargeback-report";
 import { useAuth } from "@/hooks/useAuth";
 import { NeuBadge, NeuButton, NeuInput, NeuSelect } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { RecoveryTable, RecoveryCard, RecoveryStatCard } from "@/components/recovery/recovery-controls";
 import { CustomizeColumns, useReportColumns, type ReportColumn, type SavedTemplate } from "./report-customization";
 
@@ -130,7 +131,7 @@ function ChargebackReportTable({ section, rows, totals, columns, visible, onReso
             : <NeuBadge tone={["resolved", "collected"].includes(row.status) ? "success" : "neutral"}>{row.status.replace(/_/g, " ")}</NeuBadge>}</td>}
         </tr>
         {expanded === String(row.invoiceId) && <tr><td colSpan={visibleColumns.length + 1 + (section === "shortPays" ? 1 : 0)} className="bg-[#d9e7e7] p-3">
-          {timeline.isLoading ? <div className="h-12 animate-pulse rounded bg-[#c8d5d5]" /> : timeline.isError ? <div role="alert" className="text-xs text-red-700">Timeline unavailable. <button className="underline" onClick={() => void timeline.refetch()}>Retry</button></div> : <ol className="grid gap-2 sm:grid-cols-2">{(timeline.data?.events ?? []).map(event => <li key={event.id} className="rounded-lg bg-[#e0e0e0] p-2 shadow-[1px_1px_4px_#bbb,-1px_-1px_4px_#fff]"><div className="flex justify-between gap-2"><strong className="capitalize">{event.eventType.replace(/_/g, " ")}</strong><span className="text-[#666]">{reportDate(event.createdAt)}</span></div><p className="mt-1 text-[#666]">{event.actorName || "System"}{event.amount != null ? ` · ${money(Number(event.amount))}` : ""}{event.reference ? ` · ${event.reference}` : ""}</p>{event.reason && <p className="mt-1">{event.reason}</p>}</li>)}</ol>}
+          {timeline.isLoading ? <div className="h-12 animate-pulse rounded bg-[#c8d5d5]" /> : timeline.isError ? <NeuNotice severity="block" role="alert" className="text-xs">Timeline unavailable. <button className="underline" onClick={() => void timeline.refetch()}>Retry</button></NeuNotice> : <ol className="grid gap-2 sm:grid-cols-2">{(timeline.data?.events ?? []).map(event => <li key={event.id} className="rounded-lg bg-[#e0e0e0] p-2 shadow-[1px_1px_4px_#bbb,-1px_-1px_4px_#fff]"><div className="flex justify-between gap-2"><strong className="capitalize">{event.eventType.replace(/_/g, " ")}</strong><span className="text-[#666]">{reportDate(event.createdAt)}</span></div><p className="mt-1 text-[#666]">{event.actorName || "System"}{event.amount != null ? ` · ${money(Number(event.amount))}` : ""}{event.reference ? ` · ${event.reference}` : ""}</p>{event.reason && <p className="mt-1">{event.reason}</p>}</li>)}</ol>}
         </td></tr>}
       </Fragment>)}
       {!rows.length && <tr><td colSpan={visibleColumns.length + 2} className="px-4 py-10 text-center text-[#777]">No {sectionLabels[section].toLowerCase()} match these filters.</td></tr>}</tbody>
@@ -215,10 +216,10 @@ export default function ChargebackReport() {
         <NeuButton className="min-h-8 rounded-lg px-2.5 text-[10px]" onClick={() => { setFilters(initialFilters); setCarrier(""); setBroker(""); }}><RefreshCw className="h-3 w-3" />Reset filters</NeuButton>
       </div>
     </RecoveryCard>
-    {!!Object.keys(errors).length && <p role="alert" className="rounded-lg border border-[#c8a85f] bg-[#fff4d3] p-3 text-xs text-[#604b16]">Correct the highlighted filters to load this report.</p>}
-    {exportError && <p role="alert" className="rounded-lg border border-red-400 bg-red-50 p-3 text-xs text-red-800">{exportError}</p>}
+    {!!Object.keys(errors).length && <NeuNotice severity="ack" role="alert" className="text-xs">Correct the highlighted filters to load this report.</NeuNotice>}
+    {exportError && <NeuNotice severity="block" role="alert" className="text-xs">{exportError}</NeuNotice>}
     {!Object.keys(errors).length && (reportQuery.isLoading || reportQuery.isFetching) ? <div className="space-y-3" aria-label="Loading chargeback report">{[1, 2].map(k => <div key={k} className="h-36 animate-pulse rounded-xl bg-[#d0d0d0] shadow-[inset_2px_2px_6px_#bbb,inset_-2px_-2px_6px_#fff]" />)}</div>
-      : reportQuery.isError ? <div role="alert" className="rounded-xl bg-[#e0e0e0] p-7 text-center shadow-[3px_3px_8px_#bdbdbd,-3px_-3px_8px_#fff]"><FileWarning className="mx-auto mb-2 h-5 w-5 text-red-700" /><p className="font-bold">Report could not be loaded</p><p className="mt-1 text-xs text-[#666]">{reportQuery.error instanceof Error ? reportQuery.error.message : "No export is available until this report loads."}</p><NeuButton className="mt-3 min-h-9 px-3" onClick={() => void reportQuery.refetch()}>Retry</NeuButton></div>
+      : reportQuery.isError ? <NeuNotice severity="block" role="alert" className="text-center"><FileWarning className="mx-auto mb-2 h-5 w-5" /><p className="font-bold">Report could not be loaded</p><p className="mt-1 text-xs">{reportQuery.error instanceof Error ? reportQuery.error.message : "No export is available until this report loads."}</p><NeuButton className="mt-3 min-h-9 px-3" onClick={() => void reportQuery.refetch()}>Retry</NeuButton></NeuNotice>
       : report && <div className="space-y-3">
         {report.notices?.length > 0 && <aside className="rounded-lg border border-[#c4b878] bg-[#fff8dc] px-3 py-2 text-[11px] text-[#51482c]"><strong>Accounting notes: </strong>{report.notices.join(" ")}</aside>}
         <ChargebackReportTable section={activeSection} rows={rowsBySection?.[activeSection] ?? []} totals={totalsBySection?.[activeSection] ?? { count: 0, originalAmount: 0, amount: 0, outstanding: 0, refunded: 0, collected: 0, writtenOff: 0, recovered: 0, netOutstanding: 0, unknownAmounts: 0 }} columns={columns} visible={prefs.visible} onResolve={setResolveRow} />

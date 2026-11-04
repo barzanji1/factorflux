@@ -23,6 +23,7 @@ import type { ChatMessage } from "@/components/team-chat/ThreadPanel";
 import { ChatMessageItem } from "@/components/team-chat/ChatMessageItem";
 import { ChatAvatar } from "@/components/team-chat/ChatAvatar";
 import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuSelect } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 type Channel = {
   id: string | number;
@@ -691,8 +692,8 @@ function ChatPanel({ active }: ChatPanelProps) {
           <option value="muted">Mute</option>
         </NeuSelect>
       </header>
-      {preferenceError && <div role="alert" className="mb-2 flex shrink-0 items-start gap-2 rounded-xl bg-[#f4e9d1] px-3 py-2 text-xs text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{preferenceError}</span></div>}
-      {notificationPreferenceError && <div role="alert" className="mb-2 flex shrink-0 items-start gap-2 rounded-xl bg-[#f4e9d1] px-3 py-2 text-xs text-[#783f26]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notificationPreferenceError}</span></div>}
+      {preferenceError && <NeuNotice severity="block" role="alert" className="mb-2 flex shrink-0 items-start gap-2 text-xs"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{preferenceError}</span></NeuNotice>}
+      {notificationPreferenceError && <NeuNotice severity="block" role="alert" className="mb-2 flex shrink-0 items-start gap-2 text-xs"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notificationPreferenceError}</span></NeuNotice>}
       <div className="flex min-h-0 w-full flex-1 gap-4">
         <NeuCard className={cn("flex w-full min-w-0 flex-col overflow-hidden p-3 md:w-[270px] md:shrink-0", mobileShowChannels ? "flex" : "hidden md:flex")}>
           <div className="mb-3 flex items-center justify-between gap-2 px-1">
@@ -749,7 +750,7 @@ function ChatPanel({ active }: ChatPanelProps) {
             </div> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
           </NeuCard>
         </div>
-       {error && channels.length > 0 && <div role="alert" className="absolute bottom-1 left-1 right-1 z-30 flex items-center gap-2 rounded-xl bg-[#f4e9d1] px-3 py-2 text-xs text-[#8b4141] shadow-[0_3px_10px_#aaa]"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}<button onClick={() => setError("")} aria-label="Dismiss" className="ml-auto rounded-full p-1 hover:bg-[#eadbbd]"><X className="h-3 w-3" /></button></div>}
+       {error && channels.length > 0 && <NeuNotice severity="block" role="alert" className="absolute bottom-1 left-1 right-1 z-30 flex items-center gap-2 text-xs"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}<button onClick={() => setError("")} aria-label="Dismiss" className="ml-auto rounded-full p-1 hover:bg-[#eadbbd]"><X className="h-3 w-3" /></button></NeuNotice>}
         {channelDialogOpen && <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#263b44]/35 p-4" onMouseDown={(event) => event.currentTarget === event.target && closeChannelDialog()}>
            <section role="dialog" aria-modal="true" aria-labelledby="new-channel-title" aria-describedby="new-channel-help" className="w-full max-w-sm rounded-2xl bg-[#e0e0e0] p-5 text-[#333] shadow-[-8px_-8px_18px_#fff,8px_8px_18px_#b8b8b8]">
             <div className="mb-4 flex items-start justify-between gap-3">

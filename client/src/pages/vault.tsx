@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PageInsights } from "@/components/PageInsights";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { AdminPageShell, Button, Input, Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, DialogContent, AlertDialogContent, SelectContent, useAdminToast, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin-neu/adapters";
 import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -282,20 +283,20 @@ export default function VaultPage() {
               )}
             </div>
 
-            <Card className="ff-vault-surface mb-6 border-red-300 bg-amber-50 dark:border-red-900/40 dark:bg-red-950/20">
-              <CardHeader className="pb-3">
+            <NeuNotice severity="ack" className="ff-vault-surface mb-6">
+              <div className="pb-3">
                 <CardTitle className="flex items-center text-red-800 dark:text-red-300 text-base">
                   <AlertTriangle className="h-4 w-4 mr-2" />
                   Security Notice
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
+              </div>
+              <div>
                 <p className="text-red-700 dark:text-red-400 text-sm">
                   This vault contains highly sensitive client information. All access is logged and monitored.
                   Values are encrypted with AES-256-GCM before storage — plaintext is never written to the database.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </NeuNotice>
 
             <Card className="ff-vault-surface mb-6">
               <CardHeader>

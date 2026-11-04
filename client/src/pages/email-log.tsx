@@ -11,6 +11,7 @@ import {
   NeuPageShell, NeuSelect, NeuStatCard, NeuTable, NeuTableBody, NeuTableCell,
   NeuTableHead, NeuTableHeader, NeuTableRow,
 } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { EmailLogCharts, type EmailLogSummary } from "@/components/client-email/email-log-charts";
 import "@/components/client-email/email-neu.css";
 import {
@@ -219,23 +220,23 @@ export function EmailLogPanel() {
           ["Failed", summaryQuery.data?.totals.failed ?? "—", "Send not accepted", "error"],
         ] as const).map(([label, value, detail, tone]) => <NeuStatCard key={label} label={label} value={<span className={tone === "success" ? "text-[#248f92]" : tone === "warning" ? "text-[#c77b3e]" : tone === "error" ? "text-[#ba554d]" : "text-[#3b8589]"}>{summaryQuery.isLoading ? <span className="inline-block h-8 w-16 animate-pulse rounded-lg bg-[#d0d0d0]" /> : value}</span>} detail={detail} className="min-h-32 p-4 [&_p.text-3xl]:text-2xl" />)}
       </div>
-      {summaryQuery.error && <div role="alert" data-testid="email-log-summary-error" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] px-4 py-3 text-xs text-[#a3483e] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]"><span>Summary charts and totals could not be loaded: {(summaryQuery.error as Error).message}</span><NeuButton className="min-h-9 px-3 text-xs" variant="accent" onClick={() => void summaryQuery.refetch()}>Retry summary</NeuButton></div>}
+      {summaryQuery.error && <NeuNotice severity="block" role="alert" data-testid="email-log-summary-error" className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>Summary charts and totals could not be loaded: {(summaryQuery.error as Error).message}</span><NeuButton className="min-h-9 px-3 text-xs" variant="accent" onClick={() => void summaryQuery.refetch()}>Retry summary</NeuButton></NeuNotice>}
       <EmailLogCharts data={summaryQuery.data} loading={summaryQuery.isLoading} error={summaryQuery.error ? (summaryQuery.error as Error).message : undefined} onRetry={() => void summaryQuery.refetch()} from={from} to={to} />
       {!integrationQuery.isLoading && integrationQuery.data?.webhookConfigured === false && (
-        <div data-testid="email-log-webhook-warning" role="status" className="flex items-start gap-3 rounded-2xl bg-[#e0e0e0] px-4 py-3 text-xs text-[#765f30] shadow-[inset_4px_4px_8px_#c7bca3,inset_-4px_-4px_8px_#fff9eb]">
+        <NeuNotice severity="ack" data-testid="email-log-webhook-warning" role="status" className="flex items-start gap-3 text-xs">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#bb8742]" />
           <span><strong>Delivery tracking is not configured.</strong> Email status updates may not appear until the delivery webhook is enabled.</span>
-        </div>
+        </NeuNotice>
       )}
 
       {requestedEmailId && (
-        <div data-testid="email-focus-notice" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] px-4 py-3 text-xs shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+        <NeuNotice severity={detailQuery.error ? "block" : "info"} data-testid="email-focus-notice" className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <span>{detailQuery.error ? `Email #${requestedEmailId} could not be loaded.` : detailQuery.isLoading ? `Loading email #${requestedEmailId}…` : `Email #${requestedEmailId} is expanded, including outside the current filters or page.`}</span>
           <div className="flex items-center gap-3">
             {detailQuery.error && <NeuButton className="min-h-9 px-3 text-xs" onClick={() => detailQuery.refetch()}>Retry</NeuButton>}
             <a href="/email-log" onClick={clearEmailFocus} data-testid="email-log-show-all" className="font-semibold text-[#087f8c] underline underline-offset-2">Show all email</a>
           </div>
-        </div>
+        </NeuNotice>
       )}
       <Card className="overflow-hidden rounded-2xl p-0">
         <div className="flex flex-wrap items-center gap-3 border-b border-[#c9cece] px-4 py-4">
@@ -279,19 +280,19 @@ export function EmailLogPanel() {
           </label>
         </div>
 
-        {actionMessage && <div role={actionTone === "success" ? "status" : "alert"} data-testid="email-log-action-message" data-tone={actionTone} className={`border-b px-3 py-2 text-xs ${actionTone === "warning" ? "border-[#b3954e] bg-[#fff4cf] text-[#614a12]" : actionTone === "error" ? "border-[#ad6a60] bg-[#f6e2df] text-[#812f25]" : "border-[#aaa] bg-[#e8f1eb] text-[#285536]"}`}><span className="flex items-start gap-2">{actionTone !== "success" && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}{actionMessage}</span></div>}
+        {actionMessage && <NeuNotice severity={actionTone === "error" ? "block" : actionTone === "warning" ? "ack" : "info"} role={actionTone === "success" ? "status" : "alert"} data-testid="email-log-action-message" data-tone={actionTone} className="text-xs"><span className="flex items-start gap-2">{actionTone !== "success" && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}{actionMessage}</span></NeuNotice>}
         <div className="min-h-[280px]">
           {loading ? (
             <div data-testid="email-log-loading" className="space-y-2 p-4" aria-label="Loading email log">
               {[0, 1, 2, 3].map(item => <div key={item} className="grid grid-cols-6 gap-3 border-b border-[#d1cec6] py-3"><div className="h-3 animate-pulse bg-[#d4d0c8]" /><div className="col-span-2 h-3 animate-pulse bg-[#e2dfd7]" /><div className="h-3 animate-pulse bg-[#d4d0c8]" /><div className="col-span-2 h-3 animate-pulse bg-[#e2dfd7]" /></div>)}
             </div>
           ) : listQuery.error ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 p-6 text-center" role="alert">
+            <NeuNotice severity="block" role="alert" className="flex min-h-[280px] flex-col items-center justify-center gap-2 text-center">
               <AlertTriangle className="h-7 w-7 text-[#a54135]" />
               <p className="text-sm font-bold text-[#333]">Email history could not be loaded</p>
               <p className="max-w-lg text-xs text-[#666]">{(listQuery.error as Error).message || "The service is temporarily unavailable."}</p>
               <NeuButton className="min-h-9 px-3 text-xs" onClick={() => listQuery.refetch()}>Retry</NeuButton>
-            </div>
+            </NeuNotice>
           ) : displayRows.length === 0 ? (
             <div data-testid="email-log-empty" className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-6 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><Mail className="h-5 w-5 text-[#168f9b]" /></div>
@@ -320,7 +321,7 @@ export function EmailLogPanel() {
                          <NeuTableCell className="px-3 py-3">{row.sentByName || (row.sentByUserId ? "Unknown sender" : "System")}</NeuTableCell>
                        </NeuTableRow>
                        {expanded && <tr data-testid="email-log-detail"><td colSpan={7} className="bg-[#e0e0e0] p-4">
-                        {detailQuery.isLoading ? <div className="h-20 animate-pulse rounded-xl bg-[#d2d2d2]" aria-label="Loading message detail" /> : detailQuery.error ? <div role="alert" className="flex items-center gap-2 rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#812f25] shadow-[inset_4px_4px_8px_#d1b6b2,inset_-4px_-4px_8px_#fff]">{(detailQuery.error as Error).message}<NeuButton className="min-h-9 px-3 text-xs" onClick={() => detailQuery.refetch()}>Retry</NeuButton></div> : detail ? (
+                         {detailQuery.isLoading ? <div className="h-20 animate-pulse rounded-xl bg-[#d2d2d2]" aria-label="Loading message detail" /> : detailQuery.error ? <NeuNotice severity="block" role="alert" className="flex items-center gap-2 text-xs">{(detailQuery.error as Error).message}<NeuButton className="min-h-9 px-3 text-xs" onClick={() => detailQuery.refetch()}>Retry</NeuButton></NeuNotice> : detail ? (
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,.8fr)]">
                              <NeuCard pressed className="p-4">
                               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#ccc] pb-2">
@@ -394,7 +395,7 @@ export function EmailLogPanel() {
               <p className="mt-3 text-[9px] font-bold uppercase tracking-wider text-[#7b8789]">Recipient</p>
               <p className="mt-1 break-all text-xs text-[#4d5c5e]">{addressList(resendTarget.toAddresses)}</p>
             </div>
-            {resend.error && <p role="alert" className="rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#a3483e] shadow-[inset_4px_4px_8px_#d1b6b2,inset_-4px_-4px_8px_#fff]">{(resend.error as Error).message}</p>}
+            {resend.error && <NeuNotice severity="block" role="alert" className="text-xs">{(resend.error as Error).message}</NeuNotice>}
           </div>}
           <DialogFooter className="border-t border-[#c9cece] px-5 py-3">
             <NeuButton className="min-h-10 px-4 text-xs" disabled={resend.isPending} onClick={() => setResendTarget(null)}>Cancel</NeuButton>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 interface TPFFormProps {
   formId: string;
@@ -139,7 +140,7 @@ export function TPFForm({ formId, viewId, className = '', title }: TPFFormProps)
           </div>
         )}
         {error && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <NeuNotice severity="block">
             <div className="flex items-start">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -161,7 +162,7 @@ export function TPFForm({ formId, viewId, className = '', title }: TPFFormProps)
                 </button>
               </div>
             </div>
-          </div>
+          </NeuNotice>
         )}
       </div>
     </div>

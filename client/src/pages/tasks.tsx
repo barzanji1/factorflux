@@ -15,6 +15,7 @@ import TopNav from "@/components/layout/top-nav";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -453,11 +454,11 @@ export default function Tasks() {
 
             <TasksOverview tasks={overviewTasks} isLoading={overviewLoading} isError={overviewError} onRetry={() => void refetchOverview()} />
             {isError ? (
-              <NeuCard role="alert" className="p-5 text-center">
+              <NeuNotice severity="block" role="alert" className="text-center">
                 <p className="font-semibold text-[#8f4f47]">Tasks could not be loaded</p>
                 <p className="mt-1 text-sm text-[#819092]">{tasksError instanceof Error ? tasksError.message : "Try again in a moment."}</p>
                 <NeuButton onClick={() => void refetch()} className="mt-4 min-h-10 px-4 text-xs">Retry loading</NeuButton>
-              </NeuCard>
+              </NeuNotice>
             ) : (
               <>
                 <NeuCard className="p-4 sm:p-5">

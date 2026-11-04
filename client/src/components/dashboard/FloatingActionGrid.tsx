@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { NeuButton, NeuCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import type { DashboardActionGrid } from "@shared/agent-dashboard";
 
 type Props = {
@@ -75,10 +76,10 @@ export function FloatingActionGrid({ data, isLoading, error, onRetry, canVisit, 
     return (
       <section className="ff-action-section" aria-labelledby="action-grid-title" data-testid="action-grid">
         <div className="ff-action-heading"><div><p className="ff-neu-eyebrow">Choose a direction</p><h2 id="action-grid-title" className="ff-neu-section-title">Your action grid</h2></div></div>
-        <div className="ff-action-error" role="alert">
+        <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-3">
           <div><strong>Action details could not be loaded.</strong><p>{error instanceof Error ? error.message : "Try again to reload your dashboard actions."}</p></div>
           <NeuButton variant="accent" onClick={onRetry}>Retry</NeuButton>
-        </div>
+        </NeuNotice>
       </section>
     );
   }

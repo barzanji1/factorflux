@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Area, AreaChart, Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { CylinderBar } from "@/components/dashboard/FinancialOverview";
 import { BROKER_CREDIT_GRADES, type BrokerFinancialSummary } from "@shared/broker-financial";
 
@@ -44,10 +45,10 @@ export function BrokerFinancialOverview({ brokerId }: { brokerId: number }) {
     <div className="mt-4 grid gap-4 lg:grid-cols-2">{Array.from({ length: 4 }, (_, index) =>
       <NeuCard pressed key={index} className="h-72 animate-pulse" />)}</div>
   </section>;
-  if (query.error || !query.data) return <NeuCard className="p-5" role="alert">
-    <p className="text-sm text-red-700">Unable to load broker financial summary.</p>
+  if (query.error || !query.data) return <NeuNotice severity="block" role="alert">
+    <p className="text-sm">Unable to load broker financial summary.</p>
     <NeuButton className="mt-3" onClick={() => void query.refetch()}>Retry</NeuButton>
-  </NeuCard>;
+  </NeuNotice>;
   const data = query.data;
   const report = (tab: string) => `/reports?tab=${tab}&brokerId=${brokerId}`;
   const monthly = data.months.map(row => ({ ...row, label: monthLabel(row.month) }));

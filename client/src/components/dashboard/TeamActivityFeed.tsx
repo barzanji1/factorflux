@@ -3,6 +3,7 @@ import type { InfiniteData, UseInfiniteQueryResult } from "@tanstack/react-query
 import { ArrowUpRight, ChevronDown, ChevronRight, CircleDot, FileText, ReceiptText, Settings2, WalletCards } from "lucide-react";
 import type { DashboardActivity, DashboardActivityPage, DashboardActivityGroup } from "@shared/agent-dashboard";
 import { NeuBadge, NeuButton, NeuCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 type FeedQuery = UseInfiniteQueryResult<InfiniteData<DashboardActivityPage>, Error>;
 
@@ -53,10 +54,10 @@ function ActivitySkeleton() {
 
 function ActivityError({ error, retry }: { error: unknown; retry: () => void }) {
   const message = error instanceof Error ? error.message : "This activity feed is temporarily unavailable.";
-  return <div className="ff-activity-error" role="alert">
+  return <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-3">
     <div><strong>Team activity could not be loaded</strong><p>{message}</p></div>
     <NeuButton variant="accent" onClick={retry} className="!min-h-9 !px-4">Retry</NeuButton>
-  </div>;
+  </NeuNotice>;
 }
 
 function EventDetails({ group }: { group: DashboardActivityGroup }) {
@@ -190,10 +191,10 @@ export function TeamActivityFeed({ query, isLoading, identityError, onRetry, onN
       <div className="ff-activity-summary-pill"><span>Most active</span><strong>{summary?.mostActive?.name ?? "—"}</strong><small>{summary?.mostActive ? `${summary.mostActive.count.toLocaleString()} actions` : "no activity yet"}</small></div>
       <div className="ff-activity-summary-pill"><span>Last action</span><strong>{latestTime ? lastAction : "—"}</strong><small>{latestTime ? "across the team" : "no activity yet"}</small></div>
     </div>
-    {query.isError && query.data && !query.isFetchNextPageError && <div className="ff-activity-stale" role="status">
+    {query.isError && query.data && !query.isFetchNextPageError && <NeuNotice severity="info" role="status" className="flex items-center justify-between gap-3">
       <span>Could not refresh the feed. Showing the last loaded activity.</span>
       <button type="button" onClick={onRetry}>Retry</button>
-    </div>}
+    </NeuNotice>}
 
     {groups.length ? <div className="ff-activity-timeline">
       {groups.map(group => <ActivityItem
@@ -213,10 +214,10 @@ export function TeamActivityFeed({ query, isLoading, identityError, onRetry, onN
       />)}
     </div> : <div className="ff-activity-empty"><span className="ff-activity-empty-mark"><CircleDot aria-hidden="true" /></span><strong>A quiet moment</strong><p>No recent team activity to show.</p></div>}
 
-    {loadMoreError && <div className="ff-activity-load-error" role="alert">
+    {loadMoreError && <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-3">
       <span>Could not load the next activity page.</span>
       <button type="button" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>Retry</button>
-    </div>}
+    </NeuNotice>}
     {query.hasNextPage && <div className="ff-activity-more">
       <NeuButton
         type="button"

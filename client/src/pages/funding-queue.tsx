@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Check, Download, FileText, Loader2, Search, X } from "lucide-react";
@@ -9,12 +10,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NeuTextarea as Textarea } from "@/styles/neu";
 import { LoadTypeBadge } from "@/components/load-type";
-import { FundingStatusBadge as FFBadge } from "@/components/funding/funding-status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import "@/components/funding/funding-neu.css";
-import { NeuButton, NeuPageShell, NeuTable, NeuTabs, NeuTab, NeuTabList } from "@/styles/neu/components";
+import { NeuBadge, NeuButton, NeuPageShell, NeuTable, NeuTabs, NeuTab, NeuTabList } from "@/styles/neu/components";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import { PageInsights } from "@/components/PageInsights";
 import { displayEntityName } from "@/lib/utils";
@@ -48,6 +48,7 @@ type QueueRow = {
 const money = (value: string | number) => `$${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "—";
 const statusLabel = (row: QueueRow) => row.displayStatus || row.status;
+const badgeStatusLabel = (row: QueueRow) => row.status.replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase());
 const SHEETS_REVIEW_STATUSES = ["submitted", "docs_pending", "under_review", "approved"];
 
 function SheetsPreflightAlerts({ invoiceId }: { invoiceId: number }) {
@@ -68,10 +69,10 @@ function SheetsPreflightAlerts({ invoiceId }: { invoiceId: number }) {
         : isError ? <p role="alert" className="text-sm text-red-700">Unable to check current risks.</p>
         : !data?.alerts.length ? <p className="text-sm text-slate-500">No current alerts.</p>
         : data.alerts.map((alert, index) => (
-          <div key={`${alert.code}-${index}`} className={`border-2 p-2 text-sm ${alert.severity === "block" ? "border-red-700 bg-red-50 text-red-900" : alert.severity === "ack" ? "border-amber-700 bg-amber-50 text-amber-900" : "border-gray-600 bg-white text-gray-800"}`}>
+          <NeuNotice key={`${alert.code}-${index}`} severity={alert.severity} className="text-sm">
             <strong>{alert.title}</strong> — {alert.message}{" "}
             {alert.link && <a href={alert.link} className="underline">View</a>}
-          </div>
+          </NeuNotice>
         ))}
     </div>
   );
@@ -268,9 +269,9 @@ export default function FundingQueue() {
     <TopNav title="Sheets" subtitle="Review and fund submitted invoices" group="Funding" neu />
      <NeuPageShell className="custom-scrollbar flex-1 overflow-auto"><div className="mx-auto w-full max-w-[1600px] space-y-5 p-5 md:p-8">
        <PageInsights entity="sheets" title="Funding queue activity" />
-      <Card role="region" className={`ff-card ff-sheets-surface border px-5 py-4 ${cutoffs.some((item) => item.imminent) ? "border-red-300 bg-red-50 text-red-900" : "border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-[hsl(var(--card))] dark:text-white"}`} aria-label="Funding cutoff times">
+      <NeuNotice role="region" severity={cutoffs.some((item) => item.imminent) ? "ack" : "info"} aria-label="Funding cutoff times">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em]">Funding cutoff</p><p className="mt-1 text-sm">ACH <strong>2:15 PM MST</strong> · Wire <strong>1:15 PM MST</strong> <span className="text-xs opacity-70">(Denver time, daylight changes handled)</span></p></div><div className="flex gap-3 text-xs font-semibold">{cutoffs.map((item) => <span key={item.label} className="ff-dashboard-card ff-sheets-surface px-3 py-2">{item.label}: {cutoffText(item.difference)}</span>)}</div></div>
-      </Card>
+      </NeuNotice>
        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Manager workspace</p><h1 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">Sheets</h1><p className="mt-1 text-sm text-slate-500">Actionable pending-review and approved invoices.</p></div><div className="flex gap-2"><Button variant="outline" onClick={exportCsv} disabled={exporting}><Download className="mr-2 h-4 w-4" />{exporting ? "Exporting…" : "Export CSV"}</Button>{selectedRows.length > 0 && <NeuButton variant="accent" className="funding-neu-accent" onClick={() => openFunding(selectedRows)}>Fund Selected ({selectedRows.length})</NeuButton>}</div></div>
       <NeuTabs value={tab} onValueChange={setTab} className="w-auto">
         <NeuTabList>
@@ -289,7 +290,57 @@ export default function FundingQueue() {
       </Card>
       <Card className="ff-card ff-table-container ff-sheets-surface overflow-hidden border border-slate-200 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
         {isLoading ? <div className="flex items-center justify-center gap-2 p-16 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Loading Sheets…</div> : isError ? <div className="p-16 text-center text-sm text-red-600">Unable to load Sheets. Check your filters and try again.</div> : !rows.length ? <div className="p-16 text-center"><FileText className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="font-semibold text-slate-700 dark:text-slate-200">No invoices match these filters</p><p className="mt-1 text-sm text-slate-500">New submissions will appear here when available.</p></div> :
-             <div className="overflow-x-auto"><NeuTable className="ff-data-table min-w-[1550px]"><thead><tr><th className="w-10 pl-5"><Checkbox aria-label="Select all ready approved invoices" checked={actionableRows.length > 0 && selectedRows.length === actionableRows.length} onCheckedChange={() => setSelected(selectedRows.length === actionableRows.length ? new Set() : new Set(actionableRows.map((row) => row.id)))} /></th><th>Carrier</th><th>Broker</th><th>Branch</th><th>Load#</th><th>Code</th><th>Amount $</th><th>Load Type</th><th>Payment Type</th><th>Bank Account</th><th>Driver</th><th>Rate Con</th><th>BOL</th><th>Lumper</th><th>Submitted by</th><th>Date</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <Fragment key={row.id}><tr className="cursor-pointer" onClick={() => setExpanded(expanded === row.id ? null : row.id)}><td className="pl-5" onClick={(event) => event.stopPropagation()}><Checkbox disabled={row.status !== "approved" || !row.documentPresence.readyToFund || !row.bankAccount?.isActive} aria-label={`Select ${row.invoiceNumber}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row)} /></td><td className="font-semibold">{row.carrierName || "—"}</td><td>{row.brokerName || "—"}</td><td>{row.branchName || "—"}</td><td className="font-mono font-semibold">{row.loadNumber || row.invoiceNumber}</td><td>{row.code || "—"}</td><td className="font-semibold">{money(row.amount)}</td><td><LoadTypeBadge value={row.loadType} /></td><td>{row.paymentType || "—"}</td><td>{row.bankAccount ? `${row.bankAccount.bankName} ••••${row.bankAccount.lastFour}` : <span className="text-red-600">Missing</span>}</td><td>{row.driverName || "—"}</td><td className={row.documentPresence.rateConfirmation ? "text-emerald-700" : "text-red-600"}>{row.documentPresence.rateConfirmation ? "✓" : "✕"}</td><td className={row.documentPresence.billOfLading ? "text-emerald-700" : "text-red-600"}>{row.documentPresence.billOfLading ? "✓" : "✕"}</td><td className={row.documentPresence.lumper ? "text-emerald-700" : "text-slate-400"}>{row.documentPresence.lumper ? "✓" : "—"}</td><td>{row.submittedByName || "—"}</td><td>{dateLabel(row.submittedAt)}</td><td onClick={(event) => event.stopPropagation()}><div className="flex flex-wrap items-center gap-1"><FFBadge status={row.status} size="sm" />{row.status === "approved" ? <Button size="sm" disabled={!row.documentPresence.readyToFund || !row.bankAccount?.isActive} onClick={() => openFunding([row])}>Fund</Button> : <Button size="sm" disabled={!row.documentPresence.rateConfirmation || !row.documentPresence.billOfLading} onClick={() => approve(row)}>Approve</Button>}<Button size="sm" variant="outline" onClick={() => setReasonModal({ id: row.id, action: "hold" })}>Hold</Button>{row.status !== "approved" && <Button size="sm" variant="destructive" aria-label={`Reject ${row.invoiceNumber}`} onClick={() => setReasonModal({ id: row.id, action: "reject" })}><X className="h-4 w-4" /></Button>}</div></td></tr>{expanded === row.id && <tr key={`${row.id}-detail`}><td colSpan={17} className="bg-slate-50 p-5 dark:bg-slate-950"><div className="ff-card ff-sheets-surface grid gap-5 p-4 lg:grid-cols-3"><div><p className="text-xs font-bold uppercase text-slate-500">Invoice details</p><p className="mt-2 text-sm">Invoice <strong>{row.invoiceNumber}</strong> · Load {row.loadNumber || "—"} · Code {row.code || "—"}</p><p className="text-sm">Payment: {row.paymentType || "—"} · Status: {statusLabel(row)}</p>{row.instructionsSubject && <p className="mt-3 text-sm font-semibold">{row.instructionsSubject}</p>}{row.instructionsDetails && <p className="whitespace-pre-wrap text-sm text-slate-600">{row.instructionsDetails}</p>}</div><div><p className="text-xs font-bold uppercase text-slate-500">Payout preview</p><dl className="mt-2 grid grid-cols-2 gap-2 text-sm"><dt>Gross</dt><dd className="text-right font-semibold">{money(row.payoutPreview.grossAmount)}</dd><dt>Advance ({row.payoutPreview.advanceRate}%)</dt><dd className="text-right">{money(row.payoutPreview.advanceAmount)}</dd><dt>Fee ({row.payoutPreview.feeRate}%)</dt><dd className="text-right">{money(row.payoutPreview.feeAmount)}</dd><dt>Reserve</dt><dd className="text-right">{money(row.payoutPreview.reserveAmount)}</dd><dt className="font-semibold">Net funding</dt><dd className="text-right font-semibold">{money(row.payoutPreview.netFundingAmount)}</dd></dl></div><div><p className="text-xs font-bold uppercase text-slate-500">Documents</p><div className="mt-2 space-y-2">{[{ label: "Rate Con", types: ["rate_confirmation"] }, { label: "BOL", types: ["bill_of_lading", "bol"] }, { label: "Lumper", types: ["lumper_receipt", "receipt"] }].map(({ label, types }) => { const doc = row.documents.find((item) => types.includes(item.type)); return <div key={label} className="ff-sheets-surface flex items-center justify-between border bg-white p-2 text-sm"><span className={doc ? "text-emerald-700" : "text-red-600"}>{doc ? "✓" : "✕"} {label}</span>{doc && <span className="flex gap-2"><a className="text-blue-700 hover:underline" href={doc.viewPath} target="_blank" rel="noreferrer">View</a><a className="text-blue-700 hover:underline" href={doc.downloadPath} target="_blank" rel="noreferrer">Download</a></span>}</div>; })}</div></div></div><div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${row.id}`)}>Open invoice</Button></div></td></tr>}</Fragment>)}</tbody></NeuTable></div>}
+              <div className="overflow-x-auto">
+                <NeuTable className="ff-data-table min-w-[1550px]">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pl-5"><Checkbox aria-label="Select all ready approved invoices" checked={actionableRows.length > 0 && selectedRows.length === actionableRows.length} onCheckedChange={() => setSelected(selectedRows.length === actionableRows.length ? new Set() : new Set(actionableRows.map((row) => row.id)))} /></th>
+                      <th>Carrier</th><th>Broker</th><th>Branch</th><th>Load#</th><th>Code</th><th>Amount $</th><th>Load Type</th><th>Payment Type</th><th>Bank Account</th><th>Driver</th><th>Rate Con</th><th>BOL</th><th>Lumper</th><th>Submitted by</th><th>Date</th>
+                      <th>Status</th><th className="w-[240px] min-w-[240px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => <Fragment key={row.id}>
+                      <tr className="cursor-pointer" onClick={() => setExpanded(expanded === row.id ? null : row.id)}>
+                        <td className="pl-5" onClick={(event) => event.stopPropagation()}><Checkbox disabled={row.status !== "approved" || !row.documentPresence.readyToFund || !row.bankAccount?.isActive} aria-label={`Select ${row.invoiceNumber}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row)} /></td>
+                        <td className="font-semibold">{row.carrierName || "—"}</td><td>{row.brokerName || "—"}</td><td>{row.branchName || "—"}</td>
+                        <td className="font-mono font-semibold">{row.loadNumber || row.invoiceNumber}</td><td>{row.code || "—"}</td><td className="font-semibold">{money(row.amount)}</td>
+                        <td><LoadTypeBadge value={row.loadType} /></td><td>{row.paymentType || "—"}</td>
+                        <td>{row.bankAccount ? `${row.bankAccount.bankName} ••••${row.bankAccount.lastFour}` : <span className="text-red-600">Missing</span>}</td>
+                        <td>{row.driverName || "—"}</td>
+                        <td className={row.documentPresence.rateConfirmation ? "text-emerald-700" : "text-red-600"}>{row.documentPresence.rateConfirmation ? "✓" : "✕"}</td>
+                        <td className={row.documentPresence.billOfLading ? "text-emerald-700" : "text-red-600"}>{row.documentPresence.billOfLading ? "✓" : "✕"}</td>
+                        <td className={row.documentPresence.lumper ? "text-emerald-700" : "text-slate-400"}>{row.documentPresence.lumper ? "✓" : "—"}</td>
+                        <td>{row.submittedByName || "—"}</td><td>{dateLabel(row.submittedAt)}</td>
+                        <td>
+                          <NeuBadge tone={row.status === "approved" ? "success" : row.status === "under_review" ? "accent" : "warning"} className="whitespace-nowrap">
+                            {badgeStatusLabel(row)}
+                          </NeuBadge>
+                        </td>
+                        <td className="w-[240px] min-w-[240px]" onClick={(event) => event.stopPropagation()}>
+                          <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
+                            {row.status === "approved"
+                              ? <NeuButton size="sm" className="!h-8 !min-h-8 !shrink-0 !whitespace-nowrap !px-2 !py-1 text-xs" disabled={!row.documentPresence.readyToFund || !row.bankAccount?.isActive} onClick={() => openFunding([row])}>Fund</NeuButton>
+                              : <NeuButton size="sm" className="!h-8 !min-h-8 !shrink-0 !whitespace-nowrap !px-2 !py-1 text-xs" disabled={!row.documentPresence.rateConfirmation || !row.documentPresence.billOfLading} onClick={() => approve(row)}>Approve</NeuButton>}
+                            <NeuButton size="sm" variant="outline" className="!h-8 !min-h-8 !shrink-0 !whitespace-nowrap !px-2 !py-1 text-xs" onClick={() => setReasonModal({ id: row.id, action: "hold" })}>Hold</NeuButton>
+                            {row.status !== "approved" && <NeuButton size="sm" variant="destructive" className="!h-8 !min-h-8 !w-8 !min-w-8 !shrink-0 !px-0 !py-0" aria-label={`Reject ${row.invoiceNumber}`} onClick={() => setReasonModal({ id: row.id, action: "reject" })}><X className="h-4 w-4" /></NeuButton>}
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded === row.id && <tr key={`${row.id}-detail`}>
+                        <td colSpan={18} className="bg-slate-50 p-5 dark:bg-slate-950">
+                          <div className="ff-card ff-sheets-surface grid gap-5 p-4 lg:grid-cols-3">
+                            <div><p className="text-xs font-bold uppercase text-slate-500">Invoice details</p><p className="mt-2 text-sm">Invoice <strong>{row.invoiceNumber}</strong> · Load {row.loadNumber || "—"} · Code {row.code || "—"}</p><p className="text-sm">Payment: {row.paymentType || "—"} · Status: {statusLabel(row)}</p>{row.instructionsSubject && <p className="mt-3 text-sm font-semibold">{row.instructionsSubject}</p>}{row.instructionsDetails && <p className="whitespace-pre-wrap text-sm text-slate-600">{row.instructionsDetails}</p>}</div>
+                            <div><p className="text-xs font-bold uppercase text-slate-500">Payout preview</p><dl className="mt-2 grid grid-cols-2 gap-2 text-sm"><dt>Gross</dt><dd className="text-right font-semibold">{money(row.payoutPreview.grossAmount)}</dd><dt>Advance ({row.payoutPreview.advanceRate}%)</dt><dd className="text-right">{money(row.payoutPreview.advanceAmount)}</dd><dt>Fee ({row.payoutPreview.feeRate}%)</dt><dd className="text-right">{money(row.payoutPreview.feeAmount)}</dd><dt>Reserve</dt><dd className="text-right">{money(row.payoutPreview.reserveAmount)}</dd><dt className="font-semibold">Net funding</dt><dd className="text-right font-semibold">{money(row.payoutPreview.netFundingAmount)}</dd></dl></div>
+                            <div><p className="text-xs font-bold uppercase text-slate-500">Documents</p><div className="mt-2 space-y-2">{[{ label: "Rate Con", types: ["rate_confirmation"] }, { label: "BOL", types: ["bill_of_lading", "bol"] }, { label: "Lumper", types: ["lumper_receipt", "receipt"] }].map(({ label, types }) => { const doc = row.documents.find((item) => types.includes(item.type)); return <div key={label} className="ff-sheets-surface flex items-center justify-between border bg-white p-2 text-sm"><span className={doc ? "text-emerald-700" : "text-red-600"}>{doc ? "✓" : "✕"} {label}</span>{doc && <span className="flex gap-2"><a className="text-blue-700 hover:underline" href={doc.viewPath} target="_blank" rel="noreferrer">View</a><a className="text-blue-700 hover:underline" href={doc.downloadPath} target="_blank" rel="noreferrer">Download</a></span>}</div>; })}</div></div>
+                          </div>
+                          <div className="mt-4 flex gap-2"><Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${row.id}`)}>Open invoice</Button></div>
+                        </td>
+                      </tr>}
+                    </Fragment>)}
+                  </tbody>
+                </NeuTable>
+              </div>}
       </Card>
       {expanded !== null && rows.some((row) => row.id === expanded) && (
         <section className="ff-card ff-sheets-surface border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[hsl(var(--card))]">

@@ -12,6 +12,7 @@ import DumpStatementTimeline from "@/components/brokers/dump-statement-timeline"
 import EntityNotes from "@/components/shared/EntityNotes";
 import { BrokerFinancialOverview } from "@/components/brokers/broker-financial-overview";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Award, AlertTriangle, Ban, Building2, CheckCircle2, Clock, Edit2, MapPin, MessageSquare, Plus, ReceiptText, RefreshCw, Trash2 } from "lucide-react";
 import type { Broker } from "@shared/schema";
@@ -108,10 +109,10 @@ function CreditScorePanel({ brokerId, canRecalculate }: { brokerId: number; canR
             <div className="h-20 animate-pulse rounded-xl bg-[#d1d1d1]" />
           </div>
         ) : isError ? (
-          <div role="alert" className="rounded-xl bg-[#e0e0e0] p-5 text-center text-xs text-[#667477] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
+          <NeuNotice severity="block" role="alert" className="text-center text-xs">
             Credit report unavailable.
             <NeuButton className="ml-3 min-h-8 px-3 text-[10px]" onClick={() => refetch()}>Retry</NeuButton>
-          </div>
+          </NeuNotice>
         ) : !report ? (
           <div className="rounded-xl bg-[#e0e0e0] p-5 text-center text-xs text-[#667477] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]">
             No credit score calculated yet.

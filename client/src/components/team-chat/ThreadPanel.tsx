@@ -8,6 +8,7 @@ import { ChatAvatar } from "./ChatAvatar";
 import { GifPicker } from "./GifPicker";
 import { gifMessage, type ChatGif } from "@shared/chat-gif";
 import { NeuButton } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 export type ChatMessage = {
   id: string | number;
@@ -215,7 +216,7 @@ export function ThreadPanel({
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {loading && !parent ? <div className="space-y-3" aria-label="Loading thread">{[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-[#d7d7d7]" />)}</div>
-          : error && !parent ? <div role="alert" className="p-3 text-xs text-[#8b3030]"><AlertCircle className="mb-2 h-4 w-4" />{error}<NeuButton onClick={() => setRequestVersion((version) => version + 1)} className="mt-2 !min-h-8 !rounded-lg !px-3 text-xs">Retry</NeuButton></div>
+          : error && !parent ? <NeuNotice severity="block" role="alert" className="text-xs"><AlertCircle className="mb-2 h-4 w-4" />{error}<NeuButton onClick={() => setRequestVersion((version) => version + 1)} className="mt-2 !min-h-8 !rounded-lg !px-3 text-xs">Retry</NeuButton></NeuNotice>
             : parent && <>
               <div className="mb-3 flex gap-1.5 border-b border-[#c9c7c0] pb-3" data-testid="chat-thread-parent">
                 <ChatAvatar name={parent.senderName} profileImageUrl={parent.senderProfileImageUrl} />

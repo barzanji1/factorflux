@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { queryClient } from "@/lib/queryClient";
 import { NeuButton } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { giphyApiUrl, safeGiphyGif, type ChatGif, type ProviderGif } from "@shared/chat-gif";
 
 export async function fetchGifs<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -73,7 +74,7 @@ export function GifPicker({ onSelect, disabled = false }: { onSelect: (gif: Chat
       <input id={searchId} type="search" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search GIPHY…" className="mb-2 w-full rounded-xl border-0 bg-[#e0e0e0] px-3 py-2 text-sm text-[#333] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]" />
       <div className="h-60 overflow-y-auto rounded-xl bg-[#e0e0e0] p-2 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" aria-busy={results.isFetching || posting}>
         {(results.isLoading || query !== search.trim()) ? <p role="status" className="p-2 text-xs">Loading GIFs…</p>
-          : results.isError ? <div role="alert" className="p-2 text-xs">{results.error.message}<NeuButton onClick={() => void results.refetch()} className="mt-2 !min-h-8 !rounded-lg !px-3 text-xs">Retry</NeuButton></div>
+          : results.isError ? <NeuNotice severity="block" role="alert" className="text-xs">{results.error.message}<NeuButton onClick={() => void results.refetch()} className="mt-2 !min-h-8 !rounded-lg !px-3 text-xs">Retry</NeuButton></NeuNotice>
             : !results.data?.length ? <p className="p-2 text-xs">No G-rated GIFs found.</p>
               : <div className="grid grid-cols-2 gap-2">{results.data.map(gif => <button key={gif.id} type="button" disabled={posting || disabled} onClick={() => void select(gif)} aria-label={`Send GIF: ${gif.title}`} data-testid={`chat-gif-${gif.id}`} className="rounded-lg p-1 transition-transform hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#27aab8] disabled:opacity-50">
                 <img src={gif.previewUrl} alt={gif.title} loading="lazy" referrerPolicy="no-referrer" className="h-24 w-full object-contain" />

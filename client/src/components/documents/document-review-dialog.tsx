@@ -42,6 +42,7 @@ import {
   NeuTableHeader, NeuTableRow, NeuBadge, NeuButton, NeuInput,
   NeuTab, NeuTabList, NeuTabPanel, NeuTabs,
 } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -571,14 +572,14 @@ export default function DocumentReviewDialog({
               <NeuTabPanel value="fields" unmountInactive className="flex-1 min-h-0 overflow-auto m-0 p-0">
                 {/* Low-confidence warning strip */}
                 {lowConfFields.length > 0 && (
-                  <div className="flex items-start gap-2 border-b border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
+                  <NeuNotice severity="ack" className="flex items-start gap-2 text-xs">
                     <ShieldAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     <span>
                       <strong>{lowConfFields.length} field{lowConfFields.length !== 1 ? "s" : ""}</strong> with low extraction confidence (below 60%) —&nbsp;
                       {lowConfFields.map(f => FIELD_LABELS[f.fieldName] ?? f.fieldName).join(", ")}.
                       Review and edit before confirming.
                     </span>
-                  </div>
+                  </NeuNotice>
                 )}
 
                 {candidatesLoading ? (
@@ -587,10 +588,10 @@ export default function DocumentReviewDialog({
                     Loading extracted fields…
                   </div>
                 ) : fieldCandidates.length === 0 ? (
-                  <div className="flex items-center gap-2 m-4 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                  <NeuNotice severity="ack" className="m-4 flex items-center gap-2 text-xs">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     No fields could be extracted — this may be a scanned image or handwritten document.
-                  </div>
+                  </NeuNotice>
                 ) : (
                   <NeuTable className="text-xs">
                     <NeuTableHeader className="sticky top-0 z-10">
@@ -629,10 +630,10 @@ export default function DocumentReviewDialog({
                 </div>
                 <div className="flex-1 overflow-auto p-4">
                   {!extraction?.extractedText ? (
-                    <div className="flex items-center gap-2 text-xs text-slate-400 italic">
+                    <NeuNotice severity="ack" className="flex items-center gap-2 text-xs italic">
                       <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
                       No text extracted — file may be a scanned image or extraction is still running.
-                    </div>
+                    </NeuNotice>
                   ) : (
                     <pre className="font-mono text-[11.5px] leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
                       {filteredText || <span className="text-slate-300 italic">No matches for "{textSearch}"</span>}
@@ -723,13 +724,13 @@ export default function DocumentReviewDialog({
 
                 {/* Classification info */}
                 {confidence !== null && confidence < 0.6 && (
-                  <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                  <NeuNotice severity="ack" className="flex items-start gap-2 text-xs">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     <span>
                       Classification confidence is below 60%. The auto-detected type may be incorrect.
                       Please verify and override if necessary before confirming.
                     </span>
-                  </div>
+                  </NeuNotice>
                 )}
               </NeuTabPanel>
             </NeuTabs>

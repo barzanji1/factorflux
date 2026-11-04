@@ -11,6 +11,7 @@ import { EmailBroadcast } from "@/components/client-email/email-broadcast";
 import { useAuth } from "@/hooks/useAuth";
 import { EmailLogPanel } from "@/pages/email-log";
 import "@/components/client-email/email-neu.css";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 export default function ClientEmailPage() {
   const [, navigate] = useLocation();
@@ -50,7 +51,7 @@ export default function ClientEmailPage() {
               </NeuTabList>
             </NeuTabs>
             {activeTab === "log" ? <EmailLogPanel /> : <>
-              <aside className="flex gap-2 rounded-xl bg-[#e0e0e0] p-3 text-[11px] leading-relaxed text-[#765f30] shadow-[inset_4px_4px_8px_#c6bca5,inset_-4px_-4px_8px_#fff9ec]"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><p><strong>Send-only:</strong> replies are monitored outside this app. There is no inbox reader. Review the recipient carefully before sending.</p></aside>
+              <NeuNotice severity="ack" className="flex gap-2 text-[11px] leading-relaxed"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><p><strong>Send-only:</strong> replies are monitored outside this app. There is no inbox reader. Review the recipient carefully before sending.</p></NeuNotice>
               {!permissionsLoaded && user?.role !== "admin" ? <NeuCard pressed className="h-20 animate-pulse" />
                 : !canSend ? <NeuCard pressed className="p-4 text-xs text-[#526968]">Sending requires the Client Email permission. Outbound history remains available in the Log tab.</NeuCard>
                   : <>{user?.role === "admin" && <EmailBroadcast />}
@@ -58,7 +59,7 @@ export default function ClientEmailPage() {
                       <div className="flex items-center justify-between border-b border-[#c9cece] px-4 py-3"><div><h2 className="text-sm font-bold text-[#344244]">Recent communication</h2><p className="text-[10px] text-[#747f81]">Select a client to inspect its log</p></div><NeuBadge tone="accent">Client history</NeuBadge></div>
                       <div className="p-3">
                         {isLoading ? <div className="grid gap-2 sm:grid-cols-2"><NeuCard pressed className="h-16 animate-pulse" /><NeuCard pressed className="h-16 animate-pulse" /></div>
-                          : error ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#8d433a] shadow-[inset_4px_4px_8px_#d1b6b2,inset_-4px_-4px_8px_#fff]"><span>{(error as Error).message}</span><NeuButton className="min-h-8 px-3 text-xs" onClick={() => void refetch()}>Retry</NeuButton></div>
+                          : error ? <NeuNotice severity="block" role="alert" className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{(error as Error).message}</span><NeuButton className="min-h-8 px-3 text-xs" onClick={() => void refetch()}>Retry</NeuButton></NeuNotice>
                             : clients.length === 0 ? <div className="rounded-xl bg-[#e0e0e0] px-4 py-8 text-center text-xs text-[#657977] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">{user?.role === "employee" ? <><p className="font-semibold text-[#405b5c]">No clients assigned to you</p><p className="mt-1">Ask an administrator to assign a client before sending email.</p></> : "No clients available for email."}</div>
                               : <div className="space-y-3"><label className="block text-[10px] font-bold uppercase tracking-wider text-[#71817e]" htmlFor="email-history-client">Client history</label><NeuSelect id="email-history-client" value={selectedId ?? ""} onChange={(event) => setSelectedId(event.target.value ? Number(event.target.value) : null)} className="max-w-md text-xs"><option value="">Choose a client…</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name} · {client.email || "No profile email"}</option>)}</NeuSelect>
                                 {selectedClient && <ClientEmailLog clientId={selectedClient.id} />}

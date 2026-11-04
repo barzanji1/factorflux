@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { buildTaskStats, type TaskAnalyticsRow } from "@shared/task-analytics";
 
 function TaskCylinder({ x = 0, y = 0, width = 0, height = 0, fill = "#27aab8" }: { x?: number; y?: number; width?: number; height?: number; fill?: string }) {
@@ -28,10 +29,10 @@ export function TasksOverview({ tasks, isLoading, isError, onRetry }: {
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">{Array.from({ length: 5 }, (_, index) => <NeuCard key={index} className="h-28 animate-pulse" />)}</div>
     <div className="grid gap-5 lg:grid-cols-2"><NeuCard pressed className="h-80 animate-pulse" /><NeuCard pressed className="h-80 animate-pulse" /></div>
   </section>;
-  if (isError) return <NeuCard role="alert" className="p-5">
-    <p className="text-sm text-red-700">Task statistics could not be loaded.</p>
+  if (isError) return <NeuNotice severity="block" role="alert">
+    <p className="text-sm">Task statistics could not be loaded.</p>
     <NeuButton className="mt-3" onClick={onRetry}>Retry</NeuButton>
-  </NeuCard>;
+  </NeuNotice>;
   const stats = buildTaskStats(tasks);
   return <section aria-label="Task statistics" className="space-y-5">
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">

@@ -38,6 +38,7 @@ import { Separator } from "@/components/ui/separator";
 import "@/components/funding/funding-neu.css";
 import { FundingStatCard } from "@/components/funding/funding-stat-card";
 import { NeuPageShell } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { FundingBadge } from "@/components/funding/funding-badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -330,7 +331,7 @@ export default function Payouts() {
 
             {/* Rates info bar */}
             {settings && (
-              <div className="ff-payments-surface flex flex-wrap items-center gap-4 border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/20 px-4 py-3 text-sm">
+              <NeuNotice severity="info" className="flex flex-wrap items-center gap-4 text-sm">
                 <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
                 <span className="text-blue-700 dark:text-blue-300">
                   Current rates — Advance: <strong>{settings.advanceRate}%</strong> · Fee: <strong>{settings.feeRate}%</strong> · Reserve: <strong>{(100 - Number(settings.advanceRate)).toFixed(2)}%</strong>
@@ -338,7 +339,7 @@ export default function Payouts() {
                 <span className="text-blue-500 dark:text-blue-400 text-xs ml-auto">
                   On a $10,000 invoice: carrier receives {fmt((10000 * Number(settings.advanceRate)) / 100 - (10000 * Number(settings.feeRate)) / 100)} net, {fmt((10000 * (100 - Number(settings.advanceRate))) / 100)} in reserve
                 </span>
-              </div>
+              </NeuNotice>
             )}
 
             {/* Payouts table */}

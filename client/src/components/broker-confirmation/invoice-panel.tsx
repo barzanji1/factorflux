@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { confirmationRequest } from "./api";
 import { NeuButton, NeuCard, NeuSelect } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { ConfirmationStatusBadge, type ConfirmationStatus } from "./confirmation-status";
 import { AlertTriangle, CheckCircle2, Clock3, Mail, RefreshCw, UserRound } from "lucide-react";
 
@@ -56,9 +57,9 @@ export default function BrokerConfirmationPanel({ invoiceId, isManager }: { invo
         </NeuButton>
       </div>
       {!query.data ? (
-        <div className="p-4 text-sm text-[#8a3028]" role="alert">{query.error?.message || "Broker confirmation is unavailable."}
+        <NeuNotice severity="block" className="text-sm">{query.error?.message || "Broker confirmation is unavailable."}
           <NeuButton className="ml-2 min-h-8 px-3 py-1 text-xs" onClick={() => query.refetch()}>Retry</NeuButton>
-        </div>
+        </NeuNotice>
       ) : (
         <div className="grid gap-5 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
           <div className="space-y-4">
@@ -84,12 +85,12 @@ export default function BrokerConfirmationPanel({ invoiceId, isManager }: { invo
                 </NeuSelect>
                 </label>
                 <NeuButton data-testid="confirmation-assign" className="min-h-9 px-3 py-1.5 text-xs" disabled={assign.isPending || agents.isLoading || !agents.data} onClick={() => assign.mutate()}>{assign.isPending ? "Saving…" : "Assign"}</NeuButton>
-                {agents.error && <span className="text-xs text-red-700" role="alert">{(agents.error as Error).message}</span>}
+                {agents.error && <NeuNotice severity="block" className="text-xs">{(agents.error as Error).message}</NeuNotice>}
               </div>
             )}
             <div className="border-t border-[#aaa] pt-3">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-[#555]"><UserRound className="h-3.5 w-3.5" />Record phone confirmation</p>
-              {query.data.deliveryNotice && <p data-testid="confirmation-delivery-notice" role="status" className="mb-2 border border-[#b27b18] bg-[#fff3cd] px-2 py-1.5 text-xs text-[#684600]">{query.data.deliveryNotice}</p>}
+              {query.data.deliveryNotice && <NeuNotice severity="ack" data-testid="confirmation-delivery-notice" role="status" className="mb-2 text-xs">{query.data.deliveryNotice}</NeuNotice>}
                 <textarea data-testid="confirmation-notes" value={notes} onChange={e => setNotes(e.target.value)} minLength={3} maxLength={2000} rows={3} placeholder="Who confirmed receipt, when, and any relevant details…" className="ff-neu-textarea w-full resize-y p-3 text-sm outline-none focus:ring-2 focus:ring-[#27aab8]/40" />
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] text-[#666]">{notes.trim().length}/2000 · minimum 3 characters</span>
@@ -99,7 +100,7 @@ export default function BrokerConfirmationPanel({ invoiceId, isManager }: { invo
                 </div>
               </div>
             </div>
-            {error && <p role="alert" data-testid="confirmation-action-error" className="flex items-start gap-2 border border-[#a64b40] bg-[#f9e1dd] p-2 text-xs text-[#8a3028]"><AlertTriangle className="h-4 w-4 shrink-0" />{error.message}</p>}
+            {error && <NeuNotice severity="block" role="alert" data-testid="confirmation-action-error" className="flex items-start gap-2 text-xs"><AlertTriangle className="h-4 w-4 shrink-0" />{error.message}</NeuNotice>}
           </div>
           <div className="border-l-0 border-[#aaa] lg:border-l lg:pl-5">
             <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#555]"><Clock3 className="h-3.5 w-3.5" />Audit history</h3>

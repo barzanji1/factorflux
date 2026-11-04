@@ -92,3 +92,31 @@ mtime_ms = 1793806935148
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/2f71fd83-2ad3-4d7c-a33d-34e7dbfac04c/1c99c403-57a2-48ad-8bd5-4a1140d4df74"
 storage_version_token = "1793806936755461"
 content_type = "text/html"
+
+[[outputs]]
+id = "LeylTmYR59ZmYBDqHocPQ"
+uri = "file://generated-artifacts/neu-notices/changes.html"
+type = "html"
+title = "Neumorphic alerts — full diff"
+description = "Complete file-by-file patch, touched-file list, and verification results for the shared notice styling."
+logical_id = "54990c3e-8445-446e-8d6f-f3608149bfd0"
+content_hash = "sha256:ae70edd4d8753e52f089dce6b956c4ee55bc5a789194c81c93281ffb6762f7af"
+size = 272935
+mtime_ms = 1793808969860
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/54990c3e-8445-446e-8d6f-f3608149bfd0/da748f0c-9897-43c8-b46d-79c05c377438"
+storage_version_token = "1793808979112066"
+content_type = "text/html"
+
+[[outputs]]
+id = "xVL3O1DznmckSG8eu2F-L"
+uri = "file://generated-artifacts/sheets-actions/changes.html"
+type = "html"
+title = "Sheets action layout — diff"
+description = "Request-specific layout diff, changed files, browser measurements, and first-row diagnosis."
+logical_id = "06905c77-0003-4a3b-8ddc-ae397fecee38"
+content_hash = "sha256:2b751b8179621444a8f6f3d30fcbdad275afb83383d5193e73c6204072bd71b3"
+size = 20564
+mtime_ms = 1793809312602
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/06905c77-0003-4a3b-8ddc-ae397fecee38/a53c017c-1572-4048-bc15-5dec1ef31530"
+storage_version_token = "1793809326319658"
+content_type = "text/html"

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { ArrowDownRight, ArrowUpRight, CheckCircle2, CircleDollarSign, Truck } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import AccessDenied from "@/pages/access-denied";
+import { NeuNotice } from "@/components/shared/NeuNotice";
+import { NeuTextarea } from "@/styles/neu";
 import {
   NeuBadge,
   NeuButton,
@@ -229,6 +231,21 @@ function PreviewContent() {
           <p className="mt-3 text-xs text-[#888888]">Keyboard: arrows move between tabs; Home and End jump to the first and last tabs.</p>
         </section>
 
+        <section aria-label="Notice severity samples" className="my-6 space-y-3">
+          <h2 className="text-lg font-bold text-[#333]">System notices</h2>
+          <NeuNotice severity="info" title="Information — authority unknown" data-testid="notice-sample-info">
+            <p>Confirm authority details before continuing.</p>
+          </NeuNotice>
+          <NeuNotice severity="ack" title="Acknowledgement required — open chargeback" data-testid="notice-sample-ack">
+            <p>Review the record and acknowledge this notice.</p>
+            <label className="mt-3 flex items-center gap-2"><input type="checkbox" />I have reviewed this alert</label>
+            <label className="mt-3 block">Reason (optional)<NeuTextarea aria-label="Sample acknowledgement reason" className="mt-2" /></label>
+          </NeuNotice>
+          <NeuNotice severity="block" title="Block — possible duplicate" data-testid="notice-sample-block">
+            <p>A matching invoice requires review.</p>
+            <a href="/invoices">View invoice ledger</a>
+          </NeuNotice>
+        </section>
         <footer className="mt-12 flex flex-col gap-4 border-t border-[#c9c9c9] py-6 text-xs text-[#888888] sm:flex-row sm:items-center sm:justify-between">
           <span>FactorFlux · neumorphic library review</span>
           <span>Demonstration only. No live operations or API mutations.</span>

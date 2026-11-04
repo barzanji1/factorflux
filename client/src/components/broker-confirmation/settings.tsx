@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button, Card, Input } from "@/components/admin-neu/adapters";
 import { AlertCircle, Settings2 } from "lucide-react";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 interface Settings { maxReminders: number; reminderDays: [number, number, number]; publicBaseUrl: string; chargebackWarningDays: number; dumpStatementIntervalDays: number }
 export default function BrokerConfirmationSettings() {
@@ -35,7 +36,7 @@ export default function BrokerConfirmationSettings() {
   return <Card data-testid="confirmation-settings" className="rounded-sm border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f4f4f4]">
     <div className="flex items-center gap-2 border-b-2 border-[#808080] bg-[#d4d0c8] px-4 py-3"><Settings2 className="h-4 w-4 text-[#087f8c]" /><h3 className="font-bold">Broker receipt follow-up</h3></div>
     <div className="space-y-4 p-4">
-      {query.error && <div role="alert" className="flex items-center gap-2 bg-[#f9e1dd] p-2 text-sm text-[#8a3028]"><AlertCircle className="h-4 w-4" />{(query.error as Error).message}<Button size="sm" variant="outline" onClick={() => query.refetch()}>Retry</Button></div>}
+      {query.error && <NeuNotice severity="block" role="alert" className="flex items-center gap-2 text-sm"><AlertCircle className="h-4 w-4" />{(query.error as Error).message}<Button size="sm" variant="outline" onClick={() => query.refetch()}>Retry</Button></NeuNotice>}
       {query.data && <>
         <p className="text-xs text-[#555]">Automatic collections now use VP at +48/+96 hours, followed by RPS at days 20/35/40 after agent verification. Manage the global switch and dry-run mode in <a className="underline" href="/follow-up">Follow-up → VP / RPS</a>. The public URL below is still used by receipt links. Legacy reminder values are retained for history and do not run a second schedule.</p>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -71,7 +72,7 @@ export default function BrokerConfirmationSettings() {
           <p className="text-xs text-[#555]">Default: 10 days. The daily aging job evaluates each unpaid dump invoice’s funding-date milestones. When statements are due, all open dump invoices for a broker are grouped into one PDF; if several invoices become due together, the broker receives one email. Preview does not send live broker emails.</p>
         </div>
         {mutation.error && <p role="alert" className="text-sm text-red-700">{(mutation.error as Error).message}</p>}
-        {mutation.isSuccess && <p role="status" className="text-sm text-[#087f8c]">Settings saved.</p>}
+        {mutation.isSuccess && <NeuNotice severity="info" role="status" className="text-sm">Settings saved.</NeuNotice>}
         <div className="flex justify-end"><Button data-testid="confirmation-settings-save" primary disabled={!valid || mutation.isPending} onClick={() => mutation.mutate({ maxReminders, reminderDays: days, publicBaseUrl: publicBaseUrl.trim(), chargebackWarningDays, dumpStatementIntervalDays })}>{mutation.isPending ? "Saving…" : "Save factoring settings"}</Button></div>
       </>}
     </div>

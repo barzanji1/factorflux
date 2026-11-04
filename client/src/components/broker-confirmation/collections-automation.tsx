@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { CollectionRunFailure, runBrokerCollections } from "@/lib/brokerCollections";
 import { RecoveryBadge, RecoveryButton as Button, RecoveryCard as Card, RecoveryInput as Input, RecoverySelect as Select, RecoveryDialogContent as DialogContent, RecoveryTable } from "@/components/recovery/recovery-controls";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import type { CollectionRow as QueueRow, CollectionEvent, CollectionQueue as QueueResponse,
   CollectionDetail as DetailResponse, CollectionSettings as Settings, CollectionRunResult } from "@shared/broker-collections";
 
@@ -131,10 +132,10 @@ export default function CollectionsAutomation() {
           <Button size="sm" variant="outline" className="ml-auto h-7 px-2" onClick={() => { queue.refetch(); settings.refetch(); }}><RefreshCw className="mr-1 h-3 w-3" />Refresh</Button>
         </div>
 
-        {currentSettings?.liveEmailsBlocked && <div role="alert" data-testid="collections-preview-warning" className="border-b border-[#c9c9c9] bg-[#f0e6d3] px-3 py-3 text-xs text-[#7a291d]">
+        {currentSettings?.liveEmailsBlocked && <NeuNotice severity="block" role="alert" data-testid="collections-preview-warning" className="text-xs">
           <strong>{currentSettings.liveEmailNotice}</strong>
           <p className="mt-1">Saving LIVE does not bypass this safeguard. Dry-run tests work here; a real email test must run in the published production app using a broker email address you control.</p>
-        </div>}
+        </NeuNotice>}
         {currentSettings && <div className="grid gap-3 border-b border-[#c9c9c9] p-3 md:grid-cols-[1fr_auto] md:items-center">
           <div className="flex items-start gap-2 text-xs text-[#45433e]">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#8b5a00]" />
@@ -159,8 +160,7 @@ export default function CollectionsAutomation() {
           </div>}
         </div>}
 
-        {runResult && <div role={runResult.failed ? "alert" : "status"} data-testid="collections-run-result"
-          className={`rounded-xl px-3 py-3 text-xs ${runResult.failed ? "bg-[#f0dfdc] text-[#8b1d16] shadow-[inset_4px_4px_8px_#c8aaa7,inset_-4px_-4px_8px_#fff]" : "bg-[#e0e0e0] text-[#333] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]"}`}>
+        {runResult && <NeuNotice severity={runResult.failed ? "block" : "info"} role={runResult.failed ? "alert" : "status"} data-testid="collections-run-result" className="text-xs">
           <div className="flex items-start justify-between gap-2"><strong>{runResult.message}</strong><Button variant="ghost" size="icon" aria-label="Dismiss run result" onClick={() => setRunResult(null)}><X className="h-3.5 w-3.5" /></Button></div>
           <p className="mt-1">{runResult.checked} checked · {runResult.processed} successful actions · {runResult.failed} failed. “Accepted” means accepted by the email provider, not confirmed delivered.</p>
           {runResult.errors.length > 0 && <ul className="mt-2 max-h-56 list-disc space-y-2 overflow-y-auto pl-4">{runResult.errors.map((error, i) => <li key={`${error.invoiceId}-${i}`}>
@@ -168,8 +168,8 @@ export default function CollectionsAutomation() {
             {error.outcome === "unconfirmed" && <span> Delivery may have been accepted. Resume the existing workflow to retry safely; do not start a new email.</span>}
             <Button variant="link" size="sm" className="ml-2 h-auto p-0 align-baseline" onClick={() => setSelectedId(error.invoiceId)}>View audit</Button>
           </li>)}</ul>}
-        </div>}
-        {errorMessage && <div role="alert" className="flex items-center justify-between gap-2 rounded-xl bg-[#f1e7d1] px-3 py-2 text-xs text-[#634400] shadow-[inset_4px_4px_8px_#cbbda3,inset_-4px_-4px_8px_#fff]"><span>{errorMessage}</span><Button variant="ghost" size="icon" aria-label="Dismiss notice" onClick={() => setErrorMessage("")}><X className="h-3.5 w-3.5" /></Button></div>}
+        </NeuNotice>}
+        {errorMessage && <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-2 text-xs"><span>{errorMessage}</span><Button variant="ghost" size="icon" aria-label="Dismiss notice" onClick={() => setErrorMessage("")}><X className="h-3.5 w-3.5" /></Button></NeuNotice>}
         <div className="flex flex-col gap-3 border-b border-[#c9c9c9] p-3 md:flex-row md:items-center">
           <div className="flex flex-wrap gap-1" role="group" aria-label="Filter collection phase">
             {phases.map(item => <Button key={item.value} size="sm" variant={phase === item.value ? "accent" : "outline"} onClick={() => { setPhase(item.value); setPage(1); }} className="h-8 px-2 text-[11px] font-bold">{item.label}</Button>)}
@@ -182,7 +182,7 @@ export default function CollectionsAutomation() {
         </div>
 
         {queue.isLoading ? <div className="space-y-2 p-4" aria-label="Loading collection queue">{[0, 1, 2, 3].map(n => <div key={n} className="h-16 animate-pulse rounded-xl bg-[#d2d2d2]" />)}</div>
-          : queue.error ? <div role="alert" className="p-5 text-sm text-[#8b1d16]"><AlertCircle className="mr-1 inline h-4 w-4" />{(queue.error as Error).message}<Button className="ml-2 h-7" size="sm" onClick={() => queue.refetch()}>Retry</Button></div>
+          : queue.error ? <NeuNotice severity="block" role="alert" className="text-sm"><AlertCircle className="mr-1 inline h-4 w-4" />{(queue.error as Error).message}<Button className="ml-2 h-7" size="sm" onClick={() => queue.refetch()}>Retry</Button></NeuNotice>
           : !rows.length ? <div className="p-9 text-center"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#e0e0e0] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]"><Clock3 className="h-5 w-5 text-[#168d99]" /></div><p className="text-sm font-bold text-[#333]">No collections in this view</p><p className="mt-1 text-xs text-[#666]">Try another phase or search term. No records have been added here.</p></div>
           : <div className="overflow-x-auto">
             <RecoveryTable className="w-full min-w-[1040px] border-collapse text-left text-xs">
@@ -212,7 +212,7 @@ export default function CollectionsAutomation() {
         <DialogContent className="max-h-[88vh] overflow-y-auto rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] sm:max-w-3xl">
           <DialogHeader><DialogTitle>Collection audit · {detail.data?.row.invoiceNumber ?? `Invoice ${selectedId ?? ""}`}</DialogTitle></DialogHeader>
           {detail.isLoading || (!detail.data && !detail.error) ? <div className="space-y-2 py-3">{[0, 1, 2].map(n => <div key={n} className="h-12 animate-pulse bg-[#e5e2da]" />)}</div>
-            : detail.error ? <div role="alert" className="rounded-xl bg-[#f0dfdc] px-3 py-3 text-sm text-[#a3483e] shadow-[inset_4px_4px_8px_#c8aaa7,inset_-4px_-4px_8px_#fff]">{(detail.error as Error).message}<Button variant="ghost" className="ml-2" size="sm" onClick={() => detail.refetch()}>Retry</Button></div>
+            : detail.error ? <NeuNotice severity="block" role="alert" className="text-sm">{(detail.error as Error).message}<Button variant="ghost" className="ml-2" size="sm" onClick={() => detail.refetch()}>Retry</Button></NeuNotice>
             : <div className="space-y-3">
                <div className="rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#444] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><strong>{detail.data?.row.broker || "Broker not listed"}</strong> · {phaseLabel(detail.data!.row)} · {detail.data?.row.mode === "dry_run" ? "SIMULATED (not sent)" : "LIVE"}<div className="mt-1">VP confirmed: {dateLabel(detail.data?.row.vpConfirmedAt ?? null)} · Workflow paid: {dateLabel(detail.data?.row.paidAt ?? null)}</div></div>
               {!detail.data?.events.length ? <p className="py-4 text-center text-xs text-[#666]">No audit events recorded.</p>
@@ -232,7 +232,7 @@ export default function CollectionsAutomation() {
           <DialogHeader><DialogTitle>{pending?.kind === "global-live" ? "Enable live broker automation?" : pending?.action === "paid" ? "Mark collection workflow paid?" : pending?.action === "stop" ? "Stop this collection workflow?" : "Start this invoice live?"}</DialogTitle></DialogHeader>
           <div className="space-y-3 text-sm text-[#3e3b35]">
             {pending?.kind === "global-live" && <p>This enables real automated broker emails for new enrollment. Global mode applies to new enrollment only and does not convert existing simulated invoices to live. Dry-run bell notices are logged only; live mode may create real notifications.</p>}
-            {currentSettings?.liveEmailsBlocked && (pending?.kind === "global-live" || (pending?.kind === "invoice" && pending.action === "start_live")) && <p role="alert" className="font-bold text-[#8b1d16]">{currentSettings.liveEmailNotice}</p>}
+            {currentSettings?.liveEmailsBlocked && (pending?.kind === "global-live" || (pending?.kind === "invoice" && pending.action === "start_live")) && <NeuNotice severity="block" role="alert">{currentSettings.liveEmailNotice}</NeuNotice>}
             {pending?.kind === "invoice" && pending.action === "start_live" && <p>This explicitly resets this selected invoice from simulation into live scheduling. It may send real broker emails and create real escalation notices. Other simulated invoices remain simulated.</p>}
             {pending?.kind === "invoice" && pending.action === "paid" && <p>This marks the COLLECTION WORKFLOW paid and stops RPS reminders. It does not reconcile cash, change invoice financial status, or update the financial ledger.</p>}
             {pending?.kind === "invoice" && pending.action === "stop" && <p>This permanently stops automation for this invoice. This action is irreversible. Manual broker contact remains available outside this workflow.</p>}
@@ -240,7 +240,7 @@ export default function CollectionsAutomation() {
           </div>
         </DialogContent>
       </Dialog>
-      {settings.isError && <p role="alert" className="text-xs text-[#8b1d16]">Global settings unavailable: {(settings.error as Error).message} <Button variant="link" size="sm" className="h-auto p-0 underline" onClick={() => settings.refetch()}>Retry</Button></p>}
+      {settings.isError && <NeuNotice severity="block" role="alert" className="text-xs">Global settings unavailable: {(settings.error as Error).message} <Button variant="link" size="sm" className="h-auto p-0 underline" onClick={() => settings.refetch()}>Retry</Button></NeuNotice>}
     </section>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NeuTextarea as Textarea } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -900,15 +901,13 @@ export default function Admin() {
                 </Card>
 
                 {/* Info card */}
-                <Card className="rounded-[20px] border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20">
-                  <CardContent className="p-4 flex gap-3">
+                <NeuNotice severity="ack" className="flex gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-amber-700 dark:text-amber-300">
                       <p className="font-semibold mb-1">Rate Change Notice</p>
                       <p>Changing rates only affects new payout records created after this change. All existing payouts retain their original rate snapshot for accurate record-keeping.</p>
                     </div>
-                  </CardContent>
-                </Card>
+                </NeuNotice>
 
                 <Card className="rounded-[24px] border border-[hsl(var(--border))]">
                   <CardHeader className="border-b border-slate-100 dark:border-slate-800">
@@ -1170,10 +1169,10 @@ export default function Admin() {
                   </CardContent>
                 </Card>
 
-                <div className="ff-admin-surface border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 px-4 py-3 flex items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
+                <NeuNotice severity="info" className="flex items-center gap-3 text-sm">
                   <Globe className="h-4 w-4 flex-shrink-0" />
                   <span>The carrier portal is accessible at <span className="font-mono font-semibold">/portal</span> — share this link with carriers to let them self-register.</span>
-                </div>
+                </NeuNotice>
               </div>
             )}
 
@@ -1184,7 +1183,7 @@ export default function Admin() {
               <div className="space-y-4">
                 {/* Live Now Banner */}
                 {ttLive.length > 0 && (
-                  <div className="ff-admin-surface flex flex-wrap items-center gap-3 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-3">
+                  <NeuNotice severity="info" className="flex flex-wrap items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500">
                       <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
                     </div>
@@ -1196,7 +1195,7 @@ export default function Admin() {
                         {a.firstName} {a.lastName} — {a.durationHours.toFixed(1)} h
                       </Badge>
                     ))}
-                  </div>
+                  </NeuNotice>
                 )}
 
                 <Card className="ff-admin-surface border border-[hsl(var(--border))]">
@@ -1389,10 +1388,10 @@ export default function Admin() {
                   {auditLoading ? (
                     <SkeletonRows rows={8} cols={4} />
                   ) : auditError ? (
-                    <div role="alert" className="flex items-center justify-between gap-3 p-6 text-sm text-red-700">
+                    <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-3 text-sm">
                       <span>{auditErrorValue instanceof Error ? auditErrorValue.message : "Could not load audit history."}</span>
                       <Button type="button" variant="outline" onClick={() => void refetchAudit()}>Retry</Button>
-                    </div>
+                    </NeuNotice>
                   ) : auditLog.length === 0 ? (
                     <EmptyState icon={ClipboardList} title="No audit events yet" description="System events will appear here as users perform actions." />
                   ) : (
@@ -1477,10 +1476,10 @@ export default function Admin() {
                   <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input {...field} type="password" placeholder="Min 6 characters" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <div className="ff-admin-surface flex items-center gap-2 bg-blue-50 dark:bg-blue-950/20 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
+              <NeuNotice severity="info" className="flex items-center gap-2 text-sm">
                 <Mail className="h-4 w-4 flex-shrink-0" />
                 Login credentials will be emailed to the agent automatically.
-              </div>
+              </NeuNotice>
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={createMutation.isPending}>
@@ -1606,10 +1605,10 @@ export default function Admin() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <div className="ff-admin-surface flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+              <NeuNotice severity="ack" className="flex items-center gap-2 text-sm">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 This will appear as a warning notification in the user's notification center.
-              </div>
+              </NeuNotice>
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="outline" onClick={() => setNotifyOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={notifyMutation.isPending}>

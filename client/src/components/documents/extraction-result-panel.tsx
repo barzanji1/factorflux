@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -199,10 +200,10 @@ export default function ExtractionResultPanel({ documentId }: Props) {
       </div>
 
       {fieldCandidates.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+        <NeuNotice severity="ack" className="flex items-center gap-2 text-xs">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           No fields could be extracted — this may be a scanned image or handwritten document.
-        </div>
+        </NeuNotice>
       ) : (
         <SafePaginatedTable className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
           <table className="w-full text-xs">
@@ -255,12 +256,7 @@ export default function ExtractionResultPanel({ documentId }: Props) {
 
       {/* ── Review section ───────────────────────────────────────────────── */}
       {review ? (
-        <div className={cn(
-          "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs",
-          review.reviewStatus === "confirmed"
-            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
-            : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300",
-        )}>
+        <NeuNotice severity={review.reviewStatus === "confirmed" ? "info" : "ack"} className="flex items-center gap-2 text-xs">
           {review.reviewStatus === "confirmed"
             ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
             : <XCircle className="h-3.5 w-3.5 shrink-0" />}
@@ -268,7 +264,7 @@ export default function ExtractionResultPanel({ documentId }: Props) {
             <strong className="capitalize">{review.reviewStatus}</strong>
             {review.reviewNotes ? ` — ${review.reviewNotes}` : ""}
           </span>
-        </div>
+        </NeuNotice>
       ) : (
         <div className="space-y-2">
           <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">

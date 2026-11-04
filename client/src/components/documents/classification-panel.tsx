@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -371,13 +372,13 @@ export default function ClassificationPanel({ documentId, classificationData: da
 
         {/* AI disagrees warning */}
         {aiDisagrees && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-2 text-[11px] text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/20 dark:text-amber-300">
+          <NeuNotice severity="ack" className="flex items-start gap-2 text-[11px]">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
               AI suggests <strong>{docTypeLabel(data?.aiDocumentType)}</strong>
               {" "}({Math.round((aiConfidence ?? 0) * 100)}% confidence) — consider overriding.
             </span>
-          </div>
+          </NeuNotice>
         )}
 
         {/* Override select */}

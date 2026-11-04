@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Mail, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NeuBadge, NeuCard, NeuButton } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 export interface ClientEmailLogEntry {
   id: number;
@@ -43,7 +44,7 @@ export function ClientEmailLog({ clientId }: { clientId: number }) {
     </header>
     <div className="p-3">
       {isLoading ? <div className="space-y-2" aria-label="Loading email history"><div className="h-12 animate-pulse bg-[#dce5e1]" /><div className="h-12 animate-pulse bg-[#dce5e1]" /></div>
-        : error ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#8d433a] shadow-[inset_4px_4px_8px_#d1b6b2,inset_-4px_-4px_8px_#fff]"><span>{(error as Error).message}</span><NeuButton className="min-h-9 px-3" onClick={() => void refetch()}>Retry</NeuButton></div>
+        : error ? <NeuNotice severity="block" role="alert" className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{(error as Error).message}</span><NeuButton className="min-h-9 px-3" onClick={() => void refetch()}>Retry</NeuButton></NeuNotice>
           : !data?.length ? <div className="border border-dashed border-[#bdc9c5] bg-[#f6f8f6] px-4 py-7 text-center"><Mail className="mx-auto mb-2 h-5 w-5 text-[#849794]" /><p className="text-xs font-semibold text-[#536a6d]">No email activity yet</p><p className="mt-1 text-[10px] text-[#7b8b89]">Messages sent to this client will appear here.</p></div>
             : <div className="space-y-2">{data.map((entry) => {
               const open = expanded === entry.id;

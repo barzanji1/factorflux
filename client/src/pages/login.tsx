@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { staffLoginSchema } from "@shared/staff-auth";
 import "./login.css";
 
@@ -183,7 +184,7 @@ export default function LoginPage() {
             </Form>
 
             <div className="ff-login-error" role="alert" aria-live="assertive" aria-atomic="true">
-              {error}
+              {error && <NeuNotice severity="block">{error}</NeuNotice>}
             </div>
             <div className="ff-login-support-wrap">
               <a className="ff-login-support" href="mailto:dosh@truckingprosfinancial.com">

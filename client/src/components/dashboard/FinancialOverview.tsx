@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { ArrowRight, CircleDollarSign, ClipboardCheck, Clock3, RotateCcw, TrendingUp, WalletCards } from "lucide-react";
 import { NeuBadge, NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { KpiCarousel } from "./KpiCarousel";
 import type { DashboardFinancial } from "@shared/agent-dashboard";
 
@@ -224,7 +225,7 @@ export function FinancialSummary({ data, isLoading, error, onRetry, children }: 
           </div>
         </div>
         {isLoading ? <div className="ff-neu-metrics-viewport"><div className="ff-neu-metrics-track">{metrics.map(metric => <MetricSkeleton key={metric.key} />)}</div></div> :
-          error ? <div className="ff-neu-financial-error" role="alert"><span>Financial summary could not be loaded.</span><NeuButton onClick={onRetry} className="!min-h-9 !px-3"><RotateCcw className="h-4 w-4" /> Retry</NeuButton></div> :
+          error ? <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-3"><span>Financial summary could not be loaded.</span><NeuButton onClick={onRetry} className="!min-h-9 !px-3"><RotateCcw className="h-4 w-4" /> Retry</NeuButton></NeuNotice> :
           data && metricCards ? <KpiCarousel items={metricCards} speedPixelsPerSecond={30} /> : null}
       </section>
       {children}

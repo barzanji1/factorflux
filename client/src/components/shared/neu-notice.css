@@ -1,0 +1,74 @@
+/* Scoped to notice surfaces only; status badges, charts and validation retain
+   their semantic colors. Repeated selector beats legacy page-family adapters. */
+.neu-notice.neu-notice.neu-notice[data-neu-notice] {
+  --notice-color: #168d99;
+  background: #e0e0e0 !important;
+  color: #666 !important;
+  border: 0 !important;
+  border-left: 4px solid var(--notice-color) !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  overflow-wrap: anywhere;
+}
+.neu-notice.neu-notice.neu-notice[data-neu-notice="ack"] { --notice-color: #b66a16; }
+.neu-notice.neu-notice.neu-notice[data-neu-notice="block"] { --notice-color: #b33d3d; }
+.neu-notice + .neu-notice { margin-top: 12px !important; }
+.neu-notice .neu-notice-title,
+.neu-notice strong,
+.neu-notice h2,
+.neu-notice h3,
+.neu-notice h4,
+.neu-notice h5 {
+  color: var(--notice-color) !important;
+  font-weight: 700;
+}
+.neu-notice .neu-notice-title { margin-bottom: 4px; }
+.neu-notice.neu-notice.neu-notice a {
+  color: #168d99 !important;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+.neu-notice.neu-notice.neu-notice a:hover { text-decoration: underline; }
+.neu-notice.neu-notice.neu-notice p { color: #666 !important; }
+.neu-notice.neu-notice.neu-notice input:not([type="checkbox"]):not([type="radio"]),
+.neu-notice.neu-notice.neu-notice textarea {
+  background: #e0e0e0 !important;
+  color: #333 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+.neu-notice.neu-notice.neu-notice input[type="checkbox"],
+.neu-notice.neu-notice.neu-notice [role="checkbox"] {
+  appearance: none;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-content: center;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px;
+  margin-top: 2px;
+  border: 0 !important;
+  border-radius: 5px !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: inset 2px 2px 4px #b8b8b8, inset -2px -2px 4px #fff !important;
+  cursor: pointer;
+}
+.neu-notice input[type="checkbox"]:checked::after {
+  content: "";
+  width: 6px;
+  height: 11px;
+  border: solid #168d99;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+.neu-notice input:focus-visible,
+.neu-notice textarea:focus-visible,
+.neu-notice [role="checkbox"]:focus-visible {
+  outline: 2px solid #27aab8;
+  outline-offset: 3px;
+}
+.neu-notice input:disabled,
+.neu-notice [role="checkbox"][data-disabled] { cursor: not-allowed; opacity: .5; }

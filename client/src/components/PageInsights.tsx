@@ -7,6 +7,7 @@ import {
 import { AlertCircle, RotateCcw } from "lucide-react";
 import type { PageInsights as PageInsightsData, InsightEntity } from "@shared/page-insights";
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import "./page-insights.css";
 
 type Props = {
@@ -150,10 +151,10 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
       {query.isPending ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[0, 1, 2].map((item) => <StatSkeleton key={item} />)}</div>
       ) : query.isError ? (
-        <NeuCard className="flex flex-wrap items-center justify-between gap-3 p-4" role="alert">
+        <NeuNotice severity="block" role="alert" className="flex flex-wrap items-center justify-between gap-3">
           <span className="flex items-center gap-2 text-sm text-[#76594e]"><AlertCircle className="h-4 w-4" /> Insights are temporarily unavailable.</span>
           <NeuButton onClick={() => query.refetch()} className="min-h-9 px-3"><RotateCcw className="h-4 w-4" />Retry</NeuButton>
-        </NeuCard>
+        </NeuNotice>
       ) : data ? (
         <>
           {data.extraMetrics !== undefined ? (

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, Loader2, Plus, Trash2, WalletCards } from "lucide-react";
 import PortalLayout from "@/components/layout/portal-layout";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,9 +107,9 @@ export default function PortalProfile() {
         </div>
 
         {!me?.carrierId && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <NeuNotice severity="ack" className="text-sm">
             Your portal login is not linked to a carrier record yet. Contact TPF before adding bank accounts.
-          </div>
+          </NeuNotice>
         )}
 
         {showNewAccount && (

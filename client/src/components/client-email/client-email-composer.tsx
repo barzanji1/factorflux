@@ -4,6 +4,7 @@ import { AlertCircle, Mail, Search, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { NeuButton as Button, NeuInput as Input, NeuTextarea as Textarea } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { EmailTemplatePicker } from "@/components/client-email/email-template-picker";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -181,7 +182,7 @@ export function ClientEmailComposer({
         {initialClient ? <div className="space-y-1"><Label>Client</Label><div className="rounded-xl bg-[#e0e0e0] px-4 py-3 text-sm font-semibold text-[#344244] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">{initialClient.name}</div></div>
           : <div className="space-y-1"><Label htmlFor="client-email-recipient">Client</Label>
             {clientsLoading ? <div className="h-11 animate-pulse rounded-xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" />
-              : clientsError ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#8d3f36] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><span>Client list could not be loaded.</span><Button className="min-h-8 px-3 text-xs" onClick={() => void refetch()}>Retry</Button></div>
+              : clientsError ? <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-3 text-xs"><span>Client list could not be loaded.</span><Button className="min-h-8 px-3 text-xs" onClick={() => void refetch()}>Retry</Button></NeuNotice>
                   : clients.length === 0 ? <div className="rounded-xl bg-[#e0e0e0] p-3 text-sm text-[#596d70] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">{user?.role === "employee" ? <><p className="font-semibold text-[#334c50]">No clients assigned to you</p><p className="mt-1">Ask an administrator to assign a client before sending email.</p></> : "No clients available for email."}</div>
                   : <div ref={recipientPicker} className="relative">
                     <div className="relative">
@@ -216,7 +217,7 @@ export function ClientEmailComposer({
                  : "Separate addresses with commas or semicolons. Duplicate addresses are removed."}
            </p>
          </div>
-        {configError && <div role="alert" className="flex items-center justify-between gap-2 border border-[#d2a6a0] bg-[#fff1ee] p-2 text-xs text-[#8d3f36]"><span>Sender settings could not be loaded. Sending is disabled.</span><Button variant="outline" size="sm" onClick={() => void refetchConfig()}>Retry</Button></div>}
+        {configError && <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-2 text-xs"><span>Sender settings could not be loaded. Sending is disabled.</span><Button variant="outline" size="sm" onClick={() => void refetchConfig()}>Retry</Button></NeuNotice>}
         <div className="rounded-sm border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Replies are monitored outside this app. This is a send-only tool; there is no inbox reader here.</div>
          <EmailTemplatePicker id="email-template" value={template} onChange={applyTemplate} disabled={sendMutation.isPending} />
           <p className="border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Templates are starting text only. [Company] resolves to the selected client name; when unavailable, it falls back to “Valued Client.” Review observed closure dates and hours before sending.</p>
@@ -226,7 +227,7 @@ export function ClientEmailComposer({
            <p className="mb-1 text-[9px] font-bold uppercase tracking-wide text-[#657977]">Resolved [Company] preview · {selectedClient.name || "Valued Client"}</p>
            <p className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-[#34494c]">{resolvedTemplateBody}</p>
          </div>}
-        {sendMutation.error && <div role="alert" className="border border-[#d2a6a0] bg-[#fff1ee] px-3 py-2 text-xs text-[#8d3f36]"><strong>Draft retained.</strong> {(sendMutation.error as Error).message} Retry uses the same request ID while the client and message remain unchanged.</div>}
+        {sendMutation.error && <NeuNotice severity="block" role="alert" className="text-xs"><strong>Draft retained.</strong> {(sendMutation.error as Error).message} Retry uses the same request ID while the client and message remain unchanged.</NeuNotice>}
       </div>
       <DialogFooter className="border-t border-[#c5cfcc] bg-[#e1e8e5] px-5 py-3">
          <Button type="button" className="min-h-9 px-4 text-xs" disabled={sendMutation.isPending} onClick={() => onOpenChange(false)}>Cancel</Button>

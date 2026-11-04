@@ -28,6 +28,7 @@ import ExtractionResultPanel from "./extraction-result-panel";
 import DocumentReviewDialog from "./document-review-dialog";
 import { useSafeDrop } from "@/hooks/use-safe-drop";
 import { NeuBadge, NeuButton, NeuCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 export type IntakeEntityType = "invoice" | "load" | "client" | "broker";
 
@@ -301,10 +302,10 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
 
       {/* Rejection banner */}
       {rejectBanner && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
+        <NeuNotice severity="block" className="flex items-start gap-2 text-xs">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{rejectBanner}</span>
-        </div>
+        </NeuNotice>
       )}
 
       {/* Drop zone */}
@@ -466,10 +467,10 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
 
                 {/* Error row */}
                 {f.status === "failed" && f.error && (
-                  <div className="flex items-center gap-2 border-t border-red-100 bg-red-50/50 px-4 py-2 text-xs text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
+                  <NeuNotice severity="block" className="flex items-center gap-2 text-xs">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     {f.error}
-                  </div>
+                  </NeuNotice>
                 )}
               </FileSurface>
             );

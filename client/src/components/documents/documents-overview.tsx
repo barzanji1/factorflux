@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { CylinderBar } from "@/components/dashboard/FinancialOverview";
 import type { DocumentStats } from "@shared/document-analytics";
 
@@ -43,9 +44,9 @@ export function DocumentsOverview() {
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">{Array.from({ length: 5 }, (_, index) => <NeuCard key={index} className="h-28 animate-pulse bg-[#d6d6d6]" />)}</div>
     <div className="grid gap-4 lg:grid-cols-2">{Array.from({ length: 4 }, (_, index) => <NeuCard pressed key={index} className="h-72 animate-pulse" />)}</div>
   </section>;
-  if (query.error || !query.data) return <NeuCard className="p-5" role="alert">
-    <p className="text-sm text-red-700">Unable to load document statistics.</p><NeuButton className="mt-3" onClick={() => void query.refetch()}>Retry</NeuButton>
-  </NeuCard>;
+  if (query.error || !query.data) return <NeuNotice severity="block" role="alert">
+    <p className="text-sm">Unable to load document statistics.</p><NeuButton className="mt-3" onClick={() => void query.refetch()}>Retry</NeuButton>
+  </NeuNotice>;
   const data = query.data;
   const stat = (label: string, value: string | number, detail: string) => <NeuStatCard key={label} label={label}
     value={<span className="text-[#27aab8]">{value}</span>} detail={detail} className="min-h-28 min-w-0 p-4 [&_p.text-3xl]:text-2xl" />;

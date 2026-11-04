@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { TpfLogo } from "@/components/brand/tpf-logo";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 const schema = z.object({
   companyName: z.string().min(2, "Company name required"),
@@ -80,9 +81,9 @@ export default function PortalRegister() {
         <p className="text-sm text-slate-500 mb-6">Register to start submitting invoices for factoring.</p>
 
         {mutation.error && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+          <NeuNotice severity="block" className="mb-4 text-sm">
             {(mutation.error as Error).message}
-          </div>
+          </NeuNotice>
         )}
 
         <Form {...form}>

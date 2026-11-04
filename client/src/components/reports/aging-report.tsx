@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileWarning, RefreshCw, Search } from "lucide-react";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Link } from "wouter";
 import {
   AGING_COLUMNS,
@@ -264,22 +265,22 @@ export default function AgingReport() {
       </RecoveryCard>
 
       {!parsedFilters.success ? (
-        <div data-testid="aging-validation-error" role="alert" className="border border-amber-600 bg-[#fff3cc] px-4 py-3 text-xs text-[#604b16]">
+        <NeuNotice severity="ack" data-testid="aging-validation-error" role="alert" className="text-xs">
           Correct the highlighted filters to load this report.
-        </div>
+        </NeuNotice>
       ) : showLoading ? (
         <div data-testid="aging-loading" aria-label="Loading aging report" className="recovery-neu-surface overflow-hidden">
           <div className="h-9 animate-pulse border-b border-[#808080] bg-[#dce6e3]" />
           {[0, 1, 2, 3].map(row => <div key={row} className="h-10 animate-pulse border-b border-slate-200 bg-[#ebe8df]" />)}
         </div>
       ) : reportQuery.isError ? (
-        <div data-testid="aging-error" role="alert" className="border border-red-500 bg-[#fff0ed] p-6 text-center">
+        <NeuNotice severity="block" data-testid="aging-error" role="alert" className="text-center">
           <FileWarning className="mx-auto mb-2 h-5 w-5 text-red-700" />
           <p className="text-sm font-bold text-red-800">Aging report could not be loaded</p>
           <p className="mt-1 text-xs text-red-700">{reportQuery.error instanceof Error ? reportQuery.error.message : "An unexpected error occurred."} No export is available until these filters load successfully.</p>
           <Button data-testid="aging-retry" variant="outline" size="sm" className="mt-3 rounded-none"
             onClick={() => void reportQuery.refetch()}>Retry</Button>
-        </div>
+        </NeuNotice>
       ) : report ? (
         <>
           <RecoveryCard data-testid="aging-grouped-table" aria-label={`${view === "carrier" ? "Carrier" : "Broker"} aging totals`}

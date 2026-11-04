@@ -71,7 +71,7 @@ try {
     await delay(1600);
   };
   const pointerClick = async selector => {
-    const rect = await evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return null;const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+    const rect = await evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return null;el.scrollIntoView({block:'center',behavior:'instant'});const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
     if (!rect) throw new Error("Expected form control missing");
     await send("Input.dispatchMouseEvent", { type: "mousePressed", ...rect, button: "left", clickCount: 1 });
     await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...rect, button: "left", clickCount: 1 });
@@ -129,14 +129,81 @@ try {
     }
     console.log(JSON.stringify({ route, ok, uncaught, sidebar: status.sidebar, insights: status.insights }));
   }
+  let sheets;
+  if (process.env.SHEETS_VERIFY === "1") {
+    sheets = await evaluate(`(async () => {
+      const response = await fetch('/api/invoices/funding/queue?page=1&pageSize=15', {credentials:'include'});
+      const data = await response.json();
+      const first = data.rows?.[0];
+      const detailResponse = first ? await fetch('/api/invoices/'+first.id+'/detail', {credentials:'include'}) : null;
+      const detailPayload = detailResponse?.ok ? await detailResponse.json() : null;
+      const detail = detailPayload?.invoice ?? detailPayload;
+      const headers = [...document.querySelectorAll('.ff-data-table thead th')].map(el=>el.textContent.trim());
+      const row = document.querySelector('.ff-data-table tbody tr');
+      const actions = row?.lastElementChild;
+      const buttons = [...(actions?.querySelectorAll('button')??[])];
+      return {
+        total:data.total,
+        firstRows:(data.rows??[]).slice(0,3).map(r=>({id:r.id,invoiceNumber:r.invoiceNumber,status:r.status,submittedByName:r.submittedByName,submittedAt:r.submittedAt})),
+        firstDetail:detail ? {id:detail.id,invoiceNumber:detail.invoiceNumber,status:detail.status,submittedBy:detail.submittedBy,submittedAt:detail.submittedAt,createdAt:detail.createdAt,dataOrigin:detail.dataOrigin}:null,
+        headers, firstRenderedCells:[...(row?.children??[])].map(el=>el.textContent.trim()),
+        rowBackground:row?getComputedStyle(row).backgroundColor:null,
+        hovered:row?.matches(':hover'),selectedCheckbox:row?.querySelector('[role=checkbox]')?.getAttribute('data-state'),
+        actionLayout:actions?{width:actions.getBoundingClientRect().width,wrap:getComputedStyle(actions.firstElementChild).flexWrap,gap:getComputedStyle(actions.firstElementChild).gap}:null,
+        buttons:buttons.map(b=>({text:b.textContent.trim()||b.getAttribute('aria-label'),height:b.getBoundingClientRect().height,top:b.getBoundingClientRect().top}))
+      };
+    })()`);
+    const statusIndex = sheets.headers.indexOf("Status");
+    const expectedStatus = sheets.firstRows[0]?.status.replace(/_/g, " ").replace(/^\w/, letter => letter.toUpperCase());
+    sheets.ok = statusIndex >= 0 && sheets.firstRenderedCells[statusIndex] === expectedStatus &&
+      sheets.actionLayout?.wrap === "nowrap" && sheets.actionLayout?.gap === "8px" &&
+      sheets.buttons.length > 0 && sheets.buttons.every(b => b.height === 32 && Math.abs(b.top - sheets.buttons[0].top) < 1);
+    if (!sheets.ok) process.exitCode = 1;
+    await evaluate("document.querySelector('.ff-data-table tbody tr td:last-child')?.scrollIntoView({block:'center',inline:'end',behavior:'instant'})");
+    const hoverPoint = await evaluate("(()=>{const r=document.querySelector('.ff-data-table tbody tr td:last-child').getBoundingClientRect();return{x:r.left+8,y:r.top+8}})()");
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...hoverPoint });
+    sheets.hoverBackground = await evaluate("getComputedStyle(document.querySelector('.ff-data-table tbody tr')).backgroundColor");
+    console.log(JSON.stringify({ sheetsVerification: sheets }));
+    const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 80 });
+    await writeFile(`${out}/sheets-actions.jpg`, Buffer.from(image.data, "base64"));
+  }
+  let notices;
+  if (process.env.NEU_NOTICE_VERIFY === "1") {
+    await evaluate("history.pushState({},'', '/neu-preview');dispatchEvent(new PopStateEvent('popstate'))");
+    await delay(1200);
+    await evaluate("document.querySelector('[aria-label=\"Notice severity samples\"]')?.scrollIntoView({block:'center',behavior:'instant'})");
+    await pointerClick('[data-testid="notice-sample-ack"] input[type="checkbox"]');
+    await pointerClick('[aria-label="Sample acknowledgement reason"]');
+    await send("Input.insertText", { text: "Reviewed in browser test" });
+    notices = await evaluate(`({
+      styles:[...document.querySelectorAll('[data-testid^="notice-sample-"]')].map(el=>{
+        const s=getComputedStyle(el),title=getComputedStyle(el.querySelector('.neu-notice-title'));
+        return {severity:el.dataset.neuNotice,background:s.backgroundColor,left:s.borderLeftWidth,top:s.borderTopWidth,padding:s.paddingTop,inset:s.boxShadow.includes('inset'),title:title.color};
+      }),
+      checked:document.querySelector('[data-testid="notice-sample-ack"] input').checked,
+      reason:document.querySelector('[aria-label="Sample acknowledgement reason"]').value
+    })`);
+    const ok = notices.styles.length === 3 && notices.styles.every(s => s.background === "rgb(224, 224, 224)" && s.left === "4px" && s.top === "0px" && s.padding === "16px" && s.inset) &&
+      notices.checked && notices.reason === "Reviewed in browser test";
+    notices.ok = ok;
+    if (!ok) process.exitCode = 1;
+    console.log(JSON.stringify({ noticeVerification: notices }));
+    await evaluate("document.querySelector('[aria-label=\"Notice severity samples\"]')?.scrollIntoView({block:'center',behavior:'instant'})");
+    const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 75 });
+    await writeFile(`${out}/notice-severities.jpg`, Buffer.from(image.data, "base64"));
+  }
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-   const mobileRoute = process.env.NEU_SMOKE_ROUTES ? routes[0] : "/client-email?tab=log";
+   const mobileRoute = process.env.NEU_NOTICE_VERIFY === "1" ? "/neu-preview" :
+     process.env.NEU_SMOKE_ROUTES ? routes[0] : "/client-email?tab=log";
    await evaluate(`history.pushState({},'', ${JSON.stringify(mobileRoute)});dispatchEvent(new PopStateEvent('popstate'))`);
   await delay(1500);
+  if (process.env.NEU_NOTICE_VERIFY === "1") {
+    await evaluate("document.querySelector('[aria-label=\"Notice severity samples\"]')?.scrollIntoView({block:'start',behavior:'instant'})");
+  }
   const mobile = await evaluate(`({width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+2,modalCount:document.querySelectorAll('[role=dialog]').length})`);
   const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65, captureBeyondViewport: false });
   await writeFile(`${out}/email-mobile.jpg`, Buffer.from(image.data, "base64"));
-  await writeFile(`${out}/browser-results.json`, JSON.stringify({ results, mobile }, null, 2));
+  await writeFile(`${out}/browser-results.json`, JSON.stringify({ results, mobile, notices, sheets }, null, 2));
   if (results.some(result => !result.skipped && !result.ok) || mobile.overflow) process.exitCode = 1;
 } catch (error) {
   // Fixed local messages only; never dump browser protocol payloads or stderr.

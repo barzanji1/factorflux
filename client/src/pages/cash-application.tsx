@@ -35,6 +35,7 @@ import {
 import "@/components/funding/funding-neu.css";
 import { FundingStatCard } from "@/components/funding/funding-stat-card";
 import { NeuPageShell, NeuTable } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { PageInsights } from "@/components/PageInsights";
 import { FundingBadge } from "@/components/funding/funding-badge";
 
@@ -258,12 +259,12 @@ export default function CashApplication() {
 
             {/* Attention nudge */}
             {needsAttention > 0 && (
-              <div className="flex items-center gap-2 rounded-[10px] border border-amber-200 bg-amber-50/70 px-4 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/10">
+              <NeuNotice severity="ack" className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <p className="text-[12.5px] font-medium text-amber-800 dark:text-amber-300">
                   <span className="font-bold">{needsAttention} payment{needsAttention !== 1 ? "s" : ""}</span> need matching — apply them to close out open invoices.
                 </p>
-              </div>
+              </NeuNotice>
             )}
 
             {/* Main table card */}

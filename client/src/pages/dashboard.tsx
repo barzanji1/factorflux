@@ -15,6 +15,7 @@ import type {
 } from "@shared/agent-dashboard";
 import { pathToPermission } from "@/lib/routePermissions";
 import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 const countKinds = [
   ["email_bounced", "Bounced email"],
@@ -59,14 +60,14 @@ function TableSkeleton({ testId, rows, columns }: { testId: string; rows: number
 function SectionError({ section, error, retry }: { section: DashboardSection; error: unknown; retry: () => void }) {
   const message = error instanceof Error ? error.message : "This dashboard section is temporarily unavailable.";
   return (
-    <div className="ff-neu-section-error" role="alert" data-testid={`dashboard-error-${section}`}>
+    <NeuNotice severity="block" role="alert" className="flex items-start gap-3" data-testid={`dashboard-error-${section}`}>
       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#a45e45]" />
       <div className="flex-1">
         <h3 className="font-semibold text-[#3e4946]">{section[0].toUpperCase() + section.slice(1)} could not be loaded</h3>
         <p className="mt-1 text-sm text-[#77817e]">{message}</p>
         <NeuButton variant="accent" onClick={retry} className="mt-3 !min-h-9 !px-4" data-testid={`dashboard-retry-${section}`}>Retry</NeuButton>
       </div>
-    </div>
+    </NeuNotice>
   );
 }
 

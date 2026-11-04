@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuStatCard, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import { PageInsights } from "@/components/PageInsights";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Download, FileText, Layers3, Plus, PlusCircle, Receipt, X } from "lucide-react";
 
 type Broker = { id: number; name: string; status?: string };
@@ -309,7 +310,7 @@ export default function BulkInvoices() {
           </DialogHeader>
           <div className="space-y-3 text-sm">
             {preflightLoading && <NeuCard pressed className="rounded-[12px] px-4 py-3 text-xs text-[#666666]">Checking all ticket rows…</NeuCard>}
-            {preflightError && <NeuCard role="alert" className="rounded-[12px] border border-[#d6b1ab] bg-[#f4e5e2] px-4 py-3 text-sm text-[#843f39]">{preflightError}</NeuCard>}
+            {preflightError && <NeuNotice severity="block" role="alert" className="text-sm">{preflightError}</NeuNotice>}
             {preflightAlerts.map((alert, index) => {
               const tone = alert.severity === "block" ? "warning" : alert.severity === "ack" ? "accent" : "neutral";
               const blockStyle = alert.severity === "block" ? "bg-[#f1e4e1]" : alert.severity === "ack" ? "bg-[#e3f0f0]" : "bg-[#e7e9e7]";

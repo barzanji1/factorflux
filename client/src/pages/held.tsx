@@ -10,6 +10,7 @@ import TopNav from "@/components/layout/top-nav";
 import { CardContent } from "@/components/ui/card";
 import { RiskCard as Card, RiskButton as Button, RiskInput as Input, RiskDialogContent as DialogContent, RiskSelectContent as SelectContent, RiskSelectTrigger as SelectTrigger, RiskStatCard, RiskBadge, RiskTable } from "@/components/risk/risk-controls";
 import { NeuPageShell } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import "@/components/risk/risk-neu.css";
 import { NeuTextarea as Textarea } from "@/styles/neu";
 import {
@@ -255,10 +256,10 @@ export default function HeldQueue() {
 
             {/* Alert banner if old items */}
             {held.some(i => daysOnHold(i.heldAt) > 7) && (
-              <div className="ff-held-surface flex items-center gap-2 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 px-4 py-2.5 text-sm text-red-700 dark:text-red-400">
+              <NeuNotice severity="block" className="flex items-center gap-2 text-sm">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span><strong>{held.filter(i => daysOnHold(i.heldAt) > 7).length}</strong> invoice(s) have been held for <strong>8+ days</strong> — immediate review required.</span>
-              </div>
+              </NeuNotice>
             )}
 
             {/* Filters */}

@@ -7,6 +7,7 @@ import { Badge, Button, Textarea, SelectContent, SelectTrigger, Card, AdminPageS
 import { Select, SelectItem, SelectValue } from "@/components/ui/select";
 import { NeuTable, NeuTableBody, NeuTableCell, NeuTableRow } from "@/styles/neu/components";
 import { useAuth } from "@/hooks/useAuth";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 const statuses = ["open", "in-progress", "pending", "resolved", "closed"];
 const priorities = ["low", "medium", "high", "urgent"];
@@ -56,6 +57,6 @@ export default function TicketDetail() {
     </Card>
     <section className="grid gap-6 md:grid-cols-2"><Card className="p-5"><h2 className="mb-3 font-semibold">Linked records</h2><p>Carrier: {data.carrier ? <Link className="text-[#168d99]" href={`/clients/${data.carrier.id}`}>{data.carrier.name}</Link> : "—"}</p><p>Broker: {data.broker ? <Link className="text-[#168d99]" href={`/brokers/${data.broker.id}`}>{data.broker.name}</Link> : "—"}</p><p>Invoice: {data.invoice ? <Link className="text-[#168d99]" href={`/invoices/${data.invoice.id}`}>{data.invoice.invoiceNumber}</Link> : "—"}</p>{manager && <div className="mt-4"><label className="text-sm font-medium">Assignment</label><Select value={data.assignedTo || "unassigned"} onValueChange={(assignedTo) => update.mutate({ assignedTo: assignedTo === "unassigned" ? null : assignedTo })}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{agents.map((agent) => <SelectItem value={agent.id} key={agent.id}>{name(agent)}</SelectItem>)}</SelectContent></Select></div>}</Card><Card className="p-5"><h2 className="mb-3 font-semibold">Resolution</h2><Textarea value={resolution || data.resolution || ""} onChange={(event) => setResolution(event.target.value)} placeholder="Describe the resolution (required to resolve or close)" /><Button className="mt-3" disabled={update.isPending} onClick={() => update.mutate({ resolution: resolution.trim() || null })}>Save resolution</Button></Card></section>
     <Card className="p-6"><h2 className="mb-4 font-semibold">Comments</h2><NeuTable className="w-full"><NeuTableBody>{(data.comments || []).map((comment: any) => <NeuTableRow key={comment.id}><NeuTableCell><p className="whitespace-pre-wrap text-sm">{comment.comment}</p><p className="mt-2 text-xs text-[#888]">{comment.authorName || name(comment.author)} · {new Date(comment.createdAt).toLocaleString()}</p></NeuTableCell></NeuTableRow>)}</NeuTableBody></NeuTable><div className="mt-5 space-y-2"><Textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Add a comment…" /><Button disabled={addComment.isPending || !commentText.trim()} onClick={() => addComment.mutate()}>Add comment</Button></div></Card>
-    {error && <p role="alert" className="rounded-xl bg-[#f0dfdc] p-3 text-sm text-[#a3483e] shadow-[inset_4px_4px_8px_#c8aaa7,inset_-4px_-4px_8px_#fff]">{error}</p>}
+     {error && <NeuNotice severity="block" role="alert" className="text-sm">{error}</NeuNotice>}
   </div></AdminPageShell></div>;
 }

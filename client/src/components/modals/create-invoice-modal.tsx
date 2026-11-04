@@ -3,7 +3,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Building2, CheckCircle2, Plus, Search, ShieldAlert, Truck, Upload, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { NeuBadge, NeuButton, NeuCard, NeuInput } from "@/styles/neu";
+import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuTextarea } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -218,11 +219,11 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
             </div>
           )}
            {!isCarrier && (brokerRecord?.creditGrade === "D" || brokerRecord?.creditGrade === "F") && (
-             <p className={cn("rounded-xl border px-3 py-2 text-xs font-semibold", brokerRecord.creditGrade === "F" ? "border-red-300 bg-red-50 text-red-800" : "border-orange-200 bg-orange-50 text-orange-800")}>
+             <NeuNotice severity={brokerRecord.creditGrade === "F" ? "block" : "ack"} className="text-xs">
                {brokerRecord.creditGrade === "F"
                  ? "This broker is flagged as high risk."
                  : "This broker has a poor credit rating. Proceed with caution."}
-             </p>
+             </NeuNotice>
           )}
           <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
             <p>MC#: <strong>{record.mcNumber || "Not recorded"}</strong></p>
@@ -238,10 +239,10 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
               </>
             )}
           </div>
-          <div className={cn("flex items-start gap-2 rounded-xl px-3 py-2 text-xs", favorable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800")}>
+          <NeuNotice severity={favorable ? "info" : "ack"} className="flex items-start gap-2 text-xs">
             {favorable ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />}
             <span>{record.notes || (favorable ? `${isCarrier ? "Carrier" : "Broker"} is active with no recorded holds.` : `Review ${kind} status before proceeding.`)}</span>
-          </div>
+          </NeuNotice>
         </div>
       )}
       </NeuCard>
@@ -914,11 +915,9 @@ export default function CreateInvoiceModal({
         <div className="grid gap-5 p-6 lg:grid-cols-[240px_minmax(0,1fr)_240px]">
           <StatusPanel kind="broker" record={broker} />
           <form className="space-y-5" onSubmit={event => { event.preventDefault(); if (valid) mutation.mutate(); }}>
-            {preflightError && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{preflightError}</p>}
+            {preflightError && <NeuNotice severity="block" className="text-sm">{preflightError}</NeuNotice>}
             {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
-              <div key={alert.code} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-                <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
-              </div>
+              <NeuNotice key={alert.code} title={alert.title} className="text-sm"><p>{alert.message}</p></NeuNotice>
             ))}
             <NeuCard pressed className="rounded-2xl p-4">
             <section className="space-y-3" aria-labelledby="ocr-upload-heading">
@@ -997,17 +996,15 @@ export default function CreateInvoiceModal({
                 </p>
               )}
               {ocrStatus === "failed" && ocrAlerts.map(alert => (
-                <div key={alert.code} data-testid="invoice-ocr-cross-check-alert" className="border border-red-700 bg-red-100 px-3 py-2 text-xs text-red-900">
+                <NeuNotice key={alert.code} severity="block" data-testid="invoice-ocr-cross-check-alert" className="text-xs">
                   <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
-                </div>
+                </NeuNotice>
               ))}
               {ocrStatus === "completed" && ocrFields && (
                 <>
                   {ocrMissingTypes.length > 0 && <p className="text-xs text-amber-800">Not included: {ocrMissingTypes.map(type => type.replace(/_/g, " ")).join(", ")}</p>}
                   {ocrAlerts.map(alert => (
-                    <div key={alert.code} data-testid="invoice-ocr-cross-check-alert" className={cn("border px-3 py-2 text-xs", alert.severity === "block" ? "border-red-700 bg-red-100 text-red-900" : alert.severity === "ack" ? "border-amber-700 bg-amber-100 text-amber-950" : "border-blue-700 bg-blue-100 text-blue-950")}>
-                      <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
-                    </div>
+                    <NeuNotice key={alert.code} severity={alert.severity} title={alert.title} data-testid="invoice-ocr-cross-check-alert" className="text-xs"><p>{alert.message}</p></NeuNotice>
                   ))}
                   <div className="grid gap-x-4 gap-y-1 border-t border-slate-400 pt-2 text-xs sm:grid-cols-2">
                     {ocrDocuments.map(document => <p key={document.documentId}><strong>{document.filename}</strong> · {document.docType?.replace(/_/g, " ") || "Unclassified"} · {document.status}{document.error ? ` — ${document.error}` : ""}</p>)}
@@ -1326,7 +1323,7 @@ export default function CreateInvoiceModal({
             <p className="rounded-xl bg-[#e0e0e0] px-3 py-2 text-xs text-[#555] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">
               Adding branch for <strong>{broker?.name ?? "selected broker"}</strong>. Name is required; all other details are optional.
             </p>
-            {branchCreateError && <p role="alert" className="border border-red-700 bg-red-100 px-2 py-1.5 text-xs text-red-900">{branchCreateError}</p>}
+            {branchCreateError && <NeuNotice severity="block" className="text-xs">{branchCreateError}</NeuNotice>}
             <div className="grid grid-cols-2 gap-2.5">
               {([
                 ["branchName", "Branch name", true],
@@ -1372,19 +1369,17 @@ export default function CreateInvoiceModal({
         <DialogContent showCloseButton={false} className="ff-create-invoice-dialog max-h-[80vh] max-w-xl overflow-y-auto p-0">
           <div className="flex items-center justify-between border-b border-[#c6c6c6] px-5 py-4">
             <DialogTitle className="text-sm font-bold">Invoice Preflight Alerts</DialogTitle>
-            <button type="button" onClick={() => setPreflightOpen(false)} aria-label="Close preflight alerts" className="rounded-lg bg-[#e0e0e0] px-2 font-bold leading-5 text-[#555] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">×</button>
+            <NeuButton type="button" onClick={() => setPreflightOpen(false)} aria-label="Close preflight alerts" className="h-8 min-h-8 w-8 rounded-full p-0 text-[#666] hover:text-[#27aab8]">×</NeuButton>
           </div>
           <DialogDescription className="sr-only">Review carrier and broker alerts before submitting this invoice.</DialogDescription>
           <div className="space-y-3 bg-[#e0e0e0] p-5 text-sm">
             {preflightLoading && <p className="rounded-xl px-3 py-2 shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">Checking carrier and broker records…</p>}
-            {preflightError && <p role="alert" className="border border-red-700 bg-red-100 px-3 py-2 text-red-900">{preflightError}</p>}
+            {preflightError && <NeuNotice severity="block">{preflightError}</NeuNotice>}
             {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
-              <div key={alert.code} className="border border-blue-700 bg-blue-100 px-3 py-2 text-blue-950">
-                <strong>{alert.title}</strong><p className="mt-1">{alert.message}</p>
-              </div>
+              <NeuNotice key={alert.code} title={alert.title}><p>{alert.message}</p></NeuNotice>
             ))}
             {preflightAlerts.filter(alert => alert.severity !== "info").map(alert => (
-              <section key={alert.code} className={cn("border-2 p-3", alert.severity === "block" ? "border-red-800 bg-red-100 text-red-950" : "border-[#777] bg-[#eee] text-black")}>
+              <NeuNotice key={alert.code} severity={alert.severity}>
                 <strong className="block">{alert.severity === "block" ? "BLOCK — " : "ACKNOWLEDGEMENT REQUIRED — "}{alert.title}</strong>
                 <p className="mt-1">{alert.message}</p>
                 {(alert.link || alert.invoiceId) && (
@@ -1399,19 +1394,19 @@ export default function CreateInvoiceModal({
                       I have reviewed and acknowledge this alert
                     </label>
                     <label className="mt-2 block text-xs">Reason (optional)
-                      <textarea value={acknowledgements[alert.code]?.reason ?? ""} onChange={event => setAcknowledgements(current => ({ ...current, [alert.code]: { acknowledged: !!current[alert.code]?.acknowledged, reason: event.target.value } }))} className="mt-1 min-h-16 w-full border border-gray-500 bg-white p-2 text-sm" />
+                      <NeuTextarea value={acknowledgements[alert.code]?.reason ?? ""} onChange={event => setAcknowledgements(current => ({ ...current, [alert.code]: { acknowledged: !!current[alert.code]?.acknowledged, reason: event.target.value } }))} className="mt-1 min-h-16 w-full text-sm" />
                     </label>
                   </div>
                 )}
-              </section>
+              </NeuNotice>
             ))}
             {nearDuplicateAlert && isManager && (
-              <label className="flex items-start gap-2 border-2 border-amber-700 bg-amber-100 p-3 text-amber-950">
+              <NeuNotice severity="ack"><label className="flex items-start gap-2">
                 <input type="checkbox" checked={overrideNearDuplicate} onChange={event => setOverrideNearDuplicate(event.target.checked)} />
                 <span><strong>Manager override:</strong> allow creation despite this near-duplicate alert.</span>
-              </label>
+              </label></NeuNotice>
             )}
-            {preflightAlerts.length === 0 && !preflightLoading && !preflightError && <p className="border border-gray-500 bg-white px-3 py-2">No active preflight alerts.</p>}
+            {preflightAlerts.length === 0 && !preflightLoading && !preflightError && <NeuNotice>No active preflight alerts.</NeuNotice>}
             <div className="flex justify-end gap-2 border-t border-gray-500 pt-3">
               <Button type="button" onClick={() => setPreflightOpen(false)}>Close</Button>
             </div>

@@ -2,6 +2,7 @@ import { useId } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import { NeuButton, NeuCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 export type EmailLogSummary = {
   totals: { sent: number; delivered: number; bounced: number; failed: number };
@@ -57,7 +58,7 @@ export function EmailLogCharts({ data, loading, error, onRetry, from, to }: {
       </header>
       <div className="mb-3 flex gap-4 text-[10px] font-semibold text-[#697477]"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#27aab8]" />Delivered</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#bd6258]" />Bounced + failed</span></div>
       {loading ? <div className="h-[220px] animate-pulse rounded-xl bg-[#d8d8d8]" aria-label="Loading weekly chart" />
-        : error ? <div role="alert" className="grid min-h-[220px] place-items-center rounded-xl px-5 text-center text-xs text-[#a3483e]"><div><AlertTriangle className="mx-auto mb-2 h-5 w-5" /><p>Weekly delivery summary unavailable</p><NeuButton onClick={onRetry} className="mt-2 min-h-8 px-3 text-xs">Retry</NeuButton></div></div>
+        : error ? <NeuNotice severity="block" role="alert" className="grid min-h-[220px] place-items-center text-center text-xs"><div><AlertTriangle className="mx-auto mb-2 h-5 w-5" /><p>Weekly delivery summary unavailable</p><NeuButton onClick={onRetry} className="mt-2 min-h-8 px-3 text-xs">Retry</NeuButton></div></NeuNotice>
           : weeks.length ? <ResponsiveContainer width="100%" height={220}>
             <BarChart data={weeks} margin={{ top: 8, right: 6, bottom: 0, left: -20 }} barCategoryGap="25%">
               <CartesianGrid vertical={false} stroke="#c7caca" strokeDasharray="3 5" />
@@ -76,7 +77,7 @@ export function EmailLogCharts({ data, loading, error, onRetry, from, to }: {
         <div><h2 className="text-sm font-bold text-[#354345]">Volume by Type</h2><p className="text-[11px] text-[#737e80]">Messages in the selected range · {from} to {to}</p></div>
       </header>
       {loading ? <div className="mx-auto h-[190px] w-[190px] animate-pulse rounded-full bg-[#d8d8d8]" aria-label="Loading entity chart" />
-        : error ? <div role="alert" className="grid min-h-[220px] place-items-center rounded-xl px-5 text-center text-xs text-[#a3483e]"><div><AlertTriangle className="mx-auto mb-2 h-5 w-5" /><p>Entity summary unavailable</p><NeuButton onClick={onRetry} className="mt-2 min-h-8 px-3 text-xs">Retry</NeuButton></div></div>
+        : error ? <NeuNotice severity="block" role="alert" className="grid min-h-[220px] place-items-center text-center text-xs"><div><AlertTriangle className="mx-auto mb-2 h-5 w-5" /><p>Entity summary unavailable</p><NeuButton onClick={onRetry} className="mt-2 min-h-8 px-3 text-xs">Retry</NeuButton></div></NeuNotice>
           : entities.length && entities.some((item) => item.value) ? <div className="grid min-h-[220px] items-center gap-2 sm:grid-cols-[minmax(160px,1fr)_minmax(120px,.8fr)]">
             <ResponsiveContainer width="100%" height={210}>
               <PieChart><Pie data={entities} dataKey="value" nameKey="name" innerRadius={58} outerRadius={82} paddingAngle={3} stroke="#e0e0e0" strokeWidth={3} isAnimationActive={false}>{entities.map((item, index) => <Cell key={`${item.name}-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #d0d2d2", background: "#e0e0e0", boxShadow: "3px 3px 8px #b8b8b8" }} /></PieChart>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Clock3, Eye } from "lucide-react";
 import { NeuButton, NeuCard, NeuInput } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Label } from "@/components/ui/label";
 import { federalHolidays, defaultNoticeDate, localDateTimeToIso } from "../../../../shared/holiday-scheduling";
 
@@ -41,7 +42,7 @@ export function HolidayYearPlanner({ onReview }: {
         <div className="space-y-1"><Label htmlFor="holiday-time" className="text-[9px]">Notice time</Label><NeuInput id="holiday-time" type="time" value={noticeTime} onChange={(event) => setNoticeTime(event.target.value)} className="min-h-10 h-10 px-3 text-xs" /></div>
         <div className="space-y-1"><Label htmlFor="holiday-lead" className="text-[9px]">Lead days</Label><NeuInput id="holiday-lead" type="number" min={0} max={365} value={leadDays} onChange={(event) => setLeadDays(Number(event.target.value))} className="min-h-10 h-10 px-3 text-xs" /></div>
       </div>
-      {plannerIssue && <p role="alert" className="rounded-xl bg-[#e0e0e0] p-3 text-[9px] text-[#8d433a] shadow-[inset_4px_4px_8px_#d1b6b2,inset_-4px_-4px_8px_#fff]">{plannerIssue}</p>}
+      {plannerIssue && <NeuNotice severity="ack" role="alert" className="text-[9px]">{plannerIssue}</NeuNotice>}
       <p className="rounded-xl bg-[#e0e0e0] px-3 py-2.5 text-[9px] leading-relaxed text-[#765f30] shadow-[inset_4px_4px_8px_#c7bca3,inset_-4px_-4px_8px_#fff9eb]">
         Review the observed closure date and message for each notice. “Review notice” loads its holiday template and date into the composer; it does not queue or send anything.
       </p>

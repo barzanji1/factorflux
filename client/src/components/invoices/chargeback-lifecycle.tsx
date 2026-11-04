@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Clock3, MailWarning, RotateCcw } from "lucide-react";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuSelect } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import EntityNotes from "@/components/shared/EntityNotes";
 
 type Lifecycle = {
@@ -83,7 +84,7 @@ export default function ChargebackLifecycle({ invoiceId, onChanged }: { invoiceI
   };
 
   if (lifecycleQuery.isLoading) return <NeuCard className="space-y-3 p-4" aria-label="Loading chargeback lifecycle"><div className="h-5 w-44 animate-pulse rounded bg-[#c9c9c9]" /><div className="h-16 animate-pulse rounded bg-[#d1d1d1]" /><div className="h-16 animate-pulse rounded bg-[#d1d1d1]" /></NeuCard>;
-  if (lifecycleQuery.isError) return <NeuCard className="p-4 text-sm text-[#8b3028]" role="alert"><p>Chargeback lifecycle could not be loaded.</p><NeuButton className="mt-3 min-h-9 px-3" onClick={() => void lifecycleQuery.refetch()}>Retry</NeuButton></NeuCard>;
+  if (lifecycleQuery.isError) return <NeuNotice severity="block" className="text-sm"><p>Chargeback lifecycle could not be loaded.</p><NeuButton className="mt-3 min-h-9 px-3" onClick={() => void lifecycleQuery.refetch()}>Retry</NeuButton></NeuNotice>;
   if (!lifecycle) return null;
 
   return <NeuCard className="overflow-hidden p-0">
@@ -102,8 +103,8 @@ export default function ChargebackLifecycle({ invoiceId, onChanged }: { invoiceI
         ["Resolution", lifecycle.resolutionStatus.replace(/_/g, " ")],
       ].map(([label, value]) => <div key={label} className="rounded-lg bg-[#e0e0e0] p-3 shadow-[inset_2px_2px_5px_#c1c1c1,inset_-2px_-2px_5px_#fff]"><p className="text-[10px] font-bold uppercase tracking-wide text-[#777]">{label}</p><p className="mt-1 font-mono text-sm font-bold">{value}</p></div>)}
     </div>
-    {(lifecycle.blockedReason || lifecycle.verifiedDebit <= 0) && <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg border border-[#c5a766] bg-[#fff7dc] p-3 text-xs text-[#655121]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{lifecycle.blockedReason || "No verified reserve debit is available to refund. No reserve credit has been inferred."}</div>}
-    {emailError && <div role="status" className="mx-3 mb-3 flex gap-2 border border-[#bf9e61] bg-[#fff7df] p-3 text-xs text-[#654d20]"><MailWarning className="h-4 w-4 shrink-0" /><span><strong>Refund recorded successfully.</strong> Carrier notification failed: {emailError}</span></div>}
+    {(lifecycle.blockedReason || lifecycle.verifiedDebit <= 0) && <NeuNotice severity="ack" className="mx-3 mb-3 flex items-start gap-2 text-xs"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{lifecycle.blockedReason || "No verified reserve debit is available to refund. No reserve credit has been inferred."}</NeuNotice>}
+    {emailError && <NeuNotice severity="ack" role="status" className="mx-3 mb-3 flex gap-2 text-xs"><MailWarning className="h-4 w-4 shrink-0" /><span><strong>Refund recorded successfully.</strong> Carrier notification failed: {emailError}</span></NeuNotice>}
     <div className="px-4 pb-4">
       <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-[#666]">Activity</h4>
       {sortedEvents.length ? <ol className="space-y-0">

@@ -1,5 +1,6 @@
 import { CalendarClock, Eye, Pencil, X } from "lucide-react";
 import { NeuBadge, NeuButton as Button } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import type { BroadcastSummary } from "../../../../shared/email-broadcast";
 
 export type ScheduledBroadcast = Omit<BroadcastSummary, "status"> & {
@@ -42,7 +43,7 @@ export function ScheduledBroadcasts({
     </header>
     <div className="max-h-[440px] space-y-2 overflow-auto p-2.5">
       {loading ? <div className="space-y-2" aria-label="Loading scheduled broadcasts"><div className="h-16 animate-pulse border border-[#c6d0cd] bg-[#f4f7f5]" /><div className="h-16 animate-pulse border border-[#c6d0cd] bg-[#f4f7f5]" /></div>
-        : error ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-2.5 text-[10px] text-[#8d433a]"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Retry</Button></div>
+        : error ? <NeuNotice severity="block" role="alert" className="flex flex-wrap items-center justify-between gap-2 text-[10px]"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Retry</Button></NeuNotice>
           : !items.length ? <div className="border border-dashed border-[#bdc9c5] bg-[#f6f8f6] px-3 py-6 text-center"><CalendarClock className="mx-auto mb-1.5 h-5 w-5 text-[#849794]" /><p className="text-[10px] font-semibold text-[#536a6d]">Nothing scheduled</p><p className="mt-1 text-[9px] text-[#7b8b89]">A schedule is saved only after its own preview and confirmation.</p></div>
             : items.map((item) => {
               const editable = !!item.scheduledAt && new Date(item.scheduledAt).getTime() > Date.now()

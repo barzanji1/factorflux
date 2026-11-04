@@ -4,6 +4,7 @@ import { MessageSquare, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { NeuButton, NeuCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import "./entity-notes.css";
 
 export type EntityNoteType =
@@ -208,10 +209,10 @@ function EntityNotesContent({ entityType, entityId, focusNoteId, onFocused }: En
           {[0, 1, 2].map(index => <div key={index} className="ff-entity-notes__skeleton" />)}
         </div>
       ) : notesQuery.isError ? (
-        <div className="ff-entity-notes__load-error" role="alert">
+        <NeuNotice severity="block" role="alert" className="ff-entity-notes__load-error">
           <p>{(notesQuery.error as Error)?.message || "Notes could not be loaded."}</p>
           <NeuButton onClick={() => notesQuery.refetch()}>Try again</NeuButton>
-        </div>
+        </NeuNotice>
       ) : notes.length === 0 ? (
         <div className="ff-entity-notes__empty">
           <MessageSquare className="h-5 w-5" />

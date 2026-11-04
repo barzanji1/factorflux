@@ -5,6 +5,7 @@ import type { EmailTemplate } from "../../../../shared/email-templates";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { NeuButton as Button, NeuInput as Input, NeuTextarea as Textarea } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 const templatesKey = ["/api/client-email/templates"];
 
@@ -66,7 +67,7 @@ export function EmailTemplatePicker({
     {templatesQuery.isLoading
         ? <div className="h-10 animate-pulse rounded-xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" aria-label="Loading email templates" />
       : templatesQuery.error
-        ? <div role="alert" className="flex items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] p-2 text-[10px] text-[#8d433a] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><span>{(templatesQuery.error as Error).message}</span><Button type="button" className="min-h-8 px-3 text-[10px]" onClick={() => void templatesQuery.refetch()}>Retry</Button></div>
+        ? <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-2 text-[10px]"><span>{(templatesQuery.error as Error).message}</span><Button type="button" className="min-h-8 px-3 text-[10px]" onClick={() => void templatesQuery.refetch()}>Retry</Button></NeuNotice>
         : <select id={id} value={value || "none"} disabled={disabled}
             onChange={(event) => onChange(event.target.value === "none" ? null : templatesQuery.data?.find((template) => template.id === event.target.value) || null)}
             className="h-11 w-full rounded-xl border-0 bg-[#e0e0e0] px-4 text-xs text-[#344244] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] focus:outline-none focus:ring-2 focus:ring-[#27aab8] disabled:opacity-50">
@@ -86,7 +87,7 @@ export function EmailTemplatePicker({
           <div className="space-y-1"><Label htmlFor={`${id}-template-name`}>Template name</Label><Input id={`${id}-template-name`} value={name} maxLength={100} disabled={saveMutation.isPending} onChange={(event) => setName(event.target.value)} className="text-xs" placeholder="For example, Holiday closure notice" /><p className="text-right text-[9px] text-[#84918f]">{name.length}/100</p></div>
           <div className="space-y-1"><Label htmlFor={`${id}-template-subject`}>Subject</Label><Input id={`${id}-template-subject`} value={subject} maxLength={200} disabled={saveMutation.isPending} onChange={(event) => setSubject(event.target.value)} className="text-xs" placeholder="A clear, specific subject" /></div>
           <div className="space-y-1"><Label htmlFor={`${id}-template-body`}>Message</Label><Textarea id={`${id}-template-body`} value={body} maxLength={20000} rows={7} disabled={saveMutation.isPending} onChange={(event) => setBody(event.target.value)} className="resize-y text-xs leading-relaxed" placeholder="Write reusable message text…" /></div>
-          {saveMutation.error && <div role="alert" className="border border-[#d3a49e] bg-[#fff1ee] p-2.5 text-[10px] leading-relaxed text-[#8d433a]"><strong>Template not saved.</strong> {(saveMutation.error as Error).message} Your composer draft is retained. You can retry.</div>}
+          {saveMutation.error && <NeuNotice severity="block" role="alert" className="text-[10px] leading-relaxed"><strong>Template not saved.</strong> {(saveMutation.error as Error).message} Your composer draft is retained. You can retry.</NeuNotice>}
           {saveMutation.isSuccess && <p role="status" className="text-[10px] text-[#28644f]">Template saved and selected.</p>}
         </div>
         <DialogFooter className="flex flex-wrap justify-end gap-2 border-t border-[#c5cfcc] bg-[#e1e8e5] px-4 py-3">

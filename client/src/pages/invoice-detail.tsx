@@ -40,6 +40,7 @@ import {
   NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell,
   NeuTableHead, NeuTableHeader, NeuTableRow,
 } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { forwardRef, type ComponentProps } from "react";
 import "./invoice-detail.css";
 
@@ -285,23 +286,18 @@ function LifecycleActionsCard({
                 {t.blockers.length > 0 && (
                   <div className="mt-2 space-y-1">
                     {t.blockers.map((b) => (
-                      <div key={b.code} className={cn(
-                        "flex items-start gap-1.5 rounded-lg px-2.5 py-1.5 text-xs",
-                        b.severity === "error"
-                          ? "bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300"
-                          : "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-300",
-                      )}>
+                      <NeuNotice key={b.code} severity={b.severity === "error" ? "block" : "ack"} className="flex items-start gap-1.5 text-xs">
                         {b.severity === "error"
                           ? <XCircle className="mt-0.5 h-3 w-3 shrink-0" />
                           : <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" />}
                         {b.message}
-                      </div>
+                      </NeuNotice>
                     ))}
                     {canForce && (
-                      <div className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs text-blue-700 dark:bg-blue-950/20 dark:text-blue-300">
+                      <NeuNotice severity="info" className="flex items-center gap-1.5 text-xs">
                         <Info className="h-3 w-3 shrink-0" />
                         Admin override available — you can still proceed
-                      </div>
+                      </NeuNotice>
                     )}
                   </div>
                 )}
@@ -401,10 +397,10 @@ function TransitionDialog({
           {hasSoftWarn && (
             <div className="space-y-1.5">
               {transition.blockers.map((b) => (
-                <div key={b.code} className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-300">
+                <NeuNotice key={b.code} severity="ack" className="flex items-start gap-2 text-xs">
                   <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   {b.message}
-                </div>
+                </NeuNotice>
               ))}
             </div>
           )}
@@ -797,14 +793,13 @@ export default function InvoiceDetail() {
             </NeuButton>
 
             {preflight?.alerts.filter(alert => alert.code === "DOCS_OCR_FAILED").map(alert => (
-              <div key={alert.code} role="status" data-testid="invoice-ocr-failed"
-                className="mb-4 border border-blue-300 bg-blue-50 p-3 text-blue-900">
+              <NeuNotice key={alert.code} severity="info" role="status" data-testid="invoice-ocr-failed" className="mb-4">
                 <p className="flex items-center gap-2 font-semibold"><Info className="h-4 w-4" />
                   {alert.title} <span className="text-xs">{alert.code} · Info</span>
                 </p>
                 <p className="mt-1 text-sm">{alert.message}</p>
                 <Button variant="link" onClick={() => navigate("/documents")}>Open Documents to retry</Button>
-              </div>
+              </NeuNotice>
             ))}
 
             {detailLoading ? (
@@ -1060,7 +1055,7 @@ export default function InvoiceDetail() {
                           {(docStatus.missingForReview?.length > 0 || docStatus.missingForApproval?.length > 0) && (
                             <div className="space-y-2">
                               {docStatus.missingForReview?.length > 0 && (
-                                <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                                <NeuNotice severity="ack" className="flex items-start gap-3">
                                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                                   <div>
                                     <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Missing for Review</p>
@@ -1068,10 +1063,10 @@ export default function InvoiceDetail() {
                                       {docStatus.missingForReview.join(", ")}
                                     </p>
                                   </div>
-                                </div>
+                                </NeuNotice>
                               )}
                               {docStatus.missingForApproval?.length > 0 && (
-                                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/20">
+                                <NeuNotice severity="block" className="flex items-start gap-3">
                                   <Lock className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
                                   <div>
                                     <p className="text-xs font-semibold text-red-800 dark:text-red-300">Missing for Approval</p>
@@ -1079,19 +1074,19 @@ export default function InvoiceDetail() {
                                       {docStatus.missingForApproval.join(", ")}
                                     </p>
                                   </div>
-                                </div>
+                                </NeuNotice>
                               )}
                             </div>
                           )}
 
                           {/* All-clear banner */}
                           {docStatus.canApprove && (
-                            <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                            <NeuNotice severity="info" className="flex items-center gap-3">
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                               <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                                 All required documents are present. This invoice can proceed to approval.
                               </p>
-                            </div>
+                            </NeuNotice>
                           )}
 
                           {/* Per-rule breakdown */}
@@ -1477,11 +1472,11 @@ export default function InvoiceDetail() {
                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-900 dark:border-slate-700">
                              <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2 text-xs text-slate-200">
                                <span className="truncate">{previewDocument.originalName}</span>
-                               <div className="flex items-center gap-2">
-                                 <a href={`/api/documents/${previewDocument.id}/download`} className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2 py-1 hover:bg-slate-600"><Download className="h-3 w-3" />Download</a>
-                                <NeuButton type="button" onClick={() => setPreviewDocument(null)} className="min-h-7 px-2 py-1 text-xs">Close</NeuButton>
-                               </div>
-                             </div>
+                                <div className="flex items-center gap-2">
+                                  <a href={`/api/documents/${previewDocument.id}/download`} className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2 py-1 hover:bg-slate-600"><Download className="h-3 w-3" />Download</a>
+                                 <NeuButton type="button" onClick={() => setPreviewDocument(null)} className="min-h-7 px-2 py-1 text-xs">Close</NeuButton>
+                                </div>
+                              </div>
                              {String(previewDocument.mimeType || "").startsWith("image/") ? <img src={`/api/documents/${previewDocument.id}/view`} alt={previewDocument.originalName} className="mx-auto max-h-[520px] max-w-full object-contain" /> : <iframe title={`Preview ${previewDocument.originalName}`} src={`/api/documents/${previewDocument.id}/view`} className="h-[520px] w-full bg-white" />}
                            </div>
                          )}
@@ -1607,7 +1602,7 @@ export default function InvoiceDetail() {
                               {detail.payout.paymentStatus?.replace(/_/g, " ")}
                             </Badge>
                           </NeuCard>
-                           {detail.payoutDetail?.funding && <div className={cn("flex items-center gap-2 rounded-xl border px-4 py-3 text-sm", detail.payoutDetail.funding.paymentSent ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}><CheckCircle2 className="h-4 w-4" />Payment sent: <strong>{detail.payoutDetail.funding.paymentSent ? "Yes" : "No"}</strong></div>}
+                           {detail.payoutDetail?.funding && <NeuNotice severity={detail.payoutDetail.funding.paymentSent ? "info" : "ack"} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4" />Payment sent: <strong>{detail.payoutDetail.funding.paymentSent ? "Yes" : "No"}</strong></NeuNotice>}
                            {detail.payoutDetail?.funding && <NeuCard className="p-4"><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Funding details</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-xs text-violet-600">Funding status</span><p className="font-semibold capitalize">{String(detail.payoutDetail.funding.status || "pending").replace(/_/g, " ")}</p></div><div><span className="text-xs text-violet-600">Funded date</span><p className="font-semibold">{fmtDate(detail.payoutDetail.funding.fundedDate)}</p></div><div><span className="text-xs text-violet-600">Funded by</span><p className="font-semibold">{detail.payoutDetail.funding.fundedBy ? `${detail.payoutDetail.funding.fundedBy.firstName || ""} ${detail.payoutDetail.funding.fundedBy.lastName || ""}`.trim() : "—"}</p></div></div></NeuCard>}
                             <NeuCard className="p-4">
                              <div className="flex items-center justify-between gap-3">
@@ -1691,12 +1686,7 @@ export default function InvoiceDetail() {
                           )}
                           {/* Document readiness for payment */}
                           {docStatus && (
-                            <div className={cn(
-                              "flex items-center gap-3 rounded-xl border px-4 py-3",
-                              docStatus.canApprove
-                                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-                                : "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
-                            )}>
+                             <NeuNotice severity={docStatus.canApprove ? "info" : "ack"} className="flex items-center gap-3">
                               {docStatus.canApprove
                                 ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
                                 : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />}
@@ -1710,7 +1700,7 @@ export default function InvoiceDetail() {
                                   }
                                 </span>
                               </div>
-                            </div>
+                            </NeuNotice>
                           )}
                           <Button variant="outline" size="sm" onClick={() => navigate("/payouts")} className="gap-1.5 rounded-xl text-xs">
                             <ExternalLink className="h-3.5 w-3.5" />Manage in Payouts
@@ -1768,8 +1758,8 @@ export default function InvoiceDetail() {
                                      </div>
                                    )}
                                  </div>
-                               ))}
-                             </div>
+                                ))}
+                              </div>
                             </NeuCard>
                          )}
                            <NeuCard className="flex flex-col gap-2 p-4">
@@ -1970,9 +1960,9 @@ export default function InvoiceDetail() {
                 </SelectContent>
               </Select>
             ) : (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <NeuNotice severity="ack" className="text-sm">
                 No bank accounts on file for this carrier — <a className="font-semibold underline" href={`/vault?clientId=${carrierId}`}>add one in Vault</a>
-              </p>
+              </NeuNotice>
             )}
           </div>
           <DialogFooter>
@@ -2001,7 +1991,7 @@ export default function InvoiceDetail() {
                   <SelectTrigger className="ff-invoice-select-trigger"><SelectValue placeholder="Select bank account" /></SelectTrigger>
                   <SelectContent className="ff-invoice-neu-select-content">{carrierBankAccounts.map((account: any) => <SelectItem key={account.id} value={String(account.id)}>{account.bankName} — {account.accountType ? account.accountType.charAt(0).toUpperCase() + account.accountType.slice(1) : "Account"} ending in {account.lastFour}</SelectItem>)}</SelectContent>
                 </Select>
-              ) : <p className="mt-1 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No bank accounts on file — <a className="font-semibold underline" href={`/vault?clientId=${carrierId}`}>add in carrier Vault</a></p>}
+              ) : <NeuNotice severity="ack" className="mt-1 text-sm">No bank accounts on file — <a className="font-semibold underline" href={`/vault?clientId=${carrierId}`}>add in carrier Vault</a></NeuNotice>}
             </div>}
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button onClick={() => editMutation.mutate()} disabled={!editValues.amount || editMutation.isPending || (["ACH", "Wire"].includes(editValues.paymentType) && !editValues.bankAccountId)}>Save Changes</Button></DialogFooter>

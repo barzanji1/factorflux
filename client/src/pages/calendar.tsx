@@ -16,6 +16,7 @@ import {
   NeuTabList,
   NeuTabs,
 } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
 
@@ -185,13 +186,13 @@ export default function CalendarPage() {
           </NeuCard>
         )}
         {query.isError && (
-          <NeuCard role="alert" className="flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <NeuNotice severity="block" role="alert" className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-semibold text-[#8b4545]">Calendar couldn’t load</p>
               <p className="mt-1 text-sm text-[#777]">Your events are still safe. Try loading them again.</p>
             </div>
             <NeuButton onClick={() => query.refetch()} className="min-h-10 px-4">Try again</NeuButton>
-          </NeuCard>
+          </NeuNotice>
         )}
         {!query.isLoading && !query.isError && (
           <NeuCard className="overflow-hidden p-2 sm:p-3">

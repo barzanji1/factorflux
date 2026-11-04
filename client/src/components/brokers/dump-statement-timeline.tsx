@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Download, FileText, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NeuBadge, NeuButton } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 interface StatementHistoryEvent {
   id: number;
@@ -79,7 +80,7 @@ export default function DumpStatementTimeline({ brokerId, neuStyle = false, onOp
 
   if (query.isError) {
     return (
-      <section role="alert" className={neuStyle ? "rounded-2xl bg-[#e0e0e0] p-4 shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]" : "border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f4f4f4] p-4"} data-testid="dump-statement-timeline-error">
+      <NeuNotice severity="block" role="alert" data-testid="dump-statement-timeline-error">
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#a13c35]" />
           <div className="min-w-0 flex-1">
@@ -88,7 +89,7 @@ export default function DumpStatementTimeline({ brokerId, neuStyle = false, onOp
             {neuStyle ? <NeuButton className="mt-3 min-h-9 px-3 text-xs" onClick={() => query.refetch()}><RotateCw className="h-3.5 w-3.5" />Retry</NeuButton> : <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => query.refetch()}><RotateCw className="h-3.5 w-3.5" /> Retry</Button>}
           </div>
         </div>
-      </section>
+      </NeuNotice>
     );
   }
 

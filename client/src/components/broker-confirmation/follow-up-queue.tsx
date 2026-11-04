@@ -5,6 +5,7 @@ import { RecoveryButton as Button, RecoveryCard as Card, RecoveryBadge } from "@
 import type { ConfirmationStatus } from "./confirmation-status";
 import { AlertCircle, ArrowRight, RefreshCw } from "lucide-react";
 import { NeuSelect } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 
 interface QueueItem {
   id: number; invoiceId: number; invoiceNumber: string; brokerName: string; title: string; description: string;
@@ -29,7 +30,7 @@ export default function ConfirmationFollowUpQueue() {
       <Button data-testid="confirmation-followups-retry" size="sm" variant="outline" className="h-7 px-2" onClick={() => query.refetch()}><RefreshCw className="mr-1 h-3 w-3" />Refresh</Button>
     </div>
     {query.isLoading ? <div className="space-y-2 p-4">{[1, 2, 3].map(n => <div key={n} className="h-14 animate-pulse bg-[#e5e2da]" />)}</div>
-      : query.error ? <div className="rounded-xl bg-[#f0dfdc] p-4 text-sm text-[#a3483e] shadow-[inset_4px_4px_8px_#c8aaa7,inset_-4px_-4px_8px_#fff]" role="alert">{(query.error as Error).message}<Button variant="ghost" size="sm" className="ml-2" onClick={() => query.refetch()}>Retry</Button></div>
+      : query.error ? <NeuNotice severity="block" role="alert" className="text-sm">{(query.error as Error).message}<Button variant="ghost" size="sm" className="ml-2" onClick={() => query.refetch()}>Retry</Button></NeuNotice>
       : !items.length ? <div className="p-6 text-center text-sm text-[#666]">No broker receipt follow-ups are currently queued.</div>
       : <div className="divide-y divide-[#c5c1b8]">{items.map(item => <article key={item.id} data-testid="confirmation-followup-row" className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
         <div className="min-w-0 flex-1">
@@ -49,6 +50,6 @@ export default function ConfirmationFollowUpQueue() {
           </NeuSelect>
         </label>
       </article>)}</div>}
-    {mutation.error && <p role="alert" className="rounded-b-xl bg-[#f0dfdc] p-2 text-xs text-[#a3483e]">{(mutation.error as Error).message}</p>}
+    {mutation.error && <NeuNotice severity="block" role="alert" className="text-xs">{(mutation.error as Error).message}</NeuNotice>}
   </Card>;
 }

@@ -50,6 +50,7 @@ import {
 import "@/components/funding/funding-neu.css";
 import { FundingStatCard } from "@/components/funding/funding-stat-card";
 import { NeuPageShell, NeuTable } from "@/styles/neu/components";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { PageInsights } from "@/components/PageInsights";
 import { FundingBadge } from "@/components/funding/funding-badge";
 
@@ -516,10 +517,10 @@ export default function Lockbox() {
 
             {/* Unmatched alert banner */}
             {unmatchedCount > 0 && (
-              <div className="flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+              <NeuNotice severity="ack" className="flex items-center gap-2 text-sm">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span><strong>{unmatchedCount}</strong> unmatched {unmatchedCount === 1 ? "entry requires" : "entries require"} attention — click <strong>Match</strong> to apply to open invoices.</span>
-              </div>
+              </NeuNotice>
             )}
 
             {/* Filters */}

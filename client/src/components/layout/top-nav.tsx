@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NeuButton, NeuInput } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import Sidebar from "@/components/layout/sidebar";
 import {
@@ -738,7 +739,7 @@ export default function TopNav({ title, subtitle, group, neu = true }: TopNavPro
             {selectedMessage}
           </div>
           {markReadError && (
-            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border border-red-700 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <NeuNotice severity="block" role="alert" className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <span>{markReadError}</span>
               <Button
                 type="button"
@@ -754,7 +755,7 @@ export default function TopNav({ title, subtitle, group, neu = true }: TopNavPro
               >
                 {markAsReadMutation.isPending ? "Retrying…" : "Retry"}
               </Button>
-            </div>
+            </NeuNotice>
           )}
           {selectedNotification?.actionUrl && (
             <div className="flex justify-end">

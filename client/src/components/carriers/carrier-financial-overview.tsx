@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
+import { NeuNotice } from "@/components/shared/NeuNotice";
 import { CylinderBar } from "@/components/dashboard/FinancialOverview";
 import type { CarrierFinancialSummary } from "@shared/carrier-financial";
 
@@ -47,10 +48,10 @@ export function CarrierFinancialOverview({ carrierId }: { carrierId: number }) {
     <div className="mt-4 grid gap-4 lg:grid-cols-2">{Array.from({ length: 4 }, (_, index) =>
       <NeuCard pressed key={index} className="h-72 animate-pulse" />)}</div>
   </section>;
-  if (error || !data) return <NeuCard className="p-5" role="alert">
-    <p className="text-sm text-red-700">Unable to load carrier financial summary.</p>
+  if (error || !data) return <NeuNotice severity="block" role="alert">
+    <p className="text-sm">Unable to load carrier financial summary.</p>
     <NeuButton className="mt-3" onClick={() => void refetch()}>Retry</NeuButton>
-  </NeuCard>;
+  </NeuNotice>;
   const fundedTotal = data.revenue.reduce((sum, row) => sum + row.amount, 0);
   const hasPayments = data.months.some(row => row.averageDaysToPay !== null);
   const arTotal = data.aging.reduce((sum, row) => sum + row.amount, 0);
