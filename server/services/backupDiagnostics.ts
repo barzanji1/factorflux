@@ -1,5 +1,7 @@
-// Only these fixed descriptions may leave the backup process. Never attach raw
-// stderr, exception messages/causes, connection strings or database identifiers.
+import type { BackupRuntimeDiagnostics } from "./backupRuntimeDiagnostics";
+
+// Categories and email descriptions stay allow-listed. Failure logs may also
+// contain explicitly redacted stderr and credential-free runtime probes.
 const REASONS = {
   CLIENT_NOT_FOUND: "pg_dump was not found. Rebuild and publish the PostgreSQL client.",
   CLIENT_RUNTIME_MISSING: "The bundled pg_dump exists, but its executable loader could not start.",
@@ -33,6 +35,7 @@ export interface BackupFailure {
   reason: string;
   exitCode?: number | null;
   signal?: string | null;
+  runtime?: BackupRuntimeDiagnostics;
 }
 
 function safeSignal(signal?: string | null): string | null {
@@ -45,6 +48,7 @@ export class PgDumpFailure extends Error {
   readonly name = "PgDumpFailure";
   readonly exitCode: number | null;
   readonly signal: string | null;
+  runtime?: BackupRuntimeDiagnostics;
   constructor(readonly code: FailureCode, exitCode?: number | null, signal?: string | null) {
     super(`pg_dump failed: ${REASONS[code]}`);
     this.exitCode = Number.isInteger(exitCode) ? exitCode! : null;
@@ -77,7 +81,8 @@ export function pgDumpFailure(stderr: string, options: {
 
 export function describeBackupFailure(stage: BackupStage, error: unknown): BackupFailure {
   if (error instanceof PgDumpFailure) {
-    return { stage, code: error.code, reason: REASONS[error.code], exitCode: error.exitCode, signal: error.signal };
+    return { stage, code: error.code, reason: REASONS[error.code], exitCode: error.exitCode, signal: error.signal,
+      ...(error.runtime ? { runtime: error.runtime } : {}) };
   }
   const value = error as { code?: string; name?: string; message?: string } | null;
   const identifiers = [value?.code, value?.name];

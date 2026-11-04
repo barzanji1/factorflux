@@ -53,4 +53,4 @@
 - [Document identity and viewing](document-identity-viewing.md) — dedupe pending uploads by original bytes and owner; distinguish browser CORS failures from S3 authorization.
 - [Dump statement cadence](dump-statement-cadence.md) — invoice-funded milestones trigger consolidated broker statements; no broker-wide cooldown or catch-up email bursts.
 - [Numeric page policy](numeric-page-policy.md) — insights cover every numeric operational page; summaries use authorized full datasets, and table pages default to 15 in UI and SQL.
-- [Backup diagnostic privacy](backup-diagnostic-privacy.md) — keep actionable failure categories and stages, never raw PostgreSQL stderr, SQL, connection strings, or provider responses.
+- [Backup diagnostic privacy](backup-diagnostic-privacy.md) — redacted stderr and binary/TCP evidence are allowed in failure logs; never persist credentials, raw SQL, or provider responses.

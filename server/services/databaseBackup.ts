@@ -12,7 +12,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { sendResendEmail } from "../resendTransport.js";
 import { DOCUMENTS_BUCKET, operationsS3 } from "./operationsS3";
-import { backupFailureEmail, describeBackupFailure, pgDumpFailure, type BackupFailure, type BackupStage } from "./backupDiagnostics";
+import { backupFailureEmail, describeBackupFailure, pgDumpFailure, PgDumpFailure, type BackupFailure, type BackupStage } from "./backupDiagnostics";
+import { collectBackupRuntimeDiagnostics, redactBackupStderr, STDERR_LIMIT } from "./backupRuntimeDiagnostics";
 
 export const BACKUP_PREFIX = "backups/db/";
 const BACKUP_PATTERN = /^backups\/db\/factorflux-\d{4}-\d{2}-\d{2}-\d{6}\.sql\.gz$/;
@@ -54,7 +55,11 @@ export async function dumpDatabase(
 ): Promise<void> {
   const url = new URL(directBackupConnectionUrl(databaseUrl));
   const bundled = existsSync(binary);
-  const child = spawn(bundled ? binary : "pg_dump", ["--no-password"], {
+  const selectedBinary = bundled ? binary : "pg_dump";
+  const libraryPath = [path.resolve(path.dirname(binary), "../lib"), process.env.LD_LIBRARY_PATH].filter(Boolean).join(":");
+  const privateValues = [decodeURIComponent(url.password), url.password, decodeURIComponent(url.username), url.hostname,
+    decodeURIComponent(url.pathname.slice(1))].filter(Boolean);
+  const child = spawn(selectedBinary, ["--no-password"], {
     stdio: ["ignore", "pipe", "pipe"],
     // Credentials are never passed in arguments, logs, or backup metadata.
     env: {
@@ -68,16 +73,18 @@ export async function dumpDatabase(
       PGCHANNELBINDING: url.searchParams.get("channel_binding") || "prefer",
       PGCONNECT_TIMEOUT: "10",
       // PostgreSQL's matching libpq ships alongside the generated client.
-      LD_LIBRARY_PATH: [path.resolve(path.dirname(binary), "../lib"), process.env.LD_LIBRARY_PATH]
-        .filter(Boolean).join(":"),
+      LD_LIBRARY_PATH: libraryPath,
     },
   });
-  // Bounded in-memory classification only. Never log or attach this text to an
-  // Error: stderr can contain database identifiers, SQL and credentials.
+  // Raw output is bounded and used only for classification/redaction. Only the
+  // redacted result may be attached to an Error or emitted to logs.
   let stderr = "";
+  let stderrTruncated = false;
   let timedOut = false;
   child.stderr.on("data", (chunk: Buffer) => {
-    stderr = (stderr + chunk.toString()).slice(-16_384);
+    const combined = stderr + chunk.toString();
+    if (combined.length > STDERR_LIMIT) stderrTruncated = true;
+    stderr = combined.slice(0, STDERR_LIMIT);
   });
   const exited = new Promise<void>((resolve, reject) => {
     child.once("error", (error: NodeJS.ErrnoException) => reject(pgDumpFailure("", {
@@ -95,6 +102,26 @@ export async function dumpDatabase(
       exited,
       pipeline(child.stdout, createGzip(), createWriteStream(destination, { mode: 0o600, flags: "wx" })),
     ]);
+  } catch (error) {
+    if (error instanceof PgDumpFailure) {
+      // Failure-only, parallel probes; no SQL/authentication and no addresses
+      // or connection strings in the returned diagnostic.
+      try {
+        error.runtime = await collectBackupRuntimeDiagnostics({
+          binary: selectedBinary, bundledExists: bundled, libraryPath,
+          host: url.hostname.replace(/^\[|\]$/g, ""), port: Number(url.port || 5432), stderr, stderrTruncated, privateValues,
+        });
+      } catch {
+        // Diagnostic trouble must never replace the original export failure.
+        error.runtime = {
+          stderr: redactBackupStderr(stderr, privateValues, stderrTruncated), stderrTruncated,
+          binary: { exists: existsSync(selectedBinary), bundledExists: bundled, source: bundled ? "bundled" : "PATH",
+            version: null, versionStatus: "unavailable" },
+          databaseTcp: { reachable: null, status: "error" },
+        };
+      }
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
     if (child.exitCode === null) child.kill("SIGKILL");
@@ -210,7 +237,7 @@ export async function runDatabaseBackup(overrides: Partial<BackupDependencies> =
   } catch (error) {
     if (!(error instanceof BackupInProgressError)) {
       const failure = describeBackupFailure(stage, error);
-      // Emit only allow-listed diagnostics, never raw exceptions or stderr.
+      // Never emit raw exceptions, connection strings or unredacted stderr.
       console.error("[backup] failed", {
         bucket: DOCUMENTS_BUCKET,
         ...failure,
