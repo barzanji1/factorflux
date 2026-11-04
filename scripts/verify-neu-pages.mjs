@@ -6,12 +6,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
-const out = "generated-artifacts/neu-rollout";
+const out = process.env.NEU_SMOKE_OUTPUT || "generated-artifacts/neu-rollout";
 // Keep the development hostname/Host header, while selecting the workflow's
 // known application port rather than an unrelated port on Preview's proxy.
 const host = process.env.REPLIT_DEV_DOMAIN;
 const base = `http://${host}:5000`;
-const routes = ["/client-email", "/client-email?tab=log", "/email-log", "/factoring", "/sheets", "/payouts",
+const routes = process.env.NEU_SMOKE_ROUTES?.split(",").filter(Boolean) || ["/client-email", "/client-email?tab=log", "/email-log", "/factoring", "/sheets", "/payouts",
   "/cash-application", "/lockbox", "/fuel-advance", "/bank-transfers", "/dispatchers", "/trucks", "/release-letters",
   "/credit-checks", "/fmcsa-authority", "/held", "/audit-log", "/followups", "/reports", "/admin", "/payroll",
   "/expenses", "/vault", "/document-rules", "/workflow-builder"];
@@ -93,7 +93,18 @@ try {
   for (let i = 0; i < 30 && await evaluate("location.pathname") === "/login"; i++) await delay(250);
   if (await evaluate("location.pathname") === "/login") throw new Error("Existing development test credentials did not authenticate; no account changes made");
   const results = [];
-  for (const route of routes) {
+  for (const requestedRoute of routes) {
+    let route = requestedRoute;
+    if (requestedRoute.endsWith("/:first")) {
+      const entity = requestedRoute.split("/")[1];
+      const firstId = await evaluate(`(async()=>{const response=await fetch('/api/${entity}?limit=15',{credentials:'include'});if(!response.ok)return null;const payload=await response.json();const rows=Array.isArray(payload)?payload:payload.data??payload.items??payload.${entity}??[];return Array.isArray(rows)&&rows[0]?.id!=null?String(rows[0].id):null;})()`);
+      if (!firstId) {
+        results.push({ route: requestedRoute, skipped: true, reason: "No accessible existing record for detail smoke check" });
+        console.log(JSON.stringify({ route: requestedRoute, skipped: true }));
+        continue;
+      }
+      route = `/${entity}/${encodeURIComponent(firstId)}`;
+    }
     uncaught = 0; exceptions = [];
     await evaluate(`(()=>{history.pushState({},'',${JSON.stringify(route)});dispatchEvent(new PopStateEvent('popstate'));})()`);
     for (let i = 0; i < 60; i++) {
@@ -112,20 +123,21 @@ try {
     })`);
     const ok = !status.notFound && !status.accessDenied && !status.overlays && uncaught === 0 && status.path !== "/login" && status.sidebar;
     results.push({ route, ...status, uncaught, exceptions, ok });
-    if (["/client-email?tab=log", "/sheets", "/admin", "/reports"].includes(route)) {
+    if (process.env.NEU_SMOKE_ROUTES || ["/client-email?tab=log", "/sheets", "/admin", "/reports"].includes(route)) {
       const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65, captureBeyondViewport: false });
-      await writeFile(`${out}/${route.split("?")[0].slice(1)}.jpg`, Buffer.from(image.data, "base64"));
+      await writeFile(`${out}/${route.split("?")[0].slice(1).replaceAll("/", "-") || "dashboard"}.jpg`, Buffer.from(image.data, "base64"));
     }
     console.log(JSON.stringify({ route, ok, uncaught, sidebar: status.sidebar, insights: status.insights }));
   }
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  await evaluate("history.pushState({},'', '/client-email?tab=log');dispatchEvent(new PopStateEvent('popstate'))");
+   const mobileRoute = process.env.NEU_SMOKE_ROUTES ? routes[0] : "/client-email?tab=log";
+   await evaluate(`history.pushState({},'', ${JSON.stringify(mobileRoute)});dispatchEvent(new PopStateEvent('popstate'))`);
   await delay(1500);
   const mobile = await evaluate(`({width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+2,modalCount:document.querySelectorAll('[role=dialog]').length})`);
   const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65, captureBeyondViewport: false });
   await writeFile(`${out}/email-mobile.jpg`, Buffer.from(image.data, "base64"));
   await writeFile(`${out}/browser-results.json`, JSON.stringify({ results, mobile }, null, 2));
-  if (results.some(result => !result.ok) || mobile.overflow) process.exitCode = 1;
+  if (results.some(result => !result.skipped && !result.ok) || mobile.overflow) process.exitCode = 1;
 } catch (error) {
   // Fixed local messages only; never dump browser protocol payloads or stderr.
   console.error(error instanceof Error ? error.message : "Browser verification failed");

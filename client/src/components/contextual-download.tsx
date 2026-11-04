@@ -1,7 +1,5 @@
 import { useDeviceDetection } from '@/hooks/useDeviceDetection';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Badge } from '@/components/admin-neu/adapters';
 import { Download, Monitor, Smartphone, Tablet, Globe, ExternalLink } from 'lucide-react';
 
 interface ContextualDownloadProps {
@@ -72,21 +70,21 @@ export default function ContextualDownload({ showAllOptions = false, compact = f
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Recommended Option */}
-        <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+        <div className="rounded-2xl bg-[#e0e0e0] p-4 shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-lg">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e0e0e0] text-lg shadow-[4px_4px_8px_#c1c1c1,-4px_-4px_8px_#fff]">
                 {deviceInfo.recommendedDownload?.icon || '🌐'}
               </div>
               <div>
-                <p className="font-semibold text-blue-900">
+                <p className="font-semibold text-[#333]">
                   {deviceInfo.recommendedDownload ? (
                     `${deviceInfo.recommendedDownload.platform} Desktop App`
                   ) : (
                     'Web Application'
                   )}
                 </p>
-                <p className="text-sm text-blue-700">
+                <p className="text-sm text-[#777]">
                   {deviceInfo.recommendedDownload ? (
                     `Optimized for ${deviceInfo.recommendedDownload.platform} • ${deviceInfo.recommendedDownload.size}`
                   ) : (
@@ -96,7 +94,7 @@ export default function ContextualDownload({ showAllOptions = false, compact = f
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge className="bg-blue-600">Recommended</Badge>
+              <Badge tone="accent">Recommended</Badge>
               <Button
                 onClick={() => {
                   if (deviceInfo.recommendedDownload) {
@@ -200,7 +198,7 @@ export default function ContextualDownload({ showAllOptions = false, compact = f
 
         {/* Browser-specific instructions */}
         {deviceInfo.isDesktop && (
-          <div className="p-3 bg-muted rounded-lg">
+          <div className="rounded-xl bg-[#e0e0e0] p-3 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
             <p className="text-sm font-medium mb-2">Create Desktop Shortcut:</p>
             <p className="text-xs text-muted-foreground">
               {deviceInfo.browser === 'Chrome' && 'Menu → More Tools → Create Shortcut → Check "Open as window"'}

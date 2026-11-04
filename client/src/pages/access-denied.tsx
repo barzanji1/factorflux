@@ -1,15 +1,15 @@
 import { ShieldX } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, Card } from "@/components/admin-neu/adapters";
 
 export default function AccessDenied({ onBack }: { onBack?: () => void }) {
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-[hsl(var(--background))] px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400">
+    <div className="flex min-h-[100dvh] w-full items-center justify-center bg-[#e0e0e0] px-4">
+      <Card className="w-full max-w-md p-8 text-center">
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#e0e0e0] text-[#a3483e] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
           <ShieldX className="h-7 w-7" />
         </div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Access Denied</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        <h1 className="text-xl font-semibold text-[#333]">Access Denied</h1>
+        <p className="mt-2 text-sm leading-6 text-[#777]">
           You don’t have permission to access this resource. Contact an administrator if you need access.
         </p>
         {onBack && (
@@ -17,7 +17,7 @@ export default function AccessDenied({ onBack }: { onBack?: () => void }) {
             Return to dashboard
           </Button>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

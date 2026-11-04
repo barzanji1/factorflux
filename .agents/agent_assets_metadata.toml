@@ -78,3 +78,17 @@ mtime_ms = 1793761913156
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/ea233303-e6ab-4236-aea0-ec0fdae04674/f284ae7a-7232-4a0c-91ff-cbc9300a5579"
 storage_version_token = "1793761914414645"
 content_type = "text/html"
+
+[[outputs]]
+id = "iEzzBngcNJx4if3TiZmwA"
+uri = "file://generated-artifacts/neu-remaining/changes.html"
+type = "html"
+title = "Remaining internal styling — full diff and deletion audit"
+description = "All page/component changes, ten confirmed unused-file deletions, verification results and remaining verification limits."
+logical_id = "2f71fd83-2ad3-4d7c-a33d-34e7dbfac04c"
+content_hash = "sha256:eea338f132f88165041c6e6d6c633a4c65048cd80baca95a27d156d10ab3cf66"
+size = 427480
+mtime_ms = 1793806935148
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/2f71fd83-2ad3-4d7c-a33d-34e7dbfac04c/1c99c403-57a2-48ad-8bd5-4a1140d4df74"
+storage_version_token = "1793806936755461"
+content_type = "text/html"

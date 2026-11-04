@@ -3,14 +3,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, Button, AdminPageShell } from "@/components/admin-neu/adapters";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import EntityNotes from "@/components/shared/EntityNotes";
 import { PageInsights } from "@/components/PageInsights";
+import "@/components/admin-neu/admin-neu-page.css";
 
 type Task = {
   id: number; title: string; description?: string; type: string; priority: string;
@@ -53,14 +53,14 @@ export default function TaskDetail() {
       toast({ title: "Error", description: error instanceof Error ? error.message : "Could not save progress", variant: "destructive" });
     } finally { setSaving(false); queryClient.invalidateQueries({ queryKey: ["/api/tasks", params?.id] }); }
   };
-  if (isLoading) return <div className="p-10 text-center">Loading task…</div>;
-  if (isError || !task) return <div className="p-10 text-center text-red-600">Task not found or unavailable.</div>;
-  return <div className="flex h-screen bg-[hsl(var(--background))]"><Sidebar /><div className="flex min-w-0 flex-1 flex-col overflow-hidden"><TopNav title="Task Details" subtitle="Track task progress" group="Workspace" /><main className="flex-1 overflow-auto p-6"><div className="mx-auto max-w-4xl space-y-6"><PageInsights entity="tasks" entityId={task.id} title="Task activity" />
+  if (isLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-[#e0e0e0] p-10"><Card className="w-full max-w-4xl space-y-4 p-6"><div className="h-6 w-1/2 animate-pulse rounded bg-[#d2d2d2]" /><div className="h-32 animate-pulse rounded-xl bg-[#d2d2d2]" /></Card></div>;
+  if (isError || !task) return <div className="flex min-h-[100dvh] items-center justify-center bg-[#e0e0e0] p-6"><Card className="max-w-md p-8 text-center text-[#a3483e]">Task not found or unavailable.</Card></div>;
+  return <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]"><Sidebar /><div className="flex min-w-0 flex-1 flex-col overflow-hidden"><TopNav title="Task Details" subtitle="Track task progress" group="Workspace" /><AdminPageShell className="flex-1 overflow-auto !min-h-0 p-6"><div className="mx-auto max-w-4xl space-y-6"><PageInsights entity="tasks" entityId={task.id} title="Task activity" />
     <Button variant="outline" onClick={() => navigate("/tasks")}>Back to tasks</Button>
-    <Card><CardHeader><CardTitle className="text-2xl">{task.title}</CardTitle><p className="text-muted-foreground">{task.description || "No description provided."}</p></CardHeader><CardContent className="space-y-6">
+     <Card><CardHeader><CardTitle className="text-2xl">{task.title}</CardTitle><p className="text-muted-foreground">{task.description || "No description provided."}</p></CardHeader><CardContent className="space-y-6">
       <div><div className="mb-2 flex justify-between text-sm font-medium"><span>Progress</span><span>{draftProgress}%</span></div><Progress value={draftProgress} className="h-5" /><Slider className="mt-5" min={0} max={100} step={1} value={[draftProgress]} disabled={saving} onValueChange={([value]) => setDraftProgress(value)} onValueCommit={([value]) => saveProgress(value)} /><p className="mt-2 text-xs text-muted-foreground">{saving ? "Saving…" : "Changes save immediately"}</p></div>
       <div className="grid gap-4 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Assigned to</p><div className="mt-1 flex items-center gap-2"><Avatar className="h-8 w-8"><AvatarImage src={task.assignedAgent?.profileImageUrl} /><AvatarFallback>{name(task.assignedAgent).slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>{name(task.assignedAgent)}</div></div><div><p className="text-xs text-muted-foreground">Created by</p><p>{name(task.creator)}</p></div><div><p className="text-xs text-muted-foreground">Status</p><p className="capitalize">{task.status.replace("_", " ")}</p></div><div><p className="text-xs text-muted-foreground">Priority / Type</p><p className="capitalize">{task.priority} · {task.type}</p></div><div><p className="text-xs text-muted-foreground">Last progress update</p><p>{task.progressUpdatedAt ? new Date(task.progressUpdatedAt).toLocaleString() : "Not updated yet"}{task.progressUpdater ? ` by ${name(task.progressUpdater)}` : ""}</p></div><div><p className="text-xs text-muted-foreground">Due date</p><p>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No due date"}</p></div></div>
      </CardContent></Card>
      <EntityNotes key={`task:${task.id}`} entityType="task" entityId={task.id} />
-  </div></main></div></div>;
+   </div></AdminPageShell></div></div>;
 }

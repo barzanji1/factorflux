@@ -3,11 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Button, Input, DialogContent } from "@/components/admin-neu/adapters";
+import { NeuBadge, NeuSelect } from "@/styles/neu/components";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProfileSection, EmptyState } from "./carrier-profile-section";
 
 type Driver = {
@@ -54,16 +53,18 @@ function Avatar({ driver, editable, onPhoto }: { driver: Driver; editable: boole
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="relative shrink-0">
-      <button
+      <Button
         type="button"
         disabled={!editable}
         onClick={() => inputRef.current?.click()}
-        className="group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#d9edf0] text-sm font-bold text-[#087d8d] ring-1 ring-[#b8c9cd] disabled:cursor-default"
+        variant="ghost"
+        size="icon"
+        className="group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#e0e0e0] p-0 text-sm font-bold text-[#168d99] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1] disabled:cursor-default"
         aria-label={editable ? `Upload photo for ${driver.firstName} ${driver.lastName}` : `${driver.firstName} ${driver.lastName}`}
       >
         {driver.photoUrl ? <img src={driver.photoUrl} alt="" className="h-full w-full object-cover" /> : initials(driver)}
         {editable && <span className="absolute inset-0 hidden items-center justify-center bg-black/45 text-white group-hover:flex"><Camera className="h-4 w-4" /></span>}
-      </button>
+      </Button>
       <input ref={inputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(event) => {
         const file = event.target.files?.[0];
         if (file) onPhoto(file);
@@ -175,12 +176,12 @@ export function DriverSection({ carrierId, canEdit, legacyDriver }: { carrierId:
 
   return (
     <>
-      <ProfileSection title="Drivers" action={canEdit ? <Button onClick={() => openDriver()} variant="outline" size="sm" className="h-7 gap-1 rounded-sm text-[10px]"><Plus className="h-3 w-3" />Add driver</Button> : undefined}>
+      <ProfileSection title="Drivers" action={canEdit ? <Button onClick={() => openDriver()} variant="outline" size="sm" className="h-8 gap-1 text-[10px]"><Plus className="h-3 w-3" />Add driver</Button> : undefined}>
         {isLoading ? <div className="h-20 animate-pulse border border-[#d0d9dc] bg-[#eef3f1]" />
           : isError ? <EmptyState label="Drivers could not be loaded" actionLabel="Retry" onAction={() => refetch()} />
           : drivers.length ? <div className="grid gap-2 sm:grid-cols-2">
           {drivers.map((driver) => (
-            <div key={driver.id} className="flex gap-3 border border-[#d0d9dc] bg-[#fbfcfb] p-3">
+            <div key={driver.id} className="flex gap-3 rounded-2xl bg-[#e0e0e0] p-3 shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
               <Avatar driver={driver} editable={canEdit} onPhoto={async (file) => {
                 try {
                   await uploadPhoto(driver.id, file);
@@ -194,7 +195,7 @@ export function DriverSection({ carrierId, canEdit, legacyDriver }: { carrierId:
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="truncate text-[12px] font-bold text-[#263b44]">{driver.firstName} {driver.lastName}</p>
-                    <span className={`mt-1 inline-flex border px-1.5 py-0.5 text-[9px] font-bold uppercase ${driver.status === "active" ? "border-[#85c7b1] bg-[#e9f7f1] text-[#167152]" : "border-[#c4cbcd] bg-[#f1f3f3] text-[#66777c]"}`}>{driver.status}</span>
+                    <NeuBadge tone={driver.status === "active" ? "success" : "neutral"} className="mt-1 px-1.5 py-0.5 text-[9px] uppercase">{driver.status}</NeuBadge>
                   </div>
                   {canEdit && <div className="flex">
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-[#087d8d]" onClick={() => openDriver(driver)} aria-label={`Edit ${driver.firstName}`}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -209,8 +210,8 @@ export function DriverSection({ carrierId, canEdit, legacyDriver }: { carrierId:
               </div>
             </div>
           ))}
-        </div> : legacyDriver?.name ? <div className="flex items-center gap-3 border border-[#d0d9dc] bg-[#fbfcfb] p-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#e8eceb] text-sm font-bold text-[#718187]">
+        </div> : legacyDriver?.name ? <div className="flex items-center gap-3 rounded-2xl bg-[#e0e0e0] p-3 shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#e0e0e0] text-sm font-bold text-[#718187] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
             {legacyDriver.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
@@ -230,15 +231,15 @@ export function DriverSection({ carrierId, canEdit, legacyDriver }: { carrierId:
       </ProfileSection>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-xl rounded-sm">
+        <DialogContent className="max-w-xl rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8]">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit driver" : "Add driver"}</DialogTitle>
             <DialogDescription>Driver details are linked directly to this carrier.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2 flex items-center gap-3">
-              <label className="group relative flex h-16 w-16 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#d9edf0] font-bold text-[#087d8d] ring-1 ring-[#b8c9cd]">
-                {preview ? <img src={preview} alt="Driver preview" className="h-full w-full object-cover" /> : <><span>{(form.firstName[0] || "") + (form.lastName[0] || "") || "DR"}</span><Camera className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-white p-0.5" /></>}
+              <label className="group relative flex h-16 w-16 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#e0e0e0] font-bold text-[#168d99] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
+                {preview ? <img src={preview} alt="Driver preview" className="h-full w-full object-cover" /> : <><span>{(form.firstName[0] || "") + (form.lastName[0] || "") || "DR"}</span><Camera className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-[#e0e0e0] p-0.5 text-[#168d99]" /></>}
                 <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(event) => event.target.files?.[0] && choosePendingPhoto(event.target.files[0])} />
               </label>
               <div><p className="text-xs font-semibold">Driver photo</p><p className="text-[10px] text-muted-foreground">Click the avatar to choose a JPEG or PNG, up to 5MB.</p></div>
@@ -250,7 +251,7 @@ export function DriverSection({ carrierId, canEdit, legacyDriver }: { carrierId:
             <div><Label>License #</Label><Input value={form.licenseNumber} onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })} /></div>
             <div><Label>License State</Label><Input maxLength={2} value={form.licenseState} onChange={(e) => setForm({ ...form, licenseState: e.target.value.toUpperCase().replace(/[^A-Z]/g, "") })} /></div>
             <div><Label>License Expiration</Label><Input type="date" value={form.licenseExpiration} onChange={(e) => setForm({ ...form, licenseExpiration: e.target.value })} /></div>
-            <div><Label>Status</Label><Select value={form.status} onValueChange={(value: "active" | "inactive") => setForm({ ...form, status: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div>
+            <div><Label>Status</Label><NeuSelect aria-label="Driver status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "active" | "inactive" })}><option value="active">Active</option><option value="inactive">Inactive</option></NeuSelect></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

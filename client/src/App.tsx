@@ -34,7 +34,6 @@ import FundingQueue from "@/pages/funding-queue";
 import Tasks from "@/pages/tasks";
 import TaskDetail from "@/pages/task-detail";
 import Brokers from "@/pages/brokers";
-import FormDemo from "@/pages/form-demo";
 import LoginPage from "@/pages/login";
 import Help from "@/pages/help";
 import Payouts from "@/pages/payouts";
@@ -276,11 +275,6 @@ function Router() {
       <Route path="/download">
         <ProtectedRoute>
           <DownloadPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/form-demo">
-        <ProtectedRoute>
-          <FormDemo />
         </ProtectedRoute>
       </Route>
       <Route path="/landing">

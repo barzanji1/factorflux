@@ -124,18 +124,18 @@ export default function CollectionsAutomation() {
 
   return (
     <section className="space-y-3" data-testid="collections-automation">
-      <Card className="overflow-hidden rounded-sm border-2 border-[#808080] border-r-[#404040] border-b-[#404040] bg-[#f4f4f4]">
-        <div className="flex flex-wrap items-center gap-3 border-b-2 border-[#808080] bg-[#d4d0c8] px-4 py-3">
+      <Card className="overflow-hidden rounded-2xl border-0">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[#c9c9c9] px-4 py-3">
           <FileText className="h-4 w-4 text-[#087f8c]" />
           <div><h2 className="font-bold text-[#222]">Broker collections · VP / RPS</h2><p className="text-[11px] text-[#555]">Verify paperwork receipt, then track payment status.</p></div>
           <Button size="sm" variant="outline" className="ml-auto h-7 px-2" onClick={() => { queue.refetch(); settings.refetch(); }}><RefreshCw className="mr-1 h-3 w-3" />Refresh</Button>
         </div>
 
-        {currentSettings?.liveEmailsBlocked && <div role="alert" data-testid="collections-preview-warning" className="border-b-2 border-[#a12b22] bg-[#fff1d6] px-3 py-3 text-xs text-[#7a291d]">
+        {currentSettings?.liveEmailsBlocked && <div role="alert" data-testid="collections-preview-warning" className="border-b border-[#c9c9c9] bg-[#f0e6d3] px-3 py-3 text-xs text-[#7a291d]">
           <strong>{currentSettings.liveEmailNotice}</strong>
           <p className="mt-1">Saving LIVE does not bypass this safeguard. Dry-run tests work here; a real email test must run in the published production app using a broker email address you control.</p>
         </div>}
-        {currentSettings && <div className="grid gap-3 border-b border-[#b5b1a8] bg-[#ece9e2] p-3 md:grid-cols-[1fr_auto] md:items-center">
+        {currentSettings && <div className="grid gap-3 border-b border-[#c9c9c9] p-3 md:grid-cols-[1fr_auto] md:items-center">
           <div className="flex items-start gap-2 text-xs text-[#45433e]">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#8b5a00]" />
             <div><strong>{currentSettings.enabled ? "Automation is on" : "Global automation is off."}</strong>{" "}
@@ -160,19 +160,19 @@ export default function CollectionsAutomation() {
         </div>}
 
         {runResult && <div role={runResult.failed ? "alert" : "status"} data-testid="collections-run-result"
-          className={`border-b px-3 py-3 text-xs ${runResult.failed ? "border-[#a12b22] bg-[#fce8e6] text-[#8b1d16]" : "border-[#808080] bg-[#ece9e2] text-[#333]"}`}>
-          <div className="flex items-start justify-between gap-2"><strong>{runResult.message}</strong><button aria-label="Dismiss run result" onClick={() => setRunResult(null)}><X className="h-3.5 w-3.5" /></button></div>
+          className={`rounded-xl px-3 py-3 text-xs ${runResult.failed ? "bg-[#f0dfdc] text-[#8b1d16] shadow-[inset_4px_4px_8px_#c8aaa7,inset_-4px_-4px_8px_#fff]" : "bg-[#e0e0e0] text-[#333] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]"}`}>
+          <div className="flex items-start justify-between gap-2"><strong>{runResult.message}</strong><Button variant="ghost" size="icon" aria-label="Dismiss run result" onClick={() => setRunResult(null)}><X className="h-3.5 w-3.5" /></Button></div>
           <p className="mt-1">{runResult.checked} checked · {runResult.processed} successful actions · {runResult.failed} failed. “Accepted” means accepted by the email provider, not confirmed delivered.</p>
           {runResult.errors.length > 0 && <ul className="mt-2 max-h-56 list-disc space-y-2 overflow-y-auto pl-4">{runResult.errors.map((error, i) => <li key={`${error.invoiceId}-${i}`}>
             <strong>{error.invoiceNumber ?? `Invoice ${error.invoiceId}`} — {error.outcome === "unconfirmed" ? "Delivery unconfirmed" : "Failed"}{error.step ? ` (${error.step})` : ""}: </strong>{error.message}
             {error.outcome === "unconfirmed" && <span> Delivery may have been accepted. Resume the existing workflow to retry safely; do not start a new email.</span>}
-            <button className="ml-2 underline" onClick={() => setSelectedId(error.invoiceId)}>View audit</button>
+            <Button variant="link" size="sm" className="ml-2 h-auto p-0 align-baseline" onClick={() => setSelectedId(error.invoiceId)}>View audit</Button>
           </li>)}</ul>}
         </div>}
-        {errorMessage && <div role="alert" className="flex items-center justify-between gap-2 border-b border-[#c9a46a] bg-[#fff5d8] px-3 py-2 text-xs text-[#634400]"><span>{errorMessage}</span><button aria-label="Dismiss notice" onClick={() => setErrorMessage("")}><X className="h-3.5 w-3.5" /></button></div>}
-        <div className="flex flex-col gap-3 border-b border-[#c5c1b8] p-3 md:flex-row md:items-center">
+        {errorMessage && <div role="alert" className="flex items-center justify-between gap-2 rounded-xl bg-[#f1e7d1] px-3 py-2 text-xs text-[#634400] shadow-[inset_4px_4px_8px_#cbbda3,inset_-4px_-4px_8px_#fff]"><span>{errorMessage}</span><Button variant="ghost" size="icon" aria-label="Dismiss notice" onClick={() => setErrorMessage("")}><X className="h-3.5 w-3.5" /></Button></div>}
+        <div className="flex flex-col gap-3 border-b border-[#c9c9c9] p-3 md:flex-row md:items-center">
           <div className="flex flex-wrap gap-1" role="group" aria-label="Filter collection phase">
-            {phases.map(item => <button key={item.value} onClick={() => { setPhase(item.value); setPage(1); }} className={`border-2 px-2 py-1 text-[11px] font-bold ${phase === item.value ? "border-l-[#404040] border-t-[#404040] border-r-white border-b-white bg-[#c9e4e2] text-[#075e67]" : "border-l-white border-t-white border-r-[#808080] border-b-[#808080] bg-[#d4d0c8] text-[#444]"}`}>{item.label}</button>)}
+            {phases.map(item => <Button key={item.value} size="sm" variant={phase === item.value ? "accent" : "outline"} onClick={() => { setPhase(item.value); setPage(1); }} className="h-8 px-2 text-[11px] font-bold">{item.label}</Button>)}
           </div>
           <form onSubmit={submitSearch} className="flex gap-1 md:ml-auto">
             <label className="sr-only" htmlFor="collections-search">Search broker, invoice, or load</label>
@@ -181,13 +181,13 @@ export default function CollectionsAutomation() {
           </form>
         </div>
 
-        {queue.isLoading ? <div className="space-y-2 p-4" aria-label="Loading collection queue">{[0, 1, 2, 3].map(n => <div key={n} className="h-16 animate-pulse bg-[#e5e2da]" />)}</div>
+        {queue.isLoading ? <div className="space-y-2 p-4" aria-label="Loading collection queue">{[0, 1, 2, 3].map(n => <div key={n} className="h-16 animate-pulse rounded-xl bg-[#d2d2d2]" />)}</div>
           : queue.error ? <div role="alert" className="p-5 text-sm text-[#8b1d16]"><AlertCircle className="mr-1 inline h-4 w-4" />{(queue.error as Error).message}<Button className="ml-2 h-7" size="sm" onClick={() => queue.refetch()}>Retry</Button></div>
-          : !rows.length ? <div className="p-9 text-center"><div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center border-2 border-l-white border-t-white border-r-[#808080] border-b-[#808080] bg-[#d4d0c8]"><Clock3 className="h-5 w-5 text-[#555]" /></div><p className="text-sm font-bold text-[#333]">No collections in this view</p><p className="mt-1 text-xs text-[#666]">Try another phase or search term. No records have been added here.</p></div>
+          : !rows.length ? <div className="p-9 text-center"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#e0e0e0] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]"><Clock3 className="h-5 w-5 text-[#168d99]" /></div><p className="text-sm font-bold text-[#333]">No collections in this view</p><p className="mt-1 text-xs text-[#666]">Try another phase or search term. No records have been added here.</p></div>
           : <div className="overflow-x-auto">
             <RecoveryTable className="w-full min-w-[1040px] border-collapse text-left text-xs">
-              <thead className="bg-[#d4d0c8] text-[#333]"><tr>{["Invoice / broker", "Phase", "Next scheduled", "Attempts · VP / RPS", "Controls", ""].map((h, i) => <th key={i} className="border-b-2 border-[#808080] px-3 py-2 font-bold">{h}</th>)}</tr></thead>
-              <tbody>{rows.map(row => <tr key={row.invoiceId} className="border-b border-[#c5c1b8] odd:bg-[#f7f6f2] hover:bg-[#eaf3f2]">
+              <thead className="text-[#333]"><tr>{["Invoice / broker", "Phase", "Next scheduled", "Attempts · VP / RPS", "Controls", ""].map((h, i) => <th key={i} className="border-b border-[#c9c9c9] px-3 py-2 font-bold">{h}</th>)}</tr></thead>
+              <tbody>{rows.map(row => <tr key={row.invoiceId} className="border-b border-[#d0d0d0] hover:bg-[#dceaea]">
                 <td className="px-3 py-2.5"><Link href={`/invoices/${row.invoiceId}`} className="font-bold text-[#087f8c] underline">{row.invoiceNumber}</Link><div className="mt-0.5 text-[#333]">{row.broker || "Broker not listed"}</div><div className="text-[10px] text-[#666]">Load {row.loadNumber || "—"} · Carrier {row.carrier || "—"}</div></td>
                  <td className="px-3 py-2.5"><RecoveryBadge tone={row.phase === "paid" ? "success" : row.escalatedPhase || row.lastError ? "warning" : "neutral"} className="px-2 py-1 text-[10px]">{phaseLabel(row)}</RecoveryBadge><div className="mt-1 text-[10px] font-bold uppercase text-[#666]">{row.mode === "dry_run" ? "SIMULATED" : "LIVE"}{row.paused ? " · paused" : ""}</div>{row.lastError && <div className="mt-1 max-w-64 whitespace-normal break-words text-[10px] text-[#a12b22]">Error: {row.lastError}</div>}</td>
                 <td className="px-3 py-2.5 text-[#333]">{dateLabel(row.nextActionAt)}</td>
@@ -205,30 +205,30 @@ export default function CollectionsAutomation() {
               </tr>)}</tbody>
             </RecoveryTable>
           </div>}
-        {!queue.isLoading && !queue.error && <div className="flex items-center justify-between border-t border-[#c5c1b8] bg-[#ece9e2] px-3 py-2 text-[11px] text-[#555]"><span>{queue.data?.total ?? 0} collection records · page {page} of {totalPages}</span><div className="flex gap-1"><Button variant="outline" size="sm" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><ChevronLeft className="h-3 w-3" />Previous</Button><Button variant="outline" size="sm" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next<ChevronRight className="h-3 w-3" /></Button></div></div>}
+        {!queue.isLoading && !queue.error && <div className="flex items-center justify-between border-t border-[#c9c9c9] px-3 py-2 text-[11px] text-[#666]"><span>{queue.data?.total ?? 0} collection records · page {page} of {totalPages}</span><div className="flex gap-1"><Button variant="outline" size="sm" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><ChevronLeft className="h-3 w-3" />Previous</Button><Button variant="outline" size="sm" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next<ChevronRight className="h-3 w-3" /></Button></div></div>}
       </Card>
 
       <Dialog open={selectedId !== null} onOpenChange={open => { if (!open) setSelectedId(null); }}>
-        <DialogContent className="max-h-[88vh] overflow-y-auto rounded-sm border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#f4f4f4] shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-3xl">
+        <DialogContent className="max-h-[88vh] overflow-y-auto rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] sm:max-w-3xl">
           <DialogHeader><DialogTitle>Collection audit · {detail.data?.row.invoiceNumber ?? `Invoice ${selectedId ?? ""}`}</DialogTitle></DialogHeader>
           {detail.isLoading || (!detail.data && !detail.error) ? <div className="space-y-2 py-3">{[0, 1, 2].map(n => <div key={n} className="h-12 animate-pulse bg-[#e5e2da]" />)}</div>
-            : detail.error ? <div role="alert" className="py-3 text-sm text-red-800">{(detail.error as Error).message}<Button className="ml-2" size="sm" onClick={() => detail.refetch()}>Retry</Button></div>
+            : detail.error ? <div role="alert" className="rounded-xl bg-[#f0dfdc] px-3 py-3 text-sm text-[#a3483e] shadow-[inset_4px_4px_8px_#c8aaa7,inset_-4px_-4px_8px_#fff]">{(detail.error as Error).message}<Button variant="ghost" className="ml-2" size="sm" onClick={() => detail.refetch()}>Retry</Button></div>
             : <div className="space-y-3">
-              <div className="border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white p-3 text-xs text-[#444]"><strong>{detail.data?.row.broker || "Broker not listed"}</strong> · {phaseLabel(detail.data!.row)} · {detail.data?.row.mode === "dry_run" ? "SIMULATED (not sent)" : "LIVE"}<div className="mt-1">VP confirmed: {dateLabel(detail.data?.row.vpConfirmedAt ?? null)} · Workflow paid: {dateLabel(detail.data?.row.paidAt ?? null)}</div></div>
+               <div className="rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#444] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><strong>{detail.data?.row.broker || "Broker not listed"}</strong> · {phaseLabel(detail.data!.row)} · {detail.data?.row.mode === "dry_run" ? "SIMULATED (not sent)" : "LIVE"}<div className="mt-1">VP confirmed: {dateLabel(detail.data?.row.vpConfirmedAt ?? null)} · Workflow paid: {dateLabel(detail.data?.row.paidAt ?? null)}</div></div>
               {!detail.data?.events.length ? <p className="py-4 text-center text-xs text-[#666]">No audit events recorded.</p>
-                : <div className="space-y-2">{detail.data.events.map(event => <article key={event.id} className="border-2 border-l-[#808080] border-t-[#808080] border-r-white border-b-white bg-white p-3 text-xs">
+                 : <div className="space-y-2">{detail.data.events.map(event => <article key={event.id} className="rounded-xl bg-[#e0e0e0] p-3 text-xs shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
                   <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[#333]">{event.step} · {event.phase.toUpperCase()}</strong><RecoveryBadge tone={event.mode === "dry_run" || outcomeLabel(event) === "SIMULATED" ? "warning" : "neutral"} className="px-2 py-1 text-[10px] uppercase">{outcomeLabel(event)}</RecoveryBadge></div>
                   <div className="mt-1 text-[#555]">Occurred {dateLabel(event.occurredAt)}{event.scheduledAt && ` · Scheduled ${dateLabel(event.scheduledAt)}`}{event.recipient && ` · To ${event.recipient}`}</div>
                   {event.providerMessageId && <div className="mt-1 font-mono text-[10px] text-[#555]">Provider ID: {event.providerMessageId}</div>}
                   {event.error && <div className="mt-1 text-[#a12b22]">Error: {event.error}</div>}
-                  {event.details !== null && event.details !== undefined && <details className="mt-2"><summary className="cursor-pointer font-bold text-[#087f8c]">Event details</summary><pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap border border-[#ccc] bg-[#f6f5f1] p-2 font-mono text-[10px]">{typeof event.details === "string" ? event.details : JSON.stringify(event.details, null, 2)}</pre></details>}
+                   {event.details !== null && event.details !== undefined && <details className="mt-2"><summary className="cursor-pointer font-bold text-[#168d99]">Event details</summary><pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-[#e0e0e0] p-2 font-mono text-[10px] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">{typeof event.details === "string" ? event.details : JSON.stringify(event.details, null, 2)}</pre></details>}
                 </article>)}</div>}
             </div>}
         </DialogContent>
       </Dialog>
 
       <Dialog open={pending !== null} onOpenChange={open => { if (!open && !actionMutation.isPending && !settingsMutation.isPending) setPending(null); }}>
-        <DialogContent className="rounded-sm border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#f4f4f4] sm:max-w-lg">
+        <DialogContent className="rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] sm:max-w-lg">
           <DialogHeader><DialogTitle>{pending?.kind === "global-live" ? "Enable live broker automation?" : pending?.action === "paid" ? "Mark collection workflow paid?" : pending?.action === "stop" ? "Stop this collection workflow?" : "Start this invoice live?"}</DialogTitle></DialogHeader>
           <div className="space-y-3 text-sm text-[#3e3b35]">
             {pending?.kind === "global-live" && <p>This enables real automated broker emails for new enrollment. Global mode applies to new enrollment only and does not convert existing simulated invoices to live. Dry-run bell notices are logged only; live mode may create real notifications.</p>}
@@ -240,7 +240,7 @@ export default function CollectionsAutomation() {
           </div>
         </DialogContent>
       </Dialog>
-      {settings.isError && <p role="alert" className="text-xs text-[#8b1d16]">Global settings unavailable: {(settings.error as Error).message} <button className="underline" onClick={() => settings.refetch()}>Retry</button></p>}
+      {settings.isError && <p role="alert" className="text-xs text-[#8b1d16]">Global settings unavailable: {(settings.error as Error).message} <Button variant="link" size="sm" className="h-auto p-0 underline" onClick={() => settings.refetch()}>Retry</Button></p>}
     </section>
   );
 }

@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { PageShell, Win95Button as Button, Win95Card as Card, Win95CardContent as CardContent } from "@/components/win95";
+import { NeuButton as Button, NeuCard as Card, NeuPageShell } from "@/styles/neu";
+import Sidebar from "@/components/layout/sidebar";
+import TopNav from "@/components/layout/top-nav";
 
 type LegacyRequest = { id: number | string };
 
@@ -41,9 +43,12 @@ export default function LegacyTicketRedirect() {
   }, [legacyQuery.data, setLocation]);
 
   return (
-    <PageShell title="IT Support" subtitle="Opening your support request" group="Workspace" contentClassName="p-3 sm:p-5 xl:p-7">
-      <Card>
-        <CardContent className="flex min-h-24 items-center gap-3">
+    <NeuPageShell className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopNav title="IT Support" subtitle="Opening your support request" />
+        <main className="flex-1 overflow-auto p-3 sm:p-5 xl:p-7">
+      <Card className="flex min-h-24 items-center gap-3 p-5">
           {legacyQuery.isError ? (
             <>
               <AlertCircle className="h-5 w-5 shrink-0 text-[#812f25]" />
@@ -55,16 +60,17 @@ export default function LegacyTicketRedirect() {
             </>
           ) : (
             <>
-              <div className="h-5 w-5 animate-pulse border-2 border-[#087f8c] bg-[#d4d0c8]" />
+              <div className="h-5 w-5 animate-pulse rounded-full bg-[#27aab8] shadow-[inset_2px_2px_4px_#16828e,inset_-2px_-2px_4px_#73d0d9]" />
               <div className="flex-1" role="status" aria-live="polite">
                 <p className="font-bold text-[#292929]">Finding your support request</p>
                 <p className="mt-1 text-sm text-[#666]">Loading ticket {id}…</p>
-                <div className="mt-3 h-2 max-w-sm animate-pulse bg-[#e8e6e1]" />
+                <div className="mt-3 h-2 max-w-sm animate-pulse rounded-full bg-[#d3d3d3] shadow-[inset_2px_2px_4px_#b8b8b8,inset_-2px_-2px_4px_#fff]" />
               </div>
             </>
           )}
-        </CardContent>
       </Card>
-    </PageShell>
+        </main>
+      </div>
+    </NeuPageShell>
   );
 }

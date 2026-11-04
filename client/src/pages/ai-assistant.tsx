@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
+import { NeuBadge, NeuCard } from "@/styles/neu/components";
 
 type Activity = {
   tool: string;
@@ -108,13 +109,13 @@ function ActivityList({ activities }: { activities: Activity[] }) {
   );
 }
 
-function StructuredCard({ card, cardRef }: { card: DataCard; cardRef?: Ref<HTMLElement> }) {
+function StructuredCard({ card, cardRef }: { card: DataCard; cardRef?: Ref<HTMLDivElement> }) {
   const Icon = card.type === "carrier" ? Truck : card.type === "invoice" ? FileText : Landmark;
   return (
-    <article
+    <NeuCard
       ref={cardRef}
       data-type="structured-card"
-      className="mt-3 scroll-mt-3 rounded-lg border border-slate-300 bg-[#e9e6df] p-3"
+      className="mt-3 scroll-mt-3 p-3"
       aria-label={`${card.type} details`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -123,9 +124,9 @@ function StructuredCard({ card, cardRef }: { card: DataCard; cardRef?: Ref<HTMLE
           <h3 className="truncate text-xs font-bold uppercase tracking-wide text-slate-700">{card.title}</h3>
         </div>
         {card.badge && (
-          <span className="flex-shrink-0 rounded border border-slate-400 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+          <NeuBadge tone={card.badge.tone === "warning" ? "warning" : card.badge.tone === "success" ? "success" : "neutral"} className="flex-shrink-0 px-1.5 py-0.5 text-[10px]">
             {card.badge.label}
-          </span>
+          </NeuBadge>
         )}
       </div>
       <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
@@ -136,7 +137,7 @@ function StructuredCard({ card, cardRef }: { card: DataCard; cardRef?: Ref<HTMLE
           </div>
         ))}
       </dl>
-    </article>
+    </NeuCard>
   );
 }
 
@@ -150,7 +151,7 @@ function MessageBubble({
   msg: Message;
   userInitials: string;
   onReview: (confirmation: Confirmation) => void;
-  structuredCardRef?: Ref<HTMLElement>;
+  structuredCardRef?: Ref<HTMLDivElement>;
   messageRef?: Ref<HTMLDivElement>;
 }) {
   const isUser = msg.role === "user";
@@ -208,7 +209,7 @@ export default function AIAssistant() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const messageThreadRef = useRef<HTMLDivElement>(null);
-  const latestStructuredCardRef = useRef<HTMLElement>(null);
+  const latestStructuredCardRef = useRef<HTMLDivElement>(null);
   const latestAssistantMessageRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 

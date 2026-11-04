@@ -3,16 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { NeuBadge as Badge, NeuButton as Button, NeuCard as Card, NeuInput as Input } from "@/styles/neu/components";
 import {
   Clock3,
   Play,
@@ -21,7 +12,6 @@ import {
   CalendarDays,
   PauseCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface TimeEntry {
   id: number;
@@ -170,21 +160,21 @@ export default function TimeClock() {
 
   if (isLoading) {
     return (
-      <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+      <Card className="rounded-2xl p-5">
+        <div className="border-b border-[#c9c9c9] pb-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-[#333]">
             <Clock3 className="h-5 w-5" />
             Time Clock
-          </CardTitle>
-        </CardHeader>
+          </h2>
+        </div>
 
-        <CardContent className="p-5">
+        <div className="pt-5">
           <div className="animate-pulse space-y-4">
-            <div className="h-24 rounded-[18px] bg-slate-200 dark:bg-slate-700" />
-            <div className="h-16 rounded-[18px] bg-slate-200 dark:bg-slate-700" />
-            <div className="h-10 rounded-xl bg-slate-200 dark:bg-slate-700" />
+            <div className="h-24 animate-pulse rounded-[18px] bg-[#d2d2d2]" />
+            <div className="h-16 animate-pulse rounded-[18px] bg-[#d2d2d2]" />
+            <div className="h-10 animate-pulse rounded-xl bg-[#d2d2d2]" />
           </div>
-        </CardContent>
+        </div>
       </Card>
     );
   }
@@ -193,25 +183,25 @@ export default function TimeClock() {
   const isSubmitting = clockInMutation.isPending || clockOutMutation.isPending;
 
   return (
-    <Card className="rounded-[20px] border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-      <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+    <Card className="rounded-2xl">
+      <div className="border-b border-[#c9c9c9] p-5">
         <div>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
-            <Clock3 className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-[#333]">
+            <Clock3 className="h-5 w-5 text-[#777]" />
             Time Clock
-          </CardTitle>
-          <CardDescription className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          </h2>
+          <p className="mt-1 text-sm text-[#888]">
             Track work sessions and daily hours
-          </CardDescription>
+          </p>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-5 p-5">
-        <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-5 text-center dark:border-slate-800 dark:bg-slate-900/30">
-          <div className="text-[2rem] font-semibold tracking-tight text-slate-900 dark:text-white">
+      <div className="space-y-5 p-5">
+        <div className="rounded-2xl bg-[#e0e0e0] p-5 text-center shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]">
+          <div className="font-mono text-[2rem] font-semibold tracking-tight text-[#333]">
             {formatClockTime(currentTime)}
           </div>
-          <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <div className="mt-1 text-sm text-[#888]">
             {currentTime.toLocaleDateString([], {
               weekday: "long",
               year: "numeric",
@@ -221,18 +211,15 @@ export default function TimeClock() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 rounded-[18px] border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/30">
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#e0e0e0] p-4 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
           <div className="flex items-center gap-2">
             {isClockedIn ? (
-              <Badge className="border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+              <Badge tone="success">
                 <Timer className="mr-1 h-3 w-3" />
                 Clocked In
               </Badge>
             ) : (
-              <Badge
-                variant="outline"
-                className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              >
+              <Badge tone="neutral">
                 <PauseCircle className="mr-1 h-3 w-3" />
                 Clocked Out
               </Badge>
@@ -241,8 +228,8 @@ export default function TimeClock() {
 
           {isClockedIn && timeStatus?.currentEntry && (
             <div className="text-right">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Started at</div>
-              <div className="font-mono text-sm font-semibold text-slate-900 dark:text-white">
+              <div className="text-xs text-[#888]">Started at</div>
+              <div className="font-mono text-sm font-semibold text-[#333]">
                 {formatShortTime(timeStatus.currentEntry.clockInTime)}
               </div>
             </div>
@@ -250,39 +237,39 @@ export default function TimeClock() {
         </div>
 
         {isClockedIn && timeStatus?.currentEntry ? (
-          <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-5 text-center dark:border-slate-800 dark:bg-slate-900/30">
-            <div className="mb-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+          <div className="rounded-2xl bg-[#e0e0e0] p-5 text-center shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]">
+            <div className="mb-1 text-sm font-medium text-[#888]">
               Active session
             </div>
-            <div className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            <div className="font-mono text-3xl font-semibold tracking-tight text-[#333]">
               {formatDurationFromStart(timeStatus.currentEntry.clockInTime, currentTime)}
             </div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-1 text-xs text-[#888]">
               Currently tracking live work time
             </div>
           </div>
         ) : (
-          <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-5 text-center dark:border-slate-800 dark:bg-slate-900/30">
-            <div className="mb-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+          <div className="rounded-2xl bg-[#e0e0e0] p-5 text-center shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]">
+            <div className="mb-1 text-sm font-medium text-[#888]">
               Status
             </div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">
+            <div className="text-lg font-semibold text-[#333]">
               Currently Clocked Out
             </div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-1 text-xs text-[#888]">
               Start a session to begin tracking time
             </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between rounded-[18px] border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/30">
+        <div className="flex items-center justify-between rounded-2xl bg-[#e0e0e0] p-4 shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
           <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-slate-500" />
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+            <CalendarDays className="h-4 w-4 text-[#888]" />
+            <span className="text-sm font-medium text-[#666]">
               Today&apos;s Total
             </span>
           </div>
-          <div className="font-mono text-sm font-semibold text-slate-900 dark:text-white">
+          <div className="font-mono text-sm font-semibold text-[#333]">
             {timeStatus?.todayHours?.toFixed(2) ?? "0.00"} hours
           </div>
         </div>
@@ -290,7 +277,7 @@ export default function TimeClock() {
         <div className="space-y-2">
           <label
             htmlFor={notesId}
-            className="text-sm font-medium text-slate-700 dark:text-slate-300"
+            className="text-sm font-medium text-[#555]"
           >
             Notes
           </label>
@@ -299,7 +286,7 @@ export default function TimeClock() {
             placeholder="Add a note about your work session..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="h-11 rounded-xl border-[hsl(var(--border))] bg-white dark:bg-slate-900"
+            className="h-11 rounded-xl"
           />
         </div>
 
@@ -320,7 +307,8 @@ export default function TimeClock() {
               type="button"
               onClick={handleClockIn}
               disabled={clockInMutation.isPending}
-              className="h-11 w-full rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+              variant="accent"
+              className="h-11 w-full rounded-xl"
             >
               <Play className="mr-2 h-4 w-4" />
               {clockInMutation.isPending ? "Clocking In..." : "Clock In"}
@@ -330,7 +318,7 @@ export default function TimeClock() {
 
         {timeStatus?.todayEntries && timeStatus.todayEntries.length > 0 && (
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+            <h4 className="text-sm font-semibold text-[#333]">
               Today&apos;s Entries
             </h4>
 
@@ -338,15 +326,15 @@ export default function TimeClock() {
               {timeStatus.todayEntries.slice(0, 4).map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-center justify-between rounded-[18px] border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/30"
+                  className="flex items-center justify-between rounded-xl bg-[#e0e0e0] p-3 shadow-[4px_4px_8px_#c1c1c1,-4px_-4px_8px_#fff]"
                 >
-                  <div className="min-w-0 text-xs text-slate-600 dark:text-slate-300">
-                    <span className="font-medium text-slate-900 dark:text-white">
+                  <div className="min-w-0 text-xs text-[#666]">
+                    <span className="font-medium text-[#333]">
                       {formatShortTime(entry.clockInTime)}
                     </span>
 
                     {entry.clockOutTime && (
-                      <span className="text-slate-500 dark:text-slate-400">
+                      <span className="text-[#888]">
                         {" "}
                         - {formatShortTime(entry.clockOutTime)}
                       </span>
@@ -355,9 +343,7 @@ export default function TimeClock() {
 
                   {entry.totalHours && (
                     <div
-                      className={cn(
-                        "rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                      )}
+                      className="rounded-full bg-[#e0e0e0] px-2.5 py-1 text-xs font-medium text-[#555] shadow-[-3px_-3px_7px_#fff,3px_3px_7px_#c1c1c1]"
                     >
                       {parseFloat(entry.totalHours).toFixed(2)}h
                     </div>
@@ -369,11 +355,11 @@ export default function TimeClock() {
         )}
 
         {isSubmitting && (
-          <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-center text-xs text-[#888]">
             Updating time entry...
           </p>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }

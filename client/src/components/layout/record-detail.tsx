@@ -1,9 +1,9 @@
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { NeuButton as Button } from "@/styles/neu/components";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { NeuCard, NeuTab, NeuTabList, NeuTabPanel, NeuTabs } from "@/styles/neu/components";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,21 +56,21 @@ export interface RecordDetailProps {
 // ─── Metric tint map ──────────────────────────────────────────────────────────
 
 const TINT: Record<string, string> = {
-  violet:  "text-violet-600 dark:text-violet-400",
-  amber:   "text-amber-600 dark:text-amber-400",
-  blue:    "text-blue-600 dark:text-blue-400",
-  emerald: "text-emerald-600 dark:text-emerald-400",
-  slate:   "text-slate-700 dark:text-slate-300",
-  red:     "text-red-600 dark:text-red-400",
-  orange:  "text-orange-600 dark:text-orange-400",
+  violet:  "text-[#168d99]",
+  amber:   "text-[#9b6a22]",
+  blue:    "text-[#168d99]",
+  emerald: "text-[#168d99]",
+  slate:   "text-[#555]",
+  red:     "text-[#a3483e]",
+  orange:  "text-[#9b6a22]",
 };
 
 const LINKED_TINT: Record<string, { icon: string; bg: string }> = {
-  blue:    { icon: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-950/30" },
-  violet:  { icon: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/30" },
-  emerald: { icon: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
-  amber:   { icon: "text-amber-600 dark:text-amber-400",  bg: "bg-amber-50 dark:bg-amber-950/30" },
-  slate:   { icon: "text-slate-500 dark:text-slate-400",  bg: "bg-slate-100 dark:bg-slate-800" },
+  blue:    { icon: "text-[#168d99]", bg: "bg-[#dceaea]" },
+  violet:  { icon: "text-[#168d99]", bg: "bg-[#dceaea]" },
+  emerald: { icon: "text-[#168d99]", bg: "bg-[#dceaea]" },
+  amber:   { icon: "text-[#9b6a22]", bg: "bg-[#f0e9db]" },
+  slate:   { icon: "text-[#666]", bg: "bg-[#d7d7d7]" },
 };
 
 // ─── Skeleton loading state ───────────────────────────────────────────────────
@@ -78,11 +78,11 @@ const LINKED_TINT: Record<string, { icon: string; bg: string }> = {
 function RecordDetailSkeleton() {
   return (
     <div className="space-y-4">
-      <Skeleton className="h-8 w-40 rounded-xl" />
-      <Skeleton className="h-44 w-full rounded-[28px]" />
+      <Skeleton className="h-8 w-40 rounded-xl bg-[#d2d2d2]" />
+      <Skeleton className="h-44 w-full rounded-[28px] bg-[#d2d2d2]" />
       <div className="flex gap-5">
-        <Skeleton className="h-96 flex-1 rounded-[28px]" />
-        <Skeleton className="h-96 w-72 shrink-0 rounded-[28px]" />
+        <Skeleton className="h-96 flex-1 rounded-[28px] bg-[#d2d2d2]" />
+        <Skeleton className="h-96 w-72 shrink-0 rounded-[28px] bg-[#d2d2d2]" />
       </div>
     </div>
   );
@@ -94,7 +94,7 @@ export default function RecordDetail({
   backHref,
   backLabel,
   icon,
-  iconBg = "bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.28)]",
+  iconBg = "bg-[#e0e0e0] text-[#168d99] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]",
   title,
   titleSub,
   statusBadge,
@@ -118,12 +118,12 @@ export default function RecordDetail({
   if (notFound) {
     return (
       <div className="flex flex-col items-center justify-center py-32">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-600">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e0e0e0] text-[#999] shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8]">
           {notFoundIcon}
         </div>
-        <p className="text-lg font-semibold text-slate-700 dark:text-white">{notFoundLabel}</p>
+        <p className="text-lg font-semibold text-[#444]">{notFoundLabel}</p>
         <Button variant="ghost" onClick={() => navigate(backHref)}
-          className="mt-4 gap-2 rounded-xl text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white">
+          className="mt-4 gap-2 rounded-xl text-sm text-[#666] hover:text-[#168d99]">
           <ArrowLeft className="h-4 w-4" />{backLabel}
         </Button>
       </div>
@@ -136,7 +136,7 @@ export default function RecordDetail({
     <div className="space-y-5">
       {/* Back button */}
       <Button variant="ghost" onClick={() => navigate(backHref)}
-        className="-ml-2 gap-2 rounded-xl text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+        className="-ml-2 gap-2 rounded-xl text-sm text-[#666] hover:text-[#168d99]">
         <ArrowLeft className="h-4 w-4" />{backLabel}
       </Button>
 
@@ -144,7 +144,7 @@ export default function RecordDetail({
       {alertBanner}
 
       {/* ── Header card ──────────────────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+      <NeuCard className="overflow-hidden rounded-2xl">
         <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             <div className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl", iconBg)}>
@@ -152,17 +152,17 @@ export default function RecordDetail({
             </div>
             <div>
               <div className="mb-1 flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+                <h1 className="text-xl font-semibold tracking-tight text-[#333]">{title}</h1>
                 {statusBadge}
               </div>
               {titleSub && (
-                <p className="text-sm text-slate-500 dark:text-slate-400">{titleSub}</p>
+                <p className="text-sm text-[#666]">{titleSub}</p>
               )}
             </div>
           </div>
           {metrics.length > 0 && metrics.slice(0, 1).map(m => (
             <div key={m.label} className="text-right">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{m.label}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-[#777]">{m.label}</p>
               <p className={cn("text-3xl font-semibold tracking-tight", TINT[m.tint ?? "slate"])}>
                 {m.value}
               </p>
@@ -172,7 +172,7 @@ export default function RecordDetail({
 
         {metrics.length > 1 && (
           <div className={cn(
-            "grid divide-x divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800",
+            "grid divide-x divide-[#c9c9c9] border-t border-[#c9c9c9]",
             metrics.slice(1).length === 1 && "grid-cols-1",
             metrics.slice(1).length === 2 && "grid-cols-2",
             metrics.slice(1).length === 3 && "grid-cols-3 sm:grid-cols-3",
@@ -181,18 +181,18 @@ export default function RecordDetail({
             {metrics.slice(1).map(m => (
               <div key={m.label} className="p-4 text-center">
                 <p className={cn("text-xl font-semibold", TINT[m.tint ?? "slate"])}>{m.value}</p>
-                <p className="mt-0.5 text-xs text-slate-400">{m.label}</p>
+                <p className="mt-0.5 text-xs text-[#777]">{m.label}</p>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </NeuCard>
 
       {/* ── Status strip (pipeline, progress bar, etc.) ───────────────────────── */}
       {statusStrip && (
-        <div className="rounded-[24px] border border-slate-200/80 bg-white/90 px-6 py-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+        <NeuCard className="rounded-2xl px-6 py-5">
           {statusStrip}
-        </div>
+        </NeuCard>
       )}
 
       {/* ── Two-column body ───────────────────────────────────────────────────── */}
@@ -200,29 +200,29 @@ export default function RecordDetail({
 
         {/* Main — tabs */}
         <div className="min-w-0 flex-1">
-          <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-            <Tabs defaultValue={firstTab}>
-              <div className="border-b border-slate-100 px-6 pt-5 dark:border-slate-800">
-                <TabsList className="h-auto gap-1 rounded-none bg-transparent p-0 flex-wrap">
+          <NeuCard className="overflow-hidden rounded-2xl">
+            <NeuTabs defaultValue={firstTab}>
+              <div className="border-b border-[#c9c9c9] px-6 pt-5">
+                <NeuTabList className="flex-wrap">
                   {tabs.map(({ value, label, icon: tabIcon, count, alert }) => (
-                    <TabsTrigger key={value} value={value}
-                      className="flex items-center gap-1.5 rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-xs font-semibold text-slate-500 transition-colors data-[state=active]:border-blue-600 data-[state=active]:text-blue-700 dark:text-slate-400 dark:data-[state=active]:text-blue-300">
+                    <NeuTab key={value} value={value}
+                      className="flex items-center gap-1.5 px-3 text-xs">
                       {tabIcon}{label}
                       {!!count && count > 0 && (
-                        <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{count}</span>
+                        <span className="ml-1 rounded-full bg-[#e0e0e0] px-1.5 py-0.5 text-[10px] font-bold text-[#555] shadow-[inset_2px_2px_4px_#b8b8b8,inset_-2px_-2px_4px_#fff]">{count}</span>
                       )}
-                      {alert && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-amber-500" />}
-                    </TabsTrigger>
+                        {alert && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-[#bf6e51]" />}
+                    </NeuTab>
                   ))}
-                </TabsList>
+                </NeuTabList>
               </div>
               {tabs.map(({ value, content }) => (
-                <TabsContent key={value} value={value} className="p-6">
+                <NeuTabPanel key={value} value={value} className="p-6">
                   {content}
-                </TabsContent>
+                </NeuTabPanel>
               ))}
-            </Tabs>
-          </div>
+            </NeuTabs>
+          </NeuCard>
         </div>
 
         {/* Right rail — sticky */}
@@ -230,18 +230,18 @@ export default function RecordDetail({
 
           {/* Actions card */}
           {actions && (
-            <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
+            <NeuCard className="overflow-hidden rounded-2xl">
               {actions}
-            </div>
+            </NeuCard>
           )}
 
           {/* Linked records */}
           {linkedRecords.length > 0 && (
-            <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-              <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Linked Records</h3>
+            <NeuCard className="overflow-hidden rounded-2xl">
+              <div className="border-b border-[#c9c9c9] px-5 py-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[#666]">Linked Records</h3>
               </div>
-              <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
+              <div className="divide-y divide-[#c9c9c9]">
                 {linkedRecords.map((lr, idx) => {
                   const t = LINKED_TINT[lr.tint ?? "slate"];
                   return (
@@ -250,13 +250,13 @@ export default function RecordDetail({
                         {lr.icon}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-medium text-slate-400">{lr.label}</p>
-                        <p className="truncate text-sm font-semibold text-slate-800 dark:text-white">{lr.value}</p>
-                        {lr.sub && <p className="truncate text-[11px] text-slate-400">{lr.sub}</p>}
+                        <p className="text-[11px] font-medium text-[#777]">{lr.label}</p>
+                        <p className="truncate text-sm font-semibold text-[#333]">{lr.value}</p>
+                        {lr.sub && <p className="truncate text-[11px] text-[#777]">{lr.sub}</p>}
                       </div>
                       {lr.href && (
                         <a href={lr.href}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white">
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e0e0e0] text-[#168d99] shadow-[-2px_-2px_5px_#fff,2px_2px_5px_#c1c1c1]">
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       )}
@@ -264,7 +264,7 @@ export default function RecordDetail({
                   );
                 })}
               </div>
-            </div>
+            </NeuCard>
           )}
 
           {/* Extra right-rail slots */}
@@ -279,9 +279,9 @@ export default function RecordDetail({
 
 export function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
-      <span className="text-xs font-medium text-slate-400 whitespace-nowrap">{label}</span>
-      <span className="text-right text-xs font-semibold text-slate-700 dark:text-slate-200">{value ?? "—"}</span>
+    <div className="flex items-start justify-between gap-3 rounded-xl bg-[#e0e0e0] px-4 py-2.5 shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">
+      <span className="whitespace-nowrap text-xs font-medium text-[#777]">{label}</span>
+      <span className="text-right text-xs font-semibold text-[#444]">{value ?? "—"}</span>
     </div>
   );
 }
@@ -289,7 +289,7 @@ export function DetailRow({ label, value }: { label: string; value: React.ReactN
 export function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[#777]">{title}</h3>
       {children}
     </div>
   );
@@ -298,10 +298,10 @@ export function DetailSection({ title, children }: { title: string; children: Re
 export function EmptyTab({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500">
+      <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e0e0e0] text-[#888] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#b8b8b8]">
         {icon}
       </div>
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-sm font-medium text-[#666]">{label}</p>
     </div>
   );
 }

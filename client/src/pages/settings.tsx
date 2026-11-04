@@ -6,13 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Button, Textarea, SelectContent, SelectTrigger, Tabs, TabsContent, TabsList, TabsTrigger, AdminPageShell } from "@/components/admin-neu/adapters";
 import {
   Form,
   FormControl,
@@ -22,12 +16,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import Sidebar from "@/components/layout/sidebar";
@@ -43,6 +33,7 @@ import {
   MapPin,
   Save,
 } from "lucide-react";
+import "@/components/admin-neu/admin-neu-page.css";
 
 // Validation schemas
 const personalSettingsSchema = z.object({
@@ -250,15 +241,15 @@ export default function Settings() {
   // Handle loading and error states
   if (userLoading) {
     return (
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopNav 
             title="Settings" 
             subtitle="Customize your experience and preferences"
           />
-          <main className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <main className="admin-neu-page-shell flex flex-1 items-center justify-center overflow-y-auto bg-[#e0e0e0] p-6">
+            <div className="w-full max-w-2xl space-y-4"><div className="h-8 w-1/3 animate-pulse rounded-xl bg-[#d2d2d2]" /><div className="h-64 animate-pulse rounded-2xl bg-[#d2d2d2]" /></div>
           </main>
         </div>
       </div>
@@ -267,17 +258,17 @@ export default function Settings() {
 
   if (userError || !user) {
     return (
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopNav 
             title="Settings" 
             subtitle="Customize your experience and preferences"
           />
-          <main className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-red-600">Failed to load user data. Please try logging in again.</p>
-            </div>
+          <main className="flex flex-1 items-center justify-center overflow-y-auto bg-[#e0e0e0] p-6">
+            <Card className="max-w-md p-6 text-center">
+              <p className="text-[#a3483e]">Failed to load user data. Please try logging in again.</p>
+            </Card>
           </main>
         </div>
       </div>
@@ -285,18 +276,18 @@ export default function Settings() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav 
           title="Settings" 
           subtitle="Customize your experience and preferences"
         />
-        <main className="flex-1 overflow-y-auto p-6">
+        <AdminPageShell className="flex-1 overflow-y-auto !min-h-0 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex items-center space-x-2">
-              <SettingsIcon className="w-6 h-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+              <SettingsIcon className="h-6 w-6 text-[#168d99]" />
+              <h1 className="text-2xl font-bold text-[#333]">Settings</h1>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -687,13 +678,13 @@ export default function Settings() {
                                 <SelectContent>
                                   <SelectItem value="light">
                                     <div className="flex items-center space-x-2">
-                                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                                      <div className="h-3 w-3 rounded-full bg-[#d4b45c]"></div>
                                       <span>Light</span>
                                     </div>
                                   </SelectItem>
                                   <SelectItem value="dark">
                                     <div className="flex items-center space-x-2">
-                                      <div className="w-3 h-3 rounded-full bg-gray-800"></div>
+                                      <div className="h-3 w-3 rounded-full bg-[#464646]"></div>
                                       <span>Dark</span>
                                     </div>
                                   </SelectItem>
@@ -767,7 +758,7 @@ export default function Settings() {
               </TabsContent>
             </Tabs>
           </div>
-        </main>
+        </AdminPageShell>
       </div>
     </div>
   );

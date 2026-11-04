@@ -4,23 +4,21 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PageInsights } from "@/components/PageInsights";
-import { SafePaginatedTable } from "@/components/safe-table-pagination";
+import { NeuTable } from "@/styles/neu/components";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { FFEmpty } from "@/components/ui/ff-empty";
 import { FFOnboarding } from "@/components/ui/ff-onboarding";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button, Input, Textarea, Card, DialogContent, SelectContent, SelectTrigger, AdminPageShell, Badge } from "@/components/admin-neu/adapters";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectItem, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -29,6 +27,7 @@ import {
   SquareCheck, Square, Mail,
 } from "lucide-react";
 import { useSavedViews, type SavedView } from "@/hooks/use-saved-views";
+import "@/components/admin-neu/admin-neu-page.css";
 
 // ── Sticky-state hook ─────────────────────────────────────────────────────────
 function useStickyState<T>(key: string, def: T) {
@@ -72,38 +71,29 @@ function OverduePill({ dueDate }: { dueDate: string }) {
   if (days <= 0) {
     const daysLeft = Math.abs(days);
     return (
-      <span className="text-[11px] text-slate-400 dark:text-slate-500">
+      <span className="text-[11px] text-[#777]">
         {daysLeft === 0 ? "Due today" : `${daysLeft}d left`}
       </span>
     );
   }
-  if (days <= 7)  return <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">{days}d over</span>;
+  if (days <= 7)  return <span className="text-[11px] font-semibold text-[#9b6a22]">{days}d over</span>;
   if (days <= 30) return (
-    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[#9b6a22]">
       <AlertTriangle className="h-3 w-3" />{days}d over
     </span>
   );
   return (
-    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-red-600 dark:text-red-400">
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[#a3483e]">
       <AlertTriangle className="h-3 w-3" />{days}d over
     </span>
   );
 }
 
-function rowUrgencyClass(c: Collection): string {
-  const od = overdueDays(c.dueDate);
-  const active = ["pending", "in_progress"].includes(c.status);
-  if (!active) return "";
-  if ((c.priority === "urgent" && od > 0) || od > 30) return "ff-row-urgent";
-  if (c.priority === "high" || od > 7) return "ff-row-stale";
-  return "";
-}
-
 const PRIORITY_CLASS: Record<string, string> = {
-  low:    "text-slate-500 dark:text-slate-400",
-  medium: "text-blue-600 dark:text-blue-400",
-  high:   "text-orange-600 dark:text-orange-400",
-  urgent: "font-bold text-red-600 dark:text-red-400",
+  low:    "text-[#777]",
+  medium: "text-[#168d99]",
+  high:   "text-[#9b6a22]",
+  urgent: "font-bold text-[#a3483e]",
 };
 
 const QUEUE_TABS = [
@@ -313,29 +303,30 @@ export default function CollectionsPage() {
   const bulkStatusActions = BULK_STATUS[activeTab];
 
   return (
-    <div className="flex h-screen bg-[#d4d0c8]">
+    <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Collections" subtitle="Manage funds owed to TPF and track carrier performance" group="Recovery" />
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <AdminPageShell className="custom-scrollbar flex-1 overflow-auto !min-h-0">
           <div className="mx-auto w-full max-w-[1680px] space-y-4 p-6 xl:p-8">
             <PageInsights entity="collections" title="Collections performance" />
 
             {/* ── Overdue nudge banner ────────────────────────────────────── */}
             {counts.overdue > 0 && (
-              <div className="flex items-center gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+              <div className="flex items-center gap-3 rounded-xl bg-[#e0e0e0] px-4 py-3 shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8]">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
-                <p className="text-[12.5px] font-medium text-amber-800 dark:text-amber-300">
+                <p className="text-[12.5px] font-medium text-[#825d22]">
                   <span className="font-bold">{counts.overdue} account{counts.overdue !== 1 ? "s" : ""}</span> overdue —{" "}
                   <span className="font-semibold">{fmt(overdueAmount)}</span> at risk
                 </p>
-                <button
+                <Button
                   type="button"
                   onClick={() => { setActiveTab("overdue"); setActiveViewId("overdue"); setSelected(new Set()); }}
-                  className="ml-auto whitespace-nowrap text-[11.5px] font-semibold text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                  variant="ghost"
+                  className="ml-auto whitespace-nowrap text-[11.5px] font-semibold text-[#9b6a22]"
                 >
                   View overdue →
-                </button>
+                </Button>
               </div>
             )}
 
@@ -347,37 +338,34 @@ export default function CollectionsPage() {
                 { label: "In Progress", value: counts.in_progress ?? 0,    sub: "being worked" },
                 { label: "Overdue",     value: counts.overdue ?? 0,        sub: "past due date", warn: (counts.overdue ?? 0) > 0 },
               ].map(s => (
-                <div key={s.label} className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
-                  <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.label}</p>
-                  <p className={cn("mt-0.5 text-[22px] font-bold tracking-tight", (s as any).warn ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white")}>{s.value}</p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500">{s.sub}</p>
-                </div>
+                <Card key={s.label} className="rounded-2xl p-4">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#777]">{s.label}</p>
+                  <p className={cn("mt-0.5 text-[22px] font-bold tracking-tight", (s as any).warn ? "text-[#a3483e]" : "text-[#333]")}>{s.value}</p>
+                  <p className="text-[11px] text-[#777]">{s.sub}</p>
+                </Card>
               ))}
             </div>
 
             {/* ── Queue card ─────────────────────────────────────────────── */}
-            <div className="overflow-hidden rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+            <Card className="overflow-hidden rounded-2xl">
 
               {/* Sticky filter bar */}
-              <div className="sticky top-0 z-10 border-b-2 border-[#808080] bg-[#d4d0c8]">
+              <div className="sticky top-0 z-10 border-b border-[#c9c9c9] bg-[#e0e0e0]">
 
                 {/* Saved view pills */}
                 <div className="flex items-center gap-1.5 px-5 pt-3 pb-1.5">
-                  <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-600">Views</span>
+                  <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-[#777]">Views</span>
                   {savedViews.map(view => (
-                    <button
+                    <Button
                       key={view.id}
                       type="button"
                       onClick={() => applyView(view)}
-                      className={cn(
-                        "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
-                        activeViewId === view.id
-                          ? "border-[#087888] bg-[#27aab8] text-white"
-                          : "border-[#808080] bg-white text-slate-600 hover:bg-[#dff5f6]"
-                      )}
+                      variant={activeViewId === view.id ? "accent" : "ghost"}
+                      size="sm"
+                      className="flex h-7 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px]"
                     >
                       <span>{view.emoji}</span> {view.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
 
@@ -387,78 +375,71 @@ export default function CollectionsPage() {
                       const count = counts[tab.id] ?? 0;
                       const isActive = activeTab === tab.id;
                       return (
-                        <button
+                        <Button
                           key={tab.id}
                           type="button"
                           onClick={() => { setActiveTab(tab.id); setSelected(new Set()); setActiveViewId(null); }}
-                          className={cn(
-                            "rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors",
-                            isActive
-                              ? "border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white"
-                              : "border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white text-slate-600 hover:bg-[#dff5f6]",
-                            tab.id === "overdue" && !isActive && count > 0 && "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400"
-                          )}
+                          variant={isActive ? "accent" : "ghost"}
+                          size="sm"
+                          className={cn("rounded-full px-3 py-1 text-[11.5px]", tab.id === "overdue" && !isActive && count > 0 && "text-[#a3483e]")}
                         >
                           {tab.label} <span className="opacity-60">{count}</span>
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#888]" />
                       <Input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search client or description…"
-                        className="h-8 w-[220px] rounded-lg border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-white pl-9 text-[12px] shadow-[inset_1px_1px_0_rgba(0,0,0,0.15)]"
+                        className="h-9 w-[220px] rounded-xl pl-9 text-[12px]"
                       />
                     </div>
-                    <button
+                    <Button
                       type="button"
                       onClick={openCreate}
-                      className="flex items-center gap-1.5 rounded-lg border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] px-3 py-1.5 text-[11.5px] font-semibold text-white shadow-[1px_1px_0_#808080] hover:bg-[#098b9f]"
+                      variant="accent"
+                      size="sm"
+                      className="flex items-center gap-1.5 px-3 text-[11.5px]"
                     >
                       <Plus className="h-3 w-3" /> New
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 {/* Bulk bar */}
                 {selected.size > 0 && (
-                  <div className="flex items-center gap-3 border-t border-blue-100 bg-blue-50/60 px-5 py-2 dark:border-blue-900/30 dark:bg-blue-950/10">
-                    <span className="text-[12px] font-semibold text-blue-700 dark:text-blue-300">{selected.size} selected</span>
-                    <div className="h-3.5 w-px bg-blue-200 dark:bg-blue-800" />
+                  <div className="flex items-center gap-3 border-t border-[#c9c9c9] bg-[#dceaea] px-5 py-2">
+                    <span className="text-[12px] font-semibold text-[#168d99]">{selected.size} selected</span>
+                    <div className="h-3.5 w-px bg-[#adcaca]" />
                     {bulkStatusActions.map(a => (
-                      <button
+                      <Button
                         key={a.nextStatus}
                         type="button"
                         onClick={() => bulkUpdateStatus(a.nextStatus)}
                         disabled={updateMut.isPending}
-                        className={cn(
-                          "rounded-lg border-2 px-3 py-1 text-[11.5px] font-semibold text-white shadow-[1px_1px_0_#808080] disabled:opacity-50",
-                          a.nextStatus === "paid" ? "bg-emerald-600 hover:bg-emerald-700"
-                            : a.nextStatus === "written_off" ? "bg-slate-600 hover:bg-slate-700"
-                            : "border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] hover:bg-[#098b9f]"
-                        )}
+                        variant={a.nextStatus === "paid" ? "accent" : "outline"}
+                        size="sm"
+                        className="px-3 py-1 text-[11.5px]"
                       >
                         {a.label}
-                      </button>
+                      </Button>
                     ))}
-                    <button type="button" onClick={() => setSelected(new Set())} className="ml-auto text-[11.5px] font-medium text-blue-500 hover:text-blue-700">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="ml-auto text-[11.5px] font-medium text-[#168d99]">
                       Clear
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
 
               {/* Table */}
               {isLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
-                </div>
+                  <div className="space-y-3 p-5">{[0, 1, 2].map((row) => <div key={row} className="h-12 animate-pulse rounded-xl bg-[#d2d2d2]" />)}</div>
               ) : rows.length === 0 ? (
-                <div className="m-4 rounded-xl border-2 border-dashed border-[#808080] bg-white px-8 py-10">
+                <div className="m-4 rounded-2xl bg-[#e0e0e0] px-8 py-10 shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]">
                   {collections.length === 0 ? (
                     <FFOnboarding
                       title="No collection cases yet"
@@ -476,27 +457,27 @@ export default function CollectionsPage() {
                   ) : (
                     <div className="py-8 text-center">
                       <FFEmpty context="collections" size="md" />
-                      <button
+                      <Button
                         type="button"
                         onClick={() => { setActiveTab("all"); setSearch(""); setActiveViewId(null); }}
-                        className="mt-3 text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+                        variant="ghost"
+                        className="mt-3 text-[12px] font-semibold text-[#168d99]"
                       >
                         Clear filters
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
               ) : (
-                <SafePaginatedTable className="rounded-b-xl">
-                  <table className="ff-data-table w-full min-w-[820px]">
+                <NeuTable className="w-full min-w-[820px]">
                     <thead>
                       <tr>
                         <th className="w-9 pl-5">
-                          <button type="button" onClick={toggleAll} className="text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300">
+                          <Button type="button" variant="ghost" size="icon" onClick={toggleAll} className="h-7 w-7 text-[#777]">
                             {selected.size > 0 && selected.size === rows.length
-                              ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" />
+                              ? <SquareCheck className="h-3.5 w-3.5 text-[#168d99]" />
                               : <Square className="h-3.5 w-3.5" />}
-                          </button>
+                          </Button>
                         </th>
                         <th>Client</th>
                         <th className="text-right">Amount</th>
@@ -510,33 +491,30 @@ export default function CollectionsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((c, index) => {
+                      {rows.map((c) => {
                         const isSel = selected.has(c.id);
                         return (
-                          <tr key={c.id} className={cn(index % 2 === 0 ? "bg-white" : "bg-[#f0f0f0]", rowUrgencyClass(c), isSel && "!bg-[#dff5f6]")}>
+                          <tr key={c.id} className={cn("transition-colors hover:bg-[#dceaea]", isSel && "bg-[#d7eaea]")}>
                             <td className="pl-5">
-                              <button type="button" onClick={() => toggleRow(c.id)} className="text-slate-400 hover:text-blue-600">
-                                {isSel ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" /> : <Square className="h-3.5 w-3.5" />}
-                              </button>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => toggleRow(c.id)} className="h-7 w-7 text-[#777]">
+                                {isSel ? <SquareCheck className="h-3.5 w-3.5 text-[#168d99]" /> : <Square className="h-3.5 w-3.5" />}
+                              </Button>
                             </td>
-                            <td className="font-medium text-slate-900 dark:text-white">
+                            <td className="font-medium text-[#333]">
                               <div className="flex items-center gap-1.5">
-                                {c.client?.name ?? <span className="text-slate-400">Unknown</span>}
+                                {c.client?.name ?? <span className="text-[#888]">Unknown</span>}
                                 {c.invoiceId && followUpInvoiceIds.has(c.invoiceId) && (
-                                  <span
-                                    className="inline-flex items-center gap-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400 px-1.5 py-0.5 text-[9.5px] font-bold border border-orange-200 dark:border-orange-800"
-                                    title="Active broker follow-up pending"
-                                  >
+                                  <Badge tone="warning" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9.5px]" title="Active broker follow-up pending">
                                     <Mail className="h-2.5 w-2.5" />
                                     Follow-up
-                                  </span>
+                                  </Badge>
                                 )}
                               </div>
                             </td>
-                            <td className="text-right font-semibold text-red-600 dark:text-red-400">
+                            <td className="text-right font-semibold text-[#555]">
                               {fmt(c.amount)}
                             </td>
-                            <td className="max-w-[200px] truncate text-slate-600 dark:text-slate-400">
+                            <td className="max-w-[200px] truncate text-[#555]">
                               {c.description}
                             </td>
                             <td>
@@ -544,80 +522,78 @@ export default function CollectionsPage() {
                                 {c.priority}
                               </span>
                             </td>
-                            <td className="text-slate-500 dark:text-slate-400">
+                            <td className="text-[#666]">
                               {new Date(c.dueDate).toLocaleDateString()}
                             </td>
                             <td><OverduePill dueDate={c.dueDate} /></td>
                             <td>
                               <CollectionStatusBadge status={c.status} />
                             </td>
-                            <td className="text-[11.5px] text-slate-500 dark:text-slate-400">
+                            <td className="text-[11.5px] text-[#666]">
                               {c.assignedUser
                                 ? `${c.assignedUser.firstName ?? ""} ${c.assignedUser.lastName ?? ""}`.trim() || "Assigned"
-                                : <span className="text-slate-300 dark:text-slate-600">—</span>}
+                                : <span className="text-[#999]">—</span>}
                             </td>
                             <td className="pr-5">
                               <div className="flex items-center gap-1.5">
                                 {rowStatusActions.map(a => (
-                                  <button
+                                  <Button
                                     key={a.nextStatus}
                                     type="button"
                                     onClick={() => updateMut.mutate({ id: c.id, updates: { status: a.nextStatus as any } })}
                                     disabled={updateMut.isPending}
-                                    className={cn(
-                                      "rounded-[7px] px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors disabled:opacity-50",
-                                      a.nextStatus === "paid"
-                                        ? "border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white hover:bg-[#098b9f]"
-                                        : a.nextStatus === "written_off"
-                                          ? "bg-slate-600 text-white hover:bg-slate-700"
-                                          : "border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white hover:bg-[#098b9f]"
-                                    )}
+                                    variant={a.nextStatus === "paid" ? "accent" : "outline"}
+                                    size="sm"
+                                    className="whitespace-nowrap px-2.5 py-1.5 text-[11px]"
                                   >
                                     {a.label}
-                                  </button>
+                                  </Button>
                                 ))}
-                                <button
+                                <Button
                                   type="button"
                                   onClick={() => openEdit(c)}
-                                  className="bevel-button flex h-6 w-6 items-center justify-center rounded-md bg-[#d4d0c8] text-slate-600"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-[#168d99]"
                                   title="Edit"
                                 >
                                   <Edit2 className="h-3 w-3" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                   type="button"
                                   onClick={() => { if (confirm("Delete this collection?")) deleteMut.mutate(c.id); }}
-                                  className="bevel-button flex h-6 w-6 items-center justify-center rounded-md bg-[#d4d0c8] text-red-600"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-[#a3483e]"
                                   title="Delete"
                                 >
                                   <Trash2 className="h-3 w-3" />
-                                </button>
+                                </Button>
                               </div>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
-                  </table>
-                </SafePaginatedTable>
+                </NeuTable>
               )}
 
               {rows.length > 0 && (
-                <div className="flex items-center justify-between border-t border-slate-100 px-5 py-2.5 dark:border-slate-800">
-                  <span className="text-[11.5px] text-slate-400">{rows.length} items</span>
-                  <span className="text-[12px] font-semibold text-red-600 dark:text-red-400">
+                <div className="flex items-center justify-between border-t border-[#c9c9c9] px-5 py-2.5">
+                  <span className="text-[11.5px] text-[#777]">{rows.length} items</span>
+                  <span className="text-[12px] font-semibold text-[#555]">
                     {fmt(rows.filter(c => ["pending","in_progress"].includes(c.status)).reduce((s, c) => s + Number(c.amount), 0))} owed
                   </span>
                 </div>
               )}
-            </div>
+            </Card>
           </div>
-        </main>
+        </AdminPageShell>
       </div>
 
       {/* ── Create / Edit dialog ──────────────────────────────────────────── */}
       <Dialog open={dlgOpen} onOpenChange={o => { if (!o) { setDlgOpen(false); setEditing(null); } }}>
-        <DialogContent className="max-w-lg rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+        <DialogContent className="max-w-lg rounded-2xl border-0 bg-[#e0e0e0] text-[#333] shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8]">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Collection" : "New Collection"}</DialogTitle>
           </DialogHeader>
@@ -693,12 +669,12 @@ export default function CollectionsPage() {
               <FormField control={form.control} name="notes" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
-                  <FormControl><textarea {...field} rows={2} placeholder="Optional notes…" className="w-full resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" /></FormControl>
+                  <FormControl><Textarea {...field} rows={2} placeholder="Optional notes…" className="min-h-20 resize-none" /></FormControl>
                 </FormItem>
               )} />
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDlgOpen(false)} className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#d4d0c8] shadow-[1px_1px_0_#808080]">Cancel</Button>
-                <Button type="submit" disabled={createMut.isPending || updateMut.isPending} className="rounded-xl border-2 border-t-[#64d5dc] border-l-[#64d5dc] border-b-[#087888] border-r-[#087888] bg-[#27aab8] text-white shadow-[1px_1px_0_#808080] hover:bg-[#098b9f]">
+                <Button type="button" variant="outline" onClick={() => setDlgOpen(false)}>Cancel</Button>
+                <Button type="submit" variant="accent" disabled={createMut.isPending || updateMut.isPending}>
                   {(createMut.isPending || updateMut.isPending) ? "Saving…" : editing ? "Update" : "Create"}
                 </Button>
               </DialogFooter>
@@ -711,14 +687,8 @@ export default function CollectionsPage() {
 }
 
 function CollectionStatusBadge({ status }: { status: string }) {
-  const MAP: Record<string, string> = {
-    pending:     "ff-badge ff-badge-pending",
-    in_progress: "ff-badge ff-badge-under_review",
-    paid:        "ff-badge ff-badge-paid",
-    written_off: "ff-badge ff-badge-rejected",
-  };
   const LABELS: Record<string, string> = {
     pending: "Pending", in_progress: "In Progress", paid: "Paid", written_off: "Written Off",
   };
-  return <span className={MAP[status] ?? "ff-badge ff-badge-draft"}>{LABELS[status] ?? status}</span>;
+  return <Badge tone={status === "paid" ? "success" : status === "written_off" ? "warning" : status === "in_progress" ? "accent" : "neutral"}>{LABELS[status] ?? status}</Badge>;
 }

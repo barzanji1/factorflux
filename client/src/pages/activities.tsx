@@ -6,12 +6,12 @@ import { PageInsights } from "@/components/PageInsights";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, Button, Badge, AdminPageShell } from "@/components/admin-neu/adapters";
+import { NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { Activity, Clock, FileText, UserPlus, Upload, CheckCircle, Eye, Trash2 } from "lucide-react";
 import DocumentViewer from "@/components/document-viewer";
 import type { Activity as ActivityType } from "@shared/schema";
+import "@/components/admin-neu/admin-neu-page.css";
 
 export default function Activities() {
   const { toast } = useToast();
@@ -30,30 +30,30 @@ export default function Activities() {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "document_uploaded":
-        return <Upload className="w-4 h-4 text-blue-600" />;
+        return <Upload className="w-4 h-4 text-[#168d99]" />;
       case "client_created":
-        return <UserPlus className="w-4 h-4 text-green-600" />;
+        return <UserPlus className="h-4 w-4 text-[#168d99]" />;
       case "invoice_created":
-        return <FileText className="w-4 h-4 text-purple-600" />;
+        return <FileText className="w-4 h-4 text-[#168d99]" />;
       case "invoice_approved":
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircle className="h-4 w-4 text-[#168d99]" />;
       default:
-        return <Activity className="w-4 h-4 text-gray-600" />;
+        return <Activity className="h-4 w-4 text-[#666]" />;
     }
   };
 
   const getActivityColor = (type: string) => {
     switch (type) {
       case "document_uploaded":
-        return "bg-blue-100 text-blue-800";
+        return "text-[#168d99]";
       case "client_created":
-        return "bg-green-100 text-green-800";
+        return "text-[#168d99]";
       case "invoice_created":
-        return "bg-purple-100 text-purple-800";
+        return "text-[#666]";
       case "invoice_approved":
-        return "bg-green-100 text-green-800";
+        return "text-[#168d99]";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "text-[#666]";
     }
   };
 
@@ -127,7 +127,7 @@ export default function Activities() {
 
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -136,96 +136,36 @@ export default function Activities() {
           subtitle="View all system activities and events"
         />
         
-        <main className="flex-1 overflow-auto p-6">
+        <AdminPageShell className="flex-1 overflow-auto p-6">
           <PageInsights entity="activities" title="Activity stream" />
           <div className="max-w-4xl mx-auto">
             {activitiesLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
+              <Card className="space-y-3 p-6" aria-label="Loading activities">
+                {[0, 1, 2, 3].map((n) => <div key={n} className="h-12 animate-pulse rounded-xl bg-[#d2d2d2]" />)}
+              </Card>
             ) : activities.length === 0 ? (
               <Card>
                 <CardContent className="text-center py-12">
-                  <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No activities found</h3>
-                  <p className="text-gray-500 dark:text-gray-400">
+                  <Activity className="mx-auto mb-4 h-16 w-16 text-[#999]" />
+                  <h3 className="mb-2 text-lg font-medium text-[#333]">No activities found</h3>
+                  <p className="text-[#777]">
                     Activities will appear here as you use the system
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {activities.map((activity: ActivityType) => (
-                  <Card key={activity.id} className="hover:shadow-sm transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="flex-shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                            {getActivityIcon(activity.type)}
-                          </div>
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                {activity.description}
-                              </p>
-                              <div className="flex items-center space-x-2 mt-1">
-                                <Badge className={getActivityColor(activity.type)} variant="secondary">
-                                  {formatActivityType(activity.type)}
-                                </Badge>
-                                {activity.entityType && activity.entityId && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {activity.entityType} #{activity.entityId}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                              <div className="flex items-center">
-                                <Clock className="w-4 h-4 mr-1" />
-                                <span>
-                                  {new Date(activity.createdAt!).toLocaleString()}
-                                </span>
-                              </div>
-                              {isDocumentActivity(activity.type) && activity.entityType && activity.entityId && (
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleViewDocuments(activity)}
-                                    className="h-8 px-2 text-xs"
-                                  >
-                                    <Eye className="w-3 h-3 mr-1" />
-                                    View Documents
-                                  </Button>
-                                  {activity.entityType === 'document' && activity.type === 'document_uploaded' && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleDeleteDocument(activity)}
-                                      className="h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                                      disabled={deleteDocument.isPending}
-                                    >
-                                      <Trash2 className="w-3 h-3 mr-1" />
-                                      {deleteDocument.isPending ? "Deleting..." : "Delete"}
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <NeuTable className="w-full">
+                <NeuTableHeader><NeuTableRow><NeuTableHead>Activity</NeuTableHead><NeuTableHead>Entity</NeuTableHead><NeuTableHead>When</NeuTableHead><NeuTableHead>Actions</NeuTableHead></NeuTableRow></NeuTableHeader>
+                <NeuTableBody>{activities.map((activity: ActivityType) => <NeuTableRow key={activity.id}>
+                  <NeuTableCell><div className="flex min-w-64 items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e0e0e0] shadow-[-3px_-3px_7px_#fff,3px_3px_7px_#c1c1c1]">{getActivityIcon(activity.type)}</div><div className="min-w-0"><p className="text-sm font-medium text-[#333]">{activity.description}</p><Badge tone="neutral" className={`mt-1 ${getActivityColor(activity.type)}`}>{formatActivityType(activity.type)}</Badge></div></div></NeuTableCell>
+                  <NeuTableCell>{activity.entityType && activity.entityId ? <Badge tone="accent">{activity.entityType} #{activity.entityId}</Badge> : "—"}</NeuTableCell>
+                  <NeuTableCell className="text-xs text-[#777]"><span className="flex items-center gap-1"><Clock className="h-4 w-4" />{new Date(activity.createdAt!).toLocaleString()}</span></NeuTableCell>
+                  <NeuTableCell><div className="flex gap-2">{isDocumentActivity(activity.type) && activity.entityType && activity.entityId && <><Button variant="outline" size="sm" onClick={() => handleViewDocuments(activity)} className="h-8 px-2 text-xs"><Eye className="mr-1 h-3 w-3" />View Documents</Button>{activity.entityType === "document" && activity.type === "document_uploaded" && <Button variant="destructive" size="sm" onClick={() => handleDeleteDocument(activity)} className="h-8 px-2 text-xs" disabled={deleteDocument.isPending}><Trash2 className="mr-1 h-3 w-3" />{deleteDocument.isPending ? "Deleting..." : "Delete"}</Button>}</>}</div></NeuTableCell>
+                </NeuTableRow>)}</NeuTableBody>
+              </NeuTable>
             )}
           </div>
-        </main>
+        </AdminPageShell>
       </div>
 
       {/* Document Viewer */}

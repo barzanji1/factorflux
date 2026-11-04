@@ -8,14 +8,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button, Input, Card, CardContent, CardDescription, CardHeader, CardTitle, SelectContent, SelectTrigger, AdminPageShell } from "@/components/admin-neu/adapters";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectItem, SelectValue } from "@/components/ui/select";
 import { 
   User as UserIcon, 
   Camera, 
@@ -28,6 +26,7 @@ import {
   Shield,
   BadgeCheck,
 } from "lucide-react";
+import "@/components/admin-neu/admin-neu-page.css";
 
 const departments = [
   "Operations",
@@ -173,14 +172,14 @@ export default function Profile() {
   const triggerImageUpload = () => { fileInputRef.current?.click(); };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav 
           title="Profile & Settings" 
           subtitle="Manage your personal information and account preferences"
         />
-        <main className="flex-1 overflow-y-auto p-6">
+        <AdminPageShell className="flex-1 overflow-y-auto !min-h-0 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
         {/* Profile Header */}
         <Card>
@@ -211,15 +210,15 @@ export default function Profile() {
                 {/* Name and Job Title */}
                 <div className="text-center space-y-1">
                   <div className="flex items-center justify-center gap-2">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-semibold text-[#333]">
                       {user.firstName} {user.lastName}
                     </h3>
                     {user.verified && (
-                      <BadgeCheck className="h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                      <BadgeCheck className="h-5 w-5 flex-shrink-0 text-[#168d99]" />
                     )}
                   </div>
                   {user.jobTitle && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-[#666]">
                       {user.jobTitle}
                     </p>
                   )}
@@ -248,28 +247,28 @@ export default function Profile() {
               <div className="flex-1 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium text-gray-600 flex items-center gap-1">
+                    <Label className="flex items-center gap-1 text-sm font-medium text-[#666]">
                       <Mail className="w-4 h-4" />
                       Email Address
                     </Label>
-                    <p className="text-sm text-gray-900 dark:text-white mt-1">{user.email}</p>
-                    <p className="text-xs text-gray-500">Email cannot be changed</p>
+                    <p className="mt-1 text-sm text-[#333]">{user.email}</p>
+                    <p className="text-xs text-[#777]">Email cannot be changed</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600 flex items-center gap-1">
+                    <Label className="flex items-center gap-1 text-sm font-medium text-[#666]">
                       <Shield className="w-4 h-4" />
                       Role
                     </Label>
-                    <p className="text-sm text-gray-900 dark:text-white capitalize mt-1">{user.role}</p>
-                    <p className="text-xs text-gray-500">Role is managed by administrators</p>
+                    <p className="mt-1 text-sm capitalize text-[#333]">{user.role}</p>
+                    <p className="text-xs text-[#777]">Role is managed by administrators</p>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-600 flex items-center gap-1">
+                  <Label className="flex items-center gap-1 text-sm font-medium text-[#666]">
                     <Calendar className="w-4 h-4" />
                     Member Since
                   </Label>
-                  <p className="text-sm text-gray-900 dark:text-white mt-1">
+                  <p className="mt-1 text-sm text-[#333]">
                     {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -429,7 +428,7 @@ export default function Profile() {
           </CardContent>
         </Card>
       </div>
-        </main>
+        </AdminPageShell>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import "@/components/admin-neu/admin-neu-page.css";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -12,8 +13,8 @@ import RecordDetail, {
   DetailRow, DetailSection, EmptyTab,
 } from "@/components/layout/record-detail";
 import EntityNotes from "@/components/shared/EntityNotes";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge, Button } from "@/components/admin-neu/adapters";
+import { NeuCard } from "@/styles/neu/components";
 
 import {
   Banknote, ReceiptText, CheckCircle2, Clock, DollarSign,
@@ -23,12 +24,12 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_META: Record<string, { label: string; colors: string }> = {
-  pending_advance:  { label: "Pending Advance",  colors: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  advance_paid:     { label: "Advance Paid",     colors: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300" },
-  reserve_pending:  { label: "Reserve Pending",  colors: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300" },
-  reserve_released: { label: "Reserve Released", colors: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-300" },
-  complete:         { label: "Complete",         colors: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300" },
+const STATUS_META: Record<string, { label: string }> = {
+  pending_advance:  { label: "Pending Advance" },
+  advance_paid:     { label: "Advance Paid" },
+  reserve_pending:  { label: "Reserve Pending" },
+  reserve_released: { label: "Reserve Released" },
+  complete:         { label: "Complete" },
 };
 
 const STATUS_ORDER = ["pending_advance", "advance_paid", "reserve_pending", "reserve_released", "complete"];
@@ -36,7 +37,7 @@ const STATUS_ORDER = ["pending_advance", "advance_paid", "reserve_pending", "res
 function PayoutStatusBadge({ status }: { status: string }) {
   const m = STATUS_META[status] ?? STATUS_META.pending_advance;
   return (
-    <Badge className={cn("rounded-full border px-3 py-1 text-xs font-semibold shadow-sm", m.colors)}>
+    <Badge tone={status === "complete" ? "success" : status === "reserve_pending" || status === "pending_advance" ? "warning" : "accent"}>
       {m.label}
     </Badge>
   );
@@ -56,9 +57,9 @@ function PayoutPipeline({ status }: { status: string }) {
   return (
     <div>
       <div className="mb-4 flex items-center gap-2">
-        <TrendingUp className="h-4 w-4 text-violet-600" />
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-white">Payout Progress</h2>
-        <span className="ml-auto rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
+        <TrendingUp className="h-4 w-4 text-[#168d99]" />
+        <h2 className="text-sm font-semibold text-[#444]">Payout Progress</h2>
+        <span className="ml-auto rounded-full bg-[#e0e0e0] px-2.5 py-0.5 text-[11px] font-semibold text-[#168d99] shadow-[-3px_-3px_7px_#fff,3px_3px_7px_#c1c1c1]">
           Step {current + 1} of {STATUS_ORDER.length} · {STATUS_META[status]?.label ?? status}
         </span>
       </div>
@@ -70,19 +71,19 @@ function PayoutPipeline({ status }: { status: string }) {
           return (
             <div key={s} className="flex flex-1 flex-col items-center gap-2">
               <div className="flex w-full items-center">
-                <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-all",
-                  done   ? "border-violet-500 bg-violet-500 text-white"
-                  : active ? "border-violet-600 bg-violet-600 text-white shadow-[0_0_0_4px_rgba(124,58,237,0.18)]"
-                  : "border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500",
+                <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all",
+                  done   ? "border-0 bg-[#d4eeee] text-[#168d99] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"
+                  : active ? "border-0 bg-[#e0e0e0] text-[#168d99] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"
+                  : "border-0 bg-[#e0e0e0] text-[#888] shadow-[-3px_-3px_7px_#fff,3px_3px_7px_#c1c1c1]",
                 )}>
                   {done ? <CheckCircle2 className="h-4 w-4" /> : <span>{idx + 1}</span>}
                 </div>
-                <div className={cn("h-0.5 flex-1", isLast ? "invisible" : done ? "bg-violet-500" : "bg-slate-200 dark:bg-slate-700")} />
+                <div className={cn("h-0.5 flex-1", isLast ? "invisible" : done ? "bg-[#27aab8]" : "bg-[#c9c9c9]")} />
               </div>
               <span className={cn("text-center text-[10px] font-semibold leading-tight max-w-[80px]",
-                active ? "text-violet-700 dark:text-violet-300"
-                : done  ? "text-violet-600 dark:text-violet-400"
-                : "text-slate-400 dark:text-slate-500",
+                active ? "text-[#168d99]"
+                : done  ? "text-[#168d99]"
+                : "text-[#888]",
               )}>
                 {STATUS_META[s]?.label}
               </span>
@@ -140,7 +141,7 @@ export default function PayoutDetail() {
   const availableTransitions = TRANSITIONS.filter(t => t.from.includes(currentStatus));
 
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(124,58,237,0.05),_transparent_30%),linear-gradient(to_bottom,_#f8fafc,_#f1f5f9)] dark:bg-[hsl(var(--background))]">
+    <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav
@@ -148,7 +149,7 @@ export default function PayoutDetail() {
           subtitle="Advance, fee, and reserve breakdown with disbursement tracking"
           group="Workspace"
         />
-        <main className="custom-scrollbar flex-1 overflow-auto">
+        <main className="custom-scrollbar flex-1 overflow-auto bg-[#e0e0e0]">
           <PageInsights entity="payouts" entityId={payoutId} title="Payout activity" />
           <div className="mx-auto w-full max-w-[1400px] p-6 xl:p-8">
             <RecordDetail
@@ -159,7 +160,7 @@ export default function PayoutDetail() {
               notFoundIcon={<Banknote className="h-8 w-8" />}
               notFoundLabel="Payout not found"
               icon={<Banknote className="h-7 w-7" />}
-              iconBg="bg-violet-600 text-white shadow-[0_8px_20px_rgba(124,58,237,0.28)]"
+              iconBg="bg-[#e0e0e0] text-[#168d99] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"
               title={`Payout #${payoutId}`}
               titleSub={[
                 payout?.invoiceNumber ? `Invoice ${payout.invoiceNumber}` : null,
@@ -205,26 +206,22 @@ export default function PayoutDetail() {
               ]}
               actions={isAdmin ? (
                 <div className="px-5 py-4 space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Lifecycle Actions</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#777]">Lifecycle Actions</p>
                   {availableTransitions.length === 0 ? (
-                    <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-xs text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300">
+                    <div className="flex items-center gap-2 rounded-xl bg-[#dceaea] px-3 py-2.5 text-xs text-[#168d99] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">
                       <CheckCircle2 className="h-4 w-4 shrink-0" />
                       {currentStatus === "complete" ? "Payout is complete." : "No actions available."}
                     </div>
                   ) : (
                     availableTransitions.map(t => (
                       <div key={t.to} className="space-y-1">
-                        <p className="text-[11px] text-slate-400">{t.desc}</p>
+                        <p className="text-[11px] text-[#777]">{t.desc}</p>
                         <Button
                           size="sm"
                           disabled={transitionMutation.isPending}
                           onClick={() => transitionMutation.mutate(t.to)}
-                          className={cn(
-                            "w-full justify-start gap-2 rounded-2xl text-xs text-white",
-                            t.variant === "success"
-                              ? "bg-emerald-600 hover:bg-emerald-700 shadow-[0_4px_12px_rgba(16,185,129,0.22)]"
-                              : "bg-violet-600 hover:bg-violet-700 shadow-[0_4px_12px_rgba(124,58,237,0.22)]",
-                          )}
+                            variant="accent"
+                            className="w-full justify-start gap-2 text-xs"
                         >
                           <PlayCircle className="h-3.5 w-3.5 shrink-0" />
                           {transitionMutation.isPending ? "Processing..." : t.label}
@@ -235,19 +232,19 @@ export default function PayoutDetail() {
                 </div>
               ) : (
                 <div className="px-5 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">Status</p>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#777]">Status</p>
                   {payout && <PayoutStatusBadge status={payout.paymentStatus} />}
                 </div>
               )}
               rightExtra={
-                <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-                  <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                <NeuCard className="overflow-hidden rounded-2xl">
+                  <div className="border-b border-[#c9c9c9] px-5 py-4">
                     <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-violet-600" />
-                      <h3 className="text-xs font-semibold text-slate-700 dark:text-white">Fund Breakdown</h3>
+                    <DollarSign className="h-4 w-4 text-[#168d99]" />
+                    <h3 className="text-xs font-semibold text-[#444]">Fund Breakdown</h3>
                     </div>
                   </div>
-                  <div className="divide-y divide-slate-50 px-5 dark:divide-slate-800/60">
+                  <div className="divide-y divide-[#c9c9c9] px-5">
                     {[
                       { label: "Invoice Face Value", value: fmt(payout?.invoiceAmount), note: "100%" },
                       { label: `Advance (${fmtPct(payout?.advanceRate)})`, value: fmt(payout?.advanceAmount), note: "paid now" },
@@ -257,14 +254,14 @@ export default function PayoutDetail() {
                     ].map(r => (
                       <div key={r.label} className="flex items-center justify-between py-3">
                         <div>
-                          <p className="text-xs text-slate-600 dark:text-slate-300">{r.label}</p>
-                          <p className="text-[11px] text-slate-400">{r.note}</p>
+                          <p className="text-xs text-[#555]">{r.label}</p>
+                          <p className="text-[11px] text-[#888]">{r.note}</p>
                         </div>
-                        <span className="text-sm font-semibold text-slate-800 dark:text-white">{r.value}</span>
+                        <span className="text-sm font-semibold text-[#333]">{r.value}</span>
                       </div>
                     ))}
                   </div>
-                </div>
+                </NeuCard>
               }
               tabs={[
                 {
@@ -292,8 +289,8 @@ export default function PayoutDetail() {
                       {payout?.notes && (
                         <div className="md:col-span-2">
                           <DetailSection title="Notes">
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                              <p className="text-sm text-slate-700 dark:text-slate-200">{payout.notes}</p>
+                            <div className="rounded-xl bg-[#e0e0e0] p-4 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
+                              <p className="text-sm text-[#444]">{payout.notes}</p>
                             </div>
                           </DetailSection>
                         </div>
@@ -307,21 +304,21 @@ export default function PayoutDetail() {
                   icon: <ReceiptText className="h-3.5 w-3.5" />,
                   content: payout?.invoiceId ? (
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/40">
+                      <div className="flex items-center justify-between rounded-xl bg-[#e0e0e0] px-4 py-4 shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e0e0e0] text-[#168d99] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">
                             <ReceiptText className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-800 dark:text-white">{payout.invoiceNumber ?? `Invoice #${payout.invoiceId}`}</p>
-                            {payout.clientName && <p className="text-xs text-slate-400">{payout.clientName}</p>}
+                            <p className="font-semibold text-[#333]">{payout.invoiceNumber ?? `Invoice #${payout.invoiceId}`}</p>
+                            {payout.clientName && <p className="text-xs text-[#777]">{payout.clientName}</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-lg font-semibold text-slate-800 dark:text-white">{fmt(payout.invoiceAmount)}</span>
+                          <span className="text-lg font-semibold text-[#333]">{fmt(payout.invoiceAmount)}</span>
                           <Button variant="outline" size="sm"
                             onClick={() => navigate(`/invoices/${payout.invoiceId}`)}
-                            className="gap-1.5 rounded-xl border-slate-200 text-xs dark:border-slate-700">
+                            className="gap-1.5 text-xs">
                             <ArrowRight className="h-3.5 w-3.5" />View Invoice
                           </Button>
                         </div>

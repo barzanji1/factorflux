@@ -12,7 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import BaseTopNav from "@/components/layout/top-nav";
 import { DialogContent as BaseDialogContent } from "@/components/ui/dialog";
 import { AlertDialogContent as BaseAlertDialogContent } from "@/components/ui/alert-dialog";
-import { SelectContent as BaseSelectContent } from "@/components/ui/select";
+import { SelectContent as BaseSelectContent, SelectTrigger as BaseSelectTrigger } from "@/components/ui/select";
+
+export { NeuTextarea as Textarea } from "@/styles/neu/components";
 
 type ButtonVariant = "default" | "accent" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 type ButtonSize = "default" | "sm" | "lg" | "icon";
@@ -107,6 +109,10 @@ export const SelectContent = forwardRef<ElementRef<typeof BaseSelectContent>, Co
   ({ className, ...props }, ref) => <BaseSelectContent ref={ref} className={cn("admin-neu-select", className)} {...props} />,
 );
 SelectContent.displayName = "AdminNeuSelectContent";
+export const SelectTrigger = forwardRef<ElementRef<typeof BaseSelectTrigger>, ComponentPropsWithoutRef<typeof BaseSelectTrigger>>(
+  ({ className, ...props }, ref) => <BaseSelectTrigger ref={ref} className={cn("min-h-11 rounded-xl border-0 bg-[#e0e0e0] text-[#333] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff] focus-visible:ring-2 focus-visible:ring-[#27aab8]", className)} {...props} />,
+);
+SelectTrigger.displayName = "AdminNeuSelectTrigger";
 export function useAdminToast() {
   const state = useToast();
   const toast = useCallback((options: Parameters<typeof state.toast>[0]) => {

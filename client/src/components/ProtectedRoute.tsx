@@ -18,12 +18,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (isLoading || (isAuthenticated && user?.role !== "admin" && (!permissionsReadyForRoute || (!permissionsLoaded && !permissionsError)))) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-300">Verifying authentication...</p>
-        </div>
-      </div>
+      <NeuPageShell className="flex min-h-screen items-center justify-center p-6">
+        <NeuCard className="p-6 text-center" role="status" aria-live="polite">
+          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-[#27aab8]" />
+          <p className="text-[#888]">Verifying authentication...</p>
+        </NeuCard>
+      </NeuPageShell>
     );
   }
 
