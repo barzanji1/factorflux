@@ -12,6 +12,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { sendResendEmail } from "../resendTransport.js";
 import { DOCUMENTS_BUCKET, operationsS3 } from "./operationsS3";
+import { backupFailureEmail, describeBackupFailure, pgDumpFailure, type BackupFailure, type BackupStage } from "./backupDiagnostics";
 
 export const BACKUP_PREFIX = "backups/db/";
 const BACKUP_PATTERN = /^backups\/db\/factorflux-\d{4}-\d{2}-\d{2}-\d{6}\.sql\.gz$/;
@@ -49,9 +50,11 @@ export async function dumpDatabase(
   destination: string,
   databaseUrl = connectionUrl(),
   binary = path.resolve("dist/tools/bin/pg_dump"),
+  timeoutMs = 30 * 60_000,
 ): Promise<void> {
   const url = new URL(directBackupConnectionUrl(databaseUrl));
-  const child = spawn(existsSync(binary) ? binary : "pg_dump", ["--no-password"], {
+  const bundled = existsSync(binary);
+  const child = spawn(bundled ? binary : "pg_dump", ["--no-password"], {
     stdio: ["ignore", "pipe", "pipe"],
     // Credentials are never passed in arguments, logs, or backup metadata.
     env: {
@@ -69,18 +72,22 @@ export async function dumpDatabase(
         .filter(Boolean).join(":"),
     },
   });
-  let versionMismatch = false;
+  // Bounded in-memory classification only. Never log or attach this text to an
+  // Error: stderr can contain database identifiers, SQL and credentials.
+  let stderr = "";
+  let timedOut = false;
   child.stderr.on("data", (chunk: Buffer) => {
-    if (/server version mismatch/.test(chunk.toString())) versionMismatch = true;
+    stderr = (stderr + chunk.toString()).slice(-16_384);
   });
   const exited = new Promise<void>((resolve, reject) => {
-    child.once("error", () => reject(new Error("Could not start pg_dump; run npm run build:pg-dump")));
-    child.once("close", code => code === 0 ? resolve() : reject(new Error(
-      versionMismatch ? "pg_dump/server version mismatch; rebuild the PostgreSQL client"
-        : `pg_dump failed (exit ${code ?? "signal"})`,
-    )));
+    child.once("error", (error: NodeJS.ErrnoException) => reject(pgDumpFailure("", {
+      launchCode: error.code ?? "UNKNOWN", bundled,
+    })));
+    child.once("close", (code, signal) => code === 0 && !timedOut ? resolve() : reject(
+      pgDumpFailure(stderr, { exitCode: code, signal, timedOut }),
+    ));
   });
-  const timer = setTimeout(() => child.kill("SIGKILL"), 30 * 60_000);
+  const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, timeoutMs);
   try {
     // Await BOTH the process and pipeline; a failed dump must never be uploaded
     // as an apparently successful (but valid) empty gzip.
@@ -132,7 +139,7 @@ interface BackupDependencies {
   upload: (key: string, file: string, bytes: number) => Promise<void>;
   list: () => Promise<string[]>;
   remove: (keys: string[]) => Promise<void>;
-  alert: () => Promise<unknown>;
+  alert: (failure: BackupFailure) => Promise<unknown>;
 }
 
 const defaults: BackupDependencies = {
@@ -154,20 +161,26 @@ const defaults: BackupDependencies = {
         Bucket: DOCUMENTS_BUCKET,
         Delete: { Objects: keys.slice(offset, offset + 1000).map(Key => ({ Key })), Quiet: true },
       }));
-      if (result.Errors?.length) throw new Error("S3 backup retention deletion failed");
+      if (result.Errors?.length) {
+        // DeleteObjects can return HTTP 200 with per-object permission errors.
+        // Preserve only a known code, never the returned keys or messages.
+        throw Object.assign(new Error("S3 backup retention deletion failed"), {
+          code: result.Errors.some(error => error.Code === "AccessDenied") ? "AccessDenied" : "BackupRetentionFailed",
+        });
+      }
     }
   },
-  alert: () => sendResendEmail({
+  alert: failure => sendResendEmail({
     to: "dosh@truckingprosfinancial.com",
     subject: "Trucking Pros Financial — database backup failed",
-    text: "The FactorFlux database backup or its retention cleanup failed. Please check the server's backup logs and AWS permissions. No database credentials or contents are included in this alert.",
+    text: backupFailureEmail(failure),
     emailLog: { templateName: "database_backup_failed" },
   }),
 };
 
 export async function runDatabaseBackup(overrides: Partial<BackupDependencies> = {}) {
   const deps = { ...defaults, ...overrides };
-  let stage = "lock";
+  let stage: BackupStage = "lock";
   try {
     return await deps.lock(async () => {
       stage = "temporary-file";
@@ -196,14 +209,13 @@ export async function runDatabaseBackup(overrides: Partial<BackupDependencies> =
     });
   } catch (error) {
     if (!(error instanceof BackupInProgressError)) {
-      // Do not log PostgreSQL stderr/URLs: they can contain credentials/data.
+      const failure = describeBackupFailure(stage, error);
+      // Emit only allow-listed diagnostics, never raw exceptions or stderr.
       console.error("[backup] failed", {
-        stage,
         bucket: DOCUMENTS_BUCKET,
-        type: error instanceof Error ? error.name : "UnknownError",
-        code: (error as { code?: string } | null)?.code,
+        ...failure,
       });
-      try { await deps.alert(); }
+      try { await deps.alert(failure); }
       catch { console.error("[backup] failure alert could not be delivered"); }
     }
     throw error;
