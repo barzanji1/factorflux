@@ -26,6 +26,7 @@ import { ClientEmailComposer } from "@/components/client-email/client-email-comp
 import { ClientEmailLog } from "@/components/client-email/client-email-log";
 import EntityNotes from "@/components/shared/EntityNotes";
 import { CarrierFinancialOverview } from "@/components/carriers/carrier-financial-overview";
+import { SafePaginatedTable } from "@/components/safe-table-pagination";
 import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
@@ -377,13 +378,15 @@ export default function ClientDetail() {
               <ProfileSection title="Dispatcher"><div className="flex items-center gap-3 border border-[#d0d9dc] bg-[#fbfcfb] p-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#d9edf0] text-[#087d8d]"><UserRound className="h-5 w-5" /></div><div className="min-w-0 flex-1"><p className="text-[12px] font-bold">{carrierDispatcher ? [carrierDispatcher.firstName, carrierDispatcher.lastName].filter(Boolean).join(" ") : onboarding.dispatcherName || "No dispatcher linked"}</p><p className="text-[10px] text-[#718187]">{carrierDispatcher?.phone || onboarding.dispatcherPhone || "Phone not recorded"} · {carrierDispatcher?.email || onboarding.dispatcherEmail || "Email not recorded"}</p></div><span className="text-[10px] text-[#9aa7ab]">{carrierDispatcher?.status || (onboarding.dispatcherName ? onboarding.dispatcherStatus || "Linked" : "Unavailable")}</span></div></ProfileSection>
               <ProfileSection title="Bank accounts" eyebrow="Secure Vault" action={isManager ? <ProfileActionButton onClick={() => openBank()} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton> : undefined}>
                 {isManager ? (
-                  <div className="overflow-x-auto">
+                  <>
+                  <SafePaginatedTable>
                     <table className="w-full min-w-[600px] text-left text-[10px]">
                       <thead className="bg-[#f0f4f3] uppercase tracking-wider text-[#63767d]"><tr>{["For", "Account name", "Financial institution", "Routing", "Account", "Type", "Actions"].map((heading) => <th key={heading} className="px-2 py-2 font-bold">{heading}</th>)}</tr></thead>
                       <tbody>{bankAccounts.map((account: any) => <tr key={account.id} className="border-t border-[#c8c8c8]"><td className="px-2 py-2">{account.paymentType || "Not recorded"}</td><td className="px-2 py-2 font-semibold">{account.nickname || "Operating account"}</td><td className="px-2 py-2">{account.bankName || "Not recorded"}</td><td className="px-2 py-2">•••••••••</td><td className="px-2 py-2">{revealed[account.id] || `•••• ${account.lastFour || "----"}`}</td><td className="px-2 py-2">{account.accountType || "Checking"}</td><td className="px-2 py-2"><div className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => revealBank(account.id)} title="Reveal for 30 seconds" aria-label="Reveal bank account"><Eye className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="sm" onClick={() => openBank(account)}>Edit</ProfileActionButton><ProfileActionButton variant="ghost" size="sm" onClick={() => window.confirm("Remove this bank account?") && deleteBank.mutate(account.id)}>Delete</ProfileActionButton></div></td></tr>)}</tbody>
                     </table>
-                    {!bankAccounts.length && <EmptyState label="No bank accounts are stored in the secure Vault" />}
-                  </div>
+                  </SafePaginatedTable>
+                  {!bankAccounts.length && <EmptyState label="No bank accounts are stored in the secure Vault" />}
+                  </>
                 ) : <EmptyState label="Bank accounts are restricted to managers and administrators" />}
               </ProfileSection>
               <ProfileSection title="Monitors" action={<ProfileActionButton onClick={() => openList("monitor")} variant="outline" size="sm"><Plus className="h-3 w-3" />Add</ProfileActionButton>}><MiniTable columns={["Name", "Phone", "Email", "Status", "Actions"]} rows={((onboarding.monitors || []) as any[]).map((monitor, i) => [monitor.name, monitor.phone, monitor.email, monitor.status, <span className="flex gap-1"><ProfileActionButton variant="ghost" size="icon" onClick={() => openList("monitor", monitor, i)} aria-label="Edit monitor"><Pencil className="h-3 w-3" /></ProfileActionButton><ProfileActionButton variant="ghost" size="icon" onClick={() => deleteList("monitor", i)} aria-label="Delete monitor"><Trash2 className="h-3 w-3 text-[#a33131]" /></ProfileActionButton></span>])} empty="No monitors are recorded" /></ProfileSection>

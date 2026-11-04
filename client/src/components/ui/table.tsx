@@ -1,18 +1,34 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { SafeTablePaginationControls, SafeTablePaginationProvider, useSafePaginatedRows, useSafePaginatedTableChildren } from "@/components/safe-table-pagination";
+
+function PaginatedTableContents({
+  className,
+  children,
+  tableRef,
+  ...props
+}: React.HTMLAttributes<HTMLTableElement> & { tableRef: React.Ref<HTMLTableElement> }) {
+  const tableChildren = useSafePaginatedTableChildren(children);
+  return (
+    <>
+      <div className="ff-table-container custom-scrollbar relative w-full overflow-auto">
+        <table ref={tableRef} className={cn("ff-data-table w-full caption-bottom text-sm", className)} {...props}>
+          {tableChildren}
+        </table>
+      </div>
+      <SafeTablePaginationControls />
+    </>
+  );
+}
 
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="ff-table-container custom-scrollbar relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn("ff-data-table w-full caption-bottom text-sm", className)}
-      {...props}
-    />
-  </div>
+>(({ className, children, ...props }, ref) => (
+  <SafeTablePaginationProvider>
+    <PaginatedTableContents className={className} tableRef={ref} {...props}>{children}</PaginatedTableContents>
+  </SafeTablePaginationProvider>
 ));
 Table.displayName = "Table";
 
@@ -31,13 +47,18 @@ TableHeader.displayName = "TableHeader";
 const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <tbody
-    ref={ref}
-    className={cn("[&_tr:last-child]:border-0", className)}
-    {...props}
-  />
-));
+>(({ className, children, ...props }, ref) => {
+  const visibleRows = useSafePaginatedRows(children);
+  return (
+    <tbody
+      ref={ref}
+      className={cn("[&_tr:last-child]:border-0", className)}
+      {...props}
+    >
+      {visibleRows}
+    </tbody>
+  );
+});
 TableBody.displayName = "TableBody";
 
 const TableFooter = React.forwardRef<

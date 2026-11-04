@@ -21,6 +21,11 @@ import {
   downloadToTemp,
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
+import { registerPageInsightRoutes } from "./routes/pageInsights";
+import { complianceIntegrationRuns } from "@shared/schema";
+import { readAuditPage } from "./services/auditPage";
+import { taskPageOptions, followUpPage } from "./services/taskPage";
 import { customerLogoPath } from "./customerBranding";
 import { giphy, GiphyError } from "./services/giphy";
 import { registerItSupportRoutes } from "./routes/itSupport";
@@ -42,7 +47,7 @@ import { registerDumpStatementRoutes } from "./routes/dumpStatements";
 import { agingReportFiltersSchema, groupAgingRows } from "../shared/aging-report";
 import { readCarrierFinancial } from "./services/carrierFinancial";
 import { readBrokerFinancial } from "./services/brokerFinancial";
-import { readDocumentStats, documentListMetadata, readDocumentExtractionSummary } from "./services/documentAnalytics";
+import { readDocumentStats, documentListMetadata, readDocumentExtractionSummary, readDocumentPageIds } from "./services/documentAnalytics";
 import { brokerConfirmationService, getConfirmationAgingRows, getConfirmationInvoiceScope, fundedAgeDays } from "./services/brokerConfirmationService";
 import { firestore } from "./firebase";
 import {
@@ -431,9 +436,9 @@ const assignmentUserFields = {
 
 function parseListPagination(req: any) {
   const pageValue = Number.parseInt(String(req.query.page ?? "1"), 10);
-  const limitValue = Number.parseInt(String(req.query.limit ?? "50"), 10);
+  const limitValue = Number.parseInt(String(req.query.limit ?? DEFAULT_PAGE_SIZE), 10);
   const page = Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1;
-  const limit = Number.isFinite(limitValue) ? Math.min(200, Math.max(1, limitValue)) : 50;
+  const limit = Number.isFinite(limitValue) ? Math.min(200, Math.max(1, limitValue)) : DEFAULT_PAGE_SIZE;
   return { page, limit, offset: (page - 1) * limit };
 }
 
@@ -936,7 +941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (/^\/api\/invoices\/[^/]+\/broker-confirmation(?:\/|$)/.test(pathname)) {
         return requireAnyPermission(["invoices", "factoring"])(req, res, next);
       }
-      if (req.method === "GET" && /^\/api\/invoices(?:\/[^/]+\/detail)?$/.test(pathname)) {
+      if (req.method === "GET" && /^\/api\/invoices(?:\/stats|\/[^/]+\/detail)?$/.test(pathname)) {
         return requireAnyPermission(["invoices", "factoring"])(req, res, next);
       }
     }
@@ -951,6 +956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (key === "brokerConfirmationToken") return undefined;
     return typeof previousJsonReplacer === "function" ? previousJsonReplacer.call(this, key, value) : value;
   });
+  registerPageInsightRoutes(app, { requireAuth, requireModulePermission, requireManagerOrAdmin, requireAdmin, requireInvoiceRead: requireAnyPermission(["invoices", "factoring"]) });
   registerBrokerConfirmationRoutes(app, { requireAuth, requireManagerOrAdmin, canAccessInvoice: employeeCanAccessInvoice });
   registerBrokerCollectionsRoutes(app, { requireAuth });
   registerEmailLogRoutes(app, { requireAuth, requireManagerOrAdmin });
@@ -1988,8 +1994,16 @@ ${message}
     try {
       const { load, invoice, entityType, entityId } = req.query;
       let documents;
+      const serverPaged = !!req.query.page && !load && !invoice && !entityType;
 
-      if (entityType && entityId) {
+      if (serverPaged) {
+        const result = await readDocumentPageIds(req.query, req.user);
+        res.setHeader("X-Total-Count", result.total);
+        res.setHeader("X-Page-Size", result.limit);
+        res.setHeader("X-Page", result.page);
+        documents = result.ids.length ? await db.select().from(documentsTable).where(inArray(documentsTable.id, result.ids))
+          .orderBy(desc(documentsTable.createdAt), desc(documentsTable.id)) : [];
+      } else if (entityType && entityId) {
         documents = await storage.getDocumentsByEntity(
           entityType as string,
           parseInt(entityId as string, 10)
@@ -2002,7 +2016,7 @@ ${message}
         documents = await storage.getDocuments();
       }
 
-      if (req.user.role === "employee") {
+      if (req.user.role === "employee" && !serverPaged) {
         const ownedInvoices = new Set(
           (await storage.getInvoices()).filter(invoice => invoice.submittedBy === req.user.id).map(invoice => invoice.id),
         );
@@ -2017,6 +2031,7 @@ ${message}
       res.json(documents.map(document => ({ ...document, ocrJob: latestJobs.get(document.id) ?? null, ...metadata.get(document.id) })));
     } catch (error) {
       console.error("Error fetching documents:", error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid document filters" });
       res.status(500).json({ message: "Failed to fetch documents" });
     }
   });
@@ -3565,7 +3580,7 @@ ${message}
         return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid entity filter" });
       }
       const page = Math.max(1, Number(req.query.page ?? 1));
-      const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 100)));
+      const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? DEFAULT_PAGE_SIZE)));
       if (!Number.isInteger(page) || !Number.isInteger(pageSize)) return res.status(400).json({ message: "Invalid pagination" });
       const dateFrom = typeof req.query.dateFrom === "string" && req.query.dateFrom ? new Date(`${req.query.dateFrom}T00:00:00.000Z`) : undefined;
       const dateTo = typeof req.query.dateTo === "string" && req.query.dateTo ? new Date(`${req.query.dateTo}T23:59:59.999Z`) : undefined;
@@ -6184,8 +6199,14 @@ Trucking Pros Financial Team
   });
 
   // Follow-ups
-  app.get("/api/follow-ups", requireAuth, async (_req: any, res) => {
+  app.get("/api/follow-ups", requireAuth, async (req: any, res) => {
     try {
+      if (req.query.page) {
+        const result = await followUpPage(req.query);
+        res.setHeader("X-Total-Count", result.total);
+        res.setHeader("X-Page-Size", result.limit);
+        return res.json(result.rows);
+      }
       const followUps = await storage.getAllFollowUps();
       res.json(followUps);
     } catch (error) {
@@ -6683,7 +6704,16 @@ Trucking Pros Financial Team
         ? scope === "assigned-to-me" ? eq(tasks.assignedTo, req.user.id)
           : scope === "created-by-me" ? eq(tasks.createdBy, req.user.id) : undefined
         : eq(tasks.assignedTo, req.user.id);
-      const tasksData = await db
+      const paging = req.query.page ? taskPageOptions(req.query, visibility) : undefined;
+      if (paging) {
+        const [total] = await db.select({ count: count() }).from(tasks)
+          .leftJoin(invoices, eq(tasks.confirmationInvoiceId, invoices.id))
+          .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
+          .leftJoin(clients, eq(sql`coalesce(${tasks.clientId}, ${invoices.clientId})`, clients.id)).where(paging.where);
+        res.setHeader("X-Total-Count", total.count);
+        res.setHeader("X-Page-Size", paging.limit);
+      }
+      const taskQuery = db
         .select({
           id: tasks.id,
           title: tasks.title,
@@ -6715,8 +6745,10 @@ Trucking Pros Financial Team
         .leftJoin(brokers, eq(invoices.brokerId, brokers.id))
         .leftJoin(clients, eq(sql`coalesce(${tasks.clientId}, ${invoices.clientId})`, clients.id))
         .leftJoin(userTable, eq(tasks.assignedTo, userTable.id))
-        .where(visibility)
-        .orderBy(tasks.createdAt);
+        .where(paging ? paging.where : visibility)
+        .orderBy(...(paging ? paging.order : [tasks.createdAt]))
+        .$dynamic();
+      const tasksData = await (paging ? taskQuery.limit(paging.limit).offset(paging.offset) : taskQuery);
       // Fetch attribution names separately to avoid duplicate aliases in Drizzle's
       // select object while retaining the compact list query.
       const enriched = await Promise.all(tasksData.map(async (task) => {
@@ -7861,7 +7893,10 @@ Trucking Pros Financial Team
   // ─── Admin Audit Log ───────────────────────────────────────────────────────
   app.get("/api/admin/audit-log", requireAdmin, async (req, res) => {
     try {
-      const limit = Math.min(parseInt((req.query.limit as string) || "100", 10), 500);
+      const { limit, offset } = parseListPagination(req);
+      const [total] = await db.select({ count: count() }).from(activities);
+      res.setHeader("X-Total-Count", total.count);
+      res.setHeader("X-Page-Size", limit);
       const rows = await db
         .select({
           id: activities.id,
@@ -7876,8 +7911,9 @@ Trucking Pros Financial Team
         })
         .from(activities)
         .leftJoin(users, eq(activities.userId, users.id))
-        .orderBy(desc(activities.createdAt))
-        .limit(limit);
+        .orderBy(desc(activities.createdAt), desc(activities.id))
+        .limit(limit)
+        .offset(offset);
       res.json(rows);
     } catch (err) {
       console.error("Error fetching audit log:", err);
@@ -8183,8 +8219,11 @@ Trucking Pros Financial Team
 
   app.get("/api/authority-checks/integration-runs", requireAuth, async (req, res) => {
     try {
-      const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 100);
-      res.json(await storage.getIntegrationRuns(limit));
+      const { limit, offset } = parseListPagination(req);
+      const [{ count: total }] = await db.select({ count: count() }).from(complianceIntegrationRuns);
+      res.setHeader("X-Total-Count", total);
+      res.setHeader("X-Page-Size", limit);
+      res.json(await storage.getIntegrationRuns(limit, offset));
     } catch (e) { res.status(500).json({ message: "Failed to fetch integration runs" }); }
   });
 
@@ -8663,11 +8702,15 @@ Trucking Pros Financial Team
   // ─── Audit endpoints ──────────────────────────────────────────────────────
   app.get("/api/audit/events", requireAuth, async (req, res) => {
     try {
-      const entityType = (req.query.entityType as string) || undefined;
-      const limit = Math.min(parseInt((req.query.limit as string) || "500", 10), 500);
-      const rows = await storage.getEventLedger(entityType, limit);
-      res.json(rows);
-    } catch (e) { res.status(500).json({ message: "Failed to fetch events" }); }
+      const result = await readAuditPage(req.query);
+      res.setHeader("X-Total-Count", result.total);
+      res.setHeader("X-Page-Size", result.limit);
+      res.setHeader("X-Filter-Options", JSON.stringify(result.options).replace(/[^\x20-\x7e]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`));
+      res.json(result.rows);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid audit filters" });
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
   });
   app.get("/api/audit/status-history", requireAuth, async (_req, res) => {
     try { res.json(await storage.getInvoiceStatusHistoryAll()); } catch (e) { res.status(500).json({ message: "Failed to fetch status history" }); }

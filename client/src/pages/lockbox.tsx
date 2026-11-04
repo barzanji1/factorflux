@@ -49,6 +49,7 @@ import {
 import "@/components/funding/funding-neu.css";
 import { FundingStatCard } from "@/components/funding/funding-stat-card";
 import { NeuPageShell, NeuTable } from "@/styles/neu/components";
+import { PageInsights } from "@/components/PageInsights";
 import { FundingBadge } from "@/components/funding/funding-badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -475,6 +476,7 @@ export default function Lockbox() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav title="Lockbox" subtitle="Match incoming payments to open invoices" neu />
         <NeuPageShell className="flex-1 overflow-auto p-6">
+          <PageInsights entity="lockbox" title="Lockbox activity" />
           <div className="max-w-7xl mx-auto space-y-5">
 
             {/* Header */}

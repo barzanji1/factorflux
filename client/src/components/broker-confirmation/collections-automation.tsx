@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pause, Play, RefreshCw, Search, ShieldAlert, StopCircle, X } from "lucide-react";
@@ -49,7 +50,7 @@ export default function CollectionsAutomation() {
   const [pending, setPending] = useState<PendingConfirmation | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [runResult, setRunResult] = useState<CollectionRunResult | null>(null);
-  const pageSize = 50;
+  const pageSize = DEFAULT_PAGE_SIZE;
   const params = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (phase !== "all") p.set("phase", phase);

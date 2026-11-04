@@ -25,6 +25,8 @@ import { cn } from "@/lib/utils";
 import { LOAD_TYPES, LOAD_TYPE_LABELS, type LoadType } from "@shared/load-types";
 import { LoadTypeBadge } from "@/components/load-type";
 import { useAuth } from "@/hooks/useAuth";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
+import { PageInsights } from "@/components/PageInsights";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   NeuBadge,
@@ -102,7 +104,7 @@ export default function Invoices() {
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
-        limit: "50",
+        limit: String(DEFAULT_PAGE_SIZE),
         q: debouncedSearchQuery,
         loadType: loadTypeFilter === "all" ? "" : loadTypeFilter,
         status: statusFilter,
@@ -119,8 +121,8 @@ export default function Invoices() {
   const totalInvoices = invoicesResponse?.total || 0;
   const totalPages = invoicesResponse?.totalPages || 1;
   const invoiceList = invoices;
-  const firstInvoice = totalInvoices === 0 ? 0 : (page - 1) * 50 + 1;
-  const lastInvoice = totalInvoices === 0 ? 0 : Math.min(page * 50, totalInvoices);
+  const firstInvoice = totalInvoices === 0 ? 0 : (page - 1) * DEFAULT_PAGE_SIZE + 1;
+  const lastInvoice = totalInvoices === 0 ? 0 : Math.min(page * DEFAULT_PAGE_SIZE, totalInvoices);
 
   const handleCreateInvoice = () => {
     setSelectedInvoice(null);
@@ -169,6 +171,7 @@ export default function Invoices() {
         />
 
         <NeuPageShell className="custom-scrollbar !min-h-0 flex-1 overflow-auto">
+          <PageInsights entity="invoices" title="Invoice portfolio" />
           <div className="mx-auto w-full max-w-[1680px] space-y-6 p-4 sm:p-6 xl:p-8">
             <NeuCard className="mb-8 overflow-hidden rounded-3xl p-5 sm:p-7">
               <div className="flex flex-col gap-6 border-b border-[#c9c9c9] pb-6 xl:flex-row xl:items-center xl:justify-between">

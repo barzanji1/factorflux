@@ -101,6 +101,7 @@ import {
   type PermissionKey,
 } from "@shared/schema";
 import { db } from "./db";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import { recalculateBrokerCreditSafe } from "./services/brokerCreditEngine";
 
 async function triggerBrokerCreditForInvoices(invoiceIds: number[]): Promise<void> {
@@ -345,7 +346,7 @@ export interface IStorage {
   updateException(id: number, updates: Partial<InsertException>): Promise<Exception>;
 
   // Audit
-  getEventLedger(entityType?: string, limit?: number): Promise<EventLedger[]>;
+  getEventLedger(entityType?: string, limit?: number, offset?: number): Promise<EventLedger[]>;
   getInvoiceStatusHistoryAll(): Promise<InvoiceStatusHistory[]>;
 
   // Document Rules (configurable approval checklist)
@@ -1763,7 +1764,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ── Audit ─────────────────────────────────────────────────────────────────────
-  async getEventLedger(entityType?: string, limit = 500): Promise<EventLedger[]> {
+  async getEventLedger(entityType?: string, limit = DEFAULT_PAGE_SIZE, offset = 0): Promise<EventLedger[]> {
     const baseQuery = db
       .select({
         id: eventLedger.id,
@@ -1777,8 +1778,9 @@ export class DatabaseStorage implements IStorage {
         actorName: sql<string | null>`CASE WHEN ${eventLedger.actorType} = 'user' THEN (SELECT concat(first_name, ' ', last_name) FROM users WHERE id = ${eventLedger.actorId}) ELSE NULL END`,
       })
       .from(eventLedger)
-      .orderBy(desc(eventLedger.createdAt))
-      .limit(limit);
+      .orderBy(desc(eventLedger.createdAt), desc(eventLedger.id))
+      .limit(limit)
+      .offset(offset);
 
     if (entityType && entityType !== "all") {
       return (baseQuery.where(eq(eventLedger.entityType, entityType as any))) as any;
@@ -1879,12 +1881,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ── Compliance Integration Runs ────────────────────────────────────────────────
-  async getIntegrationRuns(limit = 50): Promise<ComplianceIntegrationRun[]> {
+  async getIntegrationRuns(limit = DEFAULT_PAGE_SIZE, offset = 0): Promise<ComplianceIntegrationRun[]> {
     return db
       .select()
       .from(complianceIntegrationRuns)
-      .orderBy(desc(complianceIntegrationRuns.startedAt))
-      .limit(limit);
+      .orderBy(desc(complianceIntegrationRuns.startedAt), desc(complianceIntegrationRuns.id))
+      .limit(limit)
+      .offset(offset);
   }
 
   async getIntegrationRun(id: number): Promise<ComplianceIntegrationRun | undefined> {

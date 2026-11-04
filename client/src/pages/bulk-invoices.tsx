@@ -12,6 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuStatCard, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
+import { PageInsights } from "@/components/PageInsights";
 import { Download, FileText, Layers3, Plus, PlusCircle, Receipt, X } from "lucide-react";
 
 type Broker = { id: number; name: string; status?: string };
@@ -78,7 +80,7 @@ export default function BulkInvoices() {
   const [overrideNearDuplicate, setOverrideNearDuplicate] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<BulkPayload | null>(null);
   const [page, setPage] = useState(1);
-  const pageSize = 12;
+  const pageSize = DEFAULT_PAGE_SIZE;
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { brokerId: "", reportDateStart: "", reportDateEnd: "", items: [{ carrierId: "", ticketNumber: "", loadNumber: "", rate: 0 }] },
@@ -225,6 +227,7 @@ export default function BulkInvoices() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopNav title="Bulk invoices" subtitle="High-volume haul ticket entry" group="Operations" neu />
         <NeuPageShell className="custom-scrollbar min-h-0 flex-1 overflow-auto">
+          <PageInsights entity="bulk-invoices" title="Bulk invoice activity" />
           <div className="mx-auto max-w-[1580px] space-y-5 p-4 md:p-7">
             <NeuCard className="flex flex-wrap items-center justify-between gap-4 rounded-[16px] px-5 py-4">
               <div className="flex items-center gap-4">

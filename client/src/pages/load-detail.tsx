@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import DocumentIntakeZone from "@/components/documents/document-intake-zone";
 import EntityNotes from "@/components/shared/EntityNotes";
+import { PageInsights } from "@/components/PageInsights";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
@@ -131,6 +132,7 @@ export default function LoadDetail() {
             </div>
           ) : (
             <div className="space-y-5">
+              <PageInsights entity="loads" entityId={loadId} title="Load activity" />
               {/* Header card */}
               <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[hsl(var(--card))]">
                 <div className="flex items-start justify-between gap-4">

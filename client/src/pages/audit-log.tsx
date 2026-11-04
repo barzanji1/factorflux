@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Fragment, useState, useMemo } from "react";
+import { ServerArrayPagination, SERVER_ARRAY_PAGE_SIZE, useServerArrayPage } from "@/hooks/use-server-array-page";
+import { PageInsights } from "@/components/PageInsights";
 import {
   RiskPageFrame as PageShell,
   RiskButton as Button,
@@ -327,52 +328,93 @@ export default function AuditLog() {
   const [filterUser, setFilterUser] = useState("all");
   const [dateRange, setDateRange] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState("");
 
-  const { data: events = [], isLoading: eventsLoading, refetch } = useQuery<AuditEntry[]>({
-    queryKey: ["/api/audit/events"],
-  });
+  const params = useMemo<Record<string, string>>(() => ({
+    ...(search.trim() ? { q: search.trim() } : {}),
+    ...(filterEntity !== "all" ? { entityType: filterEntity } : {}),
+    ...(filterAction !== "all" ? { action: filterAction } : {}),
+    ...(filterUser !== "all" ? { actor: filterUser } : {}),
+    ...(dateRange !== "all" ? { days: dateRange === "today" ? "1" : dateRange } : {}),
+  }), [search, filterEntity, filterAction, filterUser, dateRange]);
+  const filterResetKey = JSON.stringify(params);
+  const {
+    items: events,
+    total: eventTotal,
+    filterOptions,
+    page,
+    pageCount,
+    isLoading: eventsLoading,
+    isFetching: eventsFetching,
+    isError: eventsError,
+    error: eventsErrorValue,
+    refetch,
+    setPage,
+  } = useServerArrayPage<AuditEntry>("/api/audit/events", { resetKey: filterResetKey, params });
   const unified = useMemo(() => toUnified(events), [events]);
 
-  const filtered = unified.filter(e => {
-    if (filterEntity !== "all" && e.entityType !== filterEntity) return false;
-    if (filterAction !== "all" && e.actionType !== filterAction) return false;
-    if (filterUser !== "all" && (e.actorName ?? e.actorType) !== filterUser) return false;
-    if (dateRange !== "all") {
-      const age = Date.now() - new Date(e.createdAt).getTime();
-      const maxAge = dateRange === "today" ? 86400000 : Number(dateRange) * 86400000;
-      if (age > maxAge) return false;
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      if (!e.title.toLowerCase().includes(q) && !e.detail.toLowerCase().includes(q) && !(e.actorName?.toLowerCase().includes(q))) return false;
-    }
-    return true;
-  });
-
-  const entityTypes = Array.from(new Set(unified.map(e => e.entityType))).sort();
-  const actionTypes = Array.from(new Set(unified.map(e => e.actionType))).sort();
-  const users = Array.from(new Set(unified.map(e => e.actorName ?? e.actorType))).sort();
+  const entityTypes = filterOptions.entities;
+  const actionTypes = filterOptions.actions;
+  const users = filterOptions.actors;
 
   const isLoading = eventsLoading;
 
-  function exportCsv() {
-    const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
-    const rows = filtered.map(e => {
-      const structuredDetails = detailPresentation(e).rows
-        .map(row => `${row.label}: ${formatDetailValue(row.value, row.label)}`)
-        .join("; ");
-      return [
-      e.createdAt, formatEventType(e.actionType), e.entityType, e.entityId,
-      e.actorName ?? e.actorType, e.detail, structuredDetails,
-    ].map(escape).join(",");
-    });
-    const csv = ["Timestamp,Action,Entity Type,Entity ID,User,Details,Structured Details", ...rows].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Trucking_Pros_Financial_audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  async function exportCsv() {
+    if (exportLoading) return;
+    setExportLoading(true);
+    setExportError("");
+    try {
+      const fetchPage = async (requestedPage: number) => {
+        const url = new URL("/api/audit/events", window.location.origin);
+        Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+        url.searchParams.set("page", String(requestedPage));
+        url.searchParams.set("limit", String(SERVER_ARRAY_PAGE_SIZE));
+        const response = await fetch(url.toString(), { credentials: "include" });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.message || `Could not export audit events (HTTP ${response.status}).`);
+        }
+        const pageEvents: unknown = await response.json();
+        if (!Array.isArray(pageEvents)) throw new Error("The audit export returned an unexpected response.");
+        const totalHeader = response.headers.get("X-Total-Count");
+        const countHeader = totalHeader === null ? Number.NaN : Number(totalHeader);
+        return {
+          items: pageEvents as AuditEntry[],
+          total: Number.isFinite(countHeader) && countHeader >= 0 ? countHeader : pageEvents.length,
+        };
+      };
+
+      const firstPage = await fetchPage(1);
+      const allEvents = [...firstPage.items];
+      const pageCount = Math.ceil(firstPage.total / SERVER_ARRAY_PAGE_SIZE);
+      for (let requestedPage = 2; requestedPage <= pageCount; requestedPage += 1) {
+        const nextPage = await fetchPage(requestedPage);
+        allEvents.push(...nextPage.items);
+      }
+      const exportEntries = toUnified(allEvents);
+      const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
+      const rows = exportEntries.map(e => {
+        const structuredDetails = detailPresentation(e).rows
+          .map(row => `${row.label}: ${formatDetailValue(row.value, row.label)}`)
+          .join("; ");
+        return [
+          e.createdAt, formatEventType(e.actionType), e.entityType, e.entityId,
+          e.actorName ?? e.actorType, e.detail, structuredDetails,
+        ].map(escape).join(",");
+      });
+      const csv = ["Timestamp,Action,Entity Type,Entity ID,User,Details,Structured Details", ...rows].join("\n");
+      const downloadUrl = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `Trucking_Pros_Financial_audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export audit history.");
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   return (
@@ -382,14 +424,15 @@ export default function AuditLog() {
       group="Risk"
       className="ff-audit-page"
     >
+      <PageInsights entity="audit-log" title="Audit activity" />
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               {[
-                { label: "Total Events", value: unified.length },
-                { label: "Today", value: unified.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString()).length },
-                { label: "System Events", value: unified.filter(e => e.actorType === "system").length },
-                { label: "User Actions", value: unified.filter(e => e.actorType === "user").length },
+                { label: "Total Events", value: eventTotal },
+                { label: "Today · this page", value: unified.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString()).length },
+                { label: "System · this page", value: unified.filter(e => e.actorType === "system").length },
+                { label: "Users · this page", value: unified.filter(e => e.actorType === "user").length },
               ].map(s => <RiskStatCard key={s.label} label={s.label} value={s.value} />)}
             </div>
 
@@ -400,7 +443,7 @@ export default function AuditLog() {
                   <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                     <ClipboardList className="h-5 w-5 text-slate-500" />
                     Event Logs
-                    <RiskBadge className="ff-badge ff-badge-draft ml-2">{filtered.length}</RiskBadge>
+                    <RiskBadge className="ff-badge ff-badge-draft ml-2">{unified.length} on page</RiskBadge>
                   </h2>
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
@@ -437,13 +480,14 @@ export default function AuditLog() {
                         {users.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Button variant="outline" onClick={exportCsv} className="gap-1.5">
-                      <Download className="h-3.5 w-3.5" /> Export CSV
+                    <Button variant="outline" onClick={() => void exportCsv()} disabled={exportLoading} className="gap-1.5">
+                      <Download className="h-3.5 w-3.5" /> {exportLoading ? "Preparing CSV…" : "Export CSV"}
                     </Button>
                     <Button variant="outline" onClick={() => refetch()} className="gap-1.5">
                       <RefreshCw className="h-3.5 w-3.5" /> Refresh
                     </Button>
                   </div>
+                  {exportError && <p role="alert" className="mt-2 text-xs text-red-700">{exportError}</p>}
                 </div>
               </div>
               <CardContent className="p-0">
@@ -451,13 +495,18 @@ export default function AuditLog() {
                   <div className="flex items-center justify-center py-20">
                     <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
                   </div>
-                ) : filtered.length === 0 ? (
+                ) : eventsError ? (
+                  <div role="alert" className="flex flex-col items-center gap-3 py-16 text-sm text-red-700">
+                    <span>{eventsErrorValue instanceof Error ? eventsErrorValue.message : "Could not load audit events."}</span>
+                    <Button variant="outline" onClick={() => void refetch()}>Retry</Button>
+                  </div>
+                ) : unified.length === 0 ? (
                   <div className="py-20 text-center">
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[22px] border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
                       <ClipboardList className="h-7 w-7 text-slate-400" />
                     </div>
-                    <p className="text-base font-semibold text-slate-900 dark:text-white">No events found</p>
-                    <p className="mt-1 text-sm text-slate-500">Events appear here as actions are performed in the system.</p>
+                    <p className="text-base font-semibold text-slate-900 dark:text-white">{eventTotal > 0 ? "No matching events on this page" : "No events found"}</p>
+                    <p className="mt-1 text-sm text-slate-500">{eventTotal > 0 ? "Change pages or clear a filter to check the rest of the audit history." : "Events appear here as actions are performed in the system."}</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -468,12 +517,12 @@ export default function AuditLog() {
                         ))}
                       </tr></thead>
                       <tbody>
-                      {filtered.map(e => {
+                      {unified.map(e => {
                         const Icon = e.icon;
                         const isExpanded = expandedId === e.id;
                         const detailView = detailPresentation(e);
                         return (
-                          <>
+                          <Fragment key={e.id}>
                             <tr key={e.id}>
                               <td><RiskBadge className={`ff-badge ${actionBadge(e.actionType)}`}><Icon className="h-3 w-3" />{formatEventType(e.actionType)}</RiskBadge></td>
                               <td><RiskBadge className={`ff-badge ${ENTITY_COLOR[e.entityType] ?? "ff-badge-draft"}`}>{e.entityType} #{e.entityId}</RiskBadge></td>
@@ -505,12 +554,21 @@ export default function AuditLog() {
                                 </Card>
                               </td></tr>
                             )}
-                          </>
+                          </Fragment>
                         );
                       })}
                       </tbody>
                     </RiskTable>
                   </div>
+                )}
+                {!isLoading && !eventsError && (
+                  <ServerArrayPagination
+                    page={page}
+                    pageCount={pageCount}
+                    total={eventTotal}
+                    onPageChange={setPage}
+                    disabled={eventsFetching}
+                  />
                 )}
               </CardContent>
             </Card>

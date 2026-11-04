@@ -3,6 +3,7 @@ import { emailLog, emailLogEvents, emailRetryPayloads, users } from "../../share
 import { db } from "../db";
 import { EmailLogError, retryDisabledReason, type EmailStore } from "./emailLogService";
 import { z } from "zod";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => {
   const date = new Date(`${s}T00:00:00Z`); return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === s;
@@ -13,7 +14,7 @@ export const emailLogFilters = z.object({
   status: z.enum(["sent", "delivered", "bounced", "complained", "failed"]).optional(),
   agentId: z.string().max(200).optional(), q: z.string().trim().max(200).optional(),
   page: z.coerce.number().int().min(1).max(100000).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(100).default(DEFAULT_PAGE_SIZE),
 }).refine(v => !v.from || !v.to || v.from <= v.to, "End date must be on or after start date");
 const entityPaths = { invoice: "/invoices/", carrier: "/clients/", broker: "/brokers/" };
 function entityUrl(type: string | null, id: string | null) {

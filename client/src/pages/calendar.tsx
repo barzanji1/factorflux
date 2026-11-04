@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { PageInsights } from "@/components/PageInsights";
 import { apiRequest } from "@/lib/queryClient";
 import {
   NeuBadge,
@@ -138,6 +139,7 @@ export default function CalendarPage() {
   return (
     <AppShell title="Calendar" subtitle="Plan appointments, follow-ups, and team work" group="Workspace" neu>
       <div className="space-y-5">
+        <PageInsights entity="calendar" title="Calendar activity" />
         <NeuCard className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
             <NeuButton onClick={() => setCursor(dayStart(new Date()))} className="min-h-10 rounded-full px-4 text-xs text-[#27aab8]">Today</NeuButton>

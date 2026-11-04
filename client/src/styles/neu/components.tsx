@@ -12,10 +12,12 @@ import React, {
   type ThHTMLAttributes,
   type TdHTMLAttributes,
   type ReactNode,
+  type Ref,
   type KeyboardEvent,
 } from "react";
 import { cn } from "@/lib/utils";
 import { neuTokenClasses } from "./tokens";
+import { SafeTablePaginationControls, SafeTablePaginationProvider, useSafePaginatedRows, useSafePaginatedTableChildren } from "@/components/safe-table-pagination";
 
 export interface NeuCardProps extends HTMLAttributes<HTMLDivElement> {
   pressed?: boolean;
@@ -245,11 +247,23 @@ export const NeuTabPanel = forwardRef<HTMLDivElement, NeuTabPanelProps>(
 );
 NeuTabPanel.displayName = "NeuTabPanel";
 
+function NeuTableContent({ className, children, tableRef, ...props }: TableHTMLAttributes<HTMLTableElement> & { tableRef: Ref<HTMLTableElement> }) {
+  const tableChildren = useSafePaginatedTableChildren(children);
+  return (
+    <>
+      <div className="overflow-x-auto rounded-2xl bg-[#e0e0e0] shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]">
+        <table ref={tableRef} className={cn("w-full border-collapse text-left text-sm text-[#333333]", className)} {...props}>{tableChildren}</table>
+      </div>
+      <SafeTablePaginationControls />
+    </>
+  );
+}
+
 export const NeuTable = forwardRef<HTMLTableElement, TableHTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="overflow-x-auto rounded-2xl bg-[#e0e0e0] shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]">
-      <table ref={ref} className={cn("w-full border-collapse text-left text-sm text-[#333333]", className)} {...props} />
-    </div>
+  ({ className, children, ...props }, ref) => (
+    <SafeTablePaginationProvider>
+      <NeuTableContent className={className} tableRef={ref} {...props}>{children}</NeuTableContent>
+    </SafeTablePaginationProvider>
   ),
 );
 NeuTable.displayName = "NeuTable";
@@ -262,9 +276,10 @@ export const NeuTableHeader = forwardRef<HTMLTableSectionElement, HTMLAttributes
 NeuTableHeader.displayName = "NeuTableHeader";
 
 export const NeuTableBody = forwardRef<HTMLTableSectionElement, HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => (
-    <tbody ref={ref} className={cn("divide-y divide-[#c9c9c9]", className)} {...props} />
-  ),
+  ({ className, children, ...props }, ref) => {
+    const visibleRows = useSafePaginatedRows(children);
+    return <tbody ref={ref} className={cn("divide-y divide-[#c9c9c9]", className)} {...props}>{visibleRows}</tbody>;
+  },
 );
 NeuTableBody.displayName = "NeuTableBody";
 

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectItem, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { PageInsights } from "@/components/PageInsights";
 import { Eye, FileText, Pencil, Plus, RotateCcw } from "lucide-react";
 import "@/components/funding/funding-neu.css";
 import { NeuPageShell, NeuTable } from "@/styles/neu/components";
@@ -157,7 +158,7 @@ export default function FuelAdvanceTracking() {
     <Sidebar />
     <div className="flex min-w-0 flex-1 flex-col">
       <TopNav title="Fuel Advance Tracking" subtitle="Review and submit carrier advances" group="Funding" neu />
-      <NeuPageShell className="flex-1 overflow-auto p-3 md:p-5"><div className="mx-auto max-w-[1600px] space-y-3">
+      <NeuPageShell className="flex-1 overflow-auto p-3 md:p-5"><div className="mx-auto max-w-[1600px] space-y-3"><PageInsights entity="fuel-advance" title="Fuel advance activity" />
         <div className="ff-card ff-fuel-advance-surface flex flex-wrap items-center justify-between gap-2 border border-[#718087] bg-white p-3">
           <div><h2 className="font-bold">Fuel Advances</h2><p className="text-xs text-[#63767d]">Advances, fees, deposits and payment status</p></div>
           <Button onClick={openCreate}><Plus className="mr-1 h-4 w-4" />New advance</Button>

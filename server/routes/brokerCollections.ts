@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { z } from "zod";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import { brokerCollectionsService, CollectionError, collectionRunHttpStatus } from "../services/brokerCollections";
 
 export function registerBrokerCollectionsRoutes(app: Express, deps: {
@@ -34,7 +35,7 @@ export function registerBrokerCollectionsRoutes(app: Express, deps: {
   app.get("/api/broker-collections", deps.requireAuth, wrap(async (req, res) => {
     const query = z.object({
       page: z.coerce.number().int().min(1).max(100000).default(1),
-      pageSize: z.coerce.number().int().min(1).max(100).default(50),
+      pageSize: z.coerce.number().int().min(1).max(100).default(DEFAULT_PAGE_SIZE),
       q: z.string().trim().max(200).optional(),
       phase: z.enum(["vp", "rps", "paid", "stopped", "escalated", "paused"]).optional(),
     }).strict().parse(req.query);

@@ -20,6 +20,7 @@ import {
   NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell,
   NeuTableHead, NeuTableHeader, NeuTableRow,
 } from "@/styles/neu/components";
+import { PageInsights } from "@/components/PageInsights";
 import {
   AlertTriangle, Check, Download, Eye, FileText, MessageCircle, Search, UserCheck, X,
 } from "lucide-react";
@@ -414,6 +415,7 @@ export default function PortalSubmissionsPage() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Portal Submissions" subtitle="Invoice submissions from the carrier portal" group="Workspace" neu />
         <NeuPageShell className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-auto px-4 py-5 sm:px-6 lg:px-8">
+          <PageInsights entity="portal-submissions" title="Submission pipeline" />
           <div className="mx-auto w-full max-w-[1480px] space-y-6">
             {canUsePortal && (
               <section aria-label="Submission overview" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

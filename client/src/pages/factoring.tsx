@@ -4,6 +4,8 @@ import { useLocation } from "wouter";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { PageInsights } from "@/components/PageInsights";
+import { SafePaginatedTable } from "@/components/safe-table-pagination";
 import { FFEmpty } from "@/components/ui/ff-empty";
 import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent } from "@/components/funding/funding-controls";
 import { Textarea } from "@/components/ui/textarea";
@@ -243,6 +245,7 @@ export default function Factoring() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Funding Queue" subtitle="Review, approve, and advance factored loads" group="Funding" neu />
         <NeuPageShell className="custom-scrollbar flex-1 overflow-auto">
+          <PageInsights entity="factoring" title="Factoring activity" />
           <div className="mx-auto w-full max-w-[1680px] space-y-5 p-6 xl:p-8">
 
             {/* ── Summary strip ──────────────────────────────────────────── */}
@@ -261,7 +264,7 @@ export default function Factoring() {
                 <div><h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white"><AlertTriangle className="h-4 w-4 text-amber-500" /> Aging Alerts</h2><p className="text-[11px] text-slate-500">Funded invoices requiring collections follow-up</p></div>
                 <div className="flex gap-1">{(["pending", "resolved"] as const).map(view => <button key={view} onClick={() => setAgingView(view)} className={cn("rounded-full px-3 py-1 text-[11px] font-semibold capitalize", agingView === view ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-600 dark:bg-slate-800")}>{view}</button>)}</div>
               </div>
-              {agingAlerts.length === 0 ? <p className="px-5 py-7 text-[12px] text-slate-400">No {agingView} aging alerts.</p> : <div className="overflow-x-auto"><table className="ff-data-table w-full min-w-[680px]"><thead><tr><th>Invoice</th><th>Carrier</th><th>Broker</th><th>Days Funded</th><th>Alert</th><th className="pr-5">Action</th></tr></thead><tbody>{agingAlerts.map(alert => { const urgent = alert.alertType === "day_90"; return <tr key={alert.id}><td><button onClick={() => go(`/invoices/${alert.invoiceId}`)} className="font-mono font-semibold text-blue-700 hover:underline dark:text-blue-400">{alert.invoiceNumber}</button></td><td>{alert.carrier ?? "—"}</td><td>{alert.broker ?? "—"}</td><td>{ageDays(alert.fundedAt) ?? "—"}d</td><td><FundingBadge tone={urgent ? "warning" : "accent"}>{urgent ? "90 DAY PAST DUE" : "60 DAY"}</FundingBadge></td><td className="pr-5">{agingView === "pending" && <Button size="sm" onClick={() => acknowledgeAging.mutate(alert.id)} disabled={acknowledgeAging.isPending} className="h-7 text-[11px]">Acknowledge</Button>}</td></tr>; })}</tbody></table></div>}
+              {agingAlerts.length === 0 ? <p className="px-5 py-7 text-[12px] text-slate-400">No {agingView} aging alerts.</p> : <SafePaginatedTable><table className="ff-data-table w-full min-w-[680px]"><thead><tr><th>Invoice</th><th>Carrier</th><th>Broker</th><th>Days Funded</th><th>Alert</th><th className="pr-5">Action</th></tr></thead><tbody>{agingAlerts.map(alert => { const urgent = alert.alertType === "day_90"; return <tr key={alert.id}><td><button onClick={() => go(`/invoices/${alert.invoiceId}`)} className="font-mono font-semibold text-blue-700 hover:underline dark:text-blue-400">{alert.invoiceNumber}</button></td><td>{alert.carrier ?? "—"}</td><td>{alert.broker ?? "—"}</td><td>{ageDays(alert.fundedAt) ?? "—"}d</td><td><FundingBadge tone={urgent ? "warning" : "accent"}>{urgent ? "90 DAY PAST DUE" : "60 DAY"}</FundingBadge></td><td className="pr-5">{agingView === "pending" && <Button size="sm" onClick={() => acknowledgeAging.mutate(alert.id)} disabled={acknowledgeAging.isPending} className="h-7 text-[11px]">Acknowledge</Button>}</td></tr>; })}</tbody></table></SafePaginatedTable>}
             </Card>
 
             {/* ── Queue card ─────────────────────────────────────────────── */}

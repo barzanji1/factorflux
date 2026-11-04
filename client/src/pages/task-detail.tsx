@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import EntityNotes from "@/components/shared/EntityNotes";
+import { PageInsights } from "@/components/PageInsights";
 
 type Task = {
   id: number; title: string; description?: string; type: string; priority: string;
@@ -54,7 +55,7 @@ export default function TaskDetail() {
   };
   if (isLoading) return <div className="p-10 text-center">Loading task…</div>;
   if (isError || !task) return <div className="p-10 text-center text-red-600">Task not found or unavailable.</div>;
-  return <div className="flex h-screen bg-[hsl(var(--background))]"><Sidebar /><div className="flex min-w-0 flex-1 flex-col overflow-hidden"><TopNav title="Task Details" subtitle="Track task progress" group="Workspace" /><main className="flex-1 overflow-auto p-6"><div className="mx-auto max-w-4xl space-y-6">
+  return <div className="flex h-screen bg-[hsl(var(--background))]"><Sidebar /><div className="flex min-w-0 flex-1 flex-col overflow-hidden"><TopNav title="Task Details" subtitle="Track task progress" group="Workspace" /><main className="flex-1 overflow-auto p-6"><div className="mx-auto max-w-4xl space-y-6"><PageInsights entity="tasks" entityId={task.id} title="Task activity" />
     <Button variant="outline" onClick={() => navigate("/tasks")}>Back to tasks</Button>
     <Card><CardHeader><CardTitle className="text-2xl">{task.title}</CardTitle><p className="text-muted-foreground">{task.description || "No description provided."}</p></CardHeader><CardContent className="space-y-6">
       <div><div className="mb-2 flex justify-between text-sm font-medium"><span>Progress</span><span>{draftProgress}%</span></div><Progress value={draftProgress} className="h-5" /><Slider className="mt-5" min={0} max={100} step={1} value={[draftProgress]} disabled={saving} onValueChange={([value]) => setDraftProgress(value)} onValueCommit={([value]) => saveProgress(value)} /><p className="mt-2 text-xs text-muted-foreground">{saving ? "Saving…" : "Changes save immediately"}</p></div>

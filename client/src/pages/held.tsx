@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useRiskToast as useToast } from "@/components/risk/risk-controls";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow, format, differenceInDays } from "date-fns";
+import { PageInsights } from "@/components/PageInsights";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { CardContent } from "@/components/ui/card";
@@ -225,6 +226,7 @@ export default function HeldQueue() {
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
         <TopNav title="Held Queue" subtitle="Invoices blocked from funding" neu />
         <NeuPageShell className="!min-h-0 flex-1 overflow-auto p-6">
+          <PageInsights entity="held" title="Held queue" />
           <div className="max-w-7xl mx-auto space-y-5">
 
             {/* Header */}

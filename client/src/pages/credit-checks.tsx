@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useRiskToast as useToast } from "@/components/risk/risk-controls";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { PageInsights } from "@/components/PageInsights";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RiskCard as Card, RiskButton as Button, RiskInput as Input, RiskDialogContent as DialogContent, RiskSelectContent as SelectContent, RiskSelectTrigger as SelectTrigger, RiskStatCard, RiskBadge, RiskTable } from "@/components/risk/risk-controls";
 import { NeuPageShell } from "@/styles/neu/components";
@@ -177,6 +178,7 @@ export default function CreditChecks() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Credit Review" subtitle="Broker and debtor risk assessments with approval indicators" group="Risk" neu />
         <NeuPageShell className="!min-h-0 custom-scrollbar flex-1 overflow-auto">
+          <PageInsights entity="credit-checks" title="Credit review activity" />
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
 
             {/* Stats Row */}

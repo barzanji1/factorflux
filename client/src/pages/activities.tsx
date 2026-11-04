@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { PageInsights } from "@/components/PageInsights";
 // Authentication removed
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
@@ -136,6 +137,7 @@ export default function Activities() {
         />
         
         <main className="flex-1 overflow-auto p-6">
+          <PageInsights entity="activities" title="Activity stream" />
           <div className="max-w-4xl mx-auto">
             {activitiesLoading ? (
               <div className="flex items-center justify-center py-12">

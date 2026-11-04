@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageInsights } from "@/components/PageInsights";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -302,6 +303,7 @@ export default function ReleaseLetters() {
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav title="Release Letters" neu />
         <NeuPageShell className="!min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
+          <PageInsights entity="release-letters" title="Release letter activity" />
 
           {/* Header */}
           <div className="flex items-center justify-between">

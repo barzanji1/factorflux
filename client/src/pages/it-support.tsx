@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
+import { PageInsights } from "@/components/PageInsights";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertCircle, Bug, Check, ChevronRight, Clock3, Lightbulb, MessageSquareText,
@@ -151,6 +152,7 @@ export default function ItSupport() {
 
   return (
     <PageShell title="IT Support" subtitle="Software issues and ideas for FactorFlux" group="Workspace" contentClassName="space-y-4 p-3 sm:p-5 xl:p-7">
+      <PageInsights entity="it-support" title="Support queue" />
       <header className="flex flex-col gap-3 rounded-sm border-2 border-b-[#808080] border-r-[#808080] border-l-white border-t-white bg-[#d4d0c8] p-4 shadow-bevel-light sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2"><Wrench className="h-5 w-5 text-[#087f8c]" /><h1 className="text-xl font-bold text-[#252525]">IT &amp; Software Support</h1></div>

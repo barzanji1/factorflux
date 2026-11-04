@@ -15,6 +15,8 @@ import { brokerFormSchema, type BrokerFormData } from "@/components/brokers/brok
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
+import { PageInsights } from "@/components/PageInsights";
 import { ProcessorIdentity } from "@/components/assignments/processor-assignment";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuStatCard, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { 
@@ -127,7 +129,7 @@ export default function Brokers() {
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
-        limit: "50",
+        limit: String(DEFAULT_PAGE_SIZE),
         q: debouncedSearch,
       });
       if (statusQuery) params.set("status", statusQuery);
@@ -157,7 +159,7 @@ export default function Brokers() {
   const averageGradeLabel = averageGradeMean === null
     ? "No graded brokers"
     : `Mean rank ${averageGradeMean.toFixed(1)} · A=4 to F=0`;
-  const currentPageRange = `${totalBrokers === 0 ? 0 : (page - 1) * 50 + 1}–${Math.min(page * 50, totalBrokers)}`;
+  const currentPageRange = `${totalBrokers === 0 ? 0 : (page - 1) * DEFAULT_PAGE_SIZE + 1}–${Math.min(page * DEFAULT_PAGE_SIZE, totalBrokers)}`;
 
   // Broker form
   const form = useForm<BrokerFormData>({
@@ -305,6 +307,7 @@ export default function Brokers() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Broker Desk" subtitle="Freight broker relationships, contacts, and risk ratings" group="Risk" neu />
         <NeuPageShell className="custom-scrollbar !min-h-0 flex-1">
+          <PageInsights entity="brokers" title="Broker portfolio" />
           <div className="mx-auto w-full max-w-[1680px] space-y-6 p-4 md:p-7 xl:p-9">
         {/* ── Stats strip ──────────────────────────────────────────────── */}
         <section aria-label="Broker portfolio snapshot">
@@ -511,7 +514,7 @@ export default function Brokers() {
                </NeuTable>
                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#c5c5c5] px-1 pt-3">
                   <span className="text-xs text-[#758587]">
-                   Showing {totalBrokers === 0 ? 0 : (page - 1) * 50 + 1}-{Math.min(page * 50, totalBrokers)} of {totalBrokers} brokers
+                   Showing {totalBrokers === 0 ? 0 : (page - 1) * DEFAULT_PAGE_SIZE + 1}-{Math.min(page * DEFAULT_PAGE_SIZE, totalBrokers)} of {totalBrokers} brokers
                  </span>
                  <span className="text-xs text-[#758587]">
                    ${brokers.reduce((s, b) => s + (b.creditLimit || 0), 0).toLocaleString()} total credit

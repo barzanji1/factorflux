@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { PageInsights } from "@/components/PageInsights";
+import { SafePaginatedTable } from "@/components/safe-table-pagination";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -317,6 +319,7 @@ export default function CollectionsPage() {
         <TopNav title="Collections" subtitle="Manage funds owed to TPF and track carrier performance" group="Recovery" />
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] space-y-4 p-6 xl:p-8">
+            <PageInsights entity="collections" title="Collections performance" />
 
             {/* ── Overdue nudge banner ────────────────────────────────────── */}
             {counts.overdue > 0 && (
@@ -484,7 +487,7 @@ export default function CollectionsPage() {
                   )}
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-b-xl">
+                <SafePaginatedTable className="rounded-b-xl">
                   <table className="ff-data-table w-full min-w-[820px]">
                     <thead>
                       <tr>
@@ -596,7 +599,7 @@ export default function CollectionsPage() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                </SafePaginatedTable>
               )}
 
               {rows.length > 0 && (

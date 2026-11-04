@@ -2,6 +2,7 @@ import * as React from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { cn } from "@/lib/utils";
+import { SafeTablePaginationControls, SafeTablePaginationProvider, useSafePaginatedRows, useSafePaginatedTableChildren } from "@/components/safe-table-pagination";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import {
@@ -158,20 +159,38 @@ export const Win95TabsTrigger = React.forwardRef<
 ));
 Win95TabsTrigger.displayName = "Win95TabsTrigger";
 
+function PaginatedWin95TableContents({
+  className,
+  children,
+  tableRef,
+  ...props
+}: React.TableHTMLAttributes<HTMLTableElement> & { tableRef: React.Ref<HTMLTableElement> }) {
+  const tableChildren = useSafePaginatedTableChildren(children);
+  return (
+    <>
+      <div className="overflow-x-auto rounded-t-card">
+        <table ref={tableRef} className={cn("w-full border-collapse text-sm", className)} {...props}>{tableChildren}</table>
+      </div>
+      <SafeTablePaginationControls />
+    </>
+  );
+}
+
 export const Win95Table = React.forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="overflow-x-auto rounded-t-card">
-      <table ref={ref} className={cn("w-full border-collapse text-sm", className)} {...props} />
-    </div>
+  ({ className, children, ...props }, ref) => (
+    <SafeTablePaginationProvider>
+      <PaginatedWin95TableContents className={className} tableRef={ref} {...props}>{children}</PaginatedWin95TableContents>
+    </SafeTablePaginationProvider>
   ),
 );
 Win95Table.displayName = "Win95Table";
 export const Win95TableHeader = ({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) => (
   <thead className={cn("bg-win95-header text-white", className)} {...props} />
 );
-export const Win95TableBody = ({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) => (
-  <tbody className={cn("[&_tr:nth-child(even)]:bg-[#f3f3f3]", className)} {...props} />
-);
+export const Win95TableBody = ({ className, children, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) => {
+  const visibleRows = useSafePaginatedRows(children);
+  return <tbody className={cn("[&_tr:nth-child(even)]:bg-[#f3f3f3]", className)} {...props}>{visibleRows}</tbody>;
+};
 export const Win95TableRow = ({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) => (
   <tr className={cn("border-b border-slate-200", className)} {...props} />
 );

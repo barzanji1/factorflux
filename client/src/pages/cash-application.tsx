@@ -34,6 +34,7 @@ import {
 import "@/components/funding/funding-neu.css";
 import { FundingStatCard } from "@/components/funding/funding-stat-card";
 import { NeuPageShell, NeuTable } from "@/styles/neu/components";
+import { PageInsights } from "@/components/PageInsights";
 import { FundingBadge } from "@/components/funding/funding-badge";
 
 type CashApplication = {
@@ -238,6 +239,7 @@ export default function CashApplication() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Cash Matching" subtitle="Match incoming payments to loads — handle short-pays, overpays, and reconciliation" group="Funding" neu />
         <NeuPageShell className="custom-scrollbar flex-1 overflow-auto">
+          <PageInsights entity="cash-application" title="Cash application activity" />
           <div className="mx-auto w-full max-w-[1680px] p-6 xl:p-8 space-y-6">
 
             {/* Stats strip */}

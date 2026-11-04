@@ -9,6 +9,7 @@ import { ClientEmailComposer, type EmailClient } from "@/components/client-email
 import { ClientEmailLog } from "@/components/client-email/client-email-log";
 import { EmailBroadcast } from "@/components/client-email/email-broadcast";
 import { useAuth } from "@/hooks/useAuth";
+import { PageInsights } from "@/components/PageInsights";
 import "@/components/client-email/email-neu.css";
 
 export default function ClientEmailPage() {
@@ -35,6 +36,7 @@ export default function ClientEmailPage() {
       <div className="custom-scrollbar flex-1 overflow-auto">
         <NeuPageShell className="email-neu min-h-0 overflow-visible px-3 py-4 sm:px-5 sm:py-6">
         <div className="mx-auto max-w-[1180px] space-y-5">
+          {canSend && <PageInsights entity="client-email" title="Client email activity" />}
           <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#e0e0e0] px-5 py-5 shadow-[-6px_-6px_14px_#fff,6px_6px_14px_#b8b8b8]">
             <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#8fb3ae] bg-[#dcebe6] text-[#087f8e]"><Mail className="h-5 w-5" /></div><div><p className="text-[9px] font-bold uppercase tracking-[.18em] text-[#758582]">Communications desk</p><h1 className="mt-0.5 text-xl font-bold tracking-tight text-[#203a46]">Email a client</h1><p className="mt-1 max-w-xl text-xs leading-relaxed text-[#637775]">Choose a client record as the primary recipient. Add optional CC addresses in the composer to copy others on this email.</p></div></div>
             {canSend && <NeuButton variant="accent" onClick={() => setComposerOpen(true)} className="min-h-10 rounded-xl px-4 text-xs"><Send className="h-3.5 w-3.5" />Compose email</NeuButton>}

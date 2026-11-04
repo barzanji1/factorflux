@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import {
   AlertTriangle,
   Brain,
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useServerArrayPage } from "@/hooks/use-server-array-page";
 import { apiRequest } from "@/lib/queryClient";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -68,7 +70,7 @@ interface ExtractionSummary {
   fields: Array<{ name: string; value: string; confidence: number | null }>;
 }
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 const TYPE_OPTIONS = [
   ["all", "All classifications"],
   ["rate_confirmation", "Rate Confirmation"],
@@ -87,6 +89,31 @@ const TYPE_OPTIONS = [
   ["release_letter", "Release Letter"],
   ["other", "Other"],
 ] as const;
+
+async function fetchAllDocuments(params: Record<string, string> = {}) {
+  const all: AIDocument[] = [];
+  let total = 0;
+  let pages = 1;
+  for (let page = 1; page <= pages; page += 1) {
+    const url = new URL("/api/documents", window.location.origin);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    url.searchParams.set("page", String(page));
+    url.searchParams.set("limit", String(PAGE_SIZE));
+    const response = await fetch(url.toString(), { credentials: "include" });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.message || `Could not load documents (HTTP ${response.status}).`);
+    }
+    const result: unknown = await response.json();
+    if (!Array.isArray(result)) throw new Error("The documents endpoint returned an unexpected response.");
+    all.push(...result as AIDocument[]);
+    const countHeader = response.headers.get("X-Total-Count");
+    const headerTotal = countHeader === null ? Number.NaN : Number(countHeader);
+    total = Number.isFinite(headerTotal) && headerTotal >= 0 ? headerTotal : all.length;
+    pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  }
+  return all;
+}
 
 function typeLabel(type: string | null | undefined) {
   return type ? documentClassificationLabel(type) : "Unclassified";
@@ -412,7 +439,6 @@ export default function Documents() {
   const requestedDocumentId = requestedValue && /^\d+$/.test(requestedValue) ? Number(requestedValue) : null;
   const handledFocusId = useRef<number | null>(null);
   const pendingFocusId = useRef<number | null>(null);
-  const preserveFocusPage = useRef(false);
   const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -422,19 +448,68 @@ export default function Documents() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [page, setPage] = useState(1);
-  const { data: documents = [], isLoading, isError, refetch } = useQuery<AIDocument[]>({
-    queryKey: ["/api/documents"],
+  const [resolvedFocusId, setResolvedFocusId] = useState<number | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const filterParams = useMemo<Record<string, string>>(() => {
+    const params: Record<string, string> = {};
+    if (search.trim()) params.q = search.trim();
+    if (typeFilter !== "all") {
+      const matchingTypes: Record<string, string[]> = {
+        invoice: ["invoice", "freight_invoice"],
+        freight_invoice: ["invoice", "freight_invoice"],
+        bill_of_lading: ["bill_of_lading", "bol"],
+        bol: ["bill_of_lading", "bol"],
+        proof_of_delivery: ["proof_of_delivery", "pod"],
+        pod: ["proof_of_delivery", "pod"],
+      };
+      params.type = (matchingTypes[typeFilter] ?? [typeFilter]).join(",");
+    }
+    if (srcFilter !== "all") params.source = srcFilter;
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (confFilter !== "all") params.confidence = confFilter;
+    if (fromDate) {
+      const date = new Date(`${fromDate}T00:00:00`);
+      if (!Number.isNaN(date.getTime())) params.from = date.toISOString();
+    }
+    if (toDate) {
+      const date = new Date(`${toDate}T23:59:59.999`);
+      if (!Number.isNaN(date.getTime())) params.to = date.toISOString();
+    }
+    return params;
+  }, [search, typeFilter, srcFilter, statusFilter, confFilter, fromDate, toDate]);
+  const queryParams = useMemo(() => (
+    requestedDocumentId !== null && resolvedFocusId !== requestedDocumentId
+      ? { ...filterParams, focusId: String(requestedDocumentId) }
+      : filterParams
+  ), [filterParams, requestedDocumentId, resolvedFocusId]);
+  const {
+    items: documents,
+    total: totalDocuments,
+    page: currentPage,
+    pageCount: totalPages,
+    pageSize,
+    resolvedPage,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+    setPage,
+  } = useServerArrayPage<AIDocument>("/api/documents", {
+    params: queryParams,
+    resetKey: JSON.stringify(filterParams),
     refetchInterval: 5000,
   });
 
   const batchMutation = useMutation({
     mutationFn: async () => {
-      const pending = documents.filter(doc => !doc.aiClassificationModel && doc.status === "processed");
+      const allDocuments = await fetchAllDocuments();
+      const pending = allDocuments.filter(doc => !doc.aiClassificationModel && doc.status === "processed");
       await Promise.allSettled(pending.map(doc => apiRequest("POST", `/api/load-documents/${doc.id}/ai-classify`, {})));
+      return pending.length;
     },
-    onSuccess: () => {
-      toast({ title: "Batch complete", description: "All eligible documents were re-classified." });
+    onSuccess: (count) => {
+      toast({ title: "Batch complete", description: count ? `${count} eligible document(s) queued for re-classification.` : "No eligible documents required re-classification." });
       qc.invalidateQueries({ queryKey: ["/api/documents"] });
     },
   });
@@ -453,62 +528,32 @@ export default function Documents() {
     anchor.remove();
   };
 
-  const filtered = useMemo(() => documents.filter(doc => {
-    const classification = documentClassification(doc);
-    const confidence = documentConfidence(doc);
-    const source = doc.classificationSource ?? "rules";
-    const processingState = doc.processingState ?? doc.status;
-    const term = search.trim().toLocaleLowerCase();
-    if (term && ![
-      doc.originalName,
-      doc.invoiceNumber ?? "",
-      doc.carrierName ?? "",
-      doc.invoiceId ? String(doc.invoiceId) : "",
-    ].some(value => value.toLocaleLowerCase().includes(term))) return false;
-    if (typeFilter !== "all") {
-      const group: Record<string, string[]> = {
-        invoice: ["invoice", "freight_invoice"],
-        freight_invoice: ["invoice", "freight_invoice"],
-        bill_of_lading: ["bill_of_lading", "bol"],
-        bol: ["bill_of_lading", "bol"],
-        proof_of_delivery: ["proof_of_delivery", "pod"],
-        pod: ["proof_of_delivery", "pod"],
-      };
-      if (!(group[typeFilter] ?? [typeFilter]).includes(classification)) return false;
-    }
-    if (srcFilter !== "all" && source !== srcFilter) return false;
-    if (statusFilter !== "all" && processingState !== statusFilter) return false;
-    if (confFilter === "high" && (confidence === null || confidence < 0.8)) return false;
-    if (confFilter === "medium" && (confidence === null || confidence < 0.6 || confidence >= 0.8)) return false;
-    if (confFilter === "low" && (confidence === null || confidence >= 0.6)) return false;
-    const created = doc.createdAt ? new Date(doc.createdAt).getTime() : Number.NaN;
-    if (fromDate && (!Number.isFinite(created) || created < new Date(`${fromDate}T00:00:00`).getTime())) return false;
-    if (toDate && (!Number.isFinite(created) || created > new Date(`${toDate}T23:59:59.999`).getTime())) return false;
-    return true;
-  }), [documents, search, typeFilter, srcFilter, statusFilter, confFilter, fromDate, toDate]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageDocuments = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageDocuments = documents;
 
   useEffect(() => {
-    if (preserveFocusPage.current) {
-      preserveFocusPage.current = false;
-      return;
-    }
-    setPage(1);
-  }, [search, typeFilter, srcFilter, confFilter, statusFilter, fromDate, toDate]);
+    handledFocusId.current = null;
+    pendingFocusId.current = null;
+    setResolvedFocusId(null);
+  }, [requestedDocumentId]);
+
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+    // Only the initial deep-link lookup may override navigation. A previous
+    // page's metadata must never cancel a user's Next/Previous click.
+    if (requestedDocumentId !== null && resolvedFocusId !== requestedDocumentId && !isFetching &&
+      resolvedPage !== null && resolvedPage !== currentPage) setPage(resolvedPage);
+  }, [requestedDocumentId, resolvedFocusId, isFetching, resolvedPage, currentPage, setPage]);
 
   useEffect(() => {
     if (requestedDocumentId === null || isLoading || handledFocusId.current === requestedDocumentId) return;
-    const index = documents.findIndex(doc => doc.id === requestedDocumentId);
-    if (index < 0) return;
+    if (resolvedPage !== null && resolvedPage !== currentPage) return;
+    const target = documents.find(doc => doc.id === requestedDocumentId);
+    if (!target) {
+      if (resolvedPage !== null && resolvedPage === currentPage) setResolvedFocusId(requestedDocumentId);
+      return;
+    }
     handledFocusId.current = requestedDocumentId;
     pendingFocusId.current = requestedDocumentId;
-    preserveFocusPage.current = true;
+    setResolvedFocusId(requestedDocumentId);
     setSearch("");
     setTypeFilter("all");
     setSrcFilter("all");
@@ -516,8 +561,8 @@ export default function Documents() {
     setStatusFilter("all");
     setFromDate("");
     setToDate("");
-    setPage(Math.floor(index / PAGE_SIZE) + 1);
-  }, [requestedDocumentId, documents, isLoading]);
+    setPage(resolvedPage ?? currentPage);
+  }, [requestedDocumentId, documents, isLoading, resolvedPage, currentPage, setPage]);
 
   useEffect(() => {
     const id = pendingFocusId.current;
@@ -542,29 +587,39 @@ export default function Documents() {
     navigate("/documents");
   };
 
-  const exportCsv = () => {
-    const headers = ["Filename", "Classification", "Invoice number", "Carrier", "Confidence", "Processing state", "Uploaded"];
-    const cell = (value: unknown) => {
-      let text = String(value ?? "");
-      if (/^[\u0000-\u0020]*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text)) text = `'${text}`;
-      return `"${text.replace(/"/g, '""')}"`;
-    };
-    const rows = filtered.map(doc => [
-      doc.originalName,
-      typeLabel(documentClassification(doc)),
-      doc.invoiceNumber ?? (doc.invoiceId ? String(doc.invoiceId) : ""),
-      doc.carrierName ?? "",
-      documentConfidence(doc) === null ? "" : `${Math.round(documentConfidence(doc)! * 100)}%`,
-      doc.processingState ?? doc.status,
-      doc.createdAt ?? "",
-    ]);
-    const csv = [headers, ...rows].map(row => row.map(cell).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = Object.assign(document.createElement("a"), { href: url, download: "factorflux-documents.csv" });
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const exportCsv = async () => {
+    if (exportLoading) return;
+    setExportLoading(true);
+    setExportError("");
+    try {
+      const exportDocuments = await fetchAllDocuments(filterParams);
+      const headers = ["Filename", "Classification", "Invoice number", "Carrier", "Confidence", "Processing state", "Uploaded"];
+      const cell = (value: unknown) => {
+        let text = String(value ?? "");
+        if (/^[\u0000-\u0020]*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text)) text = `'${text}`;
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+      const rows = exportDocuments.map(doc => [
+        doc.originalName,
+        typeLabel(documentClassification(doc)),
+        doc.invoiceNumber ?? (doc.invoiceId ? String(doc.invoiceId) : ""),
+        doc.carrierName ?? "",
+        documentConfidence(doc) === null ? "" : `${Math.round(documentConfidence(doc)! * 100)}%`,
+        doc.processingState ?? doc.status,
+        doc.createdAt ?? "",
+      ]);
+      const csv = [headers, ...rows].map(row => row.map(cell).join(",")).join("\r\n");
+      const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+      const anchor = Object.assign(document.createElement("a"), { href: url, download: "factorflux-documents.csv" });
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export documents.");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const clearFilters = () => {
@@ -599,10 +654,13 @@ export default function Documents() {
                   <h2 className="mt-1 text-lg font-semibold text-[#354548]">Review incoming paperwork</h2>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <NeuButton onClick={exportCsv} disabled={filtered.length === 0} className="min-h-10 px-3 text-xs"><Download className="h-4 w-4" />Export filtered CSV</NeuButton>
+                  <NeuButton onClick={() => void exportCsv()} disabled={totalDocuments === 0 || exportLoading} className="min-h-10 px-3 text-xs">
+                    {exportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {exportLoading ? "Preparing CSV" : "Export CSV"}
+                  </NeuButton>
                   <NeuButton
                     onClick={() => batchMutation.mutate()}
-                    disabled={batchMutation.isPending || !documents.some(doc => !doc.aiClassificationModel && doc.status === "processed")}
+                    disabled={batchMutation.isPending || totalDocuments === 0}
                     variant="accent"
                     className="min-h-10 px-3 text-xs"
                   >
@@ -650,10 +708,11 @@ export default function Documents() {
                   <NeuInput type="date" value={toDate} onChange={event => setToDate(event.target.value)} aria-label="Uploaded to date" className="min-h-10 px-1 shadow-none" />
                 </label>
                 <div className="flex flex-wrap items-center gap-2 xl:col-span-4">
-                  <span className="text-xs text-[#758587]">{filtered.length.toLocaleString()} matching documents</span>
+                  <span className="text-xs text-[#758587]">{totalDocuments.toLocaleString()} matching documents</span>
                   <NeuButton onClick={clearFilters} className="min-h-9 rounded-lg px-3 text-xs">Clear filters</NeuButton>
                 </div>
               </div>
+              {exportError && <p role="alert" className="mt-3 text-xs text-[#ad5c50]">{exportError}</p>}
             </NeuCard>
 
             <NeuCard className="min-h-0 overflow-hidden p-3 sm:p-5">
@@ -668,12 +727,12 @@ export default function Documents() {
                   <p className="mt-1 text-sm text-[#758587]">The queue could not be refreshed. Try again.</p>
                   <NeuButton onClick={() => refetch()} className="mt-4 min-h-10 px-4 text-xs"><RefreshCw className="h-4 w-4" />Retry loading</NeuButton>
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : documents.length === 0 ? (
                 <div className="flex flex-col items-center py-14 text-center">
                   <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#d9d9d9]"><FileQuestion className="h-6 w-6 text-[#788b8d]" /></div>
-                  <p className="font-semibold text-[#354548]">{documents.length === 0 ? "No documents in the queue" : "No documents match these filters"}</p>
-                  <p className="mt-1 max-w-md text-sm text-[#758587]">{documents.length === 0 ? "Documents attached to invoices appear here for OCR and classification review." : "Adjust search, date, status, or confidence filters to widen the queue."}</p>
-                  {documents.length > 0 && <NeuButton onClick={clearFilters} className="mt-4 min-h-10 px-4 text-xs">Clear filters</NeuButton>}
+                  <p className="font-semibold text-[#354548]">{totalDocuments === 0 && Object.keys(filterParams).length === 0 ? "No documents in the queue" : "No documents match these filters"}</p>
+                  <p className="mt-1 max-w-md text-sm text-[#758587]">{totalDocuments === 0 && Object.keys(filterParams).length === 0 ? "Documents attached to invoices appear here for OCR and classification review." : "Adjust search, date, status, or confidence filters to widen the queue."}</p>
+                  {Object.keys(filterParams).length > 0 && <NeuButton onClick={clearFilters} className="mt-4 min-h-10 px-4 text-xs">Clear filters</NeuButton>}
                 </div>
               ) : (
                 <>
@@ -689,12 +748,12 @@ export default function Documents() {
                   </NeuTable>
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#c5c5c5] px-1 pt-3">
                     <span className="text-xs text-[#758587]">
-                      Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} filtered · {documents.length} total
+                      Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalDocuments)} of {totalDocuments.toLocaleString()} matching documents
                     </span>
                     <div className="flex items-center gap-2">
-                      <NeuButton onClick={() => setPage(value => Math.max(1, value - 1))} disabled={currentPage <= 1 || isLoading} className="min-h-10 px-3 text-xs">Previous</NeuButton>
+                      <NeuButton onClick={() => setPage(value => Math.max(1, value - 1))} disabled={currentPage <= 1 || isFetching} className="min-h-10 px-3 text-xs">Previous</NeuButton>
                       <span className="px-2 text-xs text-[#758587]">Page {currentPage} of {totalPages}</span>
-                      <NeuButton onClick={() => setPage(value => Math.min(totalPages, value + 1))} disabled={currentPage >= totalPages || isLoading} className="min-h-10 px-3 text-xs">Next</NeuButton>
+                      <NeuButton onClick={() => setPage(value => Math.min(totalPages, value + 1))} disabled={currentPage >= totalPages || isFetching} className="min-h-10 px-3 text-xs">Next</NeuButton>
                     </div>
                   </div>
                 </>

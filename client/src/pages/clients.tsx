@@ -10,6 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { ProcessorIdentity } from "@/components/assignments/processor-assignment";
 import { Plus, Search, Trash2, Building2, Users, ArrowLeft, ArrowRight, CircleCheck, ExternalLink, Edit } from "lucide-react";
 import type { Client } from "@shared/schema";
+import { PageInsights } from "@/components/PageInsights";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 
 type ClientsResponse = { data: Client[]; total: number; page: number; totalPages: number };
 type CarrierReportRow = { clientId: number; outstanding: number };
@@ -35,7 +37,7 @@ export default function Clients() {
   const { data: clientsResponse, isLoading: clientsLoading, isError: clientsError, refetch: refetchClients } = useQuery<ClientsResponse>({
     queryKey: ["/api/clients", page, debouncedSearch, processorFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), limit: "50", q: debouncedSearch });
+      const params = new URLSearchParams({ page: String(page), limit: String(DEFAULT_PAGE_SIZE), q: debouncedSearch });
       if (processorFilter === "me") params.set("processor", "me");
       const res = await fetch(`/api/clients?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error(`Failed to load clients: ${res.status}`);
@@ -66,7 +68,7 @@ export default function Clients() {
   const activeClients = clients.filter((client) => client.status === "active").length;
   const newClients = clients.filter((client) => client.status === "new_client").length;
   const inactiveClients = clients.filter((client) => client.status === "inactive").length;
-  const currentPageRange = `${totalClients === 0 ? 0 : (page - 1) * 50 + 1}–${Math.min(page * 50, totalClients)}`;
+  const currentPageRange = `${totalClients === 0 ? 0 : (page - 1) * DEFAULT_PAGE_SIZE + 1}–${Math.min(page * DEFAULT_PAGE_SIZE, totalClients)}`;
 
   return (
     <div className="flex h-full min-h-0 bg-[#e0e0e0]">
@@ -74,6 +76,7 @@ export default function Clients() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Accounts" subtitle="Carrier and client relationships, contacts, and records" group="Workspace" neu />
         <NeuPageShell className="custom-scrollbar !min-h-0 flex-1">
+          <PageInsights entity="clients" title="Carrier portfolio" />
           <div className="mx-auto w-full max-w-[1680px] space-y-7 p-4 md:p-7 xl:p-9">
             <section className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="relative w-full max-w-xl">

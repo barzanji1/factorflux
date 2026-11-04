@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useRiskToast as useToast } from "@/components/risk/risk-controls";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { PageInsights } from "@/components/PageInsights";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RiskCard as Card, RiskButton as Button, RiskBadge as Badge, RiskInput as Input, RiskDialogContent as DialogContent, RiskStatCard } from "@/components/risk/risk-controls";
 import { NeuPageShell } from "@/styles/neu/components";
@@ -51,6 +52,7 @@ import {
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { ServerArrayPagination, useServerArrayPage } from "@/hooks/use-server-array-page";
 
 interface AuthorityCheck {
   id: number;
@@ -272,9 +274,18 @@ export default function FmcsaAuthority() {
     queryKey: ["/api/authority-alerts"],
   });
 
-  const { data: integrationRuns = [], isLoading: runsLoading } = useQuery<ComplianceIntegrationRun[]>({
-    queryKey: ["/api/authority-checks/integration-runs"],
-  });
+  const {
+    items: integrationRuns,
+    total: integrationRunsTotal,
+    page: integrationRunsPage,
+    pageCount: integrationRunsPageCount,
+    isLoading: runsLoading,
+    isFetching: runsFetching,
+    isError: runsError,
+    error: runsErrorValue,
+    refetch: refetchRuns,
+    setPage: setIntegrationRunsPage,
+  } = useServerArrayPage<ComplianceIntegrationRun>("/api/authority-checks/integration-runs");
 
   const [historyEntityType, historyEntityId] = expandedHistory?.split("-") ?? [];
   const historyQueryKey = [`/api/fmcsa/entities/${historyEntityId}/history?entityType=${historyEntityType}`];
@@ -406,6 +417,7 @@ export default function FmcsaAuthority() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="FMCSA Monitor" subtitle="Carrier authority status, safety ratings, and compliance alerts" group="Risk" neu />
         <NeuPageShell className="!min-h-0 flex-1 overflow-y-auto p-6">
+          <PageInsights entity="fmcsa-authority" title="Authority monitoring" />
           <div className="mx-auto max-w-7xl space-y-6">
 
             {/* Header */}
@@ -875,6 +887,11 @@ export default function FmcsaAuthority() {
                       <div className="flex items-center justify-center py-16 text-slate-400">
                         <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading…
                       </div>
+                    ) : runsError ? (
+                      <div role="alert" className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-red-700">
+                        <span>{runsErrorValue instanceof Error ? runsErrorValue.message : "Could not load check run history."}</span>
+                        <Button variant="outline" onClick={() => void refetchRuns()}>Retry</Button>
+                      </div>
                     ) : integrationRuns.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
                         <History className="h-10 w-10" />
@@ -958,6 +975,15 @@ export default function FmcsaAuthority() {
                           })}
                         </TableBody>
                       </Table>
+                    )}
+                    {!runsLoading && !runsError && (
+                      <ServerArrayPagination
+                        page={integrationRunsPage}
+                        pageCount={integrationRunsPageCount}
+                        total={integrationRunsTotal}
+                        onPageChange={setIntegrationRunsPage}
+                        disabled={runsFetching}
+                      />
                     )}
                   </CardContent>
                 </Card>

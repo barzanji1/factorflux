@@ -4,6 +4,7 @@ import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { PageInsights } from "@/components/PageInsights";
 import Sidebar from "@/components/layout/sidebar";
 import { TopNav } from "@/components/admin-neu/adapters";
 import { Switch } from "@/components/ui/switch";
@@ -711,6 +712,7 @@ export default function WorkflowBuilder() {
         />
 
         <AdminPageShell className="custom-scrollbar flex-1 overflow-auto">
+          <PageInsights entity="workflow-builder" title="Workflow activity" />
           <div className="mx-auto w-full max-w-[1200px] p-6 xl:p-8">
 
             {/* ── Top bar ───────────────────────────────────────────────────── */}

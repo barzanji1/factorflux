@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageInsights } from "@/components/PageInsights";
 import { AdminPageShell, Button, Input, Badge, Card, CardContent, DialogContent, SelectContent, useAdminToast, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, StatCard } from "@/components/admin-neu/adapters";
 import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -260,6 +261,7 @@ export default function Payroll() {
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopNav title="Payroll" />
         <AdminPageShell className="flex-1 overflow-y-auto p-6 space-y-6">
+          <PageInsights entity="payroll" title="Payroll activity" />
 
           {/* Header */}
           <div className="flex items-center justify-between">

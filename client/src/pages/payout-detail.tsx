@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { PageInsights } from "@/components/PageInsights";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -148,6 +149,7 @@ export default function PayoutDetail() {
           group="Workspace"
         />
         <main className="custom-scrollbar flex-1 overflow-auto">
+          <PageInsights entity="payouts" entityId={payoutId} title="Payout activity" />
           <div className="mx-auto w-full max-w-[1400px] p-6 xl:p-8">
             <RecordDetail
               backHref="/payouts"

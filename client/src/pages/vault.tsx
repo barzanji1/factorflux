@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageInsights } from "@/components/PageInsights";
 import { AdminPageShell, Button, Input, Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, DialogContent, AlertDialogContent, SelectContent, useAdminToast, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin-neu/adapters";
 import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -263,6 +264,7 @@ export default function VaultPage() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Vault" subtitle="Secure storage for confidential carrier and client records" group="Admin" />
         <AdminPageShell className="custom-scrollbar flex-1 overflow-auto">
+          {selectedClient && <PageInsights entity="vault" clientId={selectedClient} title="Selected carrier vault" />}
           <div className="container mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center space-x-4">

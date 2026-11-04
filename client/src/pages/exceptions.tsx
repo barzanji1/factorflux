@@ -3,6 +3,8 @@ import type { ElementType } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { PageInsights } from "@/components/PageInsights";
+import { SafePaginatedTable } from "@/components/safe-table-pagination";
 
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -236,6 +238,7 @@ export default function Exceptions() {
         <TopNav title="Exceptions" subtitle="Track and resolve short-pays, overpays, missing docs, and workflow holds" group="Risk" />
         <main className="custom-scrollbar flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1680px] space-y-4 p-6 xl:p-8">
+            <PageInsights entity="exceptions" title="Exception workload" />
 
             {/* ── Critical nudge banner ───────────────────────────────────── */}
             {criticalCount > 0 && (
@@ -427,7 +430,7 @@ export default function Exceptions() {
                   )}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <SafePaginatedTable>
                   <table className="ff-data-table w-full min-w-[820px]">
                     <thead>
                       <tr>
@@ -542,7 +545,7 @@ export default function Exceptions() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                </SafePaginatedTable>
               )}
 
               {rows.length > 0 && (

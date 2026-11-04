@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import type { MouseEvent } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
+import { PageInsights } from "@/components/PageInsights";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -34,6 +35,7 @@ import { cn } from "@/lib/utils";
 import ConfirmationFollowUpQueue from "@/components/broker-confirmation/follow-up-queue";
 import CollectionsAutomation from "@/components/broker-confirmation/collections-automation";
 import EntityNotes from "@/components/shared/EntityNotes";
+import { ServerArrayPagination, SERVER_ARRAY_PAGE_SIZE, useServerArrayPage } from "@/hooks/use-server-array-page";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -802,8 +804,61 @@ export default function FollowUpPage() {
     defaultValues: { status: "pending", priority: "medium" },
   });
 
+  useEffect(() => {
+    pendingFocusId.current = null;
+    handledFocusId.current = null;
+  }, [requestedFollowUpId]);
+
   // ── Queries ──────────────────────────────────────────────────────────────────
-  const { data: followUps = [], isLoading }  = useQuery<FollowUp[]>({ queryKey: ["/api/follow-ups"] });
+  const manualParams = useMemo<Record<string, string>>(() => ({
+    ...(searchTerm.trim() ? { q: searchTerm.trim() } : {}),
+    ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+    ...(priorityFilter !== "all" ? { priority: priorityFilter } : {}),
+  }), [searchTerm, statusFilter, priorityFilter]);
+  const {
+    items: followUps,
+    total: followUpsTotal,
+    page: followUpsPage,
+    pageCount: followUpsPageCount,
+    isLoading,
+    isFetching: followUpsFetching,
+    isError: followUpsError,
+    error: followUpsErrorValue,
+    refetch: refetchFollowUps,
+    setPage: setFollowUpsPage,
+  } = useServerArrayPage<FollowUp>("/api/follow-ups", {
+    params: manualParams,
+    resetKey: JSON.stringify(manualParams),
+  });
+  const focusPageQuery = useQuery<number | null>({
+    queryKey: ["/api/follow-ups", "focus-page", requestedFollowUpId],
+    enabled: !!requestedFollowUpId && /^\d+$/.test(requestedFollowUpId) && !followUps.some(item => item.id === Number(requestedFollowUpId)),
+    queryFn: async () => {
+      const fetchPage = async (page: number) => {
+        const url = new URL("/api/follow-ups", window.location.origin);
+        url.searchParams.set("page", String(page));
+        url.searchParams.set("limit", String(SERVER_ARRAY_PAGE_SIZE));
+        const response = await fetch(url.toString(), { credentials: "include" });
+        if (!response.ok) throw new Error(`Could not find requested follow-up (HTTP ${response.status}).`);
+        const rows: unknown = await response.json();
+        if (!Array.isArray(rows)) throw new Error("The follow-up endpoint returned an unexpected response.");
+        const totalHeader = response.headers.get("X-Total-Count");
+        const totalValue = totalHeader === null ? Number.NaN : Number(totalHeader);
+        return {
+          rows: rows as FollowUp[],
+          total: Number.isFinite(totalValue) && totalValue >= 0 ? totalValue : rows.length,
+        };
+      };
+      const first = await fetchPage(1);
+      if (first.rows.some(item => item.id === Number(requestedFollowUpId))) return 1;
+      const pages = Math.ceil(first.total / SERVER_ARRAY_PAGE_SIZE);
+      for (let page = 2; page <= pages; page += 1) {
+        const result = await fetchPage(page);
+        if (result.rows.some(item => item.id === Number(requestedFollowUpId))) return page;
+      }
+      return null;
+    },
+  });
   const { data: clients = [] }               = useQuery({ queryKey: ["/api/follow-up-clients"] });
   const { data: brokerFollowUps = [], isLoading: bfuLoading } = useQuery<BrokerFollowUp[]>({
     queryKey: ["/api/broker-follow-ups"],
@@ -877,25 +932,29 @@ export default function FollowUpPage() {
   const onSubmit = (data: z.infer<typeof followUpSchema>) => addFollowUpMutation.mutate(data);
 
   // ── Filtered lists ────────────────────────────────────────────────────────────
-  const filteredFollowUps = (followUps as FollowUp[]).filter(f => {
-    const matchesSearch =
-      f.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.client?.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch &&
-      (statusFilter === "all"   || f.status === statusFilter) &&
-      (priorityFilter === "all" || f.priority === priorityFilter);
-  });
+  const filteredFollowUps = followUps;
 
   useEffect(() => {
     if (!requestedFollowUpId || isLoading || !/^\d+$/.test(requestedFollowUpId)) return;
     const id = Number(requestedFollowUpId);
-    if (handledFocusId.current === id || !(followUps as FollowUp[]).some(item => item.id === id)) return;
+    if (handledFocusId.current === id) return;
+    const target = followUps.find(item => item.id === id);
+    if (!target) {
+      const targetPage = focusPageQuery.data;
+      if (targetPage !== undefined && targetPage !== null) {
+        setSearchTerm("");
+        setStatusFilter("all");
+        setPriorityFilter("all");
+        setFollowUpsPage(targetPage);
+      }
+      return;
+    }
     handledFocusId.current = id;
     pendingFocusId.current = id;
     setSearchTerm("");
     setStatusFilter("all");
     setPriorityFilter("all");
-  }, [requestedFollowUpId, isLoading, followUps]);
+  }, [requestedFollowUpId, isLoading, followUps, focusPageQuery.data, setFollowUpsPage]);
 
   useEffect(() => {
     const id = pendingFocusId.current;
@@ -939,6 +998,7 @@ export default function FollowUpPage() {
       subtitle="Manage client follow-ups, tasks, and broker payment reminder cadences"
       group="Recovery"
     >
+      <PageInsights entity="followups" title="Follow-up workload" />
       {deliverySummary && deliverySummary.total > 0 && (
       <Badge className="ff-badge-rejected gap-1.5">
           {deliverySummary.total} delivery issue{deliverySummary.total !== 1 ? "s" : ""} —&nbsp;
@@ -1018,7 +1078,7 @@ export default function FollowUpPage() {
       </Dialog>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Win95StatCard label="Open Manual Tasks" value={followUps.filter(item => item.status !== "completed").length} />
+        <Win95StatCard label="Open Manual Tasks · page" value={followUps.filter(item => item.status !== "completed").length} />
         <Win95StatCard label="Unacknowledged Automations" value={pendingBfuCount} />
         <Win95StatCard label="Email Templates" value={templates.length} />
       </div>
@@ -1033,9 +1093,9 @@ export default function FollowUpPage() {
                 <TabsTrigger value="manual" className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
                   Manual Tasks
-                  {filteredFollowUps.length > 0 && (
+                  {followUpsTotal > 0 && (
                     <span className="ff-followups-count ml-1">
-                      {filteredFollowUps.length}
+                      {followUpsTotal}
                     </span>
                   )}
                 </TabsTrigger>
@@ -1120,6 +1180,13 @@ export default function FollowUpPage() {
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
                       <p className="text-gray-600 mt-2">Loading follow-ups...</p>
                     </div>
+                  ) : followUpsError ? (
+                    <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                      <CardContent className="p-8 text-center">
+                        <p role="alert" className="text-sm text-red-700">{followUpsErrorValue instanceof Error ? followUpsErrorValue.message : "Could not load manual follow-ups."}</p>
+                        <Button variant="outline" className="mt-3" onClick={() => void refetchFollowUps()}>Retry</Button>
+                      </CardContent>
+                    </Card>
                   ) : filteredFollowUps.length === 0 ? (
                       <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
                       <CardContent className="p-8 text-center">
@@ -1183,6 +1250,15 @@ export default function FollowUpPage() {
                         ))}
                       </Win95TableBody>
                     </Win95Table>
+                  )}
+                  {!isLoading && !followUpsError && (
+                    <ServerArrayPagination
+                      page={followUpsPage}
+                      pageCount={followUpsPageCount}
+                      total={followUpsTotal}
+                      onPageChange={setFollowUpsPage}
+                      disabled={followUpsFetching}
+                    />
                   )}
                 </div>
                 </Card>

@@ -4,6 +4,7 @@ import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import { TopNav } from "@/components/admin-neu/adapters";
+import { PageInsights } from "@/components/PageInsights";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -235,6 +236,7 @@ export default function DocumentRules() {
         <TopNav title="Rules" subtitle="Configure required documents for load approval and funding" group="Admin" />
 
         <AdminPageShell className="custom-scrollbar flex-1 overflow-auto">
+          <PageInsights entity="document-rules" title="Document rule activity" />
           <div className="mx-auto w-full max-w-[1000px] p-6 xl:p-8">
 
             {/* Header */}

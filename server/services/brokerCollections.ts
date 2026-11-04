@@ -1,4 +1,5 @@
 import { isProductionAppOrigin } from "../../shared/production-urls.js";
+import { DEFAULT_PAGE_SIZE } from "../../shared/pagination";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
@@ -148,7 +149,7 @@ export function createBrokerCollectionsService({
   const rowSelect = { state: states, invoiceNumber: invoices.invoiceNumber, loadNumber: invoices.loadNumber, broker: brokers.name, carrier: clients.name };
   async function queue(actorId: string, input: { page?: number; pageSize?: number; q?: string; phase?: string } = {}): Promise<CollectionQueue> {
     const scope = await scopeFor(actorId);
-    const page = input.page ?? 1, pageSize = input.pageSize ?? 50;
+    const page = input.page ?? 1, pageSize = input.pageSize ?? DEFAULT_PAGE_SIZE;
     const where = and(scope,
       input.q ? or(ilike(invoices.invoiceNumber, `%${input.q}%`), ilike(invoices.loadNumber, `%${input.q}%`), ilike(brokers.name, `%${input.q}%`)) : undefined,
       input.phase === "escalated" ? isNotNull(states.escalatedPhase) : input.phase === "paused" ? eq(states.paused, true) :

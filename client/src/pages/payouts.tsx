@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
+import { PageInsights } from "@/components/PageInsights";
 import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent } from "@/components/funding/funding-controls";
 import {
   CardContent, CardDescription, CardHeader, CardTitle,
@@ -257,6 +258,7 @@ export default function Payouts() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Payouts" subtitle="Advance disbursements and reserve management" group="Funding" neu />
         <NeuPageShell className="custom-scrollbar flex-1 overflow-auto p-6">
+          <PageInsights entity="payouts" title="Payout activity" />
           <div className="max-w-7xl mx-auto space-y-6">
 
             {/* Header row */}

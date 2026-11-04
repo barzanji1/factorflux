@@ -21,12 +21,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Popover, PopoverContent as BasePopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { PageInsights } from "@/components/PageInsights";
 import { Textarea } from "@/components/ui/textarea";
+import { ServerArrayPagination, useServerArrayPage } from "@/hooks/use-server-array-page";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuTab, NeuTabList, NeuTabs } from "@/styles/neu/components";
 import { TasksOverview } from "@/components/tasks/tasks-overview";
 import { isTaskOverdue, taskCalendarDate, taskDueDate } from "@shared/task-analytics";
-
-const PAGE_SIZE = 20;
 
 // Portaled pickers must sit above the task dialog, not behind its controls.
 function PopoverContent({ className, ...props }: ComponentPropsWithoutRef<typeof BasePopoverContent>) {
@@ -107,9 +107,6 @@ function taskDateLabel(value?: string | null, dueDate = false) {
   if (!normalized) return "No due date";
   const date = new Date(`${normalized}T12:00:00`);
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-function priorityRank(priority: string) {
-  return ({ urgent: 0, high: 1, medium: 2, low: 3 } as Record<string, number>)[priority] ?? 4;
 }
 function statusLabel(status: string) {
   return status === "in_progress" ? "In progress" : status === "todo" ? "Open" : status.charAt(0).toUpperCase() + status.slice(1);
@@ -244,7 +241,6 @@ export default function Tasks() {
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
   const [sort, setSort] = useState("due");
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [completedExpanded, setCompletedExpanded] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
@@ -253,11 +249,61 @@ export default function Tasks() {
   const handledTaskQuery = useRef<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: tasks = [], isLoading, isError, refetch } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", { scope }],
+  const filterParams = useMemo<Record<string, string>>(() => {
+    const params: Record<string, string> = { scope, sort };
+    if (search.trim()) params.q = search.trim();
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (statusFilter === "overdue") {
+      const now = new Date();
+      params.today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    }
+    if (priorityFilter !== "all") params.priority = priorityFilter;
+    if (assigneeFilter !== "all") params.assignee = assigneeFilter === "__unassigned" ? "unassigned" : assigneeFilter;
+    if (category !== "all") {
+      params.category = category;
+      const typeByCategory: Partial<Record<Category, string>> = {
+        chargebacks: "chargeback",
+        followups: "followup",
+        calls: "call",
+        manual: "task,processing",
+      };
+      if (typeByCategory[category]) params.type = typeByCategory[category]!;
+      if (category === "held" && statusFilter === "all") params.status = "held";
+      if (category === "working" && statusFilter === "all") params.status = "in_progress";
+    }
+    if (createdFrom) {
+      const date = new Date(`${createdFrom}T00:00:00`);
+      if (!Number.isNaN(date.getTime())) params.from = date.toISOString();
+    }
+    if (createdTo) {
+      const date = new Date(`${createdTo}T23:59:59.999`);
+      if (!Number.isNaN(date.getTime())) params.to = date.toISOString();
+    }
+    return params;
+  }, [scope, sort, search, statusFilter, priorityFilter, assigneeFilter, category, createdFrom, createdTo]);
+  const {
+    items: tasks,
+    total: tasksTotal,
+    page: currentPage,
+    pageCount: totalPages,
+    isLoading,
+    isFetching,
+    isError,
+    error: tasksError,
+    refetch,
+    setPage,
+  } = useServerArrayPage<Task>("/api/tasks", { params: filterParams, resetKey: JSON.stringify(filterParams) });
+  const {
+    data: overviewTasks = [],
+    isLoading: overviewLoading,
+    isError: overviewError,
+    refetch: refetchOverview,
+  } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", { all: true, scope }],
     queryFn: async () => {
-      const response = await fetch(`/api/tasks?scope=${scope}`, { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to load tasks");
+      const params = new URLSearchParams({ all: "true", scope });
+      const response = await fetch(`/api/tasks?${params}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load task statistics");
       return response.json();
     },
   });
@@ -352,58 +398,35 @@ export default function Tasks() {
   }
 
   const taskIdFromQuery = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("taskId");
+  const { data: taskFromDeepLink } = useQuery<Task>({
+    queryKey: ["/api/tasks", "focus", taskIdFromQuery],
+    enabled: !!taskIdFromQuery && /^\d+$/.test(taskIdFromQuery) && !tasks.some(task => task.id === Number(taskIdFromQuery)),
+    queryFn: async () => {
+      const response = await fetch(`/api/tasks/${taskIdFromQuery}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Could not load the requested task.");
+      return response.json();
+    },
+  });
   useEffect(() => {
     if (!taskIdFromQuery || isLoading || handledTaskQuery.current === taskIdFromQuery || !/^\d+$/.test(taskIdFromQuery)) return;
     if (isManager && scope !== "all") { setScope("all"); return; }
-    const task = tasks.find(item => item.id === Number(taskIdFromQuery));
+    const task = tasks.find(item => item.id === Number(taskIdFromQuery)) ?? taskFromDeepLink;
     if (!task) return;
     handledTaskQuery.current = taskIdFromQuery;
     openEditDialog(task);
-  }, [taskIdFromQuery, isLoading, tasks, isManager, scope]);
+  }, [taskIdFromQuery, isLoading, tasks, taskFromDeepLink, isManager, scope]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase();
-    const from = createdFrom ? new Date(`${createdFrom}T00:00:00`).getTime() : null;
-    const to = createdTo ? new Date(`${createdTo}T23:59:59.999`).getTime() : null;
-    return tasks.filter(task => {
-      if (term && ![task.title, task.invoiceNumber ?? "", task.confirmationInvoiceId ? String(task.confirmationInvoiceId) : "", task.client?.name ?? "", task.brokerName ?? "", task.carrier?.name ?? "", task.carrierName ?? "", task.description ?? ""].some(value => value.toLocaleLowerCase().includes(term))) return false;
-      if (category === "chargebacks" && task.type !== "chargeback") return false;
-      if (category === "followups" && task.type !== "followup") return false;
-      if (category === "held" && task.status !== "held") return false;
-      if (category === "working" && task.status !== "in_progress") return false;
-      if (category === "calls" && (task.type !== "call" || task.status === "completed")) return false;
-      if (category === "manual" && !["task", "processing"].includes(task.type)) return false;
-      if (statusFilter === "open" && task.status === "completed") return false;
-      if (statusFilter === "in_progress" && task.status !== "in_progress") return false;
-      if (statusFilter === "completed" && task.status !== "completed") return false;
-      if (statusFilter === "held" && task.status !== "held") return false;
-      if (statusFilter === "overdue" && !isTaskOverdue(task, new Date())) return false;
-      if (assigneeFilter === "__unassigned" && task.assignedTo) return false;
-      if (assigneeFilter !== "all" && assigneeFilter !== "__unassigned" && task.assignedTo !== assigneeFilter) return false;
-      if (priorityFilter !== "all" && task.priority !== priorityFilter) return false;
-      const created = new Date(task.createdAt).getTime();
-      if (from !== null && (!Number.isFinite(created) || created < from)) return false;
-      if (to !== null && (!Number.isFinite(created) || created > to)) return false;
-      return true;
-    }).sort((a, b) => {
-      if (sort === "priority") return priorityRank(a.priority) - priorityRank(b.priority) || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      if (sort === "status") return a.status.localeCompare(b.status) || priorityRank(a.priority) - priorityRank(b.priority);
-      const ad = taskDueDate(a.dueDate) || "9999-12-31";
-      const bd = taskDueDate(b.dueDate) || "9999-12-31";
-      return ad.localeCompare(bd) || priorityRank(a.priority) - priorityRank(b.priority);
-    });
-  }, [tasks, search, category, statusFilter, assigneeFilter, priorityFilter, createdFrom, createdTo, sort]);
-  const activeTasks = filtered.filter(task => task.status !== "completed");
-  const completedTasks = filtered.filter(task => task.status === "completed");
+  const activeTasks = tasks.filter(task => task.status !== "completed");
+  const completedTasks = tasks.filter(task => task.status === "completed");
   const showCompletedAsPrimary = statusFilter === "completed";
   const primaryTasks = activeTasks;
-  const visibleTasks = primaryTasks.slice(0, visibleCount);
-  const visibleCompleted = completedTasks.slice(0, visibleCount);
+  const visibleTasks = primaryTasks;
+  const visibleCompleted = completedTasks;
   const hasFilters = !!search || category !== "all" || statusFilter !== "all" || assigneeFilter !== "all" || priorityFilter !== "all" || !!createdFrom || !!createdTo;
   function resetFilters() {
     setSearch(""); setCategory("all"); setStatusFilter("all"); setAssigneeFilter("all"); setPriorityFilter("all"); setCreatedFrom(""); setCreatedTo(""); setSort("due");
   }
-  useEffect(() => { setVisibleCount(PAGE_SIZE); setCompletedExpanded(false); }, [search, category, statusFilter, assigneeFilter, priorityFilter, createdFrom, createdTo, sort, scope]);
+  useEffect(() => { setCompletedExpanded(false); }, [search, category, statusFilter, assigneeFilter, priorityFilter, createdFrom, createdTo, sort, scope]);
   useEffect(() => { if (showCompletedAsPrimary) setCompletedExpanded(true); }, [showCompletedAsPrimary]);
 
   const agentName = (id?: string | null) => personName(agents.find(agent => agent.id === id));
@@ -415,6 +438,7 @@ export default function Tasks() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Tasks" subtitle="Assigned operational work · freight factoring" group="Workspace" neu />
         <NeuPageShell className="custom-scrollbar !min-h-0 flex-1 overflow-y-auto">
+          <PageInsights entity="tasks" title="Task workload" />
           <div className="mx-auto w-full max-w-[1680px] space-y-5 p-4 md:p-7 xl:p-9">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -427,8 +451,14 @@ export default function Tasks() {
               </NeuButton>
             </div>
 
-            <TasksOverview tasks={tasks} isLoading={isLoading} isError={isError} onRetry={() => void refetch()} />
-            {isError ? null : (
+            <TasksOverview tasks={overviewTasks} isLoading={overviewLoading} isError={overviewError} onRetry={() => void refetchOverview()} />
+            {isError ? (
+              <NeuCard role="alert" className="p-5 text-center">
+                <p className="font-semibold text-[#8f4f47]">Tasks could not be loaded</p>
+                <p className="mt-1 text-sm text-[#819092]">{tasksError instanceof Error ? tasksError.message : "Try again in a moment."}</p>
+                <NeuButton onClick={() => void refetch()} className="mt-4 min-h-10 px-4 text-xs">Retry loading</NeuButton>
+              </NeuCard>
+            ) : (
               <>
                 <NeuCard className="p-4 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -469,7 +499,7 @@ export default function Tasks() {
                     <label className="flex items-center gap-2 text-xs text-[#728082]"><span>From</span><NeuInput aria-label="Created from date" type="date" value={createdFrom} onChange={event => setCreatedFrom(event.target.value)} className="min-h-9 w-auto px-3 py-1.5 text-xs" /></label>
                     <label className="flex items-center gap-2 text-xs text-[#728082]"><span>To</span><NeuInput aria-label="Created through date" type="date" value={createdTo} onChange={event => setCreatedTo(event.target.value)} className="min-h-9 w-auto px-3 py-1.5 text-xs" /></label>
                     {hasFilters && <NeuButton onClick={resetFilters} className="min-h-9 rounded-lg px-3 text-xs"><X className="h-3.5 w-3.5" />Clear filters</NeuButton>}
-                    <span className="ml-auto text-xs text-[#819092]">{filtered.length} {filtered.length === 1 ? "task" : "tasks"}</span>
+                    <span className="ml-auto text-xs text-[#819092]">{tasksTotal.toLocaleString()} matching {tasksTotal === 1 ? "task" : "tasks"}</span>
                   </div>
                 </NeuCard>
 
@@ -479,7 +509,7 @@ export default function Tasks() {
                     <h2 className="text-base font-semibold text-[#354548]">{showCompletedAsPrimary ? "Completed work" : "Open work"}</h2>
                       <p className="mt-0.5 text-xs text-[#839092]">{showCompletedAsPrimary ? "Completed tasks matching your filters" : "Unfinished work, including held and in-progress items"}</p>
                     </div>
-                    <NeuBadge>{showCompletedAsPrimary ? completedTasks.length : primaryTasks.length} {showCompletedAsPrimary ? "completed" : "open"}</NeuBadge>
+                    <NeuBadge>{showCompletedAsPrimary ? completedTasks.length : primaryTasks.length} {showCompletedAsPrimary ? "completed" : "open"} on this page</NeuBadge>
                   </div>
 
                   {isLoading ? (
@@ -510,11 +540,13 @@ export default function Tasks() {
                       {completedExpanded && <div className="mt-4 space-y-3">{visibleCompleted.map(task => <TaskCard key={task.id} task={task} completed isManager={isManager} onEdit={openEditDialog} onDelete={requestDelete} onStatus={updateTaskStatus} onProgress={updateProgress} onOpenDetail={task => navigate(`/tasks/${task.id}`)} />)}</div>}
                     </NeuCard>
                   )}
-                  {(primaryTasks.length > visibleCount || (completedExpanded && completedTasks.length > visibleCount)) && (
-                    <div className="flex justify-center pt-2">
-                      <NeuButton onClick={() => setVisibleCount(count => count + PAGE_SIZE)} className="min-h-10 px-5 text-xs"><ChevronDown className="h-4 w-4" />Load 20 more</NeuButton>
-                    </div>
-                  )}
+                  <ServerArrayPagination
+                    page={currentPage}
+                    pageCount={totalPages}
+                    total={tasksTotal}
+                    onPageChange={setPage}
+                    disabled={isFetching}
+                  />
                 </section>
               </>
             )}

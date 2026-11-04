@@ -15,6 +15,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import "@/components/funding/funding-neu.css";
 import { NeuButton, NeuPageShell, NeuTable, NeuTabs, NeuTab, NeuTabList } from "@/styles/neu/components";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
+import { PageInsights } from "@/components/PageInsights";
 
 type QueueRow = {
   id: number;
@@ -107,7 +109,7 @@ export default function FundingQueue() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const pageSize = DEFAULT_PAGE_SIZE;
   const [expanded, setExpanded] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [reasonModal, setReasonModal] = useState<{ id: number; action: "reject" | "hold" } | null>(null);
@@ -263,6 +265,7 @@ export default function FundingQueue() {
   return <div className="funding-neu-page ff-sheets-page flex min-h-[100dvh] bg-[#d4d0c8]"><Sidebar /><div className="flex min-w-0 flex-1 flex-col">
     <TopNav title="Sheets" subtitle="Review and fund submitted invoices" group="Funding" neu />
      <NeuPageShell className="custom-scrollbar flex-1 overflow-auto"><div className="mx-auto w-full max-w-[1600px] space-y-5 p-5 md:p-8">
+       <PageInsights entity="sheets" title="Funding queue activity" />
       <Card role="region" className={`ff-card ff-sheets-surface border px-5 py-4 ${cutoffs.some((item) => item.imminent) ? "border-red-300 bg-red-50 text-red-900" : "border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-[hsl(var(--card))] dark:text-white"}`} aria-label="Funding cutoff times">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em]">Funding cutoff</p><p className="mt-1 text-sm">ACH <strong>2:15 PM MST</strong> · Wire <strong>1:15 PM MST</strong> <span className="text-xs opacity-70">(Denver time, daylight changes handled)</span></p></div><div className="flex gap-3 text-xs font-semibold">{cutoffs.map((item) => <span key={item.label} className="ff-dashboard-card ff-sheets-surface px-3 py-2">{item.label}: {cutoffText(item.difference)}</span>)}</div></div>
       </Card>

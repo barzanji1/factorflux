@@ -52,3 +52,4 @@
 - [Document compression](document-compression.md) — persist only compressed uploads; portal document rows need size provenance too; HEIC requires a separate system decoder.
 - [Document identity and viewing](document-identity-viewing.md) — dedupe pending uploads by original bytes and owner; distinguish browser CORS failures from S3 authorization.
 - [Dump statement cadence](dump-statement-cadence.md) — invoice-funded milestones trigger consolidated broker statements; no broker-wide cooldown or catch-up email bursts.
+- [Numeric page policy](numeric-page-policy.md) — insights cover every numeric operational page; summaries use authorized full datasets, and table pages default to 15 in UI and SQL.

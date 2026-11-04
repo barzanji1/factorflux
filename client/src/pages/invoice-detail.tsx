@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { PageInsights } from "@/components/PageInsights";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import ChargebackLifecycle from "@/components/invoices/chargeback-lifecycle";
@@ -787,6 +788,7 @@ export default function InvoiceDetail() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Load Detail" subtitle="Full factoring lifecycle — documents, status, and funding timeline" group="Workspace" neu />
         <NeuPageShell className="custom-scrollbar min-h-0 flex-1 overflow-auto">
+          <PageInsights entity="invoices" entityId={invoiceId} title="Invoice activity" />
           <div className="mx-auto w-full max-w-[1400px] p-6 xl:p-8">
 
             <NeuButton onClick={() => navigate("/invoices")}

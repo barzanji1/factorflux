@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import ClassificationPanel, { type ClassificationData } from "./classification-panel";
+import { SafePaginatedTable } from "@/components/safe-table-pagination";
 
 export type { ClassificationData };
 
@@ -203,7 +204,7 @@ export default function ExtractionResultPanel({ documentId }: Props) {
           No fields could be extracted — this may be a scanned image or handwritten document.
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+        <SafePaginatedTable className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/40">
@@ -214,9 +215,8 @@ export default function ExtractionResultPanel({ documentId }: Props) {
             </thead>
             <tbody>
               {fieldCandidates.map((c, i) => (
-                <>
+                <Fragment key={c.id}>
                   <tr
-                    key={c.id}
                     className={cn(
                       "border-b border-slate-50 dark:border-slate-800/60",
                       i % 2 === 0
@@ -246,11 +246,11 @@ export default function ExtractionResultPanel({ documentId }: Props) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
-        </div>
+        </SafePaginatedTable>
       )}
 
       {/* ── Review section ───────────────────────────────────────────────── */}

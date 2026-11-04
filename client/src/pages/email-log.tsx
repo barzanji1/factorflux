@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import { useLocation, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,7 +51,7 @@ type EmailList = { rows: EmailLogRow[]; total: number; page: number; pageSize: n
 type Agent = { id: string; name: string };
 type ResendResult = { messageId: string; emailLogId: string; warning?: string | null };
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 const ENTITY_TYPES: EntityType[] = ["invoice", "carrier", "broker", "chargeback", "followup"];
 const STATUSES: EmailStatus[] = ["sent", "delivered", "bounced", "complained", "failed"];
 const inputClass = "min-h-10 rounded-xl px-3 text-xs";

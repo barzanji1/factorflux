@@ -4,6 +4,7 @@ import { useAdminToast, AdminPageShell, Button, Badge, Input, Card, CardContent,
 import "@/components/admin-neu/admin-neu-page.css";
 import Sidebar from "@/components/layout/sidebar";
 import { TopNav } from "@/components/admin-neu/adapters";
+import { PageInsights } from "@/components/PageInsights";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -29,6 +30,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton-rows";
 import { cn } from "@/lib/utils";
+import { ServerArrayPagination, useServerArrayPage } from "@/hooks/use-server-array-page";
 import BrokerConfirmationSettings from "@/components/broker-confirmation/settings";
 import { ALL_PERMISSIONS } from "@shared/schema";
 import { getPermissionCatalog, getRolePresetPermissions } from "@/lib/adminPermissions";
@@ -269,10 +271,18 @@ export default function Admin() {
     queryKey: ["/api/admin/doc-requirements"],
   } as any);
 
-  const { data: auditLog = [], isLoading: auditLoading } = useQuery<AuditEntry[]>({
-    queryKey: ["/api/admin/audit-log"],
-    enabled: activeTab === "audit",
-  });
+  const {
+    items: auditLog,
+    total: auditTotal,
+    page: auditPage,
+    pageCount: auditPageCount,
+    isLoading: auditLoading,
+    isFetching: auditFetching,
+    isError: auditError,
+    error: auditErrorValue,
+    refetch: refetchAudit,
+    setPage: setAuditPage,
+  } = useServerArrayPage<AuditEntry>("/api/admin/audit-log", { enabled: activeTab === "audit" });
 
   // ── Time Tracking ────────────────────────────────────────────────────────
   interface TtSummaryRow {
@@ -660,6 +670,7 @@ export default function Admin() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopNav title="Team Settings" subtitle="User roles, permissions, and system configuration" group="Admin" />
         <AdminPageShell className="custom-scrollbar flex-1 overflow-auto p-6">
+          <PageInsights entity="admin" section={activeTab} title={`${TABS.find((tab) => tab.id === activeTab)?.label ?? "Team"} operations`} />
           <div className="max-w-7xl mx-auto space-y-6">
 
             {/* ── Stats row ── */}
@@ -1377,6 +1388,11 @@ export default function Admin() {
                 <CardContent className="p-0">
                   {auditLoading ? (
                     <SkeletonRows rows={8} cols={4} />
+                  ) : auditError ? (
+                    <div role="alert" className="flex items-center justify-between gap-3 p-6 text-sm text-red-700">
+                      <span>{auditErrorValue instanceof Error ? auditErrorValue.message : "Could not load audit history."}</span>
+                      <Button type="button" variant="outline" onClick={() => void refetchAudit()}>Retry</Button>
+                    </div>
                   ) : auditLog.length === 0 ? (
                     <EmptyState icon={ClipboardList} title="No audit events yet" description="System events will appear here as users perform actions." />
                   ) : (
@@ -1404,6 +1420,15 @@ export default function Admin() {
                         );
                       })}
                     </div>
+                  )}
+                  {!auditLoading && !auditError && (
+                    <ServerArrayPagination
+                      page={auditPage}
+                      pageCount={auditPageCount}
+                      total={auditTotal}
+                      onPageChange={setAuditPage}
+                      disabled={auditFetching}
+                    />
                   )}
                 </CardContent>
               </Card>
