@@ -7,7 +7,7 @@ import TopNav from "@/components/layout/top-nav";
 import { FundingButton as Button, FundingInput as Input, FundingCard as Card, FundingDialogContent as DialogContent } from "@/components/funding/funding-controls";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { LoadTypeBadge } from "@/components/load-type";
 import { FundingStatusBadge as FFBadge } from "@/components/funding/funding-status-badge";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import "@/components/funding/funding-neu.css";
 import { NeuButton, NeuPageShell, NeuTable, NeuTabs, NeuTab, NeuTabList } from "@/styles/neu/components";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import { PageInsights } from "@/components/PageInsights";
+import { displayEntityName } from "@/lib/utils";
 
 type QueueRow = {
   id: number;
@@ -145,7 +146,8 @@ export default function FundingQueue() {
       return response.json();
     },
   });
-  const rows = (data?.rows ?? []).filter((row) => SHEETS_REVIEW_STATUSES.includes(row.status));
+  const rows = (data?.rows ?? []).filter((row) => SHEETS_REVIEW_STATUSES.includes(row.status))
+    .map(row => ({ ...row, carrierName: displayEntityName(row.carrierName), brokerName: displayEntityName(row.brokerName) }));
   const { data: carrierResponse } = useQuery<Array<{ id: number; name: string }> | { data: Array<{ id: number; name: string }> }>({ queryKey: ["/api/clients?all=true"] });
   const { data: brokerResponse } = useQuery<Array<{ id: number; name: string }> | { data: Array<{ id: number; name: string }> }>({ queryKey: ["/api/brokers?all=true"] });
   const carriers = Array.isArray(carrierResponse) ? carrierResponse : carrierResponse?.data ?? [];

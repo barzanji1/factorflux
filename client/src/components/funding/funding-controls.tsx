@@ -31,8 +31,8 @@ const sizeClasses: Record<FundingButtonSize, string> = {
 };
 
 const variantClasses: Record<FundingButtonVariant, string> = {
-  default: "!bg-[#e0e0e0] !text-[#168d99] hover:!bg-[#27aab8] hover:!text-white",
-  destructive: "!bg-[#b94e4e] !text-white hover:!bg-[#a94343]",
+  default: "!bg-[#e0e0e0] !text-[#168d99] hover:!bg-[#e0e0e0] hover:!text-[#087f8c]",
+  destructive: "!bg-[#e0e0e0] !text-[#a3483e] hover:!text-[#a3483e]",
   outline: "!border-0 !bg-[#e0e0e0] !text-[#444] hover:!text-[#168d99]",
   secondary: "!bg-[#d5d5d5] !text-[#444]",
   ghost: "!bg-transparent !text-[#444] !shadow-none hover:!bg-[#d5d5d5]",

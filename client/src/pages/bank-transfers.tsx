@@ -8,7 +8,7 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent, FundingDropdownMenuContent as DropdownMenuContent } from "@/components/funding/funding-controls";
 import { CardContent } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectItem, SelectValue } from "@/components/ui/select";

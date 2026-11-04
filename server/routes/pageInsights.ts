@@ -6,7 +6,8 @@ import { z } from "zod";
 const filters = z.object({
   entityId: z.coerce.number().int().positive().optional(),
   clientId: z.coerce.number().int().positive().optional(),
-  section: z.enum(["users", "timetracking", "portal", "factoring", "documents", "audit"]).optional(),
+   section: z.enum(["users", "timetracking", "portal", "factoring", "documents", "audit",
+     "global", "aging", "agent", "agent-performance", "broker", "carrier", "carrier-ar", "chargeback", "daily-ar", "monthly"]).optional(),
 });
 export function registerPageInsightRoutes(app: Express, dependencies: {
   requireAuth: RequestHandler;

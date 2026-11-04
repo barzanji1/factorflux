@@ -10,7 +10,7 @@ import { RiskCard as Card, RiskButton as Button, RiskInput as Input, RiskDialogC
 import { NeuPageShell } from "@/styles/neu/components";
 import "@/components/risk/risk-neu.css";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import {
   Dialog,
   DialogHeader,
@@ -232,7 +232,7 @@ export default function CreditChecks() {
               <CardContent className="p-0">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-20">
-                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                    <div className="grid w-full gap-3 md:grid-cols-3" aria-label="Loading credit reviews">{[0, 1, 2].map(row => <div key={row} className="h-20 animate-pulse rounded-2xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" />)}</div>
                   </div>
                 ) : filtered.length === 0 ? (
                   <div className="py-20 text-center">

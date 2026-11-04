@@ -8,7 +8,7 @@ import { PageInsights } from "@/components/PageInsights";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Download, Check, X, Receipt, Loader2 } from "lucide-react";

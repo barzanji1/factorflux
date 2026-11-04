@@ -5,10 +5,9 @@ import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { PageInsights } from "@/components/PageInsights";
-import { SafePaginatedTable } from "@/components/safe-table-pagination";
 import { FFEmpty } from "@/components/ui/ff-empty";
 import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent } from "@/components/funding/funding-controls";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogHeader, DialogTitle, DialogFooter,
@@ -20,7 +19,8 @@ import { cn } from "@/lib/utils";
 import type { Invoice } from "@shared/schema";
 import { Search, Eye, AlertTriangle, SquareCheck, Square, ChevronRight } from "lucide-react";
 import "@/components/funding/funding-neu.css";
-import { NeuPageShell, NeuTable, NeuTabs, NeuTabList, NeuTab } from "@/styles/neu/components";
+import { NeuPageShell, NeuTable, NeuTableHeader, NeuTableHead, NeuTableBody, NeuTableRow, NeuTableCell, NeuTabs, NeuTabList, NeuTab } from "@/styles/neu/components";
+import { NeuButton } from "@/styles/neu";
 import { FundingStatCard } from "@/components/funding/funding-stat-card";
 import { FundingBadge } from "@/components/funding/funding-badge";
 import { FundingStatusBadge } from "@/components/funding/funding-status-badge";
@@ -262,9 +262,18 @@ export default function Factoring() {
             <Card className="overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3 dark:border-slate-800">
                 <div><h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white"><AlertTriangle className="h-4 w-4 text-amber-500" /> Aging Alerts</h2><p className="text-[11px] text-slate-500">Funded invoices requiring collections follow-up</p></div>
-                <div className="flex gap-1">{(["pending", "resolved"] as const).map(view => <button key={view} onClick={() => setAgingView(view)} className={cn("rounded-full px-3 py-1 text-[11px] font-semibold capitalize", agingView === view ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-600 dark:bg-slate-800")}>{view}</button>)}</div>
+                <div className="flex gap-1">{(["pending", "resolved"] as const).map(view => <NeuButton key={view} onClick={() => setAgingView(view)} className={cn("!min-h-8 rounded-full px-3 py-1 text-[11px] font-semibold capitalize", agingView === view ? "!bg-[#cbdedb] !text-[#146d72]" : "!bg-[#e0e0e0] !text-slate-600")}>{view}</NeuButton>)}</div>
               </div>
-              {agingAlerts.length === 0 ? <p className="px-5 py-7 text-[12px] text-slate-400">No {agingView} aging alerts.</p> : <SafePaginatedTable><table className="ff-data-table w-full min-w-[680px]"><thead><tr><th>Invoice</th><th>Carrier</th><th>Broker</th><th>Days Funded</th><th>Alert</th><th className="pr-5">Action</th></tr></thead><tbody>{agingAlerts.map(alert => { const urgent = alert.alertType === "day_90"; return <tr key={alert.id}><td><button onClick={() => go(`/invoices/${alert.invoiceId}`)} className="font-mono font-semibold text-blue-700 hover:underline dark:text-blue-400">{alert.invoiceNumber}</button></td><td>{alert.carrier ?? "—"}</td><td>{alert.broker ?? "—"}</td><td>{ageDays(alert.fundedAt) ?? "—"}d</td><td><FundingBadge tone={urgent ? "warning" : "accent"}>{urgent ? "90 DAY PAST DUE" : "60 DAY"}</FundingBadge></td><td className="pr-5">{agingView === "pending" && <Button size="sm" onClick={() => acknowledgeAging.mutate(alert.id)} disabled={acknowledgeAging.isPending} className="h-7 text-[11px]">Acknowledge</Button>}</td></tr>; })}</tbody></table></SafePaginatedTable>}
+              {agingAlerts.length === 0 ? <p className="px-5 py-7 text-[12px] text-slate-400">No {agingView} aging alerts.</p> : <NeuTable className="w-full min-w-[680px]"><NeuTableHeader><tr>{["Invoice", "Carrier", "Broker", "Days Funded", "Alert", "Action"].map(label => <NeuTableHead key={label}>{label}</NeuTableHead>)}</tr></NeuTableHeader><NeuTableBody>{agingAlerts.map(alert => {
+                const urgent = alert.alertType === "day_90";
+                return <NeuTableRow key={alert.id}>
+                  <NeuTableCell><NeuButton onClick={() => go(`/invoices/${alert.invoiceId}`)} className="!min-h-7 !bg-transparent !px-1 !py-0 font-mono font-semibold !text-[#168d99] !shadow-none hover:underline">{alert.invoiceNumber}</NeuButton></NeuTableCell>
+                  <NeuTableCell>{alert.carrier ?? "—"}</NeuTableCell><NeuTableCell>{alert.broker ?? "—"}</NeuTableCell>
+                  <NeuTableCell>{ageDays(alert.fundedAt) ?? "—"}d</NeuTableCell>
+                  <NeuTableCell><FundingBadge tone={urgent ? "warning" : "accent"}>{urgent ? "90 DAY PAST DUE" : "60 DAY"}</FundingBadge></NeuTableCell>
+                  <NeuTableCell>{agingView === "pending" && <Button size="sm" onClick={() => acknowledgeAging.mutate(alert.id)} disabled={acknowledgeAging.isPending} className="h-7 text-[11px]">Acknowledge</Button>}</NeuTableCell>
+                </NeuTableRow>;
+              })}</NeuTableBody></NeuTable>}
             </Card>
 
             {/* ── Queue card ─────────────────────────────────────────────── */}
@@ -301,34 +310,35 @@ export default function Factoring() {
                     </span>
                     <div className="h-3.5 w-px bg-blue-200 dark:bg-blue-800" />
                     {bulkActions.map(a => (
-                      <button
+                      <NeuButton
                         key={a.tid}
                         type="button"
                         onClick={() => handleBulk(a)}
                         disabled={doTransition.isPending}
-                        className="rounded-md bg-blue-600 px-3 py-1 text-[11.5px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                        variant="accent"
+                        className="!min-h-8 rounded-xl px-3 py-1 text-[11.5px] font-semibold"
                       >
                         {a.label}
-                      </button>
+                      </NeuButton>
                     ))}
                     {bulkActions.length === 0 && (
                       <span className="text-[11.5px] text-blue-400">No bulk actions for this queue</span>
                     )}
-                    <button
+                    <NeuButton
                       type="button"
                       onClick={() => setSelected(new Set())}
-                      className="ml-auto text-[11.5px] font-medium text-blue-500 hover:text-blue-700"
+                      className="ml-auto !min-h-8 !bg-transparent px-2 text-[11.5px] font-medium !text-[#168d99] !shadow-none hover:underline"
                     >
                       Clear selection
-                    </button>
+                    </NeuButton>
                   </div>
                 )}
               </div>
 
               {/* Table */}
               {isLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                <div className="space-y-3 px-4 py-8" aria-label="Loading invoices">
+                  {[0, 1, 2, 3].map(row => <div key={row} className="grid grid-cols-[1fr_2fr_1fr] gap-4 rounded-xl bg-[#e0e0e0] p-4 shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><span className="h-3 animate-pulse rounded bg-[#ccd5d2]" /><span className="h-3 animate-pulse rounded bg-[#ccd5d2]" /><span className="h-3 animate-pulse rounded bg-[#ccd5d2]" /></div>)}
                 </div>
               ) : rows.length === 0 ? (
                 <div className="py-16">
@@ -340,11 +350,11 @@ export default function Factoring() {
                     <thead>
                       <tr>
                         <th className="w-9 pl-5">
-                          <button type="button" onClick={toggleAll} className="text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300">
+                          <NeuButton type="button" onClick={toggleAll} aria-label="Select all invoices" className="!min-h-8 !w-8 !rounded-full !p-0 !text-slate-500">
                             {selected.size > 0 && selected.size === rows.length
                               ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" />
                               : <Square className="h-3.5 w-3.5" />}
-                          </button>
+                          </NeuButton>
                         </th>
                         <th>Invoice #</th>
                         <th>Load #</th>
@@ -361,20 +371,20 @@ export default function Factoring() {
                         return (
                           <tr key={inv.id} className={cn(isSel && "!bg-blue-50/50 dark:!bg-blue-950/10")}>
                             <td className="pl-5">
-                              <button type="button" onClick={() => toggleRow(inv.id)} className="text-slate-400 hover:text-blue-600">
+                              <NeuButton type="button" onClick={() => toggleRow(inv.id)} aria-label={`Select invoice ${inv.invoiceNumber}`} className="!min-h-8 !w-8 !rounded-full !p-0 !text-[#168d99]">
                                 {isSel
                                   ? <SquareCheck className="h-3.5 w-3.5 text-blue-600" />
                                   : <Square className="h-3.5 w-3.5" />}
-                              </button>
+                              </NeuButton>
                             </td>
                             <td>
-                              <button
+                              <NeuButton
                                 type="button"
                                 onClick={() => go(`/invoices/${inv.id}`)}
-                                className="font-mono text-[12px] font-semibold text-blue-700 hover:underline dark:text-blue-400"
+                                className="!min-h-8 !bg-transparent !px-1 !py-0 font-mono text-[12px] font-semibold !text-[#168d99] !shadow-none hover:underline"
                               >
                                 {inv.invoiceNumber}
-                              </button>
+                              </NeuButton>
                             </td>
                             <td className="text-slate-500 dark:text-slate-400">
                               {inv.loadNumber ?? (inv.loadId ? `#${inv.loadId}` : "—")}
@@ -390,7 +400,7 @@ export default function Factoring() {
                             <td className="pr-5">
                               <div className="flex items-center gap-1.5">
                                 {rowActions.map(action => (
-                                  <button
+                                  <NeuButton
                                     key={action.tid}
                                     type="button"
                                     onClick={() => handleRow(inv, action)}
@@ -398,16 +408,16 @@ export default function Factoring() {
                                     className={actionBtn(action)}
                                   >
                                     {action.label}
-                                  </button>
+                                  </NeuButton>
                                 ))}
-                                <button
+                                <NeuButton
                                   type="button"
                                   onClick={() => go(`/invoices/${inv.id}`)}
                                   title="View detail"
-                                  className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                                  className="!min-h-8 !w-8 !rounded-full !p-0 !text-slate-500"
                                 >
                                   <ChevronRight className="h-3 w-3" />
-                                </button>
+                                </NeuButton>
                               </div>
                             </td>
                           </tr>

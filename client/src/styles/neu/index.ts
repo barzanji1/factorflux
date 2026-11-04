@@ -4,6 +4,7 @@ export {
   NeuButton,
   NeuCard,
   NeuInput,
+  NeuTextarea,
   NeuPageShell,
   NeuSelect,
   NeuStatCard,

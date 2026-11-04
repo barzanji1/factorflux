@@ -106,7 +106,7 @@ const NOTIF_ICON: Record<string, { icon: typeof Info; className: string }> = {
   error:   { icon: XCircle,      className: "text-red-500 bg-red-50 dark:bg-red-950/40" },
 };
 
-export default function TopNav({ title, subtitle, group, neu = false }: TopNavProps) {
+export default function TopNav({ title, subtitle, group, neu = true }: TopNavProps) {
   const { user: authUser, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);

@@ -95,8 +95,7 @@ const navSections: NavSection[] = [
   {
     title: "Communications",
     items: [
-      { name: "Email Log", href: "/email-log", icon: MailOpen, permission: "email_log", staffVisible: true },
-      { name: "Email Client", href: "/client-email", icon: MailOpen, permission: "client_email" },
+      { name: "Email Client", href: "/client-email?tab=log", icon: MailOpen, permission: "email_log", staffVisible: true },
     ],
   },
   {
@@ -173,8 +172,10 @@ function getUserData(): CurrentUser {
 }
 
 function isRouteActive(current: string, href: string) {
-  if (href === "/") return current === "/";
-  return current === href || current.startsWith(`${href}/`);
+  const currentPath = current.split("?")[0];
+  const hrefPath = href.split("?")[0];
+  if (hrefPath === "/") return currentPath === "/";
+  return currentPath === hrefPath || currentPath.startsWith(`${hrefPath}/`);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

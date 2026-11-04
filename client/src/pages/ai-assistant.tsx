@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import { TopNav } from "@/components/admin-neu/adapters";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -363,7 +363,7 @@ export default function AIAssistant() {
                 </div>
                 <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
                   {STARTERS.map((q) => (
-                    <button key={q} onClick={() => send(q)} disabled={isBusy} className="ff-earl-starter px-4 py-3 text-left text-sm transition-colors">{q}</button>
+                    <Button key={q} onClick={() => send(q)} disabled={isBusy} className="ff-earl-starter !min-h-12 w-full justify-start rounded-xl px-4 py-3 text-left text-sm transition-colors">{q}</Button>
                   ))}
                 </div>
               </div>
@@ -416,10 +416,11 @@ export default function AIAssistant() {
                 {emojiOpen && (
                   <div className="ff-earl-emoji-picker absolute bottom-[calc(100%+8px)] right-0 z-20 grid grid-cols-5 gap-1 p-2">
                     {["👍", "✅", "🙂", "🎉", "🚚", "💵", "📄", "⚠️", "🙏", "👋"].map((emoji) => (
-                      <button
+                      <Button
                         key={emoji}
                         type="button"
-                        className="ff-earl-emoji-option"
+                        aria-label={`Insert ${emoji}`}
+                        className="ff-earl-emoji-option !min-h-9 !w-9 !rounded-full !p-0"
                         onClick={() => {
                           setInput((value) => value + emoji);
                           setEmojiOpen(false);
@@ -427,7 +428,7 @@ export default function AIAssistant() {
                         }}
                       >
                         {emoji}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}

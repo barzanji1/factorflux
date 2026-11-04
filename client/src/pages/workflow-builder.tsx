@@ -8,7 +8,7 @@ import { PageInsights } from "@/components/PageInsights";
 import Sidebar from "@/components/layout/sidebar";
 import { TopNav } from "@/components/admin-neu/adapters";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
@@ -208,24 +208,24 @@ function StageCard({
 
           {/* Up/Down buttons */}
           <div className="flex shrink-0 flex-col gap-0.5">
-            <button
+            <Button
               type="button"
               onClick={onMoveUp}
               disabled={disabled || index === 0}
-               className="ff-workflow-icon-button flex h-5 w-5 items-center justify-center text-slate-600 disabled:opacity-20"
+               className="!min-h-8 !h-8 !w-8 !rounded-full !p-0 text-slate-600 disabled:opacity-20"
               title="Move up"
             >
               <ArrowUp className="h-3 w-3" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onMoveDown}
               disabled={disabled || index === total - 1}
-               className="ff-workflow-icon-button flex h-5 w-5 items-center justify-center text-slate-600 disabled:opacity-20"
+               className="!min-h-8 !h-8 !w-8 !rounded-full !p-0 text-slate-600 disabled:opacity-20"
               title="Move down"
             >
               <ArrowDown className="h-3 w-3" />
-            </button>
+            </Button>
           </div>
 
           {/* Step number */}
@@ -294,14 +294,14 @@ function StageCard({
                 {stage.enabled ? "On" : "Off"}
               </span>
             </label>
-            <button
+            <Button
               type="button"
               onClick={onToggleExpand}
-              className="ff-workflow-icon-button flex h-8 w-8 items-center justify-center"
+              className="!min-h-8 !h-8 !w-8 !rounded-full !p-0"
               title={expanded ? "Collapse" : "Configure"}
             >
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -738,24 +738,24 @@ export default function WorkflowBuilder() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* Undo / Redo */}
-                <button
+                <Button
                   type="button"
                   onClick={undo}
                   disabled={!isManager || history.length === 0}
-                   className="ff-workflow-icon-button flex h-8 w-8 items-center justify-center disabled:opacity-30"
+                   className="!min-h-8 !h-8 !w-8 !rounded-full !p-0 disabled:opacity-30"
                   title="Undo (Ctrl+Z)"
                 >
                   <Undo2 className="h-3.5 w-3.5" />
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={redo}
                   disabled={!isManager || future.length === 0}
-                   className="ff-workflow-icon-button flex h-8 w-8 items-center justify-center disabled:opacity-30"
+                   className="!min-h-8 !h-8 !w-8 !rounded-full !p-0 disabled:opacity-30"
                   title="Redo (Ctrl+Y)"
                 >
                   <Redo2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
 
                 <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
 
@@ -818,9 +818,9 @@ export default function WorkflowBuilder() {
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span className="text-[12px] text-amber-700 dark:text-amber-400">
                   You have unsaved changes —
-                  <button onClick={save} className="ml-1 font-semibold underline-offset-2 hover:underline" disabled={saveMutation.isPending}>
+                  <Button onClick={save} className="!min-h-7 !bg-transparent !px-1 !py-0 font-semibold underline-offset-2 !text-[#087f8c] !shadow-none hover:underline" disabled={saveMutation.isPending}>
                     save now
-                  </button>
+                  </Button>
                   {" "}or press <kbd className="rounded bg-amber-100 px-1 py-0.5 text-[10px] dark:bg-amber-900/40">Ctrl+S</kbd>
                 </span>
               </div>

@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import {
   RiskTable as Table,
   RiskTableBody as TableBody,
@@ -444,7 +444,7 @@ export default function FmcsaAuthority() {
             </div>
 
             {hasNoKey && (
-              <div className="flex items-center gap-3 border-2 border-t-white border-l-white border-r-[#808080] border-b-[#808080] bg-[#fff4c2] px-4 py-3 text-[#5f4600] shadow-[2px_2px_0_rgba(128,128,128,0.35)]">
+              <div className="flex items-center gap-3 rounded-xl bg-[#eee7d4] px-4 py-3 text-[#705d32] shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
                 <AlertTriangle className="h-5 w-5 shrink-0" />
                 <p className="text-sm font-bold">
                   FMCSA web key not configured — checks are paused. Add FMCSA_WEBKEY in secrets.
@@ -454,10 +454,10 @@ export default function FmcsaAuthority() {
 
             {runResult && (
               <div className={cn(
-                "border-2 border-t-white border-l-white border-r-[#808080] border-b-[#808080] px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.35)]",
-                runResult.status === "failed" ? "bg-red-50 text-red-900" :
-                  runResult.status === "skipped" ? "bg-amber-50 text-amber-900" :
-                    "bg-green-50 text-green-900",
+                "rounded-xl px-4 py-3 shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]",
+                runResult.status === "failed" ? "bg-[#eee1dd] text-[#9a4941]" :
+                  runResult.status === "skipped" ? "bg-[#eee7d4] text-[#705d32]" :
+                    "bg-[#dceae3] text-[#34634d]",
               )}>
                 <p className="text-sm font-bold">
                   Run #{runResult.runId}: {runResult.status}

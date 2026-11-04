@@ -70,7 +70,7 @@ function addressList(addresses: string[]) {
   return addresses.length ? addresses.join(", ") : "—";
 }
 
-export default function EmailLog() {
+export function EmailLogPanel() {
   const [, navigate] = useLocation();
   const queryString = useSearch();
   const queryEmailId = new URLSearchParams(queryString).get("emailId");
@@ -411,3 +411,5 @@ export default function EmailLog() {
 function FragmentRow({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
+
+export default EmailLogPanel;

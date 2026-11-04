@@ -8,6 +8,7 @@ import React, {
   type HTMLAttributes,
   type InputHTMLAttributes,
   type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
   type TableHTMLAttributes,
   type ThHTMLAttributes,
   type TdHTMLAttributes,
@@ -39,22 +40,32 @@ export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
 NeuCard.displayName = "NeuCard";
 
 export interface NeuButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "accent";
+  variant?: "default" | "accent" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  size?: "default" | "sm" | "lg" | "icon";
 }
 
 export const NeuButton = forwardRef<HTMLButtonElement, NeuButtonProps>(
-  ({ className, variant = "default", type = "button", disabled, ...props }, ref) => (
+  ({ className, variant = "default", size = "default", type = "button", disabled, ...props }, ref) => (
     <button
       ref={ref}
       type={type}
       disabled={disabled}
       className={cn(
-        "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-[transform,box-shadow,background-color] duration-150",
-        "bg-[#e0e0e0] text-[#333333] active:translate-y-px active:shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
-        "disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:shadow-[-7px_-7px_16px_#ffffff,7px_7px_16px_#b8b8b8]",
+        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-[transform,box-shadow,background-color,color] duration-150",
+        size === "sm" ? "min-h-8 px-3 py-1.5 text-xs" : size === "lg" ? "min-h-11 px-8 py-2.5 text-base" : size === "icon" ? "h-9 min-h-9 w-9 px-0 py-0" : "min-h-11 px-5 py-2.5 text-sm",
         variant === "accent"
-          ? "bg-[#27aab8] text-[#ffffff] shadow-[-5px_-5px_12px_#ffffff,5px_5px_12px_#b8b8b8] active:bg-[#2398a4]"
-          : neuTokenClasses.convex,
+          ? "bg-[#e0e0e0] text-[#168d99] hover:bg-[#e0e0e0] hover:text-[#087f8c]"
+          : variant === "destructive"
+            ? "bg-[#e0e0e0] text-[#a3483e] hover:text-[#a3483e]"
+            : variant === "secondary"
+              ? "bg-[#d5d5d5] text-[#444444] shadow-[-4px_-4px_9px_#ffffff,4px_4px_9px_#c1c1c1] hover:text-[#168d99]"
+              : variant === "ghost"
+                ? "bg-transparent text-[#444444] shadow-none hover:bg-[#d5d5d5] hover:text-[#168d99]"
+                : variant === "link"
+                  ? "bg-transparent text-[#168d99] shadow-none underline-offset-4 hover:underline"
+                  : "bg-[#e0e0e0] text-[#333333] hover:text-[#168d99] active:shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        variant !== "ghost" && variant !== "link" ? neuTokenClasses.convex : "",
+        "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0",
         neuTokenClasses.focus,
         className,
       )}
@@ -79,6 +90,22 @@ export const NeuInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
   ),
 );
 NeuInput.displayName = "NeuInput";
+
+export const NeuTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  ({ className, ...props }, ref) => (
+    <textarea
+      ref={ref}
+      className={cn(
+        "min-h-24 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-3 text-sm !text-[#333333] placeholder:text-[#888888]",
+        "!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]",
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+NeuTextarea.displayName = "NeuTextarea";
 
 export interface NeuSelectOption {
   value: string;

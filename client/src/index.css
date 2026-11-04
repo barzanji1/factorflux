@@ -607,36 +607,35 @@
   to   { transform: rotate(360deg); }
 }
 
-/* ─── FactorFlux operating system skin ───────────────────────────────────
-   Canonical tactile palette. Keep this block last so shared primitives and
-   legacy modules converge on one deliberate visual language. */
+/* ─── FactorFlux workspace palette ────────────────────────────────────────
+   Light stone neumorphism with a restrained teal interaction accent. */
 :root {
-  --ff-bg: #d4d0c8;
-  --ff-surface: #ffffff;
-  --ff-surface-subtle: #f0f0f0;
-  --ff-surface-tint: #c0c0c0;
-  --ff-border: #808080;
-  --ff-border-strong: #404040;
-  --ff-border-focus: #098b9f;
-  --ff-primary: #27aab8;
-  --ff-primary-dark: #098b9f;
+  --ff-bg: #e0e0e0;
+  --ff-surface: #e0e0e0;
+  --ff-surface-subtle: #d9dfdd;
+  --ff-surface-tint: #d4dbd8;
+  --ff-border: #c9d1ce;
+  --ff-border-strong: #8b9995;
+  --ff-border-focus: #168d99;
+  --ff-primary: #e0e0e0;
+  --ff-primary-dark: #168d99;
   --ff-raised-highlight: #ffffff;
-  --ff-raised-shadow: #808080;
-  --ff-inset-shadow: #808080;
-  --ff-panel-header: #404040;
-  --ff-card-radius: 22px;
-  --ff-text-0: #1a1a1a;
-  --ff-text-1: #444444;
-  --ff-text-2: #666666;
-  --ff-text-3: #808080;
-  --ff-r-xs: 0px;
-  --ff-r-sm: 2px;
-  --ff-r-md: 3px;
-  --ff-r-lg: 4px;
-  --ff-r-xl: 5px;
-  --ff-shadow-xs: 1px 1px 0 #808080, -1px -1px 0 #ffffff;
-  --ff-shadow-sm: 2px 2px 0 #808080, -2px -2px 0 #ffffff;
-  --ff-shadow-md: 3px 3px 0 #808080, -3px -3px 0 #ffffff;
+  --ff-raised-shadow: #b8b8b8;
+  --ff-inset-shadow: #b8b8b8;
+  --ff-panel-header: #e0e0e0;
+  --ff-card-radius: 16px;
+  --ff-text-0: #344244;
+  --ff-text-1: #596d70;
+  --ff-text-2: #74827f;
+  --ff-text-3: #8a9692;
+  --ff-r-xs: 8px;
+  --ff-r-sm: 10px;
+  --ff-r-md: 12px;
+  --ff-r-lg: 16px;
+  --ff-r-xl: 20px;
+  --ff-shadow-xs: -3px -3px 7px #ffffff, 3px 3px 7px #b8b8b8;
+  --ff-shadow-sm: -4px -4px 9px #ffffff, 4px 4px 9px #b8b8b8;
+  --ff-shadow-md: -6px -6px 14px #ffffff, 6px 6px 14px #b8b8b8;
 }
 
 body {
@@ -646,128 +645,145 @@ body {
 }
 
 .ff-card, .qc-card {
-  border: 2px solid;
-  border-color: var(--ff-raised-highlight) var(--ff-raised-shadow) var(--ff-raised-shadow) var(--ff-raised-highlight);
-  border-radius: 0;
+  border: 0;
+  border-radius: var(--ff-card-radius);
   background: var(--ff-surface);
-  box-shadow: none;
-}
-.ff-card-interactive:hover, .qc-card-hover:hover {
-  border-color: #27aab8 #098b9f #098b9f #27aab8;
   box-shadow: var(--ff-shadow-sm);
 }
-.ff-btn-primary, .qc-button-primary {
-  border: 2px solid;
-  border-color: #fff #4a4a4a #4a4a4a #fff;
-  border-radius: 2px;
-  background: var(--ff-primary);
-  color: #fff;
-  text-shadow: 1px 1px rgba(0,0,0,.25);
+.ff-card-interactive:hover, .qc-card-hover:hover {
+  color: #168d99;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
 }
-.ff-btn-primary:hover, .qc-button-primary:hover { background: #098b9f; }
+.ff-btn-primary, .qc-button-primary {
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  color: #168d99;
+  box-shadow: var(--ff-shadow-xs);
+  text-shadow: none;
+}
+.ff-btn-primary:hover, .qc-button-primary:hover { background: #e0e0e0; color: #087f8c; }
 .ff-btn-primary:active, .qc-button-primary:active,
 .ff-btn-secondary:active, .qc-button-secondary:active,
-.ff-btn-danger:active { border-color: #4a4a4a #fff #fff #4a4a4a; }
+.ff-btn-danger:active { box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff; }
 .ff-btn-secondary, .qc-button-secondary {
-  border: 2px solid;
-  border-color: var(--ff-raised-highlight) var(--ff-raised-shadow) var(--ff-raised-shadow) var(--ff-raised-highlight);
-  border-radius: 2px;
-  background: #d4d0c8;
-  color: #1a1a1a;
-  text-shadow: 1px 1px #fff;
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  color: #596d70;
+  box-shadow: var(--ff-shadow-xs);
+  text-shadow: none;
 }
 .ff-btn-danger {
-  border: 2px solid;
-  border-color: #fff #660000 #660000 #fff;
-  border-radius: 2px;
-  background: #cc0000;
-  color: #fff;
-  text-shadow: 1px 1px rgba(0,0,0,.3);
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  color: #a3483e;
+  box-shadow: var(--ff-shadow-xs);
+  text-shadow: none;
 }
-.ff-btn-danger:hover { background: #a80000; }
+.ff-btn-danger:hover { background: #e0e0e0; color: #a3483e; }
 .ff-input, .qc-topbar-search {
-  border: 2px solid;
-  border-color: var(--ff-inset-shadow) var(--ff-raised-highlight) var(--ff-raised-highlight) var(--ff-inset-shadow);
-  border-radius: 0;
-  background: #fff;
-  box-shadow: none;
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
 }
 .ff-input:focus, .qc-topbar-search:focus {
-  border-color: #098b9f;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.15), 0 0 0 1px #27aab8;
+  border-color: transparent;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff, 0 0 0 2px #8abeb8;
 }
-.ff-data-table tbody tr:nth-child(odd) { background: #f0f0f0; }
-.ff-data-table tbody tr:hover { background: #dff5f6; box-shadow: inset 3px 0 #27aab8; }
+.ff-data-table tbody tr:nth-child(odd),
+.ff-data-table tbody tr:nth-child(even) { background: transparent; }
+.ff-data-table tbody tr:hover { background: #d7e5e2; }
 
 /* Shared surface contract */
 .ff-card, .qc-card {
-  box-shadow: 2px 2px 0 #808080, -2px -2px 0 #fff;
+  box-shadow: var(--ff-shadow-sm);
 }
 .ff-card > :first-child,
-.qc-card > :first-child { border-top-left-radius: 0; border-top-right-radius: 0; }
+.qc-card > :first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
 .ff-card h1, .ff-card h2, .ff-card h3,
 .qc-card h1, .qc-card h2, .qc-card h3 { letter-spacing: -0.02em; }
 
-/* Dense operational controls */
+/* Shared controls: quiet relief, clear teal interaction, muted data. */
 .ff-btn-primary, .qc-button-primary,
 [data-button-variant="default"] {
-  min-height: 32px;
-  background: #27aab8 !important;
-  border-color: #fff #098b9f #098b9f #fff !important;
+  min-height: 38px;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
 }
 .ff-btn-primary:hover, .qc-button-primary:hover,
-[data-button-variant="default"]:hover:not(:disabled) { background: #098b9f !important; }
+[data-button-variant="default"]:hover:not(:disabled) { background: #e0e0e0 !important; color:#087f8c!important; }
 .ff-btn-secondary, .qc-button-secondary,
 [data-button-variant="secondary"], [data-button-variant="outline"] {
-  min-height: 32px;
-  background: #d4d0c8 !important;
-  border-color: #fff #808080 #808080 #fff !important;
+  min-height: 38px;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  color: #596d70 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
 }
 .ff-btn-danger, [data-button-variant="destructive"] {
-  background: #b51f1f !important;
-  border-color: #fff #6e1111 #6e1111 #fff !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
 }
-.ff-btn-danger:hover, [data-button-variant="destructive"]:hover:not(:disabled) { background: #8f1f1f !important; }
+.ff-btn-danger:hover, [data-button-variant="destructive"]:hover:not(:disabled) { background: #e0e0e0 !important; color:#a3483e!important; }
 .ff-input, .qc-topbar-search {
-  min-height: 32px;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  min-height: 40px;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 .ff-input:focus, .qc-topbar-search:focus {
-  border-color: #098b9f !important;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18), 0 0 0 1px #27aab8 !important;
+  border-color: transparent !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff, 0 0 0 2px #8abeb8 !important;
 }
 .ff-data-table thead th {
-  background: var(--ff-panel-header);
-  color: #fff !important;
-  border-bottom: 2px solid #808080;
+  background: #d5d8d7;
+  color: #697875 !important;
+  border-bottom: 1px solid #c9d1ce;
 }
-.ff-data-table tbody tr:nth-child(even) { background: #fff; }
-.ff-data-table tbody tr:hover {
-  background: #dff5f6 !important;
-  box-shadow: inset 3px 0 #27aab8;
-}
-.ff-data-table tbody td { color: #1a1a1a !important; }
+.ff-data-table tbody tr:nth-child(even),
+.ff-data-table tbody tr:nth-child(odd) { background: transparent; }
+.ff-data-table tbody tr:hover { background: #d7e5e2 !important; }
+.ff-data-table tbody td { color: #344244 !important; }
 .uppercase, [data-label] { letter-spacing: .08em; }
 
-/* Canonical reusable retro surfaces. Pages should compose these instead of
+/* Canonical reusable soft surfaces. Pages should compose these instead of
    defining their own card, statistic, header, table, or field chrome. */
 .ff-panel-header {
-  border-bottom: 2px solid var(--ff-raised-shadow);
-  background: var(--ff-surface-tint);
+  border-bottom: 1px solid var(--ff-border);
+  background: var(--ff-surface);
   color: var(--ff-text-0);
   font-weight: 700;
 }
 .ff-stat-card {
-  border: 2px solid;
-  border-color: var(--ff-raised-highlight) var(--ff-raised-shadow) var(--ff-raised-shadow) var(--ff-raised-highlight);
+  border: 0;
+  border-radius: 16px;
   background: var(--ff-surface);
-  box-shadow: 2px 2px 0 var(--ff-raised-shadow), -1px -1px 0 var(--ff-raised-highlight);
+  box-shadow: var(--ff-shadow-sm);
 }
 .ff-stat-value { color: var(--ff-primary-dark); font-weight: 800; }
 
-:is(.ff-app-shell, .ff-portal-shell) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
-:is(.ff-app-shell, .ff-portal-shell) textarea,
-:is(.ff-app-shell, .ff-portal-shell) select {
+.ff-app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+.ff-app-shell textarea,
+.ff-app-shell select {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+}
+.ff-portal-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+.ff-portal-shell textarea,
+.ff-portal-shell select {
   border: 2px solid !important;
   border-color: var(--ff-inset-shadow) var(--ff-raised-highlight) var(--ff-raised-highlight) var(--ff-inset-shadow) !important;
   border-radius: 0 !important;
@@ -778,26 +794,26 @@ body {
 /* ─── Shared button and active-control contract ─────────────────────────── */
 :root,
 .dark {
-  --background: 40 11% 80%;
-  --foreground: 0 0% 10%;
-  --muted: 40 9% 74%;
-  --muted-foreground: 0 0% 27%;
-  --border: 0 0% 66%;
-  --input: 0 0% 100%;
-  --primary: 182 56% 41%;
+  --background: 0 0% 88%;
+  --foreground: 0 0% 20%;
+  --muted: 150 7% 83%;
+  --muted-foreground: 160 7% 42%;
+  --border: 150 8% 80%;
+  --input: 0 0% 88%;
+  --primary: 185 72% 37%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 40 9% 74%;
-  --secondary-foreground: 0 0% 10%;
-  --accent: 183 49% 28%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 62% 42%;
+  --secondary: 150 7% 83%;
+  --secondary-foreground: 160 7% 30%;
+  --accent: 177 27% 87%;
+  --accent-foreground: 185 72% 29%;
+  --destructive: 7 43% 46%;
   --destructive-foreground: 0 0% 100%;
-  --ring: 183 49% 28%;
-  --radius: 0.18rem;
-  --button-primary-hover: #246669;
-  --button-secondary-hover: #cfe9ea;
-  --button-subtle-hover: #e5f3f3;
-  --button-destructive-hover: #8f1f1f;
+  --ring: 177 31% 48%;
+  --radius: 1rem;
+  --button-primary-hover: #dfe8e5;
+  --button-secondary-hover: #dfe8e5;
+  --button-subtle-hover: #dfe8e5;
+  --button-destructive-hover: #e8ddd9;
 }
 
 body {
@@ -806,13 +822,10 @@ body {
 }
 
 .bevel-button {
-  border: 2px solid !important;
-  border-color: #ffffff #727272 #727272 #ffffff !important;
-  border-radius: 1px !important;
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.55),
-    inset -1px -1px 0 rgba(64, 64, 64, 0.18),
-    1px 1px 0 rgba(35, 35, 35, 0.28);
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8;
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease,
@@ -821,68 +834,61 @@ body {
 }
 
 .bevel-button:active:not(:disabled) {
-  transform: translate(1px, 1px);
-  border-color: #727272 #ffffff #ffffff #727272 !important;
-  box-shadow: inset 1px 1px 1px rgba(40, 40, 40, 0.24);
+  transform: translateY(1px);
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
 }
 
 .ff-sidebar-button {
-  border: 2px solid;
-  border-color: #ffffff #777777 #777777 #ffffff;
-  border-radius: 1px;
-  background: #c8c8c8;
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.45),
-    1px 1px 0 rgba(48, 48, 48, 0.2);
-  color: #1a1a1a;
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8;
+  color: #344244;
   text-shadow: none;
 }
 
 .ff-sidebar-button:hover {
-  background: #d4d0c8;
-  border-color: #ffffff #666666 #666666 #ffffff;
+  background: #e0e0e0;
+  color: #168d99;
 }
 
 .ff-sidebar-button[aria-current="page"] {
-  background: #c8e7e9;
-  border-color: #ffffff #6f8587 #6f8587 #ffffff;
-  box-shadow:
-    inset 3px 0 0 #27aab8,
-    inset 1px 1px 0 rgba(255, 255, 255, 0.5),
-    1px 1px 0 rgba(48, 48, 48, 0.2);
+  background: #e0e0e0;
+  color: #168d99;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
 }
 
 .ff-sidebar-button:active {
-  border-color: #777777 #ffffff #ffffff #777777;
-  box-shadow: inset 1px 1px 1px rgba(40, 40, 40, 0.24);
-  transform: translate(1px, 1px);
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  transform: translateY(1px);
 }
 
 [data-button-variant="default"]:hover:not(:disabled) {
-  background-color: var(--button-primary-hover) !important;
-  color: #fff !important;
+  background-color: #e0e0e0 !important;
+  color: #087f8c !important;
 }
 
 [data-button-variant="secondary"]:hover:not(:disabled),
 [data-button-variant="outline"]:hover:not(:disabled) {
   background-color: var(--button-secondary-hover) !important;
-  color: #1a1a1a !important;
+  color: #168d99 !important;
 }
 
 [data-button-variant="ghost"]:hover:not(:disabled),
 [data-button-variant="link"]:hover:not(:disabled) {
   background-color: var(--button-subtle-hover) !important;
-  color: #1a1a1a !important;
+  color: #168d99 !important;
 }
 
 [data-button-variant="destructive"]:hover:not(:disabled) {
-  background-color: var(--button-destructive-hover) !important;
-  color: #fff !important;
+  background-color: #e0e0e0 !important;
+  color: #a3483e !important;
 }
 
 [data-state="on"] {
-  background-color: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
+  background-color: #e0e0e0;
+  color: #168d99;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 *:focus-visible {
@@ -905,11 +911,21 @@ body {
   }
 }
 
-/* ─── Scoped legacy normalization ─────────────────────────────────────────
-   The operating system skin is intentionally scoped to application and
-   carrier-portal shells. This lets older modules converge without touching
-   public/third-party surfaces or semantic status colors. */
-.ff-app-shell,
+/* ─── Authenticated app surfaces ───────────────────────────────────────────
+   The main workspace converges on soft neumorphic geometry. Keep the
+   carrier portal's separate legacy variables isolated. */
+.ff-app-shell {
+  --ff-shell-bg: #e0e0e0;
+  --ff-shell-surface: #e0e0e0;
+  --ff-shell-muted: #e0e0e0;
+  --ff-shell-rail: #d6ddda;
+  --ff-shell-border: #c9d1ce;
+  --ff-shell-ink: #344244;
+  --ff-shell-copy: #596d70;
+  --ff-shell-teal: #168d99;
+  --ff-shell-teal-light: #d7e5e2;
+}
+
 .ff-portal-shell {
   --ff-shell-bg: #d4d0c8;
   --ff-shell-surface: #fff;
@@ -922,19 +938,20 @@ body {
   --ff-shell-teal-light: #dff5f6;
 }
 
-/* Old rounded SaaS geometry becomes compact, tactile controls. Avatars,
-   pills, and status dots remain rounded-full by design. */
-.ff-app-shell :is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"], [class~="rounded-[20px]"], [class~="rounded-[18px]"], [class~="rounded-[16px]"], [class~="rounded-[14px]"], [class~="rounded-[12px]"], [class~="rounded-[10px]"], [class~="rounded-[9px]"]):not([class~="rounded-full"]),
-.ff-portal-shell :is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"], [class~="rounded-[20px]"], [class~="rounded-[18px]"], [class~="rounded-[16px]"], [class~="rounded-[14px]"], [class~="rounded-[12px]"], [class~="rounded-[10px]"], [class~="rounded-[9px]"]):not([class~="rounded-full"]) {
-  border-radius: 2px !important;
+/* Keep page geometry soft, tactile, and consistent in the authenticated app. */
+.ff-app-shell :is([class~="rounded-xl"], [class~="rounded-[12px]"], [class~="rounded-[10px]"], [class~="rounded-[9px]"]):not([class~="rounded-full"]),
+.ff-app-shell :is([class~="rounded-[10px]"], [class~="rounded-[9px]"]):not([class~="rounded-full"]) {
+  border-radius: 12px !important;
 }
+.ff-app-shell :is([class~="rounded-2xl"], [class~="rounded-3xl"], [class~="rounded-[20px]"], [class~="rounded-[18px]"], [class~="rounded-[16px]"], [class~="rounded-[14px]"]):not([class~="rounded-full"]) { border-radius: 16px !important; }
+.ff-portal-shell :is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"], [class~="rounded-[20px]"], [class~="rounded-[18px]"], [class~="rounded-[16px]"], [class~="rounded-[14px]"], [class~="rounded-[12px]"], [class~="rounded-[10px]"], [class~="rounded-[9px]"]):not([class~="rounded-full"]) { border-radius: 2px !important; }
 
-/* Neutral legacy palette: slate/gray utilities are not status semantics. */
+/* Neutralize residual utility-based controls without flattening status tones. */
 .ff-app-shell :is([class~="text-slate-900"], [class~="text-slate-800"], [class~="text-slate-700"], [class~="text-slate-600"], [class~="text-slate-500"], [class~="text-slate-400"], [class~="text-gray-900"], [class~="text-gray-800"], [class~="text-gray-700"], [class~="text-gray-600"], [class~="text-gray-500"], [class~="text-gray-400"]),
 .ff-portal-shell :is([class~="text-slate-900"], [class~="text-slate-800"], [class~="text-slate-700"], [class~="text-slate-600"], [class~="text-slate-500"], [class~="text-slate-400"], [class~="text-gray-900"], [class~="text-gray-800"], [class~="text-gray-700"], [class~="text-gray-600"], [class~="text-gray-500"], [class~="text-gray-400"]) {
   color: var(--ff-shell-copy) !important;
 }
-.ff-app-shell :is([class~="bg-slate-50"], [class~="bg-slate-100"], [class~="bg-slate-200"], [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"]) ,
+.ff-app-shell :is([class~="bg-white"], [class~="bg-slate-50"], [class~="bg-slate-100"], [class~="bg-slate-200"], [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"]),
 .ff-portal-shell :is([class~="bg-slate-50"], [class~="bg-slate-100"], [class~="bg-slate-200"], [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"]) {
   background-color: var(--ff-shell-muted) !important;
 }
@@ -953,37 +970,37 @@ body {
 .ff-portal-shell :is([class~="bg-blue-50"], [class~="bg-blue-100"]) {
   background-color: var(--ff-shell-teal-light) !important;
 }
-.ff-app-shell :is([class~="bg-blue-600"], [class~="bg-blue-700"]),
-.ff-portal-shell :is([class~="bg-blue-600"], [class~="bg-blue-700"]) {
-  background-color: #27aab8 !important;
-  color: #fff !important;
+.ff-app-shell :is([class~="bg-blue-600"], [class~="bg-blue-700"]) {
+  background-color: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
 }
-.ff-app-shell :is([class~="hover:bg-blue-600"], [class~="hover:bg-blue-700"]):hover,
-.ff-portal-shell :is([class~="hover:bg-blue-600"], [class~="hover:bg-blue-700"]):hover {
-  background-color: #098b9f !important;
-  color: #fff !important;
+.ff-app-shell :is([class~="hover:bg-blue-600"], [class~="hover:bg-blue-700"]):hover {
+  background-color: #e0e0e0 !important;
+  color: #087f8c !important;
 }
+.ff-portal-shell :is([class~="bg-blue-600"], [class~="bg-blue-700"]) { background-color:#27aab8!important;color:#fff!important; }
+.ff-portal-shell :is([class~="hover:bg-blue-600"], [class~="hover:bg-blue-700"]):hover { background-color:#098b9f!important;color:#fff!important; }
 .ff-app-shell :is([class~="border-blue-100"], [class~="border-blue-200"], [class~="border-blue-300"]),
 .ff-portal-shell :is([class~="border-blue-100"], [class~="border-blue-200"], [class~="border-blue-300"]) {
   border-color: #27aab8 !important;
 }
 
-/* Shared shell surfaces and menus carry a Windows-era embossed panel edge. */
+/* White legacy tiles become calm raised surfaces. */
 .ff-app-shell :is(.ff-card, .qc-card, [class~="bg-white"], [class~="bg-slate-50"]),
 .ff-portal-shell :is(.ff-card, .qc-card, [class~="bg-white"]) {
   color: var(--ff-shell-ink);
 }
 .ff-app-shell .ff-dashboard-card {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff !important;
-  border-radius: var(--ff-card-radius) !important;
-  background: #fff !important;
-  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff !important;
+  border: 0;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
 }
-.ff-app-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]),
-.ff-portal-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]) {
-  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff !important;
+.ff-app-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]) {
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
 }
+.ff-portal-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]) { box-shadow:2px 2px 0 #808080,-1px -1px 0 #fff!important; }
 
 /* The requested application theme is light. Neutralize legacy dark-only
    slate islands without changing semantic red, amber, or emerald states. */
@@ -1000,14 +1017,14 @@ body {
   border-color: var(--ff-shell-border) !important;
 }
 
-.ff-top-nav [class~="rounded-xl"],
-.ff-top-nav [class~="rounded-2xl"],
-.ff-top-nav [class~="rounded-3xl"] {
-  border-radius: 2px !important;
+.ff-app-shell .ff-top-nav [class~="rounded-xl"],
+.ff-app-shell .ff-top-nav [class~="rounded-2xl"],
+.ff-app-shell .ff-top-nav [class~="rounded-3xl"] {
+  border-radius: 12px !important;
 }
-.ff-top-nav-menu [class~="rounded-xl"],
-.ff-top-nav-menu [class~="rounded-2xl"] {
-  border-radius: 2px !important;
+.ff-app-shell .ff-top-nav-menu [class~="rounded-xl"],
+.ff-app-shell .ff-top-nav-menu [class~="rounded-2xl"] {
+  border-radius: 12px !important;
 }
 
 /* Carriers establishes the canonical card geometry. Keep every card-like
@@ -1354,11 +1371,10 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-audit-detail {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 12px !important;
-  background: #fff;
-  box-shadow: 2px 2px 0 rgba(128,128,128,.55);
+  border: 0;
+  border-radius: 16px !important;
+  background: #e0e0e0;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8;
 }
 
 .ff-audit-detail table {
@@ -1367,14 +1383,17 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-audit-detail tr:nth-child(even) td {
-  background: #f8f8f5;
+  background: #d9dddb;
 }
 
 .ff-followups-surface,
 .ff-followups-page .ff-card,
 .ff-app-shell .ff-followups-page .ff-followups-surface,
 .ff-portal-shell .ff-followups-page .ff-followups-surface {
-  border-radius: 12px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
 }
 
 .ff-followups-surface > :first-child,
@@ -1391,56 +1410,59 @@ div:has(> table.ff-data-table) {
 
 .ff-followups-expanded {
   margin: 0 10px 10px;
-  border-radius: 12px;
-  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #fff;
+  border-radius: 14px;
+  background: #e0e0e0;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
 }
 
 .ff-followup-step {
-  box-shadow: 1px 1px 0 #808080, -1px -1px 0 #fff;
+  border: 0 !important;
+  background: #e0e0e0 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8 !important;
 }
 
 .ff-followups-page .ff-followups-surface,
 .ff-followups-page .ff-card {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  background-color: #fff;
-  box-shadow: 2px 2px 0 rgba(128,128,128,.55);
+  border: 0;
+  background-color: #e0e0e0;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
 }
 
 .ff-followups-page :is(input, textarea, button[role="combobox"]).ff-followups-field,
 .ff-followups-page .ff-followups-field {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 8px !important;
-  background: #fff !important;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.15) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
 .ff-followups-page input:not([type="checkbox"]):not([type="radio"]),
 .ff-followups-page textarea,
 .ff-followups-page button[role="combobox"] {
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .ff-followups-switch {
-  border: 2px solid #808080 !important;
-  background: #b7b7b7 !important;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.28) !important;
+  border: 0 !important;
+  background: #c4cbc8 !important;
+  box-shadow: inset 2px 2px 4px #aab3b0, inset -2px -2px 4px #e8efed !important;
 }
 
 .ff-followups-switch[data-state="checked"] {
-  border-color: #087888 !important;
-  background: #27aab8 !important;
+  background: #258f98 !important;
+  box-shadow: inset 2px 2px 4px #176b72, inset -2px -2px 4px #5bb3b7 !important;
 }
 
 .ff-followups-task-card,
 .ff-followups-automation-row,
 .ff-followups-template-card {
-  background: #fff !important;
+  border: 0 !important;
+  background: #e0e0e0 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
 }
 
 .ff-followups-automation-row > div:first-child:hover {
-  background: #dff5f6;
+  background: #d9e8e6;
 }
 
 .ff-followups-source-rules,
@@ -1486,7 +1508,10 @@ div:has(> table.ff-data-table) {
 .ff-reports-page .ff-card,
 .ff-app-shell .ff-reports-page .ff-reports-surface,
 .ff-portal-shell .ff-reports-page .ff-reports-surface {
-  border-radius: 12px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
 }
 
 .ff-reports-page .ff-card > :first-child,
@@ -1502,31 +1527,34 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-reports-page .ff-card {
-  background: #fff;
+  background: #e0e0e0;
 }
 
 .ff-reports-tabs {
-  border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
-  background: #c0c0c0;
+  border: 0;
+  border-radius: 16px;
+  background: #e0e0e0;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
 }
 
 .ff-reports-tab {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  background: #d4d0c8;
-  color: #444;
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  color: #465a56;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1;
 }
 
 .ff-reports-tab.is-active {
-  border-color: #808080 #fff #fff #808080;
-  background: #fff;
+  background: #e0e0e0;
   color: #087d8d;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
 }
 
 .ff-reports-section-header {
-  background: #c0c0c0 !important;
-  box-shadow: inset 1px 1px 0 #fff;
+  border-bottom: 1px solid #c9d1ce;
+  background: #e0e0e0 !important;
+  box-shadow: none;
 }
 
 .ff-reports-link {
@@ -1535,39 +1563,37 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-reports-link:hover {
-  background: #dff5f6;
+  background: #d7e5e2;
   color: #087d8d;
 }
 
 .ff-reports-bucket {
-  box-shadow: 1px 1px 0 #808080, -1px -1px 0 #fff;
+  background: #e0e0e0;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-reports-page input:not([type="checkbox"]):not([type="radio"]),
 .ff-reports-page textarea,
 .ff-reports-page [role="combobox"] {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 0 !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
-.ff-reports-page .ff-data-table tbody tr:nth-child(odd) {
-  background: #fff;
-}
-
-.ff-reports-page .ff-data-table tbody tr:nth-child(even) {
-  background: #f0f0f0;
-}
+.ff-reports-page .ff-data-table tbody tr:nth-child(odd),
+.ff-reports-page .ff-data-table tbody tr:nth-child(even) { background: transparent; }
 
 .ff-reports-page .ff-data-table tbody tr:hover {
-  background: #dff5f6;
+  background: #d7e5e2;
 }
 
 .ff-admin-surface,
 .ff-admin-page .ff-card {
-  border-radius: 12px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
 }
 
 .ff-admin-surface > :first-child,
@@ -1583,49 +1609,51 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-admin-page .ff-card {
-  background: #fff;
+  background: #e0e0e0;
 }
 
 .ff-admin-tabs {
-  border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
-  background: #c0c0c0;
+  border: 0;
+  border-radius: 16px;
+  background: #e0e0e0;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
 }
 
 .ff-admin-tab {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  background: #d4d0c8;
-  color: #444;
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  color: #465a56;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1;
 }
 
 .ff-admin-tab.is-active {
-  border-color: #808080 #fff #fff #808080;
-  background: #fff;
+  background: #e0e0e0;
   color: #087d8d;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
 }
 
 .ff-admin-role-admin {
-  border-color: #d8b4fe;
-  background: #7e22ce;
-  color: #fff;
+  border-color: #b8d4ce;
+  background: #d9e8e4;
+  color: #27635e;
 }
 
 .ff-admin-role-manager {
-  border-color: #93c5fd;
-  background: #2563eb;
-  color: #fff;
+  border-color: #c9d6c8;
+  background: #e1eadc;
+  color: #4b6e55;
 }
 
 .ff-admin-role-employee {
-  border-color: #b8b8b8;
-  background: #e5e5e5;
-  color: #444;
+  border-color: #ccd2ce;
+  background: #e0e0e0;
+  color: #596a64;
 }
 
-.ff-admin-page .ff-data-table tbody tr:nth-child(odd) { background: #fff; }
-.ff-admin-page .ff-data-table tbody tr:nth-child(even) { background: #f0f0f0; }
-.ff-admin-page .ff-data-table tbody tr:hover { background: #dff5f6 !important; }
+.ff-admin-page .ff-data-table tbody tr:nth-child(odd),
+.ff-admin-page .ff-data-table tbody tr:nth-child(even) { background: transparent; }
+.ff-admin-page .ff-data-table tbody tr:hover { background: #d7e5e2 !important; }
 
 .ff-admin-page input:not([type="checkbox"]):not([type="radio"]),
 .ff-admin-page textarea,
@@ -1633,30 +1661,33 @@ div:has(> table.ff-data-table) {
 .ff-admin-surface input:not([type="checkbox"]):not([type="radio"]),
 .ff-admin-surface textarea,
 .ff-admin-surface [role="combobox"] {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 0 !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
 .ff-admin-section-header {
-  border-bottom: 2px solid #808080;
-  background: #c0c0c0;
+  border-bottom: 1px solid #c9d1ce;
+  background: #e0e0e0;
 }
 
 .ff-admin-permission-section {
   overflow: hidden;
-  border: 1px solid #808080;
-  background: #f0f0f0;
+  border: 0;
+  border-radius: 14px;
+  background: #e0e0e0;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-admin-hours {
   width: 64px;
   height: 6px;
   overflow: hidden;
-  border: 1px solid #808080;
-  background: #fff;
+  border: 0;
+  border-radius: 999px;
+  background: #e0e0e0;
+  box-shadow: inset 2px 2px 4px #b8b8b8, inset -2px -2px 4px #fff;
 }
 
 .ff-admin-hours > span {
@@ -1667,7 +1698,10 @@ div:has(> table.ff-data-table) {
 
 .ff-payroll-surface,
 .ff-payroll-page .ff-card {
-  border-radius: 12px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
 }
 
 .ff-payroll-surface > :first-child,
@@ -1683,12 +1717,12 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-payroll-page .ff-card {
-  background: #fff;
+  background: #e0e0e0;
 }
 
-.ff-payroll-page .ff-data-table tbody tr:nth-child(odd) { background: #fff; }
-.ff-payroll-page .ff-data-table tbody tr:nth-child(even) { background: #f0f0f0; }
-.ff-payroll-page .ff-data-table tbody tr:hover { background: #dff5f6 !important; }
+.ff-payroll-page .ff-data-table tbody tr:nth-child(odd),
+.ff-payroll-page .ff-data-table tbody tr:nth-child(even) { background: transparent; }
+.ff-payroll-page .ff-data-table tbody tr:hover { background: #d7e5e2 !important; }
 
 .ff-payroll-page input:not([type="checkbox"]):not([type="radio"]),
 .ff-payroll-page textarea,
@@ -1696,11 +1730,10 @@ div:has(> table.ff-data-table) {
 .ff-payroll-surface input:not([type="checkbox"]):not([type="radio"]),
 .ff-payroll-surface textarea,
 .ff-payroll-surface [role="combobox"] {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 0 !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
 .ff-payroll-avatar {
@@ -1710,11 +1743,11 @@ div:has(> table.ff-data-table) {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 8px;
-  background: #27aab8;
-  color: #fff;
+  border: 0;
+  border-radius: 50%;
+  background: #d7e9e6;
+  color: #287a7d;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
   font-size: 11px;
   font-weight: 800;
 }
@@ -1726,31 +1759,36 @@ div:has(> table.ff-data-table) {
 
 .ff-payroll-deductions {
   overflow: hidden;
-  border: 1px solid #808080;
-  background: #f0f0f0;
+  border: 0;
+  border-radius: 14px;
+  background: #e0e0e0;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-payroll-section-header {
-  border-bottom: 2px solid #808080;
-  background: #c0c0c0;
+  border-bottom: 1px solid #c9d1ce;
+  background: #e0e0e0;
 }
 
 .ff-payroll-action-approve,
 .ff-payroll-action-paid {
   margin: 3px;
-  border: 2px solid;
-  border-color: #fff #727272 #727272 #fff;
-  border-radius: 1px;
-  color: #fff !important;
+  border: 0;
+  border-radius: 10px;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
   font-weight: 700;
 }
 
-.ff-payroll-action-approve { background: #098b9f !important; }
-.ff-payroll-action-paid { background: #25834b !important; }
+.ff-payroll-action-paid { color: #3d7453 !important; }
 
 .ff-expenses-surface,
 .ff-expenses-page .ff-card {
-  border-radius: 12px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
 }
 
 .ff-expenses-surface > :first-child,
@@ -1766,12 +1804,12 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-expenses-page .ff-card {
-  background: #fff;
+  background: #e0e0e0;
 }
 
-.ff-expenses-page .ff-data-table tbody tr:nth-child(odd) { background: #fff; }
-.ff-expenses-page .ff-data-table tbody tr:nth-child(even) { background: #f0f0f0; }
-.ff-expenses-page .ff-data-table tbody tr:hover { background: #dff5f6 !important; }
+.ff-expenses-page .ff-data-table tbody tr:nth-child(odd),
+.ff-expenses-page .ff-data-table tbody tr:nth-child(even) { background: transparent; }
+.ff-expenses-page .ff-data-table tbody tr:hover { background: #d7e5e2 !important; }
 
 .ff-expenses-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .ff-expenses-page textarea,
@@ -1779,58 +1817,71 @@ div:has(> table.ff-data-table) {
 .ff-expenses-surface input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .ff-expenses-surface textarea,
 .ff-expenses-surface [role="combobox"] {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 0 !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
 .ff-expenses-category-travel {
-  border-color: #d8b4fe;
-  background: #f3e8ff;
-  color: #7e22ce;
+  border-color: #b8d4ce;
+  background: #d9e8e4;
+  color: #27635e;
 }
 
 .ff-expenses-category-other {
-  border-color: #b8b8b8;
-  background: #e5e5e5;
-  color: #444;
+  border-color: #ccd2ce;
+  background: #e0e0e0;
+  color: #596a64;
 }
 
 .ff-expenses-status-reimbursed {
-  border-color: #86efac;
-  background: #166534;
-  color: #fff;
+  border-color: #b8d4c0;
+  background: #dcebe0;
+  color: #3d7453;
 }
 
 .ff-expenses-upload {
   padding: 10px;
-  border: 2px dashed #808080;
-  background: #f0f0f0;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18);
+  border: 1px dashed #9eafaa;
+  border-radius: 14px;
+  background: #e0e0e0;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-expenses-upload input[type="file"] {
   margin-top: 6px;
-  border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
-  border-radius: 0;
-  background: #fff;
+  border: 0;
+  border-radius: 10px;
+  background: #e0e0e0;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-expenses-approve {
-  background: #098b9f !important;
-  border-color: #fff #246669 #246669 #fff !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
 }
 
 .ff-expenses-reject {
-  border-color: #fff #6e1111 #6e1111 #fff !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+}
+.ff-expenses-page a.bevel-button {
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8 !important;
 }
 
 .ff-vault-surface,
 .ff-vault-page .ff-card {
-  border-radius: 12px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #e0e0e0 !important;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
 }
 
 .ff-vault-surface > :first-child,
@@ -1846,12 +1897,12 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-vault-page .ff-card {
-  background-color: #fff;
+  background-color: #e0e0e0;
 }
 
 .ff-vault-panel-header {
-  border-bottom: 2px solid #808080;
-  background: #c0c0c0;
+  border-bottom: 1px solid #c9d1ce;
+  background: #e0e0e0;
 }
 
 .ff-vault-page input:not([type="checkbox"]):not([type="radio"]),
@@ -1860,59 +1911,57 @@ div:has(> table.ff-data-table) {
 .ff-vault-surface input:not([type="checkbox"]):not([type="radio"]),
 .ff-vault-surface textarea,
 .ff-vault-surface [role="combobox"] {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 0 !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
 .ff-vault-table {
   border-collapse: separate;
-  border-spacing: 0 8px;
+  border-spacing: 0;
 }
 
 .ff-vault-table thead th {
-  background: #404040;
-  color: #fff;
+  background: #d5d8d7;
+  color: #66736f;
 }
 
 .ff-vault-entry td {
-  border-top: 2px solid #fff;
-  border-bottom: 2px solid #808080;
-  background: #fff;
+  border-bottom: 1px solid #c9d1ce;
+  background: transparent;
 }
 
 .ff-vault-entry td:first-child {
-  border-left: 2px solid #fff;
-  border-radius: 12px 0 0 12px;
+  border-left: 0;
+  border-radius: 0;
 }
 
 .ff-vault-entry td:last-child {
-  border-right: 2px solid #808080;
-  border-radius: 0 12px 12px 0;
+  border-right: 0;
+  border-radius: 0;
 }
 
 .ff-vault-entry:hover td {
-  background: #dff5f6;
+  background: #d7e5e2;
 }
 
 .ff-vault-value {
   display: inline-block;
   min-width: 84px;
   padding: 4px 7px;
-  border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
-  background: #f0f0f0;
+  border: 0;
+  border-radius: 8px;
+  background: #e0e0e0;
   letter-spacing: .08em;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-rules-surface {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 12px !important;
-  background: #fff;
-  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff;
+  border: 0;
+  border-radius: 16px !important;
+  background: #e0e0e0;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
 }
 
 .ff-rules-page input:not([type="checkbox"]):not([type="radio"]),
@@ -1921,23 +1970,22 @@ div:has(> table.ff-data-table) {
 .ff-rules-surface input:not([type="checkbox"]):not([type="radio"]),
 .ff-rules-surface textarea,
 .ff-rules-surface [role="combobox"] {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 0 !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
 .ff-rule-card {
   margin: 8px;
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 12px;
-  background: #fff;
+  border: 0;
+  border-radius: 16px;
+  background: #e0e0e0;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8;
 }
 
 .ff-rule-card:hover {
-  background: #dff5f6;
+  background: #d9e8e6;
 }
 
 .ff-rules-type {
@@ -1960,33 +2008,34 @@ div:has(> table.ff-data-table) {
 
 .ff-rules-page [role="switch"],
 .ff-rules-surface [role="switch"] {
-  border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
-  background: #c0c0c0;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18);
+  border: 0;
+  background: #c4cbc8;
+  box-shadow: inset 2px 2px 4px #aab3b0, inset -2px -2px 4px #e8efed;
 }
 
 .ff-rules-page [role="switch"][data-state="checked"],
 .ff-rules-surface [role="switch"][data-state="checked"] {
-  background: #25834b !important;
+  background: #258f98 !important;
 }
 
 .ff-rules-edit {
-  background: #098b9f !important;
-  border-color: #fff #246669 #246669 #fff !important;
+  background: #27aab8 !important;
+  border: 0 !important;
+  color: #fff !important;
 }
 
 .ff-rules-delete {
-  border-color: #fff #6e1111 #6e1111 #fff !important;
+  border: 0 !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
 }
 
 .ff-workflow-surface,
 .ff-workflow-stage {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 12px !important;
-  background: #fff;
-  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff;
+  border: 0;
+  border-radius: 16px !important;
+  background: #e0e0e0;
+  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
 }
 
 .ff-workflow-page input:not([type="checkbox"]):not([type="radio"]),
@@ -1995,25 +2044,25 @@ div:has(> table.ff-data-table) {
 .ff-workflow-surface input:not([type="checkbox"]):not([type="radio"]),
 .ff-workflow-surface textarea,
 .ff-workflow-surface select {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
-  border-radius: 0 !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
 }
 
 .ff-workflow-stage-number {
-  border: 2px solid;
-  border-color: #fff #098b9f #098b9f #fff;
-  background: #27aab8;
-  color: #fff;
+  border: 0;
+  background: #d7e9e6;
+  color: #147c82;
+  box-shadow: inset 2px 2px 5px #b3ceca, inset -2px -2px 5px #f6ffff;
 }
 
 .ff-workflow-stage-icon,
 .ff-workflow-preview-stage {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: #e0e0e0;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
 }
 
 .ff-workflow-auto {
@@ -2030,27 +2079,26 @@ div:has(> table.ff-data-table) {
 
 .ff-workflow-page [role="switch"],
 .ff-workflow-surface [role="switch"] {
-  border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
-  background: #c0c0c0;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18);
+  border: 0;
+  background: #c4cbc8;
+  box-shadow: inset 2px 2px 4px #aab3b0, inset -2px -2px 4px #e8efed;
 }
 
 .ff-workflow-page [role="switch"][data-state="checked"],
 .ff-workflow-surface [role="switch"][data-state="checked"] {
-  background: #27aab8 !important;
+  background: #258f98 !important;
 }
 
 .ff-workflow-icon-button {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 2px;
-  background: #d4d0c8;
-  color: #444;
+  border: 0;
+  border-radius: 50%;
+  background: #e0e0e0;
+  color: #4b625d;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
 }
 
 .ff-workflow-icon-button:active:not(:disabled) {
-  border-color: #808080 #fff #fff #808080;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-workflow-connector {
@@ -2059,102 +2107,99 @@ div:has(> table.ff-data-table) {
 }
 
 .ff-workflow-summary-stat {
-  border: 2px solid;
-  border-color: #808080 #fff #fff #808080;
-  border-radius: 8px;
-  background: #f0f0f0;
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
 }
 
 .ff-earl-chat {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 2px 2px 0 #808080, -1px -1px 0 #fff;
+  border: 0;
+  border-radius: 18px;
+  background: #e0e0e0;
+  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8;
 }
 
 .ff-earl-header {
-  border-radius: 10px 10px 0 0;
-  background: #c0c0c0;
+  border-radius: 16px 16px 0 0;
+  background: #e0e0e0;
 }
 
 .ff-earl-avatar {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  box-shadow: 1px 1px 0 #808080;
+  border: 0;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
 }
 
 .ff-earl-assistant-avatar {
-  border: 2px solid;
-  border-color: #fff #098b9f #098b9f #fff;
-  background: #e4fbfc;
+  border: 0;
+  background: #e0e0e0;
 }
 
 .ff-earl-user-avatar {
-  background: #27aab8;
-  color: #fff;
+  background: #d5e9e6;
+  color: #35676b;
 }
 
 .ff-earl-message-user {
-  border: 2px solid;
-  border-color: #64d5dc #098b9f #098b9f #64d5dc;
-  background: #27aab8;
-  color: #fff;
+  border: 0;
+  background: rgba(39,170,184,.08);
+  color: #31575a;
 }
 
 .ff-earl-message-assistant {
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  background: #fff;
-  color: #1a1a1a;
-  box-shadow: 1px 1px 0 #808080;
+  border: 0;
+  background: #e0e0e0;
+  color: #414141;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
 }
 
 .ff-earl-starter {
-  border: 2px solid;
-  border-color: #27aab8 #098b9f #098b9f #27aab8;
-  border-radius: 999px;
-  background: #fff;
-  color: #096f7c;
+  border: 0;
+  border-radius: 12px;
+  background: #e0e0e0;
+  color: #45605c;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
 }
 
 .ff-earl-starter:hover {
-  background: #dff5f6;
+  background: #e0e0e0;
+  color: #087f8c;
 }
 
 .ff-earl-input {
-  border: 2px solid !important;
-  border-color: #808080 #fff #fff #808080 !important;
+  border: 0 !important;
   border-radius: 12px !important;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,.18) !important;
+  background: #e0e0e0 !important;
+  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
 }
 
 .ff-earl-icon-button {
-  border: 2px solid !important;
-  border-color: #fff #808080 #808080 #fff !important;
-  border-radius: 8px !important;
-  background: #d4d0c8 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #e0e0e0 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
 }
 
 .ff-earl-emoji-picker {
   width: 194px;
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  border-radius: 12px;
-  background: #d4d0c8;
-  box-shadow: 2px 2px 0 #808080;
+  border: 0;
+  border-radius: 16px;
+  background: #e0e0e0;
+  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8;
 }
 
 .ff-earl-emoji-option {
   display: flex;
-  height: 30px;
+  height: 32px;
+  width: 32px;
   align-items: center;
   justify-content: center;
-  border: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
-  background: #fff;
+  border: 0;
+  border-radius: 50%;
+  background: #e0e0e0;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
 }
+.ff-earl-emoji-option:hover { color:#087f8c; }
 
 .ff-earl-timestamp {
   font-size: 10px;

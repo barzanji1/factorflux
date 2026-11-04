@@ -1,6 +1,12 @@
 .recovery-neu-page.recovery-neu-page.recovery-neu-page,
 .recovery-neu-page.recovery-neu-page.recovery-neu-page main { background:#e0e0e0!important; color:#333!important; }
 .recovery-neu-page main { min-height:0; }
+.recovery-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"] {
+  right:12px!important;top:12px!important;width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;
+  border:0!important;border-radius:50%!important;background:#e0e0e0!important;color:#677b77!important;
+  box-shadow:-3px -3px 7px #fff,3px 3px 7px #b8b8b8!important;
+}
+.recovery-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"]:hover { color:#087f8c!important; }
 .recovery-neu-page main .recovery-neu-surface,
 .recovery-neu-dialog.recovery-neu-dialog.recovery-neu-dialog,
 body:has(.recovery-neu-page) [role="dialog"].recovery-neu-dialog,
@@ -34,8 +40,8 @@ body:has(.recovery-neu-page) [role="dialog"].recovery-neu-dialog button:not([dat
 }
 .recovery-neu-page main button:hover:not(:disabled),.recovery-neu-dialog button:hover:not(:disabled) {color:#168d99!important}
 .recovery-neu-page main button:active:not(:disabled),.recovery-neu-dialog button:active:not(:disabled) {box-shadow:inset 4px 4px 8px #b8b8b8,inset -4px -4px 8px #fff!important}
-.recovery-neu-page main button.recovery-neu-accent,.recovery-neu-dialog button.recovery-neu-accent {background:#27aab8!important;color:#fff!important}
-.recovery-neu-page main button.recovery-neu-danger,.recovery-neu-dialog button.recovery-neu-danger {background:#b94e4e!important;color:#fff!important}
+.recovery-neu-page main button.recovery-neu-accent,.recovery-neu-dialog button.recovery-neu-accent {background:#e0e0e0!important;color:#168d99!important}
+.recovery-neu-page main button.recovery-neu-danger,.recovery-neu-dialog button.recovery-neu-danger {background:#e0e0e0!important;color:#a3483e!important}
 .recovery-neu-page main table {color:#333!important;border-collapse:separate!important;border-spacing:0!important}
 .recovery-neu-page main thead,.recovery-neu-page main thead tr {background:#d7d7d7!important;color:#666!important}
 .recovery-neu-page main th {border-color:#c9c9c9!important;color:#777!important;font-size:10px!important;letter-spacing:.12em!important;text-transform:uppercase}
@@ -104,11 +110,11 @@ body:has(.recovery-neu-page) [data-radix-toast-viewport] [role="alert"] {border:
 }
 .recovery-neu-page.recovery-neu-page.recovery-neu-page main button.recovery-neu-accent,
 .recovery-neu-dialog.recovery-neu-dialog.recovery-neu-dialog button.recovery-neu-accent {
-  background:#27aab8!important;color:#fff!important;
+  background:#e0e0e0!important;color:#168d99!important;
 }
 .recovery-neu-page.recovery-neu-page.recovery-neu-page main button.recovery-neu-danger,
 .recovery-neu-dialog.recovery-neu-dialog.recovery-neu-dialog button.recovery-neu-danger {
-  background:#b94e4e!important;color:#fff!important;
+  background:#e0e0e0!important;color:#a3483e!important;
 }
 .recovery-neu-page.recovery-neu-page.recovery-neu-page main .recovery-neu-chart,
 .recovery-neu-page.recovery-neu-page.recovery-neu-page main .recovery-neu-surface.recovery-neu-chart {

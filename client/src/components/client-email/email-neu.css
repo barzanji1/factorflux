@@ -31,8 +31,9 @@
 
 .ff-app-shell .email-neu button:not(:disabled):hover,
 .email-neu-dialog button:not(:disabled):hover {
-  background-color: #27aab8 !important;
-  color: #fff !important;
+  background-color: #e0e0e0 !important;
+  color: #087f8c !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8 !important;
 }
 
 .ff-app-shell .email-neu button:not(:disabled):active,
@@ -46,6 +47,13 @@
   background: var(--email-surface) !important;
   box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
 }
+
+.email-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"] {
+  right:12px!important;top:12px!important;width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;
+  border:0!important;border-radius:50%!important;background:#e0e0e0!important;color:#677b77!important;
+  box-shadow:-3px -3px 7px #fff,3px 3px 7px #b8b8b8!important;
+}
+.email-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"]:hover { color:#087f8c!important; }
 
 .email-neu section > header {
   border-color: #c9cece !important;
@@ -77,8 +85,9 @@
 
 .email-neu button[class*="bg-[#087f8e]"],
 .email-neu button[class*="bg-[#27aab8]"] {
-  background-color: #27aab8 !important;
-  color: #fff !important;
+  background-color: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
 }
 
 .email-neu button[class*="text-[#8d433a]"],
@@ -128,8 +137,9 @@
 
 .email-neu-dialog button[class*="bg-[#087f8e]"],
 .email-neu-dialog button[class*="bg-[#27aab8]"] {
-  background-color: #27aab8 !important;
-  color: #fff !important;
+  background-color: #e0e0e0 !important;
+  color: #168d99 !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
 }
 
 .email-neu-toast {

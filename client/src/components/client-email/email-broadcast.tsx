@@ -1,11 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, Mail, RefreshCw, Send, ShieldAlert, Users, X, CalendarClock } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmailTemplatePicker } from "@/components/client-email/email-template-picker";
 import { BUILT_IN_EMAIL_TEMPLATES, type EmailTemplate } from "../../../../shared/email-templates";
@@ -13,7 +10,7 @@ import type { BroadcastClient, BroadcastDetail, BroadcastDraftInput, BroadcastFi
 import { federalHolidays, isoToLocalDateTime, localDateTimeToIso } from "../../../../shared/holiday-scheduling";
 import { HolidayYearPlanner } from "@/components/client-email/holiday-year-planner";
 import { ScheduledBroadcasts, type ScheduledBroadcast } from "@/components/client-email/scheduled-broadcasts";
-import { NeuBadge } from "@/styles/neu";
+import { NeuBadge, NeuButton as Button, NeuInput as Input, NeuTextarea as Textarea } from "@/styles/neu";
 
 type BroadcastOptions = { statuses: string[]; agents: { id: string; name: string }[] };
 type RecipientResponse = { clients: BroadcastClient[]; counts: { matched: number; sendable: number; skipped: number } };
@@ -313,11 +310,11 @@ export function EmailBroadcast() {
         <div className="space-y-2">
             <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-[#758582]">01 / Audience</p><h3 className="text-xs font-bold text-[#304a52]">Choose all clients or narrow the group</h3></div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <div className="space-y-1"><Label htmlFor="broadcast-search" className="text-[10px]">Client search</Label><Input id="broadcast-search" value={search} disabled={inputsDisabled} onChange={(e) => setSearch(e.target.value)} maxLength={200} placeholder="Name or email…" className="h-9 rounded-sm bg-white text-xs" /></div>
+            <div className="space-y-1"><Label htmlFor="broadcast-search" className="text-[10px]">Client search</Label><Input id="broadcast-search" value={search} disabled={inputsDisabled} onChange={(e) => setSearch(e.target.value)} maxLength={200} placeholder="Name or email…" className="text-xs" /></div>
             <div className="space-y-1"><Label htmlFor="broadcast-status" className="text-[10px]">Client status</Label><Select value={status || "all"} disabled={inputsDisabled} onValueChange={(value) => setStatus(value === "all" ? "" : value)}><SelectTrigger id="broadcast-status" className="h-10 rounded-xl border-0 bg-[#e0e0e0] text-xs shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent className="rounded-xl border-0 bg-[#e0e0e0] shadow-[4px_4px_12px_#b8b8b8]"><SelectItem value="all">All statuses</SelectItem>{statusOptions.map((option) => <SelectItem key={option} value={option}>{option.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1 sm:col-span-2"><Label htmlFor="broadcast-agent" className="text-[10px]">Assigned processor</Label><Select value={assignedProcessor || "all"} disabled={inputsDisabled} onValueChange={(value) => setAssignedProcessor(value === "all" ? "" : value)}><SelectTrigger id="broadcast-agent" className="h-10 rounded-xl border-0 bg-[#e0e0e0] text-xs shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><SelectValue placeholder="All processors" /></SelectTrigger><SelectContent className="rounded-xl border-0 bg-[#e0e0e0] shadow-[4px_4px_12px_#b8b8b8]"><SelectItem value="all">All processors</SelectItem>{(optionsQuery.data?.agents || []).map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
-          {optionsQuery.isLoading ? <div className="h-8 animate-pulse bg-[#dce5e1]" /> : optionsQuery.error ? <div role="alert" className="flex items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-2 text-[10px] text-[#8d433a]"><span>{optionsQuery.error.message}</span><Button size="sm" variant="outline" onClick={() => void optionsQuery.refetch()}>Retry</Button></div> : null}
+          {optionsQuery.isLoading ? <div className="h-8 animate-pulse rounded-xl bg-[#e0e0e0] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]" /> : optionsQuery.error ? <div role="alert" className="flex items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] p-2 text-[10px] text-[#8d433a] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><span>{optionsQuery.error.message}</span><Button size="sm" variant="outline" onClick={() => void optionsQuery.refetch()}>Retry</Button></div> : null}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border border-[#c6d0cd] bg-[#f8faf8] px-3 py-2 text-[10px] text-[#536a6d]">
             {!selectedEditDetail && recipientsQuery.isLoading ? <span className="h-3 w-36 animate-pulse bg-[#dce5e1]" /> : !selectedEditDetail && recipientsQuery.error ? <span className="text-[#8d433a]">{recipientsQuery.error.message}</span> : <>
               <span><strong className="text-[#304a52]">{audienceCounts?.matched ?? 0}</strong> matched</span><span><strong className="text-[#28644f]">{audienceCounts?.sendable ?? 0}</strong> sendable</span><span><strong className="text-[#866322]">{audienceCounts?.skipped ?? 0}</strong> skipped</span>
@@ -339,8 +336,8 @@ export function EmailBroadcast() {
         <div className="space-y-2 border-t border-[#cbd5d1] pt-3">
           <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-[#758582]">Schedule / optional</p><h3 className="text-xs font-bold text-[#304a52]">Send now or set a local time</h3></div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <div className="space-y-1"><Label htmlFor="broadcast-scheduled-at" className="text-[10px]">Scheduled date and time</Label><Input id="broadcast-scheduled-at" type="datetime-local" required={!!editingDraft} value={scheduleDateTime} disabled={inputsDisabled} onChange={(event) => setScheduleDateTime(event.target.value)} className="h-9 rounded-sm bg-white text-xs" /><p className="text-[9px] text-[#758582]">{editingDraft ? "The schedule must remain in the future." : "Blank means the existing immediate-send flow."}</p></div>
-            <div className="space-y-1"><Label htmlFor="broadcast-time-zone" className="text-[10px]">Time zone (IANA)</Label><Input id="broadcast-time-zone" value={scheduleTimeZone} disabled={inputsDisabled} onChange={(event) => setScheduleTimeZone(event.target.value)} placeholder="America/Denver" className="h-9 rounded-sm bg-white text-xs" /><p className="text-[9px] text-[#758582]">Local wall time is converted using this zone, not your browser zone.</p></div>
+            <div className="space-y-1"><Label htmlFor="broadcast-scheduled-at" className="text-[10px]">Scheduled date and time</Label><Input id="broadcast-scheduled-at" type="datetime-local" required={!!editingDraft} value={scheduleDateTime} disabled={inputsDisabled} onChange={(event) => setScheduleDateTime(event.target.value)} className="text-xs" /><p className="text-[9px] text-[#758582]">{editingDraft ? "The schedule must remain in the future." : "Blank means the existing immediate-send flow."}</p></div>
+            <div className="space-y-1"><Label htmlFor="broadcast-time-zone" className="text-[10px]">Time zone (IANA)</Label><Input id="broadcast-time-zone" value={scheduleTimeZone} disabled={inputsDisabled} onChange={(event) => setScheduleTimeZone(event.target.value)} placeholder="America/Denver" className="text-xs" /><p className="text-[9px] text-[#758582]">Local wall time is converted using this zone, not your browser zone.</p></div>
           </div>
           {scheduleIssue && <p role="alert" className="border border-[#d3a49e] bg-[#fff1ee] p-2 text-[9px] text-[#8d433a]">{scheduleIssue} Check daylight-saving gaps and use a valid IANA zone.</p>}
           {editingDraft && <p className="border border-[#d5b77b] bg-[#fff8e9] p-2 text-[9px] leading-relaxed text-[#765f30]">Editing schedule rev {editingDraft.revision}. Edit preview creates a draft revision and pauses the previous scheduled dispatch. Nothing sends until you review and confirm the new revision.</p>}
@@ -352,12 +349,12 @@ export function EmailBroadcast() {
           <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-[#758582]">02 / Message</p><h3 className="text-xs font-bold text-[#304a52]">Write once, delivered separately</h3></div>
           <EmailTemplatePicker id="broadcast-template" value={templateName} onChange={applyTemplate} disabled={inputsDisabled} />
           <p className="border border-[#c6d0cd] bg-[#f8faf8] p-2 text-[10px] leading-relaxed text-[#657977]">The [Company] placeholder is personalized separately for each recipient; if a company name is unavailable, “Valued Client” is used. Review observed closure dates and hours before sending.</p>
-          <div className="space-y-1"><Label htmlFor="broadcast-subject" className="text-[10px]">Subject</Label><Input id="broadcast-subject" value={subject} disabled={inputsDisabled} maxLength={200} onChange={(e) => setSubject(e.target.value)} className="rounded-sm bg-white text-xs" placeholder="A clear, specific subject" /><p className="text-right text-[9px] text-[#84918f]">{subject.length}/200</p></div>
-          <div className="space-y-1"><Label htmlFor="broadcast-body" className="text-[10px]">Message</Label><Textarea id="broadcast-body" value={body} disabled={inputsDisabled} maxLength={20000} rows={7} onChange={(e) => setBody(e.target.value)} className="resize-y rounded-sm bg-white text-xs leading-relaxed" placeholder="Write your message…" /><p className="text-right text-[9px] text-[#84918f]">{body.length}/20,000</p></div>
+          <div className="space-y-1"><Label htmlFor="broadcast-subject" className="text-[10px]">Subject</Label><Input id="broadcast-subject" value={subject} disabled={inputsDisabled} maxLength={200} onChange={(e) => setSubject(e.target.value)} className="text-xs" placeholder="A clear, specific subject" /><p className="text-right text-[9px] text-[#84918f]">{subject.length}/200</p></div>
+          <div className="space-y-1"><Label htmlFor="broadcast-body" className="text-[10px]">Message</Label><Textarea id="broadcast-body" value={body} disabled={inputsDisabled} maxLength={20000} rows={7} onChange={(e) => setBody(e.target.value)} className="resize-y text-xs leading-relaxed" placeholder="Write your message…" /><p className="text-right text-[9px] text-[#84918f]">{body.length}/20,000</p></div>
           <p className="text-[10px] text-[#657977]">TPF branding and monitored Reply-To are applied by the server sender. No recipient is exposed to another.</p>
           {staleMessage && <div role="alert" className="border border-[#d5b77b] bg-[#fff7e7] p-2.5 text-[10px] leading-relaxed text-[#765f30]">{staleMessage}</div>}
           {currentError && <div role="alert" className="border border-[#d3a49e] bg-[#fff1ee] p-2.5 text-[10px] leading-relaxed text-[#8d433a]"><strong>Draft retained.</strong> {currentError.message}</div>}
-          <Button type="button" disabled={!canPreview || (!editingDraft && (recipientsQuery.isLoading || recipientsQuery.isError || !recipients?.counts.sendable))} onClick={() => void beginPreview()} className="h-9 w-full rounded-sm bg-[#087f8e] text-xs font-bold text-white hover:bg-[#076c78]">
+          <Button type="button" variant="accent" disabled={!canPreview || (!editingDraft && (recipientsQuery.isLoading || recipientsQuery.isError || !recipients?.counts.sendable))} onClick={() => void beginPreview()} className="min-h-9 w-full text-xs font-bold">
             {scheduleDateTime ? <CalendarClock className="mr-2 h-3.5 w-3.5" /> : <Send className="mr-2 h-3.5 w-3.5" />}{previewRefreshing ? "Refreshing audience…" : previewMutation.isPending ? "Preparing preview…" : editingDraft ? "Review schedule changes" : scheduleDateTime ? "Preview scheduled broadcast" : "Preview broadcast"}
           </Button>
         </div>
@@ -385,9 +382,9 @@ export function EmailBroadcast() {
           : historyQuery.error ? <div role="alert" className="flex items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-3 text-[10px] text-[#8d433a]"><span>{historyQuery.error.message}</span><Button size="sm" variant="outline" onClick={() => void historyQuery.refetch()}>Retry</Button></div>
             : !historyQuery.data?.length ? <div className="border border-dashed border-[#bdc9c5] bg-[#f6f8f6] px-4 py-8 text-center"><Mail className="mx-auto mb-2 h-5 w-5 text-[#849794]" /><p className="text-xs font-semibold text-[#536a6d]">No broadcasts yet</p><p className="mt-1 text-[10px] text-[#7b8b89]">A broadcast only starts after a fresh preview and a separate confirmation.</p></div>
               : <div className="max-h-64 space-y-1 overflow-auto">
-                {historyQuery.data.map((item) => <button key={item.id} type="button" onClick={() => { setSelectedId(item.id); setConfirmOpen(false); }} className={`flex w-full items-center gap-2 border px-2.5 py-2 text-left ${item.id === selectedId ? "border-[#6eaaa4] bg-[#e8f3ef]" : "border-[#c6d0cd] bg-[#f8faf8] hover:bg-[#eff6f3]"}`}>
+                {historyQuery.data.map((item) => <Button key={item.id} type="button" size="sm" onClick={() => { setSelectedId(item.id); setConfirmOpen(false); }} className={`w-full justify-start text-left ${item.id === selectedId ? "text-[#087f8e]" : ""}`}>
                   <StatusTag value={item.status} /><span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-[#304a52]">{item.subject || "(No subject)"}</span><span className="hidden text-[9px] text-[#73817f] sm:inline">{item.counts.sent}/{item.counts.total}</span><span className="text-[9px] text-[#73817f]">{dateTime(item.createdAt)}</span>
-                </button>)}
+                </Button>)}
               </div>}
         {selectedId && detailQuery.isLoading && <div className="mt-3 space-y-2 border border-[#c6d0cd] bg-[#f8faf8] p-3" aria-label="Loading broadcast details"><div className="h-6 animate-pulse bg-[#dce5e1]" /><div className="h-20 animate-pulse bg-[#dce5e1]" /></div>}
         {selectedId && detailQuery.error && <div role="alert" className="mt-3 flex items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-3 text-[10px] text-[#8d433a]"><span>{detailQuery.error.message}</span><Button size="sm" variant="outline" onClick={() => void detailQuery.refetch()}>Retry details</Button></div>}
@@ -436,7 +433,7 @@ export function EmailBroadcast() {
         </div>
         <DialogFooter className="flex flex-wrap justify-end gap-2 border-t border-[#c5cfcc] bg-[#e1e8e5] px-4 py-3">
           <Button type="button" variant="outline" className="h-8 rounded-sm text-xs" disabled={confirmMutation.isPending} onClick={() => setConfirmOpen(false)}>Review message</Button>
-          <Button type="button" className="h-8 rounded-sm bg-[#087f8e] text-xs text-white hover:bg-[#076c78]" disabled={confirmMutation.isPending || preview.broadcast.counts.sendable < 1} onClick={() => { if (confirmGuard.current) return; confirmGuard.current = true; confirmMutation.mutate(undefined, { onSettled: () => { confirmGuard.current = false; } }); }}><Check className="mr-1.5 h-3.5 w-3.5" />{confirmMutation.isPending ? "Confirming…" : (preview.broadcast as ScheduledBroadcast).scheduledAt ? "Confirm schedule" : `Confirm ${preview.broadcast.counts.sendable} emails`}</Button>
+          <Button type="button" variant="accent" className="min-h-9 px-4 text-xs" disabled={confirmMutation.isPending || preview.broadcast.counts.sendable < 1} onClick={() => { if (confirmGuard.current) return; confirmGuard.current = true; confirmMutation.mutate(undefined, { onSettled: () => { confirmGuard.current = false; } }); }}><Check className="mr-1.5 h-3.5 w-3.5" />{confirmMutation.isPending ? "Confirming…" : (preview.broadcast as ScheduledBroadcast).scheduledAt ? "Confirm schedule" : `Confirm ${preview.broadcast.counts.sendable} emails`}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>}

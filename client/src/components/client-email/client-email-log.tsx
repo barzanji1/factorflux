@@ -48,13 +48,13 @@ export function ClientEmailLog({ clientId }: { clientId: number }) {
             : <div className="space-y-2">{data.map((entry) => {
               const open = expanded === entry.id;
               return <NeuCard key={entry.id} pressed className="overflow-hidden p-0">
-                <button type="button" aria-expanded={open} onClick={() => setExpanded(open ? null : entry.id)} className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 text-left hover:bg-[#eff6f3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#087f8e]">
+                <NeuButton type="button" aria-expanded={open} onClick={() => setExpanded(open ? null : entry.id)} className="w-full flex-wrap justify-start gap-x-3 gap-y-2 rounded-xl px-3 py-2.5 text-left">
                   {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#607674]" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#607674]" />}
                   <NeuBadge tone={entry.status === "sent" ? "success" : entry.status === "failed" ? "warning" : entry.status === "unconfirmed" ? "warning" : "accent"} className={cn("px-2 py-0.5 text-[9px] uppercase tracking-wide", entry.status === "failed" && "text-[#a3483e]")}>{entry.status}</NeuBadge>
                   <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[#304a52]">{entry.subject || "(No subject)"}</span>
                   <span className="text-[10px] text-[#647876]">{dateTime(entry.sentAt || entry.createdAt)}</span>
                   <span className="text-[10px] text-[#73817f]">{entry.agentName || "Staff"}</span>
-                </button>
+                </NeuButton>
                 {open && <div className="space-y-3 border-t border-[#d2dbd8] bg-white/70 p-3 text-xs">
                   <dl className="grid gap-x-5 gap-y-2 sm:grid-cols-2">
                     <div><dt className="text-[9px] font-bold uppercase tracking-wider text-[#7a8986]">To</dt><dd className="mt-0.5 break-all text-[#344f54]">{entry.toEmail || "—"}</dd></div>

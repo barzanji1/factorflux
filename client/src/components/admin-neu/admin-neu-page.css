@@ -123,20 +123,8 @@ body:has(.ff-expenses-page) .admin-neu-dialog button.admin-neu-accent,
 body:has(.ff-vault-page) .admin-neu-dialog button.admin-neu-accent,
 body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-accent,
 body:has(.ff-workflow-page) .admin-neu-dialog button.admin-neu-accent,
-.ff-admin-page.ff-admin-page.ff-admin-page main button.admin-neu-danger,
-.ff-payroll-page.ff-payroll-page.ff-payroll-page main button.admin-neu-danger,
-.ff-expenses-page.ff-expenses-page.ff-expenses-page main button.admin-neu-danger,
-.ff-vault-page.ff-vault-page.ff-vault-page main button.admin-neu-danger,
-.ff-rules-page.ff-rules-page.ff-rules-page main button.admin-neu-danger,
-.ff-workflow-page.ff-workflow-page.ff-workflow-page main button.admin-neu-danger,
-body:has(.ff-admin-page) .admin-neu-dialog button.admin-neu-danger,
-body:has(.ff-payroll-page) .admin-neu-dialog button.admin-neu-danger,
-body:has(.ff-expenses-page) .admin-neu-dialog button.admin-neu-danger,
-body:has(.ff-vault-page) .admin-neu-dialog button.admin-neu-danger,
-body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-danger,
-body:has(.ff-workflow-page) .admin-neu-dialog button.admin-neu-danger,
 body:has(.ff-earl-page) .admin-neu-dialog button.admin-neu-accent {
-  background:#27aab8!important;color:#fff!important;
+  background:#e0e0e0!important;color:#168d99!important;
 }
 .ff-admin-page.ff-admin-page.ff-admin-page main button.admin-neu-danger,
 .ff-payroll-page.ff-payroll-page.ff-payroll-page main button.admin-neu-danger,
@@ -147,7 +135,10 @@ body:has(.ff-earl-page) .admin-neu-dialog button.admin-neu-accent {
 body:has(.ff-admin-page) .admin-neu-dialog button.admin-neu-danger,
 body:has(.ff-expenses-page) .admin-neu-dialog button.admin-neu-danger,
 body:has(.ff-vault-page) .admin-neu-dialog button.admin-neu-danger,
-body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-danger {background:#b94e4e!important;color:#fff!important}
+body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-danger,
+body:has(.ff-workflow-page) .admin-neu-dialog button.admin-neu-danger {
+  background:#e0e0e0!important;color:#a3483e!important;box-shadow:-4px -4px 9px #fff,4px 4px 9px #c1c1c1!important;
+}
 .ff-admin-page.ff-admin-page.ff-admin-page main table,.ff-payroll-page.ff-payroll-page.ff-payroll-page main table,
 .ff-expenses-page.ff-expenses-page.ff-expenses-page main table,.ff-vault-page.ff-vault-page.ff-vault-page main table {color:#383838!important;border-collapse:separate!important;border-spacing:0!important}
 .ff-admin-page.ff-admin-page.ff-admin-page main thead,.ff-admin-page.ff-admin-page.ff-admin-page main thead tr,
@@ -215,7 +206,7 @@ body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-danger {background:#
   border:0!important;border-radius:12px!important;background:#e0e0e0!important;
   box-shadow:inset 5px 5px 10px #b8b8b8,inset -5px -5px 10px #fff!important;
 }
-.ff-earl-page.ff-earl-page.ff-earl-page button[aria-label="Send message"] {background:#27aab8!important;color:#fff!important}
+.ff-earl-page.ff-earl-page.ff-earl-page button[aria-label="Send message"] {background:#e0e0e0!important;color:#168d99!important}
 .ff-admin-page.ff-admin-page.ff-admin-page [role="switch"],
 .ff-rules-page.ff-rules-page.ff-rules-page [role="switch"],
 .ff-workflow-page.ff-workflow-page.ff-workflow-page [role="switch"] {
@@ -235,7 +226,7 @@ body:has(.ff-rules-page) .admin-neu-dialog button.admin-neu-danger {background:#
 .ff-expenses-page.ff-expenses-page.ff-expenses-page .ff-btn-danger,
 .ff-vault-page.ff-vault-page.ff-vault-page .ff-btn-danger,
 .ff-rules-page.ff-rules-page.ff-rules-page .ff-btn-danger,
-.ff-workflow-page.ff-workflow-page.ff-workflow-page .ff-btn-danger {background:#b94e4e!important;color:#fff!important}
+.ff-workflow-page.ff-workflow-page.ff-workflow-page .ff-btn-danger {background:#e0e0e0!important;color:#a3483e!important}
 .ff-admin-page.ff-admin-page.ff-admin-page .ff-payroll-action-paid {color:#168d99!important}
 body:has(.ff-admin-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 body:has(.ff-payroll-page) [role="dialog"].admin-neu-dialog input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
@@ -275,9 +266,9 @@ body:has(.ff-admin-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert
 body:has(.ff-vault-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert-dialog-action],
 body:has(.ff-rules-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert-dialog-action],
 body:has(.ff-earl-page) [role="alertdialog"].admin-neu-dialog [data-radix-alert-dialog-action] {
-  background:#27aab8!important;color:#fff!important
+  background:#e0e0e0!important;color:#168d99!important
 }
-.admin-neu-dialog.admin-neu-dialog.admin-neu-dialog > button.ff-btn-secondary:has(>span.sr-only) {width:36px!important;height:36px!important;min-height:0!important;padding:0!important;border:0!important;border-radius:50%!important;background:#e0e0e0!important;box-shadow:-3px -3px 7px #fff,3px 3px 7px #c1c1c1!important}
+.admin-neu-dialog.admin-neu-dialog.admin-neu-dialog > button.ff-btn-secondary:has(>span.sr-only) {width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;border:0!important;border-radius:50%!important;background:#e0e0e0!important;box-shadow:-3px -3px 7px #fff,3px 3px 7px #c1c1c1!important}
 .admin-neu-toast.admin-neu-toast.admin-neu-toast,body:has(.ff-admin-page) [data-sonner-toaster] [data-sonner-toast],
 body:has(.ff-payroll-page) [data-sonner-toaster] [data-sonner-toast],body:has(.ff-expenses-page) [data-sonner-toaster] [data-sonner-toast],
 body:has(.ff-vault-page) [data-sonner-toaster] [data-sonner-toast],body:has(.ff-rules-page) [data-sonner-toaster] [data-sonner-toast],
@@ -290,6 +281,12 @@ body:has(.ff-workflow-page) [data-sonner-toaster] [data-sonner-toast],body:has(.
 .admin-neu-button.admin-neu-button.admin-neu-button:hover:not(:disabled):not(.admin-neu-accent):not(.admin-neu-danger) {
   color:#168d99!important;
 }
+.admin-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"] {
+  right:12px!important;top:12px!important;width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;
+  border:0!important;border-radius:50%!important;background:#e0e0e0!important;color:#677b77!important;
+  box-shadow:-3px -3px 7px #fff,3px 3px 7px #b8b8b8!important;
+}
+.admin-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"]:hover { color:#087f8c!important; }
 @media(max-width:767px) {
   .ff-admin-page main,.ff-payroll-page main,.ff-expenses-page main,.ff-vault-page main,.ff-rules-page main,.ff-workflow-page main {padding:1rem!important}
   .ff-admin-page main > div:first-child,.ff-payroll-page main > div:first-child,.ff-expenses-page main > div:first-child,.ff-vault-page main > div:first-child,.ff-rules-page main > div:first-child,.ff-workflow-page main > div:first-child {gap:.75rem}

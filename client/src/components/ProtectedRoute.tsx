@@ -3,6 +3,8 @@ import { Loader2 } from "lucide-react";
 import { Redirect, useLocation } from "wouter";
 import AccessDenied from "@/pages/access-denied";
 import { pathToPermission } from "@/lib/routePermissions";
+import { AlertCircle, RotateCcw } from "lucide-react";
+import { NeuButton, NeuCard, NeuPageShell } from "@/styles/neu";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -30,12 +32,16 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Redirect to="/login" />;
   }
   if (user?.role !== "admin" && permissionsError) {
-    return <div role="alert" className="flex min-h-screen items-center justify-center bg-[#d4d0c8] p-6">
-      <div className="border-2 border-[#808080] bg-[#ece9df] p-5">
-        <p>{permissionsError}</p>
-        <button type="button" className="mt-3 border-2 border-[#808080] bg-[#d4d0c8] px-4 py-2" onClick={() => void refreshPermissions()}>Retry access check</button>
-      </div>
-    </div>;
+    return <NeuPageShell className="flex min-h-[100dvh] items-center justify-center p-6">
+      <NeuCard role="alert" className="max-w-lg p-6">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#b46a37]" />
+          <div><h1 className="text-base font-bold text-[#344d48]">Access check could not finish</h1><p className="mt-1 text-sm text-[#687b75]">{permissionsError}</p>
+            <NeuButton variant="accent" className="mt-4 min-h-9 px-4" onClick={() => void refreshPermissions()}><RotateCcw className="h-4 w-4" />Retry access check</NeuButton>
+          </div>
+        </div>
+      </NeuCard>
+    </NeuPageShell>;
   }
 
   const requiredPermission = pathToPermission(location);

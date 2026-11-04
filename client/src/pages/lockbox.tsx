@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { NeuButton } from "@/styles/neu";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,7 +11,7 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { FundingButton as Button, FundingCard as Card, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent } from "@/components/funding/funding-controls";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import {
   Dialog,
   DialogHeader,
@@ -242,9 +243,9 @@ function MatchModal({
                   line.varianceType === "short_pay"  ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" :
                   "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400"
                 )}>{line.varianceType.replace("_", " ")}</span>
-                <button onClick={() => removeLine(line.invoiceId)} className="ml-auto text-slate-400 hover:text-red-500">
+                <NeuButton aria-label={`Remove invoice ${line.invoiceNumber}`} onClick={() => removeLine(line.invoiceId)} className="ml-auto !min-h-8 !w-8 !rounded-full !p-0 !text-red-700">
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </NeuButton>
               </div>
             ))}
           </div>
@@ -534,18 +535,18 @@ export default function Lockbox() {
               </div>
               <div className="flex gap-1">
                 {(["all", "unmatched", "partial", "matched", "exception"] as const).map(s => (
-                  <button
+                  <NeuButton
                     key={s}
                     onClick={() => setStatusFilter(s)}
                     className={cn(
-                      "rounded-full px-3 py-1 text-[11px] font-semibold border transition-colors capitalize",
+                      "!min-h-8 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors capitalize",
                       statusFilter === s
-                        ? "border-blue-500 bg-blue-500 text-white"
-                        : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-blue-300",
+                        ? "!bg-[#cbdedb] !text-[#146d72]"
+                        : "!bg-[#e0e0e0] !text-slate-500",
                     )}
                   >
                     {s}
-                  </button>
+                  </NeuButton>
                 ))}
               </div>
             </div>

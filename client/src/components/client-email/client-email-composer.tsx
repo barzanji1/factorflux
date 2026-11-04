@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Mail, Send } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertCircle, Mail, Search, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NeuButton as Button, NeuInput as Input, NeuTextarea as Textarea } from "@/styles/neu";
 import { EmailTemplatePicker } from "@/components/client-email/email-template-picker";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,6 +43,9 @@ export function ClientEmailComposer({
   const [cc, setCc] = useState("");
   const [template, setTemplate] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientOpen, setClientOpen] = useState(false);
+  const recipientPicker = useRef<HTMLDivElement>(null);
   const requestId = useRef(getRequestId());
   const draftSignature = useRef("");
   const sendGuard = useRef(false);
@@ -74,6 +74,13 @@ export function ClientEmailComposer({
     },
   });
   const selectedClient = useMemo(() => initialClient ?? clients.find((client) => String(client.id) === clientId), [initialClient, clients, clientId]);
+  const filteredClients = useMemo(() => {
+    const query = clientSearch.trim().toLowerCase();
+    if (!query) return clients;
+    return clients.filter((client) =>
+      client.name.toLowerCase().includes(query) || (client.email || "").toLowerCase().includes(query),
+    );
+  }, [clients, clientSearch]);
 
   useEffect(() => {
     if (open) {
@@ -83,6 +90,8 @@ export function ClientEmailComposer({
       setCc("");
       setTemplate("");
       setSelectedTemplate(null);
+      setClientSearch("");
+      setClientOpen(false);
       draftSignature.current = "";
       requestId.current = getRequestId();
     }
@@ -97,6 +106,8 @@ export function ClientEmailComposer({
   };
   const changeClient = (value: string) => {
     setClientId(value);
+    setClientSearch("");
+    setClientOpen(false);
     setTemplate("");
     setSelectedTemplate(null);
     noteDraftChanged(value, subject, body, cc);
@@ -167,22 +178,36 @@ export function ClientEmailComposer({
         <DialogDescription className="text-xs text-[#596d70]">Send-only communication to the assigned client, with optional CC recipients.</DialogDescription>
       </DialogHeader>
       <div className="space-y-4 px-5 py-4">
-        {initialClient ? <div className="space-y-1"><Label>Client</Label><div className="border border-[#bcc8c5] bg-[#f4f7f5] px-3 py-2 text-sm font-semibold">{initialClient.name}</div></div>
+        {initialClient ? <div className="space-y-1"><Label>Client</Label><div className="rounded-xl bg-[#e0e0e0] px-4 py-3 text-sm font-semibold text-[#344244] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">{initialClient.name}</div></div>
           : <div className="space-y-1"><Label htmlFor="client-email-recipient">Client</Label>
-            {clientsLoading ? <div className="h-10 animate-pulse border border-[#c4cfcc] bg-[#dce4e1]" />
-              : clientsError ? <div role="alert" className="flex items-center justify-between border border-[#d2a6a0] bg-[#fff1ee] p-2 text-xs text-[#8d3f36]"><span>Client list could not be loaded.</span><Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button></div>
-                  : clients.length === 0 ? <div className="border border-[#c4cfcc] bg-[#f4f7f5] p-3 text-sm text-[#596d70]">{user?.role === "employee" ? <><p className="font-semibold text-[#334c50]">No clients assigned to you</p><p className="mt-1">Ask an administrator to assign a client before sending email.</p></> : "No clients available for email."}</div>
-                  : <Select value={clientId} onValueChange={changeClient} disabled={sendMutation.isPending}><SelectTrigger id="client-email-recipient" className="min-h-11 rounded-xl border-0 bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><SelectValue placeholder="Choose a client…" /></SelectTrigger><SelectContent className="rounded-xl border-0 bg-[#e0e0e0] shadow-[4px_4px_12px_#b8b8b8]">{clients.map((client) => <SelectItem key={client.id} value={String(client.id)}>{client.name}</SelectItem>)}</SelectContent></Select>}
+            {clientsLoading ? <div className="h-11 animate-pulse rounded-xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" />
+              : clientsError ? <div role="alert" className="flex items-center justify-between gap-3 rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#8d3f36] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><span>Client list could not be loaded.</span><Button className="min-h-8 px-3 text-xs" onClick={() => void refetch()}>Retry</Button></div>
+                  : clients.length === 0 ? <div className="rounded-xl bg-[#e0e0e0] p-3 text-sm text-[#596d70] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">{user?.role === "employee" ? <><p className="font-semibold text-[#334c50]">No clients assigned to you</p><p className="mt-1">Ask an administrator to assign a client before sending email.</p></> : "No clients available for email."}</div>
+                  : <div ref={recipientPicker} className="relative">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#758582]" />
+                      <Input id="client-email-recipient" value={clientOpen ? clientSearch : selectedClient?.name || ""} disabled={sendMutation.isPending}
+                        onFocus={() => { setClientSearch(""); setClientOpen(true); }}
+                        onChange={(event) => { setClientSearch(event.target.value); setClientOpen(true); }}
+                        onBlur={(event) => { if (!recipientPicker.current?.contains(event.relatedTarget as Node | null)) setClientOpen(false); }}
+                        className="pl-10" placeholder="Search clients by name or email…" role="combobox" aria-expanded={clientOpen} aria-controls="client-email-options" aria-autocomplete="list" />
+                    </div>
+                    {clientOpen && <div id="client-email-options" role="listbox" className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-xl bg-[#e0e0e0] p-2 shadow-[6px_6px_14px_#b8b8b8,-6px_-6px_14px_#fff]">
+                      {filteredClients.length ? filteredClients.map((client) => <Button key={client.id} type="button" role="option" aria-selected={String(client.id) === clientId} onMouseDown={(event) => event.preventDefault()} onClick={() => changeClient(String(client.id))} className="min-h-10 w-full justify-start rounded-lg px-3 text-left text-sm">
+                        <span className="flex min-w-0 flex-col items-start"><span>{client.name}</span>{client.email && <span className="text-[10px] font-normal text-[#778480]">{client.email}</span>}</span>
+                      </Button>) : <p className="px-3 py-4 text-center text-xs text-[#758582]">No matching clients.</p>}
+                    </div>}
+                  </div>}
           </div>}
         {selectedClient && <div className={`flex items-start gap-2 border p-2.5 text-xs ${isValidEmail(selectedClient.email) ? "border-[#b7cfca] bg-[#f1f7f4] text-[#345c54]" : "border-[#d6b076] bg-[#fff8e9] text-[#805f26]"}`}>
           {isValidEmail(selectedClient.email) ? <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
           <span>{isValidEmail(selectedClient.email) ? <>To <strong>{selectedClient.email}</strong></> : <>No valid email is on this client profile. Sending is disabled; edit the client profile to add a valid email address.</>}</span>
         </div>}
-        <div className="space-y-1"><Label>From</Label><div className="break-all border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{emailConfig?.from ?? (configError ? "Sender unavailable" : "Loading sender settings…")}</div></div>
-        <div className="space-y-1"><Label>Reply-to</Label><div className="break-all border border-[#c6d0cd] bg-[#f3f6f4] px-3 py-2 text-xs text-[#465b60]">{emailConfig?.replyTo ?? (configError ? "Reply-to unavailable" : "Loading sender settings…")}</div></div>
+        <div className="space-y-1"><Label>From</Label><div className="break-all rounded-xl bg-[#e0e0e0] px-4 py-3 text-xs text-[#465b60] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">{emailConfig?.from ?? (configError ? "Sender unavailable" : "Loading sender settings…")}</div></div>
+        <div className="space-y-1"><Label>Reply-to</Label><div className="break-all rounded-xl bg-[#e0e0e0] px-4 py-3 text-xs text-[#465b60] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">{emailConfig?.replyTo ?? (configError ? "Reply-to unavailable" : "Loading sender settings…")}</div></div>
          <div className="space-y-1">
            <Label htmlFor="client-email-cc">CC <span className="font-normal text-[#71817e]">(optional, up to 20)</span></Label>
-           <Input id="client-email-cc" value={cc} disabled={sendMutation.isPending} onChange={(event) => changeCc(event.target.value)} className={`rounded-sm bg-white ${ccIsInvalid ? "border-[#b75c50] focus-visible:ring-[#b75c50]" : ""}`} placeholder="name@example.com, another@example.com" aria-invalid={ccIsInvalid} aria-describedby="client-email-cc-help" />
+            <Input id="client-email-cc" value={cc} disabled={sendMutation.isPending} onChange={(event) => changeCc(event.target.value)} className={`text-xs ${ccIsInvalid ? "focus-visible:ring-[#b75c50]" : ""}`} placeholder="name@example.com, another@example.com" aria-invalid={ccIsInvalid} aria-describedby="client-email-cc-help" />
            <p id="client-email-cc-help" className={`text-[11px] ${ccIsInvalid ? "text-[#8d3f36]" : "text-[#596d70]"}`}>
              {parsedCc.tooMany
                ? "A maximum of 20 unique CC addresses is allowed."
@@ -195,8 +220,8 @@ export function ClientEmailComposer({
         <div className="rounded-sm border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Replies are monitored outside this app. This is a send-only tool; there is no inbox reader here.</div>
          <EmailTemplatePicker id="email-template" value={template} onChange={applyTemplate} disabled={sendMutation.isPending} />
           <p className="border border-[#d6b076] bg-[#fff8e9] px-3 py-2 text-[11px] leading-relaxed text-[#725927]">Templates are starting text only. [Company] resolves to the selected client name; when unavailable, it falls back to “Valued Client.” Review observed closure dates and hours before sending.</p>
-         <div className="space-y-1"><Label htmlFor="client-email-subject">Subject</Label><Input id="client-email-subject" value={subject} maxLength={200} disabled={sendMutation.isPending} onChange={(event) => changeSubject(event.target.value)} className="rounded-sm bg-white" placeholder="A clear, specific subject" /></div>
-         <div className="space-y-1"><Label htmlFor="client-email-body">Message</Label><Textarea id="client-email-body" value={body} maxLength={20000} disabled={sendMutation.isPending} rows={8} onChange={(event) => changeBody(event.target.value)} className="resize-y rounded-sm bg-white leading-relaxed" placeholder="Write your message…" /></div>
+          <div className="space-y-1"><Label htmlFor="client-email-subject">Subject</Label><Input id="client-email-subject" value={subject} maxLength={200} disabled={sendMutation.isPending} onChange={(event) => changeSubject(event.target.value)} className="text-xs" placeholder="A clear, specific subject" /></div>
+          <div className="space-y-1"><Label htmlFor="client-email-body">Message</Label><Textarea id="client-email-body" value={body} maxLength={20000} disabled={sendMutation.isPending} rows={8} onChange={(event) => changeBody(event.target.value)} className="resize-y text-xs leading-relaxed" placeholder="Write your message…" /></div>
          {selectedTemplate && selectedClient && <div className="border border-[#c6d0cd] bg-[#f4f7f5] p-2.5">
            <p className="mb-1 text-[9px] font-bold uppercase tracking-wide text-[#657977]">Resolved [Company] preview · {selectedClient.name || "Valued Client"}</p>
            <p className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-[#34494c]">{resolvedTemplateBody}</p>
@@ -204,8 +229,8 @@ export function ClientEmailComposer({
         {sendMutation.error && <div role="alert" className="border border-[#d2a6a0] bg-[#fff1ee] px-3 py-2 text-xs text-[#8d3f36]"><strong>Draft retained.</strong> {(sendMutation.error as Error).message} Retry uses the same request ID while the client and message remain unchanged.</div>}
       </div>
       <DialogFooter className="border-t border-[#c5cfcc] bg-[#e1e8e5] px-5 py-3">
-         <Button type="button" variant="outline" className="rounded-sm" disabled={sendMutation.isPending} onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button type="button" className="rounded-sm bg-[#087f8e] text-white hover:bg-[#076c78]" disabled={!canSend} onClick={() => {
+         <Button type="button" className="min-h-9 px-4 text-xs" disabled={sendMutation.isPending} onClick={() => onOpenChange(false)}>Cancel</Button>
+        <Button type="button" variant="accent" className="min-h-9 px-4 text-xs" disabled={!canSend} onClick={() => {
           if (sendGuard.current) return;
           sendGuard.current = true;
           sendMutation.mutate(undefined, { onSettled: () => { sendGuard.current = false; } });

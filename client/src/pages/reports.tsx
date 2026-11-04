@@ -2,15 +2,16 @@ import { useState, useMemo, useRef, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { PageInsights } from "@/components/PageInsights";
 import { apiRequest } from "@/lib/queryClient";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   RecoveryPageFrame, RecoveryCard as Card, RecoveryButton as Button, RecoveryInput as Input, RecoveryBadge,
-  RecoveryTabs as Win95Tabs, RecoveryTabList as Win95TabsList, RecoveryTab as Win95TabsTrigger,
+  RecoveryTabs as NeuTabs, RecoveryTabList as NeuTabList, RecoveryTab as NeuTab,
   RecoveryStatCard, RecoveryTable, RecoveryDialogContent as DialogContent,
 } from "@/components/recovery/recovery-controls";
 import "@/components/recovery/recovery-neu.css";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -802,11 +803,11 @@ function SearchableEntitySelect({ label, items, value, onChange, placeholder }: 
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <Input value={open ? search : selected?.name ?? ""} onFocus={() => { setSearch(""); setOpen(true); }}
         onChange={e => { setSearch(e.target.value); setOpen(true); }} placeholder={placeholder} className="h-10 pl-9 pr-9" />
-      {selected && <button type="button" onClick={() => { onChange(""); setSearch(""); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>}
+      {selected && <Button type="button" aria-label="Clear selection" onClick={() => { onChange(""); setSearch(""); }} className="absolute right-2 top-1/2 !min-h-8 !w-8 -translate-y-1/2 !rounded-full !p-0 !text-[#65807b]"><X className="h-4 w-4" /></Button>}
     </div>
     {open && <div className="ff-reports-surface absolute z-30 mt-1 max-h-60 w-full overflow-auto border bg-white p-1 shadow-xl dark:bg-slate-900">
-      {filtered.length ? filtered.map(item => <button key={item.id} type="button" onClick={() => { onChange(String(item.id)); setOpen(false); setSearch(""); }}
-        className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">{item.name}</button>)
+      {filtered.length ? filtered.map(item => <Button key={item.id} type="button" onClick={() => { onChange(String(item.id)); setOpen(false); setSearch(""); }}
+        className="!min-h-10 w-full justify-start rounded-xl px-3 py-2 text-left text-sm font-medium">{item.name}</Button>)
         : <p className="px-3 py-5 text-center text-xs text-slate-500">No matches found</p>}
     </div>}
   </div>;
@@ -899,10 +900,10 @@ function CarrierArTab() {
       <CardContent className="grid gap-5 p-5 lg:grid-cols-2">
         {Array.from(new Set(CARRIER_BROKER_REPORTS.map(item => item.category))).map(category => <section key={category}>
           <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{category}</h3>
-          <div className="ff-reports-surface divide-y overflow-hidden border">{CARRIER_BROKER_REPORTS.filter(item => item.category === category).map(item => <button key={item.id} type="button" onClick={() => setReport(item)}
-            className={cn("ff-reports-link flex w-full items-center justify-between px-3 py-2.5 text-left text-sm", report?.id === item.id && "font-semibold text-[#087d8d]")}>
+          <div className="ff-reports-surface divide-y overflow-hidden border">{CARRIER_BROKER_REPORTS.filter(item => item.category === category).map(item => <Button key={item.id} type="button" onClick={() => setReport(item)}
+            className={cn("ff-reports-link !min-h-12 flex w-full items-center justify-between rounded-none px-3 py-2.5 text-left text-sm", report?.id === item.id && "font-semibold !text-[#087d8d]")}>
             <span>{item.title}</span><ChevronRight className="h-4 w-4" />
-          </button>)}</div>
+          </Button>)}</div>
         </section>)}
       </CardContent>
     </Card>}
@@ -1035,10 +1036,10 @@ function GlobalReportsTab() {
         </CardHeader>
         <CardContent className="p-2">
           <div className="divide-y dark:divide-slate-800">
-            {group.reports.map(item => <button key={item.id} type="button" onClick={() => setReportId(item.id)}
-              className={cn("ff-reports-link flex w-full items-center justify-between gap-2 px-2.5 py-2.5 text-left text-sm", reportId === item.id && "font-semibold text-[#087d8d]")}>
+            {group.reports.map(item => <Button key={item.id} type="button" onClick={() => setReportId(item.id)}
+              className={cn("ff-reports-link !min-h-12 flex w-full items-center justify-between gap-2 rounded-none px-2.5 py-2.5 text-left text-sm", reportId === item.id && "font-semibold !text-[#087d8d]")}>
               <span>{item.label}</span><ChevronRight className="h-4 w-4 shrink-0 opacity-60" />
-            </button>)}
+            </Button>)}
           </div>
         </CardContent>
       </Card>)}
@@ -1097,19 +1098,21 @@ export default function Reports() {
               </div>
             </div>
 
-            <Win95Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabId)}>
-              <Win95TabsList>
+            <PageInsights entity="reports" section={activeTab} title={`${TABS.find(tab => tab.id === activeTab)?.label ?? "Global"} report summary`} />
+
+            <NeuTabs value={activeTab} onValueChange={value => setActiveTab(value as TabId)}>
+              <NeuTabList>
                 {TABS.map(tab => {
                   const Icon = tab.icon;
                   return (
-                    <Win95TabsTrigger key={tab.id} value={tab.id}>
+                    <NeuTab key={tab.id} value={tab.id}>
                       <Icon className="h-4 w-4" />
                       {tab.label}
-                    </Win95TabsTrigger>
+                    </NeuTab>
                   );
                 })}
-              </Win95TabsList>
-            </Win95Tabs>
+              </NeuTabList>
+            </NeuTabs>
 
             <div>
               {activeTab === "global"   && <GlobalReportsTab />}

@@ -73,7 +73,6 @@ import LegacyTicketRedirect from "@/pages/legacy-ticket-redirect";
 import PortalChat from "@/pages/portal/chat";
 import { TeamChatWorkspace } from "@/pages/chat";
 import ClientEmailPage from "@/pages/client-email";
-import EmailLog from "@/pages/email-log";
 import ItSupport from "@/pages/it-support";
 
 function Router() {
@@ -122,9 +121,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/email-log">
-        <ProtectedRoute>
-          <EmailLog />
-        </ProtectedRoute>
+        <ProtectedRoute><Redirect to="/client-email?tab=log" /></ProtectedRoute>
       </Route>
       <Route path="/invoices">
         <ProtectedRoute>

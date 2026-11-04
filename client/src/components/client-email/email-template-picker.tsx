@@ -2,11 +2,9 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw, Save } from "lucide-react";
 import type { EmailTemplate } from "../../../../shared/email-templates";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuButton as Button, NeuInput as Input, NeuTextarea as Textarea } from "@/styles/neu";
 
 const templatesKey = ["/api/client-email/templates"];
 
@@ -61,17 +59,17 @@ export function EmailTemplatePicker({
   return <div className="space-y-1.5">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <Label htmlFor={id}>Optional shared template</Label>
-      <Button type="button" variant="outline" size="sm" className="h-7 rounded-sm px-2 text-[10px]" disabled={disabled} onClick={() => setDialogOpen(true)}>
+      <Button type="button" className="min-h-8 px-3 text-[10px]" disabled={disabled} onClick={() => setDialogOpen(true)}>
         <Plus className="mr-1 h-3 w-3" />Add custom template
       </Button>
     </div>
     {templatesQuery.isLoading
-      ? <div className="h-8 animate-pulse border border-[#c6d0cd] bg-[#dce5e1]" aria-label="Loading email templates" />
+        ? <div className="h-10 animate-pulse rounded-xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]" aria-label="Loading email templates" />
       : templatesQuery.error
-        ? <div role="alert" className="flex items-center justify-between gap-2 border border-[#d3a49e] bg-[#fff1ee] p-2 text-[10px] text-[#8d433a]"><span>{(templatesQuery.error as Error).message}</span><Button type="button" size="sm" variant="outline" onClick={() => void templatesQuery.refetch()}>Retry</Button></div>
+        ? <div role="alert" className="flex items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] p-2 text-[10px] text-[#8d433a] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><span>{(templatesQuery.error as Error).message}</span><Button type="button" className="min-h-8 px-3 text-[10px]" onClick={() => void templatesQuery.refetch()}>Retry</Button></div>
         : <select id={id} value={value || "none"} disabled={disabled}
             onChange={(event) => onChange(event.target.value === "none" ? null : templatesQuery.data?.find((template) => template.id === event.target.value) || null)}
-            className="h-10 w-full rounded-xl border-0 bg-[#e0e0e0] px-3 text-xs text-[#344244] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] focus:outline-none focus:ring-2 focus:ring-[#27aab8] disabled:opacity-50">
+            className="h-11 w-full rounded-xl border-0 bg-[#e0e0e0] px-4 text-xs text-[#344244] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff] focus:outline-none focus:ring-2 focus:ring-[#27aab8] disabled:opacity-50">
           <option value="none">No template</option>
           {(templatesQuery.data || []).map((template) => <option key={template.id} value={template.id}>{template.name}{template.kind === "custom" ? " · Shared" : ""}</option>)}
         </select>}
@@ -85,15 +83,15 @@ export function EmailTemplatePicker({
           <DialogDescription className="text-[10px] text-[#596d70]">Save reusable starting text for both client email composers. Your current draft is unchanged until you select the saved template.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 p-4">
-          <div className="space-y-1"><Label htmlFor={`${id}-template-name`}>Template name</Label><Input id={`${id}-template-name`} value={name} maxLength={100} disabled={saveMutation.isPending} onChange={(event) => setName(event.target.value)} className="rounded-sm bg-white text-xs" placeholder="For example, Holiday closure notice" /><p className="text-right text-[9px] text-[#84918f]">{name.length}/100</p></div>
-          <div className="space-y-1"><Label htmlFor={`${id}-template-subject`}>Subject</Label><Input id={`${id}-template-subject`} value={subject} maxLength={200} disabled={saveMutation.isPending} onChange={(event) => setSubject(event.target.value)} className="rounded-sm bg-white text-xs" placeholder="A clear, specific subject" /></div>
-          <div className="space-y-1"><Label htmlFor={`${id}-template-body`}>Message</Label><Textarea id={`${id}-template-body`} value={body} maxLength={20000} rows={7} disabled={saveMutation.isPending} onChange={(event) => setBody(event.target.value)} className="resize-y rounded-sm bg-white text-xs leading-relaxed" placeholder="Write reusable message text…" /></div>
+          <div className="space-y-1"><Label htmlFor={`${id}-template-name`}>Template name</Label><Input id={`${id}-template-name`} value={name} maxLength={100} disabled={saveMutation.isPending} onChange={(event) => setName(event.target.value)} className="text-xs" placeholder="For example, Holiday closure notice" /><p className="text-right text-[9px] text-[#84918f]">{name.length}/100</p></div>
+          <div className="space-y-1"><Label htmlFor={`${id}-template-subject`}>Subject</Label><Input id={`${id}-template-subject`} value={subject} maxLength={200} disabled={saveMutation.isPending} onChange={(event) => setSubject(event.target.value)} className="text-xs" placeholder="A clear, specific subject" /></div>
+          <div className="space-y-1"><Label htmlFor={`${id}-template-body`}>Message</Label><Textarea id={`${id}-template-body`} value={body} maxLength={20000} rows={7} disabled={saveMutation.isPending} onChange={(event) => setBody(event.target.value)} className="resize-y text-xs leading-relaxed" placeholder="Write reusable message text…" /></div>
           {saveMutation.error && <div role="alert" className="border border-[#d3a49e] bg-[#fff1ee] p-2.5 text-[10px] leading-relaxed text-[#8d433a]"><strong>Template not saved.</strong> {(saveMutation.error as Error).message} Your composer draft is retained. You can retry.</div>}
           {saveMutation.isSuccess && <p role="status" className="text-[10px] text-[#28644f]">Template saved and selected.</p>}
         </div>
         <DialogFooter className="flex flex-wrap justify-end gap-2 border-t border-[#c5cfcc] bg-[#e1e8e5] px-4 py-3">
-          <Button type="button" variant="outline" className="h-8 rounded-sm text-xs" disabled={saveMutation.isPending} onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button type="button" className="h-8 rounded-sm bg-[#087f8e] text-xs text-white hover:bg-[#076c78]" disabled={saveMutation.isPending || !name.trim() || !subject.trim() || !body.trim()} onClick={() => saveMutation.mutate()}>
+          <Button type="button" className="min-h-9 px-4 text-xs" disabled={saveMutation.isPending} onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button type="button" variant="accent" className="min-h-9 px-4 text-xs" disabled={saveMutation.isPending || !name.trim() || !subject.trim() || !body.trim()} onClick={() => saveMutation.mutate()}>
             <Save className="mr-1.5 h-3.5 w-3.5" />{saveMutation.isPending ? "Saving…" : "Save shared template"}
           </Button>
         </DialogFooter>

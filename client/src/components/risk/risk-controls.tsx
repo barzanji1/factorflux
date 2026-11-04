@@ -55,7 +55,7 @@ const buttonSizes: Record<RiskButtonSize, string> = {
 
 const buttonVariants: Record<RiskButtonVariant, string> = {
   default: "!bg-[#e0e0e0] !text-[#444] hover:!text-[#168d99]",
-  accent: "!bg-[#27aab8] !text-white hover:!bg-[#2398a4]",
+  accent: "!bg-[#e0e0e0] !text-[#168d99] hover:!bg-[#e0e0e0] hover:!text-[#087f8c]",
   destructive: "!bg-[#b94e4e] !text-white hover:!bg-[#a94343]",
   outline: "!border-0 !bg-[#e0e0e0] !text-[#444] hover:!text-[#168d99]",
   secondary: "!bg-[#d5d5d5] !text-[#444]",

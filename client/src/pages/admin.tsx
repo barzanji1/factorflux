@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAdminToast, AdminPageShell, Button, Badge, Input, Card, CardContent, CardDescription, CardHeader, CardTitle, DialogContent, AlertDialogContent, SelectContent, Tabs as Win95Tabs, TabsList as Win95TabsList, TabsTrigger as Win95TabsTrigger, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin-neu/adapters";
+import { useAdminToast, AdminPageShell, Button, Badge, Input, Card, CardContent, CardDescription, CardHeader, CardTitle, DialogContent, AlertDialogContent, SelectContent, Tabs as NeuTabs, TabsList as NeuTabList, TabsTrigger as NeuTab, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin-neu/adapters";
 import "@/components/admin-neu/admin-neu-page.css";
 import Sidebar from "@/components/layout/sidebar";
 import { TopNav } from "@/components/admin-neu/adapters";
@@ -11,7 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -696,16 +696,16 @@ export default function Admin() {
             </div>
 
             {/* ── Tab Navigation ── */}
-            <Win95Tabs value={activeTab} onValueChange={value => setActiveTab(value as Tab)}>
-              <Win95TabsList>
+            <NeuTabs value={activeTab} onValueChange={value => setActiveTab(value as Tab)}>
+              <NeuTabList>
                 {TABS.map((tab) => (
-                  <Win95TabsTrigger key={tab.id} value={tab.id}>
+                  <NeuTab key={tab.id} value={tab.id}>
                     <tab.icon className="h-4 w-4" />
                     {tab.label}
-                  </Win95TabsTrigger>
+                  </NeuTab>
                 ))}
-              </Win95TabsList>
-            </Win95Tabs>
+              </NeuTabList>
+            </NeuTabs>
 
             {/* ══════════════════════════════════════════════════════════════ */}
             {/* TAB: USERS                                                     */}
@@ -1667,9 +1667,9 @@ export default function Admin() {
                    <div className="ff-admin-section-header mb-2 flex items-center gap-2 px-3 py-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{section.label}</p>
                     <div className="flex-1 border-t border-slate-100 dark:border-slate-800" />
-                    <button
+                    <Button
                       type="button"
-                       className="bevel-button bg-[#d4d0c8] px-2 py-1 text-[10px] text-slate-700"
+                       className="!min-h-8 rounded-full px-3 py-1 text-[10px] text-slate-700"
                       onClick={() => {
                         const allOn = section.items.every(i => activeToggles[i.key]);
                         setPermToggles(prev => ({
@@ -1680,7 +1680,7 @@ export default function Admin() {
                       }}
                     >
                       {section.items.every(i => activeToggles[i.key]) ? "Disable all" : "Enable all"}
-                    </button>
+                    </Button>
                   </div>
                    <div className="grid grid-cols-2 gap-x-3 gap-y-3 p-3 pt-1 sm:grid-cols-3">
                     {section.items.map((item) => (

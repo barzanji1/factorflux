@@ -4,6 +4,7 @@ import * as schema from "@shared/schema";
 import type { InsightEntity, PageInsights } from "@shared/page-insights";
 import { db } from "../db";
 import { IT_CONTACT_USER_ID } from "./itSupport";
+import { insightPresentation, insightProjection } from "./pageInsightPresentation";
 
 type Definition = {
   table: AnyPgTable; permission: string; amount?: string; cents?: boolean;
@@ -22,11 +23,11 @@ export const insightDefinitions: Record<InsightEntity, Definition> = {
   "email-log": { table: schema.emailLog, permission: "all_authenticated" },
   "client-email": { table: schema.clientEmailLogs, permission: "client_email", owner: "agentId" },
   factoring: { ...invoice, permission: "factoring" },
-  sheets: { ...invoice, permission: "factoring", filter: sql`${schema.invoices.status} = 'approved'` },
+   sheets: { ...invoice, permission: "factoring" },
   payouts: { table: schema.payouts, permission: "payments", amount: "advanceAmount", state: "paymentStatus" },
-  "cash-application": { table: schema.cashApplications, permission: "payments", amount: "totalReceived" },
-  lockbox: { table: schema.lockboxEntries, permission: "lockbox", amount: "amount" },
-  "fuel-advance": { table: schema.fuelAdvances, permission: "fuel_advance", amount: "advanceAmount" },
+   "cash-application": { table: schema.cashApplications, permission: "payments", amount: "totalReceived", date: "paymentDate" },
+   lockbox: { table: schema.lockboxEntries, permission: "lockbox", amount: "amount", date: "receivedDate" },
+   "fuel-advance": { table: schema.fuelAdvances, permission: "fuel_advance", amount: "advanceAmount", date: "advanceDate" },
   "bank-transfers": { table: schema.bankTransfers, permission: "bank_transfers", amount: "amount" },
   held: { ...invoice, permission: "held", filter: sql`${schema.invoices.status} = 'held'` },
   exceptions: { table: schema.exceptions, permission: "payments" },
@@ -41,8 +42,8 @@ export const insightDefinitions: Record<InsightEntity, Definition> = {
   "bulk-invoices": { table: schema.bulkInvoiceBatches, permission: "bulk_invoices", amount: "totalAmount", owner: "createdBy" },
   "portal-submissions": { table: schema.carrierSubmissions, permission: "portal_submissions", amount: "amount" },
   admin: { table: schema.users, permission: "admin" },
-  payroll: { table: schema.payrollEntries, permission: "payroll", amount: "netPay" },
-  expenses: { table: schema.expenses, permission: "expenses", amount: "amountCents", cents: true, owner: "submittedBy" },
+   payroll: { table: schema.payrollEntries, permission: "payroll", amount: "netPay", date: "payPeriodEnd" },
+   expenses: { table: schema.expenses, permission: "expenses", amount: "amountCents", cents: true, owner: "submittedBy", date: "expenseDate" },
   vault: { table: schema.clientVault, permission: "vault", state: "isActive" },
   "document-rules": { table: schema.documentRules, permission: "rules", state: "active" },
   "workflow-builder": { table: schema.invoices, permission: "workflow_builder", state: "status", amount: "amount", owner: "submittedBy" },
@@ -59,7 +60,7 @@ export function buildInsightQuery(entity: InsightEntity, actor: InsightActor, in
   let definition = insightDefinitions[entity];
   if (entity === "admin" && input.section) {
     const sections: Record<string, Definition> = {
-      timetracking: { table: schema.timeEntries, permission: "admin" },
+       timetracking: { table: schema.timeEntries, permission: "admin", date: "clockInTime" },
       portal: { table: schema.carrierPortalUsers, permission: "admin" },
       factoring: { ...invoice, permission: "admin" },
       documents: { table: schema.documentRules, permission: "admin", state: "active" },
@@ -102,9 +103,10 @@ export function buildInsightQuery(entity: InsightEntity, actor: InsightActor, in
   const open = stateColumn && !["role", "type", "eventType"].includes(definition.state ?? "")
     ? sql`count(*) FILTER (WHERE state NOT IN ('paid','completed','closed','resolved','cancelled','canceled','inactive','suspended','failed','rejected','written_off','charged_back','unknown','posted','void','matched','reserve_released'))`
     : sql`count(*) FILTER (WHERE occurred_at >= current_date)`;
-  const query = sql`
+   const presentation = insightPresentation(entity, input.section);
+   const query = sql`
     WITH normalized AS MATERIALIZED (
-      SELECT ${state} AS state, ${date} AS occurred_at, ${amount} AS amount
+       SELECT ${state} AS state, ${date} AS occurred_at, ${amount} AS amount ${insightProjection(columns, entity)}
       FROM ${definition.table} WHERE ${where}
     ), ranked AS (
       SELECT state, count(*)::int AS value, row_number() OVER (ORDER BY count(*) DESC, state) AS rank
@@ -120,11 +122,12 @@ export function buildInsightQuery(entity: InsightEntity, actor: InsightActor, in
       SELECT to_char(d, 'YYYY-MM') AS period, coalesce(m.count, 0) AS count, coalesce(m.amount, 0) AS amount
       FROM generate_series(date_trunc('month', now()) - interval '5 months', date_trunc('month', now()), interval '1 month') d
       LEFT JOIN months m ON m.period = d ORDER BY d
-    )
+     ) ${presentation.ctes}
     SELECT count(*)::int AS total, ${open}::int AS open,
       ${amountColumn ? sql`coalesce(sum(amount), 0)::float8` : sql`count(*) FILTER (WHERE occurred_at BETWEEN now() - interval '30 days' AND now())::float8`} AS metric,
       coalesce((SELECT jsonb_agg(b ORDER BY b.value DESC, b.name) FROM breakdown b), '[]'::jsonb) AS breakdown,
-      coalesce((SELECT jsonb_agg(s ORDER BY s.period) FROM series s), '[]'::jsonb) AS series
+       coalesce((SELECT jsonb_agg(s ORDER BY s.period) FROM series s), '[]'::jsonb) AS series,
+       ${presentation.metrics} AS extra_metrics, ${presentation.charts} AS charts
     FROM normalized`;
   return { query, metricLabel: definition.metric ?? (currency ? "Total amount" : "Last 30 days"), format: currency ? "currency" as const : "number" as const,
     openLabel: stateColumn && !["role", "type", "eventType"].includes(definition.state ?? "") ? "Open / active" : "Recorded today" };
@@ -133,10 +136,12 @@ export function buildInsightQuery(entity: InsightEntity, actor: InsightActor, in
 export async function readPageInsights(entity: InsightEntity, actor: InsightActor, input: InsightInput): Promise<PageInsights> {
   const { query, metricLabel, format, openLabel } = buildInsightQuery(entity, actor, input);
   const result = await db.execute(query);
-  const row = result.rows[0] as { total: number; open: number; metric: number; breakdown: PageInsights["breakdown"]; series: PageInsights["series"] };
+   const row = result.rows[0] as { total: number; open: number; metric: number; breakdown: PageInsights["breakdown"]; series: PageInsights["series"]; extra_metrics: PageInsights["extraMetrics"]; charts: PageInsights["charts"] };
   return {
     total: Number(row.total), open: Number(row.open), openLabel,
     keyMetric: { label: metricLabel, value: Number(row.metric), format },
-    breakdown: row.breakdown, series: row.series,
+     breakdown: row.breakdown, series: row.series,
+     ...(row.extra_metrics ? { extraMetrics: row.extra_metrics } : {}),
+     ...(row.charts ? { charts: row.charts } : {}),
   };
 }

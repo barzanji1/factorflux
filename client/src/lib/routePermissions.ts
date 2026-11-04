@@ -35,13 +35,18 @@ export const ROUTE_PERMISSION_MAP: Record<string, string> = {
   "/expenses": "expenses",
   "/tickets": "tickets",
   "/chat": "chat",
-  "/client-email": "client_email",
+  // The Email route hosts Log for every authenticated employee. Compose is
+  // gated inside ClientEmailPage with the client_email permission.
+  "/client-email": "",
 };
 
 export function pathToPermission(pathname: string): string | null {
-  if (ROUTE_PERMISSION_MAP[pathname]) return ROUTE_PERMISSION_MAP[pathname];
+  const path = pathname.split(/[?#]/, 1)[0];
+  if (Object.prototype.hasOwnProperty.call(ROUTE_PERMISSION_MAP, path)) {
+    return ROUTE_PERMISSION_MAP[path] || null;
+  }
   for (const [route, permission] of Object.entries(ROUTE_PERMISSION_MAP)) {
-    if (route !== "/" && pathname.startsWith(`${route}/`)) return permission;
+    if (permission && route !== "/" && path.startsWith(`${route}/`)) return permission;
   }
   return null;
 }

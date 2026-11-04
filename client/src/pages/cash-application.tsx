@@ -6,7 +6,7 @@ import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { FundingButton as Button, FundingInput as Input, FundingDialogContent as DialogContent, FundingSelectTrigger as SelectTrigger, FundingSelectContent as SelectContent } from "@/components/funding/funding-controls";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { FFEmpty } from "@/components/ui/ff-empty";
 import {
   Dialog,
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { NeuButton } from "@/styles/neu";
 import {
   Plus,
   Search,
@@ -285,19 +286,20 @@ export default function CashApplication() {
                       <SelectItem value="overpaid">Overpaid</SelectItem>
                     </SelectContent>
                   </Select>
-                  <button
+                  <NeuButton
                     onClick={() => setShowNewPayment(true)}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-blue-600 px-4 text-[12px] font-semibold text-white transition-colors hover:bg-blue-700"
+                    variant="accent"
+                    className="!min-h-9 rounded-full px-4 text-[12px] font-semibold"
                   >
                     <Plus className="h-3.5 w-3.5" /> Record Payment
-                  </button>
+                  </NeuButton>
                 </div>
               </div>
 
               {/* Body */}
               {isLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                <div className="space-y-3 px-4 py-8" aria-label="Loading payments">
+                  {[0, 1, 2, 3].map(row => <div key={row} className="grid grid-cols-[1fr_2fr_1fr] gap-4 rounded-xl bg-[#e0e0e0] p-4 shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]"><span className="h-3 animate-pulse rounded bg-[#ccd5d2]" /><span className="h-3 animate-pulse rounded bg-[#ccd5d2]" /><span className="h-3 animate-pulse rounded bg-[#ccd5d2]" /></div>)}
                 </div>
               ) : filtered.length === 0 ? (
                 <FFEmpty
@@ -366,13 +368,14 @@ export default function CashApplication() {
                             </td>
                             <td className="pr-5">
                               {needsAction && (
-                                <button
+                                <NeuButton
                                   onClick={() => handleApplyOpen(p)}
-                                  className="inline-flex items-center gap-1.5 rounded-[8px] bg-blue-600 px-3 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:bg-blue-700"
+                                  variant="accent"
+                                  className="!min-h-9 rounded-xl px-3 py-1.5 text-[11.5px] font-semibold"
                                 >
                                   <ArrowRightLeft className="h-3.5 w-3.5" />
                                   Match
-                                </button>
+                                </NeuButton>
                               )}
                             </td>
                           </tr>

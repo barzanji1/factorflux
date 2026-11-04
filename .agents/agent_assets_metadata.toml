@@ -50,3 +50,17 @@ mtime_ms = 1791909787273
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/3ecd672e-5d1c-4938-9110-715d6e76036a/311f7dc2-bfbd-4817-88d6-8fdfdadae3ac"
 storage_version_token = "1791909856993600"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "n2yhlgyhsT2nehwnoQNOp"
+uri = "file://generated-artifacts/neu-rollout/changes.html"
+type = "html"
+title = "Neumorphic rollout — full diff and audit"
+description = "Complete patch for all 61 touched files, validation results, and the whole-client legacy-style audit."
+logical_id = "b49b06a9-b03d-4d21-a11c-dc872f088590"
+content_hash = "sha256:18266250ba8fc68b7272acdbc72e479f7dfb63ab3089b929aa842d67cf184e41"
+size = 370191
+mtime_ms = 1793758085985
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/b49b06a9-b03d-4d21-a11c-dc872f088590/30bcb06f-befb-4c71-8add-6ff669ff612c"
+storage_version_token = "1793758122497336"
+content_type = "text/html"

@@ -11,7 +11,7 @@ import { CardContent } from "@/components/ui/card";
 import { RiskCard as Card, RiskButton as Button, RiskInput as Input, RiskDialogContent as DialogContent, RiskSelectContent as SelectContent, RiskSelectTrigger as SelectTrigger, RiskStatCard, RiskBadge, RiskTable } from "@/components/risk/risk-controls";
 import { NeuPageShell } from "@/styles/neu/components";
 import "@/components/risk/risk-neu.css";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import {
   Dialog,
   DialogHeader,

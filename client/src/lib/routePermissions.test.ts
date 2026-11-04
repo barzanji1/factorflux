@@ -17,3 +17,9 @@ test("action-grid destinations retain their existing permission boundaries", () 
     ["/ai-assistant", "earl"],
   ]) assert.equal(pathToPermission(path), permission);
 });
+
+test("email log stays available to authenticated staff; composing is gated in the page", () => {
+  assert.equal(pathToPermission("/client-email"), null);
+  assert.equal(pathToPermission("/client-email?tab=log"), null);
+  assert.equal(pathToPermission("/client-email?tab=compose"), null);
+});

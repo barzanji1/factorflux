@@ -17,6 +17,12 @@ body:has(.risk-neu-page) [role="listbox"].risk-neu-select {
   border-radius: 16px !important;
   box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
 }
+.risk-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"] {
+  top:12px!important;right:12px!important;width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;
+  border:0!important;border-radius:50%!important;background:#e0e0e0!important;color:#677b77!important;
+  box-shadow:-3px -3px 7px #fff,3px 3px 7px #b8b8b8!important;
+}
+.risk-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"]:hover { color:#087f8c!important; }
 
 .risk-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .risk-neu-page main textarea,
@@ -64,19 +70,19 @@ body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog button:hover:not(:disab
 .risk-neu-page main button.risk-neu-accent,
 .risk-neu-dialog button.risk-neu-accent,
 body:has(.risk-neu-page) [role="dialog"] button.risk-neu-accent {
-  background: #27aab8 !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
   box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
 }
 .risk-neu-page main button.risk-neu-accent:hover:not(:disabled),
 .risk-neu-dialog button.risk-neu-accent:hover:not(:disabled) {
-  background: #2398a4 !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #087f8c !important;
 }
 .risk-neu-page main button.risk-neu-danger,
 .risk-neu-dialog button.risk-neu-danger {
-  background: #b94e4e !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
 }
 
 .risk-neu-page main table {
@@ -238,14 +244,14 @@ body:has(.risk-neu-page) [role="dialog"].risk-neu-dialog {
 
 .risk-neu-page.risk-neu-page.risk-neu-page main button.risk-neu-accent,
 .risk-neu-dialog.risk-neu-dialog.risk-neu-dialog button.risk-neu-accent {
-  background: #27aab8 !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
 }
 
 .risk-neu-page.risk-neu-page.risk-neu-page main button.risk-neu-danger,
 .risk-neu-dialog.risk-neu-dialog.risk-neu-dialog button.risk-neu-danger {
-  background: #b94e4e !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
 }
 
 .risk-neu-page.risk-neu-page.risk-neu-page main [class*="border-t-white"] {

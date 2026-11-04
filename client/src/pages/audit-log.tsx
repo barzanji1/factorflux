@@ -532,15 +532,15 @@ export default function AuditLog() {
                               <td><Button size="sm" variant="outline" aria-label={`${isExpanded ? "Collapse" : "Expand"} log details`} onClick={() => setExpandedId(isExpanded ? null : e.id)}>{isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></td>
                             </tr>
                             {isExpanded && (
-                              <tr key={`${e.id}-detail`}><td colSpan={6} className="!bg-[#f0f0f0]">
+                               <tr key={`${e.id}-detail`}><td colSpan={6} className="!bg-[#e0e0e0]">
                                  <Card className="ff-card ff-audit-surface ff-audit-detail risk-neu-pressed p-4">
                                    <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">{detailView.title}</p>
-                                   <div className="overflow-hidden rounded-xl border-2 border-[#808080] bg-white">
+                                    <div className="overflow-hidden rounded-xl bg-[#e0e0e0] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
                                      <RiskTable className="w-full text-xs">
                                        <tbody>
                                          {detailView.rows.map(row => (
                                            <tr key={row.label} className="border-b border-slate-200 last:border-b-0">
-                                             <th className="w-1/3 bg-[#d4d0c8] px-3 py-2 text-left font-semibold text-slate-600">
+                                              <th className="w-1/3 bg-[#d4d4d4] px-3 py-2 text-left font-semibold text-slate-600">
                                                {row.label}
                                              </th>
                                              <td className="break-words px-3 py-2 text-slate-900">

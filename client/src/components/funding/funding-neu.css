@@ -9,6 +9,23 @@
   min-height: 0;
 }
 
+.funding-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"] {
+  right: 12px !important;
+  top: 12px !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #e0e0e0 !important;
+  color: #677b77 !important;
+  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8 !important;
+}
+.funding-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"]:hover {
+  color: #087f8c !important;
+}
+
 .funding-neu-page.funding-neu-page.funding-neu-page .funding-neu-surface,
 .funding-neu-page.funding-neu-page.funding-neu-page main [class*="ff-card"],
 .funding-neu-page.funding-neu-page.funding-neu-page main [class*="ff-dashboard-card"],
@@ -88,31 +105,32 @@
 .funding-neu-dialog button[class*="bg-blue-"],
 .funding-neu-dialog button[class*="bg-emerald-"],
 .funding-neu-dialog button[class*="bg-primary"] {
-  background: #27aab8 !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
   box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-accent,
 .funding-neu-dialog button.funding-neu-accent,
 body:has(.funding-neu-page) [role="dialog"] button.funding-neu-accent {
-  background: #27aab8 !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #168d99 !important;
   box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger,
 .funding-neu-dialog button.funding-neu-danger,
 body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger {
-  background: #b94e4e !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
+  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger:hover:not(:disabled),
 .funding-neu-dialog button.funding-neu-danger:hover:not(:disabled),
 body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger:hover:not(:disabled) {
-  background: #a94343 !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main table,
@@ -283,8 +301,8 @@ body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger,
 .funding-neu-dialog.funding-neu-dialog.funding-neu-dialog button.funding-neu-danger {
-  background: #b94e4e !important;
-  color: #fff !important;
+  background: #e0e0e0 !important;
+  color: #a3483e !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page.funding-neu-page .ff-top-nav button:not([class~="rounded-full"]) {

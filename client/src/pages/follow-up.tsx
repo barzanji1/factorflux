@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import type { MouseEvent } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Textarea } from "@/components/ui/textarea";
+import { NeuTextarea as Textarea } from "@/styles/neu";
 import { PageInsights } from "@/components/PageInsights";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -11,10 +11,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import {
   RecoveryPageFrame as PageShell, RecoveryBadge as Badge, RecoveryButton as Button,
   RecoveryCard as Card, RecoveryCardContent as CardContent, RecoveryInput as Input, RecoverySelectContent as SelectContent,
-  RecoverySelectTrigger as SelectTrigger, RecoveryStatCard as Win95StatCard,
-  RecoveryTable as Win95Table, RecoveryTableBody as Win95TableBody,
-  RecoveryTableCell as Win95TableCell, RecoveryTableHead as Win95TableHead,
-  RecoveryTableHeader as Win95TableHeader, RecoveryTableRow as Win95TableRow,
+  RecoverySelectTrigger as SelectTrigger,
+  RecoveryTable as NeuTable, RecoveryTableBody as NeuTableBody,
+  RecoveryTableCell as NeuTableCell, RecoveryTableHead as NeuTableHead,
+  RecoveryTableHeader as NeuTableHeader, RecoveryTableRow as NeuTableRow,
   RecoveryTabs as Tabs, RecoveryTabsContent as TabsContent, RecoveryTabList as TabsList,
   RecoveryTab as TabsTrigger, RecoveryDialogContent as DialogContent, useRecoveryToast,
 } from "@/components/recovery/recovery-controls";
@@ -285,14 +285,14 @@ function TemplateDialog({
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {PLACEHOLDERS.map(ph => (
-                  <button
+                  <Button
                     key={ph}
                     type="button"
                     onClick={() => insertPlaceholder(ph)}
-                    className="bevel-button bg-[#d4d0c8] px-2 py-0.5 text-[11px] font-mono text-slate-700"
+                    className="!min-h-8 rounded-full px-3 py-1 text-[11px] font-mono text-[#45605c]"
                   >
                     {ph}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -301,17 +301,17 @@ function TemplateDialog({
               <FormItem>
                 <div className="flex items-center justify-between mb-1">
                   <FormLabel>Email Body</FormLabel>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setPreview(v => !v)}
-                    className="bevel-button flex items-center gap-1 bg-[#d4d0c8] px-2 py-1 text-[11px] text-slate-700"
+                    className="!min-h-8 flex items-center gap-1 px-3 py-1 text-[11px]"
                   >
                     <Eye className="h-3 w-3" />
                     {preview ? "Edit" : "Preview"}
-                  </button>
+                  </Button>
                 </div>
                 {preview ? (
-                  <div className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] p-3 space-y-2">
+                  <div className="rounded-2xl bg-[#e0e0e0] p-3 shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8] space-y-2">
                     <p className="text-[11px] font-semibold text-slate-500">Subject:</p>
                     <p className="text-[13px] text-slate-800 dark:text-slate-200">{applyPreview(subject)}</p>
                     <hr className="border-slate-200 dark:border-slate-700" />
@@ -335,7 +335,7 @@ function TemplateDialog({
             )} />
 
             <FormField control={form.control} name="isDefault" render={({ field }) => (
-              <FormItem className="flex items-center gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-3 py-2.5 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+              <FormItem className="flex items-center gap-3 rounded-2xl bg-[#e0e0e0] px-3 py-2.5 shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8]">
                 <Switch checked={field.value} onCheckedChange={field.onChange} id="tpl-default" />
                 <div>
                   <Label htmlFor="tpl-default" className="text-sm font-medium cursor-pointer">
@@ -558,7 +558,7 @@ function ReminderTimeline({
 
       {/* Cadence editor */}
       {editingCadence && (
-        <div className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white p-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)] space-y-3">
+        <div className="rounded-2xl bg-[#e0e0e0] p-3 shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8] space-y-3">
           <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Cadence Settings</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
             <div className="flex items-center gap-2">
@@ -644,7 +644,7 @@ function ReminderTimeline({
               >
                 {/* Step dot */}
                 <div className={cn(
-                  "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white text-[10px] font-bold shadow-[1px_1px_0_#808080]",
+                  "ff-followup-step relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e0e0e0] text-[10px] font-bold",
                   r.status === "sent"     ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300" :
                   r.status === "canceled" ? "border-red-300 bg-red-50 text-red-400 dark:bg-red-950/20" :
                   r.status === "skipped"  ? "border-amber-300 bg-amber-50 text-amber-600 dark:bg-amber-950/20" :
@@ -717,43 +717,43 @@ function ReminderTimeline({
                 {/* Actions */}
                 <div className="flex items-start gap-1 pt-0.5 shrink-0">
                   {r.status === "scheduled" && (
-                    <button type="button" onClick={() => openReminderEditor(r)}
-                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium">
+                    <Button type="button" onClick={() => openReminderEditor(r)}
+                      className="!min-h-8 flex items-center gap-1 px-2 py-1 text-[10.5px] font-medium">
                       <Pencil className="h-3 w-3" /> Edit
-                    </button>
+                    </Button>
                   )}
                   {canRestore && (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => handleReminderAction(r, "restore")}
                       disabled={updateReminder.isPending}
-                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium text-slate-700 disabled:opacity-50"
+                      className="!min-h-8 flex items-center gap-1 px-2 py-1 text-[10.5px] font-medium"
                       title="Restore to scheduled"
                     >
                       <RotateCcw className="h-3 w-3" /> Restore
-                    </button>
+                    </Button>
                   )}
                   {canSkip && (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => handleReminderAction(r, "skip")}
                       disabled={updateReminder.isPending}
-                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium text-amber-700 disabled:opacity-50"
+                      className="!min-h-8 flex items-center gap-1 px-2 py-1 text-[10.5px] font-medium !text-amber-800"
                       title="Skip this reminder"
                     >
                       <SkipForward className="h-3 w-3" /> Skip
-                    </button>
+                    </Button>
                   )}
                   {canCancel && (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => handleReminderAction(r, "cancel")}
                       disabled={updateReminder.isPending}
-                      className="bevel-button flex items-center gap-0.5 bg-[#d4d0c8] px-2 py-1 text-[10.5px] font-medium text-red-700 disabled:opacity-50"
+                      className="!min-h-8 flex items-center gap-1 px-2 py-1 text-[10.5px] font-medium !text-red-700"
                       title="Cancel this reminder"
                     >
                       <Ban className="h-3 w-3" /> Cancel
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -762,13 +762,13 @@ function ReminderTimeline({
         </div>
       )}
       <Dialog open={!!editingReminder} onOpenChange={open => !open && setEditingReminder(null)}>
-        <DialogContent className="max-w-xl rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+        <DialogContent className="max-w-xl">
           <DialogHeader><DialogTitle>Edit Scheduled Reminder</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Send date & time</Label><Input className="mt-1" type="datetime-local" value={reminderDraft.scheduledSendAt} onChange={e => setReminderDraft(d => ({ ...d, scheduledSendAt: e.target.value }))} /></div>
             <div><Label>Subject</Label><Input className="mt-1" value={reminderDraft.subject} onChange={e => setReminderDraft(d => ({ ...d, subject: e.target.value }))} /></div>
             <div><Label>Message</Label><Textarea className="mt-1 min-h-36" value={reminderDraft.body} onChange={e => setReminderDraft(d => ({ ...d, body: e.target.value }))} /></div>
-            <div className="flex flex-wrap gap-1"><span className="mr-1 text-[11px] text-slate-500">Insert:</span>{["{{brokerName}}", "{{invoiceNumber}}", "{{loadNumber}}", "{{amountDue}}", "{{dueDate}}"].map(token => <button type="button" key={token} onClick={() => setReminderDraft(d => ({ ...d, body: `${d.body}${d.body ? " " : ""}${token}` }))} className="bevel-button bg-[#d4d0c8] px-1.5 py-0.5 text-[10px] text-slate-700">{token}</button>)}</div>
+            <div className="flex flex-wrap gap-1"><span className="mr-1 text-[11px] text-slate-500">Insert:</span>{["{{brokerName}}", "{{invoiceNumber}}", "{{loadNumber}}", "{{amountDue}}", "{{dueDate}}"].map(token => <Button type="button" key={token} onClick={() => setReminderDraft(d => ({ ...d, body: `${d.body}${d.body ? " " : ""}${token}` }))} className="!min-h-7 rounded-full px-2 py-0.5 text-[10px]">{token}</Button>)}</div>
           </div>
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEditingReminder(null)}>Cancel</Button><Button disabled={!reminderDraft.scheduledSendAt || !reminderDraft.subject.trim() || !reminderDraft.body.trim() || editReminderMut.isPending} onClick={() => editReminderMut.mutate()}>{editReminderMut.isPending ? "Saving…" : "Save reminder"}</Button></div>
         </DialogContent>
@@ -1011,7 +1011,7 @@ export default function FollowUpPage() {
       )}
 
       <Dialog open={isAddingFollowUp} onOpenChange={setIsAddingFollowUp}>
-        <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
                     <DialogTitle>Create Follow Up Task</DialogTitle>
                   </DialogHeader>
@@ -1077,12 +1077,6 @@ export default function FollowUpPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Win95StatCard label="Open Manual Tasks · page" value={followUps.filter(item => item.status !== "completed").length} />
-        <Win95StatCard label="Unacknowledged Automations" value={pendingBfuCount} />
-        <Win95StatCard label="Email Templates" value={templates.length} />
-      </div>
-
             {/* Tabs */}
             <Tabs defaultValue="collections">
               <TabsList className="mb-4">
@@ -1132,7 +1126,7 @@ export default function FollowUpPage() {
               {/* ── Manual follow-ups ─────────────────────────────────────────── */}
               <TabsContent value="manual">
                 {requestedFollowUpId && /^\d+$/.test(requestedFollowUpId) && (
-                  <div data-testid="followup-focus-notice" className="mb-3 flex flex-wrap items-center justify-between gap-2 border-2 border-[#808080] border-b-white border-r-white bg-[#ece9e2] px-3 py-2 text-xs">
+                  <div data-testid="followup-focus-notice" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#e0e0e0] px-3 py-2 text-xs shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
                     <span>Showing manual follow-up #{requestedFollowUpId} from your authorized task list.</span>
                     <a href="/follow-up" onClick={clearFollowUpFocus} data-testid="followup-show-all" className="font-semibold text-[#087c8d] underline underline-offset-2">Show all follow-ups</a>
                   </div>
@@ -1181,14 +1175,14 @@ export default function FollowUpPage() {
                       <p className="text-gray-600 mt-2">Loading follow-ups...</p>
                     </div>
                   ) : followUpsError ? (
-                    <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                    <Card>
                       <CardContent className="p-8 text-center">
                         <p role="alert" className="text-sm text-red-700">{followUpsErrorValue instanceof Error ? followUpsErrorValue.message : "Could not load manual follow-ups."}</p>
                         <Button variant="outline" className="mt-3" onClick={() => void refetchFollowUps()}>Retry</Button>
                       </CardContent>
                     </Card>
                   ) : filteredFollowUps.length === 0 ? (
-                      <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                      <Card>
                       <CardContent className="p-8 text-center">
                         <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No follow-ups found</h3>
@@ -1200,41 +1194,41 @@ export default function FollowUpPage() {
                       </CardContent>
                     </Card>
                   ) : (
-                    <Win95Table>
-                      <Win95TableHeader>
-                        <Win95TableRow>
-                          <Win95TableHead>Task</Win95TableHead>
-                          <Win95TableHead>Carrier</Win95TableHead>
-                          <Win95TableHead>Due Date</Win95TableHead>
-                          <Win95TableHead>Priority</Win95TableHead>
-                          <Win95TableHead>Status</Win95TableHead>
-                          <Win95TableHead className="text-right">Actions</Win95TableHead>
-                        </Win95TableRow>
-                      </Win95TableHeader>
-                      <Win95TableBody>
+                    <NeuTable>
+                      <NeuTableHeader>
+                        <NeuTableRow>
+                          <NeuTableHead>Task</NeuTableHead>
+                          <NeuTableHead>Carrier</NeuTableHead>
+                          <NeuTableHead>Due Date</NeuTableHead>
+                          <NeuTableHead>Priority</NeuTableHead>
+                          <NeuTableHead>Status</NeuTableHead>
+                          <NeuTableHead className="text-right">Actions</NeuTableHead>
+                        </NeuTableRow>
+                      </NeuTableHeader>
+                      <NeuTableBody>
                         {filteredFollowUps.map(followUp => (
-                          <Win95TableRow
+                          <NeuTableRow
                             key={followUp.id}
                             id={`manual-followup-${followUp.id}`}
                             tabIndex={-1}
                             data-testid={`manual-followup-row-${followUp.id}`}
                             className={cn(followUp.id === Number(requestedFollowUpId) && "outline outline-2 outline-[#087c8d] outline-offset-[-2px]")}
                           >
-                            <Win95TableCell>
+                            <NeuTableCell>
                               <p className="font-semibold text-slate-900">{followUp.title}</p>
                               {followUp.description && <p className="mt-1 max-w-md text-xs text-slate-500">{followUp.description}</p>}
-                            </Win95TableCell>
-                            <Win95TableCell>{followUp.client?.name ?? "—"}</Win95TableCell>
-                            <Win95TableCell>{format(new Date(followUp.dueDate), "MMM dd, yyyy")}</Win95TableCell>
-                            <Win95TableCell>
+                            </NeuTableCell>
+                            <NeuTableCell>{followUp.client?.name ?? "—"}</NeuTableCell>
+                            <NeuTableCell>{format(new Date(followUp.dueDate), "MMM dd, yyyy")}</NeuTableCell>
+                            <NeuTableCell>
                               <Badge className={getPriorityColor(followUp.priority)}>{followUp.priority}</Badge>
-                            </Win95TableCell>
-                            <Win95TableCell>
+                            </NeuTableCell>
+                            <NeuTableCell>
                               <Badge className={getStatusColor(followUp.status)}>
                                 <span className="flex items-center gap-1">{getStatusIcon(followUp.status)}{followUp.status.replace("-", " ")}</span>
                               </Badge>
-                            </Win95TableCell>
-                            <Win95TableCell>
+                            </NeuTableCell>
+                            <NeuTableCell>
                               <div className="flex justify-end gap-2">
                                 {followUp.status !== "completed" && (
                                   <>
@@ -1245,11 +1239,11 @@ export default function FollowUpPage() {
                                   </>
                                 )}
                               </div>
-                            </Win95TableCell>
-                          </Win95TableRow>
+                            </NeuTableCell>
+                          </NeuTableRow>
                         ))}
-                      </Win95TableBody>
-                    </Win95Table>
+                      </NeuTableBody>
+                    </NeuTable>
                   )}
                   {!isLoading && !followUpsError && (
                     <ServerArrayPagination
@@ -1266,7 +1260,7 @@ export default function FollowUpPage() {
 
               {/* ── Broker automations ────────────────────────────────────────── */}
               <TabsContent value="broker" className="recovery-neu-surface border-0 p-4">
-                <div className="flex items-start gap-3 rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white px-4 py-3 shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                <div className="flex items-start gap-3 rounded-2xl bg-[#e0e0e0] px-4 py-3 shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8]">
                   <Zap className="h-4 w-4 mt-0.5 shrink-0 text-orange-500" />
                   <p className="text-[12.5px] text-orange-800 dark:text-orange-300">
                     <span className="font-semibold">Automated follow-ups</span> are triggered when an invoice is funded.
@@ -1274,7 +1268,7 @@ export default function FollowUpPage() {
                   </p>
                 </div>
 
-                <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-4 items-center">
                       <div className="flex items-center gap-2 flex-1 min-w-64">
@@ -1304,7 +1298,7 @@ export default function FollowUpPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto" />
                   </div>
                 ) : filteredBfu.length === 0 ? (
-                    <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                    <Card>
                     <CardContent className="p-8 text-center">
                       <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No broker follow-ups yet</h3>
@@ -1322,7 +1316,7 @@ export default function FollowUpPage() {
                       const cadence = localCadences[bfu.id] ?? bfu.cadenceConfig;
                       return (
                         <Card key={bfu.id} className={cn(
-                          "overflow-hidden rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] transition-shadow odd:bg-white even:bg-[#f0f0f0]",
+                          "overflow-hidden rounded-2xl bg-[#e0e0e0] shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8] transition-shadow",
                           isExpanded && "ring-1 ring-orange-200 dark:ring-orange-800",
                         )}>
                           {/* Row header */}
@@ -1394,7 +1388,7 @@ export default function FollowUpPage() {
 
                           {/* Expanded detail */}
                           {isExpanded && (
-                            <div className="mx-2 mb-2 rounded-xl border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-white px-5 py-4 shadow-[inset_1px_1px_0_rgba(0,0,0,0.2)]">
+                            <div className="mx-2 mb-2 rounded-xl bg-[#e0e0e0] px-5 py-4 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
                               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
                                 {/* Left: reminder timeline */}
@@ -1412,7 +1406,7 @@ export default function FollowUpPage() {
                                   </div>
                                   <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Email Body Preview</p>
-                                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-xl border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-white p-3 font-sans text-[11.5px] text-slate-600 shadow-[inset_1px_1px_0_rgba(0,0,0,0.15)]">
+                                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-xl bg-[#e0e0e0] p-3 font-sans text-[11.5px] text-slate-600 shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]">
                                       {bfu.body}
                                     </pre>
                                   </div>
@@ -1499,7 +1493,7 @@ export default function FollowUpPage() {
                     <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading templates…
                   </div>
                 ) : templates.length === 0 ? (
-                    <Card className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                    <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16 text-slate-400">
                       <LayoutTemplate className="h-10 w-10 mb-3 opacity-40" />
                       <p className="text-sm font-medium">No templates yet</p>
@@ -1526,7 +1520,7 @@ export default function FollowUpPage() {
                             <Card
                               key={tpl.id}
                               className={cn(
-                                "rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] transition-colors",
+                                "rounded-2xl bg-[#e0e0e0] shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8] transition-colors",
                                 tpl.isDefault && "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/10",
                               )}
                             >
@@ -1552,41 +1546,41 @@ export default function FollowUpPage() {
                                   {/* Actions */}
                                   <div className="flex items-center gap-1 shrink-0">
                                     {!tpl.isDefault && (
-                                      <button
+                                      <Button
                                         type="button"
                                         title="Set as default"
                                         disabled={setDefaultTplMutation.isPending}
                                         onClick={() => setDefaultTplMutation.mutate(tpl.id)}
-                                        className="bevel-button flex items-center gap-1 bg-[#d4d0c8] px-2 py-1 text-[11px] text-slate-700 disabled:opacity-50"
+                                        className="!min-h-8 flex items-center gap-1 px-2 py-1 text-[11px]"
                                       >
                                         <Star className="h-3 w-3" /> Set default
-                                      </button>
+                                      </Button>
                                     )}
-                                    <button
+                                    <Button
                                       type="button"
                                       title="Preview"
                                       onClick={() => setPreviewTpl(tpl)}
-                                      className="bevel-button bg-[#d4d0c8] p-1.5 text-slate-700"
+                                      className="!min-h-8 !w-8 !rounded-full !p-0"
                                     >
                                       <Eye className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                       type="button"
                                       title="Edit"
                                       onClick={() => { setEditingTpl(tpl); setTplDialogOpen(true); }}
-                                      className="bevel-button bg-[#d4d0c8] p-1.5 text-slate-700"
+                                      className="!min-h-8 !w-8 !rounded-full !p-0"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                       type="button"
                                       title="Delete"
                                       disabled={deleteTplMutation.isPending}
                                       onClick={() => { if (confirm(`Delete template "${tpl.name}"?`)) deleteTplMutation.mutate(tpl.id); }}
-                                      className="bevel-button bg-[#d4d0c8] p-1.5 text-red-700 disabled:opacity-50"
+                                      className="!min-h-8 !w-8 !rounded-full !p-0 !text-red-700"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
+                                    </Button>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1599,7 +1593,7 @@ export default function FollowUpPage() {
                 )}
 
                 {/* Placeholder legend */}
-                <Card className="rounded-xl border-2 border-dashed border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                <Card className="border border-dashed border-[#bdc8c5]">
                   <CardContent className="p-4">
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Available placeholders</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -1631,7 +1625,7 @@ export default function FollowUpPage() {
 
             {/* ── Template preview dialog ───────────────────────────────────── */}
             <Dialog open={!!previewTpl} onOpenChange={v => { if (!v) setPreviewTpl(null); }}>
-              <DialogContent className="rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)] sm:max-w-[580px]">
+              <DialogContent className="sm:max-w-[580px]">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
@@ -1653,14 +1647,14 @@ export default function FollowUpPage() {
                         </Badge>
                       )}
                     </div>
-                    <div className="overflow-hidden rounded-xl border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-white shadow-[2px_2px_0_rgba(128,128,128,0.45)]">
+                    <div className="overflow-hidden rounded-2xl bg-[#e0e0e0] shadow-[-5px_-5px_12px_#fff,5px_5px_12px_#b8b8b8]">
                       <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">Subject</p>
                         <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200">
                           {applyPreview(previewTpl.subject)}
                         </p>
                       </div>
-                      <div className="p-4 bg-white dark:bg-slate-900">
+                      <div className="p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Body (sample data)</p>
                         <pre className="text-[12px] whitespace-pre-wrap font-sans text-slate-700 dark:text-slate-300 max-h-72 overflow-auto leading-relaxed">
                           {applyPreview(previewTpl.body)}

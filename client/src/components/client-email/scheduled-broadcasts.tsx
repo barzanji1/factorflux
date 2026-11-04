@@ -1,6 +1,5 @@
 import { CalendarClock, Eye, Pencil, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { NeuBadge } from "@/styles/neu";
+import { NeuBadge, NeuButton as Button } from "@/styles/neu";
 import type { BroadcastSummary } from "../../../../shared/email-broadcast";
 
 export type ScheduledBroadcast = Omit<BroadcastSummary, "status"> & {

@@ -6,6 +6,22 @@ export interface PageInsights {
   keyMetric: { label: string; value: number; format: "number" | "currency" };
   breakdown: Array<{ name: string; value: number }>;
   series: Array<{ period: string; count: number; amount: number }>;
+  /** Complete page-specific stat row when supplied; values cover authorized rows. */
+  extraMetrics?: InsightMetric[];
+  charts?: InsightChart[];
+}
+
+export interface InsightMetric {
+  label: string;
+  value: number;
+  format: "number" | "currency" | "days" | "hours" | "datetime" | "percent";
+}
+export interface InsightChart {
+  title: string;
+  kind: "cylinder" | "donut" | "area";
+  data: Array<Record<string, string | number>>;
+  series: Array<{ key: string; label: string; color: string; format?: "number" | "currency" | "percent" }>;
+  xKey?: string;
 }
 
 export const INSIGHT_ENTITIES = [
