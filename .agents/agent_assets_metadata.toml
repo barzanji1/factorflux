@@ -64,3 +64,17 @@ mtime_ms = 1793758085985
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/b49b06a9-b03d-4d21-a11c-dc872f088590/30bcb06f-befb-4c71-8add-6ff669ff612c"
 storage_version_token = "1793758122497336"
 content_type = "text/html"
+
+[[outputs]]
+id = "YsFvM9FOTHdZjey4d-pUM"
+uri = "file://generated-artifacts/neu-rollout/remaining-style-findings.html"
+type = "html"
+title = "Remaining styles — every flagged file"
+description = "All 186 flagged files, elements and line numbers, with actual leftovers separated from scoped overrides, compatibility code and unverified candidates."
+logical_id = "ea233303-e6ab-4236-aea0-ec0fdae04674"
+content_hash = "sha256:2269a5bcdf1ddc2cb97c91a90f2d52e474a863c02dcad602e02eb4eae7bba367"
+size = 116157
+mtime_ms = 1793761913156
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/ea233303-e6ab-4236-aea0-ec0fdae04674/f284ae7a-7232-4a0c-91ff-cbc9300a5579"
+storage_version_token = "1793761914414645"
+content_type = "text/html"
