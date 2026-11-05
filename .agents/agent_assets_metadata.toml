@@ -148,3 +148,17 @@ mtime_ms = 1793844364502
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/fc089ab0-5622-45a1-be58-fdfc24b3d758/4d456cac-2a75-4482-926b-698e1e4a47d4"
 storage_version_token = "1793844365431504"
 content_type = "text/html"
+
+[[outputs]]
+id = "34K15ZraGlBrDOixiYtQv"
+uri = "file://generated-artifacts/time-clock-strip/changes.html"
+type = "html"
+title = "Compact Time Clock — diff"
+description = "Complete layout diff and desktop/mobile interaction verification."
+logical_id = "de7865ab-db72-4629-9364-f0899005f0db"
+content_hash = "sha256:57ebc8195af24f9f3fcb65039c2af3b260d91637471f15b51ac82fa3fab721b8"
+size = 30755
+mtime_ms = 1793844744197
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/de7865ab-db72-4629-9364-f0899005f0db/1e2756fb-332d-46f6-b212-533314078354"
+storage_version_token = "1793844744780898"
+content_type = "text/html"

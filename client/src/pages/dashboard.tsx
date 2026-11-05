@@ -193,6 +193,10 @@ export default function Dashboard() {
   return (
     <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace" neu>
       <div className="ff-neu-dashboard" data-testid="agent-dashboard">
+        <div className="mb-3 w-full" data-testid="time-clock-widget">
+          <TimeClock />
+        </div>
+
         <div className="ff-neu-dashboard-toolbar">
           <div>
             <p className="ff-neu-updated">{updatedAt ? `Updated ${displayDate(updatedAt)}` : "Live work queue"}</p>
@@ -285,10 +289,6 @@ export default function Dashboard() {
             </> : <div data-testid="alerts-loading"><TableSkeleton testId="alerts-loading-table" rows={3} columns={5} /></div>}
           </NeuCard>
         </section>
-
-        <div className="mx-auto mt-5 w-full max-w-2xl" data-testid="time-clock-widget">
-          <TimeClock />
-        </div>
 
         <WorkShortcuts
           followupCount={followupsData?.totalCount}

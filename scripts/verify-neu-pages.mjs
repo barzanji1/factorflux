@@ -146,7 +146,7 @@ try {
         const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
         if(url.pathname==='/api/time-tracking/status'){
           if(state.fail)return json({message:'Browser-only status error'},503);
-          return json({isClocked:state.clocked,currentEntry:state.clocked?{id:990001,clockInTime:new Date(Date.now()-60000).toISOString(),status:'clocked_in'}:undefined,todayEntries:[],todayHours:state.clocked?0:1.25});
+          return json({isClocked:state.clocked,currentEntry:state.clocked?{id:990001,clockInTime:new Date(Date.now()-154*60000).toISOString(),status:'clocked_in'}:undefined,todayEntries:[],todayHours:state.clocked?0:1.25});
         }
         if(url.pathname==='/api/time-tracking/clock-in'||url.pathname==='/api/time-tracking/clock-out'){
           state.notes.push(JSON.parse(init.body).notes);
@@ -170,12 +170,14 @@ try {
     const failureSafe=await evaluate(`![...document.querySelectorAll('[data-testid="time-clock-widget"] button')].some(el=>el.textContent.trim()==='Clock In')`);
     if(!failureSafe)throw new Error("Failed clock status falsely enabled Clock In");
     await evaluate(`window.__clockVerify.fail=false`);
-    await pointerClick('[data-testid="time-clock-widget"] button');
+    await pointerClick('[data-testid="time-clock-action"]');
     await waitText("Clock In");
-    const inspectWidget=()=>evaluate(`(()=>{const el=document.querySelector('[data-testid="time-clock-widget"]');const r=el.getBoundingClientRect();const style=getComputedStyle(el);return {width:r.width,height:r.height,display:style.display,visibility:style.visibility};})()`);
+    const inspectWidget=()=>evaluate(`(()=>{const el=document.querySelector('[data-testid="time-clock-widget"]');const r=el.getBoundingClientRect();const style=getComputedStyle(el);const bounds=id=>{const e=document.querySelector('[data-testid="'+id+'"]');if(!e)return null;const b=e.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height,text:e.textContent};};return {width:r.width,height:r.height,top:r.top,bottom:r.bottom,display:style.display,visibility:style.visibility,count:document.querySelectorAll('[data-testid="time-clock-widget"]').length,firstDashboardChild:el.parentElement?.firstElementChild===el,notesCollapsed:!document.querySelector('[data-testid="time-clock-notes-input"]'),status:bounds('time-clock-status'),clock:bounds('time-clock-live'),total:bounds('time-clock-total'),action:bounds('time-clock-action')};})()`);
     const desktop=await inspectWidget();
-    if(desktop.height<100||desktop.display==='none'||desktop.visibility==='hidden')throw new Error("Time clock is not visibly rendered");
-    await pointerClick('[data-testid="time-clock-widget"] input');
+    if(desktop.height<40||desktop.height>60||desktop.display==='none'||desktop.visibility==='hidden'||!desktop.firstDashboardChild||desktop.count!==1||!desktop.notesCollapsed||desktop.top<0||desktop.bottom>1000)throw new Error("Compact time clock is hidden, too tall, duplicated, or not first on dashboard");
+    if(!desktop.clock||Math.abs(desktop.clock.y-desktop.status.y)>6||!desktop.total||!desktop.action)throw new Error("Desktop time clock is not a single row");
+    await pointerClick('[data-testid="time-clock-notes-toggle"]');
+    await pointerClick('[data-testid="time-clock-notes-input"]');
     await send("Input.insertText",{text:"Browser-only time clock verification"});
     const clockButton = async label => {
       const found=await evaluate(`(()=>{const el=[...document.querySelectorAll('[data-testid="time-clock-widget"] button')].find(e=>e.textContent.trim()===${JSON.stringify(label)});if(!el)return false;el.setAttribute('data-clock-action','true');return true;})()`);
@@ -185,21 +187,26 @@ try {
     };
     await clockButton("Clock In");
     await waitText("Clock Out");
+    await waitText("Clocked In · 2h 34m");
+    const activeStatus=await evaluate(`document.querySelector('[data-testid="time-clock-status"]').textContent`);
+    if(!activeStatus.includes("2h 34m"))throw new Error("Active session duration is not shown compactly");
     await clockButton("Clock Out");
     await waitText("Clock In");
+    if(await evaluate(`!!document.querySelector('[data-testid="time-clock-notes-input"]')`))await pointerClick('[data-testid="time-clock-notes-toggle"]');
     const calls=await evaluate(`({inCount:window.__clockVerify.inCount,outCount:window.__clockVerify.outCount,notes:window.__clockVerify.notes})`);
     if(calls.inCount!==1||calls.outCount!==1||calls.notes[0]!=="Browser-only time clock verification")throw new Error("Time-clock action or notes wiring failed");
-    await evaluate(`document.querySelector('[data-testid="time-clock-widget"]').scrollIntoView({block:'center',behavior:'instant'})`);
+    await evaluate(`window.scrollTo({top:0,behavior:'instant'})`);
     const image=await send("Page.captureScreenshot",{format:"jpeg",quality:70});
     await writeFile(`${out}/time-clock-desktop.jpg`,Buffer.from(image.data,"base64"));
     await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
     await delay(200);
-    await evaluate(`document.querySelector('[data-testid="time-clock-widget"]').scrollIntoView({block:'center',behavior:'instant'})`);
+    await evaluate(`window.scrollTo({top:0,behavior:'instant'})`);
     const mobileClock=await inspectWidget();
-    if(mobileClock.width>390||mobileClock.height<100)throw new Error("Mobile time clock is clipped or hidden");
+    if(mobileClock.width>390||mobileClock.height>120||mobileClock.height<60||mobileClock.top<0||mobileClock.bottom>844||!mobileClock.notesCollapsed)throw new Error("Mobile time clock is clipped, hidden, or too large");
+    if(Math.abs(mobileClock.status.y-mobileClock.clock.y)>6||Math.abs((mobileClock.total.y+mobileClock.total.height/2)-(mobileClock.action.y+mobileClock.action.height/2))>6||mobileClock.total.y<=mobileClock.status.y)throw new Error("Mobile time clock is not arranged in two compact rows");
     const mobileImage=await send("Page.captureScreenshot",{format:"jpeg",quality:70});
     await writeFile(`${out}/time-clock-mobile.jpg`,Buffer.from(mobileImage.data,"base64"));
-    const clockResult={liveStatus,failureSafe,desktop,mobile:mobileClock,calls};
+    const clockResult={liveStatus,failureSafe,desktop,mobile:mobileClock,activeStatus,calls};
     console.log(JSON.stringify({timeClock:clockResult}));
     await writeFile(`${out}/time-clock-results.json`,JSON.stringify(clockResult,null,2));
     await send("Emulation.setDeviceMetricsOverride",{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
