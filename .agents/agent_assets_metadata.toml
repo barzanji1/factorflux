@@ -120,3 +120,17 @@ mtime_ms = 1793809312602
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/06905c77-0003-4a3b-8ddc-ae397fecee38/a53c017c-1572-4048-bc15-5dec1ef31530"
 storage_version_token = "1793809326319658"
 content_type = "text/html"
+
+[[outputs]]
+id = "MEA2DX8pH7K0yYu5jPmBX"
+uri = "file://generated-artifacts/invoice-submit-after/changes.html"
+type = "html"
+title = "Create Invoice submit fix — diff"
+description = "Complete source diff, logged blocker, field-wiring audit, and browser verification results."
+logical_id = "323b576c-5b5d-40ba-bc68-ebdaa8a75498"
+content_hash = "sha256:c16d2b131cddd110fe22a75814f08c3d13722e0292ed844da27c7cc2b1c13beb"
+size = 23492
+mtime_ms = 1793843913686
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/323b576c-5b5d-40ba-bc68-ebdaa8a75498/ce34cd81-e62b-41fe-9a47-6193fe301555"
+storage_version_token = "1793843914314952"
+content_type = "text/html"

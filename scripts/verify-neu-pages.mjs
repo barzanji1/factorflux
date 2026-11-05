@@ -71,10 +71,14 @@ try {
     await delay(1600);
   };
   const pointerClick = async selector => {
-    const rect = await evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return null;el.scrollIntoView({block:'center',behavior:'instant'});const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+    await evaluate(`document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({block:'center',behavior:'instant'})`);
+    await delay(150);
+    const rect = await evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return null;const r=el.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;return {x,y,hit:el.contains(document.elementFromPoint(x,y))};})()`);
     if (!rect) throw new Error("Expected form control missing");
-    await send("Input.dispatchMouseEvent", { type: "mousePressed", ...rect, button: "left", clickCount: 1 });
-    await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...rect, button: "left", clickCount: 1 });
+    if (!rect.hit) throw new Error(`Pointer target blocked: ${selector}`);
+    const {x,y} = rect;
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x,y, button: "left", clickCount: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x,y, button: "left", clickCount: 1 });
   };
   await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await navigate("/login");
@@ -128,6 +132,115 @@ try {
       await writeFile(`${out}/${route.split("?")[0].slice(1).replaceAll("/", "-") || "dashboard"}.jpg`, Buffer.from(image.data, "base64"));
     }
     console.log(JSON.stringify({ route, ok, uncaught, sidebar: status.sidebar, insights: status.insights }));
+  }
+  let invoiceCreate;
+  if (process.env.INVOICE_CREATE_VERIFY === "1") {
+    // Browser-local fixtures only. Never create an invoice or upload to storage.
+    await evaluate(`(() => {
+      window.__invoiceVerify = { submits: 0, debug: [], alerts: [{code:'CARRIER_OPEN_CHARGEBACK',severity:'ack',title:'Carrier has open chargeback',message:'Browser-only regression fixture.'}] };
+      const log = console.log;
+      console.log = (...args) => { if(args[0] === '[invoice-submit-debug]') window.__invoiceVerify.debug.push(args[1]); log(...args); };
+      const original = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
+        let payload;
+        if (url.pathname === '/api/clients') payload = [{id:940001,name:'UI Regression Carrier',status:'active',cargoType:'otr'}];
+        else if (url.pathname === '/api/clients/940001') payload = {id:940001,name:'UI Regression Carrier',status:'active'};
+        else if (url.pathname === '/api/brokers') payload = {data:[{id:940002,name:'UI Regression Broker',status:'active'}]};
+        else if (url.pathname === '/api/brokers/940002') payload = {id:940002,name:'UI Regression Broker',status:'active'};
+        else if (url.pathname === '/api/brokers/940002/branches' || url.pathname === '/api/carriers/940001/bank-accounts') payload = [];
+        else if (url.pathname === '/api/invoices/preflight') payload = {alerts:window.__invoiceVerify.alerts};
+        else if (url.pathname === '/api/invoices/with-documents') {
+          window.__invoiceVerify.submits++;
+          const data = init.body;
+          window.__invoiceVerify.submitted = {metadata:JSON.parse(data.get('metadata')),rateConfirmation:!!data.get('rateConfirmation'),billOfLading:!!data.get('billOfLading')};
+          return new Response(JSON.stringify({message:'Browser-only submit intercepted; nothing saved.'}),{status:422,headers:{'Content-Type':'application/json'}});
+        } else return original(input, init);
+        return new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}});
+      };
+      history.pushState({},'', '/invoices?create=1'); dispatchEvent(new PopStateEvent('popstate'));
+    })()`);
+    await delay(1200);
+    const clickText = async (text) => {
+      const selector = await evaluate(`(() => { const el=[...document.querySelectorAll('button')].find(e=>e.textContent.trim()===${JSON.stringify(text)});if(!el)return null;el.setAttribute('data-invoice-test-click','true');return '[data-invoice-test-click="true"]';})()`);
+      if (!selector) {
+        const shot = await send("Page.captureScreenshot", {format:"jpeg",quality:65});
+        await writeFile(`${out}/invoice-control-debug.jpg`,Buffer.from(shot.data,"base64"));
+        throw new Error(`Missing invoice test control: ${text}`);
+      }
+      await pointerClick(selector);
+      await evaluate(`document.querySelector('[data-invoice-test-click]')?.removeAttribute('data-invoice-test-click')`);
+      await delay(180);
+    };
+    await pointerClick('input[placeholder="Search carriers..."]');
+    await delay(100);
+    await clickText("UI Regression Carrieractive");
+    await delay(250);
+    if (await evaluate(`!!document.querySelector('[aria-label="Close preflight alerts"]')`)) await pointerClick('[aria-label="Close preflight alerts"]');
+    await delay(350);
+    await pointerClick('input[placeholder="Search brokers..."]');
+    await delay(350);
+    await clickText("UI Regression Brokeractive");
+    await delay(500);
+    await evaluate(`document.querySelector('[aria-label="Close preflight alerts"]').closest('[role=dialog]').setAttribute('data-invoice-preflight','true')`);
+    await pointerClick('[data-invoice-preflight] input[type="checkbox"]');
+    await pointerClick('[aria-label="Close preflight alerts"]');
+    await delay(350);
+    await pointerClick('#loadNumber');
+    await send("Input.insertText", {text:"UI-REGRESSION-1"});
+    await delay(100);
+    await pointerClick('#rateAmount');
+    await delay(200);
+    const blurOpenedDialog = await evaluate(`!!document.querySelector('[aria-label="Close preflight alerts"]')`);
+    if (process.env.INVOICE_CREATE_BASELINE !== "1" && blurOpenedDialog) throw new Error("Field blur stole focus with a preflight dialog");
+    if (await evaluate(`!!document.querySelector('[aria-label="Close preflight alerts"]')`)) {
+      await pointerClick('[aria-label="Close preflight alerts"]');
+      await delay(250);
+      await pointerClick('#rateAmount');
+    }
+    await send("Input.insertText", {text:"100"});
+    // Blurring a field must not steal the submit click by opening a dialog.
+    await evaluate(`document.querySelector('#rateAmount').blur()`);
+    await delay(200);
+    if (await evaluate(`!!document.querySelector('[aria-label="Close preflight alerts"]')`)) await pointerClick('[aria-label="Close preflight alerts"]');
+    await evaluate(`(() => {
+      for(const input of document.querySelectorAll('[aria-label^="Upload Rate Confirmation"] input[type=file], [aria-label^="Upload Bill of Lading"] input[type=file]')){
+        const data=new DataTransfer();data.items.add(new File(['%PDF-1.4\\n%%EOF'],'regression.pdf',{type:'application/pdf'}));
+        input.files=data.files;input.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+    })()`);
+    await delay(300);
+    invoiceCreate = await evaluate(`(() => {const submit=document.querySelector('.ff-create-invoice-dialog button[type=submit]');return {
+      beforeReview:{disabled:submit.disabled,debug:window.__invoiceVerify.debug.at(-1),blockers:document.querySelector('[data-testid="invoice-submit-blockers"]')?.innerText},
+      reviewAvailable:!!document.querySelector('[data-testid="review-invoice-alerts"]')
+    };})()`);
+    console.log(JSON.stringify({invoiceCreate}));
+    if (process.env.INVOICE_CREATE_BASELINE !== "1") {
+      if (!invoiceCreate.reviewAvailable) throw new Error("Disabled invoice has no way to review its alerts");
+      await pointerClick('[data-testid="review-invoice-alerts"]');
+      await delay(180);
+      await evaluate(`document.querySelector('[aria-label="Close preflight alerts"]').closest('[role=dialog]').setAttribute('data-invoice-preflight','true')`);
+      await pointerClick('[data-invoice-preflight] input[type=checkbox]');
+      await pointerClick('[aria-label="Close preflight alerts"]');
+      await delay(350);
+      invoiceCreate.afterReview = await evaluate(`({disabled:document.querySelector('.ff-create-invoice-dialog button[type=submit]').disabled})`);
+      if (invoiceCreate.afterReview.disabled) throw new Error("Invoice submit stayed disabled after required acknowledgement");
+      // Existing required paperwork rules must still be enforced.
+      await pointerClick('[aria-label="Remove Rate Confirmation"]');
+      await delay(100);
+      invoiceCreate.withoutPaperwork = await evaluate(`({disabled:document.querySelector('.ff-create-invoice-dialog button[type=submit]').disabled,blockers:document.querySelector('[data-testid="invoice-submit-blockers"]')?.innerText})`);
+      if (!invoiceCreate.withoutPaperwork.disabled || !invoiceCreate.withoutPaperwork.blockers.includes("Upload the Rate Confirmation PDF")) throw new Error("Required document validation changed");
+      await evaluate(`(() => {const input=document.querySelector('[aria-label^="Upload Rate Confirmation"] input[type=file]');const data=new DataTransfer();data.items.add(new File(['%PDF-1.4\\n%%EOF'],'regression.pdf',{type:'application/pdf'}));input.files=data.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+      await delay(200);
+      await pointerClick('.ff-create-invoice-dialog button[type=submit]');
+      await delay(250);
+      invoiceCreate.submission = await evaluate(`({count:window.__invoiceVerify.submits,...window.__invoiceVerify.submitted})`);
+      if (invoiceCreate.submission.count !== 1 || invoiceCreate.submission.metadata.loadNumber !== "UI-REGRESSION-1" || invoiceCreate.submission.metadata.amount !== "100" || !invoiceCreate.submission.rateConfirmation || !invoiceCreate.submission.billOfLading) throw new Error("Invoice field wiring/submission regression");
+      console.log(JSON.stringify({invoiceCreate}));
+    }
+    const shot = await send("Page.captureScreenshot", {format:"jpeg",quality:65});
+    await writeFile(`${out}/invoice-create.jpg`,Buffer.from(shot.data,"base64"));
+    await writeFile(`${out}/invoice-create-results.json`,JSON.stringify(invoiceCreate,null,2));
   }
   let sheets;
   if (process.env.SHEETS_VERIFY === "1") {

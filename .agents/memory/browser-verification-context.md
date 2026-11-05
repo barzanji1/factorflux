@@ -14,3 +14,9 @@ Verify pointer targets only after scrolling has settled.
 **Why:** Smooth scrolling can move controls between measuring their position and sending a pointer event. This produces missed clicks and empty fields even when the component works correctly.
 
 **How to apply:** Use instantaneous scrolling or wait for stable bounds before pointer checks. Confirm the actual target before diagnosing a failed checkbox or input as an application bug.
+
+Scope browser tests to the active dialog and the intended upload control.
+
+**Why:** Nested dialogs leave background controls mounted. A generic checkbox selector can target the hold checkbox behind a preflight panel, and a generic PDF input selector can stage OCR intake files instead of required paperwork, clearing the prefill as designed.
+
+**How to apply:** Identify the active dialog via its unique heading or close control, assert the pointer hit target, and select upload inputs by their labeled drop zone rather than MIME type alone.

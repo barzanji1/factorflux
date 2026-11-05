@@ -894,6 +894,28 @@ export default function CreateInvoiceModal({
     && paperwork.rateConfirmation && paperwork.billOfLading
     && !lumperReceiptMissing && !holdDetailsInvalid
     && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
+  // Explain the existing validation/async guards instead of leaving a disabled
+  // submit button with no route back to a required preflight acknowledgement.
+  const submissionBlockers = [
+    values.carrierInvoiceNumber.trim().length > 100 && "Carrier invoice number must be 100 characters or fewer.",
+    !values.loadNumber.trim() && "Enter a load number.",
+    !values.clientId && "Select a carrier from the search results.",
+    !values.brokerId && "Select a broker from the search results.",
+    (!Number.isFinite(Number(values.amount)) || Number(values.amount) <= 0) && "Enter a rate greater than zero.",
+    lumperTotalInvalid && "Enter a valid lumper total.",
+    !isLoadType(values.loadType) && "Select a load type.",
+    !paperwork.rateConfirmation && "Upload the Rate Confirmation PDF.",
+    !paperwork.billOfLading && "Upload the Bill of Lading PDF.",
+    lumperReceiptMissing && "Upload the Lumper Receipt PDF when Lumper is Yes.",
+    holdDetailsInvalid && "Choose a hold reason and at least one available reviewer (wait for reviewers to load).",
+    hasUnresolvedBlock && "Resolve the blocking preflight alerts.",
+    hasUnacknowledgedAlert && "Review and acknowledge the required preflight alerts.",
+    mutation.isPending && "Invoice creation is in progress.",
+    branchMutation.isPending && "Wait for the branch to finish saving.",
+    preflightLoading && "Wait for the preflight checks to finish.",
+    entityDataLoading && "Wait for broker and carrier details to finish refreshing.",
+    entityDataError && "Broker or carrier details could not refresh. Reselect the record or reopen the form.",
+  ].filter((message): message is string => typeof message === "string");
   return (
     <Dialog open={open} onOpenChange={nextOpen => {
       if (branchMutation.isPending) return;
@@ -1027,32 +1049,32 @@ export default function CreateInvoiceModal({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="carrierInvoiceNumber">Carrier Invoice Number <span className="text-xs font-normal text-slate-500">(optional)</span></Label>
-                <Input id="carrierInvoiceNumber" maxLength={100} value={values.carrierInvoiceNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, carrierInvoiceNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Enter carrier's invoice number" />
+                <Input id="carrierInvoiceNumber" maxLength={100} value={values.carrierInvoiceNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, carrierInvoiceNumber: e.target.value })); }} onBlur={() => void runPreflight({}, false)} placeholder="Enter carrier's invoice number" />
                 {renderOcrSource("invoice_number")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="loadNumber">Load # <span data-required-mark>*</span></Label>
-                <Input id="loadNumber" required value={values.loadNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, loadNumber: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Enter load number" />
+                <Input id="loadNumber" required value={values.loadNumber} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, loadNumber: e.target.value })); }} onBlur={() => void runPreflight({}, false)} placeholder="Enter load number" />
                 {renderOcrSource("load_number")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="invoiceDate">Invoice Date</Label>
-                <Input id="invoiceDate" type="date" value={values.invoiceDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, invoiceDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                <Input id="invoiceDate" type="date" value={values.invoiceDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, invoiceDate: e.target.value })); }} onBlur={() => void runPreflight({}, false)} />
                 {renderOcrSource("invoice_date")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="rateAmount">Rate <span data-required-mark>*</span></Label>
-                <Input id="rateAmount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, amount: e.target.value })); }} onBlur={() => void runPreflight()} placeholder="Rate confirmation amount" />
+                <Input id="rateAmount" required min="0.01" step="0.01" type="number" value={values.amount} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, amount: e.target.value })); }} onBlur={() => void runPreflight({}, false)} placeholder="Rate confirmation amount" />
                 {renderOcrSource(ocrFields?.rate?.trim() ? "rate" : "amount")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="pickupDate">Pickup Date</Label>
-                <Input id="pickupDate" type="date" value={values.pickupDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, pickupDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                <Input id="pickupDate" type="date" value={values.pickupDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, pickupDate: e.target.value })); }} onBlur={() => void runPreflight({}, false)} />
                 {renderOcrSource("pickup_date")}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="deliveryDate">Delivery Date</Label>
-                <Input id="deliveryDate" type="date" value={values.deliveryDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, deliveryDate: e.target.value })); }} onBlur={() => void runPreflight()} />
+                <Input id="deliveryDate" type="date" value={values.deliveryDate} onChange={e => { invalidatePreflightAcknowledgements(); setValues(v => ({ ...v, deliveryDate: e.target.value })); }} onBlur={() => void runPreflight({}, false)} />
                 {renderOcrSource("delivery_date")}
               </div>
               <div className="space-y-1.5">
@@ -1258,6 +1280,18 @@ export default function CreateInvoiceModal({
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
+              {submissionBlockers.length > 0 && (
+                <NeuNotice className="w-full" severity={hasUnresolvedBlock ? "block" : hasUnacknowledgedAlert ? "ack" : "info"} title="Before submitting" data-testid="invoice-submit-blockers">
+                  <ul className="list-disc space-y-1 pl-5">
+                    {submissionBlockers.map(message => <li key={message}>{message}</li>)}
+                  </ul>
+                </NeuNotice>
+              )}
+              {(preflightAlerts.length > 0 || preflightError) && (
+                <Button type="button" variant="outline" data-testid="review-invoice-alerts" onClick={() => setPreflightOpen(true)}>
+                  Review preflight alerts
+                </Button>
+              )}
               <Button type="button" variant="ghost" disabled={branchMutation.isPending} onClick={() => {
                 if (!branchMutation.isPending) onOpenChange(false);
               }}>Cancel</Button>
@@ -1375,6 +1409,7 @@ export default function CreateInvoiceModal({
           <div className="space-y-3 bg-[#e0e0e0] p-5 text-sm">
             {preflightLoading && <p className="rounded-xl px-3 py-2 shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#ffffff]">Checking carrier and broker records…</p>}
             {preflightError && <NeuNotice severity="block">{preflightError}</NeuNotice>}
+            {preflightError && <Button type="button" disabled={preflightLoading} onClick={() => void runPreflight()}>Retry preflight checks</Button>}
             {preflightAlerts.filter(alert => alert.severity === "info").map(alert => (
               <NeuNotice key={alert.code} title={alert.title}><p>{alert.message}</p></NeuNotice>
             ))}
