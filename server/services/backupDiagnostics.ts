@@ -1,9 +1,10 @@
 import type { BackupRuntimeDiagnostics } from "./backupRuntimeDiagnostics";
+import { SqlBackupError } from "./sqlBackup";
 
 // Categories and email descriptions stay allow-listed. Failure logs may also
 // contain explicitly redacted stderr and credential-free runtime probes.
 const REASONS = {
-  CLIENT_NOT_FOUND: "pg_dump was not found. Rebuild and publish the PostgreSQL client.",
+  CLIENT_NOT_FOUND: "The system pg_dump could not start. Check that PostgreSQL 18 or newer and its runtime dependencies are installed on PATH.",
   CLIENT_RUNTIME_MISSING: "The bundled pg_dump exists, but its executable loader could not start.",
   CLIENT_EXECUTION_DENIED: "The operating system refused permission to execute pg_dump.",
   CLIENT_START_FAILED: "The pg_dump process could not start.",
@@ -24,10 +25,13 @@ const REASONS = {
   LOCAL_PERMISSION_DENIED: "Local filesystem permissions prevented the backup.",
   LOCAL_FILE_UNAVAILABLE: "A required local backup file was unavailable.",
   BACKUP_FAILED: "The backup failed without a recognized error category.",
+  SQL_EXPORT_UNSUPPORTED: "The database contains a feature not supported by the SQL exporter. No backup was uploaded.",
+  SQL_EXPORT_FAILED: "The SQL export failed. No backup was uploaded.",
+  SQL_EXPORT_TIMEOUT: "The SQL export exceeded the backup timeout. No backup was uploaded.",
 } as const;
 
 type FailureCode = keyof typeof REASONS;
-export type BackupStage = "lock" | "temporary-file" | "pg_dump" |
+export type BackupStage = "lock" | "temporary-file" | "pg_dump" | "sql-export" |
   "s3:PutObject" | "s3:ListBucket" | "s3:DeleteObject";
 export interface BackupFailure {
   stage: BackupStage;
@@ -36,6 +40,8 @@ export interface BackupFailure {
   exitCode?: number | null;
   signal?: string | null;
   runtime?: BackupRuntimeDiagnostics;
+  sqlState?: string;
+  exportStep?: string;
 }
 
 function safeSignal(signal?: string | null): string | null {
@@ -80,6 +86,14 @@ export function pgDumpFailure(stderr: string, options: {
 }
 
 export function describeBackupFailure(stage: BackupStage, error: unknown): BackupFailure {
+  if (error instanceof SqlBackupError) {
+    return { stage, code:error.code, reason:REASONS[error.code],
+      ...(error.sqlState && /^[0-9A-Z]{5}$/.test(error.sqlState) ? {sqlState:error.sqlState} : {}),
+      ...(error.exportStep && ["connect","session","feature-check","schemas","extensions","enums","functions","sequences",
+        "tables","columns","constraints","indexes","triggers","table-definitions","table-data","sequence-state"].includes(error.exportStep)
+        ? {exportStep:error.exportStep} : {}),
+    };
+  }
   if (error instanceof PgDumpFailure) {
     return { stage, code: error.code, reason: REASONS[error.code], exitCode: error.exitCode, signal: error.signal,
       ...(error.runtime ? { runtime: error.runtime } : {}) };

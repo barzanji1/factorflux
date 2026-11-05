@@ -218,3 +218,17 @@ mtime_ms = 1793846210481
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/3f7f13bb-68f3-4168-8aef-255771728f7b/69e6ef9c-d09e-4c6f-bc69-87319b6211fa"
 storage_version_token = "1793846210971942"
 content_type = "text/html"
+
+[[outputs]]
+id = "K-fPZ2olH57sff5ku3yfQ"
+uri = "file://generated-artifacts/backup-portability/changes.html"
+type = "html"
+title = "Backup fix — full diff and restore verification"
+description = "Native-free SQL export, file-by-file diff, test results and the pending production verification."
+logical_id = "200bc676-e428-4181-bde2-7d5e5046bc1c"
+content_hash = "sha256:61b0b8568a1c124fe7146e62d626510fd49171913f551629cdb2d2f0390fe885"
+size = 46882
+mtime_ms = 1793902345596
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/200bc676-e428-4181-bde2-7d5e5046bc1c/66e7572a-0795-4dc5-a1de-7edaddc89163"
+storage_version_token = "1793902346451278"
+content_type = "text/html"

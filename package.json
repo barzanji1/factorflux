@@ -5,8 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "npm run build:pg-dump && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && cp server/assets/tpf-logo.png dist/tpf-logo.png",
-    "build:pg-dump": "bash scripts/build-pg-dump.sh",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && cp server/assets/tpf-logo.png dist/tpf-logo.png",
     "backup:db": "tsx scripts/backup-db.ts",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",

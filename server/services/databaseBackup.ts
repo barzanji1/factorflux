@@ -14,6 +14,7 @@ import { sendResendEmail } from "../resendTransport.js";
 import { DOCUMENTS_BUCKET, operationsS3 } from "./operationsS3";
 import { backupFailureEmail, describeBackupFailure, pgDumpFailure, PgDumpFailure, type BackupFailure, type BackupStage } from "./backupDiagnostics";
 import { collectBackupRuntimeDiagnostics, redactBackupStderr, STDERR_LIMIT } from "./backupRuntimeDiagnostics";
+import { dumpDatabaseSql } from "./sqlBackup";
 
 export const BACKUP_PREFIX = "backups/db/";
 const BACKUP_PATTERN = /^backups\/db\/factorflux-\d{4}-\d{2}-\d{2}-\d{6}\.sql\.gz$/;
@@ -50,13 +51,15 @@ export function obsoleteBackups(keys: string[]): string[] {
 export async function dumpDatabase(
   destination: string,
   databaseUrl = connectionUrl(),
-  binary = path.resolve("dist/tools/bin/pg_dump"),
+  binary?: string,
   timeoutMs = 30 * 60_000,
 ): Promise<void> {
+  if (!binary) return dumpDatabaseSql(destination, directBackupConnectionUrl(databaseUrl), timeoutMs);
   const url = new URL(directBackupConnectionUrl(databaseUrl));
-  const bundled = existsSync(binary);
-  const selectedBinary = bundled ? binary : "pg_dump";
-  const libraryPath = [path.resolve(path.dirname(binary), "../lib"), process.env.LD_LIBRARY_PATH].filter(Boolean).join(":");
+  // Explicit executable injection is retained solely for the isolated legacy
+  // diagnostic tests. Neither the scheduler nor the admin route enters here.
+  // In particular, dist/tools/bin/pg_dump is never discovered or selected.
+  const selectedBinary = binary;
   const privateValues = [decodeURIComponent(url.password), url.password, decodeURIComponent(url.username), url.hostname,
     decodeURIComponent(url.pathname.slice(1))].filter(Boolean);
   const child = spawn(selectedBinary, ["--no-password"], {
@@ -72,8 +75,6 @@ export async function dumpDatabase(
       PGSSLMODE: url.searchParams.get("sslmode") || "require",
       PGCHANNELBINDING: url.searchParams.get("channel_binding") || "prefer",
       PGCONNECT_TIMEOUT: "10",
-      // PostgreSQL's matching libpq ships alongside the generated client.
-      LD_LIBRARY_PATH: libraryPath,
     },
   });
   // Raw output is bounded and used only for classification/redaction. Only the
@@ -88,7 +89,7 @@ export async function dumpDatabase(
   });
   const exited = new Promise<void>((resolve, reject) => {
     child.once("error", (error: NodeJS.ErrnoException) => reject(pgDumpFailure("", {
-      launchCode: error.code ?? "UNKNOWN", bundled,
+      launchCode: error.code ?? "UNKNOWN", bundled: false,
     })));
     child.once("close", (code, signal) => code === 0 && !timedOut ? resolve() : reject(
       pgDumpFailure(stderr, { exitCode: code, signal, timedOut }),
@@ -108,14 +109,14 @@ export async function dumpDatabase(
       // or connection strings in the returned diagnostic.
       try {
         error.runtime = await collectBackupRuntimeDiagnostics({
-          binary: selectedBinary, bundledExists: bundled, libraryPath,
+          binary: selectedBinary, bundledExists: false,
           host: url.hostname.replace(/^\[|\]$/g, ""), port: Number(url.port || 5432), stderr, stderrTruncated, privateValues,
         });
       } catch {
         // Diagnostic trouble must never replace the original export failure.
         error.runtime = {
           stderr: redactBackupStderr(stderr, privateValues, stderrTruncated), stderrTruncated,
-          binary: { exists: existsSync(selectedBinary), bundledExists: bundled, source: bundled ? "bundled" : "PATH",
+          binary: { exists: existsSync(selectedBinary), bundledExists: false, source: "PATH",
             version: null, versionStatus: "unavailable" },
           databaseTcp: { reachable: null, status: "error" },
         };
@@ -172,7 +173,7 @@ interface BackupDependencies {
 const defaults: BackupDependencies = {
   now: () => new Date(),
   lock: withDatabaseLock,
-  dump: dumpDatabase,
+  dump: file => dumpDatabaseSql(file, connectionUrl()),
   upload: async (Key, file, ContentLength) => {
     await operationsS3.send(new PutObjectCommand({
       Bucket: DOCUMENTS_BUCKET, Key, Body: createReadStream(file), ContentLength,
@@ -215,7 +216,7 @@ export async function runDatabaseBackup(overrides: Partial<BackupDependencies> =
       const file = path.join(directory, "database.sql.gz");
       try {
         const key = backupKey(deps.now());
-        stage = "pg_dump";
+        stage = "sql-export";
         await deps.dump(file);
         const { size: bytes } = await stat(file);
         if (!bytes) throw new Error("Database backup is empty");

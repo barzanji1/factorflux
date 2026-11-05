@@ -8,6 +8,7 @@ import { DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { operationsS3 } from "./operationsS3";
 import { backupFailureEmail, describeBackupFailure, pgDumpFailure } from "./backupDiagnostics";
 import { dumpDatabase, runDatabaseBackup } from "./databaseBackup";
+import { SqlBackupError } from "./sqlBackup";
 
 const privateText = "postgresql://private-user:SYNTHETIC_PASSWORD@private-host.invalid/private-db INSERT INTO private_table VALUES ('PRIVATE_CONTENT');";
 function assertPrivateTextAbsent(output: string) {
@@ -15,6 +16,34 @@ function assertPrivateTextAbsent(output: string) {
     assert.ok(!output.includes(text), `Unexpected private content: ${text}`);
   }
 }
+
+test("SQL export failures retain safe codes and never upload partial files", async t => {
+  const captured = t.mock.method(console,"error",()=>{});
+  try {
+    for (const code of ["SQL_EXPORT_UNSUPPORTED","SQL_EXPORT_FAILED","SQL_EXPORT_TIMEOUT"] as const) {
+      const failure=new SqlBackupError(code);
+      failure.exportStep="table-data";
+      failure.sqlState="42501";
+      const described=describeBackupFailure("sql-export",failure);
+      assert.equal(described.code,code);
+      assert.equal(described.sqlState,"42501");
+      assert.equal(described.exportStep,"table-data");
+      let alerts=0;
+      await assert.rejects(runDatabaseBackup({
+        lock:work=>work(),
+        dump:async()=>{throw failure;},
+        upload:async()=>assert.fail("Failed SQL exports must never upload"),
+        list:async()=>{assert.fail("Failed SQL exports must never prune");},
+        alert:async event=>{alerts++;assert.equal(event.code,code);},
+      }),{code});
+      assert.equal(alerts,1);
+    }
+    const forged=new SqlBackupError("SQL_EXPORT_FAILED");
+    forged.sqlState=privateText;
+    forged.exportStep=privateText;
+    assertPrivateTextAbsent(JSON.stringify(describeBackupFailure("sql-export",forged)));
+  } finally { captured.mock.restore(); }
+});
 
 const cases = [
   ["server version mismatch", "CLIENT_VERSION_MISMATCH"],
@@ -117,7 +146,7 @@ setTimeout(() => {
     }), { name: "PgDumpFailure", code: "AUTHENTICATION_FAILED" });
     assert.equal(alerts, 1);
     assert.equal(uploads + lists + deletions, 0);
-    assert.match(alertText, /Stage: pg_dump/);
+    assert.match(alertText, /Stage: sql-export/);
     assert.match(alertText, /AUTHENTICATION_FAILED/);
     assert.match(alertText, /pg_dump exit code: 1/);
     assert.equal(logs.length, 1);
@@ -136,7 +165,7 @@ test("missing executable loader and timeout are observable without a database co
     await writeFile(executable, "#!/nonexistent-backup-test-interpreter\n", { mode: 0o700 });
     await assert.rejects(dumpDatabase(path.join(dir, "missing.gz"),
       "postgresql://synthetic:synthetic@example.invalid/db", executable),
-    { name: "PgDumpFailure", code: "CLIENT_RUNTIME_MISSING" });
+    { name: "PgDumpFailure", code: "CLIENT_NOT_FOUND" });
     await writeFile(executable, "#!/usr/bin/env node\nsetInterval(() => {}, 1000);\n", { mode: 0o700 });
     await assert.rejects(dumpDatabase(path.join(dir, "timeout.gz"),
       "postgresql://synthetic:synthetic@example.invalid/db", executable, 100),

@@ -54,4 +54,5 @@
 - [Dump statement cadence](dump-statement-cadence.md) — invoice-funded milestones trigger consolidated broker statements; no broker-wide cooldown or catch-up email bursts.
 - [Numeric page policy](numeric-page-policy.md) — insights cover every numeric operational page; summaries use authorized full datasets, and table pages default to 15 in UI and SQL.
 - [Backup diagnostic privacy](backup-diagnostic-privacy.md) — redacted stderr and binary/TCP evidence are allowed in failure logs; never persist credentials, raw SQL, or provider responses.
+- [Backup portability](backup-portability.md) — native-free SQL export avoids development-loader failures; unsupported schemas must fail closed and require restore-tested support.
 - [Browser verification context](browser-verification-context.md) — select the application port and preserve a secure origin before treating blank signed-in pages as app regressions.

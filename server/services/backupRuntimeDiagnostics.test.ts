@@ -118,7 +118,8 @@ if (process.argv.includes("--version")) {
     const record = logs[0]?.[1] as { exitCode: number; runtime: Awaited<ReturnType<typeof collectBackupRuntimeDiagnostics>> };
     assert.equal(record.exitCode, 1);
     assert.equal(record.runtime.binary.exists, true);
-    assert.equal(record.runtime.binary.bundledExists, true);
+    assert.equal(record.runtime.binary.bundledExists, false);
+    assert.equal(record.runtime.binary.source, "PATH");
     assert.equal(record.runtime.binary.version, "pg_dump (PostgreSQL) 18.6");
     assert.equal(record.runtime.databaseTcp.reachable, true);
     assert.match(record.runtime.stderr, /password authentication failed/);
