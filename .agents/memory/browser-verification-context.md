@@ -9,6 +9,12 @@ Verify the configured application port and the browser's secure context before d
 
 **How to apply:** Prefer the normal HTTPS Preview at its configured application port. For isolated direct-port browser checks, preserve the development Host header and emulate the secure origin in the test browser only. Keep authentication, application security, and deployment configuration unchanged. Do not treat a browser harness that has no secure context as evidence that the signed-in application is broken.
 
+Node-based development API probes need the same hostname-to-loopback routing as the browser harness.
+
+**Why:** The public development hostname did not reach the application port directly from a Node probe. Node 20 also requested all addresses from a custom DNS lookup; returning a single-address callback shape failed before the request reached the server.
+
+**How to apply:** Preserve the development hostname and Host header while routing to the local application port. A custom lookup must respect its `all` option and return the matching address-list shape. Do not mistake transport failures for login or application errors.
+
 Verify pointer targets only after scrolling has settled.
 
 **Why:** Smooth scrolling can move controls between measuring their position and sending a pointer event. This produces missed clicks and empty fields even when the component works correctly.

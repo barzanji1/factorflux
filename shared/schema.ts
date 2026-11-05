@@ -740,7 +740,7 @@ export const fuelCardApplications = pgTable("fuel_card_applications", {
 
 // Time Tracking table
 export const timeEntries = pgTable("time_entries", {
-  id: integer("id").primaryKey(),
+  id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   clockInTime: timestamp("clock_in_time").notNull(),
   clockOutTime: timestamp("clock_out_time"),

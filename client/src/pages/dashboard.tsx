@@ -193,7 +193,7 @@ export default function Dashboard() {
   return (
     <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace" neu>
       <div className="ff-neu-dashboard" data-testid="agent-dashboard">
-        <div className="mb-3 w-full" data-testid="time-clock-widget">
+        <div className="ff-neu-time-clock-widget" data-testid="time-clock-widget">
           <TimeClock />
         </div>
 

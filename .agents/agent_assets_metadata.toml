@@ -162,3 +162,17 @@ mtime_ms = 1793844744197
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/de7865ab-db72-4629-9364-f0899005f0db/1e2756fb-332d-46f6-b212-533314078354"
 storage_version_token = "1793844744780898"
 content_type = "text/html"
+
+[[outputs]]
+id = "sQkDdwWF2goayvYJv92Fe"
+uri = "file://generated-artifacts/time-clock-fixes/changes.html"
+type = "html"
+title = "Time Clock fixes — diff"
+description = "Database sequence repair, real clock-in/out test results, and measured width/spacing fixes."
+logical_id = "d904480d-3ee3-4282-ac22-737f5d2d0f6e"
+content_hash = "sha256:68ae5dd505f426b45f54744ba56d30aa3603bdc2f6347e79761bb5c1fce48efe"
+size = 18361
+mtime_ms = 1793845275298
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/d904480d-3ee3-4282-ac22-737f5d2d0f6e/dedbdac8-c186-45b0-ac29-2888400aacc3"
+storage_version_token = "1793845275941400"
+content_type = "text/html"

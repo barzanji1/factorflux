@@ -1062,7 +1062,7 @@ export class DatabaseStorage implements IStorage {
         clockInTime: new Date(),
         status: "clocked_in",
         notes: notes || null,
-      } as any)
+      })
       .returning();
 
     await this.createActivity({

@@ -94,6 +94,8 @@
 
 .ff-neu-app-shell .ff-neu-dashboard :is([class~="rounded-xl"],[class~="rounded-2xl"],[class~="rounded-3xl"]) { border-radius:16px !important; }
 .ff-neu-dashboard { width:100%; color:#394541; --neu-convex:7px 7px 16px #c1c5c2,-7px -7px 16px #fff; --neu-concave:inset 5px 5px 10px #c1c5c2,inset -5px -5px 10px #fff; }
+.ff-neu-dashboard .ff-neu-time-clock-widget { box-sizing:border-box; min-width:0; width:100%; max-width:1680px; margin:0 0 16px; }
+.ff-neu-dashboard .ff-neu-time-clock-widget > [data-testid="time-clock-strip"] { box-sizing:border-box; min-width:0; width:100%; max-width:100%; }
 .ff-neu-dashboard .ff-neu-dashboard-intro { display:flex; min-height:116px; align-items:center; justify-content:space-between; gap:18px; overflow:hidden; padding:20px 3px 12px; }
 .ff-neu-eyebrow { color:#89938f; font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
 .ff-neu-page-title { margin-top:6px; color:#394541; font-size:clamp(25px,3vw,36px); font-weight:600; letter-spacing:-.055em; line-height:1.05; }
