@@ -16,7 +16,6 @@ import type {
 import { pathToPermission } from "@/lib/routePermissions";
 import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
 import { NeuNotice } from "@/components/shared/NeuNotice";
-import TimeClock from "@/components/time-tracking/time-clock";
 
 const countKinds = [
   ["email_bounced", "Bounced email"],
@@ -173,11 +172,6 @@ export default function Dashboard() {
     setRefreshStatus(failed ? `${failed} section${failed === 1 ? "" : "s"} could not refresh.` : "Refresh complete.");
   };
 
-  const updatedAt = [followupsData, activityData, alertsData, financialData]
-    .map(data => data?.generatedAt)
-    .filter((value): value is string => Boolean(value))
-    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
-
   const followupsLoading = !user?.id || !user.role || followupsQuery.isLoading;
   const activityLoading = !user?.id || !user.role || activityQuery.isLoading;
   const alertsLoading = !user?.id || !user.role || alertsQuery.isLoading;
@@ -189,28 +183,34 @@ export default function Dashboard() {
     const permission = pathToPermission(path);
     return !permission || permissions.includes(permission);
   };
+  const agentName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || user?.name || "Agent";
 
   return (
-    <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace" neu>
+    <AppShell
+      title="Agent Dashboard"
+      subtitle="Your work, follow-ups and operational alerts"
+      group="Workspace"
+      neu
+      actions={<NeuButton
+        type="button"
+        aria-label="Refresh dashboard"
+        title="Refresh dashboard"
+        onClick={refreshAll}
+        disabled={isFetching || !user?.id || !user.role}
+        data-testid="dashboard-refresh"
+        className="ff-neu-dashboard-refresh h-9 w-9 shrink-0 rounded-full p-0"
+      >
+        <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+      </NeuButton>}
+    >
       <div className="ff-neu-dashboard" data-testid="agent-dashboard">
-        <div className="ff-neu-dashboard-toolbar">
-          <div>
-            <p className="ff-neu-updated">{updatedAt ? `Updated ${displayDate(updatedAt)}` : "Live work queue"}</p>
-            {refreshStatus && <p role="status" className="mt-1 text-xs text-[#77817e]">{refreshStatus}</p>}
-          </div>
-          <NeuButton type="button" onClick={refreshAll} disabled={isFetching || !user?.id || !user.role} data-testid="dashboard-refresh" className="ff-neu-refresh">
-            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh
-          </NeuButton>
-        </div>
-
-        <div className="ff-neu-time-clock-widget" data-testid="time-clock-widget">
-          <TimeClock />
-        </div>
+        <p role="status" className="sr-only" aria-live="polite">{refreshStatus}</p>
 
         <FinancialSummary
           data={financialData}
           isLoading={financialLoading}
           error={financialError}
+          agentName={agentName}
           onRetry={() => financialQuery.refetch()}
           children={<FloatingActionGrid
             data={financialData?.actionGrid}

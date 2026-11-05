@@ -12,15 +12,16 @@ interface AppShellProps {
   subtitle?: string;
   group?: string;
   neu?: boolean;
+  actions?: ReactNode;
 }
 
-export function AppShell({ children, title, subtitle, group, neu = false }: AppShellProps) {
+export function AppShell({ children, title, subtitle, group, neu = false, actions }: AppShellProps) {
   return (
     <div className={`${neu ? "ff-neu-app-shell" : "ff-app-shell"} flex min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]`}>
       <Sidebar />
 
       <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${neu ? "ff-neu-main-column" : ""}`}>
-        <TopNav title={title} subtitle={subtitle} group={group} neu={neu} />
+        <TopNav title={title} subtitle={subtitle} group={group} neu={neu} actions={actions} />
 
         {neu ? (
           <NeuPageShell className="ff-neu-page-shell custom-scrollbar min-h-0 flex-1 overflow-auto px-3 py-4 sm:px-5 sm:py-6 xl:px-8">

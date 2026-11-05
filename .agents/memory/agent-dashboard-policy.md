@@ -3,11 +3,11 @@ name: Agent Dashboard policy
 description: Default work-queue landing page, no project-management UI, and dashboard-specific manager visibility.
 ---
 
-Keep Updated/Refresh with the dashboard header, above the time clock. The clock is separate from those controls and aligned with dashboard content, with 16px of space before Work Queue.
+Keep Refresh as an icon-only circular control beside New in the top bar. Do not restore a visible Updated/Refresh-complete text block. Time Clock belongs in the shared top bar between the bell and user chip, not in a dashboard strip.
 
-**Why:** The user corrected the placement after finding the refresh controls crowded the clock; these are page-header controls, not clock or work-queue content.
+**Why:** The user repeatedly corrected dashboard header crowding, then replaced the strip with a top-bar clock accessible from every page.
 
-**How to apply:** Preserve this separation when rearranging the dashboard rather than putting refresh controls between the clock and Work Queue again.
+**How to apply:** Keep clock details and actions in its anchored dropdown and do not restore a dashboard clock strip. Keep the personal KPI summary muted and compact; do not restore hero copy or explanatory action-grid labels.
 
 The Agent Dashboard is the default staff landing page, not a project-management tool. No boards, kanban cards, task drag-and-drop, or sprints. Neumorphic section/KPI cards, the KPI carousel, and floating 3D action cards are explicitly approved.
 

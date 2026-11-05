@@ -133,6 +133,51 @@ try {
     }
     console.log(JSON.stringify({ route, ok, uncaught, sidebar: status.sidebar, insights: status.insights }));
   }
+  if (process.env.DASHBOARD_HEADER_VERIFY === "1") {
+    await evaluate(`(()=>{history.pushState({},'','/');dispatchEvent(new PopStateEvent('popstate'));})()`);
+    for (let i=0;i<80;i++) {
+      if(await evaluate(`!!document.querySelector('.ff-neu-dashboard-summary')&&!document.querySelector('[data-testid="dashboard-refresh"]')?.disabled`))break;
+      await delay(150);
+    }
+    const header=await evaluate(`(async()=>{
+      const [personResponse,financialResponse]=await Promise.all([fetch('/api/auth/user'),fetch('/api/agent-dashboard/financial')]);
+      if(!personResponse.ok||!financialResponse.ok)throw new Error('Header verification data request failed');
+      const person=await personResponse.json(),financial=await financialResponse.json();
+      const agentName=[person.firstName,person.lastName].filter(Boolean).join(' ').trim()||person.name||'Agent';
+      const money=new Intl.NumberFormat(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2}).format(financial.kpis.fundedThisWeek);
+      const expected=agentName+' — '+financial.kpis.openFollowups.toLocaleString()+' open follow-ups · '+money+' funded this week';
+      const button=document.querySelector('[data-testid="dashboard-refresh"]'),box=button.getBoundingClientRect();
+      return {summaryMatches:document.querySelector('.ff-neu-dashboard-summary')?.textContent.trim()===expected,
+        inTopbar:document.querySelector('.ff-neu-top-nav')?.contains(button),
+        besideNew:button.previousElementSibling?.textContent.includes('New'),
+        iconOnly:button.textContent.trim()===''&&button.getAttribute('aria-label')==='Refresh dashboard',
+        circular:Math.abs(box.width-box.height)<1&&parseFloat(getComputedStyle(button).borderRadius)>=box.height/2,
+        oldToolbarAbsent:!document.querySelector('.ff-neu-dashboard-toolbar,.ff-neu-updated'),
+        oldHeroAbsent:!document.body.innerText.includes('Good work moves forward.')&&!document.body.innerText.includes('A clear view of what is ready, waiting, and getting older.'),
+        labelsAbsent:!document.querySelector('.ff-action-heading,.ff-action-hint'),
+        cards:document.querySelectorAll('[data-testid="action-grid"] .ff-action-card').length};
+    })()`);
+    for(const key of ['summaryMatches','inTopbar','besideNew','iconOnly','circular','oldToolbarAbsent','oldHeroAbsent','labelsAbsent']) {
+      if(!header[key])throw new Error('Dashboard header verification failed: '+key);
+    }
+    await evaluate(`(()=>{
+      window.__headerRefreshCounts={};
+      const original=window.fetch;
+      window.fetch=function(...args){const url=typeof args[0]==='string'?args[0]:args[0].url;
+        for(const section of ['followups','activity','alerts','financial'])if(url?.startsWith('/api/agent-dashboard/'+section))window.__headerRefreshCounts[section]=(window.__headerRefreshCounts[section]||0)+1;
+        return original.apply(this,args);};
+    })()`);
+    await pointerClick('[data-testid="dashboard-refresh"]');
+    let refreshed=false;
+    for(let i=0;i<100;i++) {
+      refreshed=await evaluate(`['followups','activity','alerts','financial'].every(key=>window.__headerRefreshCounts[key]>0)&&!document.querySelector('[data-testid="dashboard-refresh"]').disabled`);
+      if(refreshed)break;
+      await delay(150);
+    }
+    if(!refreshed)throw new Error('Topbar refresh did not reload all four dashboard sections');
+    console.log(JSON.stringify({dashboardHeader:{...header,allFourSectionsRefreshed:refreshed}}));
+    await writeFile(`${out}/dashboard-header-results.json`,JSON.stringify({...header,allFourSectionsRefreshed:refreshed},null,2));
+  }
   if (process.env.TIME_CLOCK_VERIFY === "1") {
     const liveStatus = await evaluate(`(async()=>{const r=await fetch('/api/time-tracking/status',{credentials:'include'});const body=await r.json();return {httpStatus:r.status,shapeValid:typeof body.isClocked==='boolean'&&Array.isArray(body.todayEntries)&&typeof body.todayHours==='number'};})()`);
     if (liveStatus.httpStatus !== 200 || !liveStatus.shapeValid) throw new Error("Authenticated time-clock status endpoint failed");
@@ -146,7 +191,8 @@ try {
         const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
         if(url.pathname==='/api/time-tracking/status'){
           if(state.fail)return json({message:'Browser-only status error'},503);
-          return json({isClocked:state.clocked,currentEntry:state.clocked?{id:990001,clockInTime:new Date(Date.now()-154*60000).toISOString(),status:'clocked_in'}:undefined,todayEntries:[],todayHours:state.clocked?0:1.25});
+          const todayEntries=Array.from({length:4},(_,i)=>({id:990010+i,clockInTime:new Date(Date.now()-(i+1)*3600000).toISOString(),clockOutTime:new Date(Date.now()-(i+1)*3600000+1800000).toISOString(),totalHours:"0.50",status:"clocked_out"}));
+          return json({isClocked:state.clocked,currentEntry:state.clocked?{id:990001,clockInTime:new Date(Date.now()-154*60000).toISOString(),status:'clocked_in'}:undefined,todayEntries,todayHours:4.25});
         }
         if(url.pathname==='/api/time-tracking/clock-in'||url.pathname==='/api/time-tracking/clock-out'){
           state.notes.push(JSON.parse(init.body).notes);
@@ -161,57 +207,58 @@ try {
     await evaluate(`(async()=>{const {queryClient}=await import('/src/lib/queryClient.ts');await queryClient.invalidateQueries({queryKey:['/api/time-tracking/status']});})()`);
     const waitText = async text => {
       for(let i=0;i<70;i++){
-        if(await evaluate(`document.querySelector('[data-testid="time-clock-widget"]')?.innerText.includes(${JSON.stringify(text)})`))return;
+        if(await evaluate(`document.querySelector('[data-testid="time-clock-popover"]')?.innerText.includes(${JSON.stringify(text)})`))return;
         await delay(150);
       }
       throw new Error(`Time clock did not display ${text}`);
     };
+    await pointerClick('[data-testid="time-clock-trigger"]');
     await waitText("Time clock unavailable");
-    const failureSafe=await evaluate(`![...document.querySelectorAll('[data-testid="time-clock-widget"] button')].some(el=>el.textContent.trim()==='Clock In')`);
+    const failureSafe=await evaluate(`![...document.querySelectorAll('[data-testid="time-clock-popover"] button')].some(el=>el.textContent.trim()==='Clock In'&&!el.disabled)`);
     if(!failureSafe)throw new Error("Failed clock status falsely enabled Clock In");
     await evaluate(`window.__clockVerify.fail=false`);
     await pointerClick('[data-testid="time-clock-action"]');
     await waitText("Clock In");
-    const inspectWidget=()=>evaluate(`(()=>{
-      const el=document.querySelector('[data-testid="time-clock-widget"]');
-      const r=el.getBoundingClientRect(), style=getComputedStyle(el);
-      const dashboard=el.parentElement.getBoundingClientRect();
-      const strip=document.querySelector('[data-testid="time-clock-strip"]').getBoundingClientRect();
-      const toolbarElement=document.querySelector('.ff-neu-dashboard-toolbar');
-      const toolbar=toolbarElement.getBoundingClientRect();
-      const introElement=document.querySelector('.ff-neu-dashboard-intro');
-      const intro=introElement.getBoundingClientRect();
-      const bounds=id=>{const e=document.querySelector('[data-testid="'+id+'"]');if(!e)return null;const b=e.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height,text:e.textContent};};
-      return {width:r.width,height:r.height,top:r.top,bottom:r.bottom,
-        gapAbove:r.top-toolbar.bottom,gapBelow:intro.top-r.bottom,
-        correctOrder:el.previousElementSibling===toolbarElement&&el.nextElementSibling===introElement,
-        alignedToContent:Math.abs(r.left-dashboard.left)<1&&Math.abs(r.right-dashboard.right)<1&&Math.abs(r.left-intro.left)<1&&Math.abs(r.right-intro.right)<1,
-        stripContained:strip.left>=r.left&&strip.right<=r.right,maxWidth:style.maxWidth,
-        display:style.display,visibility:style.visibility,count:document.querySelectorAll('[data-testid="time-clock-widget"]').length,
-        notesCollapsed:!document.querySelector('[data-testid="time-clock-notes-input"]'),
-        status:bounds('time-clock-status'),clock:bounds('time-clock-live'),total:bounds('time-clock-total'),action:bounds('time-clock-action')};
+    const inspectClock=()=>evaluate(`(()=>{
+      const trigger=document.querySelector('[data-testid="time-clock-trigger"]'),t=trigger.getBoundingClientRect();
+      const popup=document.querySelector('[data-testid="time-clock-popover"]'),r=popup.getBoundingClientRect();
+      const topbar=trigger.closest('header,.ff-neu-top-nav')||trigger.parentElement;
+      const bell=trigger.previousElementSibling,user=trigger.nextElementSibling;
+      return {oneTrigger:document.querySelectorAll('[data-testid="time-clock-trigger"]').length===1,
+        inTopbar:!!topbar,betweenBellAndUser:!!bell?.querySelector('svg')&&!!user,
+        noStrip:!document.querySelector('[data-testid="time-clock-widget"],[data-testid="time-clock-strip"]'),
+        anchored:r.top>=t.bottom-1,visible:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,
+        width:r.width,height:r.height,
+        recentEntries:document.querySelectorAll('[data-testid="time-clock-recent-entry"]').length,
+        total:document.querySelector('[data-testid="time-clock-total"]').textContent,
+        status:document.querySelector('[data-testid="time-clock-status"]').textContent,
+        liveClock:!!document.querySelector('[data-testid="time-clock-live"]').textContent};
     })()`);
-    const desktop=await inspectWidget();
-    if(desktop.height<40||desktop.height>60||desktop.display==='none'||desktop.visibility==='hidden'||!desktop.correctOrder||desktop.count!==1||!desktop.notesCollapsed||desktop.top<0||desktop.bottom>1000)throw new Error("Compact time clock is hidden, too tall, duplicated, or not between toolbar and Work Queue");
-    if(!desktop.clock||Math.abs(desktop.clock.y-desktop.status.y)>6||!desktop.total||!desktop.action)throw new Error("Desktop time clock is not a single row");
-    if(desktop.gapBelow!==16||desktop.gapAbove<16||!desktop.alignedToContent||!desktop.stripContained||desktop.width>1680)throw new Error("Desktop clock alignment or 16px spacing is incorrect");
-    await pointerClick('[data-testid="time-clock-notes-toggle"]');
+    const desktop=await inspectClock();
+    if(!desktop.oneTrigger||!desktop.inTopbar||!desktop.betweenBellAndUser||!desktop.noStrip||!desktop.anchored||!desktop.visible||desktop.recentEntries!==3||!desktop.total.includes('4.25')||!desktop.liveClock)throw new Error("Topbar clock layout or recent-entry details failed");
     await pointerClick('[data-testid="time-clock-notes-input"]');
     await send("Input.insertText",{text:"Browser-only time clock verification"});
-    const clockButton = async label => {
-      const found=await evaluate(`(()=>{const el=[...document.querySelectorAll('[data-testid="time-clock-widget"] button')].find(e=>e.textContent.trim()===${JSON.stringify(label)});if(!el)return false;el.setAttribute('data-clock-action','true');return true;})()`);
-      if(!found)throw new Error(`Missing ${label} button`);
-      await pointerClick('[data-clock-action="true"]');
-      await evaluate(`document.querySelector('[data-clock-action]')?.removeAttribute('data-clock-action')`);
-    };
-    await clockButton("Clock In");
+    await pointerClick('[data-testid="time-clock-action"]');
     await waitText("Clock Out");
-    await waitText("Clocked In · 2h 34m");
-    const activeStatus=await evaluate(`document.querySelector('[data-testid="time-clock-status"]').textContent`);
-    if(!activeStatus.includes("2h 34m"))throw new Error("Active session duration is not shown compactly");
-    await clockButton("Clock Out");
+    for(let i=0;i<40;i++){if(await evaluate(`document.querySelector('[data-testid="time-clock-trigger"]').textContent.includes('2h 34m')`))break;await delay(150);}
+    const active=await evaluate(`(()=>{const e=document.querySelector('[data-testid="time-clock-trigger"]');return {timer:e.textContent.trim(),clocked:e.getAttribute('data-clocked-in'),animation:getComputedStyle(e,'::after').animationName,status:document.querySelector('[data-testid="time-clock-status"]').textContent};})()`);
+    if(!active.timer.includes('2h 34m')||active.clocked!=='true'||active.animation==='none'||!active.status.includes('since'))throw new Error("Active trigger timer, glow or since-status is missing");
+    await pointerClick('[data-testid="agent-dashboard"] .ff-neu-eyebrow');
+    await delay(200);
+    if(await evaluate(`!!document.querySelector('[data-testid="time-clock-popover"]')`))throw new Error("Outside click did not close clock dropdown");
+    // Client-side navigation must retain the shared clock on another page.
+    await evaluate(`history.pushState({},'','/invoices');dispatchEvent(new PopStateEvent('popstate'))`);
+    await delay(700);
+    if(!await evaluate(`document.querySelector('[data-testid="time-clock-trigger"]')?.textContent.includes('2h 34m')`))throw new Error("Active clock did not survive page navigation");
+    await pointerClick('[data-testid="time-clock-trigger"]');
+    await waitText("Clock Out");
+    await send("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+    await send("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+    await delay(200);
+    if(!await evaluate(`!document.querySelector('[data-testid="time-clock-popover"]')&&document.activeElement===document.querySelector('[data-testid="time-clock-trigger"]')`))throw new Error("Escape dismissal/focus restoration failed");
+    await pointerClick('[data-testid="time-clock-trigger"]');
+    await pointerClick('[data-testid="time-clock-action"]');
     await waitText("Clock In");
-    if(await evaluate(`!!document.querySelector('[data-testid="time-clock-notes-input"]')`))await pointerClick('[data-testid="time-clock-notes-toggle"]');
     const calls=await evaluate(`({inCount:window.__clockVerify.inCount,outCount:window.__clockVerify.outCount,notes:window.__clockVerify.notes})`);
     if(calls.inCount!==1||calls.outCount!==1||calls.notes[0]!=="Browser-only time clock verification")throw new Error("Time-clock action or notes wiring failed");
     await evaluate(`window.scrollTo({top:0,behavior:'instant'})`);
@@ -220,13 +267,11 @@ try {
     await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
     await delay(200);
     await evaluate(`window.scrollTo({top:0,behavior:'instant'})`);
-    const mobileClock=await inspectWidget();
-    if(mobileClock.width>390||mobileClock.height>120||mobileClock.height<60||mobileClock.top<0||mobileClock.bottom>844||!mobileClock.notesCollapsed)throw new Error("Mobile time clock is clipped, hidden, or too large");
-    if(Math.abs(mobileClock.status.y-mobileClock.clock.y)>6||Math.abs((mobileClock.total.y+mobileClock.total.height/2)-(mobileClock.action.y+mobileClock.action.height/2))>6||mobileClock.total.y<=mobileClock.status.y)throw new Error("Mobile time clock is not arranged in two compact rows");
-    if(mobileClock.gapBelow!==16||mobileClock.gapAbove<16||!mobileClock.correctOrder||!mobileClock.alignedToContent||!mobileClock.stripContained)throw new Error("Mobile clock order/alignment or 16px spacing is incorrect");
+    const mobileClock=await inspectClock();
+    if(!mobileClock.visible||!mobileClock.anchored||!mobileClock.oneTrigger||!mobileClock.noStrip)throw new Error("Mobile clock dropdown is clipped or missing");
     const mobileImage=await send("Page.captureScreenshot",{format:"jpeg",quality:70});
     await writeFile(`${out}/time-clock-mobile.jpg`,Buffer.from(mobileImage.data,"base64"));
-    const clockResult={liveStatus,failureSafe,desktop,mobile:mobileClock,activeStatus,calls};
+    const clockResult={liveStatus,failureSafe,desktop,mobile:mobileClock,active,calls,outsideClose:true,escapeClose:true,crossPage:true};
     console.log(JSON.stringify({timeClock:clockResult}));
     await writeFile(`${out}/time-clock-results.json`,JSON.stringify(clockResult,null,2));
     await send("Emulation.setDeviceMetricsOverride",{width:1440,height:1000,deviceScaleFactor:1,mobile:false});

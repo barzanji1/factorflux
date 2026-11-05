@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -41,6 +41,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import TimeClock from "@/components/time-tracking/time-clock";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,7 @@ interface TopNavProps {
   subtitle?: string;
   group?: string;
   neu?: boolean;
+  actions?: ReactNode;
 }
 
 function normalizeCarrierChatUrl(url?: string | null) {
@@ -107,7 +109,7 @@ const NOTIF_ICON: Record<string, { icon: typeof Info; className: string }> = {
   error:   { icon: XCircle,      className: "text-red-500 bg-red-50 dark:bg-red-950/40" },
 };
 
-export default function TopNav({ title, subtitle, group, neu = true }: TopNavProps) {
+export default function TopNav({ title, subtitle, group, neu = true, actions }: TopNavProps) {
   const { user: authUser, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -532,6 +534,8 @@ export default function TopNav({ title, subtitle, group, neu = true }: TopNavPro
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {actions}
+
             {/* ── Notification Bell ── */}
             <DropdownMenu open={notificationMenuOpen} onOpenChange={setNotificationMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -661,6 +665,8 @@ export default function TopNav({ title, subtitle, group, neu = true }: TopNavPro
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {authUser?.id && <TimeClock key={authUser.id} />}
 
             {/* ── User menu ── */}
             <DropdownMenu>

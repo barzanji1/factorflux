@@ -23,6 +23,7 @@ type Props = {
   isLoading: boolean;
   error?: unknown;
   onRetry: () => void;
+  agentName: string;
   children?: ReactNode;
 };
 
@@ -187,7 +188,7 @@ function MetricSkeleton() {
   return <div className="ff-neu-metric-skeleton" aria-hidden="true"><span /><span /><span /></div>;
 }
 
-export function FinancialSummary({ data, isLoading, error, onRetry, children }: Props) {
+export function FinancialSummary({ data, isLoading, error, onRetry, agentName, children }: Props) {
   const metricCards = data ? metrics.map(metric => {
     const Icon = metric.icon;
     const value = data.kpis[metric.key];
@@ -213,8 +214,9 @@ export function FinancialSummary({ data, isLoading, error, onRetry, children }: 
       <div className="ff-neu-dashboard-intro">
         <div>
           <p className="ff-neu-eyebrow">Trucking Pros Financial · Work Queue</p>
-          <h1 className="ff-neu-page-title">Good work moves forward.</h1>
-          <p className="ff-neu-page-subtitle">A clear view of what is ready, waiting, and getting older.</p>
+          <p className="ff-neu-dashboard-summary" aria-live="polite">
+            {agentName} — {data ? data.kpis.openFollowups.toLocaleString() : "—"} open follow-ups · {data ? currency.format(data.kpis.fundedThisWeek) : "—"} funded this week
+          </p>
         </div>
       </div>
       <section aria-label="Financial key performance indicators" className="mt-6">

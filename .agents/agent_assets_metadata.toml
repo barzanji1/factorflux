@@ -190,3 +190,31 @@ mtime_ms = 1793845520426
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/24674d04-6e71-40c1-89bd-b5dcf47d583e/d70b0c8e-c84f-40b9-8904-e80ad7d79712"
 storage_version_token = "1793845521653884"
 content_type = "text/html"
+
+[[outputs]]
+id = "8AMFE-Tw26XwLKTu_X_gB"
+uri = "file://generated-artifacts/dashboard-header-cleanup/changes.html"
+type = "html"
+title = "Dashboard header cleanup — diff"
+description = "Complete frontend and regression-test diff for Refresh placement, personalized summary, and action-grid label removal."
+logical_id = "23d2f5a2-188a-4a73-9dcb-14021fa2d77c"
+content_hash = "sha256:5a741d1110361d0989c2281c9b1a45a7e385349238bdddbd2fe550fd5a875fae"
+size = 22239
+mtime_ms = 1793845890134
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/23d2f5a2-188a-4a73-9dcb-14021fa2d77c/7c166f4e-fa1b-4782-8412-10007f346fe5"
+storage_version_token = "1793845890748049"
+content_type = "text/html"
+
+[[outputs]]
+id = "sqoURXBCOnOWK882qVPPl"
+uri = "file://generated-artifacts/topbar-clock/changes.html"
+type = "html"
+title = "Shared top-bar Time Clock — diff"
+description = "Request-specific diff for the universal clock dropdown, dashboard strip removal, and browser regression coverage."
+logical_id = "3f7f13bb-68f3-4168-8aef-255771728f7b"
+content_hash = "sha256:6f360b18e8f99ea16f819bf18d81ba6c14afbb33a1bbd30cf2bf25627c3ed038"
+size = 41623
+mtime_ms = 1793846210481
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/3f7f13bb-68f3-4168-8aef-255771728f7b/69e6ef9c-d09e-4c6f-bc69-87319b6211fa"
+storage_version_token = "1793846210971942"
+content_type = "text/html"
