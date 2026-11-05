@@ -172,11 +172,29 @@ try {
     await evaluate(`window.__clockVerify.fail=false`);
     await pointerClick('[data-testid="time-clock-action"]');
     await waitText("Clock In");
-    const inspectWidget=()=>evaluate(`(()=>{const el=document.querySelector('[data-testid="time-clock-widget"]');const r=el.getBoundingClientRect();const style=getComputedStyle(el);const dashboard=el.parentElement.getBoundingClientRect();const strip=document.querySelector('[data-testid="time-clock-strip"]').getBoundingClientRect();const toolbar=document.querySelector('.ff-neu-dashboard-toolbar').getBoundingClientRect();const bounds=id=>{const e=document.querySelector('[data-testid="'+id+'"]');if(!e)return null;const b=e.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height,text:e.textContent};};return {width:r.width,height:r.height,top:r.top,bottom:r.bottom,gapBelow:toolbar.top-r.bottom,alignedToContent:Math.abs(r.left-dashboard.left)<1&&Math.abs(r.right-dashboard.right)<1,stripContained:strip.left>=r.left&&strip.right<=r.right,maxWidth:style.maxWidth,display:style.display,visibility:style.visibility,count:document.querySelectorAll('[data-testid="time-clock-widget"]').length,firstDashboardChild:el.parentElement?.firstElementChild===el,notesCollapsed:!document.querySelector('[data-testid="time-clock-notes-input"]'),status:bounds('time-clock-status'),clock:bounds('time-clock-live'),total:bounds('time-clock-total'),action:bounds('time-clock-action')};})()`);
+    const inspectWidget=()=>evaluate(`(()=>{
+      const el=document.querySelector('[data-testid="time-clock-widget"]');
+      const r=el.getBoundingClientRect(), style=getComputedStyle(el);
+      const dashboard=el.parentElement.getBoundingClientRect();
+      const strip=document.querySelector('[data-testid="time-clock-strip"]').getBoundingClientRect();
+      const toolbarElement=document.querySelector('.ff-neu-dashboard-toolbar');
+      const toolbar=toolbarElement.getBoundingClientRect();
+      const introElement=document.querySelector('.ff-neu-dashboard-intro');
+      const intro=introElement.getBoundingClientRect();
+      const bounds=id=>{const e=document.querySelector('[data-testid="'+id+'"]');if(!e)return null;const b=e.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height,text:e.textContent};};
+      return {width:r.width,height:r.height,top:r.top,bottom:r.bottom,
+        gapAbove:r.top-toolbar.bottom,gapBelow:intro.top-r.bottom,
+        correctOrder:el.previousElementSibling===toolbarElement&&el.nextElementSibling===introElement,
+        alignedToContent:Math.abs(r.left-dashboard.left)<1&&Math.abs(r.right-dashboard.right)<1&&Math.abs(r.left-intro.left)<1&&Math.abs(r.right-intro.right)<1,
+        stripContained:strip.left>=r.left&&strip.right<=r.right,maxWidth:style.maxWidth,
+        display:style.display,visibility:style.visibility,count:document.querySelectorAll('[data-testid="time-clock-widget"]').length,
+        notesCollapsed:!document.querySelector('[data-testid="time-clock-notes-input"]'),
+        status:bounds('time-clock-status'),clock:bounds('time-clock-live'),total:bounds('time-clock-total'),action:bounds('time-clock-action')};
+    })()`);
     const desktop=await inspectWidget();
-    if(desktop.height<40||desktop.height>60||desktop.display==='none'||desktop.visibility==='hidden'||!desktop.firstDashboardChild||desktop.count!==1||!desktop.notesCollapsed||desktop.top<0||desktop.bottom>1000)throw new Error("Compact time clock is hidden, too tall, duplicated, or not first on dashboard");
+    if(desktop.height<40||desktop.height>60||desktop.display==='none'||desktop.visibility==='hidden'||!desktop.correctOrder||desktop.count!==1||!desktop.notesCollapsed||desktop.top<0||desktop.bottom>1000)throw new Error("Compact time clock is hidden, too tall, duplicated, or not between toolbar and Work Queue");
     if(!desktop.clock||Math.abs(desktop.clock.y-desktop.status.y)>6||!desktop.total||!desktop.action)throw new Error("Desktop time clock is not a single row");
-    if(desktop.gapBelow!==16||!desktop.alignedToContent||!desktop.stripContained||desktop.width>1680)throw new Error("Desktop clock width/alignment or 16px toolbar gap is incorrect");
+    if(desktop.gapBelow!==16||desktop.gapAbove<16||!desktop.alignedToContent||!desktop.stripContained||desktop.width>1680)throw new Error("Desktop clock alignment or 16px spacing is incorrect");
     await pointerClick('[data-testid="time-clock-notes-toggle"]');
     await pointerClick('[data-testid="time-clock-notes-input"]');
     await send("Input.insertText",{text:"Browser-only time clock verification"});
@@ -205,7 +223,7 @@ try {
     const mobileClock=await inspectWidget();
     if(mobileClock.width>390||mobileClock.height>120||mobileClock.height<60||mobileClock.top<0||mobileClock.bottom>844||!mobileClock.notesCollapsed)throw new Error("Mobile time clock is clipped, hidden, or too large");
     if(Math.abs(mobileClock.status.y-mobileClock.clock.y)>6||Math.abs((mobileClock.total.y+mobileClock.total.height/2)-(mobileClock.action.y+mobileClock.action.height/2))>6||mobileClock.total.y<=mobileClock.status.y)throw new Error("Mobile time clock is not arranged in two compact rows");
-    if(mobileClock.gapBelow!==16||!mobileClock.alignedToContent||!mobileClock.stripContained)throw new Error("Mobile clock alignment or 16px toolbar gap is incorrect");
+    if(mobileClock.gapBelow!==16||mobileClock.gapAbove<16||!mobileClock.correctOrder||!mobileClock.alignedToContent||!mobileClock.stripContained)throw new Error("Mobile clock order/alignment or 16px spacing is incorrect");
     const mobileImage=await send("Page.captureScreenshot",{format:"jpeg",quality:70});
     await writeFile(`${out}/time-clock-mobile.jpg`,Buffer.from(mobileImage.data,"base64"));
     const clockResult={liveStatus,failureSafe,desktop,mobile:mobileClock,activeStatus,calls};

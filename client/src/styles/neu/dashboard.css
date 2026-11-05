@@ -100,7 +100,7 @@
 .ff-neu-eyebrow { color:#89938f; font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
 .ff-neu-page-title { margin-top:6px; color:#394541; font-size:clamp(25px,3vw,36px); font-weight:600; letter-spacing:-.055em; line-height:1.05; }
 .ff-neu-page-subtitle { margin-top:9px; color:#7d8883; font-size:13px; }
-.ff-neu-dashboard-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid rgba(162,171,167,.44); padding:0 2px 11px; }
+.ff-neu-dashboard .ff-neu-dashboard-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; border-bottom:1px solid rgba(162,171,167,.44); padding:0 2px 11px; }
 .ff-neu-updated { color:#818c87; font-size:11px; }
 .ff-neu-app-shell .ff-neu-dashboard .ff-neu-refresh {
   min-height:38px !important;

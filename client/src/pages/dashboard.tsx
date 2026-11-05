@@ -193,10 +193,6 @@ export default function Dashboard() {
   return (
     <AppShell title="Agent Dashboard" subtitle="Your work, follow-ups and operational alerts" group="Workspace" neu>
       <div className="ff-neu-dashboard" data-testid="agent-dashboard">
-        <div className="ff-neu-time-clock-widget" data-testid="time-clock-widget">
-          <TimeClock />
-        </div>
-
         <div className="ff-neu-dashboard-toolbar">
           <div>
             <p className="ff-neu-updated">{updatedAt ? `Updated ${displayDate(updatedAt)}` : "Live work queue"}</p>
@@ -205,6 +201,10 @@ export default function Dashboard() {
           <NeuButton type="button" onClick={refreshAll} disabled={isFetching || !user?.id || !user.role} data-testid="dashboard-refresh" className="ff-neu-refresh">
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh
           </NeuButton>
+        </div>
+
+        <div className="ff-neu-time-clock-widget" data-testid="time-clock-widget">
+          <TimeClock />
         </div>
 
         <FinancialSummary
