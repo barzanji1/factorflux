@@ -8,3 +8,9 @@ Every concrete staff API prefix must resolve to a module permission, including l
 **Why:** Representative endpoint tests missed alternate prefixes that allowed authenticated users to bypass module permissions. Applying staff-session permission middleware to a provider webhook fixed the bypass but broke the integration; restoring public access without signature verification would allow forged state updates.
 
 **How to apply:** When adding or changing routes, inventory all concrete API paths against the permission map. Test low-permission accounts against aliases and write methods. For signed webhooks, preserve raw bytes only for the exact path, fail closed when verification is unavailable, and test valid, unsigned, and tampered payloads.
+
+Staff clock-in/out and their own time entries are self-service, not payroll-report access.
+
+**Why:** The time clock historically appeared on the Agent Dashboard without a payroll gate. A shared payroll API prefix prevented ordinary agents from using it even when its UI was restored.
+
+**How to apply:** Keep authenticated, session-user-only clock operations separate from permission-gated payroll reports. Never extend that exemption to other employees' entries or staff-wide reporting.

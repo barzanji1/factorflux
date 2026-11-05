@@ -133,6 +133,77 @@ try {
     }
     console.log(JSON.stringify({ route, ok, uncaught, sidebar: status.sidebar, insights: status.insights }));
   }
+  if (process.env.TIME_CLOCK_VERIFY === "1") {
+    const liveStatus = await evaluate(`(async()=>{const r=await fetch('/api/time-tracking/status',{credentials:'include'});const body=await r.json();return {httpStatus:r.status,shapeValid:typeof body.isClocked==='boolean'&&Array.isArray(body.todayEntries)&&typeof body.todayHours==='number'};})()`);
+    if (liveStatus.httpStatus !== 200 || !liveStatus.shapeValid) throw new Error("Authenticated time-clock status endpoint failed");
+    // Exercise UI states with browser-local responses, never alter real payroll.
+    await evaluate(`(() => {
+      window.__clockVerify={fail:true,clocked:false,inCount:0,outCount:0,notes:[]};
+      const original=window.fetch.bind(window);
+      window.fetch=async(input,init)=>{
+        const url=new URL(typeof input==='string'?input:input.url,location.origin);
+        const state=window.__clockVerify;
+        const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
+        if(url.pathname==='/api/time-tracking/status'){
+          if(state.fail)return json({message:'Browser-only status error'},503);
+          return json({isClocked:state.clocked,currentEntry:state.clocked?{id:990001,clockInTime:new Date(Date.now()-60000).toISOString(),status:'clocked_in'}:undefined,todayEntries:[],todayHours:state.clocked?0:1.25});
+        }
+        if(url.pathname==='/api/time-tracking/clock-in'||url.pathname==='/api/time-tracking/clock-out'){
+          state.notes.push(JSON.parse(init.body).notes);
+          state.clocked=url.pathname.endsWith('clock-in');
+          if(state.clocked)state.inCount++;else state.outCount++;
+          return json({id:990001,status:state.clocked?'clocked_in':'clocked_out'});
+        }
+        return original(input,init);
+      };
+      history.pushState({},'','/');dispatchEvent(new PopStateEvent('popstate'));
+    })()`);
+    await evaluate(`(async()=>{const {queryClient}=await import('/src/lib/queryClient.ts');await queryClient.invalidateQueries({queryKey:['/api/time-tracking/status']});})()`);
+    const waitText = async text => {
+      for(let i=0;i<70;i++){
+        if(await evaluate(`document.querySelector('[data-testid="time-clock-widget"]')?.innerText.includes(${JSON.stringify(text)})`))return;
+        await delay(150);
+      }
+      throw new Error(`Time clock did not display ${text}`);
+    };
+    await waitText("Time clock unavailable");
+    const failureSafe=await evaluate(`![...document.querySelectorAll('[data-testid="time-clock-widget"] button')].some(el=>el.textContent.trim()==='Clock In')`);
+    if(!failureSafe)throw new Error("Failed clock status falsely enabled Clock In");
+    await evaluate(`window.__clockVerify.fail=false`);
+    await pointerClick('[data-testid="time-clock-widget"] button');
+    await waitText("Clock In");
+    const inspectWidget=()=>evaluate(`(()=>{const el=document.querySelector('[data-testid="time-clock-widget"]');const r=el.getBoundingClientRect();const style=getComputedStyle(el);return {width:r.width,height:r.height,display:style.display,visibility:style.visibility};})()`);
+    const desktop=await inspectWidget();
+    if(desktop.height<100||desktop.display==='none'||desktop.visibility==='hidden')throw new Error("Time clock is not visibly rendered");
+    await pointerClick('[data-testid="time-clock-widget"] input');
+    await send("Input.insertText",{text:"Browser-only time clock verification"});
+    const clockButton = async label => {
+      const found=await evaluate(`(()=>{const el=[...document.querySelectorAll('[data-testid="time-clock-widget"] button')].find(e=>e.textContent.trim()===${JSON.stringify(label)});if(!el)return false;el.setAttribute('data-clock-action','true');return true;})()`);
+      if(!found)throw new Error(`Missing ${label} button`);
+      await pointerClick('[data-clock-action="true"]');
+      await evaluate(`document.querySelector('[data-clock-action]')?.removeAttribute('data-clock-action')`);
+    };
+    await clockButton("Clock In");
+    await waitText("Clock Out");
+    await clockButton("Clock Out");
+    await waitText("Clock In");
+    const calls=await evaluate(`({inCount:window.__clockVerify.inCount,outCount:window.__clockVerify.outCount,notes:window.__clockVerify.notes})`);
+    if(calls.inCount!==1||calls.outCount!==1||calls.notes[0]!=="Browser-only time clock verification")throw new Error("Time-clock action or notes wiring failed");
+    await evaluate(`document.querySelector('[data-testid="time-clock-widget"]').scrollIntoView({block:'center',behavior:'instant'})`);
+    const image=await send("Page.captureScreenshot",{format:"jpeg",quality:70});
+    await writeFile(`${out}/time-clock-desktop.jpg`,Buffer.from(image.data,"base64"));
+    await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
+    await delay(200);
+    await evaluate(`document.querySelector('[data-testid="time-clock-widget"]').scrollIntoView({block:'center',behavior:'instant'})`);
+    const mobileClock=await inspectWidget();
+    if(mobileClock.width>390||mobileClock.height<100)throw new Error("Mobile time clock is clipped or hidden");
+    const mobileImage=await send("Page.captureScreenshot",{format:"jpeg",quality:70});
+    await writeFile(`${out}/time-clock-mobile.jpg`,Buffer.from(mobileImage.data,"base64"));
+    const clockResult={liveStatus,failureSafe,desktop,mobile:mobileClock,calls};
+    console.log(JSON.stringify({timeClock:clockResult}));
+    await writeFile(`${out}/time-clock-results.json`,JSON.stringify(clockResult,null,2));
+    await send("Emulation.setDeviceMetricsOverride",{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  }
   let invoiceCreate;
   if (process.env.INVOICE_CREATE_VERIFY === "1") {
     // Browser-local fixtures only. Never create an invoice or upload to storage.

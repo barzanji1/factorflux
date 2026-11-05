@@ -5,6 +5,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { NeuBadge as Badge, NeuButton as Button, NeuCard as Card, NeuInput as Input } from "@/styles/neu/components";
 import {
+  AlertTriangle,
   Clock3,
   Play,
   Square,
@@ -71,7 +72,7 @@ export default function TimeClock() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const { data: timeStatus, isLoading } = useQuery<TimeTrackingStatus>({
+  const { data: timeStatus, isLoading, isError, error, refetch, isFetching } = useQuery<TimeTrackingStatus>({
     queryKey: ["/api/time-tracking/status"],
     refetchInterval: 30000,
   });
@@ -173,6 +174,33 @@ export default function TimeClock() {
             <div className="h-24 animate-pulse rounded-[18px] bg-[#d2d2d2]" />
             <div className="h-16 animate-pulse rounded-[18px] bg-[#d2d2d2]" />
             <div className="h-10 animate-pulse rounded-xl bg-[#d2d2d2]" />
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    const message = error instanceof Error
+      ? error.message
+      : "Time clock status is temporarily unavailable.";
+    return (
+      <Card className="rounded-2xl p-5" role="alert">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#a45e45]" />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold text-[#333]">Time clock unavailable</h2>
+            <p className="mt-1 text-sm text-[#777]">{message}</p>
+            <Button
+              type="button"
+              variant="accent"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="mt-4"
+              data-testid="time-clock-retry"
+            >
+              {isFetching ? "Retrying..." : "Retry"}
+            </Button>
           </div>
         </div>
       </Card>

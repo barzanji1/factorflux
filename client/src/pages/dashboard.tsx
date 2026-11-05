@@ -16,6 +16,7 @@ import type {
 import { pathToPermission } from "@/lib/routePermissions";
 import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
 import { NeuNotice } from "@/components/shared/NeuNotice";
+import TimeClock from "@/components/time-tracking/time-clock";
 
 const countKinds = [
   ["email_bounced", "Bounced email"],
@@ -284,6 +285,10 @@ export default function Dashboard() {
             </> : <div data-testid="alerts-loading"><TableSkeleton testId="alerts-loading-table" rows={3} columns={5} /></div>}
           </NeuCard>
         </section>
+
+        <div className="mx-auto mt-5 w-full max-w-2xl" data-testid="time-clock-widget">
+          <TimeClock />
+        </div>
 
         <WorkShortcuts
           followupCount={followupsData?.totalCount}

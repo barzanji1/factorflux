@@ -134,3 +134,17 @@ mtime_ms = 1793843913686
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/323b576c-5b5d-40ba-bc68-ebdaa8a75498/ce34cd81-e62b-41fe-9a47-6193fe301555"
 storage_version_token = "1793843914314952"
 content_type = "text/html"
+
+[[outputs]]
+id = "07vTlE3S1b8gcLU5E5gyW"
+uri = "file://generated-artifacts/time-clock/changes.html"
+type = "html"
+title = "Time Clock restoration — diff"
+description = "Full diff, removed mount diagnosis, self-service permission fix, and desktop/mobile verification."
+logical_id = "fc089ab0-5622-45a1-be58-fdfc24b3d758"
+content_hash = "sha256:d6ea2bbd15a6364607696f522d8f5395c8104a125da8649cabcf3b786a85bb9c"
+size = 15223
+mtime_ms = 1793844364502
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/fc089ab0-5622-45a1-be58-fdfc24b3d758/4d456cac-2a75-4482-926b-698e1e4a47d4"
+storage_version_token = "1793844365431504"
+content_type = "text/html"

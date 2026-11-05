@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { registerChargebackResolutionRoutes } from "./routes/chargebackResolutions";
 import { registerEntityNoteRoutes } from "./routes/entityNotes";
+import { isSelfTimeTrackingRequest } from "./timeTrackingAccess";
 import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
 import { registerOcrIntakeRoutes } from "./routes/ocrIntake";
@@ -920,6 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", (req: any, res: any, next: any) => {
     const pathname = String(req.originalUrl || "").split("?")[0];
     if (publicApiPath(pathname)) return next();
+    if (isSelfTimeTrackingRequest(req.method, pathname)) return requireAuth(req, res, next);
     if (/^\/api\/it-support(?:\/|$)/.test(pathname)) return requireAuth(req, res, next);
     // The default staff workbench must not fail because its bell polls an old
     // dashboard-module endpoint. These GET handlers always use req.user.id;
