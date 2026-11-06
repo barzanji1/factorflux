@@ -34,9 +34,9 @@ export function registerOcrIntakeRoutes(
     let committed = false;
     try {
       const files = (Array.isArray(req.files) ? req.files : req.file ? [req.file] : []) as Express.Multer.File[];
-      if (!files.length || files.length > 8 || files.some(file => file.mimetype !== "application/pdf" ||
+      if (!files.length || files.length > 20 || files.some(file => file.mimetype !== "application/pdf" ||
         !file.buffer.subarray(0, 5).equals(Buffer.from("%PDF-")))) {
-        return res.status(400).json({ message: "Upload up to eight valid PDF documents." });
+        return res.status(400).json({ message: "Upload up to twenty valid PDF documents." });
       }
       const prepared: { file: Express.Multer.File; filename: string; tmpPath: string; key: string; sourceSha256: string }[] = [];
       res.locals.finishOcrReceive?.();
@@ -113,8 +113,8 @@ export function registerOcrIntakeRoutes(
   app.get("/api/invoices/ocr-intake", auth, async (req: any, res) => {
     try {
       const raw = String(req.query.documentIds ?? "").split(",");
-      if (!raw.length || raw.length > 8 || raw.some(id => !/^[1-9]\d*$/.test(id))) {
-        throw new IntakeError("Provide one to eight intake document IDs");
+      if (!raw.length || raw.length > 20 || raw.some(id => !/^[1-9]\d*$/.test(id))) {
+        throw new IntakeError("Provide one to twenty intake document IDs");
       }
       const snapshot = await getIntakeSnapshot(parseIntakeIds(raw.map(Number)), req.user);
       res.json(snapshot);

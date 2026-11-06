@@ -24,7 +24,8 @@ export function mapIntakeDocuments(documents: IntakeDocument[], tolerance = inta
   const select = (type: string) => {
     const found = completed.filter(doc => type === "bol"
       ? ["bol", "pod"].includes(normalizeIntakeType(doc.docType)) : normalizeIntakeType(doc.docType) === type);
-    if (found.length > 1) throw new IntakeError(`Multiple ${type} documents detected. Keep one document per type and retry.`, 409);
+    // Preserve existing field precedence (first completed document), while
+    // allowing all originals, corrections and multi-stop paperwork to attach.
     return found[0];
   };
   const rateCon = select("rate_confirmation"), invoice = select("invoice"), bol = select("bol");

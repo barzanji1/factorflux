@@ -295,21 +295,21 @@ function handleUpload(field: string) {
   };
 }
 function handleOcrIntakeUpload(req: any, res: any, next: any) {
-  multer({ storage: multer.memoryStorage(), limits: { fileSize: DOCUMENT_UPLOAD_LIMIT, files: 8 } })
-    .array("files", 8)(req, res, (error: any) => {
+  multer({ storage: multer.memoryStorage(), limits: { fileSize: DOCUMENT_UPLOAD_LIMIT, files: 20 } })
+    .array("files", 20)(req, res, (error: any) => {
       if (!error) return next();
       res.status(400).json({ message: error.code === "LIMIT_FILE_SIZE" ?
-        "Each intake PDF must be 135MB or smaller." : "Upload up to eight PDFs using the files field." });
+        "Each intake PDF must be 135MB or smaller." : "Upload up to twenty PDFs using the files field." });
     });
 }
 
-// Invoice intake uses one bounded memory-storage parser for all four paperwork
+// Invoice intake uses one bounded memory-storage parser for all paperwork
 // slots. Keeping this separate from handleUpload avoids changing the limits or
 // file types accepted by existing upload endpoints.
 function handleInvoicePaperworkUpload(req: any, res: any, next: any) {
   const paperworkUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: DOCUMENT_UPLOAD_LIMIT, files: 4 },
+    limits: { fileSize: DOCUMENT_UPLOAD_LIMIT, files: 20 },
     fileFilter: (_req, file, cb) => {
       const isPdf = file.mimetype.toLowerCase() === "application/pdf"
         && path.extname(file.originalname).toLowerCase() === ".pdf";
@@ -317,10 +317,14 @@ function handleInvoicePaperworkUpload(req: any, res: any, next: any) {
       else cb(new Error("Invoice paperwork must be a PDF"));
     },
   }).fields([
-    { name: "rateConfirmation", maxCount: 1 },
-    { name: "billOfLading", maxCount: 1 },
-    { name: "lumperReceipt", maxCount: 1 },
-    { name: "other", maxCount: 1 },
+    { name: "rateConfirmation", maxCount: 20 },
+    { name: "carrierInvoice", maxCount: 20 },
+    { name: "billOfLading", maxCount: 20 },
+    { name: "proofOfDelivery", maxCount: 20 },
+    { name: "weightTicket", maxCount: 20 },
+    { name: "dispatchSheet", maxCount: 20 },
+    { name: "lumperReceipt", maxCount: 20 },
+    { name: "other", maxCount: 20 },
   ]);
 
   paperworkUpload(req, res, (err: any) => {
@@ -2894,7 +2898,7 @@ ${message}
         amount: z.coerce.number().nonnegative().optional(),
         serviceDate: z.union([z.string(), z.date()]).optional(),
         excludeInvoiceId: z.coerce.number().int().positive().optional(),
-        ocrDocumentIds: z.array(z.number().int().positive()).max(8).optional(),
+        ocrDocumentIds: z.array(z.number().int().positive()).max(20).optional(),
       }).parse(req.body);
       if (!(await canAccessClient(req, input.carrierId))) {
         return res.status(403).json({ message: "You may only preflight invoices for carriers assigned to you" });
@@ -3221,8 +3225,9 @@ ${message}
       const files = (req.files ?? {}) as Record<string, Express.Multer.File[]>;
       const rateConfirmation = files.rateConfirmation?.[0];
       const billOfLading = files.billOfLading?.[0];
-      if (!rateConfirmation || !billOfLading) {
-        return res.status(400).json({ message: "Rate Confirmation and Bill of Lading are required." });
+      const carrierInvoice = files.carrierInvoice?.[0];
+      if (!rateConfirmation || !billOfLading || !carrierInvoice) {
+        return res.status(400).json({ message: "Rate Confirmation, Carrier Invoice and Bill of Lading are required." });
       }
 
       const allFiles = Object.values(files).flat();
@@ -3320,36 +3325,40 @@ ${message}
       if (preflightDecision.invalidAcknowledgements) return res.status(400).json({ message: "Acknowledgements must contain only unique alert codes requiring acknowledgement, with optional text reasons." });
       if (!preflightDecision.accepted) return res.status(409).json({ message: "Invoice preflight requires attention", alerts: preflightResult.alerts });
 
-      const paperwork: Array<{ field: string; type: "rate_confirmation" | "bill_of_lading" | "lumper_receipt" | "other" }> = [
+      const paperwork = [
         { field: "rateConfirmation", type: "rate_confirmation" },
+        { field: "carrierInvoice", type: "freight_invoice" },
         { field: "billOfLading", type: "bill_of_lading" },
+        { field: "proofOfDelivery", type: "proof_of_delivery" },
+        { field: "weightTicket", type: "weight_ticket" },
+        { field: "dispatchSheet", type: "dispatch_sheet" },
         { field: "lumperReceipt", type: "lumper_receipt" },
         { field: "other", type: "other" },
       ];
       const intakeKeyPrefix = crypto.randomUUID();
       const uploadedDocuments: Array<Record<string, any>> = [];
       for (const { field, type } of paperwork) {
-        const file = files[field]?.[0];
-        if (!file) continue;
-        if (reusedPaperwork.has(field)) continue;
-        const filename = `${type}-${crypto.randomUUID()}.pdf`;
-        const s3Key = `invoices/intake/${intakeKeyPrefix}/paperwork/${filename}`;
-        uploadedKeys.push(s3Key);
-        await uploadDocumentToS3(file, s3Key);
-        uploadedDocuments.push({
-          filename,
-          originalName: sanitizeOriginalName(file.originalname),
-          mimeType: "application/pdf",
-          size: file.size,
-          ...documentSizeMetadata(file),
-          s3Key,
-          documentType: type,
-          finalDocumentType: type,
-          loadId: null,
-          uploadedBy: req.user.id,
-          sourceChannel: metadata.sourceChannel === "manual" ? "manual" : "drag_drop",
-          status: "processed",
-        });
+        for (const [index, file] of (files[field] ?? []).entries()) {
+          if (reusedPaperwork.has(index === 0 ? field : `${field}:${index}`)) continue;
+          const filename = `${type}-${crypto.randomUUID()}.pdf`;
+          const s3Key = `invoices/intake/${intakeKeyPrefix}/paperwork/${filename}`;
+          uploadedKeys.push(s3Key);
+          await uploadDocumentToS3(file, s3Key);
+          uploadedDocuments.push({
+            filename,
+            originalName: sanitizeOriginalName(file.originalname),
+            mimeType: "application/pdf",
+            size: file.size,
+            ...documentSizeMetadata(file),
+            s3Key,
+            documentType: type,
+            finalDocumentType: type,
+            loadId: null,
+            uploadedBy: req.user.id,
+            sourceChannel: metadata.sourceChannel === "manual" ? "manual" : "drag_drop",
+            status: "processed",
+          });
+        }
       }
 
       const {

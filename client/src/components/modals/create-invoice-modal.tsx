@@ -46,13 +46,21 @@ type Broker = {
   email?: string | null; phone?: string | null; creditLimit?: string | null;
   averageDaysToPay?: number | null; notes?: string | null; creditGrade?: string | null; creditScore?: number | null;
 };
-type PaperworkKey = "rateConfirmation" | "billOfLading" | "lumperReceipt" | "other";
+type PaperworkKey = "rateConfirmation" | "carrierInvoice" | "billOfLading" | "proofOfDelivery" | "weightTicket" | "dispatchSheet" | "lumperReceipt" | "other";
 const PAPERWORK: Array<{ key: PaperworkKey; label: string; required?: boolean }> = [
   { key: "rateConfirmation", label: "Rate Confirmation", required: true },
+  { key: "carrierInvoice", label: "Carrier Invoice", required: true },
   { key: "billOfLading", label: "Bill of Lading", required: true },
+  { key: "proofOfDelivery", label: "Proof of Delivery (POD)" },
+  { key: "weightTicket", label: "Weight Ticket" },
+  { key: "dispatchSheet", label: "Dispatch Sheet" },
   { key: "lumperReceipt", label: "Lumper Receipt" },
   { key: "other", label: "Other" },
 ];
+const emptyPaperwork = (): Record<PaperworkKey, File[]> => ({
+  rateConfirmation: [], carrierInvoice: [], billOfLading: [], proofOfDelivery: [],
+  weightTicket: [], dispatchSheet: [], lumperReceipt: [], other: [],
+});
 const MAX_PDF_SIZE = 135 * 1024 * 1024;
 
 type PreflightAlert = {
@@ -80,10 +88,10 @@ function formatFileSize(bytes: number) {
 }
 
 function PaperworkDropzone({
-  label, required, file, onFile, onRemove, onInvalid,
+  label, required, files, onFile, onRemove, onInvalid,
 }: {
-  label: string; required?: boolean; file: File | null;
-  onFile: (file: File) => void; onRemove: () => void; onInvalid: (message: string) => void;
+  label: string; required?: boolean; files: File[];
+  onFile: (file: File) => void; onRemove: (index: number) => void; onInvalid: (message: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -112,27 +120,26 @@ function PaperworkDropzone({
       role="button"
       tabIndex={0}
       aria-label={`Upload ${label}${required ? ", required" : ""}`}
-      onKeyDown={event => { if ((event.key === "Enter" || event.key === " ") && !file) { event.preventDefault(); inputRef.current?.click(); } }}
-      onClick={() => !file && inputRef.current?.click()}
+      onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); inputRef.current?.click(); } }}
+      onClick={() => inputRef.current?.click()}
       onDragOver={event => { event.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
-      onDrop={event => { event.preventDefault(); setDragging(false); const dropped = event.dataTransfer.files[0]; if (dropped) void validate(dropped); }}
-      className={cn("rounded-xl border border-dashed p-3 transition-colors shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]", dragging ? "border-[#27aab8] bg-[#d8eeee] ring-2 ring-[#27aab8]" : file ? "border-emerald-400 bg-emerald-50/70" : "border-[#aaa] hover:border-[#27aab8]")}
+      onDrop={event => { event.preventDefault(); setDragging(false); void (async () => { for (const file of Array.from(event.dataTransfer.files)) await validate(file); })(); }}
+      className={cn("rounded-xl border border-dashed p-3 transition-colors shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]", dragging ? "border-[#27aab8] bg-[#d8eeee] ring-2 ring-[#27aab8]" : files.length ? "border-emerald-400" : "border-[#aaa] hover:border-[#27aab8]")}
     >
-      <input ref={inputRef} type="file" className="hidden" accept="application/pdf,.pdf" onChange={event => {
-        const selected = event.target.files?.[0];
-        if (selected) void validate(selected);
+      <input ref={inputRef} type="file" multiple className="hidden" accept="application/pdf,.pdf" onClick={event => event.stopPropagation()} onChange={event => {
+        const selected = Array.from(event.target.files ?? []);
+        void (async () => { for (const file of selected) await validate(file); })();
         event.currentTarget.value = "";
       }} />
-      {file ? (
-        <div className="flex items-center gap-2">
+      <div className="mb-2 flex items-center gap-2.5"><Upload className="h-5 w-5 text-slate-500" /><span className="text-xs font-medium">{label}{required && <span data-required-mark> *</span>} · Add PDFs</span></div>
+      {files.map((file, index) => (
+        <div key={index} className="flex items-center gap-2 py-1">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
           <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{file.name}</p><p className="text-[11px] text-slate-500">{formatFileSize(file.size)}</p></div>
-          <button type="button" aria-label={`Remove ${label}`} className="rounded p-1 text-slate-500 hover:bg-white" onClick={event => { event.stopPropagation(); onRemove(); }}><X className="h-4 w-4" /></button>
+          <button type="button" aria-label={`Remove ${file.name}`} className="rounded p-1 text-slate-500 hover:bg-white" onClick={event => { event.stopPropagation(); onRemove(index); }}><X className="h-4 w-4" /></button>
         </div>
-      ) : (
-        <div className="flex items-center gap-2.5"><Upload className="h-5 w-5 text-slate-500" /><span className="text-xs font-medium">{label}{required && <span data-required-mark> *</span>}</span></div>
-      )}
+      ))}
     </div>
   );
 }
@@ -331,10 +338,8 @@ export default function CreateInvoiceModal({
   const [brokerSearch, setBrokerSearch] = useState("");
   const [brokerQuery, setBrokerQuery] = useState("");
   const [brokerOpen, setBrokerOpen] = useState(false);
-  const [paperwork, setPaperwork] = useState<Record<PaperworkKey, File | null>>({
-    rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null,
-  });
-  const ocrPaperworkRef = useRef<Partial<Record<PaperworkKey, File>>>({});
+  const [paperwork, setPaperwork] = useState(emptyPaperwork);
+  const ocrPaperworkRef = useRef<Partial<Record<PaperworkKey, File[]>>>({});
   const [ocrFiles, setOcrFiles] = useState<File[]>([]);
   const [ocrDocuments, setOcrDocuments] = useState<OcrDocument[]>([]);
   const [ocrStatus, setOcrStatus] = useState<OcrStatus>("idle");
@@ -478,7 +483,7 @@ export default function CreateInvoiceModal({
     setPaperwork(current => {
       const next = { ...current };
       (Object.keys(ocrPaperworkRef.current) as PaperworkKey[]).forEach(key => {
-        if (next[key] === ocrPaperworkRef.current[key]) next[key] = null;
+        next[key] = next[key].filter(file => !ocrPaperworkRef.current[key]?.includes(file));
       });
       ocrPaperworkRef.current = {};
       return next;
@@ -486,7 +491,7 @@ export default function CreateInvoiceModal({
   };
 
   const validateOcrFiles = async (files: File[]) => {
-    if (files.length > 8) throw new Error("Choose no more than 8 PDF files.");
+    if (files.length > 20) throw new Error("Choose no more than 20 PDF files.");
     for (const file of files) {
       if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
         throw new Error(`${file.name} is not a PDF file.`);
@@ -595,23 +600,26 @@ export default function CreateInvoiceModal({
           }
           const returnedDocs: OcrDocument[] = Array.isArray(result.documents) ? result.documents : [];
           const byType = (types: OcrDocType[]) => {
-            const document = returnedDocs.find(item => item.docType && types.includes(item.docType) && item.status === "completed");
-            return document ? files.find(file => file.name === document.filename) ?? null : null;
+            return returnedDocs.filter(item => item.docType && types.includes(item.docType) && item.status === "completed")
+              .map(document => files.find(file => file.name === document.filename))
+              .filter((file): file is File => !!file);
           };
           const matchedPaperwork = {
             rateConfirmation: byType(["rate_confirmation"]),
             billOfLading: byType(["bol", "pod"]),
-            other: byType(["invoice"]),
+            carrierInvoice: byType(["invoice"]),
           };
           ocrPaperworkRef.current = Object.fromEntries(
-            Object.entries(matchedPaperwork).filter(([, file]) => file != null),
-          ) as Partial<Record<PaperworkKey, File>>;
-          setPaperwork(current => ({
-            ...current,
-            rateConfirmation: matchedPaperwork.rateConfirmation ?? current.rateConfirmation,
-            billOfLading: matchedPaperwork.billOfLading ?? current.billOfLading,
-            other: matchedPaperwork.other ?? current.other,
-          }));
+            Object.entries(matchedPaperwork).filter(([, files]) => files.length),
+          ) as Partial<Record<PaperworkKey, File[]>>;
+          setPaperwork(current => {
+            const next = { ...current };
+            for (const [key, matched] of Object.entries(matchedPaperwork)) {
+              const slot = key as PaperworkKey;
+              next[slot] = Array.from(new Set([...current[slot], ...matched]));
+            }
+            return next;
+          });
           invalidatePreflightAcknowledgements();
           const crossAlerts: OcrAlert[] = Array.isArray(result.alerts) ? result.alerts : [];
           setPreflightAlerts(crossAlerts.map(alert => ({ ...alert })));
@@ -716,7 +724,7 @@ export default function CreateInvoiceModal({
       ocrSelectedBrokerId.current = null;
       setBrokerSearch("");
       setBrokerOpen(false);
-      setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
+      setPaperwork(emptyPaperwork());
       ocrPaperworkRef.current = {};
       setOcrFiles([]);
       setOcrDocuments([]);
@@ -776,7 +784,7 @@ export default function CreateInvoiceModal({
       };
       const formData = new FormData();
       formData.append("metadata", JSON.stringify(metadata));
-      PAPERWORK.forEach(({ key }) => { const file = paperwork[key]; if (file) formData.append(key, file); });
+      PAPERWORK.forEach(({ key }) => { paperwork[key].forEach(file => formData.append(key, file)); });
       const response = await apiRequest("POST", "/api/invoices/with-documents", formData);
       return response.json();
     },
@@ -883,7 +891,8 @@ export default function CreateInvoiceModal({
   const selectedAvailableRecipients = holdRecipients.filter(option =>
     option.available && values.heldFor.includes(option.value),
   );
-  const lumperReceiptMissing = values.lumper === "yes" && !paperwork.lumperReceipt;
+  const lumperReceiptMissing = values.lumper === "yes" && !paperwork.lumperReceipt.length;
+  const paperworkCount = Object.values(paperwork).reduce((count, files) => count + files.length, 0);
   const lumperTotalInvalid = values.lumperTotal.trim() !== ""
     && (!/^\d+(?:\.\d{1,2})?$/.test(values.lumperTotal) || Number(values.lumperTotal) > 99999999.99);
   const holdDetailsInvalid = values.holdForManagerReview && (
@@ -894,7 +903,8 @@ export default function CreateInvoiceModal({
     && Number.isFinite(Number(values.amount)) && Number(values.amount) > 0
     && !lumperTotalInvalid
     && isLoadType(values.loadType)
-    && paperwork.rateConfirmation && paperwork.billOfLading
+    && paperwork.rateConfirmation.length > 0 && paperwork.billOfLading.length > 0 && paperwork.carrierInvoice.length > 0
+    && paperworkCount <= 20
     && !lumperReceiptMissing && !holdDetailsInvalid
     && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
   // Explain the existing validation/async guards instead of leaving a disabled
@@ -907,8 +917,10 @@ export default function CreateInvoiceModal({
     (!Number.isFinite(Number(values.amount)) || Number(values.amount) <= 0) && "Enter a rate greater than zero.",
     lumperTotalInvalid && "Enter a valid lumper total.",
     !isLoadType(values.loadType) && "Select a load type.",
-    !paperwork.rateConfirmation && "Upload the Rate Confirmation PDF.",
-    !paperwork.billOfLading && "Upload the Bill of Lading PDF.",
+    !paperwork.rateConfirmation.length && "Upload the Rate Confirmation PDF.",
+    !paperwork.carrierInvoice.length && "Upload the Carrier Invoice PDF.",
+    !paperwork.billOfLading.length && "Upload the Bill of Lading PDF.",
+    paperworkCount > 20 && "Choose no more than 20 paperwork PDFs in total.",
     lumperReceiptMissing && "Upload the Lumper Receipt PDF when Lumper is Yes.",
     holdDetailsInvalid && "Choose a hold reason and at least one available reviewer (wait for reviewers to load).",
     hasUnresolvedBlock && "Resolve the blocking preflight alerts.",
@@ -948,7 +960,7 @@ export default function CreateInvoiceModal({
             <section className="space-y-3" aria-labelledby="ocr-upload-heading">
               <div>
                 <h3 id="ocr-upload-heading" className="text-sm font-semibold">Staff intake · document set</h3>
-                <p className="mt-0.5 text-xs text-slate-600">Drop the rate confirmation, carrier invoice, and BOL/POD together. Up to 8 PDFs, 135MB each. Large PDFs are compressed automatically.</p>
+                <p className="mt-0.5 text-xs text-slate-600">Drop the rate confirmation, carrier invoice, and BOL/POD together. Up to 20 PDFs, 135MB each. Multiple files of each type are welcome. Large PDFs are compressed automatically.</p>
               </div>
               <input
                 ref={ocrInputRef}
@@ -1261,16 +1273,16 @@ export default function CreateInvoiceModal({
                 </div>
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold">Paperwork Uploads</h3>
-                   <p className="mt-1 text-xs font-medium text-red-600">PDF files only. Large files are compressed automatically before storage (135MB upload limit).</p>
+                   <p className="mt-1 text-xs text-slate-600">Multiple PDFs per slot, up to 20 total ({paperworkCount}/20). 135MB per file. Large files are compressed automatically before storage.</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                      {PAPERWORK.map(({ key, label, required }) => (
                        <div key={key} className="space-y-1">
                          <PaperworkDropzone
                            label={label}
                            required={required || (key === "lumperReceipt" && values.lumper === "yes")}
-                           file={paperwork[key]}
-                           onFile={file => setPaperwork(current => ({ ...current, [key]: file }))}
-                           onRemove={() => setPaperwork(current => ({ ...current, [key]: null }))}
+                           files={paperwork[key]}
+                           onFile={file => setPaperwork(current => ({ ...current, [key]: [...current[key], file] }))}
+                           onRemove={index => setPaperwork(current => ({ ...current, [key]: current[key].filter((_, i) => i !== index) }))}
                            onInvalid={message => toast({ title: "Invalid paperwork", description: message, variant: "destructive" })}
                          />
                          {key === "lumperReceipt" && lumperReceiptMissing && (
@@ -1315,7 +1327,7 @@ export default function CreateInvoiceModal({
                 setValues(EMPTY);
                 setBrokerSearch("");
                 setBrokerOpen(false);
-                setPaperwork({ rateConfirmation: null, billOfLading: null, lumperReceipt: null, other: null });
+                setPaperwork(emptyPaperwork());
                 ocrPaperworkRef.current = {};
               }}>Reset</Button>
               {entityDataLoading && <p role="status" className="text-sm">Refreshing broker and carrier data…</p>}

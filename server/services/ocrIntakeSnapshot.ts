@@ -7,8 +7,8 @@ import { normalizeIntakeType } from "./ocr/textractQueries";
 
 export function parseIntakeIds(value: unknown): number[] {
   if (value == null) return [];
-  if (!Array.isArray(value) || value.length > 8 || value.some(id => !Number.isSafeInteger(id) || id <= 0)) {
-    throw new IntakeError("ocrDocumentIds must contain up to eight positive integer IDs");
+  if (!Array.isArray(value) || value.length > 20 || value.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+    throw new IntakeError("ocrDocumentIds must contain up to twenty positive integer IDs");
   }
   if (new Set(value).size !== value.length) throw new IntakeError("Duplicate intake document IDs");
   return value;

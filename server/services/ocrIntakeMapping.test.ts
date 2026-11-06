@@ -39,8 +39,13 @@ test("rate tolerance is cent-exact and inclusive, default zero", () => {
   assert.equal(mapIntakeDocuments([rate, changed, bol], .01).alerts.length, 0);
   for (const bad of ["-1", "NaN", "abc", "", "1.001", "Infinity"]) assert.throws(() => intakeTolerance(bad));
 });
-test("missing dates are not inferred and duplicate document types are rejected", () => {
-  assert.throws(() => mapIntakeDocuments([rate, rate], 0), /Multiple rate_confirmation/);
+test("missing dates are not inferred and multiple documents per type are accepted", () => {
+  const duplicates = mapIntakeDocuments([rate, { ...rate, documentId: 4 },
+    invoice, { ...invoice, documentId: 5 }, bol, { ...bol, documentId: 6 }], 0);
+  assert.equal(duplicates.sources.rate.documentId, rate.documentId);
+  assert.equal(duplicates.sources.invoice_number.documentId, invoice.documentId);
+  assert.equal(duplicates.sources.bol_number.documentId, bol.documentId);
+  assert.deepEqual(duplicates.missingTypes, []);
   const result = mapIntakeDocuments([invoice], 0);
   assert.equal(result.fields.delivery_date, undefined);
   assert.equal(result.fields.pickup_date, undefined);
@@ -96,4 +101,15 @@ test("paperwork reuse requires correct type and exact content hash; cannot steal
   assert.equal(reusableIntakePaperwork(files, [{ ...source, contentHash: "other" }]).size, 0);
   assert.equal(reusableIntakePaperwork(files, [{ ...source, docType: "invoice" }]).size, 0);
   assert.throws(() => reusableIntakePaperwork(files, [{ ...source, invoiceId: 8 }]), /already attached/);
+});
+test("every file in multi-file slots reuses its own intake document without uploading it again", () => {
+  const buffer = Buffer.from("%PDF-fixture");
+  const corrected = Buffer.from("%PDF-corrected");
+  const source = { ...invoice, contentHash: createHash("sha256").update(buffer).digest("hex") };
+  const correction = { ...invoice, documentId: 9, contentHash: createHash("sha256").update(corrected).digest("hex") };
+  const files = { carrierInvoice: [{ buffer }, { buffer: corrected }] as Express.Multer.File[] };
+  const reused = reusableIntakePaperwork(files, [source, correction]);
+  assert.equal(reused.get("carrierInvoice"), invoice.documentId);
+  assert.equal(reused.get("carrierInvoice:1"), 9);
+  assert.equal(reused.size, 2);
 });

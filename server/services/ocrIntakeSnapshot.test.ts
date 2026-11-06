@@ -43,7 +43,9 @@ test("intake snapshot enforces staff document ownership before reading extractio
 });
 test("intake ID validation rejects duplicates, malformed values and oversized sets", () => {
   assert.deepEqual(parseIntakeIds([1, 2]), [1, 2]);
-  for (const bad of [[1, 1], ["1"], [0], [1.1], Array.from({ length: 9 }, (_, index) => index + 1)]) {
+  const twenty = Array.from({ length: 20 }, (_, index) => index + 1);
+  assert.deepEqual(parseIntakeIds(twenty), twenty);
+  for (const bad of [[1, 1], ["1"], [0], [1.1], Array.from({ length: 21 }, (_, index) => index + 1)]) {
     assert.throws(() => parseIntakeIds(bad));
   }
 });

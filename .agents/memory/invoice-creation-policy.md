@@ -20,3 +20,9 @@ Named hold options may represent a user-confirmed nickname rather than the store
 **Why:** The user confirmed that an unavailable named reviewer was an existing active manager using a different stored first name.
 
 **How to apply:** Preserve confirmed aliases when changing recipient lookup; retain active-account filtering, uniqueness checks, and group/individual deduplication.
+
+Multiple documents of the same type are normal and must not block intake.
+
+**Why:** The user explained that carriers send original plus corrected invoices, multiple rate confirmations, and multiple BOLs for multi-stop loads.
+
+**How to apply:** Preserve every uploaded document and allow multiple files in each paperwork slot. Do not reintroduce a one-document-per-classification restriction or change OCR classification to enforce one.
