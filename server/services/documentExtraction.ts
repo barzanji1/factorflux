@@ -22,6 +22,7 @@ import { getExtractionProvider } from "./ocr/registry";
 import { assertSuccessfulExtraction, type ExtractionProvider } from "./ocr/types";
 import { classifyDocumentAI, reviewDocumentType } from "./aiClassifier";
 import { findOcrBrokerMatch } from "./ocrBrokerMatching";
+import { timeOcrStage, startOcrStage } from "./ocrPipelineTiming";
 import { extractInvoiceNumber, extractLoadNumber, extractReferenceNumber, extractBolNumber, type FieldResult } from "./documentFieldDetectors";
 
 // Re-export PageResult so existing callers (e.g. document-review-dialog) keep working
@@ -252,6 +253,7 @@ export async function runExtractionJob(
   dependencies: { database?: typeof db; provider?: ExtractionProvider } = {},
 ): Promise<void> {
   const jobDb = dependencies.database ?? db;
+  let finishFieldParsing: (outcome?: string) => void = () => {};
 
   try {
     const provider = dependencies.provider ?? getExtractionProvider();
@@ -304,7 +306,8 @@ export async function runExtractionJob(
     // AI errors must fail the enclosing extraction job, never select rules.
     const routed = extracted.raw as { classification?: Awaited<ReturnType<typeof classifyDocumentAI>>; docType?: string } | undefined;
     const firstPage = (extracted.raw as { pageResults?: { text?: string }[] } | undefined)?.pageResults?.[0]?.text ?? t;
-    const aiResult = routed?.classification ?? await classifyDocumentAI(firstPage, classification);
+    const aiResult = routed?.classification ?? await timeOcrStage("Claude Haiku Classification",
+      () => classifyDocumentAI(firstPage, classification));
     const finalDocType = reviewDocumentType(aiResult.docType);
     const finalConfidence = aiResult.confidence;
 
@@ -326,6 +329,7 @@ export async function runExtractionJob(
       .where(eq(documents.id, documentId));
 
     // ── Field candidates ──────────────────────────────────────────────────────
+    finishFieldParsing = startOcrStage("Field Extraction/Parsing");
     const candidates: Array<{
       documentId:      number;
       fieldName:       string;
@@ -395,9 +399,10 @@ export async function runExtractionJob(
     add("lumper_amount",     extractLumperAmount(t));
     add("pod_signature",     extractPodSignature(t));
 
+    finishFieldParsing();
     const rawBrokerName = candidates.find(candidate => candidate.fieldName === "broker_name")?.fieldValue ?? null;
     if (rawBrokerName) {
-      const match = await findOcrBrokerMatch(rawBrokerName, jobDb);
+      const match = await timeOcrStage("Broker Matching", () => findOcrBrokerMatch(rawBrokerName, jobDb));
       if (match.brokerId && match.confidence) {
         for (const [name, value] of [["broker_id", String(match.brokerId)],
           ["broker_match_confidence", match.confidence], ["broker_matched_name", match.matchedName!]]) {
@@ -431,6 +436,7 @@ export async function runExtractionJob(
       .where(eq(docExtractionJobs.id, jobId));
 
   } catch (err: any) {
+    finishFieldParsing("failed");
     console.error(`[Extraction] job ${jobId} failed:`, err?.message);
     await jobDb
       .update(docExtractionJobs)

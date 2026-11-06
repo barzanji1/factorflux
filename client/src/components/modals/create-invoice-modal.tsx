@@ -501,6 +501,7 @@ export default function CreateInvoiceModal({
 
   const uploadOcrBatch = async (files: File[]) => {
     if (!files.length) return;
+    const ocrTimingStartedAt = performance.now();
     stopOcrRequest();
     const requestId = ocrRequestId.current;
     const controller = new AbortController();
@@ -632,6 +633,8 @@ export default function CreateInvoiceModal({
       setOcrStatus("failed");
       setOcrError(error instanceof Error ? error.message : "Unable to extract document fields.");
     } finally {
+      console.info(`[OCR Pipeline] Stage: Total End-to-End (browser, including upload and polling) — ${Math.round(performance.now() - ocrTimingStartedAt).toLocaleString("en-US")}ms`,
+        { outcome: controller.signal.aborted ? "cancelled" : "attempt_finished" });
       if (requestId === ocrRequestId.current) ocrController.current = null;
     }
   };

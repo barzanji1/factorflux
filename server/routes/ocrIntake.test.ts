@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import { createHash } from "node:crypto";
+import * as ocrPipelineTiming from "../services/ocrPipelineTiming";
 import ts from "typescript";
 import express from "express";
 import multer from "multer";
@@ -60,6 +61,7 @@ async function setup(t: { after: (fn: () => Promise<void>) => void }) {
   vm.runInNewContext(code, {
     exports, Buffer, console: { error() {} },
     require: (name: string) => {
+      if (name.endsWith("ocrPipelineTiming")) return ocrPipelineTiming;
       if (name === "../db") return { db: database };
       if (name === "../../shared/schema") return { documents, docExtractionJobs, docFieldCandidates };
       if (name === "drizzle-orm") return { eq() {}, desc() {}, asc() {}, and() {}, isNull() {}, sql() {} };

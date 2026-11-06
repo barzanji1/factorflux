@@ -1,3 +1,4 @@
+import { timeOcrStage, startOcrStage } from "./ocrPipelineTiming";
 import {
   S3Client,
   PutObjectCommand,
@@ -55,8 +56,13 @@ export async function getSignedViewUrl(key: string): Promise<string> {
 
 // All user-uploaded business documents use this entry point before S3 PUT.
 export async function uploadDocumentToS3(file: Express.Multer.File, key: string): Promise<string> {
-  await prepareDocument(file);
-  return uploadToS3(file.buffer, key, file.mimetype);
+  const finishCompression = startOcrStage("Document Compression");
+  const originalBuffer = file.buffer;
+  try {
+    await prepareDocument(file);
+    finishCompression(file.buffer === originalBuffer ? "skipped" : "completed");
+  } catch (error) { finishCompression("failed"); throw error; }
+  return timeOcrStage("S3 Upload", () => uploadToS3(file.buffer, key, file.mimetype));
 }
 
 export async function getSignedDownloadUrl(

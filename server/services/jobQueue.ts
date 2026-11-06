@@ -13,6 +13,7 @@ import { runExtractionJob } from "./documentExtraction";
 import { db } from "../db";
 import { docExtractionJobs, documents } from "../../shared/schema";
 import { eq, inArray } from "drizzle-orm";
+import { currentOcrTrace, newOcrTrace, withOcrTrace, logOcrTiming, timeOcrStage, type OcrTimingTrace } from "./ocrPipelineTiming";
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS  = [3_000, 10_000, 30_000] as const;
@@ -23,6 +24,7 @@ interface PendingJob {
   filePath:   string;
   mimeType:   string;
   attempt:    number;
+  timingTrace?: OcrTimingTrace;
 }
 
 class ExtractionJobQueue {
@@ -31,7 +33,7 @@ class ExtractionJobQueue {
 
   /** Enqueue a new job (always attempt = 1). */
   enqueue(job: Omit<PendingJob, "attempt">) {
-    this.queue.push({ ...job, attempt: 1 });
+    this.queue.push({ ...job, timingTrace: job.timingTrace ?? currentOcrTrace(), attempt: 1 });
     this._scheduleProcess();
   }
 
@@ -62,7 +64,16 @@ class ExtractionJobQueue {
         .set({ attemptCount: job.attempt })
         .where(eq(docExtractionJobs.id, job.jobId));
 
-      await runExtractionJob(job.documentId, job.jobId, job.filePath, job.mimeType);
+      const trace = job.timingTrace ?? newOcrTrace();
+      await withOcrTrace(trace, async () => {
+        try {
+          await timeOcrStage("OCR Worker", () =>
+            runExtractionJob(job.documentId, job.jobId, job.filePath, job.mimeType));
+        } finally {
+          logOcrTiming(job.timingTrace ? "Total End-to-End" : "Total Worker (no upload trace)",
+            trace.startedAt, "attempt_finished");
+        }
+      });
     } catch (err: any) {
       console.error(`[JobQueue] job ${job.jobId} threw (attempt ${job.attempt}):`, err?.message ?? err);
       // Mark as failed in DB (runExtractionJob normally handles this, but if it threw externally, handle it)

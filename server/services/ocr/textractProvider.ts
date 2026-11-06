@@ -5,6 +5,7 @@ import { BOL_QUERIES, decodeQueries, INTAKE_QUERIES, normalizeIntakeType } from 
 import type { OcrProvider, OcrResult } from "./types";
 import { fieldsFromText, mergeFields, parseAmount, parseServiceDate } from "./ocrFields";
 import { renderPages } from "./renderPages";
+import { timeOcrStage, timeOcrParsing } from "../ocrPipelineTiming";
 
 export function decodeExpense(response: AnalyzeExpenseCommandOutput, docType: string): OcrResult {
   const expenses = response.ExpenseDocuments ?? [];
@@ -83,21 +84,21 @@ export class TextractProvider implements OcrProvider {
   ) {}
 
   async extract(fileBuffer: Buffer, mimeType: string, docType: string): Promise<OcrResult> {
-    const pages = await this.rasterize(fileBuffer, mimeType);
+    const pages = await timeOcrStage("Page Rendering", () => this.rasterize(fileBuffer, mimeType));
     let classification: Awaited<ReturnType<typeof classifyDocumentAI>> | undefined;
     let type = normalizeIntakeType(docType);
     if (["other", "auto"].includes(type)) {
       const classificationTexts: string[] = [];
       const classificationConfidence: number[] = [];
       for (const page of pages) {
-        const initial = await this.client.send(new DetectDocumentTextCommand({ Document: { Bytes: page } }));
+        const initial = await timeOcrStage("Textract API Call", () => this.client.send(new DetectDocumentTextCommand({ Document: { Bytes: page } })));
         classificationTexts.push((initial.Blocks ?? []).filter(block => block.BlockType === "LINE").map(block => block.Text ?? "").join("\n"));
         const scores = (initial.Blocks ?? []).filter(block => block.BlockType === "LINE" && block.Confidence != null).map(block => block.Confidence! / 100);
         classificationConfidence.push(scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0);
       }
       const text = classificationTexts.join("\n\n");
       if (!text.trim()) throw new Error("Textract returned no text for intake classification");
-      classification = await this.classify(classificationTexts[0], undefined, { requireAI: true });
+      classification = await timeOcrStage("Claude Haiku Classification", () => this.classify(classificationTexts[0], undefined, { requireAI: true }));
       if (classification.source !== "ai") throw new Error("Claude intake classification unavailable; refusing to guess document type");
       type = normalizeIntakeType(classification.docType);
       if (!["invoice", "rate_confirmation", "bol", "pod"].includes(type)) {
@@ -112,14 +113,14 @@ export class TextractProvider implements OcrProvider {
     for (const page of pages) {
       if (page.length > 5 * 1024 * 1024) throw new Error("OCR page exceeds Textract's 5 MB synchronous limit");
       if (type === "invoice") {
-        const response = await this.client.send(new AnalyzeExpenseCommand({ Document: { Bytes: page } }));
-        results.push(decodeExpense(response, type));
+        const response = await timeOcrStage("Textract API Call", () => this.client.send(new AnalyzeExpenseCommand({ Document: { Bytes: page } })));
+        results.push(timeOcrParsing(() => decodeExpense(response, type)));
       } else {
-        const response = await this.client.send(new AnalyzeDocumentCommand({
+        const response = await timeOcrStage("Textract API Call", () => this.client.send(new AnalyzeDocumentCommand({
           Document: { Bytes: page }, FeatureTypes: ["QUERIES", "SIGNATURES"],
           QueriesConfig: { Queries: type === "rate_confirmation" ? INTAKE_QUERIES : BOL_QUERIES },
-        }));
-        results.push(decodeQueries(response, type));
+        })));
+        results.push(timeOcrParsing(() => decodeQueries(response, type)));
       }
     }
     return {

@@ -10,12 +10,26 @@ import { jobQueue } from "../services/jobQueue";
 import { findOcrBrokerMatch } from "../services/ocrBrokerMatching";
 import { getIntakeSnapshot, parseIntakeIds } from "../services/ocrIntakeSnapshot";
 import { IntakeError } from "../services/ocrIntakeMapping";
+import { newOcrTrace, withOcrTrace, startOcrStage, logOcrTiming } from "../services/ocrPipelineTiming";
 
 export function registerOcrIntakeRoutes(
   app: Express, auth: RequestHandler, upload: RequestHandler,
   compensate: (key: string, reason: string) => Promise<boolean>,
 ) {
-  app.post("/api/invoices/ocr-intake", auth, upload, async (req: any, res) => {
+  app.post("/api/invoices/ocr-intake", auth, (req, res, next) => {
+    const trace = newOcrTrace();
+    withOcrTrace(trace, () => {
+      const finish = startOcrStage("File Receive/Validation");
+      res.locals.finishOcrReceive = finish;
+      res.once("finish", () => {
+        if (res.statusCode >= 400) {
+          finish("failed");
+          logOcrTiming("Total End-to-End", trace.startedAt, "upload_failed");
+        }
+      });
+      next();
+    });
+  }, upload, async (req: any, res) => {
     const staged: { key: string; tmpPath: string }[] = [];
     let committed = false;
     try {
@@ -25,6 +39,7 @@ export function registerOcrIntakeRoutes(
         return res.status(400).json({ message: "Upload up to eight valid PDF documents." });
       }
       const prepared: { file: Express.Multer.File; filename: string; tmpPath: string; key: string; sourceSha256: string }[] = [];
+      res.locals.finishOcrReceive?.();
       for (const file of files) {
         const sourceSha256 = createHash("sha256").update(file.buffer).digest("hex");
         const uuid = randomUUID(), filename = `invoice-ocr-${uuid}.pdf`, tmpPath = `/tmp/${filename}`;
