@@ -46,20 +46,18 @@ type Broker = {
   email?: string | null; phone?: string | null; creditLimit?: string | null;
   averageDaysToPay?: number | null; notes?: string | null; creditGrade?: string | null; creditScore?: number | null;
 };
-type PaperworkKey = "rateConfirmation" | "carrierInvoice" | "billOfLading" | "proofOfDelivery" | "weightTicket" | "dispatchSheet" | "lumperReceipt" | "other";
+type PaperworkKey = "rateConfirmation" | "billOfLading" | "lumperReceipt" | "documents" | "documents2" | "documents3";
 const PAPERWORK: Array<{ key: PaperworkKey; label: string; required?: boolean }> = [
   { key: "rateConfirmation", label: "Rate Confirmation", required: true },
-  { key: "carrierInvoice", label: "Carrier Invoice", required: true },
   { key: "billOfLading", label: "Bill of Lading", required: true },
-  { key: "proofOfDelivery", label: "Proof of Delivery (POD)" },
-  { key: "weightTicket", label: "Weight Ticket" },
-  { key: "dispatchSheet", label: "Dispatch Sheet" },
   { key: "lumperReceipt", label: "Lumper Receipt" },
-  { key: "other", label: "Other" },
+  { key: "documents", label: "Documents" },
+  { key: "documents2", label: "Documents" },
+  { key: "documents3", label: "Documents" },
 ];
 const emptyPaperwork = (): Record<PaperworkKey, File[]> => ({
-  rateConfirmation: [], carrierInvoice: [], billOfLading: [], proofOfDelivery: [],
-  weightTicket: [], dispatchSheet: [], lumperReceipt: [], other: [],
+  rateConfirmation: [], billOfLading: [], lumperReceipt: [],
+  documents: [], documents2: [], documents3: [],
 });
 const MAX_PDF_SIZE = 135 * 1024 * 1024;
 
@@ -607,7 +605,7 @@ export default function CreateInvoiceModal({
           const matchedPaperwork = {
             rateConfirmation: byType(["rate_confirmation"]),
             billOfLading: byType(["bol", "pod"]),
-            carrierInvoice: byType(["invoice"]),
+            documents: byType(["invoice", "other"]),
           };
           ocrPaperworkRef.current = Object.fromEntries(
             Object.entries(matchedPaperwork).filter(([, files]) => files.length),
@@ -784,7 +782,11 @@ export default function CreateInvoiceModal({
       };
       const formData = new FormData();
       formData.append("metadata", JSON.stringify(metadata));
-      PAPERWORK.forEach(({ key }) => { paperwork[key].forEach(file => formData.append(key, file)); });
+      // Generic supporting slots share the existing untyped multipart field.
+      PAPERWORK.forEach(({ key }) => {
+        const field = key.startsWith("documents") ? "other" : key;
+        paperwork[key].forEach(file => formData.append(field, file));
+      });
       const response = await apiRequest("POST", "/api/invoices/with-documents", formData);
       return response.json();
     },
@@ -903,7 +905,7 @@ export default function CreateInvoiceModal({
     && Number.isFinite(Number(values.amount)) && Number(values.amount) > 0
     && !lumperTotalInvalid
     && isLoadType(values.loadType)
-    && paperwork.rateConfirmation.length > 0 && paperwork.billOfLading.length > 0 && paperwork.carrierInvoice.length > 0
+    && paperwork.rateConfirmation.length > 0 && paperwork.billOfLading.length > 0
     && paperworkCount <= 20
     && !lumperReceiptMissing && !holdDetailsInvalid
     && !hasUnresolvedBlock && !hasUnacknowledgedAlert;
@@ -918,7 +920,6 @@ export default function CreateInvoiceModal({
     lumperTotalInvalid && "Enter a valid lumper total.",
     !isLoadType(values.loadType) && "Select a load type.",
     !paperwork.rateConfirmation.length && "Upload the Rate Confirmation PDF.",
-    !paperwork.carrierInvoice.length && "Upload the Carrier Invoice PDF.",
     !paperwork.billOfLading.length && "Upload the Bill of Lading PDF.",
     paperworkCount > 20 && "Choose no more than 20 paperwork PDFs in total.",
     lumperReceiptMissing && "Upload the Lumper Receipt PDF when Lumper is Yes.",

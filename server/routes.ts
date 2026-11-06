@@ -3225,9 +3225,8 @@ ${message}
       const files = (req.files ?? {}) as Record<string, Express.Multer.File[]>;
       const rateConfirmation = files.rateConfirmation?.[0];
       const billOfLading = files.billOfLading?.[0];
-      const carrierInvoice = files.carrierInvoice?.[0];
-      if (!rateConfirmation || !billOfLading || !carrierInvoice) {
-        return res.status(400).json({ message: "Rate Confirmation, Carrier Invoice and Bill of Lading are required." });
+      if (!rateConfirmation || !billOfLading) {
+        return res.status(400).json({ message: "Rate Confirmation and Bill of Lading are required." });
       }
 
       const allFiles = Object.values(files).flat();

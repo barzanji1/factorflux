@@ -11,7 +11,8 @@ export function reusableIntakePaperwork(files: Record<string, Express.Multer.Fil
   for (const [slot, uploaded] of Object.entries(files)) {
     uploaded.forEach((file, index) => {
       const hash = createHash("sha256").update(file.buffer).digest("hex");
-      const match = docs.find(doc => doc.contentHash === hash && expected[slot]?.includes(doc.docType));
+      // Generic supporting uploads may already have any OCR classification.
+      const match = docs.find(doc => doc.contentHash === hash && (slot === "other" || expected[slot]?.includes(doc.docType)));
       if (match) reused.set(index === 0 ? slot : `${slot}:${index}`, match.documentId);
     });
   }

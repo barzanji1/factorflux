@@ -113,3 +113,9 @@ test("every file in multi-file slots reuses its own intake document without uplo
   assert.equal(reused.get("carrierInvoice:1"), 9);
   assert.equal(reused.size, 2);
 });
+test("generic supporting slots preserve any existing OCR classification when reused", () => {
+  const buffer = Buffer.from("%PDF-generic-pod");
+  const source = { ...bol, docType: "pod", contentHash: createHash("sha256").update(buffer).digest("hex") };
+  const reused = reusableIntakePaperwork({ other: [{ buffer } as Express.Multer.File] }, [source]);
+  assert.equal(reused.get("other"), bol.documentId);
+});

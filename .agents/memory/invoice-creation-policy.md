@@ -26,3 +26,9 @@ Multiple documents of the same type are normal and must not block intake.
 **Why:** The user explained that carriers send original plus corrected invoices, multiple rate confirmations, and multiple BOLs for multi-stop loads.
 
 **How to apply:** Preserve every uploaded document and allow multiple files in each paperwork slot. Do not reintroduce a one-document-per-classification restriction or change OCR classification to enforce one.
+
+Supporting paperwork uses three generic Documents slots, not required carrier-invoice or type-specific supporting slots.
+
+**Why:** The user wants agents to upload supporting documents without categorizing them; only Rate Confirmation and Bill of Lading are always required. Lumper Receipt remains conditional on Lumper=Yes.
+
+**How to apply:** Keep generic slot labels independent of OCR classifications and preserve existing classifications when attaching intake documents.

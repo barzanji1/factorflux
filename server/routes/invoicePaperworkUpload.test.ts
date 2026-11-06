@@ -55,6 +55,30 @@ test("paperwork rejects a 21-file batch instead of silently dropping files", asy
   assert.equal((await upload(Array(21).fill("billOfLading"))).status, 400);
 });
 
+test("Create Invoice presents exactly the requested six slots in row order", () => {
+  const modal = fs.readFileSync("client/src/components/modals/create-invoice-modal.tsx", "utf8");
+  const start = modal.indexOf("type PaperworkKey =");
+  const end = modal.indexOf("const MAX_PDF_SIZE", start);
+  const source = ts.transpileModule(`${modal.slice(start, end)}\nexports.slots = PAPERWORK;`,
+    { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const exports: { slots?: { label: string; required?: boolean }[] } = {};
+  vm.runInNewContext(source, { exports });
+  assert.deepEqual(JSON.parse(JSON.stringify(exports.slots?.map(slot => [slot.label, !!slot.required]))), [
+    ["Rate Confirmation", true], ["Bill of Lading", true],
+    ["Lumper Receipt", false], ["Documents", false],
+    ["Documents", false], ["Documents", false],
+  ]);
+});
+
+test("generic supporting uploads accept multiple files without a carrierInvoice field", async t => {
+  const upload = await setup(t, "paperwork");
+  const response = await upload(["rateConfirmation", "billOfLading", ...Array(18).fill("other")]);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.count, 20);
+  assert.equal(body.slots.other, 18);
+});
+
 test("OCR intake accepts 20 PDFs and rejects 21", async t => {
   const upload = await setup(t, "ocr");
   const response = await upload(Array(20).fill("files"));
