@@ -21,3 +21,12 @@ restore tests first. Restores target an empty isolated database as the restoring
 owner; role grants/ownership are separately managed. Never include SQL/data in
 diagnostic logs or review assets. Production verification still requires the
 user to publish before testing the authenticated admin backup endpoint.
+
+When addressing production export timeouts, preserve progress diagnostics and
+do not shorten the existing execution budget as a timeout remedy.
+
+**Why:** The user corrected a change that reduced the budget while investigating
+production exports exceeding their deadline; that made the problem worse.
+
+**How to apply:** Compare requested durations with the current effective limit
+before editing, and retain the credential-safe table progress logging.

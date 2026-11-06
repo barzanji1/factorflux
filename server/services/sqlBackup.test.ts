@@ -11,7 +11,7 @@ import { BACKUP_TIMEOUT_MS, dumpDatabaseSql, identifier, literal } from "./sqlBa
 
 const exec = promisify(execFile);
 test("SQL identifiers and values are escaped without changing content", () => {
-  assert.equal(BACKUP_TIMEOUT_MS, 600_000);
+  assert.equal(BACKUP_TIMEOUT_MS, 1_800_000);
   assert.equal(identifier('a"b'), '"a""b"');
   assert.equal(literal("a'b"), "'a''b'");
 });

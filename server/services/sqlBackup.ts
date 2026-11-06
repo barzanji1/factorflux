@@ -4,7 +4,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 
-export const BACKUP_TIMEOUT_MS = 600_000;
+export const BACKUP_TIMEOUT_MS = 1_800_000;
 
 export const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
 export const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
