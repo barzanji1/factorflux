@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { CompressionInfo } from "@/components/documents/compression-info";
+import EntityNotes from "@/components/shared/EntityNotes";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -541,8 +542,10 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
       bolNumber: values.bolNumber || undefined,
       pickupLocation: values.pickupLocation || undefined,
       deliveryLocation: values.deliveryLocation || undefined,
-      notes: values.notes || undefined,
+      ...(!invoice ? { notes: values.notes || undefined } : {}),
     };
+    // Notes on existing invoices are saved independently by EntityNotes.
+    if (invoice) delete data.notes;
 
     if (invoice) {
       updateMutation.mutate(data);
@@ -994,7 +997,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                 </div>
               </SectionCard>
 
-              <SectionCard
+              {!invoice && <SectionCard
                 icon={<ClipboardList className="h-5 w-5" />}
                 title="Notes"
                 description="Add any operational notes or billing context."
@@ -1020,10 +1023,11 @@ export default function InvoiceModal({ isOpen, onClose, invoice, initialClient, 
                     </FormItem>
                   )}
                 />
-              </SectionCard>
+              </SectionCard>}
 
             </form>
           </Form>
+          {invoice && <EntityNotes key={`invoice:${invoice.id}`} entityType="invoice" entityId={invoice.id} />}
         </div>
 
         <div className="shrink-0 border-t border-slate-200/80 bg-white/90 px-8 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-[hsl(var(--background))]/90">

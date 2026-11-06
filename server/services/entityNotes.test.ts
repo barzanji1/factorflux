@@ -14,6 +14,43 @@ import { registerEntityNoteRoutes } from "../routes/entityNotes";
 import { registerDumpStatementRoutes } from "../routes/dumpStatements";
 
 after(() => pool.end());
+test("first invoice notes load migrates legacy text once, preserves creator and never resurrects deleted imports (rollback)", async () => {
+  const rollback = new Error("ROLLBACK_LEGACY_NOTES");
+  await assert.rejects(db.transaction(async tx => {
+    const tag = randomUUID();
+    const author = { id: `legacy-author-${tag}`, role: "employee" };
+    await tx.insert(users).values({ ...author, firstName: "Legacy", lastName: "Fixture", status: "active", isTestAccount: true });
+    const [carrier] = await tx.insert(clients).values({ name: `Legacy QA ${tag}`, status: "new_client", dataOrigin: "pilot" }).returning();
+    const [invoice] = await tx.insert(invoices).values({
+      invoiceNumber: `LEGACY-${tag}`, loadId: null, clientId: carrier.id, amount: "100",
+      submittedBy: author.id, notes: "Original invoice context",
+    }).returning();
+    const [note] = await listEntityNotes("invoice", invoice.id, tx);
+    assert.equal(note.noteText, invoice.notes);
+    assert.equal(note.userId, author.id);
+    assert.equal(+note.createdAt, +invoice.createdAt!);
+    assert.equal((await listEntityNotes("invoice", invoice.id, tx)).length, 1);
+    const [source] = await tx.select().from(invoices).where(eq(invoices.id, invoice.id));
+    assert.equal(source.notes, null);
+    const events = await tx.select().from(eventLedger).where(and(eq(eventLedger.entityType, "invoice"), eq(eventLedger.entityId, invoice.id)));
+    assert.equal(events.length, 1);
+    assert.ok(!JSON.stringify(events).includes(invoice.notes!));
+    await mutateEntityNote("edit", { noteText: "Updated context" }, author, note.id, tx);
+    assert.equal((await listEntityNotes("invoice", invoice.id, tx))[0].noteText, "Updated context");
+    await mutateEntityNote("delete", {}, author, note.id, tx);
+    assert.deepEqual(await listEntityNotes("invoice", invoice.id, tx), []);
+    // Simulate the older SQL migration having copied a note but kept the source.
+    await tx.update(invoices).set({ notes: "Updated context" }).where(eq(invoices.id, invoice.id));
+    assert.deepEqual(await listEntityNotes("invoice", invoice.id, tx), []);
+    const all = await tx.select().from(entityNotes).where(and(eq(entityNotes.entityType, "invoice"), eq(entityNotes.entityId, invoice.id)));
+    assert.equal(all.length, 1, "already imported, even if soft-deleted: no duplicate");
+    const [unknown] = await tx.insert(invoices).values({
+      invoiceNumber: `UNKNOWN-${tag}`, loadId: null, clientId: carrier.id, amount: "100", notes: "No recorded creator",
+    }).returning();
+    assert.equal((await listEntityNotes("invoice", unknown.id, tx))[0].userId, null);
+    throw rollback;
+  }), error => error === rollback);
+});
 test("one notes API: all ten entities, ownership, soft deletion, audit/timeline privacy and HTTP permissions (rollback)", async () => {
   const rollback = new Error("ROLLBACK_ENTITY_NOTES");
   await assert.rejects(db.transaction(async tx => {

@@ -1994,6 +1994,7 @@ export default function InvoiceDetail() {
               ) : <NeuNotice severity="ack" className="mt-1 text-sm">No bank accounts on file — <a className="font-semibold underline" href={`/vault?clientId=${carrierId}`}>add in carrier Vault</a></NeuNotice>}
             </div>}
           </div>
+          {editOpen && <EntityNotes key={`edit-invoice:${invoiceId}`} entityType="invoice" entityId={invoiceId} />}
           <DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button><Button onClick={() => editMutation.mutate()} disabled={!editValues.amount || editMutation.isPending || (["ACH", "Wire"].includes(editValues.paymentType) && !editValues.bankAccountId)}>Save Changes</Button></DialogFooter>
         </DialogContent>
       </Dialog>
