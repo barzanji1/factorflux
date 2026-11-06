@@ -11,6 +11,7 @@ import { findOcrBrokerMatch } from "../services/ocrBrokerMatching";
 import { getIntakeSnapshot, parseIntakeIds } from "../services/ocrIntakeSnapshot";
 import { IntakeError } from "../services/ocrIntakeMapping";
 import { newOcrTrace, withOcrTrace, startOcrStage, logOcrTiming } from "../services/ocrPipelineTiming";
+import { presetDocumentClassification } from "../services/documentTypeHints";
 
 export function registerOcrIntakeRoutes(
   app: Express, auth: RequestHandler, upload: RequestHandler,
@@ -62,7 +63,12 @@ export function registerOcrIntakeRoutes(
           if (existing) {
             let [job] = await tx.select().from(docExtractionJobs).where(eq(docExtractionJobs.documentId, existing.id))
               .orderBy(desc(docExtractionJobs.id)).limit(1);
-            const needsQueue = !job || job.status === "failed";
+            const hint = presetDocumentClassification(existing);
+            // Reusing a completed upload must not preserve an old "other"
+            // result when the filename now has an explicit supported category.
+            const needsQueue = !job || job.status === "failed" || (job.status === "completed"
+              && hint?.model === "filename-pattern"
+              && (existing.aiDocumentType ?? existing.candidateDocumentType ?? existing.documentType) !== hint.docType);
             if (needsQueue) [job] = await tx.insert(docExtractionJobs).values({
               documentId: existing.id, jobType: "ocr", status: "queued",
             }).returning();

@@ -87,7 +87,8 @@ export class TextractProvider implements OcrProvider {
     const pages = await timeOcrStage("Page Rendering", () => this.rasterize(fileBuffer, mimeType));
     let classification: Awaited<ReturnType<typeof classifyDocumentAI>> | undefined;
     let type = normalizeIntakeType(docType);
-    if (["other", "auto"].includes(type)) {
+    const needsClassification = ["other", "auto"].includes(type);
+    if (needsClassification || !["invoice", "rate_confirmation", "bol", "pod"].includes(type)) {
       const classificationTexts: string[] = [];
       const classificationConfidence: number[] = [];
       for (const page of pages) {
@@ -98,12 +99,14 @@ export class TextractProvider implements OcrProvider {
       }
       const text = classificationTexts.join("\n\n");
       if (!text.trim()) throw new Error("Textract returned no text for intake classification");
-      classification = await timeOcrStage("Claude Haiku Classification", () => this.classify(classificationTexts[0], undefined, { requireAI: true }));
-      if (classification.source !== "ai") throw new Error("Claude intake classification unavailable; refusing to guess document type");
-      type = normalizeIntakeType(classification.docType);
+      if (needsClassification) {
+        classification = await timeOcrStage("Claude Haiku Classification", () => this.classify(classificationTexts[0], undefined, { requireAI: true }));
+        if (classification.source !== "ai") throw new Error("Claude intake classification unavailable; refusing to guess document type");
+        type = normalizeIntakeType(classification.docType);
+      }
       if (!["invoice", "rate_confirmation", "bol", "pod"].includes(type)) {
         return { text, confidence: classificationConfidence.reduce((sum, value) => sum + value, 0) / classificationConfidence.length, fields: fieldsFromText(""),
-          raw: { classification, docType: "other", pageCount: pages.length,
+          raw: { classification, docType: type, pageCount: pages.length,
             fileSha256: createHash("sha256").update(fileBuffer).digest("hex"),
             pageResults: classificationTexts.map((text, index) => ({ text, confidence: classificationConfidence[index] })),
             operation: "DetectDocumentText", ignoredForIntake: true } };

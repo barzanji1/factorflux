@@ -18,6 +18,7 @@ import { useInvoiceEntityQuery } from "@/hooks/use-invoice-entity-query";
 import { displayLoadType, isLoadType } from "@shared/load-types";
 import { LoadTypeToggleGroup } from "@/components/load-type";
 import { HOLD_REASONS } from "@shared/invoice-creation-options";
+import { routeIntakePaperwork, type PaperworkSlot } from "@shared/intake-paperwork";
 import "./create-invoice-modal.css";
 
 type ModalButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -46,7 +47,7 @@ type Broker = {
   email?: string | null; phone?: string | null; creditLimit?: string | null;
   averageDaysToPay?: number | null; notes?: string | null; creditGrade?: string | null; creditScore?: number | null;
 };
-type PaperworkKey = "rateConfirmation" | "billOfLading" | "lumperReceipt" | "documents" | "documents2" | "documents3";
+type PaperworkKey = PaperworkSlot;
 const PAPERWORK: Array<{ key: PaperworkKey; label: string; required?: boolean }> = [
   { key: "rateConfirmation", label: "Rate Confirmation", required: true },
   { key: "billOfLading", label: "Bill of Lading", required: true },
@@ -256,7 +257,7 @@ function StatusPanel({ kind, record }: { kind: "carrier" | "broker"; record?: Ca
 
 type InitialInvoiceValues = Partial<typeof EMPTY> & { brokerName?: string };
 type OcrFields = Record<string, string>;
-type OcrDocType = "rate_confirmation" | "invoice" | "bol" | "pod" | "other";
+type OcrDocType = "rate_confirmation" | "invoice" | "bol" | "pod" | "lumper_receipt" | "release_letter" | "noa" | "weight_ticket" | "dispatch_sheet" | "other";
 type OcrDocument = { documentId: number; filename: string; docType?: OcrDocType; status: string; error?: string | null; fields?: OcrFields; confidence?: number };
 type OcrSource = { documentId: number; filename: string; docType: OcrDocType; confidence: number };
 type OcrAlert = { code: string; severity: "block" | "ack" | "info"; title: string; message: string };
@@ -597,26 +598,10 @@ export default function CreateInvoiceModal({
             ocrSelectedBrokerId.current = null;
           }
           const returnedDocs: OcrDocument[] = Array.isArray(result.documents) ? result.documents : [];
-          const byType = (types: OcrDocType[]) => {
-            return returnedDocs.filter(item => item.docType && types.includes(item.docType) && item.status === "completed")
-              .map(document => files.find(file => file.name === document.filename))
-              .filter((file): file is File => !!file);
-          };
-          const matchedPaperwork = {
-            rateConfirmation: byType(["rate_confirmation"]),
-            billOfLading: byType(["bol", "pod"]),
-            documents: byType(["invoice", "other"]),
-          };
-          ocrPaperworkRef.current = Object.fromEntries(
-            Object.entries(matchedPaperwork).filter(([, files]) => files.length),
-          ) as Partial<Record<PaperworkKey, File[]>>;
           setPaperwork(current => {
-            const next = { ...current };
-            for (const [key, matched] of Object.entries(matchedPaperwork)) {
-              const slot = key as PaperworkKey;
-              next[slot] = Array.from(new Set([...current[slot], ...matched]));
-            }
-            return next;
+            const routed = routeIntakePaperwork(current, files, returnedDocs);
+            ocrPaperworkRef.current = routed.added;
+            return routed.paperwork;
           });
           invalidatePreflightAcknowledgements();
           const crossAlerts: OcrAlert[] = Array.isArray(result.alerts) ? result.alerts : [];

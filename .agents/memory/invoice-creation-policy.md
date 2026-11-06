@@ -32,3 +32,9 @@ Supporting paperwork uses three generic Documents slots, not required carrier-in
 **Why:** The user wants agents to upload supporting documents without categorizing them; only Rate Confirmation and Bill of Lading are always required. Lumper Receipt remains conditional on Lumper=Yes.
 
 **How to apply:** Keep generic slot labels independent of OCR classifications and preserve existing classifications when attaching intake documents.
+
+Classification precedence is explicit named slot, then supported filename hints, then Claude for unknown filenames. Bulk intake routes Rate Confirmation, BOL/POD and Lumper Receipt to their named slots and everything else to available generic Documents slots.
+
+**Why:** The user requested automatic routing and filename recognition after a lumper receipt was misclassified, while requiring manual slot assignments to take priority.
+
+**How to apply:** Filename hints are an intentional pre-classification path, not a fallback after an API error. Unknown-file classifier failures must still fail visibly.

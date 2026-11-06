@@ -3352,6 +3352,7 @@ ${message}
             s3Key,
             documentType: type,
             finalDocumentType: type,
+            classificationSource: type === "other" ? "rules" : "agent",
             loadId: null,
             uploadedBy: req.user.id,
             sourceChannel: metadata.sourceChannel === "manual" ? "manual" : "drag_drop",
@@ -3419,6 +3420,17 @@ ${message}
           const attached = await tx.update(documentsTable).set({ invoiceId: invoice.id, clientId: invoice.clientId })
             .where(and(inArray(documentsTable.id, ocrDocumentIds), isNull(documentsTable.invoiceId))).returning();
           if (attached.length !== ocrDocumentIds.length) throw new IntakeError("Intake paperwork changed before submission", 409);
+          for (const { field, type } of paperwork.filter(slot => slot.type !== "other")) {
+            const ids = Array.from(reusedPaperwork.entries())
+              .filter(([slot]) => slot === field || slot.startsWith(`${field}:`)).map(([, id]) => id);
+            if (!ids.length) continue;
+            await tx.update(documentsTable).set({
+              documentType: type as any, finalDocumentType: type as any, classificationSource: "agent",
+            }).where(and(inArray(documentsTable.id, ids), eq(documentsTable.invoiceId, invoice.id)));
+            for (const doc of attached.filter(doc => ids.includes(doc.id))) {
+              Object.assign(doc, { documentType: type, finalDocumentType: type, classificationSource: "agent" });
+            }
+          }
           documents.push(...attached);
         }
         await recordInvoicePreflight(invoice.id, req.user.id, transactionalPreflight.alerts, transactionalDecision.acknowledgements, transactionalDecision.nearOverride, tx);

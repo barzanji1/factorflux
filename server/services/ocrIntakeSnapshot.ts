@@ -51,7 +51,9 @@ export async function getIntakeSnapshot(ids: number[], user: { id: string; role:
     }
     const raw = (result?.rawPayloadJson as any)?.providerRaw;
     extracted.push({ documentId: row.id, filename: row.originalName, status: job?.status ?? "queued",
-      error: job?.errorMessage, docType: normalizeIntakeType(raw?.docType ?? row.aiDocumentType ?? row.candidateDocumentType ?? row.documentType),
+      error: job?.errorMessage, docType: normalizeIntakeType(row.classificationSource === "agent"
+        ? row.finalDocumentType ?? row.documentType
+        : raw?.docType ?? row.aiDocumentType ?? row.candidateDocumentType ?? row.documentType),
       fields, fieldConfidences: confidence, confidence: Number(result?.confidenceScore ?? 0),
       contentHash: row.sourceSha256 ?? raw?.fileSha256 ?? null, invoiceId: row.invoiceId, classification: raw?.classification ?? null });
   }

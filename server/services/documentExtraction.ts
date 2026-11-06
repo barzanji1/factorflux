@@ -21,6 +21,7 @@ import { refreshInvoiceDocumentRequirements } from "./invoiceDocumentWorkflow";
 import { getExtractionProvider } from "./ocr/registry";
 import { assertSuccessfulExtraction, type ExtractionProvider } from "./ocr/types";
 import { classifyDocumentAI, reviewDocumentType } from "./aiClassifier";
+import { presetDocumentClassification } from "./documentTypeHints";
 import { findOcrBrokerMatch } from "./ocrBrokerMatching";
 import { timeOcrStage, startOcrStage } from "./ocrPipelineTiming";
 import { extractInvoiceNumber, extractLoadNumber, extractReferenceNumber, extractBolNumber, type FieldResult } from "./documentFieldDetectors";
@@ -269,8 +270,12 @@ export async function runExtractionJob(
     // ── Extraction via provider ────────────────────────────────────────────────
     const [document] = dependencies.provider ? [] : await jobDb.select({
       documentType: documents.documentType,
+      originalName: documents.originalName,
+      finalDocumentType: documents.finalDocumentType,
+      classificationSource: documents.classificationSource,
     }).from(documents).where(eq(documents.id, documentId)).limit(1);
-    const extracted = await provider.extractText(filePath, mimeType, document?.documentType ?? "other");
+    const preset = presetDocumentClassification(document);
+    const extracted = await provider.extractText(filePath, mimeType, preset?.docType ?? document?.documentType ?? "other");
     assertSuccessfulExtraction(extracted);
     const t = extracted.mainText || extracted.fullText;
 
@@ -306,7 +311,7 @@ export async function runExtractionJob(
     // AI errors must fail the enclosing extraction job, never select rules.
     const routed = extracted.raw as { classification?: Awaited<ReturnType<typeof classifyDocumentAI>>; docType?: string } | undefined;
     const firstPage = (extracted.raw as { pageResults?: { text?: string }[] } | undefined)?.pageResults?.[0]?.text ?? t;
-    const aiResult = routed?.classification ?? await timeOcrStage("Claude Haiku Classification",
+    const aiResult = preset ?? routed?.classification ?? await timeOcrStage("Claude Haiku Classification",
       () => classifyDocumentAI(firstPage, classification));
     const finalDocType = reviewDocumentType(aiResult.docType);
     const finalConfidence = aiResult.confidence;

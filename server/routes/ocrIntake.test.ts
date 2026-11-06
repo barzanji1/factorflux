@@ -4,6 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import { createHash } from "node:crypto";
 import * as ocrPipelineTiming from "../services/ocrPipelineTiming";
+import * as documentTypeHints from "../services/documentTypeHints";
 import ts from "typescript";
 import express from "express";
 import multer from "multer";
@@ -62,6 +63,7 @@ async function setup(t: { after: (fn: () => Promise<void>) => void }) {
     exports, Buffer, console: { error() {} },
     require: (name: string) => {
       if (name.endsWith("ocrPipelineTiming")) return ocrPipelineTiming;
+      if (name.endsWith("documentTypeHints")) return documentTypeHints;
       if (name === "../db") return { db: database };
       if (name === "../../shared/schema") return { documents, docExtractionJobs, docFieldCandidates };
       if (name === "drizzle-orm") return { eq() {}, desc() {}, asc() {}, and() {}, isNull() {}, sql() {} };
@@ -131,6 +133,16 @@ test("upload retry reuses its pending document and job, removes the redundant S3
   assert.equal(state.pendingDoc.uploadedBy, "owner");
   assert.equal(state.pendingDoc.sourceSha256.length, 64);
   assert.equal(state.cleanup.length, 1);
+});
+test("reupload of a previously misclassified filename document requeues OCR on the same row", async t => {
+  const { state, upload } = await setup(t);
+  await upload();
+  state.pendingDoc.originalName = "LUMPER-0556271.pdf";
+  state.pendingDoc.aiDocumentType = "other";
+  state.pendingJob.status = "completed";
+  await upload();
+  assert.equal(state.inserted.length, 3, "one document and two jobs");
+  assert.equal(state.queued.length, 2);
 });
 test("reupload of failed OCR retries a job on the same document", async t => {
   const { state, upload } = await setup(t);

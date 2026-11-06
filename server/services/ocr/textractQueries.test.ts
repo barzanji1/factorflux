@@ -7,6 +7,21 @@ const answer = (alias: string, text: string, confidence = 95): Block[] => [
   { BlockType: "QUERY", Id: alias, Query: { Alias: alias }, Relationships: [{ Type: "ANSWER", Ids: [`${alias}-a`] }] },
   { BlockType: "QUERY_RESULT", Id: `${alias}-a`, Text: text, Confidence: confidence },
 ];
+test("preclassified lumper receipt uses text OCR without calling Claude or BOL queries", async () => {
+  const calls: unknown[] = [];
+  const provider = new TextractProvider({ send: async (command: unknown) => {
+    calls.push(command);
+    return { Blocks: [{ BlockType: "LINE", Text: "Lumper Receipt 0556271 Paid $250", Confidence: 98 }] };
+  } } as any, async () => [Buffer.from("page")], async () => {
+    throw new Error("Classification must be skipped for a preset type");
+  });
+  const result = await provider.extract(Buffer.from("file"), "application/pdf", "lumper_receipt");
+  assert.equal((result.raw as any).docType, "lumper_receipt");
+  assert.equal((result.raw as any).operation, "DetectDocumentText");
+  assert.equal(calls.length, 1);
+  assert(calls[0] instanceof DetectDocumentTextCommand);
+  assert.match(result.text, /0556271/);
+});
 test("query fields retain answer confidence, section dates and company name beat ambiguous questions", () => {
   const result = decodeQueries({ Blocks: [
     { BlockType: "LINE", Text: "Load #150611", Confidence: 98 },

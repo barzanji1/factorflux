@@ -93,13 +93,13 @@ test("matching routes/references tolerate formatting; missing evidence and indep
     assert.deepEqual(mapIntakeDocuments([rate, invoice, { ...bol, fields: { ...bol.fields, ...extra } }], 0).alerts, []);
   }
 });
-test("paperwork reuse requires correct type and exact content hash; cannot steal associated documents", () => {
+test("paperwork reuse requires exact content hash; explicit slots can override type but cannot steal documents", () => {
   const buffer = Buffer.from("%PDF-fixture");
   const source = { ...rate, contentHash: createHash("sha256").update(buffer).digest("hex") };
   const files = { rateConfirmation: [{ buffer } as Express.Multer.File] };
   assert.equal(reusableIntakePaperwork(files, [source]).get("rateConfirmation"), 1);
   assert.equal(reusableIntakePaperwork(files, [{ ...source, contentHash: "other" }]).size, 0);
-  assert.equal(reusableIntakePaperwork(files, [{ ...source, docType: "invoice" }]).size, 0);
+  assert.equal(reusableIntakePaperwork(files, [{ ...source, docType: "invoice" }]).get("rateConfirmation"), 1);
   assert.throws(() => reusableIntakePaperwork(files, [{ ...source, invoiceId: 8 }]), /already attached/);
 });
 test("every file in multi-file slots reuses its own intake document without uploading it again", () => {
