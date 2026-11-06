@@ -4,6 +4,8 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 
+export const BACKUP_TIMEOUT_MS = 600_000;
+
 export const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
 export const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 const qualified = (schema: string, name: string) => `${identifier(schema)}.${identifier(name)}`;
@@ -37,6 +39,7 @@ function sequenceOptions(s: SequenceRow) {
 }
 
 export async function* exportDatabaseSql(client: pg.Client): AsyncGenerator<string> {
+  const startedAt = Date.now();
   await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
   let step = "session";
   try {
@@ -192,6 +195,13 @@ export async function* exportDatabaseSql(client: pg.Client): AsyncGenerator<stri
     // infinities and timestamp precision without JavaScript type conversions.
     // A server cursor bounds memory; gzip pipeline supplies backpressure.
     step = "table-data";
+    let tablesCompleted = 0;
+    let rowsExported = 0;
+    const logProgress = () => console.info("[backup] SQL export progress", {
+      phase: "table-data", tablesCompleted, tablesTotal: tables.rows.length,
+      rowsExported, elapsedMs: Date.now() - startedAt,
+    });
+    logProgress();
     for (const t of tables.rows) {
       const cols = columns.rows.filter(c => c.table_oid === t.oid);
       const rowExpr = cols.length
@@ -202,12 +212,15 @@ export async function* exportDatabaseSql(client: pg.Client): AsyncGenerator<stri
           const batch = await client.query<{ values_sql: string }>("FETCH FORWARD 250 FROM tpf_backup_rows");
           if (!batch.rows.length) break;
           for (const row of batch.rows) {
+            rowsExported++;
             yield cols.length
               ? `INSERT INTO ${qualified(t.schema,t.name)} (${cols.map(c=>identifier(c.name)).join(",")}) OVERRIDING SYSTEM VALUE VALUES (${row.values_sql});\n`
               : `INSERT INTO ${qualified(t.schema,t.name)} DEFAULT VALUES;\n`;
           }
         }
       } finally { await client.query("CLOSE tpf_backup_rows"); }
+      tablesCompleted++;
+      if (tablesCompleted % 10 === 0 || tablesCompleted === tables.rows.length) logProgress();
     }
     step = "sequence-state";
     for (const s of sequences.rows) {
@@ -237,7 +250,7 @@ export async function* exportDatabaseSql(client: pg.Client): AsyncGenerator<stri
   }
 }
 
-export async function dumpDatabaseSql(destination: string, databaseUrl: string, timeoutMs=30*60_000): Promise<void> {
+export async function dumpDatabaseSql(destination: string, databaseUrl: string, timeoutMs=BACKUP_TIMEOUT_MS): Promise<void> {
   const client = new pg.Client({ connectionString: databaseUrl, connectionTimeoutMillis:10_000, application_name:"tpf_sql_backup" });
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;

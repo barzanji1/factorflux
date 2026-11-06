@@ -7,15 +7,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import pg from "pg";
-import { dumpDatabaseSql, identifier, literal } from "./sqlBackup";
+import { BACKUP_TIMEOUT_MS, dumpDatabaseSql, identifier, literal } from "./sqlBackup";
 
 const exec = promisify(execFile);
 test("SQL identifiers and values are escaped without changing content", () => {
+  assert.equal(BACKUP_TIMEOUT_MS, 600_000);
   assert.equal(identifier('a"b'), '"a""b"');
   assert.equal(literal("a'b"), "'a''b'");
 });
 
-test("native-free backup restores schema, data, sequences and triggers into an empty database", {timeout:180_000}, async () => {
+test("native-free backup restores schema, data, sequences and triggers into an empty database", {timeout:180_000}, async (t) => {
   const directory = await mkdtemp(path.join(tmpdir(),"tpf-sql-restore-"));
   const data = path.join(directory,"data");
   const socket = path.join(directory,"socket");
@@ -56,7 +57,12 @@ test("native-free backup restores schema, data, sequences and triggers into an e
           '{"x": [1, null, "hello"]}',decode('00ff0180','hex'),123456789012345678.123456789012,
           '2026-11-05 12:34:56.123456+00','Infinity');
       ALTER TABLE business."odd table" DISABLE TRIGGER logged;
+      CREATE TABLE public.cursor_fixture (id integer, value text);
+      INSERT INTO public.cursor_fixture SELECT n, repeat('fixture',20) FROM generate_series(1,601) n;
     `);
+    // Eleven tables exercise the 10-table checkpoint and final partial group.
+    for (let n=0; n<7; n++) await source.query(`CREATE TABLE public.progress_${n} (id integer)`);
+    const progress = t.mock.method(console, "info", () => {});
     const destination = path.join(directory,"backup.sql.gz");
     const connection = `postgresql://backup_fixture@localhost/backup_source?host=${encodeURIComponent(socket)}`;
     // No native client is used by this path, even with PATH deliberately empty.
@@ -65,6 +71,14 @@ test("native-free backup restores schema, data, sequences and triggers into an e
       process.env.PATH = "/nonexistent";
       await dumpDatabaseSql(destination,connection);
     } finally { process.env.PATH = oldPath; }
+    assert.deepEqual(progress.mock.calls.map(call => call.arguments[1]?.tablesCompleted), [0,10,11]);
+    assert.equal(progress.mock.calls.at(-1)?.arguments[1]?.rowsExported,604);
+    for (const call of progress.mock.calls) {
+      assert.deepEqual(Object.keys(call.arguments[1]).sort(),
+        ["elapsedMs","phase","rowsExported","tablesCompleted","tablesTotal"].sort());
+      assert.equal(call.arguments[0], "[backup] SQL export progress");
+    }
+    progress.mock.restore();
     const sql = gunzipSync(await readFile(destination)).toString();
     assert.match(sql,/javascript-sql-v1/);
     assert.match(sql,/-- TPF SQL backup complete/);
@@ -72,6 +86,8 @@ test("native-free backup restores schema, data, sequences and triggers into an e
     await writeFile(restoreFile,sql,{mode:0o600});
     await exec("psql",["-X","--set","ON_ERROR_STOP=1","--host",socket,"--username","backup_fixture","--dbname","backup_restored","--file",restoreFile],{env,maxBuffer:1024*1024});
     await restored.connect();
+    assert.deepEqual((await restored.query("SELECT * FROM public.cursor_fixture ORDER BY id")).rows,
+      (await source.query("SELECT * FROM public.cursor_fixture ORDER BY id")).rows);
     const select = `SELECT id::text,parent_id,label,kind::text,items,payload,encode(bytes,'hex') AS bytes,
       precise::text,at::text,missing,special::text FROM business."odd table"`;
     assert.deepEqual((await restored.query(select)).rows,(await source.query(select)).rows);

@@ -10,6 +10,14 @@ The exporter uses a dedicated read-only, repeatable-read transaction and a
 temporary file, then uploads to the existing S3 backup prefix. Upload, retention
 (last 30 backups), advisory locking, and Resend failure alerts are unchanged.
 Failure prevents upload and retention cleanup. Temporary files are removed.
+The shared export timeout is 600,000 ms (10 minutes), including for CLI,
+scheduled, and manual admin backups. This replaces the previous 30-minute
+default; individual statements retain their separate 60-second limit.
+SQL rows are yielded individually from bounded cursor batches directly into
+the backpressure-aware gzip pipeline, never accumulated into a whole dump.
+Progress is logged at table-data start, every 10 completed tables, and the last
+table: completed/total tables, exported row count, and elapsed milliseconds only.
+No table names, SQL, row contents, or connection details are logged.
 
 Supported: ordinary and unlogged tables, column types/defaults/collations,
 enums, serial and identity sequences (including their current state), functions,

@@ -14,7 +14,7 @@ import { sendResendEmail } from "../resendTransport.js";
 import { DOCUMENTS_BUCKET, operationsS3 } from "./operationsS3";
 import { backupFailureEmail, describeBackupFailure, pgDumpFailure, PgDumpFailure, type BackupFailure, type BackupStage } from "./backupDiagnostics";
 import { collectBackupRuntimeDiagnostics, redactBackupStderr, STDERR_LIMIT } from "./backupRuntimeDiagnostics";
-import { dumpDatabaseSql } from "./sqlBackup";
+import { BACKUP_TIMEOUT_MS, dumpDatabaseSql } from "./sqlBackup";
 
 export const BACKUP_PREFIX = "backups/db/";
 const BACKUP_PATTERN = /^backups\/db\/factorflux-\d{4}-\d{2}-\d{2}-\d{6}\.sql\.gz$/;
@@ -52,7 +52,7 @@ export async function dumpDatabase(
   destination: string,
   databaseUrl = connectionUrl(),
   binary?: string,
-  timeoutMs = 30 * 60_000,
+  timeoutMs = BACKUP_TIMEOUT_MS,
 ): Promise<void> {
   if (!binary) return dumpDatabaseSql(destination, directBackupConnectionUrl(databaseUrl), timeoutMs);
   const url = new URL(directBackupConnectionUrl(databaseUrl));
@@ -173,7 +173,7 @@ interface BackupDependencies {
 const defaults: BackupDependencies = {
   now: () => new Date(),
   lock: withDatabaseLock,
-  dump: file => dumpDatabaseSql(file, connectionUrl()),
+  dump: file => dumpDatabaseSql(file, connectionUrl(), BACKUP_TIMEOUT_MS),
   upload: async (Key, file, ContentLength) => {
     await operationsS3.send(new PutObjectCommand({
       Bucket: DOCUMENTS_BUCKET, Key, Body: createReadStream(file), ContentLength,
