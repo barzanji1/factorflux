@@ -29,7 +29,7 @@
   isolation: isolate;
   width: min(100%, clamp(451.4px, 35.6vw, 546.6px));
   padding-bottom: 0;
-  transform: none;
+  transform: translateY(clamp(0px, calc(14.62vh - 87.72px), 70px));
 }
 
 .ff-login-page .ff-login-stage::before,

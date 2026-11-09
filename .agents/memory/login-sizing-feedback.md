@@ -14,3 +14,9 @@ On the login, FactorFlux is the primary brand and Trucking Pros Financial is the
 **Why:** The user explicitly identified TPF as the tenant and asked that it read as secondary to FactorFlux.
 
 **How to apply:** Preserve this hierarchy in future login refinements. When the user asks for text-only changes, retain the card footprint rather than applying the earlier whole-card sizing approach.
+
+The login card should appear to sit on the lobby floor rather than float above it.
+
+**Why:** The user explicitly requested floor placement after approving a smaller card.
+
+**How to apply:** Preserve the smaller card dimensions while aligning its lower edge and contact reflection with the visible floor. Keep short-screen and mobile layouts usable.
