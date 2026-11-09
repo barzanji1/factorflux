@@ -1,8 +1,8 @@
 .ff-login-page {
   --login-ink: #f0f2f0;
   --login-muted: #c0c9c8;
-  --login-teal: #147c7c;
-  --login-teal-hover: #1a9390;
+  --login-teal: #087F87;
+  --login-teal-hover: #108b92;
   --login-border: rgba(229, 239, 238, 0.2);
   --login-control-height: 48px;
   position: relative;
@@ -39,13 +39,13 @@
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid rgba(245, 249, 247, 0.4) !important;
+  border: 1px solid rgba(245, 249, 247, 0.28) !important;
   border-radius: 26px !important;
-  background: linear-gradient(145deg, rgba(18, 34, 38, 0.82), rgba(12, 25, 30, 0.74)) !important;
+  background: linear-gradient(145deg, rgba(18, 34, 38, 0.76), rgba(12, 25, 30, 0.68)) !important;
   padding: 38px 48px 34px !important;
   box-shadow:
-    0 28px 80px rgba(2, 10, 13, 0.48),
-    0 8px 24px rgba(4, 14, 16, 0.28),
+    0 28px 80px rgba(2, 10, 13, 0.42),
+    0 8px 24px rgba(4, 14, 16, 0.23),
     inset 0 1px 0 rgba(255, 255, 255, 0.17) !important;
   -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
@@ -192,7 +192,7 @@
 }
 
 .ff-login-page .ff-login-input::placeholder {
-  color: #aebbb8 !important;
+  color: #c0ceca !important;
   opacity: 1;
 }
 
@@ -314,11 +314,11 @@
 }
 
 .ff-login-page .ff-login-support {
-  color: #d2ddda;
+  color: #e0e8e5;
   font-size: 12px;
   line-height: 1.5;
   text-decoration: underline;
-  text-decoration-color: rgba(210, 221, 218, 0.58);
+  text-decoration-color: rgba(224, 232, 229, 0.68);
   text-underline-offset: 3px;
 }
 
