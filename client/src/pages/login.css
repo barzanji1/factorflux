@@ -27,7 +27,7 @@
 .ff-login-page .ff-login-stage {
   position: relative;
   isolation: isolate;
-  width: min(100%, 600px);
+  width: min(100%, 560px);
   padding-bottom: 32px;
   transform: translateY(clamp(18px, 3.6vh, 38px));
 }
@@ -73,8 +73,8 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  width: min(100%, 600px);
-  min-height: 600px;
+  width: min(100%, 560px);
+  min-height: 560px;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
