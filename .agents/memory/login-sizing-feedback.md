@@ -21,6 +21,12 @@ Preserve the approved smaller login card and its material when changing the back
 
 **How to apply:** Do not reintroduce the generated lobby or change the card to accommodate a background-only request. Keep short-screen and mobile layouts usable.
 
+Latest: the user supplied an exact liquid-glass spec ("do NOT deviate") with a 420px max-width card, no card pseudo-elements, and specified input values; this supersedes the earlier ~547px footprint.
+
+**Why:** the user explicitly dictated the values.
+
+**How to apply:** keep those values verbatim; don't re-add reflections or enlarge the card.
+
 Over the dusk building photo, use light translucent white glass rather than the former dark navy card.
 
 **Why:** The user found the dark card blended into the background and explicitly requested light frosted glass for contrast.

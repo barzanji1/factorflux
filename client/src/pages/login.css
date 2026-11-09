@@ -80,62 +80,24 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  width: 100%;
-  max-width: 546.6px;
-  min-height: clamp(437.8px, 34.67vw, 533px);
+  width: 90%;
+  max-width: 420px;
+  margin-inline: auto;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.35) !important;
-  border-radius: 24px !important;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.25) 0%,
-    rgba(255, 255, 255, 0.08) 40%,
-    rgba(255, 255, 255, 0.05) 60%,
-    rgba(255, 255, 255, 0.15) 100%
-  ) !important;
-  padding: clamp(16.9px, 1.355vw, 20.8px) clamp(19.7px, 3.88vw, 59.6px) clamp(24.7px, 2.321vw, 35.6px) !important;
+  border: 2px solid #ffffffb3;
+  border-radius: 24px;
+  background: #ffffff59;
+  background-image: linear-gradient(#fff8, #0000);
+  padding: 48px 40px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
-    inset 1px 0 0 rgba(255, 255, 255, 0.15),
-    inset -1px 0 0 rgba(255, 255, 255, 0.05) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  backdrop-filter: blur(24px) saturate(1.4);
+    inset 0 2px 0 #fff,
+    0 20px 40px #0002;
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
   color: #ffffff;
-}
-
-.ff-login-page .ff-login-card::before {
-  position: absolute;
-  top: 0;
-  left: -20%;
-  z-index: 1;
-  width: 140%;
-  height: 45%;
-  border-radius: 24px 24px 50% 50%;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(255, 255, 255, 0.08) 50%,
-    transparent 100%
-  );
-  content: "";
-  pointer-events: none;
-}
-
-.ff-login-page .ff-login-card::after {
-  position: absolute;
-  right: -10%;
-  bottom: -10%;
-  z-index: 1;
-  width: 60%;
-  height: 40%;
-  background: radial-gradient(ellipse at 70% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
-  content: "";
-  pointer-events: none;
 }
 
 .ff-login-page.ff-login-transition {
@@ -249,7 +211,7 @@
   font-weight: 700;
   letter-spacing: 0.005em;
   line-height: clamp(24px, 2.388vw, 36.7px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .ff-login-page .ff-login-registered {
@@ -272,10 +234,11 @@
   color: #ffffff;
   font-size: clamp(9.2px, 0.917vw, 14.1px);
   font-weight: 600;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
   line-height: 1.4;
   text-transform: uppercase;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .ff-login-page .ff-login-tagline::before,
@@ -300,7 +263,7 @@
   letter-spacing: -0.01em;
   line-height: clamp(24.9px, 2.526vw, 38.8px);
   text-wrap: balance;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .ff-login-page .ff-login-content {
@@ -367,14 +330,14 @@
   display: block;
   width: 100%;
   height: var(--login-control-height);
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 15.6px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid #ffffff60 !important;
+  border-radius: 12px !important;
+  background: #ffffff40 !important;
   padding: 0 16.9px 0 66.3px !important;
   color: #ffffff !important;
   font-family: inherit;
   font-size: clamp(12px, 1.102vw, 16.9px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   outline: none;
   box-shadow:
     inset 0 1px 0 rgba(238, 250, 255, 0.28),
@@ -388,12 +351,12 @@
 .ff-login-page .ff-login-input::placeholder {
   color: #ffffff !important;
   opacity: 1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .ff-login-page .ff-login-input:focus {
-  border-color: rgba(203, 239, 249, 0.7) !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: #ffffff60 !important;
+  background: #ffffff40 !important;
   box-shadow:
     inset 0 1px 0 rgba(245, 253, 255, 0.34),
     inset 0 -2px 6px rgba(102, 169, 195, 0.18),
@@ -528,7 +491,7 @@
   text-decoration: underline;
   text-decoration-color: rgba(255, 255, 255, 0.48);
   text-underline-offset: 2.1px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .ff-login-page .ff-login-support:hover {
@@ -602,10 +565,7 @@
   }
 
   .ff-login-page .ff-login-card {
-    width: min(100%, 440px);
-    min-height: 0;
-    border-radius: 24px !important;
-    padding: 38px clamp(22px, 7vw, 34px) 34px !important;
+    padding: 38px clamp(22px, 7vw, 34px) 34px;
   }
 
   .ff-login-page .ff-login-stage {
@@ -733,7 +693,7 @@
   }
 
   .ff-login-page .ff-login-card {
-    padding: 34px 22px 30px !important;
+    padding: 34px 22px 30px;
   }
 
   .ff-login-page .ff-login-content {
@@ -754,12 +714,6 @@
   .ff-login-page .ff-login-stage {
     padding-bottom: 27px;
     transform: none;
-  }
-
-  .ff-login-page .ff-login-card {
-    min-height: 0;
-    padding-top: 34px !important;
-    padding-bottom: 34px !important;
   }
 
 }
