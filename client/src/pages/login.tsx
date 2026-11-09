@@ -86,7 +86,7 @@ export default function LoginPage() {
                 markClassName="h-14 w-14"
               />
             </div>
-            <p className="ff-login-product">FactorFlux<sup className="ff-login-registered">®</sup></p>
+            <p className="ff-login-product">FactorFlux</p>
             <p className="ff-login-tagline">Freight Factoring OS</p>
             <p className="ff-login-company">Trucking Pros Financial</p>
           </CardHeader>
