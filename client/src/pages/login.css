@@ -79,17 +79,16 @@
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid rgba(223, 244, 249, 0.34) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: 28px !important;
-  background: linear-gradient(138deg, rgba(7, 27, 37, 0.48) 0%, rgba(5, 23, 32, 0.43) 49%, rgba(10, 26, 34, 0.46) 100%) !important;
+  background: rgba(10, 20, 35, 0.85) !important;
   padding: 42px 46px 40px !important;
   box-shadow:
-    0 24px 64px rgba(4, 14, 20, 0.34),
-    0 7px 22px rgba(5, 18, 24, 0.18),
-    inset 0 1px 0 rgba(245, 253, 255, 0.2),
-    inset 0 -1px 0 rgba(194, 226, 233, 0.12),
-    inset 1px 0 5px rgba(107, 207, 224, 0.26),
-    inset -1px -1px 5px rgba(255, 184, 119, 0.24) !important;
+    0 4px 30px rgba(39, 170, 184, 0.15),
+    0 0 60px rgba(39, 170, 184, 0.05),
+    0 18px 36px rgba(4, 14, 20, 0.24),
+    inset 0 1px 0 rgba(245, 253, 255, 0.12),
+    inset 0 -1px 0 rgba(194, 226, 233, 0.08) !important;
   -webkit-backdrop-filter: blur(18px) saturate(132%);
   backdrop-filter: blur(18px) saturate(132%);
   color: var(--login-ink);
@@ -104,16 +103,16 @@
   border-radius: inherit;
   padding: 1px;
   background:
-    radial-gradient(ellipse at 0% 10%, rgba(202, 245, 255, 0.82), rgba(119, 212, 232, 0.24) 34%, transparent 72%),
-    radial-gradient(ellipse at 100% 100%, rgba(255, 207, 153, 0.78), rgba(246, 164, 101, 0.24) 34%, transparent 73%),
-    linear-gradient(120deg, rgba(221, 249, 255, 0.58), rgba(221, 249, 255, 0.06) 22%, transparent 54%, rgba(255, 215, 170, 0.12));
+    radial-gradient(ellipse at 0% 10%, rgba(202, 245, 255, 0.34), rgba(119, 212, 232, 0.12) 34%, transparent 72%),
+    radial-gradient(ellipse at 100% 100%, rgba(255, 207, 153, 0.3), rgba(246, 164, 101, 0.1) 34%, transparent 73%),
+    linear-gradient(120deg, rgba(221, 249, 255, 0.24), rgba(221, 249, 255, 0.025) 22%, transparent 54%, rgba(255, 215, 170, 0.06));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   content: "";
   pointer-events: none;
-  opacity: 1;
+  opacity: 0.82;
 }
 
 .ff-login-page .ff-login-card::after {
@@ -122,8 +121,8 @@
   inset: 1px;
   border-radius: inherit;
   background:
-    radial-gradient(ellipse 26% 34% at 1% 7%, rgba(166, 228, 245, 0.3), transparent 78%),
-    radial-gradient(ellipse 28% 30% at 100% 100%, rgba(255, 175, 105, 0.34), transparent 78%);
+    radial-gradient(ellipse 22% 28% at 1% 7%, rgba(166, 228, 245, 0.08), transparent 78%),
+    radial-gradient(ellipse 24% 26% at 100% 100%, rgba(255, 175, 105, 0.09), transparent 78%);
   content: "";
   pointer-events: none;
 }
@@ -162,7 +161,7 @@
 
 .ff-login-page .ff-login-product {
   margin: 0;
-  color: #f1f4f1;
+  color: #ffffff;
   font-size: 34px;
   font-weight: 650;
   letter-spacing: -0.035em;
@@ -176,7 +175,7 @@
   justify-content: center;
   gap: 13px;
   margin: 7px 0 0;
-  color: #ccdae0;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.22em;
@@ -199,7 +198,7 @@
 
 .ff-login-page .ff-login-brand .ff-login-company {
   margin: 16px 0 0;
-  color: #f1f5f6;
+  color: #ffffff;
   font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
   font-size: clamp(24px, 4.5vw, 32px);
   font-weight: 650;
@@ -233,7 +232,7 @@
 .ff-login-page .ff-login-label {
   display: block;
   margin: 0 0 7px;
-  color: #d9e5eb;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.035em;
@@ -250,7 +249,7 @@
   left: 15px;
   width: 17px;
   height: 17px;
-  color: #c7d7df;
+  color: #edfaff;
   pointer-events: none;
   transform: translateY(-50%);
 }
@@ -259,11 +258,11 @@
   display: block;
   width: 100%;
   height: var(--login-control-height);
-  border: 1px solid rgba(220, 244, 250, 0.52) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 13px !important;
-  background: linear-gradient(180deg, rgba(192, 218, 228, 0.17) 0%, rgba(104, 145, 159, 0.12) 16%, rgba(16, 43, 54, 0.42) 62%, rgba(8, 29, 39, 0.4) 100%) !important;
+  background: rgba(0, 0, 0, 0.45) !important;
   padding: 0 15px 0 44px !important;
-  color: #f4f5f2 !important;
+  color: #ffffff !important;
   font-family: inherit;
   font-size: 14px;
   outline: none;
@@ -277,13 +276,13 @@
 }
 
 .ff-login-page .ff-login-input::placeholder {
-  color: #cfdee4 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
   opacity: 1;
 }
 
 .ff-login-page .ff-login-input:focus {
-  border-color: rgba(232, 248, 255, 0.82) !important;
-  background: linear-gradient(180deg, rgba(20, 53, 66, 0.76), rgba(9, 34, 45, 0.68)) !important;
+  border-color: rgba(255, 255, 255, 0.42) !important;
+  background: rgba(0, 0, 0, 0.45) !important;
   box-shadow:
     inset 0 1px 0 rgba(239, 251, 255, 0.3),
     inset 0 -2px 5px rgba(147, 213, 225, 0.13),
@@ -310,7 +309,7 @@
   border: 0 !important;
   border-radius: 8px !important;
   background: transparent !important;
-  color: #c3cfcc;
+  color: #edfaff;
   cursor: pointer;
   transform: translateY(-50%);
 }
@@ -344,8 +343,7 @@
   margin-top: 4px;
   border: 1px solid rgba(145, 244, 245, 0.78) !important;
   border-radius: 13px !important;
-  background:
-    linear-gradient(180deg, rgba(20, 190, 191, 0.98) 0%, rgba(0, 151, 163, 0.98) 52%, rgba(0, 112, 129, 1) 100%) !important;
+  background: linear-gradient(135deg, #2bc4d4, #27aab8, #1d8a96) !important;
   padding: 0 18px !important;
   color: #ffffff !important;
   font-family: inherit;
@@ -362,8 +360,7 @@
 }
 
 .ff-login-page .ff-login-submit:hover:not(:disabled) {
-  background:
-    linear-gradient(180deg, rgba(29, 207, 202, 1) 0%, rgba(5, 166, 173, 1) 48%, rgba(0, 122, 141, 1) 100%) !important;
+  background: linear-gradient(135deg, #39d0dc, #30b9c5, #2498a3) !important;
   box-shadow:
     0 10px 22px rgba(1, 17, 23, 0.29),
     inset 0 1px 0 rgba(255, 255, 255, 0.43),
@@ -405,16 +402,16 @@
 }
 
 .ff-login-page .ff-login-support {
-  color: #e0ebf0;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 12px;
   line-height: 1.5;
   text-decoration: underline;
-  text-decoration-color: rgba(224, 237, 243, 0.72);
+  text-decoration-color: rgba(255, 255, 255, 0.48);
   text-underline-offset: 3px;
 }
 
 .ff-login-page .ff-login-support:hover {
-  color: #ffffff;
+  color: #2bc4d4;
   text-decoration-color: currentColor;
 }
 

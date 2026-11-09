@@ -15,14 +15,14 @@ The login page is an exception: the user replaced its circular neumorphic design
 
 **How to apply:** Do not restore the old circular gray login when changing global neumorphic components. Preserve the shared FactorFlux platform and Trucking Pros Financial company branding on staff login.
 
-The login reference requires a dark, clear navy center, localized cyan/silver upper-left reflections, and warm amber lower-right edge lighting. Inputs are dark glass; the button is rich teal, not gray-teal.
+Prioritize login readability over the earlier see-through glass treatment: a distinct, more opaque navy surface, dark inputs, white brand/company text, and a vivid teal button. Keep reflections restrained.
 
-**Why:** The user repeatedly rejected both a solid dark card and an evenly cloudy silver-gray surface, then explicitly called the dark-clear material with localized cyan/amber reflections "excellent." Preserve that approved material while discussing sizing or placement separately.
+**Why:** After earlier glass experiments, the user explicitly said the contents were getting lost against the background and requested a more solid surface. This supersedes the earlier preference against opacity.
 
-**How to apply:** Preserve the existing architectural background while refining the glass surfaces; keep decorative layers pointer-transparent and form content crisp. Follow the user's explicit compact sizing rather than scaling the panel to the reference image's pixel bounds; the user rejected the oversized interpretation.
+**How to apply:** Do not revert to lighter transparency merely to match an older reference. Preserve the architectural background, compact sizing, and pointer-transparent decoration; do not enlarge the panel to the reference image's pixel bounds.
 
 After approving the glass material, the user explicitly chose reference-like near-square proportions and a floor-grounded placement, with a narrow contact shadow and cyan/amber reflected light beneath the panel.
 
 **Why:** The user wants a freestanding architectural glass panel that appears to rest on the lobby floor, rather than a wide floating modal.
 
-**How to apply:** Preserve the approved dark-clear glass when refining proportions or placement. Keep floor effects noninteractive and outside the clipped glass surface; allow scrolling on short screens rather than clipping the form.
+**How to apply:** Preserve the high-contrast navy glass when refining proportions or placement. Keep floor effects noninteractive and outside the clipped glass surface; allow scrolling on short screens rather than clipping the form.
