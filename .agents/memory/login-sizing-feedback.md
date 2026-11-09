@@ -15,8 +15,8 @@ On the login, FactorFlux is the primary brand and Trucking Pros Financial is the
 
 **How to apply:** Preserve this hierarchy in future login refinements. When the user asks for text-only changes, retain the card footprint rather than applying the earlier whole-card sizing approach.
 
-The login card should appear to sit on the lobby floor rather than float above it.
+Preserve the approved smaller login card and its material when changing the background.
 
-**Why:** The user explicitly requested floor placement after approving a smaller card.
+**Why:** After requesting floor placement over the former lobby, the user replaced that scene with the actual TPF office photo and explicitly asked to keep the glass card exactly as-is.
 
-**How to apply:** Preserve the smaller card dimensions while aligning its lower edge and contact reflection with the visible floor. Keep short-screen and mobile layouts usable.
+**How to apply:** Do not reintroduce the generated lobby or change the card to accommodate a background-only request. Keep short-screen and mobile layouts usable.

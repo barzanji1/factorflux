@@ -15,13 +15,51 @@
   overflow-x: hidden;
   padding: 39.8px 19.9px;
   background-color: #101a1d;
-  background-image:
-    linear-gradient(90deg, rgba(8, 17, 21, 0.12), rgba(9, 18, 21, 0.08)),
-    url("/images/login-financial-lobby.webp");
+  background-image: none;
   background-position: center;
   background-size: cover;
   color: var(--login-ink);
   font-family: "DM Sans", "Segoe UI", sans-serif;
+}
+
+.ff-login-page:not(.ff-login-transition)::before,
+.ff-login-transition-background::before,
+.ff-login-page:not(.ff-login-transition)::after,
+.ff-login-transition-background::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.ff-login-page:not(.ff-login-transition)::before,
+.ff-login-transition-background::before {
+  background-image: url("/assets/tpf-building.jpg");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: brightness(0.35) saturate(0.7) contrast(1.1);
+}
+
+.ff-login-page:not(.ff-login-transition)::after,
+.ff-login-transition-background::after {
+  background-image:
+    radial-gradient(ellipse 22% 18% at 88% clamp(58%, calc(50% + 14.22vw), 90%), rgba(180, 120, 60, 0.15), transparent 100%),
+    linear-gradient(180deg, rgba(10, 15, 30, 0.7) 0%, rgba(15, 25, 50, 0.5) 40%, rgba(20, 30, 55, 0.6) 70%, rgba(5, 10, 20, 0.85) 100%);
+  background-repeat: no-repeat;
+}
+
+.ff-login-page:not(.ff-login-transition)::before,
+.ff-login-page:not(.ff-login-transition)::after {
+  z-index: -1;
+}
+
+.ff-login-transition-background::before {
+  z-index: 0;
+}
+
+.ff-login-transition-background::after {
+  z-index: 1;
 }
 
 .ff-login-page .ff-login-stage {
@@ -588,10 +626,6 @@
     --login-control-height: 48px;
     place-items: center;
     padding: 28px 16px;
-    background-image:
-      linear-gradient(180deg, rgba(8, 17, 21, 0.3), rgba(8, 17, 21, 0.48)),
-      url("/images/login-financial-lobby-mobile.webp");
-    background-position: center;
   }
 
   .ff-login-page .ff-login-card {
