@@ -47,10 +47,10 @@
   height: 10px;
   border-radius: 50%;
   background:
-    linear-gradient(90deg, transparent 5%, rgba(164, 229, 246, 0.38) 16%, rgba(227, 250, 255, 0.94) 33%, rgba(248, 254, 255, 0.99) 49%, rgba(210, 246, 255, 0.96) 62%, rgba(233, 249, 255, 0.84) 77%, rgba(255, 226, 197, 0.92) 92%, transparent 100%) 0 100% / 100% 2px no-repeat,
+    linear-gradient(90deg, transparent 5%, rgba(164, 229, 246, 0.38) 16%, rgba(227, 250, 255, 0.94) 33%, rgba(248, 254, 255, 0.99) 49%, rgba(210, 246, 255, 0.96) 62%, rgba(233, 249, 255, 0.84) 77%, rgba(255, 226, 197, 0.92) 92%, transparent 100%) 0 100% / 100% 1px no-repeat,
     radial-gradient(ellipse 42% 58% at 50% 12%, rgba(205, 244, 253, 0.34), transparent 76%),
     radial-gradient(ellipse, rgba(2, 10, 13, 0.72) 0%, rgba(3, 12, 16, 0.42) 48%, transparent 78%);
-  filter: blur(0.55px);
+  filter: blur(1.5px);
 }
 
 .ff-login-page .ff-login-stage::after {
@@ -60,10 +60,10 @@
   height: 88px;
   border-radius: 50%;
   background:
-    radial-gradient(ellipse 8% 88% at 51% 0%, rgba(236, 252, 255, 0.72) 0%, rgba(184, 231, 243, 0.42) 24%, rgba(137, 202, 219, 0.14) 58%, transparent 100%),
-    radial-gradient(ellipse 12% 94% at 92% 0%, rgba(255, 222, 184, 0.76) 0%, rgba(243, 177, 119, 0.48) 27%, rgba(209, 144, 100, 0.15) 59%, transparent 100%),
+    radial-gradient(ellipse 22% 52% at 51% 0%, rgba(236, 252, 255, 0.52) 0%, rgba(184, 231, 243, 0.31) 24%, rgba(137, 202, 219, 0.1) 58%, transparent 100%),
+    radial-gradient(ellipse 20% 64% at 92% 0%, rgba(255, 222, 184, 0.54) 0%, rgba(243, 177, 119, 0.34) 27%, rgba(209, 144, 100, 0.11) 59%, transparent 100%),
     radial-gradient(ellipse 20% 78% at 14% 0%, rgba(154, 222, 241, 0.25) 0%, rgba(118, 194, 215, 0.12) 42%, transparent 100%);
-  filter: blur(2.4px);
+  filter: blur(8px);
 }
 
 .ff-login-page *,
