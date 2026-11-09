@@ -155,18 +155,38 @@
   will-change: width, height, opacity;
 }
 
+/* Water-surface wavelets: a touch dimple plus three trailing waves, each a dark
+   trough beside a bright crest, strongest at the leading edge. */
 .ff-login-page .ff-login-hover-ripple {
   position: absolute;
   z-index: 1;
-  width: 0;
-  height: 0;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  width: 210px;
+  height: 210px;
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.12);
+  background: radial-gradient(
+    circle closest-side,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0) 6%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(0, 12, 32, 0.22) 34%,
+    rgba(255, 255, 255, 0.26) 40%,
+    rgba(255, 255, 255, 0) 45%,
+    rgba(255, 255, 255, 0) 56%,
+    rgba(0, 12, 32, 0.3) 61%,
+    rgba(255, 255, 255, 0.42) 67%,
+    rgba(255, 255, 255, 0) 73%,
+    rgba(255, 255, 255, 0) 80%,
+    rgba(0, 12, 32, 0.4) 85%,
+    rgba(255, 255, 255, 0.7) 91%,
+    rgba(255, 255, 255, 0.2) 96%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: blur(0.7px);
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, -50%);
-  animation: ff-login-hover-ripple 600ms ease-out both;
+  transform: translate(-50%, -50%) scale(0.12);
+  animation: ff-login-hover-ripple 850ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 .ff-login-page .ff-login-card > .ff-login-brand,
@@ -526,8 +546,9 @@
 }
 
 @keyframes ff-login-hover-ripple {
-  0% { width: 0; height: 0; opacity: 0.65; }
-  100% { width: 190px; height: 190px; opacity: 0; }
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.12); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
 @keyframes ff-login-shake-a {
