@@ -79,13 +79,14 @@ export default function LoginPage() {
 
   return (
     <main className="ff-login-page">
-      <Card
-        className={`ff-login-card${isRotating ? " ff-login-card--rotating" : shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
-        onAnimationEnd={(event) => {
-          if (event.target === event.currentTarget && event.animationName === "ff-login-rotate") finishRotation();
-        }}
-        aria-busy={isLoading}
-      >
+      <div className="ff-login-stage">
+        <Card
+          className={`ff-login-card${isRotating ? " ff-login-card--rotating" : shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
+          onAnimationEnd={(event) => {
+            if (event.target === event.currentTarget && event.animationName === "ff-login-rotate") finishRotation();
+          }}
+          aria-busy={isLoading}
+        >
           <CardHeader className="ff-login-brand">
             <div className="flex justify-center">
               <FactorFluxLogo
@@ -194,7 +195,8 @@ export default function LoginPage() {
               </a>
             </div>
           </CardContent>
-      </Card>
+        </Card>
+      </div>
       <div className="ff-login-status" role="status" aria-live="polite" aria-atomic="true">
         {isLoading ? "Signing in…" : ""}
       </div>

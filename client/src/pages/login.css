@@ -24,6 +24,45 @@
   font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
 }
 
+.ff-login-page .ff-login-stage {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 600px);
+  padding-bottom: 32px;
+  transform: translateY(clamp(18px, 3.6vh, 38px));
+}
+
+.ff-login-page .ff-login-stage::before,
+.ff-login-page .ff-login-stage::after {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+}
+
+.ff-login-page .ff-login-stage::before {
+  right: 1%;
+  bottom: 27px;
+  left: 1%;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(2, 10, 13, 0.72) 0%, rgba(3, 12, 16, 0.42) 48%, transparent 78%);
+  filter: blur(3px);
+}
+
+.ff-login-page .ff-login-stage::after {
+  right: 2%;
+  bottom: -28px;
+  left: 2%;
+  height: 68px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 25% 70% at 9% 16%, rgba(96, 199, 222, 0.42), transparent 75%),
+    radial-gradient(ellipse 25% 70% at 91% 16%, rgba(245, 166, 103, 0.48), transparent 75%),
+    radial-gradient(ellipse 48% 40% at 50% 10%, rgba(170, 217, 223, 0.25), transparent 76%);
+  filter: blur(8px);
+}
+
 .ff-login-page *,
 .ff-login-page *::before,
 .ff-login-page *::after {
@@ -35,6 +74,7 @@
   isolation: isolate;
   display: flex;
   width: min(100%, 600px);
+  min-height: 600px;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
@@ -42,7 +82,7 @@
   border: 1px solid rgba(223, 244, 249, 0.48) !important;
   border-radius: 28px !important;
   background: linear-gradient(138deg, rgba(8, 29, 38, 0.43) 0%, rgba(6, 25, 33, 0.34) 49%, rgba(12, 29, 36, 0.41) 100%) !important;
-  padding: 30px 46px 32px !important;
+  padding: 42px 46px 40px !important;
   box-shadow:
     0 24px 64px rgba(4, 14, 20, 0.34),
     0 7px 22px rgba(5, 18, 24, 0.18),
@@ -421,8 +461,14 @@
 
   .ff-login-page .ff-login-card {
     width: min(100%, 440px);
+    min-height: 0;
     border-radius: 22px !important;
     padding: 34px clamp(22px, 7vw, 34px) 30px !important;
+  }
+
+  .ff-login-page .ff-login-stage {
+    width: min(100%, 440px);
+    transform: none;
   }
 
   .ff-login-page .ff-login-product {
@@ -457,6 +503,33 @@
 
   .ff-login-page .ff-login-form {
     gap: 13px;
+  }
+}
+
+@media (max-height: 720px) {
+  .ff-login-page {
+    padding-top: 20px;
+    padding-bottom: 48px;
+  }
+
+  .ff-login-page .ff-login-stage {
+    padding-bottom: 27px;
+    transform: none;
+  }
+
+  .ff-login-page .ff-login-card {
+    min-height: 0;
+    padding-top: 26px !important;
+    padding-bottom: 26px !important;
+  }
+
+  .ff-login-page .ff-login-stage::before {
+    bottom: 18px;
+  }
+
+  .ff-login-page .ff-login-stage::after {
+    height: 32px;
+    bottom: 0;
   }
 }
 

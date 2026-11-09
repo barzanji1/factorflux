@@ -21,8 +21,8 @@ The login reference requires a dark, clear navy center, localized cyan/silver up
 
 **How to apply:** Preserve the existing architectural background while refining the glass surfaces; keep decorative layers pointer-transparent and form content crisp. Follow the user's explicit compact sizing rather than scaling the panel to the reference image's pixel bounds; the user rejected the oversized interpretation.
 
-The user confirmed the compact card's size and positioning are correct. Material-only refinements must leave those, form layout, typography sizes, and branding unchanged.
+After approving the glass material, the user explicitly chose reference-like near-square proportions and a floor-grounded placement, with a narrow contact shadow and cyan/amber reflected light beneath the panel.
 
-**Why:** The user explicitly approved the geometry while rejecting the dark, opaque material.
+**Why:** The user wants a freestanding architectural glass panel that appears to rest on the lobby floor, rather than a wide floating modal.
 
-**How to apply:** Replace conflicting dark fills and overlays rather than stacking additional effects; restrict future material corrections to surfaces, highlights, shadows, and contrast unless the user requests layout changes.
+**How to apply:** Preserve the approved dark-clear glass when refining proportions or placement. Keep floor effects noninteractive and outside the clipped glass surface; allow scrolling on short screens rather than clipping the form.
