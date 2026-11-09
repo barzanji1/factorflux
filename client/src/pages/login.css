@@ -70,40 +70,6 @@
   transform: translateY(clamp(0px, calc(14.62vh - 87.72px), 70px));
 }
 
-.ff-login-page .ff-login-stage::before,
-.ff-login-page .ff-login-stage::after {
-  position: absolute;
-  z-index: -1;
-  content: "";
-  pointer-events: none;
-}
-
-.ff-login-page .ff-login-stage::before {
-  right: 1%;
-  bottom: calc(var(--login-stage-space, 0px) - 5px);
-  left: 1%;
-  height: 10px;
-  border-radius: 50%;
-  background:
-    linear-gradient(90deg, transparent 5%, rgba(164, 229, 246, 0.38) 16%, rgba(227, 250, 255, 0.94) 33%, rgba(248, 254, 255, 0.99) 49%, rgba(210, 246, 255, 0.96) 62%, rgba(233, 249, 255, 0.84) 77%, rgba(255, 226, 197, 0.92) 92%, transparent 100%) 0 100% / 100% 1px no-repeat,
-    radial-gradient(ellipse 42% 58% at 50% 12%, rgba(205, 244, 253, 0.34), transparent 76%),
-    radial-gradient(ellipse, rgba(2, 10, 13, 0.72) 0%, rgba(3, 12, 16, 0.42) 48%, transparent 78%);
-  filter: blur(1.5px);
-}
-
-.ff-login-page .ff-login-stage::after {
-  right: 2%;
-  bottom: calc(var(--login-stage-space, 0px) - 90px);
-  left: 2%;
-  height: 88px;
-  border-radius: 50%;
-  background:
-    radial-gradient(ellipse 22% 52% at 51% 0%, rgba(236, 252, 255, 0.52) 0%, rgba(184, 231, 243, 0.31) 24%, rgba(137, 202, 219, 0.1) 58%, transparent 100%),
-    radial-gradient(ellipse 20% 64% at 92% 0%, rgba(255, 222, 184, 0.54) 0%, rgba(243, 177, 119, 0.34) 27%, rgba(209, 144, 100, 0.11) 59%, transparent 100%),
-    radial-gradient(ellipse 20% 78% at 14% 0%, rgba(154, 222, 241, 0.25) 0%, rgba(118, 194, 215, 0.12) 42%, transparent 100%);
-  filter: blur(8px);
-}
-
 .ff-login-page *,
 .ff-login-page *::before,
 .ff-login-page *::after {
@@ -129,8 +95,8 @@
     linear-gradient(138deg, rgba(5, 25, 36, 0.68), rgba(4, 21, 31, 0.62) 48%, rgba(8, 26, 35, 0.58)) !important;
   padding: clamp(16.9px, 1.355vw, 20.8px) clamp(19.7px, 3.88vw, 59.6px) clamp(24.7px, 2.321vw, 35.6px) !important;
   box-shadow:
-    0 24px 54px rgba(3, 12, 18, 0.38),
-    0 0 34px rgba(72, 191, 211, 0.16),
+    0 18px 40px rgba(4, 10, 26, 0.46),
+    0 0 20px rgba(66, 112, 143, 0.11),
     inset 0 1px 0 rgba(248, 253, 255, 0.3),
     inset 1px 0 14px rgba(118, 207, 231, 0.25),
     inset 0 -1px 0 rgba(255, 190, 133, 0.15) !important;
@@ -636,7 +602,6 @@
   }
 
   .ff-login-page .ff-login-stage {
-    --login-stage-space: 32px;
     width: min(100%, 440px);
     padding-bottom: 32px;
     transform: none;
@@ -790,14 +755,6 @@
     padding-bottom: 34px !important;
   }
 
-  .ff-login-page .ff-login-stage::before {
-    bottom: 18px;
-  }
-
-  .ff-login-page .ff-login-stage::after {
-    height: 32px;
-    bottom: 0;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
