@@ -15,9 +15,9 @@ The login page is an exception: the user replaced its circular neumorphic design
 
 **How to apply:** Do not restore the old circular gray login when changing global neumorphic components. Preserve the shared FactorFlux platform and Trucking Pros Financial company branding on staff login.
 
-The login must remain transparent frosted glass, not a solid navy panel. Preserve visible background through the card, bright white branding, light translucent inputs, and a glossy teal button.
+Use the selected reference's soft blue-gray frosted glass rather than pronounced liquid-lens glints. The login must remain translucent, not a solid navy panel. Preserve diffused background light through the card, white branding, translucent inputs, and a restrained teal button.
 
-**Why:** After trying the higher-opacity treatment, the user explicitly rejected it as "way too dark and opaque" and repeated that seeing the lobby through the card is the defining feature. This supersedes the intervening request for a more solid surface.
+**Why:** The user explicitly selected the softer frosted-glass reference after the liquid-glass trial. They had repeatedly rejected opaque navy treatments and emphasized seeing the lobby through the card; the newer reference changes the material finish, not that transparency requirement.
 
 **How to apply:** Do not increase the fill opacity to improve readability. Check the actual browser styles for conflicting fills and decorative overlays. Preserve the lobby image and pointer-transparent reflections. Keep field labels accessible but visually hidden; use placeholders in the visible design.
 
