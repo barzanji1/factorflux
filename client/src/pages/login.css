@@ -27,7 +27,7 @@
 .ff-login-page .ff-login-stage {
   position: relative;
   isolation: isolate;
-  width: min(100%, 560px);
+  width: min(100%, 480px);
   padding-bottom: 32px;
   transform: translateY(clamp(18px, 3.6vh, 38px));
 }
@@ -73,22 +73,22 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  width: min(100%, 560px);
+  width: 100%;
+  max-width: 480px;
   min-height: 560px;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
-  border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+  border: 1.5px solid transparent !important;
   border-radius: 24px !important;
-  background: rgba(10, 20, 40, 0.2) !important;
-  padding: 48px 46px 46px !important;
+  background: rgba(15, 25, 45, 0.15) !important;
+  padding: 56px 48px !important;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    0 12px 48px rgba(39, 170, 184, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
-  -webkit-backdrop-filter: blur(30px);
-  backdrop-filter: blur(30px);
+    0 20px 60px rgba(39, 170, 184, 0.3),
+    0 0 100px rgba(39, 170, 184, 0.1) !important;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
   color: var(--login-ink);
   transform: rotateY(0deg);
   transform-origin: center center;
@@ -99,15 +99,15 @@
   z-index: 0;
   inset: 0;
   border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.74), transparent 28%, transparent 76%, rgba(255, 255, 255, 0.24));
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.05));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   content: "";
   pointer-events: none;
-  opacity: 0.9;
+  opacity: 1;
 }
 
 .ff-login-page .ff-login-card::after {
@@ -521,7 +521,7 @@
   }
 }
 
-@media (max-height: 720px) {
+@media (max-height: 600px) and (min-width: 601px) {
   .ff-login-page {
     padding-top: 20px;
     padding-bottom: 48px;
