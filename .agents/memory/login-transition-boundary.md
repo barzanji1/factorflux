@@ -3,8 +3,8 @@ name: Login transition boundary
 description: Why successful login motion continues across navigation without delaying authentication.
 ---
 
-The success shatter is approved; preserve it during login material refinements. Reveal the authenticated dashboard while the success fragments are still moving, rather than waiting for every fragment to disappear before routing.
+The success transition is now a water ripple from the Sign In button (concentric rings, ~1.2s) that replaced the earlier glass shatter at the user's request. Navigate while the overlay still covers the screen, then fade the overlay so the dashboard appears underneath.
 
-**Why:** The user requested that the dashboard fade in as the glass fragments fly out, then called the result "excellent" before requesting a login-only liquid-glass trial. The visual effect has to survive the login page unmounting; keeping it owned only by that page would cut it off at navigation.
+**Why:** The visual effect has to survive the login page unmounting; keeping it owned only by that page would cut it off at navigation.
 
-**How to apply:** Keep transition cleanup independent of the login route after navigation begins, but cancel it if the user leaves before the reveal. Never delay or bypass authentication or permission checks to drive the animation. Preserve a reduced-motion path that reaches the dashboard without the shatter.
+**How to apply:** Keep transition cleanup independent of the login route after navigation begins, but cancel it if the user leaves before the reveal. Never delay or bypass authentication or permission checks to drive the animation. Preserve a reduced-motion path that reaches the dashboard without animation. The overlay clone must never carry credentials.

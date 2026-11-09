@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useLocation } from "wouter";
-import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-shatter";
+import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-ripple";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ export default function LoginPage() {
   const mainRef = useRef<HTMLElement>(null);
   const transitionRef = useRef<LoginSuccessTransition | null>(null);
   const mounted = useRef(true);
+  const lastRipple = useRef({ x: -999, y: -999, time: 0 });
 
   useEffect(() => {
     mounted.current = true;
@@ -47,6 +48,26 @@ export default function LoginPage() {
     },
   });
 
+  // Ambient fingertip ripple: one small ring per meaningful pointer movement over the card.
+  const handleCardPointerMove = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "touch") return;
+    const card = event.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const last = lastRipple.current;
+    const now = performance.now();
+    if (Math.hypot(x - last.x, y - last.y) < 56 || now - last.time < 140) return;
+    lastRipple.current = { x, y, time: now };
+    const ripple = document.createElement("span");
+    ripple.className = "ff-login-hover-ripple";
+    ripple.setAttribute("aria-hidden", "true");
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
+    card.appendChild(ripple);
+  };
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     setError("");
@@ -56,7 +77,8 @@ export default function LoginPage() {
       if (!mounted.current) return;
       if (success) {
         const card = mainRef.current?.querySelector<HTMLElement>(".ff-login-card") ?? null;
-        transitionRef.current = playLoginSuccess(card, () => setLocation("/"));
+        const button = mainRef.current?.querySelector<HTMLElement>(".ff-login-submit") ?? null;
+        transitionRef.current = playLoginSuccess(card, () => setLocation("/"), button);
       } else {
         setError("Invalid email or password. Please try again.");
         setShakeCount((count) => count + 1);
@@ -75,6 +97,7 @@ export default function LoginPage() {
         <Card
           className={`ff-login-card${shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
           aria-busy={isLoading}
+          onPointerMove={handleCardPointerMove}
         >
           <CardHeader className="ff-login-brand">
             <div className="flex justify-center">

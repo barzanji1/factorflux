@@ -3,8 +3,9 @@ export interface LoginSuccessTransition {
   cancel(): void;
 }
 
-const PULSE_DURATION = 200;
-const REVEAL_CLEANUP_DELAY = 825;
+const RING_DELAYS = [0, 110, 220, 330];
+const REVEAL_DELAY = 700;
+const REVEAL_CLEANUP_DELAY = 550;
 const HARD_CLEANUP_DELAY = 1350;
 
 interface CardMetrics {
@@ -18,6 +19,7 @@ function cloneWithoutCredentials(node: Node): Node {
   }
 
   if (!(node instanceof Element)) return document.createTextNode("");
+  if (node.classList.contains("ff-login-hover-ripple")) return document.createTextNode("");
 
   const clone = node.cloneNode(false) as Element;
   const deniedAttributes = new Set([
@@ -110,99 +112,14 @@ function copyMainBackground(main: HTMLElement, width: number, height: number): H
   return background;
 }
 
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
-function createShards(
-  root: HTMLElement,
-  safeCard: HTMLElement,
-  cardRect: DOMRect,
-  cardComputed: CardMetrics,
-): void {
-  const cells = 4;
-  const vertices: Array<Array<{ x: number; y: number }>> = [];
-
-  for (let row = 0; row <= cells; row += 1) {
-    const line: Array<{ x: number; y: number }> = [];
-    for (let column = 0; column <= cells; column += 1) {
-      const x = (column / cells) * 100;
-      const y = (row / cells) * 100;
-      const boundary = row === 0 || row === cells || column === 0 || column === cells;
-      line.push(boundary ? { x, y } : {
-        x: x + randomBetween(-5, 5),
-        y: y + randomBetween(-5, 5),
-      });
-    }
-    vertices.push(line);
-  }
-
-  for (let row = 0; row < cells; row += 1) {
-    for (let column = 0; column < cells; column += 1) {
-      const points = [
-        vertices[row][column],
-        vertices[row][column + 1],
-        vertices[row + 1][column + 1],
-        vertices[row + 1][column],
-      ];
-      const shard = cloneWithoutCredentials(safeCard) as HTMLElement;
-      shard.classList.add("ff-login-shard");
-      applyCardGeometry(shard, cardRect.left, cardRect.top, cardRect.width, cardRect.height, cardComputed);
-      shard.style.setProperty(
-        "clip-path",
-        `polygon(${points.map((point) => `${point.x}% ${point.y}%`).join(", ")})`,
-        "important",
-      );
-
-      const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
-      const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
-      shard.style.setProperty("--origin-x", `${(centerX / 100) * cardRect.width}px`);
-      shard.style.setProperty("--origin-y", `${(centerY / 100) * cardRect.height}px`);
-
-      const outward = Math.atan2(centerY - 50, centerX - 50);
-      const direction = Math.hypot(centerX - 50, centerY - 50) < 8
-        ? randomBetween(0, Math.PI * 2)
-        : outward + randomBetween(-0.65, 0.65);
-      const distance = randomBetween(70, 200);
-      shard.style.setProperty("--tx", `${Math.cos(direction) * distance}px`);
-      shard.style.setProperty("--ty", `${Math.sin(direction) * distance}px`);
-      shard.style.setProperty("--ax", `${randomBetween(-1, 1)}`);
-      shard.style.setProperty("--ay", `${randomBetween(-1, 1)}`);
-      shard.style.setProperty("--az", `${randomBetween(-1, 1)}`);
-      shard.style.setProperty("--angle", `${randomBetween(30, 90)}deg`);
-      shard.style.setProperty("--shard-delay", `${randomBetween(0, 100)}ms`);
-      shard.style.setProperty("--shard-duration", `${randomBetween(600, 700)}ms`);
-
-      // Give every cut edge a highlight, not just pieces on the card perimeter.
-      const edge = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      edge.setAttribute("viewBox", "0 0 100 100");
-      edge.setAttribute("preserveAspectRatio", "none");
-      edge.setAttribute("class", "ff-login-shard-edge");
-      const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-      polygon.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
-      polygon.setAttribute("fill", "none");
-      polygon.setAttribute("stroke", "rgba(220, 246, 255, 0.4)");
-      polygon.setAttribute("stroke-width", "0.8");
-      polygon.setAttribute("vector-effect", "non-scaling-stroke");
-      edge.appendChild(polygon);
-      shard.appendChild(edge);
-      root.appendChild(shard);
-    }
-  }
-}
-
 export function playLoginSuccess(
   card: HTMLElement | null,
   onReveal: () => void,
+  origin?: HTMLElement | null,
 ): LoginSuccessTransition {
   let active = true;
   let navigated = false;
   let overlay: HTMLDivElement | null = null;
-  let safeCard: HTMLElement | null = null;
-  let cardBounds: DOMRect | null = null;
-  let cardComputed: CardMetrics | null = null;
-  let pulseCard: HTMLElement | null = null;
-  let pulseHalo: HTMLDivElement | null = null;
   const timers = new Set<number>();
 
   const clearTimers = () => {
@@ -217,11 +134,6 @@ export function playLoginSuccess(
     document.removeEventListener("visibilitychange", onVisibilityChange);
     overlay?.remove();
     overlay = null;
-    safeCard = null;
-    cardBounds = null;
-    cardComputed = null;
-    pulseCard = null;
-    pulseHalo = null;
   };
 
   const later = (callback: () => void, delay: number) => {
@@ -242,25 +154,13 @@ export function playLoginSuccess(
     }
   };
 
+  // Navigate while the overlay still covers the screen, then fade it out so the
+  // dashboard appears underneath without a hard cut.
   const reveal = () => {
     if (!active || navigated) return;
-    try {
-      if (overlay && safeCard && cardBounds && cardComputed) {
-        pulseCard?.remove();
-        pulseHalo?.remove();
-        pulseCard = null;
-        pulseHalo = null;
-        createShards(overlay, safeCard, cardBounds, cardComputed);
-        overlay.classList.add("is-revealing");
-        later(cleanup, REVEAL_CLEANUP_DELAY);
-      }
-    } catch {
-      overlay?.classList.add("is-revealing");
-      navigateOnce();
-      later(cleanup, 0);
-      return;
-    }
+    overlay?.classList.add("is-revealing");
     navigateOnce();
+    later(cleanup, REVEAL_CLEANUP_DELAY);
   };
 
   const onVisibilityChange = () => {
@@ -276,13 +176,16 @@ export function playLoginSuccess(
     cancel: cleanup,
   };
 
-  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-  if (reducedMotion || !card || !document.body) {
-    card = null;
+  const skipAnimation = () => {
     later(() => {
       navigateOnce();
       cleanup();
     }, 0);
+  };
+
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  if (reducedMotion || !card || !document.body) {
+    skipAnimation();
     return handle;
   }
 
@@ -296,9 +199,19 @@ export function playLoginSuccess(
       padding: originalCardStyle.padding,
       borderRadius: originalCardStyle.borderRadius,
     };
-    cardBounds = cardRect;
-    cardComputed = cardMetrics;
-    safeCard = cloneWithoutCredentials(card) as HTMLElement;
+    const safeCard = cloneWithoutCredentials(card) as HTMLElement;
+    safeCard.classList.add("ff-login-transition-card");
+    applyCardGeometry(safeCard, cardRect.left, cardRect.top, cardRect.width, cardRect.height, cardMetrics);
+
+    const originRect = (origin ?? card).getBoundingClientRect();
+    const centerX = originRect.left + originRect.width / 2;
+    const centerY = originRect.top + originRect.height / 2;
+    const maxRadius = Math.max(
+      Math.hypot(centerX, centerY),
+      Math.hypot(window.innerWidth - centerX, centerY),
+      Math.hypot(centerX, window.innerHeight - centerY),
+      Math.hypot(window.innerWidth - centerX, window.innerHeight - centerY),
+    );
 
     overlay = document.createElement("div");
     overlay.className = "ff-login-page ff-login-transition";
@@ -308,26 +221,21 @@ export function playLoginSuccess(
     background.style.left = `${mainRect.left}px`;
     background.style.top = `${mainRect.top}px`;
     overlay.appendChild(background);
+    overlay.appendChild(safeCard);
 
-    pulseCard = cloneWithoutCredentials(safeCard) as HTMLElement;
-    pulseCard.classList.add("ff-login-transition-card-pulse");
-    applyCardGeometry(pulseCard, cardRect.left, cardRect.top, cardRect.width, cardRect.height, cardMetrics);
-    overlay.appendChild(pulseCard);
-
-    pulseHalo = document.createElement("div");
-    pulseHalo.className = "ff-login-transition-halo";
-    pulseHalo.setAttribute("aria-hidden", "true");
-    pulseHalo.style.left = `${cardRect.left}px`;
-    pulseHalo.style.top = `${cardRect.top}px`;
-    pulseHalo.style.width = `${cardRect.width}px`;
-    pulseHalo.style.height = `${cardRect.height}px`;
-    pulseHalo.style.borderRadius = cardMetrics.borderRadius;
-    overlay.appendChild(pulseHalo);
+    RING_DELAYS.forEach((delay) => {
+      const ring = document.createElement("div");
+      ring.className = "ff-login-transition-ring";
+      ring.style.left = `${centerX}px`;
+      ring.style.top = `${centerY}px`;
+      ring.style.setProperty("--ring-size", `${Math.ceil(maxRadius * 2)}px`);
+      ring.style.setProperty("--ring-delay", `${delay}ms`);
+      overlay!.appendChild(ring);
+    });
 
     document.body.appendChild(overlay);
-    card = null;
     document.addEventListener("visibilitychange", onVisibilityChange);
-    later(reveal, PULSE_DURATION);
+    later(reveal, REVEAL_DELAY);
     later(() => {
       if (!navigated) reveal();
       else cleanup();
@@ -338,16 +246,7 @@ export function playLoginSuccess(
     document.removeEventListener("visibilitychange", onVisibilityChange);
     overlay?.remove();
     overlay = null;
-    card = null;
-    safeCard = null;
-    cardBounds = null;
-    cardComputed = null;
-    pulseCard = null;
-    pulseHalo = null;
-    later(() => {
-      navigateOnce();
-      cleanup();
-    }, 0);
+    skipAnimation();
   }
 
   return handle;
