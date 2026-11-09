@@ -59,3 +59,4 @@
 - [Browser verification context](browser-verification-context.md) — select the application port and preserve a secure origin before treating blank signed-in pages as app regressions.
 - [Neumorphic depth](neumorphic-depth-policy.md) — subtle global shadows; older one-off utilities are compacted at CSS build time without changing interaction states.
 - [Login transition boundary](login-transition-boundary.md) — success fragments continue across routing so the authenticated dashboard appears underneath; cancellation must not redirect later.
+- [Login sizing feedback](login-sizing-feedback.md) — smaller means a real proportional reduction, not only recentering or retaining a superseded pixel target.
