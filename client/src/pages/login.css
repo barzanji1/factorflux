@@ -34,27 +34,27 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  width: min(50.4vw, 774px);
+  width: min(100%, 600px);
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid rgba(225, 244, 246, 0.42) !important;
+  border: 1px solid rgba(235, 247, 249, 0.34) !important;
   border-radius: 28px !important;
   background:
-    radial-gradient(ellipse at 6% 12%, rgba(156, 217, 230, 0.18), transparent 36%),
-    radial-gradient(ellipse at 94% 95%, rgba(241, 188, 129, 0.14), transparent 35%),
-    linear-gradient(138deg, rgba(26, 54, 64, 0.53) 0%, rgba(14, 34, 42, 0.57) 48%, rgba(19, 39, 45, 0.49) 100%) !important;
-  padding: 28px 56px 36px !important;
+    radial-gradient(ellipse at 5% 8%, rgba(178, 225, 236, 0.17), transparent 42%),
+    radial-gradient(ellipse at 96% 100%, rgba(244, 196, 145, 0.13), transparent 39%),
+    linear-gradient(138deg, rgba(35, 65, 78, 0.48) 0%, rgba(34, 59, 70, 0.43) 52%, rgba(42, 62, 68, 0.4) 100%) !important;
+  padding: 30px 46px 32px !important;
   box-shadow:
-    0 30px 82px rgba(1, 12, 17, 0.38),
-    0 8px 28px rgba(5, 18, 23, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1px 0 rgba(202, 229, 233, 0.12),
-    inset 1px 0 3px rgba(174, 235, 255, 0.28),
-    inset -1px -1px 3px rgba(255, 219, 169, 0.35) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(130%);
-  backdrop-filter: blur(24px) saturate(130%);
+    0 24px 64px rgba(1, 12, 17, 0.28),
+    0 7px 22px rgba(5, 18, 23, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(202, 229, 233, 0.1),
+    inset 1px 0 4px rgba(174, 235, 255, 0.22),
+    inset -1px -1px 4px rgba(255, 219, 169, 0.24) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  backdrop-filter: blur(28px) saturate(140%);
   color: var(--login-ink);
   transform: rotateY(0deg);
   transform-origin: center center;
@@ -164,13 +164,13 @@
   flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
-  margin-top: 30px;
+  margin-top: 23px;
 }
 
 .ff-login-page .ff-login-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .ff-login-page .ff-login-form > div {
@@ -210,11 +210,11 @@
   display: block;
   width: 100%;
   height: var(--login-control-height);
-  border: 1px solid rgba(222, 242, 245, 0.38) !important;
+  border: 1px solid rgba(222, 242, 245, 0.3) !important;
   border-radius: 13px !important;
   background:
-    linear-gradient(180deg, rgba(222, 242, 246, 0.13), rgba(143, 184, 192, 0.065)),
-    rgba(9, 28, 35, 0.25) !important;
+    linear-gradient(180deg, rgba(222, 242, 246, 0.12), rgba(143, 184, 192, 0.055)),
+    rgba(20, 42, 49, 0.19) !important;
   padding: 0 15px 0 44px !important;
   color: #f4f5f2 !important;
   font-family: inherit;
@@ -222,8 +222,8 @@
   outline: none;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -5px 12px rgba(2, 13, 18, 0.18),
-    0 3px 10px rgba(2, 13, 18, 0.08) !important;
+    inset 0 -5px 12px rgba(2, 13, 18, 0.13),
+    0 3px 10px rgba(2, 13, 18, 0.06) !important;
   -webkit-backdrop-filter: blur(10px) saturate(125%);
   backdrop-filter: blur(10px) saturate(125%);
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
@@ -238,7 +238,7 @@
   border-color: rgba(193, 232, 235, 0.78) !important;
   background:
     linear-gradient(180deg, rgba(222, 242, 246, 0.17), rgba(143, 184, 192, 0.1)),
-    rgba(9, 28, 35, 0.38) !important;
+    rgba(20, 42, 49, 0.27) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset 0 -5px 12px rgba(2, 13, 18, 0.17),
@@ -292,15 +292,15 @@
 .ff-login-page .ff-login-submit {
   display: inline-flex;
   width: 100%;
-  min-height: 50px;
-  height: 50px;
+  min-height: 48px;
+  height: 48px;
   align-items: center;
   justify-content: center;
   margin-top: 4px;
   border: 1px solid rgba(184, 245, 244, 0.58) !important;
   border-radius: 13px !important;
   background:
-    linear-gradient(180deg, rgba(38, 209, 207, 0.9) 0%, rgba(0, 154, 158, 0.96) 48%, rgba(0, 112, 122, 0.98) 100%) !important;
+    linear-gradient(180deg, rgba(48, 190, 190, 0.88) 0%, rgba(0, 145, 150, 0.92) 52%, rgba(0, 106, 116, 0.94) 100%) !important;
   padding: 0 18px !important;
   color: #ffffff !important;
   font-family: inherit;
@@ -309,9 +309,9 @@
   letter-spacing: 0.13em;
   cursor: pointer;
   box-shadow:
-    0 8px 18px rgba(1, 17, 23, 0.25),
-    0 2px 4px rgba(1, 17, 23, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    0 6px 15px rgba(1, 17, 23, 0.2),
+    0 2px 4px rgba(1, 17, 23, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
     inset 0 -1px 0 rgba(0, 61, 70, 0.32) !important;
   transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
@@ -355,7 +355,7 @@
 }
 
 .ff-login-page .ff-login-support-wrap {
-  margin-top: 18px;
+  margin-top: 15px;
   text-align: center;
 }
 
@@ -448,99 +448,6 @@
 
   .ff-login-page .ff-login-content {
     margin-top: 25px;
-  }
-}
-
-@media (min-width: 1400px) {
-  .ff-login-page .ff-login-card {
-    min-height: 73.8vh;
-    border-radius: 42px !important;
-    padding: 42px 84px 42px !important;
-  }
-
-  .ff-login-page .ff-login-brand img {
-    width: 84px;
-    height: 84px;
-  }
-
-  .ff-login-page .ff-login-brand > div:first-child {
-    margin-bottom: 13px;
-  }
-
-  .ff-login-page .ff-login-product {
-    font-size: 51px;
-  }
-
-  .ff-login-page .ff-login-tagline {
-    margin-top: 8px;
-    font-size: 16px;
-  }
-
-  .ff-login-page .ff-login-brand .ff-login-company {
-    margin-top: 25px;
-    font-size: 48px;
-  }
-
-  .ff-login-page .ff-login-content {
-    margin-top: 45px;
-  }
-
-  .ff-login-page .ff-login-form {
-    gap: 24px;
-  }
-
-  .ff-login-page .ff-login-label {
-    margin-bottom: 10px;
-    font-size: 18px;
-  }
-
-  .ff-login-page .ff-login-input {
-    height: 72px;
-    border-radius: 19px !important;
-    padding-left: 66px !important;
-    font-size: 21px;
-  }
-
-  .ff-login-page .ff-login-input-icon {
-    left: 23px;
-    width: 25px;
-    height: 25px;
-  }
-
-  .ff-login-page .ff-login-password-input {
-    padding-right: 75px !important;
-  }
-
-  .ff-login-page .ff-login-toggle {
-    right: 10px;
-    width: 54px;
-    height: 54px;
-  }
-
-  .ff-login-page .ff-login-toggle svg {
-    width: 24px;
-    height: 24px;
-  }
-
-  .ff-login-page .ff-login-submit {
-    min-height: 75px;
-    height: 75px;
-    margin-top: 6px;
-    border-radius: 19px !important;
-    font-size: 19px;
-  }
-
-  .ff-login-page .ff-login-support-wrap {
-    margin-top: 27px;
-  }
-
-  .ff-login-page .ff-login-support {
-    font-size: 18px;
-  }
-
-  .ff-login-page .ff-login-error,
-  .ff-login-page .ff-login-form [id$="-form-item-message"] {
-    font-size: 18px;
   }
 }
 

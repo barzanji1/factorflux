@@ -246,3 +246,17 @@ mtime_ms = 1794239635918
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/68d32ca1-444c-471d-8561-250075ad0f7c/fd13d629-c7fa-484a-ba2e-4a4bc57d2e14"
 storage_version_token = "1794239643046981"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "lOVvfTmrX7sOfVgdZR8QM"
+uri = "file://generated-artifacts/login-600-comparison.jpg"
+type = "image"
+title = "Reference and refined login"
+description = "Reference left; updated login right, both at the same 1536 × 1024 viewport. The update follows your requested 600px card width and preserves the existing lobby background."
+logical_id = "900b14d5-47c9-4fb9-bb20-ac89b3c39608"
+content_hash = "sha256:89da639fbcaf3650b1a0e679673d8a2062622cd0dfe44bd1a2d064d03c1df3f9"
+size = 137028
+mtime_ms = 1794240045107
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/900b14d5-47c9-4fb9-bb20-ac89b3c39608/4fcf5143-f767-4976-b0b4-162517fd12a4"
+storage_version_token = "1794240072296572"
+content_type = "image/jpeg"

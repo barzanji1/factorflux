@@ -19,4 +19,4 @@ The login glass must visibly use translucent layered surfaces, internal reflecti
 
 **Why:** The user explicitly rejected the earlier dark card and requested matching the architectural glass reference, rather than merely changing opacity or adding a generic glow.
 
-**How to apply:** Preserve the existing architectural background while refining the glass surfaces; keep decorative layers pointer-transparent and form content crisp.
+**How to apply:** Preserve the existing architectural background while refining the glass surfaces; keep decorative layers pointer-transparent and form content crisp. Follow the user's explicit compact sizing rather than scaling the panel to the reference image's pixel bounds; the user rejected the oversized interpretation.
