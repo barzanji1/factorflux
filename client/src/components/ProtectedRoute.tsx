@@ -19,7 +19,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (isLoading || (isAuthenticated && user?.role !== "admin" && (!permissionsReadyForRoute || (!permissionsLoaded && !permissionsError)))) {
     return (
-      <NeuPageShell className="flex min-h-screen items-center justify-center p-6">
+      <NeuPageShell className="ff-institutional-root flex min-h-screen items-center justify-center p-6">
         <NeuCard className="p-6 text-center" role="status" aria-live="polite">
           <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-[#27aab8]" />
           <p className="text-[#888]">Verifying authentication...</p>
@@ -33,7 +33,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Redirect to="/login" />;
   }
   if (user?.role !== "admin" && permissionsError) {
-    return <NeuPageShell className="flex min-h-[100dvh] items-center justify-center p-6">
+    return <NeuPageShell className="ff-institutional-root flex min-h-[100dvh] items-center justify-center p-6">
       <NeuNotice severity="block" role="alert" className="max-w-lg">
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#b46a37]" />
@@ -47,7 +47,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   const requiredPermission = pathToPermission(location);
   if (requiredPermission && user?.role !== "admin" && !permissions.includes(requiredPermission)) {
-    return <AccessDenied />;
+    return <AccessDenied className="ff-institutional-root" />;
   }
 
   console.log("Authenticated, rendering protected content");

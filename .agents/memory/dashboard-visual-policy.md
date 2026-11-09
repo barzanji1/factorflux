@@ -1,10 +1,10 @@
 ---
-name: Dashboard visual scope
-description: Why the Agent Dashboard has a separate institutional-finance palette and what must remain unchanged in visual passes.
+name: Institutional-finance visual scope
+description: The approved Agent Dashboard is the visual reference across authenticated pages, with strict layout and behavior preservation.
 ---
 
-The Agent Dashboard uses an institutional-finance palette, intentionally separate from the other internal pages and the architectural-glass login.
+Use the approved Agent Dashboard as the institutional-finance visual source of truth across authenticated Workspace, Communications, Funding, Operations, Risk, Recovery, and Admin pages, including nested details, forms, and dialogs. Do not introduce a different design direction.
 
-**Why:** The user requested a premium financial-dashboard reskin only, explicitly preserving other pages, the KPI carousel, six action cards, all dimensions, animations, navigation, and financial calculations.
+**Why:** The user approved the dashboard and then explicitly expanded that exact visual language system-wide. This supersedes the earlier dashboard-only styling restriction.
 
-**How to apply:** Keep dashboard-only styling scoped to its shell and its open menus. Do not change shared neumorphic tokens to achieve dashboard changes. Preserve the existing geometry and interactions during visual refinements unless the user explicitly requests otherwise.
+**How to apply:** Preserve existing layouts, dimensions, positioning, sidebar groupings, workflows, permissions, financial logic, charts, data behavior, and carousel/card-flip motion. Extend only visual materials and control styling. Keep the approved dashboard appearance intact, and leave the architectural-glass login and public/customer-facing output outside the internal theme.

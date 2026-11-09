@@ -50,7 +50,7 @@ function PreviewContent() {
   });
 
   return (
-    <NeuPageShell className="px-4 py-8 sm:px-8 lg:px-12">
+    <NeuPageShell className="ff-institutional-root px-4 py-8 sm:px-8 lg:px-12">
       <div className="mx-auto max-w-7xl">
         <header className="mb-10 flex flex-col gap-6 border-b border-[#c9c9c9] pb-8 md:flex-row md:items-end md:justify-between">
           <div>
@@ -259,7 +259,7 @@ export default function NeuPreviewPage() {
   const { user, isLoading } = useAuth();
   if (isLoading) {
     return (
-      <NeuPageShell className="grid place-items-center p-8">
+      <NeuPageShell className="ff-institutional-root grid place-items-center p-8">
         <div aria-label="Loading access" className="w-full max-w-xl space-y-4">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-[#d6d6d6]" />
           <div className="h-28 animate-pulse rounded-2xl bg-[#d6d6d6]" />
@@ -268,6 +268,6 @@ export default function NeuPreviewPage() {
       </NeuPageShell>
     );
   }
-  if (user?.role !== "admin") return <AccessDenied />;
+  if (user?.role !== "admin") return <AccessDenied className="ff-institutional-root" />;
   return <PreviewContent />;
 }

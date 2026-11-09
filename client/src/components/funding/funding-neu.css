@@ -1,8 +1,8 @@
 /* Funding-only neumorphic skin. Deliberately scoped away from the app sidebar. */
 .funding-neu-page.funding-neu-page.funding-neu-page,
 .funding-neu-page.funding-neu-page.funding-neu-page main {
-  background: #e0e0e0 !important;
-  color: #333 !important;
+  background: var(--ff-institutional-workspace, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
 }
 
 .funding-neu-page main {
@@ -18,9 +18,9 @@
   padding: 0 !important;
   border: 0 !important;
   border-radius: 50% !important;
-  background: #e0e0e0 !important;
-  color: #677b77 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-muted, #677b77) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 .funding-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"]:hover {
   color: #087f8c !important;
@@ -32,10 +32,10 @@
 .funding-neu-page.funding-neu-page.funding-neu-page main [class*="rounded-xl"][class*="border"],
 .funding-neu-page.funding-neu-page.funding-neu-page main [class*="rounded-[16px]"][class*="bg-white"],
 .funding-neu-dialog {
-  background-color: #e0e0e0 !important;
-  color: #333 !important;
-  border-color: #d1d1d1 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background-color: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  border-color: var(--ff-institutional-border, #dfe5e8) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
@@ -47,56 +47,56 @@
 .funding-neu-dialog textarea,
 .funding-neu-dialog [role="combobox"],
 .funding-neu-dialog .funding-neu-select {
-  background: #e0e0e0 !important;
-  color: #333 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
   border: 0 !important;
   border-radius: 12px !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8), 0 1px 2px rgba(20, 46, 55, .025) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main .funding-neu-select[role="combobox"],
 .funding-neu-dialog .funding-neu-select[role="combobox"],
 .funding-neu-page.funding-neu-page.funding-neu-page main [role="combobox"] {
-  background: #e0e0e0 !important;
-  color: #333 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
   border: 0 !important;
   border-radius: 12px !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8), 0 1px 2px rgba(20, 46, 55, .025) !important;
 }
 
 .funding-neu-select[role="listbox"],
 .funding-neu-menu[role="menu"] {
   border: 0 !important;
   border-radius: 14px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main input::placeholder,
 .funding-neu-page.funding-neu-page.funding-neu-page main textarea::placeholder,
 .funding-neu-dialog input::placeholder,
 .funding-neu-dialog textarea::placeholder {
-  color: #888 !important;
+  color: var(--ff-institutional-muted, #888) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button:not([role="checkbox"]):not([role="tab"]):not([data-radix-collection-item]):not([class*="bg-red-"]):not([class*="destructive"]),
 .funding-neu-dialog button:not([data-radix-collection-item]):not([class*="bg-red-"]):not([class*="destructive"]) {
-  border-color: #d1d1d1 !important;
+  border-color: var(--ff-institutional-border, #dfe5e8) !important;
   border-radius: 12px !important;
-  background-color: #e0e0e0 !important;
-  color: #444 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background-color: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #444) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button:hover:not(:disabled),
 .funding-neu-dialog button:hover:not(:disabled) {
-  color: #168d99 !important;
+  color: var(--ff-institutional-teal, #168d99) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button:active:not(:disabled),
 .funding-neu-dialog button:active:not(:disabled) {
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button[class*="bg-blue-"],
@@ -105,50 +105,50 @@
 .funding-neu-dialog button[class*="bg-blue-"],
 .funding-neu-dialog button[class*="bg-emerald-"],
 .funding-neu-dialog button[class*="bg-primary"] {
-  background: #e0e0e0 !important;
-  color: #168d99 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-teal, #168d99) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-accent,
 .funding-neu-dialog button.funding-neu-accent,
 body:has(.funding-neu-page) [role="dialog"] button.funding-neu-accent {
-  background: #e0e0e0 !important;
-  color: #168d99 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-teal, #168d99) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger,
 .funding-neu-dialog button.funding-neu-danger,
 body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger {
-  background: #e0e0e0 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
   color: #a3483e !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger:hover:not(:disabled),
 .funding-neu-dialog button.funding-neu-danger:hover:not(:disabled),
 body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger:hover:not(:disabled) {
-  background: #e0e0e0 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
   color: #a3483e !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main table,
 .funding-neu-page.funding-neu-page.funding-neu-page main .ff-data-table {
-  color: #333 !important;
+  color: var(--ff-institutional-ink, #333) !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main thead,
 .funding-neu-page.funding-neu-page.funding-neu-page main thead tr {
-  background: #d7d7d7 !important;
-  color: #666 !important;
+  background: #f1f5f6 !important;
+  color: var(--ff-institutional-muted, #666) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main th {
-  border-color: #c9c9c9 !important;
-  color: #777 !important;
+  border-color: var(--ff-institutional-border, #c9c9c9) !important;
+  color: var(--ff-institutional-muted, #777) !important;
   font-size: 10px !important;
   letter-spacing: .12em !important;
   text-transform: uppercase;
@@ -156,17 +156,17 @@ body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger:hover:not(
 
 .funding-neu-page.funding-neu-page.funding-neu-page main td,
 .funding-neu-page.funding-neu-page.funding-neu-page main th {
-  border-bottom-color: #c9c9c9 !important;
+  border-bottom-color: var(--ff-institutional-border, #c9c9c9) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main tbody tr:hover {
-  background: #d9e8e8 !important;
+  background: var(--ff-institutional-tint, #d9e8e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main [class*="ff-badge"],
 .funding-neu-page.funding-neu-page.funding-neu-page main [class*="rounded-full"][class*="text-"][class*="px-"] {
   border-color: transparent !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main [role="tablist"],
@@ -178,26 +178,26 @@ body:has(.funding-neu-page) [role="dialog"] button.funding-neu-danger:hover:not(
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main [role="tablist"] {
-  background: #e0e0e0 !important;
-  box-shadow: 3px 3px 6px #c8c8c8, -3px -3px 6px #fff !important;
+  background: var(--ff-institutional-subtle, #f3f6f7) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main [role="tablist"] button[aria-selected="true"],
 .funding-neu-page.funding-neu-page.funding-neu-page main button[data-state="active"],
 .funding-neu-page.funding-neu-page.funding-neu-page main button[aria-pressed="true"] {
-  color: #168d99 !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  color: var(--ff-institutional-teal, #168d99) !important;
+  box-shadow: 0 1px 3px rgba(20, 46, 55, .08), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="listbox"],
 body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menu"],
 body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [data-radix-menu-content],
 .funding-neu-dialog {
-  border-color: #d1d1d1 !important;
+  border-color: var(--ff-institutional-border, #dfe5e8) !important;
   border-radius: 16px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 .funding-neu-dialog.funding-neu-dialog.funding-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
@@ -207,8 +207,8 @@ body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [data-radix-menu
   padding: 0 !important;
   border: 0 !important;
   border-radius: 50% !important;
-  background: #e0e0e0 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 body:has(.funding-neu-page) [data-sonner-toaster] [data-sonner-toast],
@@ -216,25 +216,25 @@ body:has(.funding-neu-page) [data-radix-toast-viewport] [role="status"],
 body:has(.funding-neu-page) [data-radix-toast-viewport] [role="alert"] {
   border: 0 !important;
   border-radius: 14px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 .funding-neu-toast {
   border: 0 !important;
   border-radius: 14px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 body:has(.funding-neu-page) [role="dialog"] {
   border: 0 !important;
   border-radius: 16px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 body:has(.funding-neu-page) [role="dialog"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
@@ -243,35 +243,35 @@ body:has(.funding-neu-page) [role="dialog"] [role="combobox"],
 body:has(.funding-neu-page) [role="dialog"] .funding-neu-select {
   border: 0 !important;
   border-radius: 12px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8), 0 1px 2px rgba(20, 46, 55, .025) !important;
 }
 
 body:has(.funding-neu-page) [role="dialog"] button:not([class*="bg-red-"]):not([class*="destructive"]) {
-  border-color: #d1d1d1 !important;
+  border-color: var(--ff-institutional-border, #dfe5e8) !important;
   border-radius: 12px !important;
-  background: #e0e0e0 !important;
-  color: #444 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #444) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 body:has(.funding-neu-page) [role="dialog"] button:hover:not(:disabled) {
-  color: #168d99 !important;
+  color: var(--ff-institutional-teal, #168d99) !important;
 }
 
 body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menuitem"],
 body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="option"] {
-  color: #444 !important;
+  color: var(--ff-institutional-ink, #444) !important;
 }
 
 body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="listbox"],
 body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
   border: 0 !important;
   border-radius: 14px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 @media (max-width: 767px) {
@@ -296,12 +296,12 @@ body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main .funding-neu-stat .text-3xl {
-  color: #168d99 !important;
+  color: var(--ff-institutional-teal, #168d99) !important;
 }
 
 .funding-neu-page.funding-neu-page.funding-neu-page main button.funding-neu-danger,
 .funding-neu-dialog.funding-neu-dialog.funding-neu-dialog button.funding-neu-danger {
-  background: #e0e0e0 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
   color: #a3483e !important;
 }
 
@@ -313,6 +313,6 @@ body:has(.funding-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
 .funding-neu-page.funding-neu-page.funding-neu-page.funding-neu-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
   border: 0 !important;
   border-radius: 12px !important;
-  background: #e0e0e0 !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8), 0 1px 2px rgba(20, 46, 55, .025) !important;
 }

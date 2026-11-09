@@ -25,7 +25,7 @@ function evaluate(expression: string, context: Record<string, unknown> = {}) {
   }).outputText, context);
 }
 const carrier = parse("client/src/pages/carrier-onboarding.tsx");
-const broker = parse("client/src/pages/brokers.tsx");
+const broker = parse("client/src/components/brokers/broker-form-schema.ts");
 test("carrier defaults survive generated blank section fields", () => {
   const sections = evaluate(initializer(carrier, "sections"));
   assert(sections.some((section: { fields: string[] }) => section.fields.includes("status")));

@@ -1,8 +1,8 @@
 /* Operations-only neumorphic layer; intentionally does not touch shared app chrome. */
 .operations-neu-page.operations-neu-page.operations-neu-page,
 .operations-neu-page.operations-neu-page.operations-neu-page main {
-  background: #e0e0e0 !important;
-  color: #333 !important;
+  background: var(--ff-institutional-workspace, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
 }
 
 .operations-neu-page main { min-height: 0; }
@@ -10,11 +10,11 @@
 .operations-neu-page.operations-neu-page.operations-neu-page main .operations-neu-surface,
 .operations-neu-dialog.operations-neu-dialog.operations-neu-dialog,
 body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog {
-  background: #e0e0e0 !important;
-  color: #333 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
   border: 0 !important;
   border-radius: 16px !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 .operations-neu-page.operations-neu-page.operations-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
@@ -29,9 +29,9 @@ body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog [role="comb
   min-width: 0;
   border: 0 !important;
   border-radius: 12px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8), 0 1px 2px rgba(20, 46, 55, .025) !important;
 }
 
 .operations-neu-page main input::placeholder,
@@ -42,35 +42,35 @@ body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog [role="comb
 .operations-neu-page.operations-neu-page.operations-neu-page main button:not([role="checkbox"]):not([role="option"]):not([role="menuitem"]),
 .operations-neu-dialog.operations-neu-dialog.operations-neu-dialog button:not([data-radix-collection-item]),
 body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog button:not([data-radix-collection-item]) {
-  border-color: #d1d1d1 !important;
+  border-color: var(--ff-institutional-border, #dfe5e8) !important;
   border-radius: 12px !important;
-  background-color: #e0e0e0 !important;
-  color: #444 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background-color: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #444) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .operations-neu-page main button:hover:not(:disabled),
 .operations-neu-dialog button:hover:not(:disabled),
 body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog button:hover:not(:disabled) {
-  color: #168d99 !important;
+  color: var(--ff-institutional-teal, #168d99) !important;
 }
 
 .operations-neu-page main button:active:not(:disabled),
 .operations-neu-dialog button:active:not(:disabled) {
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 .operations-neu-page main button.operations-neu-accent,
 .operations-neu-dialog button.operations-neu-accent,
 body:has(.operations-neu-page) [role="dialog"] button.operations-neu-accent {
-  background: #27aab8 !important;
-  color: #fff !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #fff) !important;
+  color: var(--ff-institutional-teal, #087f87) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 .operations-neu-page main button.operations-neu-accent:hover:not(:disabled),
 .operations-neu-dialog button.operations-neu-accent:hover:not(:disabled) {
-  background: #2398a4 !important;
-  color: #fff !important;
+  background: var(--ff-institutional-tint, #eaf3f3) !important;
+  color: var(--ff-institutional-teal, #087f87) !important;
 }
 .operations-neu-page main button.operations-neu-danger,
 .operations-neu-dialog button.operations-neu-danger {
@@ -79,30 +79,30 @@ body:has(.operations-neu-page) [role="dialog"] button.operations-neu-accent {
 }
 
 .operations-neu-page main table {
-  color: #333 !important;
+  color: var(--ff-institutional-ink, #333) !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
 }
 .operations-neu-page main thead,
 .operations-neu-page main thead tr {
-  background: #d7d7d7 !important;
-  color: #666 !important;
+  background: #f1f5f6 !important;
+  color: var(--ff-institutional-muted, #666) !important;
 }
 .operations-neu-page main th {
-  border-color: #c9c9c9 !important;
-  color: #777 !important;
+  border-color: var(--ff-institutional-border, #c9c9c9) !important;
+  color: var(--ff-institutional-muted, #777) !important;
   font-size: 10px !important;
   letter-spacing: .12em !important;
   text-transform: uppercase;
 }
 .operations-neu-page main td,
-.operations-neu-page main th { border-bottom-color: #c9c9c9 !important; }
-.operations-neu-page main tbody tr:hover { background: #d9e8e8 !important; }
+.operations-neu-page main th { border-bottom-color: var(--ff-institutional-border, #c9c9c9) !important; }
+.operations-neu-page main tbody tr:hover { background: var(--ff-institutional-tint, #d9e8e8) !important; }
 
 .operations-neu-page main .operations-neu-badge {
   border: 0 !important;
-  background: #e0e0e0 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background: var(--ff-institutional-subtle, #f3f6f7) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 .operations-neu-page main .operations-neu-badge.ff-badge-draft { color: #475569 !important; }
 .operations-neu-page main .operations-neu-badge.ff-badge-pending { color: #92400e !important; }
@@ -118,13 +118,13 @@ body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="listbo
 body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menu"] {
   border: 0 !important;
   border-radius: 14px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 .operations-neu-menu [role="menuitem"],
 body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="option"],
-body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menuitem"] { color: #444 !important; }
+body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menuitem"] { color: var(--ff-institutional-ink, #444) !important; }
 
 .operations-neu-dialog.operations-neu-dialog.operations-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
   width: 36px !important;
@@ -133,8 +133,8 @@ body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menuit
   padding: 0 !important;
   border: 0 !important;
   border-radius: 50% !important;
-  background: #e0e0e0 !important;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  box-shadow: 0 2px 5px rgba(22, 48, 58, .06), inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8) !important;
 }
 
 body:has(.operations-neu-page) [data-sonner-toaster] [data-sonner-toast],
@@ -142,16 +142,16 @@ body:has(.operations-neu-page) [data-radix-toast-viewport] [role="status"],
 body:has(.operations-neu-page) [data-radix-toast-viewport] [role="alert"] {
   border: 0 !important;
   border-radius: 14px !important;
-  background: #e0e0e0 !important;
-  color: #333 !important;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  color: var(--ff-institutional-ink, #333) !important;
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
 .operations-neu-page.operations-neu-page.operations-neu-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
   border: 0 !important;
   border-radius: 12px !important;
-  background: #e0e0e0 !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
+  background: var(--ff-institutional-surface, #e0e0e0) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8), 0 1px 2px rgba(20, 46, 55, .025) !important;
 }
 
 @media (max-width: 767px) {

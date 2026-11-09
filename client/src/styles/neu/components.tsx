@@ -29,10 +29,11 @@ export const NeuCard = forwardRef<HTMLDivElement, NeuCardProps>(
     <div
       ref={ref}
       className={cn(
-        "rounded-2xl bg-[#e0e0e0] text-[#333333]",
+        "ff-institutional-neu-card rounded-2xl bg-[#e0e0e0] text-[#333333]",
         pressed ? neuTokenClasses.concave : neuTokenClasses.convex,
         className,
       )}
+      data-ff-neu-pressed={pressed || undefined}
       {...props}
     />
   ),
@@ -67,8 +68,10 @@ export const NeuButton = forwardRef<HTMLButtonElement, NeuButtonProps>(
         variant !== "ghost" && variant !== "link" ? [neuTokenClasses.button, neuTokenClasses.buttonPressed] : "",
         "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0",
         neuTokenClasses.focus,
+        "ff-institutional-neu-button",
         className,
       )}
+      data-ff-neu-variant={variant}
       {...props}
     />
   ),
@@ -80,7 +83,7 @@ export const NeuInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
     <input
       ref={ref}
       className={cn(
-        "min-h-11 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 text-sm !text-[#333333] placeholder:text-[#888888]",
+        "ff-institutional-neu-field min-h-11 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 text-sm !text-[#333333] placeholder:text-[#888888]",
         neuTokenClasses.input,
         neuTokenClasses.focus,
         className,
@@ -96,7 +99,7 @@ export const NeuTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttribute
     <textarea
       ref={ref}
       className={cn(
-        "min-h-24 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-3 text-sm !text-[#333333] placeholder:text-[#888888]",
+        "ff-institutional-neu-field min-h-24 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-3 text-sm !text-[#333333] placeholder:text-[#888888]",
         neuTokenClasses.input,
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]",
         className,
@@ -123,7 +126,7 @@ export const NeuSelect = forwardRef<HTMLSelectElement, NeuSelectProps>(
     <select
       ref={ref}
       className={cn(
-        "min-h-11 w-full appearance-auto !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 pr-10 text-sm !text-[#333333]",
+        "ff-institutional-neu-field min-h-11 w-full appearance-auto !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 pr-10 text-sm !text-[#333333]",
         neuTokenClasses.input,
         neuTokenClasses.focus,
         className,
@@ -188,7 +191,7 @@ export const NeuTabList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
     <div
       ref={ref}
       role="tablist"
-      className={cn("flex flex-wrap gap-2 rounded-2xl bg-[#e0e0e0] p-2", neuTokenClasses.flat, className)}
+      className={cn("ff-institutional-neu-tablist flex flex-wrap gap-2 rounded-2xl bg-[#e0e0e0] p-2", neuTokenClasses.flat, className)}
       {...props}
     />
   ),
@@ -231,7 +234,7 @@ export const NeuTab = forwardRef<HTMLButtonElement, NeuTabProps>(
         aria-controls={`${baseId}-panel-${value}`}
         tabIndex={selected ? 0 : -1}
         className={cn(
-          "min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition-[transform,box-shadow,color] duration-150 focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]",
+          "ff-institutional-neu-tab min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition-[transform,box-shadow,color] duration-150 focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]",
           selected
             ? cn("bg-[#e0e0e0] text-[#27aab8]", neuTokenClasses.concave)
             : cn("bg-[#e0e0e0] text-[#333333] hover:text-[#27aab8]", neuTokenClasses.button),
@@ -266,7 +269,7 @@ export const NeuTabPanel = forwardRef<HTMLDivElement, NeuTabPanelProps>(
         aria-labelledby={`${baseId}-tab-${value}`}
         tabIndex={0}
         hidden={selectedValue !== value}
-        className={cn("mt-5 rounded-2xl bg-[#e0e0e0] p-5 text-[#333333] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]", neuTokenClasses.flat, className)}
+        className={cn("ff-institutional-neu-tabpanel mt-5 rounded-2xl bg-[#e0e0e0] p-5 text-[#333333] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]", neuTokenClasses.flat, className)}
         {...props}
       />
     );
@@ -278,8 +281,8 @@ function NeuTableContent({ className, children, tableRef, ...props }: TableHTMLA
   const tableChildren = useSafePaginatedTableChildren(children);
   return (
     <>
-      <div className={cn("overflow-x-auto rounded-2xl bg-[#e0e0e0]", neuTokenClasses.flat)}>
-        <table ref={tableRef} className={cn("w-full border-collapse text-left text-sm text-[#333333]", className)} {...props}>{tableChildren}</table>
+      <div className={cn("ff-institutional-neu-table-wrap overflow-x-auto rounded-2xl bg-[#e0e0e0]", neuTokenClasses.flat)}>
+        <table ref={tableRef} className={cn("ff-institutional-neu-table w-full border-collapse text-left text-sm text-[#333333]", className)} {...props}>{tableChildren}</table>
       </div>
       <SafeTablePaginationControls />
     </>
@@ -297,7 +300,7 @@ NeuTable.displayName = "NeuTable";
 
 export const NeuTableHeader = forwardRef<HTMLTableSectionElement, HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <thead ref={ref} className={cn("bg-[#d7d7d7] text-[#555555]", className)} {...props} />
+    <thead ref={ref} className={cn("ff-institutional-neu-table-head bg-[#d7d7d7] text-[#555555]", className)} {...props} />
   ),
 );
 NeuTableHeader.displayName = "NeuTableHeader";
@@ -305,28 +308,28 @@ NeuTableHeader.displayName = "NeuTableHeader";
 export const NeuTableBody = forwardRef<HTMLTableSectionElement, HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, children, ...props }, ref) => {
     const visibleRows = useSafePaginatedRows(children);
-    return <tbody ref={ref} className={cn("divide-y divide-[#c9c9c9]", className)} {...props}>{visibleRows}</tbody>;
+    return <tbody ref={ref} className={cn("ff-institutional-neu-table-body divide-y divide-[#c9c9c9]", className)} {...props}>{visibleRows}</tbody>;
   },
 );
 NeuTableBody.displayName = "NeuTableBody";
 
 export const NeuTableRow = forwardRef<HTMLTableRowElement, HTMLAttributes<HTMLTableRowElement>>(
   ({ className, ...props }, ref) => (
-    <tr ref={ref} className={cn("transition-colors hover:bg-[#d9e8e8]", className)} {...props} />
+    <tr ref={ref} className={cn("ff-institutional-neu-table-row transition-colors hover:bg-[#d9e8e8]", className)} {...props} />
   ),
 );
 NeuTableRow.displayName = "NeuTableRow";
 
 export const NeuTableHead = forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <th ref={ref} scope="col" className={cn("whitespace-nowrap px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#777777]", className)} {...props} />
+    <th ref={ref} scope="col" className={cn("ff-institutional-neu-table-cell whitespace-nowrap px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#777777]", className)} {...props} />
   ),
 );
 NeuTableHead.displayName = "NeuTableHead";
 
 export const NeuTableCell = forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn("whitespace-nowrap px-5 py-4", className)} {...props} />
+    <td ref={ref} className={cn("ff-institutional-neu-table-cell whitespace-nowrap px-5 py-4", className)} {...props} />
   ),
 );
 NeuTableCell.displayName = "NeuTableCell";
@@ -341,6 +344,7 @@ export const NeuBadge = forwardRef<HTMLSpanElement, NeuBadgeProps>(
       ref={ref}
       className={cn(
         "inline-flex items-center rounded-full bg-[#e0e0e0] px-3 py-1 text-xs font-semibold",
+        "ff-institutional-neu-badge",
         neuTokenClasses.flat,
         tone === "accent" && "text-[#27aab8]",
         tone === "success" && "text-[#347d69]",
@@ -348,6 +352,7 @@ export const NeuBadge = forwardRef<HTMLSpanElement, NeuBadgeProps>(
         tone === "neutral" && "text-[#666666]",
         className,
       )}
+      data-ff-neu-tone={tone}
       {...props}
     />
   ),

@@ -1980,12 +1980,12 @@ div:has(> table.ff-data-table) {
   margin: 8px;
   border: 0;
   border-radius: 16px;
-  background: #e0e0e0;
-  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
+  background: var(--ff-institutional-surface, #e0e0e0);
+  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8);
 }
 
 .ff-rule-card:hover {
-  background: #d9e8e6;
+  background: var(--ff-institutional-tint, #d9e8e6);
 }
 
 .ff-rules-type {
@@ -2057,12 +2057,17 @@ div:has(> table.ff-data-table) {
   box-shadow: inset 2px 2px 4px #b3ceca, inset -2px -2px 4px #f6ffff;
 }
 
-.ff-workflow-stage-icon,
+.ff-workflow-stage-icon {
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(20, 46, 55, .08);
+}
+
 .ff-workflow-preview-stage {
   border: 0;
   border-radius: 10px;
-  background: #e0e0e0;
-  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
+  background: var(--ff-institutional-surface, #e0e0e0);
+  box-shadow: var(--ff-institutional-shadow, -3px -3px 6px #fff, 3px 3px 6px #c8c8c8);
 }
 
 .ff-workflow-auto {
@@ -2109,8 +2114,8 @@ div:has(> table.ff-data-table) {
 .ff-workflow-summary-stat {
   border: 0;
   border-radius: 12px;
-  background: #e0e0e0;
-  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
+  background: var(--ff-institutional-surface, #e0e0e0);
+  box-shadow: inset 0 0 0 1px var(--ff-institutional-border, #dfe5e8), inset 0 2px 5px rgba(20, 46, 55, .045);
 }
 
 .ff-earl-chat {
