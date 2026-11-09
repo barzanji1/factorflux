@@ -11,6 +11,7 @@ import {
 } from "../services/brokerConfirmationService";
 import { SYSTEM_EMAIL_REPLY_TO } from "../resendTransport.js";
 import { isProductionAppOrigin } from "../../shared/production-urls.js";
+import { BROKER_PUBLIC_ORIGIN } from "../services/brokerConfirmationPresentation";
 
 type Dependencies = {
   requireAuth: RequestHandler;
@@ -29,11 +30,58 @@ export const confirmationSettingsSchema = z.object({
   reminderDays: z.tuple([z.number().int().min(1).max(365), z.number().int().min(1).max(365), z.number().int().min(1).max(365)])
     .refine(days => days[0] < days[1] && days[1] < days[2], "Reminder days must be strictly increasing."),
   publicBaseUrl: z.string().url().refine(isProductionAppOrigin,
-    "Use https://factorflux.co or https://factorflux.io, without a path."),
+    "Use https://factorflux.io, without a path."),
 }).strict();
 
 function page(title: string, content: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" href="/images/tpf-logo.png"><title>${escape(title)} — Trucking Pros Financial</title><style>body{background:#c0c0c0;color:#111;font:16px Arial,sans-serif;margin:0;padding:32px 12px}main{max-width:620px;margin:auto;padding:4px;border:3px outset #ddd;background:#c0c0c0}header{padding:12px;color:white;background:#000080;font-weight:bold}.body{padding:20px}h1{font-size:24px}table{width:100%;border:2px inset #ddd;background:white;margin:16px 0}th,td{text-align:left;padding:8px;overflow-wrap:anywhere}button,a.button{font:inherit;display:inline-block;border:3px outset #ddd;background:#c0c0c0;color:#111;padding:10px 20px;cursor:pointer;text-decoration:none}textarea{box-sizing:border-box;width:100%;min-height:100px;border:2px inset #ddd;font:inherit;margin:8px 0 16px}button:active{border-style:inset}.muted{font-size:14px;color:#444}</style></head><body><main><header><img src="/images/tpf-logo-white.png" alt="Trucking Pros Financial" width="40" height="40" style="vertical-align:middle;margin-right:12px">Trucking Pros Financial — Broker Invoice Confirmation</header><div class="body"><h1>${escape(title)}</h1>${content}</div></main></body></html>`;
+  const pageClass = /^(Confirmation unavailable|Unable to record response)$/.test(title) ? " page-error" : "";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" href="/images/tpf-logo.png"><title>${escape(title)} — Trucking Pros Financial</title><style>
+    :root{color-scheme:light;--surface:#e0e0e0;--ink:#394541;--muted:#68736e;--teal:#27aab8;--teal-deep:#168f99;--shadow:7px 7px 16px #c1c5c2,-7px -7px 16px #fff;--inset:inset 5px 5px 10px #c1c5c2,inset -5px -5px 10px #fff}
+    *{box-sizing:border-box}
+    body{min-height:100vh;margin:0;padding:clamp(16px,5vw,48px) 14px;background:var(--surface);color:var(--ink);font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{width:min(100%,620px);margin:0 auto;overflow:hidden;border-radius:20px;background:var(--surface);box-shadow:var(--shadow)}
+    header{display:flex;align-items:center;gap:13px;min-height:76px;padding:16px 22px;background:var(--teal);color:#fff;font-size:15px;font-weight:700;letter-spacing:.01em}
+    header img{width:40px;height:40px;flex:0 0 40px;object-fit:contain}
+    .body{padding:clamp(22px,6vw,36px)}
+    h1{margin:0 0 22px;color:var(--ink);font-size:clamp(24px,6vw,30px);font-weight:650;letter-spacing:-.035em;line-height:1.15}
+    p{margin:14px 0}
+    .invoice-details{width:100%;margin:20px 0 24px;border:0;border-radius:15px;background:var(--surface);box-shadow:var(--shadow);border-spacing:0;overflow:hidden}
+    .invoice-details caption{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .invoice-details th,.invoice-details td{padding:12px 16px;border-bottom:1px solid rgba(160,171,165,.42);text-align:left;overflow-wrap:anywhere}
+    .invoice-details tr:last-child th,.invoice-details tr:last-child td{border-bottom:0}
+    .invoice-details th{width:39%;color:var(--muted);font-size:13px;font-weight:650}
+    .invoice-details td{color:var(--ink);font-weight:600}
+    form{margin-top:22px}
+    label{display:block;margin:0 0 7px;font-size:14px;font-weight:650}
+    textarea{display:block;width:100%;min-height:112px;margin:8px 0 18px;padding:13px 14px;border:0;border-radius:12px;background:var(--surface);box-shadow:var(--inset);color:var(--ink);font:inherit;resize:vertical}
+    button,a.button{display:inline-flex;min-height:50px;align-items:center;justify-content:center;border:0;border-radius:12px;background:var(--teal);box-shadow:4px 4px 9px #c1c5c2,-4px -4px 9px #fff;color:#fff;padding:12px 22px;font:inherit;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
+    button:hover,a.button:hover{background:var(--teal-deep)}
+    button:active,a.button:active{transform:translateY(1px);box-shadow:inset 3px 3px 7px rgba(24,93,97,.28),inset -3px -3px 7px rgba(255,255,255,.25)}
+    :focus-visible{outline:3px solid #147b84;outline-offset:3px}
+    .muted{margin-top:20px;color:var(--muted);font-size:14px}
+    .result{margin:4px 0 0;padding:24px;border-radius:16px;background:var(--surface);box-shadow:var(--shadow)}
+    .success-mark{display:grid;width:54px;height:54px;place-items:center;margin-bottom:17px;border-radius:50%;background:var(--surface);box-shadow:var(--inset);color:var(--teal-deep)}
+    .success-mark svg{width:27px;height:27px}
+    .result-copy{margin:0 0 12px;font-size:17px;font-weight:600}
+    .invoice-ref{margin:0;color:var(--muted);font-size:14px}
+    .notice{padding:16px 18px;border-radius:12px;background:var(--surface);box-shadow:var(--inset)}
+    .notice-error{border-left:4px solid #b76556;color:#66473f}
+    .page-error .body>p:first-of-type{margin:4px 0 0;padding:16px 18px;border-left:4px solid #b76556;border-radius:12px;background:var(--surface);box-shadow:var(--inset);color:#66473f}
+    @media(max-width:480px){
+      body{padding:14px 12px}
+      main{border-radius:16px}
+      header{min-height:68px;padding:13px 17px;font-size:14px}
+      header img{width:36px;height:36px;flex-basis:36px}
+      .body{padding:23px 18px}
+      .invoice-details{display:block}
+      .invoice-details tbody{display:block}
+      .invoice-details tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:8px}
+      .invoice-details th,.invoice-details td{width:auto;padding:11px 13px}
+      button,a.button{width:100%}
+      .result{padding:20px}
+    }
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+  </style></head><body><main class="page${pageClass}"><header><img src="/images/tpf-logo-white.png" alt="Trucking Pros Financial" width="40" height="40"> <span>Trucking Pros Financial <span aria-hidden="true">—</span> Broker Invoice Confirmation</span></header><div class="body"><h1>${escape(title)}</h1>${content}</div></main></body></html>`;
 }
 
 function publicHeaders(res: any) {
@@ -89,7 +137,7 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
   app.get("/api/broker-confirmation-settings", deps.requireAuth, wrap(async (_req, res) => res.json(await service.settings())));
   app.patch("/api/broker-confirmation-settings", deps.requireManagerOrAdmin, wrap(async (req, res) => {
     const value = confirmationSettingsSchema.parse(req.body);
-    await db.update(brokerConfirmationSettings).set({ ...value, publicBaseUrl: new URL(value.publicBaseUrl).origin, updatedBy: req.user.id, updatedAt: new Date() })
+    await db.update(brokerConfirmationSettings).set({ ...value, publicBaseUrl: BROKER_PUBLIC_ORIGIN, updatedBy: req.user.id, updatedAt: new Date() })
       .where(eq(brokerConfirmationSettings.id, 1));
     res.json(await service.settings());
   }));
@@ -130,7 +178,7 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
         const invoice = await service.publicInvoice(token, true);
         if (["confirmed", "disputed"].includes(invoice.status)) {
           return void res.send(page(invoice.status === "confirmed" ? "Thank you" : "Dispute recorded",
-            `<p>${invoice.status === "confirmed" ? "Receipt of this invoice has been confirmed." : "Your dispute has been recorded. Please contact Trucking Pros Financial."}</p><p>Invoice ${escape(invoice.invoiceNumber)}</p><p>Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p>`));
+            `<section class="result" aria-label="Response recorded"><div class="success-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12.5 4.5 4.5L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><p class="result-copy">${invoice.status === "confirmed" ? "Receipt of this invoice has been confirmed." : "Your dispute has been recorded. Please contact Trucking Pros Financial."}</p><p class="invoice-ref">Invoice ${escape(invoice.invoiceNumber)}</p><p class="muted">Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p></section>`));
         }
         const csrf = randomBytes(32).toString("hex");
         const cookie = `ff-broker-confirm-${invoice.invoiceId}`;
@@ -138,7 +186,7 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
         const summary = [["Invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"],
           ["Load", invoice.loadNumber || "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`], ["Carrier", invoice.carrier || "Not provided"]];
         res.send(page(mode === "confirm" ? "Confirm invoice receipt" : "Dispute invoice receipt",
-          `<table>${summary.map(([key, value]) => `<tr><th>${escape(key)}</th><td>${escape(value)}</td></tr>`).join("")}</table><p>${mode === "confirm" ? "Opening this page has not confirmed receipt. Click the button below to confirm." : "Describe the issue, then submit your dispute. Please also contact Trucking Pros Financial."}</p><form method="post" action="/api/broker-${mode}/${token}"><input type="hidden" name="csrf" value="${csrf}">${mode === "dispute" ? '<label for="reason">Reason (optional)</label><textarea id="reason" name="reason" maxlength="2000"></textarea>' : ""}<button type="submit" data-testid="broker-confirm-submit">${mode === "confirm" ? "Confirm Receipt" : "Submit Dispute"}</button></form><p class="muted">Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p>`));
+          `<table class="invoice-details"><caption>Invoice details</caption><tbody>${summary.map(([key, value]) => `<tr><th scope="row">${escape(key)}</th><td>${escape(value)}</td></tr>`).join("")}</tbody></table><p>${mode === "confirm" ? "Opening this page has not confirmed receipt. Click the button below to confirm." : "Describe the issue, then submit your dispute. Please also contact Trucking Pros Financial."}</p><form method="post" action="/api/broker-${mode}/${token}"><input type="hidden" name="csrf" value="${csrf}">${mode === "dispute" ? '<label for="reason">Reason (optional)</label><textarea id="reason" name="reason" maxlength="2000"></textarea>' : ""}<button type="submit" data-testid="broker-confirm-submit">${mode === "confirm" ? "Confirm Receipt" : "Submit Dispute"}</button></form><p class="muted">Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p>`));
       } catch (error) {
         const status = error instanceof z.ZodError ? 404 : error instanceof ConfirmationError ? error.status : 500;
         res.status(status).send(page("Confirmation unavailable", `<p>${escape(error instanceof ConfirmationError ? error.message : "This link is invalid or currently unavailable. Please contact Trucking Pros Financial.")}</p>`));
@@ -157,7 +205,7 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
         }
         const response = await service.brokerRespond(token, mode === "confirm" ? "confirmed" : "disputed", input.reason || "");
         res.send(page(mode === "confirm" ? "Thank you" : "Dispute recorded",
-          `<p>${escape(response.message)}</p><p>Invoice ${escape(invoice.invoiceNumber)}</p>${mode === "dispute" ? `<p>Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p>` : ""}`));
+          `<section class="result" aria-label="Response recorded"><div class="success-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12.5 4.5 4.5L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><p class="result-copy">${escape(response.message)}</p><p class="invoice-ref">Invoice ${escape(invoice.invoiceNumber)}</p>${mode === "dispute" ? `<p class="muted">Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p>` : ""}</section>`));
       } catch (error) {
         const status = error instanceof z.ZodError ? 400 : error instanceof ConfirmationError ? error.status : 500;
         res.status(status).send(page("Unable to record response", `<p>${escape(error instanceof ConfirmationError ? error.message : "The response could not be recorded. Please reopen the link and try again.")}</p>`));

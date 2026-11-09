@@ -6,7 +6,8 @@ import {
   brokerConfirmationEvents, brokerConfirmationSettings, eventLedger,
 } from "../../shared/schema";
 import { sendEmailTracked } from "../emailService";
-import { emailDetailsTable, emailDisplayName } from "../emailTemplate.js";
+import { emailDetailsTable, emailDisplayName, wrapEmail } from "../emailTemplate.js";
+import { BROKER_PUBLIC_ORIGIN, brokerReceiptLinks, brokerReceiptActions } from "./brokerConfirmationPresentation";
 import { brokerCollectionsService, confirmCollectionVpInTransaction, recordCollectionReceiptSend, startBrokerCollectionsScheduler } from "./brokerCollections";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -62,7 +63,8 @@ export function createBrokerConfirmationService({
   async function settings(): Promise<ConfirmationSettings> {
     const [row] = await store.select().from(brokerConfirmationSettings).where(eq(brokerConfirmationSettings.id, 1));
     if (!row) throw new ConfirmationError(503, "Broker confirmation settings have not been configured.");
-    return { maxReminders: row.maxReminders, reminderDays: row.reminderDays, publicBaseUrl: row.publicBaseUrl,
+    return { maxReminders: row.maxReminders, reminderDays: row.reminderDays,
+      publicBaseUrl: isProductionAppOrigin(row.publicBaseUrl) ? BROKER_PUBLIC_ORIGIN : row.publicBaseUrl,
       chargebackWarningDays: row.chargebackWarningDays, dumpStatementIntervalDays: row.dumpStatementIntervalDays };
   }
 
@@ -134,11 +136,9 @@ export function createBrokerConfirmationService({
         return { message: "Not sent: no valid broker email on file. Flagged for manual follow-up.", skipped: true };
       }
       if (!isProductionAppOrigin(config.publicBaseUrl)) {
-        throw new ConfirmationError(503, "Set the published URL to https://factorflux.co or https://factorflux.io in Factoring Settings. Development links cannot be emailed.");
+        throw new ConfirmationError(503, "Set the published URL to https://factorflux.io in Factoring Settings. Development links cannot be emailed.");
       }
-      const root = new URL(config.publicBaseUrl);
-      const confirmationUrl = `${root.origin}/api/broker-confirm/${invoice.brokerConfirmationToken}`;
-      const disputeUrl = `${root.origin}/api/broker-dispute/${invoice.brokerConfirmationToken}`;
+      const { confirm: confirmationUrl, dispute: disputeUrl } = brokerReceiptLinks(invoice.brokerConfirmationToken);
       const reminder = action === "reminder" ? invoice.confirmationRemindedCount + 1 : null;
       const subject = `${reminder ? `Reminder ${reminder}: ` : ""}Confirm invoice receipt — ${invoice.invoiceNumber}`;
       const details = [
@@ -147,7 +147,7 @@ export function createBrokerConfirmationService({
         ["Carrier", emailDisplayName(row.carrierName) || "Not provided"],
       ];
       const text = `Trucking Pros Financial\n${details.map(([label, value]) => `${label}: ${value}`).join("\n")}\nConfirm Receipt: ${confirmationUrl}\nDispute: ${disputeUrl}\nOpening a link does not confirm receipt. Please use the button on the page.`;
-      const html = `<p>Please confirm that you received this invoice, or report a dispute.</p>${emailDetailsTable(details as Array<[string, string]>)}<p style="margin-top:24px"><a href="${escapeConfirmationHtml(confirmationUrl)}" style="display:inline-block;padding:12px;background:#27aab8;color:white;text-decoration:none">Confirm Receipt</a> <a href="${escapeConfirmationHtml(disputeUrl)}" style="display:inline-block;padding:12px;color:#176873;text-decoration:underline">Dispute</a></p><p>Opening a link does not record confirmation. Use the confirmation button on the page.</p>`;
+      const html = wrapEmail(subject, `<p>Please confirm that you received this invoice, or report a dispute.</p>${emailDetailsTable(details as Array<[string, string]>)}${brokerReceiptActions(invoice.brokerConfirmationToken)}`);
       const [acceptedSends] = await tx.select({ count: sql<string>`count(*)` }).from(brokerConfirmationEvents)
         .where(and(eq(brokerConfirmationEvents.invoiceId, id), inArray(brokerConfirmationEvents.event, ["sent", "reminder_sent"])));
       // Failed/uncertain manual attempts must reuse a key; only committed acceptance advances it.

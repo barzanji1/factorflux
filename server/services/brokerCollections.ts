@@ -11,7 +11,8 @@ import {
 import { collectionActionSchema, collectionSettingsSchema, type CollectionQueue, type CollectionRow,
   type CollectionRunResult, type CollectionRunError } from "../../shared/broker-collections";
 import { sendResendEmail, ResendDeliveryError, type ResendEmailParams } from "../resendTransport.js";
-import { emailDetailsTable } from "../emailTemplate.js";
+import { emailDetailsTable, wrapEmail } from "../emailTemplate.js";
+import { brokerReceiptActions, brokerReceiptLinks } from "./brokerConfirmationPresentation";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = Pick<typeof db, "select" | "insert" | "update" | "transaction" | "execute">;
@@ -290,12 +291,10 @@ export function createBrokerCollectionsService({
           let receiptHtml = "";
           if (state.phase === "vp") {
             if (!confirmationConfig) throw new CollectionError(503, "Configure the published broker confirmation URL first.");
-            if (!isProductionAppOrigin(confirmationConfig.publicBaseUrl)) throw new CollectionError(503, "Set the published URL to https://factorflux.co or https://factorflux.io in Factoring Settings. Development links cannot be emailed.");
-            const url = new URL(confirmationConfig.publicBaseUrl);
-            receiptLinks = `\nConfirm receipt: ${url.origin}/api/broker-confirm/${invoice.brokerConfirmationToken}\nDispute: ${url.origin}/api/broker-dispute/${invoice.brokerConfirmationToken}\nOpening a link does not confirm receipt; use the confirmation button.`;
-            // URL origin is validated above; the token is a server-generated UUID.
-            const origin = url.origin.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
-            receiptHtml = `<p><a href="${origin}/api/broker-confirm/${invoice.brokerConfirmationToken}">Confirm Receipt</a> · <a href="${origin}/api/broker-dispute/${invoice.brokerConfirmationToken}">Dispute</a></p><p>Opening a link does not confirm receipt. Use the button on the page.</p>`;
+            if (!isProductionAppOrigin(confirmationConfig.publicBaseUrl)) throw new CollectionError(503, "Set the published URL to https://factorflux.io in Factoring Settings. Development links cannot be emailed.");
+            const links = brokerReceiptLinks(invoice.brokerConfirmationToken);
+            receiptLinks = `\nConfirm receipt: ${links.confirm}\nDispute: ${links.dispute}\nOpening a link does not confirm receipt; use the confirmation button.`;
+            receiptHtml = brokerReceiptActions(invoice.brokerConfirmationToken);
           }
           const subject = state.phase === "vp" ? `Confirm paperwork receipt — ${invoice.invoiceNumber} (follow-up ${number})` :
             `Payment status request — ${invoice.invoiceNumber} (day ${[20, 35, 40][number - 1]})`;
@@ -308,7 +307,7 @@ export function createBrokerCollectionsService({
             const key = state.phase === "vp" && number === 1 ? `broker-confirm/${invoice.brokerConfirmationToken}/initial` :
               `broker-collections/${invoice.brokerConfirmationToken}/${state.generation}/${due.step}`;
             providerMessageId = await send({ to: recipient, subject, text, idempotencyKey: key,
-              html: `<p>${message}</p>${emailDetailsTable([["Invoice", invoice.invoiceNumber], ["Load", invoice.loadNumber ?? "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`]])}${receiptHtml}<p>Please reply to this email with any questions.</p>`,
+              html: wrapEmail(subject, `<p>${message}</p>${emailDetailsTable([["Invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"], ["Load", invoice.loadNumber ?? "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`]])}${receiptHtml}<p>Please reply to this email with any questions.</p>`),
               emailLog: { entityType: "invoice", entityId: invoiceId, templateName: `broker_collections_${state.phase}`, sentByUserId: null } });
             if (!providerMessageId) throw new CollectionError(502, "Provider did not return an acceptance ID.");
             await tx.update(settingsTable).set({ nextSendAt: new Date(now().getTime() + 2000) }).where(eq(settingsTable.id, 1));

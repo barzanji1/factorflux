@@ -8,3 +8,9 @@ Never derive login, welcome-email, installer, or other distributed links from th
 **Why:** An agent account created from Preview received a credentials email linking to the sleeping development workspace and saw a “Run this app” placeholder instead of the login page.
 
 **How to apply:** Verify the current published domain through deployment metadata before changing the canonical link policy. Keep the carrier portal's established domain unchanged. Retain required server-side platform connectors and development tooling; those are not user-facing branding. Obsolete prebuilt distributions must not reintroduce workspace links.
+
+Broker receipt confirmation and dispute email links must use `https://factorflux.io`, even when deployment metadata lists `.co` as the primary domain. This is a broker-facing policy, not a change to all internal application links.
+
+**Why:** The user explicitly requested `.io` for these customer-facing pages; it is a verified additional deployment domain.
+
+**How to apply:** Preserve existing token URLs and explicit confirmation submissions. Generate new initial/reminder/collections receipt links on `.io`; do not invent carrier invoice references from internal IDs when a stored reference is short or missing.
