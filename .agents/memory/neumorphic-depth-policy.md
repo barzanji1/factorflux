@@ -17,9 +17,9 @@ The login page is an exception: the user replaced its circular neumorphic design
 
 The login must remain transparent frosted glass, not a solid navy panel. Preserve visible background through the card, bright white branding, light translucent inputs, and a glossy teal button.
 
-**Why:** After trying the higher-opacity treatment, the user explicitly rejected it as "way too dark and opaque" and reaffirmed the transparent-glass reference. This supersedes the intervening request for a more solid surface.
+**Why:** After trying the higher-opacity treatment, the user explicitly rejected it as "way too dark and opaque" and repeated that seeing the lobby through the card is the defining feature. This supersedes the intervening request for a more solid surface.
 
-**How to apply:** Improve readability with backdrop blur, typography, and edge lighting rather than increasing the fill opacity beyond the user's latest specified tint. Preserve the lobby image, compact widths, and pointer-transparent reflections. Keep field labels accessible but visually hidden; use placeholders in the visible design.
+**How to apply:** Trust the requested blur and do not increase the fill opacity to improve readability. Check the actual browser styles for conflicting fills and decorative overlays. Preserve the lobby image, compact widths, and pointer-transparent reflections. Keep field labels accessible but visually hidden; use placeholders in the visible design.
 
 After approving the glass material, the user explicitly chose reference-like near-square proportions and a floor-grounded placement, with a narrow contact shadow and cyan/amber reflected light beneath the panel.
 
