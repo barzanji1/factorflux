@@ -39,19 +39,19 @@
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid rgba(235, 247, 249, 0.34) !important;
+  border: 1px solid rgba(223, 244, 249, 0.48) !important;
   border-radius: 28px !important;
-  background: linear-gradient(138deg, rgba(142, 174, 190, 0.36) 0%, rgba(95, 135, 155, 0.28) 48%, rgba(57, 84, 101, 0.36) 100%) !important;
+  background: linear-gradient(138deg, rgba(8, 29, 38, 0.43) 0%, rgba(6, 25, 33, 0.34) 49%, rgba(12, 29, 36, 0.41) 100%) !important;
   padding: 30px 46px 32px !important;
   box-shadow:
-    0 24px 64px rgba(12, 29, 40, 0.25),
-    0 7px 22px rgba(21, 43, 56, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1px 0 rgba(213, 233, 241, 0.12),
-    inset 1px 0 4px rgba(222, 241, 249, 0.16),
-    inset -1px -1px 4px rgba(205, 226, 237, 0.1) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(140%) brightness(1.12);
-  backdrop-filter: blur(18px) saturate(140%) brightness(1.12);
+    0 24px 64px rgba(4, 14, 20, 0.34),
+    0 7px 22px rgba(5, 18, 24, 0.18),
+    inset 0 1px 0 rgba(245, 253, 255, 0.24),
+    inset 0 -1px 0 rgba(194, 226, 233, 0.13),
+    inset 1px 0 5px rgba(107, 207, 224, 0.3),
+    inset -1px -1px 5px rgba(255, 184, 119, 0.3) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(132%);
+  backdrop-filter: blur(18px) saturate(132%);
   color: var(--login-ink);
   transform: rotateY(0deg);
   transform-origin: center center;
@@ -64,9 +64,9 @@
   border-radius: inherit;
   padding: 1px;
   background:
-    radial-gradient(ellipse at 0% 18%, rgba(255, 255, 255, 0.78), transparent 34%),
-    radial-gradient(ellipse at 100% 100%, rgba(255, 255, 255, 0.72), transparent 36%),
-    linear-gradient(120deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.04) 28%, transparent 54%, rgba(238, 248, 252, 0.24));
+    radial-gradient(ellipse at 0% 10%, rgba(202, 245, 255, 0.9), rgba(119, 212, 232, 0.28) 34%, transparent 72%),
+    radial-gradient(ellipse at 100% 100%, rgba(255, 207, 153, 0.86), rgba(246, 164, 101, 0.28) 34%, transparent 73%),
+    linear-gradient(120deg, rgba(221, 249, 255, 0.66), rgba(221, 249, 255, 0.08) 22%, transparent 54%, rgba(255, 215, 170, 0.16));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -82,8 +82,8 @@
   inset: 1px;
   border-radius: inherit;
   background:
-    radial-gradient(ellipse 58% 44% at 12% 8%, rgba(232, 247, 253, 0.24), transparent 72%),
-    radial-gradient(ellipse 56% 44% at 50% 68%, rgba(25, 48, 63, 0.16), transparent 76%);
+    radial-gradient(ellipse 30% 42% at 1% 7%, rgba(166, 228, 245, 0.4), transparent 78%),
+    radial-gradient(ellipse 34% 36% at 100% 100%, rgba(255, 175, 105, 0.48), transparent 78%);
   content: "";
   pointer-events: none;
 }
@@ -205,18 +205,18 @@
   display: block;
   width: 100%;
   height: var(--login-control-height);
-  border: 1px solid rgba(228, 243, 250, 0.42) !important;
+  border: 1px solid rgba(220, 244, 250, 0.52) !important;
   border-radius: 13px !important;
-  background: linear-gradient(180deg, rgba(220, 239, 247, 0.2), rgba(116, 153, 171, 0.13)) !important;
+  background: linear-gradient(180deg, rgba(16, 43, 54, 0.4), rgba(8, 29, 39, 0.35)) !important;
   padding: 0 15px 0 44px !important;
   color: #f4f5f2 !important;
   font-family: inherit;
   font-size: 14px;
   outline: none;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    inset 0 -4px 10px rgba(28, 52, 68, 0.1),
-    0 3px 10px rgba(20, 42, 56, 0.08) !important;
+    inset 0 1px 0 rgba(239, 251, 255, 0.24),
+    inset 0 -2px 5px rgba(147, 213, 225, 0.1),
+    0 3px 10px rgba(2, 14, 20, 0.16) !important;
   -webkit-backdrop-filter: blur(10px) saturate(125%);
   backdrop-filter: blur(10px) saturate(125%);
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
@@ -229,11 +229,11 @@
 
 .ff-login-page .ff-login-input:focus {
   border-color: rgba(232, 248, 255, 0.82) !important;
-  background: linear-gradient(180deg, rgba(230, 246, 252, 0.25), rgba(132, 171, 188, 0.2)) !important;
+  background: linear-gradient(180deg, rgba(20, 53, 66, 0.76), rgba(9, 34, 45, 0.68)) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -4px 10px rgba(28, 52, 68, 0.12),
-    0 0 0 3px rgba(192, 225, 236, 0.2) !important;
+    inset 0 1px 0 rgba(239, 251, 255, 0.3),
+    inset 0 -2px 5px rgba(147, 213, 225, 0.13),
+    0 0 0 3px rgba(143, 218, 233, 0.2) !important;
 }
 
 .ff-login-page .ff-login-input:disabled {
@@ -288,10 +288,10 @@
   align-items: center;
   justify-content: center;
   margin-top: 4px;
-  border: 1px solid rgba(184, 245, 244, 0.58) !important;
+  border: 1px solid rgba(145, 244, 245, 0.78) !important;
   border-radius: 13px !important;
   background:
-    linear-gradient(180deg, rgba(76, 164, 164, 0.9) 0%, rgba(50, 137, 143, 0.94) 52%, rgba(43, 108, 119, 0.96) 100%) !important;
+    linear-gradient(180deg, rgba(20, 190, 191, 0.98) 0%, rgba(0, 151, 163, 0.98) 52%, rgba(0, 112, 129, 1) 100%) !important;
   padding: 0 18px !important;
   color: #ffffff !important;
   font-family: inherit;
@@ -300,16 +300,16 @@
   letter-spacing: 0.13em;
   cursor: pointer;
   box-shadow:
-    0 6px 15px rgba(1, 17, 23, 0.2),
-    0 2px 4px rgba(1, 17, 23, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    inset 0 -1px 0 rgba(0, 61, 70, 0.32) !important;
+    0 6px 15px rgba(1, 17, 23, 0.28),
+    0 2px 4px rgba(1, 17, 23, 0.18),
+    inset 0 1px 0 rgba(238, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(0, 52, 64, 0.34) !important;
   transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .ff-login-page .ff-login-submit:hover:not(:disabled) {
   background:
-    linear-gradient(180deg, rgba(88, 184, 181, 0.96) 0%, rgba(60, 151, 153, 0.98) 48%, rgba(48, 119, 129, 1) 100%) !important;
+    linear-gradient(180deg, rgba(29, 207, 202, 1) 0%, rgba(5, 166, 173, 1) 48%, rgba(0, 122, 141, 1) 100%) !important;
   box-shadow:
     0 10px 22px rgba(1, 17, 23, 0.29),
     inset 0 1px 0 rgba(255, 255, 255, 0.43),
