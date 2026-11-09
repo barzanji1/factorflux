@@ -232,3 +232,17 @@ mtime_ms = 1793902345596
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/200bc676-e428-4181-bde2-7d5e5046bc1c/66e7572a-0795-4dc5-a1de-7edaddc89163"
 storage_version_token = "1793902346451278"
 content_type = "text/html"
+
+[[outputs]]
+id = "b14cx0kngvNN48mtSflMF"
+uri = "file://generated-artifacts/login-glass-comparison.jpg"
+type = "image"
+title = "Login glass comparison"
+description = "Reference on the left; updated login on the right. Both captured or scaled from 1536 × 1024. The existing lobby background is intentionally preserved."
+logical_id = "68d32ca1-444c-471d-8561-250075ad0f7c"
+content_hash = "sha256:5c4d91d793a97701aa46813723c06aeec2247bc607b05c73c7ad2236a52d2d11"
+size = 137548
+mtime_ms = 1794239635918
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/68d32ca1-444c-471d-8561-250075ad0f7c/fd13d629-c7fa-484a-ba2e-4a4bc57d2e14"
+storage_version_token = "1794239643046981"
+content_type = "image/jpeg"
