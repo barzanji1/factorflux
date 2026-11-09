@@ -240,10 +240,10 @@
 .ff-login-page .ff-login-product {
   margin: 0 !important;
   color: #ffffff;
-  font-size: clamp(28.2px, 2.809vw, 43.2px);
+  font-size: clamp(27px, 2.61vw, 40px);
   font-weight: 700;
   letter-spacing: 0.005em;
-  line-height: 1;
+  line-height: clamp(28.2px, 2.809vw, 43.2px);
 }
 
 .ff-login-page .ff-login-registered {
@@ -288,10 +288,10 @@
   margin: clamp(11.6px, 0.813vw, 12.5px) 0 0 !important;
   color: #ffffff;
   font-family: inherit;
-  font-size: clamp(26.6px, 2.702vw, 41.5px);
-  font-weight: 700;
+  font-size: clamp(22px, 2.08vw, 32px);
+  font-weight: 600;
   letter-spacing: -0.01em;
-  line-height: 1.1;
+  line-height: clamp(29.26px, 2.9722vw, 45.65px);
   text-wrap: balance;
 }
 
@@ -609,7 +609,8 @@
   }
 
   .ff-login-page .ff-login-product {
-    font-size: 31px;
+    font-size: 29px;
+    line-height: 31px;
     letter-spacing: -0.035em;
   }
 
@@ -636,7 +637,8 @@
 
   .ff-login-page .ff-login-brand .ff-login-company {
     margin-top: 16px !important;
-    font-size: clamp(24px, 4.5vw, 32px);
+    font-size: 21px;
+    line-height: clamp(26.4px, 4.95vw, 35.2px);
     letter-spacing: -0.035em;
   }
 
