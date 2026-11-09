@@ -1,0 +1,446 @@
+/* FactorFlux Agent Dashboard — scoped institutional-finance visual reskin.
+   Visual properties only: geometry, motion, and interactions remain in dashboard.css. */
+.ff-financial-dashboard-shell {
+  --ff-financial-navy: #102a38;
+  --ff-financial-workspace: #f5f7f8;
+  --ff-financial-porcelain: #ffffff;
+  --ff-financial-teal: #087f87;
+  --ff-financial-charcoal: #263d40;
+  --ff-financial-slate: #72878a;
+  --ff-financial-border: #dfe5e8;
+  background: var(--ff-financial-workspace) !important;
+  color: var(--ff-financial-charcoal) !important;
+}
+
+.ff-financial-dashboard-shell .ff-neu-main-column,
+.ff-financial-dashboard-shell .ff-neu-page-shell {
+  background: var(--ff-financial-workspace) !important;
+  color: var(--ff-financial-charcoal) !important;
+}
+
+/* Sidebar: rich navy field with a restrained teal active cue. */
+.ff-financial-dashboard-shell .ff-neu-sidebar {
+  background: var(--ff-financial-navy) !important;
+  color: #d9e3e5 !important;
+  box-shadow: 3px 0 12px rgba(16, 42, 56, .12);
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-brand,
+.ff-financial-dashboard-shell .ff-neu-sidebar-user-wrap,
+.ff-financial-dashboard-shell .ff-neu-sidebar-footer {
+  border-color: rgba(223, 229, 232, .15) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-user {
+  background: rgba(255, 255, 255, .07) !important;
+  box-shadow: inset 0 0 0 1px rgba(223, 229, 232, .11) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-user p,
+.ff-financial-dashboard-shell .ff-neu-sidebar-footer span,
+.ff-financial-dashboard-shell .ff-neu-sidebar-footer > span,
+.ff-financial-dashboard-shell .ff-neu-pin-button,
+.ff-financial-dashboard-shell .ff-neu-sidebar-group-toggle {
+  color: #b5c5c9 !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-group-toggle:hover,
+.ff-financial-dashboard-shell .ff-neu-sidebar-group-toggle:focus-visible,
+.ff-financial-dashboard-shell .ff-neu-pin-button:hover,
+.ff-financial-dashboard-shell .ff-neu-pin-button[aria-pressed="true"] {
+  color: #7dd0cc !important;
+}
+.ff-financial-dashboard-shell .ff-neu-group-marker {
+  background: rgba(255, 255, 255, .09) !important;
+  color: #c8d5d8 !important;
+  box-shadow: inset 0 0 0 1px rgba(223, 229, 232, .14) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-button {
+  color: #d0dcdf !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-button svg {
+  color: #9db4ba;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-button:not([aria-current="page"]):hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, .08) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-button[aria-current="page"] {
+  background: rgba(8, 127, 135, .2) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 0 0 1px rgba(125, 208, 204, .22) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-button[aria-current="page"]::before {
+  background: #38a9a7 !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-badge {
+  background: #b8795e !important;
+  color: #ffffff !important;
+}
+.ff-financial-dashboard-shell .ff-neu-sidebar-initials {
+  background: var(--ff-financial-teal) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .18) !important;
+}
+
+/* Mobile sidebar is rendered in a Radix Sheet portal, outside the shell tree. */
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar {
+  background: var(--ff-financial-navy) !important;
+  color: #d9e3e5 !important;
+  box-shadow: 3px 0 12px rgba(16, 42, 56, .12);
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-brand [aria-label="FactorFlux dashboard"] .font-bold {
+  color: #ffffff !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-brand p {
+  color: #9db4ba !important;
+}
+body:has(.ff-financial-dashboard-shell) :is(.ff-neu-sidebar-brand, .ff-neu-sidebar-user-wrap, .ff-neu-sidebar-footer) {
+  border-color: rgba(223, 229, 232, .15) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-user {
+  background: rgba(255, 255, 255, .07) !important;
+  box-shadow: inset 0 0 0 1px rgba(223, 229, 232, .11) !important;
+}
+body:has(.ff-financial-dashboard-shell) :is(.ff-neu-sidebar-user p, .ff-neu-sidebar-footer span, .ff-neu-sidebar-footer > span, .ff-neu-pin-button, .ff-neu-sidebar-group-toggle) {
+  color: #b5c5c9 !important;
+}
+body:has(.ff-financial-dashboard-shell) :is(.ff-neu-sidebar-group-toggle:hover, .ff-neu-sidebar-group-toggle:focus-visible, .ff-neu-pin-button:hover, .ff-neu-pin-button[aria-pressed="true"]) {
+  color: #7dd0cc !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-group-marker {
+  background: rgba(255, 255, 255, .09) !important;
+  color: #c8d5d8 !important;
+  box-shadow: inset 0 0 0 1px rgba(223, 229, 232, .14) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-button {
+  color: #d0dcdf !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-button svg {
+  color: #9db4ba;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-button:not([aria-current="page"]):hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, .08) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-button[aria-current="page"] {
+  background: rgba(8, 127, 135, .2) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 0 0 1px rgba(125, 208, 204, .22) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-button[aria-current="page"]::before {
+  background: #38a9a7 !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-badge {
+  background: #b8795e !important;
+  color: #ffffff !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-sidebar-initials {
+  background: var(--ff-financial-teal) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .18) !important;
+}
+
+/* Toolbar, search, controls. */
+.ff-financial-dashboard-shell .ff-neu-top-nav {
+  background: var(--ff-financial-workspace) !important;
+  color: var(--ff-financial-charcoal) !important;
+  box-shadow: 0 1px 0 var(--ff-financial-border);
+}
+.ff-financial-dashboard-shell .ff-neu-top-nav :is(h1, [class*="text-[#394541]"]) {
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-nav :is([class*="text-[#7c8983]"], [class*="text-[#7d8883]"], [class*="text-[#8b9691]"]) {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-search {
+  background: var(--ff-financial-porcelain) !important;
+  color: var(--ff-financial-charcoal) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border), 0 2px 5px rgba(22, 48, 58, .035) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-search::placeholder {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-nav :is(.ff-neu-new-button, .ff-neu-dashboard-refresh, button.rounded-xl) {
+  background: var(--ff-financial-porcelain) !important;
+  color: var(--ff-financial-charcoal) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border), 0 2px 5px rgba(22, 48, 58, .06) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-nav .ff-neu-new-button {
+  color: var(--ff-financial-teal) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-nav :is(.ff-neu-new-button, .ff-neu-dashboard-refresh, button.rounded-xl):hover {
+  color: var(--ff-financial-teal) !important;
+  background: #f0f7f7 !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-nav .ff-neu-notification-count {
+  background: var(--ff-financial-teal) !important;
+  color: #ffffff !important;
+}
+.ff-financial-dashboard-shell .ff-neu-top-nav .ff-neu-profile-avatar {
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border), 0 1px 3px rgba(16, 42, 56, .1) !important;
+}
+
+/* Dashboard headings and data surfaces. */
+.ff-financial-dashboard-shell .ff-neu-dashboard {
+  color: var(--ff-financial-charcoal) !important;
+  --neu-convex: 0 2px 8px rgba(20, 46, 55, .07), 0 1px 2px rgba(20, 46, 55, .04);
+  --neu-concave: 0 2px 8px rgba(20, 46, 55, .07), 0 1px 2px rgba(20, 46, 55, .04);
+}
+.ff-financial-dashboard-shell :is(.ff-neu-eyebrow, .ff-neu-chart-caption, .ff-neu-small-count, .ff-neu-dashboard-note, .ff-action-hint) {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-page-title, .ff-neu-dashboard-summary, .ff-neu-section-title, .ff-neu-card-kicker, .ff-neu-bottom-count) {
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-kpi-card, .ff-neu-chart-card, .ff-neu-bottom-card, .ff-neu-work-section, .ff-neu-queue-card) {
+  background: var(--ff-financial-porcelain) !important;
+  box-shadow: 0 3px 10px rgba(20, 46, 55, .065), 0 1px 2px rgba(20, 46, 55, .045), inset 0 0 0 1px var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-section-heading {
+  border-bottom-color: var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-section-number, .ff-neu-dashboard-note svg, .ff-neu-chart-mark, .ff-neu-bottom-icon, .ff-neu-kpi-card > div:first-child > span) {
+  color: var(--ff-financial-teal) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-chart-mark, .ff-neu-bottom-icon, .ff-neu-carousel-arrow, .ff-neu-kpi-arrow) {
+  background: #f3f8f8 !important;
+  box-shadow: inset 0 0 0 1px #dce9e9, 0 1px 3px rgba(20, 46, 55, .05) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-kpi-card > div:first-child > p {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-kpi-card > div:last-child > p:first-child {
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-kpi-card > div:last-child > p:last-child {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-live-dot {
+  background: #2b9c8f !important;
+  box-shadow: 0 0 0 4px rgba(43, 156, 143, .1) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-carousel-arrow, .ff-neu-kpi-arrow) {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-carousel-arrow, .ff-neu-kpi-arrow):hover {
+  color: var(--ff-financial-teal) !important;
+}
+
+/* Floating action cards retain all existing float, tilt, and flip behavior. */
+.ff-financial-dashboard-shell .ff-action-face {
+  background: var(--ff-financial-porcelain) !important;
+  box-shadow: 0 7px 18px rgba(20, 46, 55, .1), 0 2px 5px rgba(20, 46, 55, .055), inset 0 0 0 1px var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell .ff-action-front-button {
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell .ff-action-front-button:hover,
+.ff-financial-dashboard-shell .ff-action-card:hover .ff-action-face {
+  box-shadow: 0 9px 22px rgba(20, 46, 55, .13), 0 2px 5px rgba(20, 46, 55, .06), inset 0 0 0 1px #b6d5d5 !important;
+}
+.ff-financial-dashboard-shell :is(.ff-action-icon, .ff-action-close, .ff-action-go, .ff-action-count, .ff-earl-mini button) {
+  background: #f3f8f8 !important;
+  box-shadow: inset 0 0 0 1px #dce9e9, 0 1px 3px rgba(20, 46, 55, .05) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-action-icon, .ff-action-count.has-count, .ff-action-turn svg, .ff-action-go, .ff-earl-mini button) {
+  color: var(--ff-financial-teal) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-action-title, .ff-action-back-stat strong) {
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-action-label, .ff-action-turn, .ff-action-back-stat small, .ff-action-detail-label, .ff-action-muted, .ff-action-back-stat span) {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-action-invoice {
+  border-bottom-color: var(--ff-financial-border) !important;
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell .ff-earl-mini input {
+  background: #f8fafb !important;
+  color: var(--ff-financial-charcoal) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell .ff-earl-mini input::placeholder {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-action-badge {
+  color: var(--ff-financial-teal) !important;
+  background: #eaf4f4 !important;
+}
+
+/* Queue tables and activity timeline. */
+.ff-financial-dashboard-shell .ff-neu-work-section .ff-neu-table {
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-work-section .ff-neu-table thead {
+  background: #f4f7f8 !important;
+}
+.ff-financial-dashboard-shell .ff-neu-work-section .ff-neu-table :is(th, td) {
+  border-color: var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-work-section .ff-neu-table th {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-work-section .ff-neu-table tbody tr {
+  border-bottom-color: var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-work-section .ff-neu-table tbody tr:hover {
+  background: #f7fafa !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-text-link, .ff-neu-link-button) {
+  color: var(--ff-financial-teal) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-alert-count {
+  background: #f7f9fa !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell .ff-activity-summary-pill,
+.ff-financial-dashboard-shell .ff-activity-event-card {
+  background: var(--ff-financial-porcelain) !important;
+  box-shadow: 0 2px 7px rgba(20, 46, 55, .06), inset 0 0 0 1px var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-activity-summary-pill strong, .ff-activity-agent, .ff-activity-action-copy strong, .ff-activity-toggle) {
+  color: var(--ff-financial-charcoal) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-activity-summary-pill > span, .ff-activity-action-copy, .ff-activity-time, .ff-activity-detail-heading, .ff-activity-details li time) {
+  color: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-activity-open, .ff-activity-more-button, .ff-activity-load-error button, .ff-activity-stale button) {
+  color: var(--ff-financial-teal) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-activity-action, .ff-activity-open, .ff-activity-details) {
+  border-color: var(--ff-financial-border) !important;
+}
+.ff-financial-dashboard-shell .ff-activity-avatar {
+  background: #f3f8f8 !important;
+  box-shadow: inset 0 0 0 1px #dce9e9 !important;
+  color: var(--ff-financial-teal) !important;
+}
+.ff-financial-dashboard-shell .ff-activity-connector {
+  border-color: var(--ff-financial-workspace) !important;
+  box-shadow: 0 0 0 2px rgba(8, 127, 135, .11) !important;
+}
+.ff-financial-dashboard-shell .ff-activity-timeline::before {
+  background: linear-gradient(to bottom, #72bcb9 0%, #b6d6d4 64%, rgba(182, 214, 212, .16) 100%) !important;
+}
+.ff-financial-dashboard-shell .ff-activity-stale {
+  background: rgba(184, 121, 94, .08) !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-chart-empty, .ff-neu-empty-state, .ff-activity-empty p, .ff-activity-empty strong) {
+  color: var(--ff-financial-slate) !important;
+}
+
+/* Loading and recovery surfaces keep their current size and behavior. */
+.ff-financial-dashboard-shell :is(.ff-neu-skeleton-card, .ff-neu-metric-skeleton, .ff-neu-chart-skeleton span, .ff-activity-skeleton-pills span, .ff-activity-skeleton-row) {
+  background-color: #eef2f3 !important;
+  box-shadow: inset 0 0 0 1px #e2e8ea !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-metric-skeleton span, .ff-activity-skeleton-row i, .ff-activity-skeleton-row span) {
+  background: #e3eaec !important;
+}
+.ff-financial-dashboard-shell :is(.ff-neu-financial-error, .ff-neu-section-error, .ff-action-error, .ff-activity-error) {
+  background: var(--ff-financial-porcelain) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border), 0 2px 7px rgba(20, 46, 55, .05) !important;
+}
+.ff-financial-dashboard-shell :focus-visible {
+  outline-color: var(--ff-financial-teal);
+}
+
+/* Clock is portaled outside the dashboard tree; preserve all clock status hues. */
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-trigger {
+  background: var(--ff-financial-porcelain) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border), 0 2px 5px rgba(22, 48, 58, .06) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-popover .ff-time-clock-card {
+  background: var(--ff-financial-porcelain) !important;
+  box-shadow: 0 12px 30px rgba(16, 42, 56, .14), inset 0 0 0 1px var(--ff-financial-border) !important;
+  color: var(--ff-financial-charcoal) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-card .ff-time-clock-eyebrow {
+  color: var(--ff-financial-slate) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-card .ff-time-clock-summary {
+  background: #f7f9fa !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-card .ff-time-clock-total {
+  border-top-color: var(--ff-financial-border) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-card .ff-time-clock-entry {
+  background: #f5f8f9 !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-card .ff-time-clock-empty {
+  color: var(--ff-financial-slate) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-time-clock-card :is(.ff-time-clock-skeleton, .ff-time-clock-entry-skeleton) {
+  background: #e3eaec !important;
+}
+
+/* Radix portals live under body; activate this palette only while dashboard is mounted. */
+body:has(.ff-financial-dashboard-shell) {
+  --ff-financial-navy: #102a38;
+  --ff-financial-workspace: #f5f7f8;
+  --ff-financial-porcelain: #ffffff;
+  --ff-financial-teal: #087f87;
+  --ff-financial-charcoal: #263d40;
+  --ff-financial-slate: #72878a;
+  --ff-financial-border: #dfe5e8;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu {
+  background: var(--ff-financial-porcelain) !important;
+  color: var(--ff-financial-charcoal) !important;
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border), 0 12px 30px rgba(16, 42, 56, .14), 0 2px 6px rgba(16, 42, 56, .06) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu :is([role="menuitem"], button) {
+  color: var(--ff-financial-charcoal);
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu :is([role="menuitem"]:hover, [role="menuitem"]:focus, button:hover) {
+  background: #f0f7f7 !important;
+  color: var(--ff-financial-teal) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu :is(.text-slate-900, .text-white) {
+  color: var(--ff-financial-charcoal) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu :is(.bg-slate-900, .bg-white, .bg-slate-100, .bg-blue-50\/50) {
+  background: #eef5f5 !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu :is(.border-slate-100, .dark\:border-slate-800) {
+  border-color: var(--ff-financial-border) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu [class*="dark:text-"] {
+  color: var(--ff-financial-slate) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu [class*="dark:bg-"] {
+  background: var(--ff-financial-porcelain) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu [class*="text-slate-500"],
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu [class*="text-slate-400"] {
+  color: var(--ff-financial-slate) !important;
+}
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu button[class*="bg-blue-50"],
+body:has(.ff-financial-dashboard-shell) .ff-neu-menu button[class*="bg-amber-50"] {
+  background: #f4f8f8 !important;
+}
+body:has(.ff-financial-dashboard-shell) [data-radix-popper-content-wrapper] .ff-neu-menu {
+  box-shadow: inset 0 0 0 1px var(--ff-financial-border), 0 12px 30px rgba(16, 42, 56, .14), 0 2px 6px rgba(16, 42, 56, .06) !important;
+}
+body:has(.ff-financial-dashboard-shell) [data-radix-dialog-overlay] {
+  background: rgba(16, 42, 56, .38) !important;
+}
+body:has(.ff-financial-dashboard-shell) [data-radix-dialog-content] {
+  background: var(--ff-financial-porcelain) !important;
+  color: var(--ff-financial-charcoal) !important;
+  box-shadow: 0 18px 44px rgba(16, 42, 56, .2) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-dashboard a[class*="text-[#168f99]"] {
+  color: var(--ff-financial-teal) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-chart-card .recharts-cartesian-axis-tick-value {
+  fill: var(--ff-financial-slate) !important;
+}
+.ff-financial-dashboard-shell .ff-neu-chart-card .recharts-cartesian-grid line {
+  stroke: #dfe5e8 !important;
+}
+.ff-financial-dashboard-shell .ff-neu-chart-card .recharts-default-tooltip {
+  background: var(--ff-financial-porcelain) !important;
+  color: var(--ff-financial-charcoal) !important;
+  box-shadow: 0 6px 18px rgba(16, 42, 56, .13), inset 0 0 0 1px var(--ff-financial-border) !important;
+}

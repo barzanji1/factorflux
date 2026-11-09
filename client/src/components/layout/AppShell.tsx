@@ -13,11 +13,12 @@ interface AppShellProps {
   group?: string;
   neu?: boolean;
   actions?: ReactNode;
+  className?: string;
 }
 
-export function AppShell({ children, title, subtitle, group, neu = false, actions }: AppShellProps) {
+export function AppShell({ children, title, subtitle, group, neu = false, actions, className }: AppShellProps) {
   return (
-    <div className={`${neu ? "ff-neu-app-shell" : "ff-app-shell"} flex min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]`}>
+    <div className={`${neu ? "ff-neu-app-shell" : "ff-app-shell"} ${className ?? ""} flex min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]`}>
       <Sidebar />
 
       <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${neu ? "ff-neu-main-column" : ""}`}>

@@ -274,3 +274,17 @@ mtime_ms = 1794240478006
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/a03fd2b4-13b7-4be6-b0f4-32b4cb0bb3ee/651bbf96-cb4b-43ff-8a4a-7c10c8b68778"
 storage_version_token = "1794240494526196"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "1AwlFaz-GyaHNUv6LyXiP"
+uri = "file://generated-artifacts/dashboard-comparison.jpg"
+type = "image"
+title = "Agent Dashboard — Before and After"
+description = "Signed-in screenshots at the same 1536 × 1024 viewport. Institutional palette with unchanged dashboard dimensions and layout."
+logical_id = "c5a1490e-daa9-4e50-9b85-9e7982b0a94f"
+content_hash = "sha256:fbcb2aca2197d04cd619ddd7d604f6876bb2891204602e955ed510241b7cd832"
+size = 224261
+mtime_ms = 1794243434794
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/c5a1490e-daa9-4e50-9b85-9e7982b0a94f/b5e8eb73-79c8-4c37-a712-8d1fedf82581"
+storage_version_token = "1794243445963472"
+content_type = "image/jpeg"
