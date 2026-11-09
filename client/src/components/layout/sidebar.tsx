@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { getSidebarState, subscribeSidebarState, setSidebarHovered, toggleSidebarSection, requestSidebarFocus, consumeSidebarFocus } from "./sidebar-state";
 import { useQuery } from "@tanstack/react-query";
 import { useImmediateNavigation as useLocation } from "@/hooks/useImmediateNavigation";
 import { cn } from "@/lib/utils";
@@ -220,9 +221,10 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const previousChannelUnreadRef = useRef<Record<string, number> | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const [pinned, setPinned] = useState(readSidebarPinned);
-  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const sidebarState = useSyncExternalStore(subscribeSidebarState, getSidebarState, getSidebarState);
+  const hoverExpanded = sidebarState.hovered;
   const [focusExpanded, setFocusExpanded] = useState(false);
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const openSections = sidebarState.sections[mobile ? "mobile" : "desktop"];
   const expanded = mobile || pinned || hoverExpanded || focusExpanded;
   const scrollPositionKey = mobile ? "mobile" : "desktop";
 
@@ -272,6 +274,12 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     if (nav) nav.scrollTop = sidebarScrollPositions[scrollPositionKey];
   }, [filteredSections, scrollPositionKey]);
 
+  useLayoutEffect(() => {
+    if (!mobile && navRef.current?.getClientRects().length && consumeSidebarFocus(location)) {
+      navRef.current.querySelector<HTMLButtonElement>('[aria-current="page"]')?.focus({ preventScroll: true });
+    }
+  }, [location, mobile]);
+
   useEffect(() => {
     if (!notificationChannels) return;
     const nextUnread = Object.fromEntries(notificationChannels.map((channel) => [String(channel.id), channel.unreadCount]));
@@ -303,6 +311,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const navigateTo = (href: string) => {
     if (navRef.current) {
       sidebarScrollPositions[scrollPositionKey] = navRef.current.scrollTop;
+      if (!mobile && navRef.current.contains(document.activeElement)) requestSidebarFocus(href.split("?")[0]);
     }
     setLocation(href);
     onNavigate?.();
@@ -310,13 +319,13 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
 
   return (
     <aside
-      onMouseEnter={() => !mobile && setHoverExpanded(true)}
-      onMouseLeave={() => !mobile && setHoverExpanded(false)}
+      onMouseEnter={() => !mobile && setSidebarHovered(true)}
+      onMouseLeave={() => !mobile && setSidebarHovered(false)}
       onFocusCapture={() => !mobile && setFocusExpanded(true)}
       onBlurCapture={event => {
         if (!mobile && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setFocusExpanded(false);
-          setHoverExpanded(false);
+          setSidebarHovered(event.currentTarget.matches(":hover"));
         }
       }}
       className={cn(
@@ -376,7 +385,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
               <button
                 type="button"
                 className="ff-neu-sidebar-group-toggle"
-                onClick={() => setOpenSections(current => ({ ...current, [section.title]: !(current[section.title] ?? true) }))}
+                onClick={() => toggleSidebarSection(scrollPositionKey, section.title)}
                 aria-expanded={openSections[section.title] ?? true}
                 aria-label={`${section.title} section`}
                 title={expanded ? undefined : `${section.title} section`}

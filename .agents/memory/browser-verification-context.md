@@ -32,3 +32,9 @@ Scope browser tests to the active dialog and the intended upload control.
 **Why:** Nested dialogs leave background controls mounted. A generic checkbox selector can target the hold checkbox behind a preflight panel, and a generic PDF input selector can stage OCR intake files instead of required paperwork, clearing the prefill as designed.
 
 **How to apply:** Identify the active dialog via its unique heading or close control, assert the pointer hit target, and select upload inputs by their labeled drop zone rather than MIME type alone.
+
+Navigation checks must exercise a real pointer over the expanded sidebar and sample geometry across the route change, not only call a button's `.click()` and assert the destination.
+
+**Why:** Programmatic navigation tests passed while missing a visible expanded-to-collapsed rail jump. They never exercised hover state during page remounts.
+
+**How to apply:** Move the pointer into the rail, wait for expansion, click with pointer events, and check width and surface colors in successive animation frames. Also check keyboard activation, focus continuity, and normal collapse.
