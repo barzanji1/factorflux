@@ -57,9 +57,9 @@
   height: 68px;
   border-radius: 50%;
   background:
-    radial-gradient(ellipse 28% 76% at 9% 16%, rgba(96, 199, 222, 0.56), transparent 75%),
+    radial-gradient(ellipse 28% 76% at 9% 16%, rgba(96, 199, 222, 0.44), transparent 75%),
     radial-gradient(ellipse 28% 76% at 91% 16%, rgba(245, 166, 103, 0.6), transparent 75%),
-    radial-gradient(ellipse 52% 44% at 50% 10%, rgba(170, 217, 223, 0.32), transparent 76%);
+    radial-gradient(ellipse 52% 44% at 50% 10%, rgba(170, 217, 223, 0.26), transparent 76%);
   filter: blur(9px);
 }
 
@@ -85,8 +85,8 @@
   background: rgba(15, 25, 45, 0.15) !important;
   padding: 56px 48px !important;
   box-shadow:
-    0 20px 60px rgba(39, 170, 184, 0.3),
-    0 0 100px rgba(39, 170, 184, 0.1),
+    0 20px 60px rgba(39, 170, 184, 0.22),
+    0 0 100px rgba(39, 170, 184, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 1px 0 10px rgba(191, 231, 246, 0.14),
     inset 0 -1px 0 rgba(132, 220, 238, 0.22) !important;
