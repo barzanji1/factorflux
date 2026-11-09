@@ -4,7 +4,7 @@
   --login-teal: #397f83;
   --login-teal-hover: #468c8f;
   --login-border: rgba(232, 244, 250, 0.3);
-  --login-control-height: 48px;
+  --login-control-height: clamp(56px, 4.62vw, 71px);
   position: relative;
   isolation: isolate;
   display: grid;
@@ -16,20 +16,20 @@
   padding: 48px 24px;
   background-color: #101a1d;
   background-image:
-    linear-gradient(90deg, rgba(8, 17, 21, 0.24), rgba(9, 18, 21, 0.2)),
+    linear-gradient(90deg, rgba(8, 17, 21, 0.12), rgba(9, 18, 21, 0.08)),
     url("/images/login-financial-lobby.webp");
   background-position: center;
   background-size: cover;
   color: var(--login-ink);
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  font-family: "DM Sans", "Segoe UI", sans-serif;
 }
 
 .ff-login-page .ff-login-stage {
   position: relative;
   isolation: isolate;
-  width: min(100%, 480px);
+  width: min(100%, clamp(640px, 50.46vw, 775px));
   padding-bottom: 32px;
-  transform: translateY(clamp(18px, 3.6vh, 38px));
+  transform: none;
 }
 
 .ff-login-page .ff-login-stage::before,
@@ -74,22 +74,25 @@
   isolation: isolate;
   display: flex;
   width: 100%;
-  max-width: 480px;
-  min-height: 560px;
+  max-width: 775px;
+  min-height: clamp(620px, 49.15vw, 755px);
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
   border: 1.5px solid transparent !important;
-  border-radius: 24px !important;
-  background: rgba(70, 90, 115, 0.09) !important;
-  padding: 56px 48px !important;
+  border-radius: 48px !important;
+  background:
+    radial-gradient(ellipse 46% 42% at 0% 8%, rgba(132, 209, 233, 0.16), transparent 78%),
+    radial-gradient(ellipse 36% 36% at 100% 100%, rgba(242, 157, 96, 0.18), transparent 78%),
+    linear-gradient(138deg, rgba(5, 25, 36, 0.68), rgba(4, 21, 31, 0.62) 48%, rgba(8, 26, 35, 0.58)) !important;
+  padding: clamp(24px, 1.92vw, 29.5px) clamp(28px, 5.47vw, 84px) clamp(35px, 3.29vw, 50.5px) !important;
   box-shadow:
-    0 20px 60px rgba(39, 170, 184, 0.18),
-    0 0 100px rgba(39, 170, 184, 0.056),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 1px 0 10px rgba(211, 227, 242, 0.09),
-    inset 0 -1px 0 rgba(184, 208, 229, 0.11) !important;
+    0 24px 54px rgba(3, 12, 18, 0.38),
+    0 0 34px rgba(72, 191, 211, 0.16),
+    inset 0 1px 0 rgba(248, 253, 255, 0.3),
+    inset 1px 0 14px rgba(118, 207, 231, 0.25),
+    inset 0 -1px 0 rgba(255, 190, 133, 0.15) !important;
   -webkit-backdrop-filter: blur(22px) saturate(115%) brightness(1.08);
   backdrop-filter: blur(22px) saturate(115%) brightness(1.08);
   color: var(--login-ink);
@@ -101,7 +104,10 @@
   inset: 0;
   border-radius: inherit;
   padding: 1.5px;
-  background: linear-gradient(135deg, rgba(221, 238, 250, 0.34) 0%, rgba(255, 255, 255, 0.21) 14%, rgba(255, 255, 255, 0.12) 70%, rgba(232, 203, 178, 0.13) 100%);
+  background:
+    radial-gradient(ellipse at 0% 10%, rgba(218, 247, 255, 0.88), rgba(119, 212, 232, 0.32) 32%, transparent 74%),
+    radial-gradient(ellipse at 100% 100%, rgba(255, 209, 159, 0.74), rgba(246, 164, 101, 0.24) 30%, transparent 74%),
+    linear-gradient(120deg, rgba(236, 251, 255, 0.56), rgba(221, 249, 255, 0.08) 24%, transparent 56%, rgba(255, 215, 170, 0.12));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -117,9 +123,9 @@
   inset: 1px;
   border-radius: inherit;
   background:
-    radial-gradient(ellipse 68% 52% at 12% 10%, rgba(205, 220, 237, 0.065), transparent 100%),
-    radial-gradient(ellipse 64% 48% at 88% 92%, rgba(232, 203, 178, 0.05), transparent 100%),
-    radial-gradient(ellipse 84% 76% at 50% 50%, transparent 68%, rgba(190, 208, 227, 0.025) 100%);
+    radial-gradient(ellipse 38% 42% at 0% 8%, rgba(144, 216, 237, 0.2), transparent 78%),
+    radial-gradient(ellipse 30% 30% at 100% 100%, rgba(255, 196, 140, 0.36), rgba(242, 156, 96, 0.12) 42%, transparent 78%),
+    radial-gradient(ellipse 84% 76% at 50% 50%, transparent 68%, rgba(174, 210, 229, 0.055) 100%);
   content: "";
   pointer-events: none;
 }
@@ -219,20 +225,32 @@
 }
 
 .ff-login-page .ff-login-brand img {
+  width: clamp(72px, 7.29vw, 112px);
+  height: clamp(66px, 6.71vw, 103px);
   filter: none !important;
 }
 
 .ff-login-page .ff-login-brand > div:first-child {
-  margin-bottom: 11px;
+  margin-bottom: clamp(-2px, 0.2vw, 3px);
 }
 
 .ff-login-page .ff-login-product {
-  margin: 0;
+  margin: 0 !important;
   color: #ffffff;
-  font-size: 34px;
-  font-weight: 650;
-  letter-spacing: -0.035em;
-  line-height: 1.08;
+  font-size: clamp(34px, 3.385vw, 52px);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1;
+}
+
+.ff-login-page .ff-login-registered {
+  display: inline-block;
+  margin-left: 2px;
+  font-size: 0.24em;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  vertical-align: top;
 }
 
 .ff-login-page .ff-login-tagline {
@@ -241,21 +259,21 @@
   align-items: center;
   justify-content: center;
   gap: 13px;
-  margin: 9px 0 0;
+  margin: clamp(14px, 1.43vw, 22px) 0 0 !important;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 11px;
+  font-size: clamp(13px, 1.3vw, 20px);
   font-weight: 600;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.28em;
   line-height: 1.4;
   text-transform: uppercase;
 }
 
 .ff-login-page .ff-login-tagline::before,
 .ff-login-page .ff-login-tagline::after {
-  width: clamp(22px, 8vw, 42px);
+  width: clamp(30px, 4.56vw, 70px);
   height: 1px;
   flex: 0 1 auto;
-  background: linear-gradient(90deg, transparent, rgba(194, 218, 226, 0.58));
+  background: linear-gradient(90deg, transparent, rgba(220, 238, 246, 0.62));
   content: "";
 }
 
@@ -264,12 +282,12 @@
 }
 
 .ff-login-page .ff-login-brand .ff-login-company {
-  margin: 19px 0 0;
+  margin: clamp(14px, 0.98vw, 15px) 0 0 !important;
   color: #ffffff;
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  font-size: clamp(24px, 4.5vw, 32px);
-  font-weight: 650;
-  letter-spacing: -0.035em;
+  font-family: inherit;
+  font-size: clamp(32px, 3.255vw, 50px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.1;
   text-wrap: balance;
 }
@@ -279,13 +297,13 @@
   flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
-  margin-top: 28px;
+  margin-top: clamp(22px, 2.73vw, 42px);
 }
 
 .ff-login-page .ff-login-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: clamp(14px, 1.17vw, 18px);
 }
 
 .ff-login-page .ff-login-form > div {
@@ -326,10 +344,10 @@
   position: absolute;
   z-index: 1;
   top: 50%;
-  left: 15px;
-  width: 17px;
-  height: 17px;
-  color: rgba(255, 255, 255, 0.6);
+  left: 30px;
+  width: 28px;
+  height: 28px;
+  color: #f4fbff;
   pointer-events: none;
   transform: translateY(-50%);
 }
@@ -338,18 +356,17 @@
   display: block;
   width: 100%;
   height: var(--login-control-height);
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  border-radius: 12px !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  padding: 0 15px 0 44px !important;
+  border: 1px solid rgba(177, 218, 235, 0.38) !important;
+  border-radius: 22px !important;
+  background: linear-gradient(180deg, rgba(171, 211, 229, 0.2), rgba(77, 112, 132, 0.18) 48%, rgba(26, 50, 66, 0.22)) !important;
+  padding: 0 24px 0 94px !important;
   color: #ffffff !important;
   font-family: inherit;
-  font-size: 14px;
+  font-size: clamp(17px, 1.5625vw, 24px);
   outline: none;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.13),
-    inset 0 0 0 1px rgba(226, 236, 246, 0.04),
-    inset 0 -2px 5px rgba(174, 196, 218, 0.065),
+    inset 0 1px 0 rgba(238, 250, 255, 0.28),
+    inset 0 -2px 6px rgba(102, 169, 195, 0.16),
     0 3px 10px rgba(2, 14, 20, 0.16) !important;
   -webkit-backdrop-filter: blur(8px) saturate(120%);
   backdrop-filter: blur(8px) saturate(120%);
@@ -357,18 +374,17 @@
 }
 
 .ff-login-page .ff-login-input::placeholder {
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: rgba(255, 255, 255, 0.94) !important;
   opacity: 1;
 }
 
 .ff-login-page .ff-login-input:focus {
-  border-color: rgba(255, 255, 255, 0.42) !important;
-  background: rgba(255, 255, 255, 0.055) !important;
+  border-color: rgba(203, 239, 249, 0.7) !important;
+  background: linear-gradient(180deg, rgba(184, 224, 239, 0.25), rgba(77, 112, 132, 0.2) 48%, rgba(26, 50, 66, 0.24)) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 0 0 1px rgba(226, 236, 246, 0.05),
-    inset 0 -2px 5px rgba(174, 196, 218, 0.075),
-    0 0 0 3px rgba(143, 218, 233, 0.2) !important;
+    inset 0 1px 0 rgba(245, 253, 255, 0.34),
+    inset 0 -2px 6px rgba(102, 169, 195, 0.18),
+    0 0 0 3px rgba(143, 218, 233, 0.28) !important;
 }
 
 .ff-login-page .ff-login-input:disabled {
@@ -383,17 +399,23 @@
 .ff-login-page .ff-login-toggle {
   position: absolute;
   top: 50%;
-  right: 7px;
+  right: 16px;
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   place-items: center;
   border: 0 !important;
   border-radius: 8px !important;
   background: transparent !important;
-  color: rgba(255, 255, 255, 0.6);
+  color: #f4fbff;
   cursor: pointer;
   transform: translateY(-50%);
+}
+
+.ff-login-page .ff-login-toggle svg {
+  width: 28px;
+  height: 28px;
+  stroke-width: 1.8;
 }
 
 .ff-login-page .ff-login-toggle:hover {
@@ -418,37 +440,38 @@
 .ff-login-page .ff-login-submit {
   display: inline-flex;
   width: 100%;
-  min-height: 48px;
-  height: 48px;
+  min-height: clamp(60px, 4.95vw, 76px);
+  height: clamp(60px, 4.95vw, 76px);
   align-items: center;
   justify-content: center;
-  margin-top: 4px;
-  border: 1px solid rgba(203, 239, 243, 0.58) !important;
-  border-radius: 12px !important;
+  margin-top: clamp(11px, 1.1vw, 17px);
+  border: 1px solid rgba(114, 238, 245, 0.82) !important;
+  border-radius: 24px !important;
   background:
-    radial-gradient(ellipse 82% 100% at 50% 0%, rgba(232, 252, 255, 0.12), transparent 64%),
-    linear-gradient(180deg, #4caeb8 0%, #358992 44%, #2a727b 100%) !important;
+    radial-gradient(ellipse 76% 75% at 4% 0%, rgba(232, 255, 255, 0.4), transparent 68%),
+    linear-gradient(180deg, #16c9d2 0%, #00aab6 42%, #007d8c 100%) !important;
   padding: 0 18px !important;
   color: #ffffff !important;
   font-family: inherit;
-  font-size: 13px;
+  font-size: clamp(20px, 1.95vw, 30px);
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.06em;
   cursor: pointer;
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.3),
-    0 4px 15px rgba(39, 170, 184, 0.28) !important;
+    0 7px 18px rgba(2, 19, 25, 0.28),
+    0 0 16px rgba(39, 170, 184, 0.22),
+    inset 0 1px 1px rgba(255, 255, 255, 0.48) !important;
   transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .ff-login-page .ff-login-submit:hover:not(:disabled) {
   background:
-    radial-gradient(ellipse 82% 100% at 50% 0%, rgba(242, 255, 255, 0.15), transparent 64%),
-    linear-gradient(180deg, #5bbdc6 0%, #3c949d 44%, #307984 100%) !important;
+    radial-gradient(ellipse 76% 75% at 4% 0%, rgba(242, 255, 255, 0.48), transparent 68%),
+    linear-gradient(180deg, #27d5dd 0%, #0ab9c3 42%, #008b99 100%) !important;
   box-shadow:
-    0 6px 16px rgba(1, 17, 23, 0.21),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(0, 61, 70, 0.24) !important;
+    0 9px 24px rgba(2, 19, 25, 0.3),
+    0 0 20px rgba(39, 170, 184, 0.28),
+    inset 0 1px 1px rgba(255, 255, 255, 0.52) !important;
   transform: translateY(-1px);
 }
 
@@ -481,14 +504,14 @@
 }
 
 .ff-login-page .ff-login-support-wrap {
-  margin-top: 15px;
+  margin-top: clamp(22px, 2.34vw, 36px);
   text-align: center;
 }
 
 .ff-login-page .ff-login-support {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
-  line-height: 1.5;
+  color: #d4f3fa;
+  font-size: clamp(16px, 1.43vw, 22px);
+  line-height: 1.4;
   text-decoration: underline;
   text-decoration-color: rgba(255, 255, 255, 0.48);
   text-underline-offset: 3px;
@@ -559,6 +582,7 @@
 
 @media (max-width: 600px) {
   .ff-login-page {
+    --login-control-height: 48px;
     place-items: center;
     padding: 28px 16px;
     background-image:
@@ -581,18 +605,82 @@
 
   .ff-login-page .ff-login-product {
     font-size: 31px;
+    letter-spacing: -0.035em;
+  }
+
+  .ff-login-page .ff-login-brand img {
+    width: 56px;
+    height: 52px;
   }
 
   .ff-login-page .ff-login-brand > div:first-child {
     margin-bottom: 9px;
   }
 
+  .ff-login-page .ff-login-tagline {
+    margin-top: 9px !important;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+  }
+
+  .ff-login-page .ff-login-tagline::before,
+  .ff-login-page .ff-login-tagline::after {
+    width: clamp(16px, 5vw, 24px);
+  }
+
   .ff-login-page .ff-login-brand .ff-login-company {
-    margin-top: 16px;
+    margin-top: 16px !important;
+    font-size: clamp(24px, 4.5vw, 32px);
+    letter-spacing: -0.035em;
   }
 
   .ff-login-page .ff-login-content {
     margin-top: 27px;
+  }
+
+  .ff-login-page .ff-login-form {
+    gap: 18px;
+  }
+
+  .ff-login-page .ff-login-input-icon {
+    left: 15px;
+    width: 17px;
+    height: 17px;
+  }
+
+  .ff-login-page .ff-login-input {
+    border-radius: 12px !important;
+    padding-left: 44px !important;
+    font-size: 14px;
+  }
+
+  .ff-login-page .ff-login-toggle {
+    right: 7px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .ff-login-page .ff-login-toggle svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .ff-login-page .ff-login-submit {
+    min-height: 48px;
+    height: 48px;
+    margin-top: 4px;
+    border-radius: 12px !important;
+    font-size: 13px;
+    letter-spacing: 0.13em;
+  }
+
+  .ff-login-page .ff-login-support-wrap {
+    margin-top: 15px;
+  }
+
+  .ff-login-page .ff-login-support {
+    font-size: 12px;
+    line-height: 1.5;
   }
 }
 

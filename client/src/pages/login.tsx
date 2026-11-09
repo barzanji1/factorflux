@@ -4,7 +4,7 @@ import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-shatt
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -86,7 +86,7 @@ export default function LoginPage() {
                 markClassName="h-14 w-14"
               />
             </div>
-            <p className="ff-login-product">FactorFlux</p>
+            <p className="ff-login-product">FactorFlux<sup className="ff-login-registered">®</sup></p>
             <p className="ff-login-tagline">Freight Factoring OS</p>
             <p className="ff-login-company">Trucking Pros Financial</p>
           </CardHeader>
@@ -100,7 +100,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel htmlFor="ff-login-email" className="ff-login-label">Email address</FormLabel>
                         <div className="ff-login-input-wrap">
-                          <User className="ff-login-input-icon" aria-hidden="true" />
+                          <Mail className="ff-login-input-icon" aria-hidden="true" />
                           <FormControl>
                           <Input
                             {...field}
