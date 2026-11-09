@@ -15,8 +15,14 @@ The login page is an exception: the user replaced its circular neumorphic design
 
 **How to apply:** Do not restore the old circular gray login when changing global neumorphic components. Preserve the shared FactorFlux platform and Trucking Pros Financial company branding on staff login.
 
-The login glass must visibly use translucent layered surfaces, internal reflections, and localized cool upper-left/warm lower-right edge lighting, not a solid-looking dark card.
+The login glass must visibly use translucent blue-gray surfaces, a silver-blue upper-left reflection, and localized white upper-left/lower-right edge highlights, not a solid-looking dark card.
 
 **Why:** The user explicitly rejected the earlier dark card and requested matching the architectural glass reference, rather than merely changing opacity or adding a generic glow.
 
 **How to apply:** Preserve the existing architectural background while refining the glass surfaces; keep decorative layers pointer-transparent and form content crisp. Follow the user's explicit compact sizing rather than scaling the panel to the reference image's pixel bounds; the user rejected the oversized interpretation.
+
+The user confirmed the compact card's size and positioning are correct. Material-only refinements must leave those, form layout, typography sizes, and branding unchanged.
+
+**Why:** The user explicitly approved the geometry while rejecting the dark, opaque material.
+
+**How to apply:** Replace conflicting dark fills and overlays rather than stacking additional effects; restrict future material corrections to surfaces, highlights, shadows, and contrast unless the user requests layout changes.

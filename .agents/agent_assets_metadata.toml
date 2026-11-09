@@ -260,3 +260,17 @@ mtime_ms = 1794240045107
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/900b14d5-47c9-4fb9-bb20-ac89b3c39608/4fcf5143-f767-4976-b0b4-162517fd12a4"
 storage_version_token = "1794240072296572"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "gKZM-fxztX0IspT-QL0Pf"
+uri = "file://generated-artifacts/login-material-comparison.jpg"
+type = "image"
+title = "Glass material comparison"
+description = "Original reference on the left; updated login on the right at the same 1536 × 1024 viewport. Approved compact sizing and existing background are preserved."
+logical_id = "a03fd2b4-13b7-4be6-b0f4-32b4cb0bb3ee"
+content_hash = "sha256:296a9947e3fa2956b377fdcc8af0fa6081d6669ad03d15bfe65abe521f2a6a6d"
+size = 137049
+mtime_ms = 1794240478006
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/a03fd2b4-13b7-4be6-b0f4-32b4cb0bb3ee/651bbf96-cb4b-43ff-8a4a-7c10c8b68778"
+storage_version_token = "1794240494526196"
+content_type = "image/jpeg"
