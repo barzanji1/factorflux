@@ -4,7 +4,7 @@
   --login-teal: #397f83;
   --login-teal-hover: #468c8f;
   --login-border: rgba(232, 244, 250, 0.3);
-  --login-control-height: clamp(46.5px, 3.835vw, 58.9px);
+  --login-control-height: clamp(39.5px, 3.26vw, 50.1px);
   position: relative;
   isolation: isolate;
   display: grid;
@@ -27,7 +27,7 @@
 .ff-login-page .ff-login-stage {
   position: relative;
   isolation: isolate;
-  width: min(100%, clamp(531px, 41.88vw, 643px));
+  width: min(100%, clamp(451.4px, 35.6vw, 546.6px));
   padding-bottom: 0;
   transform: none;
 }
@@ -77,19 +77,19 @@
   isolation: isolate;
   display: flex;
   width: 100%;
-  max-width: 643px;
-  min-height: clamp(515px, 40.79vw, 627px);
+  max-width: 546.6px;
+  min-height: clamp(437.8px, 34.67vw, 533px);
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
   border: 1.5px solid transparent !important;
-  border-radius: 39.8px !important;
+  border-radius: 33.8px !important;
   background:
     radial-gradient(ellipse 46% 42% at 0% 8%, rgba(132, 209, 233, 0.16), transparent 78%),
     radial-gradient(ellipse 36% 36% at 100% 100%, rgba(242, 157, 96, 0.18), transparent 78%),
     linear-gradient(138deg, rgba(5, 25, 36, 0.68), rgba(4, 21, 31, 0.62) 48%, rgba(8, 26, 35, 0.58)) !important;
-  padding: clamp(19.9px, 1.594vw, 24.5px) clamp(23.2px, 4.565vw, 70.1px) clamp(29.1px, 2.731vw, 41.9px) !important;
+  padding: clamp(16.9px, 1.355vw, 20.8px) clamp(19.7px, 3.88vw, 59.6px) clamp(24.7px, 2.321vw, 35.6px) !important;
   box-shadow:
     0 24px 54px rgba(3, 12, 18, 0.38),
     0 0 34px rgba(72, 191, 211, 0.16),
@@ -228,27 +228,27 @@
 }
 
 .ff-login-page .ff-login-brand img {
-  width: clamp(59.8px, 6.051vw, 93px);
-  height: clamp(54.8px, 5.569vw, 85.5px);
+  width: clamp(50.8px, 5.143vw, 79.1px);
+  height: clamp(46.6px, 4.734vw, 72.7px);
   filter: none !important;
 }
 
 .ff-login-page .ff-login-brand > div:first-child {
-  margin-bottom: clamp(-1.7px, 0.166vw, 2.5px);
+  margin-bottom: clamp(-1.45px, 0.141vw, 2.13px);
 }
 
 .ff-login-page .ff-login-product {
   margin: 0 !important;
   color: #ffffff;
-  font-size: clamp(27px, 2.61vw, 40px);
+  font-size: clamp(23px, 2.219vw, 34px);
   font-weight: 700;
   letter-spacing: 0.005em;
-  line-height: clamp(28.2px, 2.809vw, 43.2px);
+  line-height: clamp(24px, 2.388vw, 36.7px);
 }
 
 .ff-login-page .ff-login-registered {
   display: inline-block;
-  margin-left: 1.7px;
+  margin-left: 1.45px;
   font-size: 0.24em;
   font-weight: 600;
   letter-spacing: 0;
@@ -261,10 +261,10 @@
   width: 100%;
   align-items: center;
   justify-content: center;
-  gap: 10.8px;
-  margin: clamp(11.6px, 1.187vw, 18.3px) 0 0 !important;
+  gap: 9.2px;
+  margin: clamp(9.9px, 1.009vw, 15.6px) 0 0 !important;
   color: rgba(255, 255, 255, 0.7);
-  font-size: clamp(10.8px, 1.079vw, 16.6px);
+  font-size: clamp(9.2px, 0.917vw, 14.1px);
   font-weight: 600;
   letter-spacing: 0.28em;
   line-height: 1.4;
@@ -273,7 +273,7 @@
 
 .ff-login-page .ff-login-tagline::before,
 .ff-login-page .ff-login-tagline::after {
-  width: clamp(24.9px, 3.785vw, 58.1px);
+  width: clamp(21.2px, 3.217vw, 49.4px);
   height: 1px;
   flex: 0 1 auto;
   background: linear-gradient(90deg, transparent, rgba(220, 238, 246, 0.62));
@@ -285,13 +285,13 @@
 }
 
 .ff-login-page .ff-login-brand .ff-login-company {
-  margin: clamp(11.6px, 0.813vw, 12.5px) 0 0 !important;
+  margin: clamp(9.9px, 0.691vw, 10.6px) 0 0 !important;
   color: #ffffff;
   font-family: inherit;
-  font-size: clamp(22px, 2.08vw, 32px);
+  font-size: clamp(18.7px, 1.768vw, 27.2px);
   font-weight: 600;
   letter-spacing: -0.01em;
-  line-height: clamp(29.26px, 2.9722vw, 45.65px);
+  line-height: clamp(24.9px, 2.526vw, 38.8px);
   text-wrap: balance;
 }
 
@@ -300,13 +300,13 @@
   flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
-  margin-top: clamp(18.3px, 2.266vw, 34.9px);
+  margin-top: clamp(15.6px, 1.926vw, 29.7px);
 }
 
 .ff-login-page .ff-login-form {
   display: flex;
   flex-direction: column;
-  gap: clamp(11.6px, 0.971vw, 14.9px);
+  gap: clamp(9.9px, 0.825vw, 12.7px);
 }
 
 .ff-login-page .ff-login-form > div {
@@ -314,7 +314,7 @@
 }
 
 .ff-login-page .ff-login-form > div > * + * {
-  margin-top: 5px;
+  margin-top: 4.25px;
 }
 
 .ff-login-page .ff-login-label {
@@ -336,7 +336,7 @@
 
 /* Keep validation messages visible and separated from their fields. */
 .ff-login-page .ff-login-form > div > [id$="-form-item-message"] {
-  margin-top: 5px;
+  margin-top: 4.25px;
 }
 
 .ff-login-page .ff-login-input-wrap {
@@ -347,9 +347,9 @@
   position: absolute;
   z-index: 1;
   top: 50%;
-  left: 24.9px;
-  width: 23.2px;
-  height: 23.2px;
+  left: 21.2px;
+  width: 19.7px;
+  height: 19.7px;
   color: #f4fbff;
   pointer-events: none;
   transform: translateY(-50%);
@@ -360,12 +360,12 @@
   width: 100%;
   height: var(--login-control-height);
   border: 1px solid rgba(177, 218, 235, 0.38) !important;
-  border-radius: 18.3px !important;
+  border-radius: 15.6px !important;
   background: linear-gradient(180deg, rgba(171, 211, 229, 0.2), rgba(77, 112, 132, 0.18) 48%, rgba(26, 50, 66, 0.22)) !important;
-  padding: 0 19.9px 0 78px !important;
+  padding: 0 16.9px 0 66.3px !important;
   color: #ffffff !important;
   font-family: inherit;
-  font-size: clamp(14.1px, 1.297vw, 19.9px);
+  font-size: clamp(12px, 1.102vw, 16.9px);
   outline: none;
   box-shadow:
     inset 0 1px 0 rgba(238, 250, 255, 0.28),
@@ -396,19 +396,19 @@
 }
 
 .ff-login-page .ff-login-password-input {
-  padding-right: 41.5px !important;
+  padding-right: 35.3px !important;
 }
 
 .ff-login-page .ff-login-toggle {
   position: absolute;
   top: 50%;
-  right: 13.3px;
+  right: 11.3px;
   display: grid;
-  width: 39.8px;
-  height: 39.8px;
+  width: 33.8px;
+  height: 33.8px;
   place-items: center;
   border: 0 !important;
-  border-radius: 6.6px !important;
+  border-radius: 5.6px !important;
   background: transparent !important;
   color: #f4fbff;
   cursor: pointer;
@@ -416,8 +416,8 @@
 }
 
 .ff-login-page .ff-login-toggle svg {
-  width: 23.2px;
-  height: 23.2px;
+  width: 19.7px;
+  height: 19.7px;
   stroke-width: 1.8;
 }
 
@@ -436,27 +436,27 @@
 
 .ff-login-page .ff-login-form [id$="-form-item-message"] {
   color: #ffd5c7;
-  font-size: 10px;
+  font-size: 8.5px;
   line-height: 1.35;
 }
 
 .ff-login-page .ff-login-submit {
   display: inline-flex;
   width: 100%;
-  min-height: clamp(49.8px, 4.109vw, 63.1px);
-  height: clamp(49.8px, 4.109vw, 63.1px);
+  min-height: clamp(42.3px, 3.493vw, 53.6px);
+  height: clamp(42.3px, 3.493vw, 53.6px);
   align-items: center;
   justify-content: center;
-  margin-top: clamp(9.1px, 0.913vw, 14.1px);
+  margin-top: clamp(7.7px, 0.776vw, 12px);
   border: 1px solid rgba(114, 238, 245, 0.82) !important;
-  border-radius: 19.9px !important;
+  border-radius: 16.9px !important;
   background:
     radial-gradient(ellipse 76% 75% at 4% 0%, rgba(232, 255, 255, 0.4), transparent 68%),
     linear-gradient(180deg, #16c9d2 0%, #00aab6 42%, #007d8c 100%) !important;
-  padding: 0 14.9px !important;
+  padding: 0 12.7px !important;
   color: #ffffff !important;
   font-family: inherit;
-  font-size: clamp(16.6px, 1.619vw, 24.9px);
+  font-size: clamp(14.1px, 1.376vw, 21.2px);
   font-weight: 700;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -497,27 +497,27 @@
   min-height: 0;
   margin-top: 0;
   color: #ffd5c7;
-  font-size: 10px;
+  font-size: 8.5px;
   line-height: 1.4;
   text-align: center;
 }
 
 .ff-login-page .ff-login-error:not(:empty) {
-  margin-top: 8.3px;
+  margin-top: 7.1px;
 }
 
 .ff-login-page .ff-login-support-wrap {
-  margin-top: clamp(18.3px, 1.942vw, 29.9px);
+  margin-top: clamp(15.6px, 1.651vw, 25.4px);
   text-align: center;
 }
 
 .ff-login-page .ff-login-support {
   color: #d4f3fa;
-  font-size: clamp(13.3px, 1.187vw, 18.3px);
+  font-size: clamp(11.3px, 1.009vw, 15.6px);
   line-height: 1.4;
   text-decoration: underline;
   text-decoration-color: rgba(255, 255, 255, 0.48);
-  text-underline-offset: 2.5px;
+  text-underline-offset: 2.1px;
 }
 
 .ff-login-page .ff-login-support:hover {
