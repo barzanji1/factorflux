@@ -21,6 +21,12 @@ Verify pointer targets only after scrolling has settled.
 
 **How to apply:** Use instantaneous scrolling or wait for stable bounds before pointer checks. Confirm the actual target before diagnosing a failed checkbox or input as an application bug.
 
+Set the viewport explicitly after every new browser-debugging connection.
+
+**Why:** A fresh connection can revert to a small default viewport despite an earlier connection setting desktop dimensions. This can clip popovers and invalidate screenshot comparisons without an application regression.
+
+**How to apply:** Apply device metrics on each connection before measuring geometry, taking screenshots, or sending pointer events. Keep the cursor away from hover-expanding navigation while measuring a portaled menu.
+
 Scope browser tests to the active dialog and the intended upload control.
 
 **Why:** Nested dialogs leave background controls mounted. A generic checkbox selector can target the hold checkbox behind a preflight panel, and a generic PDF input selector can stage OCR intake files instead of required paperwork, clearing the prefill as designed.

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useImmediateNavigation as useLocation } from "@/hooks/useImmediateNavigation";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";

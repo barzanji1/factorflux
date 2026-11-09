@@ -65,6 +65,47 @@
   font-weight: 700 !important;
   letter-spacing: .01em;
 }
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="clock-in"],
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="retry"] {
+  background-color: #087f87 !important;
+  border-color: #087f87 !important;
+  color: #fff !important;
+  box-shadow: 0 2px 5px rgba(16, 42, 56, .14), inset 0 0 0 1px rgba(16, 42, 56, .12) !important;
+}
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="clock-out"] {
+  background-color: #102a38 !important;
+  border-color: #102a38 !important;
+  color: #fff !important;
+  box-shadow: 0 2px 5px rgba(16, 42, 56, .18), inset 0 0 0 1px rgba(255, 255, 255, .08) !important;
+}
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="clock-in"]:hover:not(:disabled),
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="retry"]:hover:not(:disabled) {
+  background-color: #066d74 !important;
+  border-color: #066d74 !important;
+}
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="clock-out"]:hover:not(:disabled) {
+  background-color: #1b3a49 !important;
+  border-color: #1b3a49 !important;
+}
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="clock-in"]:active:not(:disabled),
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="retry"]:active:not(:disabled) {
+  background-color: #055b62 !important;
+  border-color: #055b62 !important;
+  box-shadow: inset 0 1px 3px rgba(16, 42, 56, .24) !important;
+}
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action[data-clock-action="clock-out"]:active:not(:disabled) {
+  background-color: #0b202b !important;
+  border-color: #0b202b !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .28) !important;
+}
+body:has(.ff-institutional-root) [role="dialog"].ff-time-clock-popover button.ff-time-clock-action:disabled {
+  background-color: #52676d !important;
+  border-color: #52676d !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18) !important;
+  cursor: not-allowed;
+}
 .ff-time-clock-entry {
   display: flex;
   min-height: 36px;

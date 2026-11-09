@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
+import { useImmediateNavigation as useLocation } from "@/hooks/useImmediateNavigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import type { Notification as AppNotification } from "@shared/schema";

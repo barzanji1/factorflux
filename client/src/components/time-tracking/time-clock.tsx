@@ -204,7 +204,7 @@ export default function TimeClock() {
                 </div>
                 <Button
                   type="button"
-                  variant="ghost"
+              variant="ghost"
                   aria-label="Retry time clock status"
                   onClick={() => refetch()}
                   disabled={isFetching}
@@ -259,24 +259,24 @@ export default function TimeClock() {
           {isError ? (
             <Button
               type="button"
+                  variant="ghost"
               onClick={() => refetch()}
               disabled={isFetching || isSubmitting}
               data-testid="time-clock-action"
-              className="ff-time-clock-action mt-3 w-full !min-h-11 !rounded-xl !bg-[#168f99] !text-white hover:!bg-[#117c85]"
+              data-clock-action="retry"
+              className="ff-time-clock-action mt-3 w-full !min-h-11 !rounded-xl !text-white"
             >
               {isFetching ? "Retrying…" : "Retry status"}
             </Button>
           ) : (
             <Button
               type="button"
+              variant="ghost"
               onClick={clockAction}
               disabled={!userId || isLoading || isError || isSubmitting}
               data-testid="time-clock-action"
-              className={`ff-time-clock-action mt-3 w-full !min-h-11 !rounded-xl !text-white ${
-                isClockedIn
-                  ? "!bg-[#bd765b] hover:!bg-[#a8634b]"
-                  : "!bg-[#168f99] hover:!bg-[#117c85]"
-              }`}
+              data-clock-action={isClockedIn ? "clock-out" : "clock-in"}
+              className="ff-time-clock-action mt-3 w-full !min-h-11 !rounded-xl !text-white"
             >
               {isSubmitting ? "Updating…" : isClockedIn ? (
                 <><Square className="h-3.5 w-3.5" />Clock Out</>
