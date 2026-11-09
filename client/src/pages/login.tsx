@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
+import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-shatter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,14 +26,17 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [shakeCount, setShakeCount] = useState(0);
-  const [isRotating, setIsRotating] = useState(false);
-  const rotationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didNavigate = useRef(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const transitionRef = useRef<LoginSuccessTransition | null>(null);
+  const mounted = useRef(true);
 
-  useEffect(() => () => {
-    if (rotationTimer.current) clearTimeout(rotationTimer.current);
-    if (navigationTimer.current) clearTimeout(navigationTimer.current);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      const transition = transitionRef.current;
+      if (transition && !transition.hasNavigated) transition.cancel();
+    };
   }, []);
 
   const form = useForm<LoginFormData>({
@@ -49,15 +53,10 @@ export default function LoginPage() {
 
     try {
       const success = await login(data.username, data.password);
+      if (!mounted.current) return;
       if (success) {
-        setIsRotating(true);
-        // Keep a fallback so reduced motion or a cancelled animation never blocks navigation.
-        navigationTimer.current = setTimeout(() => {
-          if (!didNavigate.current) {
-            didNavigate.current = true;
-            setLocation("/");
-          }
-        }, 1400);
+        const card = mainRef.current?.querySelector<HTMLElement>(".ff-login-card") ?? null;
+        transitionRef.current = playLoginSuccess(card, () => setLocation("/"));
       } else {
         setError("Invalid email or password. Please try again.");
         setShakeCount((count) => count + 1);
@@ -70,21 +69,11 @@ export default function LoginPage() {
     }
   };
 
-  const finishRotation = () => {
-    if (didNavigate.current) return;
-    didNavigate.current = true;
-    if (navigationTimer.current) clearTimeout(navigationTimer.current);
-    rotationTimer.current = setTimeout(() => setLocation("/"), 0);
-  };
-
   return (
-    <main className="ff-login-page">
+    <main ref={mainRef} className="ff-login-page">
       <div className="ff-login-stage">
         <Card
-          className={`ff-login-card${isRotating ? " ff-login-card--rotating" : shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
-          onAnimationEnd={(event) => {
-            if (event.target === event.currentTarget && event.animationName === "ff-login-rotate") finishRotation();
-          }}
+          className={`ff-login-card${shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
           aria-busy={isLoading}
         >
           <CardHeader className="ff-login-brand">
