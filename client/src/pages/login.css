@@ -1,22 +1,27 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
-
 .ff-login-page {
-  --login-bg: #e0e0e0;
-  --login-ink: #33474a;
-  --login-muted: #718184;
-  --login-teal: #178b91;
-  --login-teal-dark: #116f76;
-  --login-control-height: 40px;
+  --login-ink: #f0f2f0;
+  --login-muted: #c0c9c8;
+  --login-teal: #147c7c;
+  --login-teal-hover: #1a9390;
+  --login-border: rgba(229, 239, 238, 0.2);
+  --login-control-height: 48px;
+  position: relative;
+  isolation: isolate;
   display: grid;
   min-height: 100vh;
   min-height: 100dvh;
   place-items: center;
   perspective: 1000px;
   overflow-x: hidden;
-  padding: 40px;
-  background: var(--login-bg);
+  padding: 48px 24px;
+  background-color: #101a1d;
+  background-image:
+    linear-gradient(90deg, rgba(8, 17, 21, 0.24), rgba(9, 18, 21, 0.2)),
+    url("/images/login-financial-lobby.webp");
+  background-position: center;
+  background-size: cover;
   color: var(--login-ink);
-  font-family: "DM Sans", "Avenir Next", sans-serif;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
 }
 
 .ff-login-page *,
@@ -29,42 +34,40 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  width: min(500px, calc(100vw - 80px), max(460px, calc(100dvh - 80px)));
-  aspect-ratio: 1;
+  width: min(100%, 472px);
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   overflow: hidden;
-  border: 0 !important;
-  border-radius: 50% !important;
-  background: #e0e0e0 !important;
-  padding: clamp(24px, 7%, 44px) clamp(24px, 14%, 76px) !important;
+  border: 1px solid rgba(245, 249, 247, 0.4) !important;
+  border-radius: 26px !important;
+  background: linear-gradient(145deg, rgba(18, 34, 38, 0.82), rgba(12, 25, 30, 0.74)) !important;
+  padding: 38px 48px 34px !important;
   box-shadow:
-    4px 4px 8px #c8c8c8,
-    -4px -4px 8px #ffffff,
-    inset 2px 2px 4px rgba(190, 190, 190, 0.24),
-    inset -2px -2px 4px rgba(255, 255, 255, 0.36) !important;
+    0 28px 80px rgba(2, 10, 13, 0.48),
+    0 8px 24px rgba(4, 14, 16, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.17) !important;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
   color: var(--login-ink);
   transform: rotateY(0deg);
   transform-origin: center center;
 }
 
 .ff-login-page .ff-login-card::before {
-  content: "";
   position: absolute;
-  inset: 12px;
-  border-radius: inherit;
-  pointer-events: none;
   z-index: -1;
-  box-shadow:
-    inset 2px 2px 4px rgba(170, 170, 170, 0.22),
-    inset -2px -2px 4px rgba(255, 255, 255, 0.48),
-    -1px -1px 3px rgba(255, 255, 255, 0.35),
-    1px 1px 3px rgba(180, 180, 180, 0.12);
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(160, 195, 182, 0.12), transparent 55%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.035), transparent 42%);
+  content: "";
+  pointer-events: none;
 }
 
-.ff-login-card > .ff-login-brand,
-.ff-login-card > .ff-login-content {
+.ff-login-page .ff-login-card > .ff-login-brand,
+.ff-login-page .ff-login-card > .ff-login-content {
   width: 100%;
   border: 0;
   background: transparent !important;
@@ -72,7 +75,7 @@
   color: inherit;
 }
 
-.ff-login-brand {
+.ff-login-page .ff-login-brand {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
@@ -81,73 +84,91 @@
   text-align: center;
 }
 
-.ff-login-brand > :not([hidden]) ~ :not([hidden]) {
+.ff-login-page .ff-login-brand > :not([hidden]) ~ :not([hidden]) {
   margin-top: 0;
 }
 
-.ff-login-brand img {
+.ff-login-page .ff-login-brand img {
   filter: none !important;
 }
 
-.ff-login-brand > div:first-child {
-  margin-bottom: 5px;
+.ff-login-page .ff-login-brand > div:first-child {
+  margin-bottom: 9px;
 }
 
 .ff-login-page .ff-login-product {
   margin: 0;
-  color: #758587;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  line-height: 1.3;
+  color: #f1f4f1;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+  line-height: 1.25;
 }
 
 .ff-login-page .ff-login-tagline {
-  margin: 2px 0 0;
-  color: var(--login-muted);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  line-height: 1.3;
+  margin: 5px 0 0;
+  color: #c1cfcc;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  line-height: 1.4;
+  text-transform: uppercase;
 }
 
 .ff-login-page .ff-login-brand .ff-login-company {
-  margin: 7px 0 0;
-  color: #304649;
-  font-family: "Manrope", "Avenir Next", sans-serif;
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: -0.055em;
-  line-height: 1.13;
+  margin: 16px 0 0;
+  color: #f1eee7;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(23px, 5vw, 29px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
   text-wrap: balance;
 }
 
-.ff-login-content {
+.ff-login-page .ff-login-content {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
-  margin-top: 22px;
+  margin-top: 30px;
 }
 
-.ff-login-form {
+.ff-login-page .ff-login-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
 }
 
-.ff-login-input-wrap {
+.ff-login-page .ff-login-form > div {
+  min-width: 0;
+}
+
+.ff-login-page .ff-login-form > div > * + * {
+  margin-top: 6px;
+}
+
+.ff-login-page .ff-login-label {
+  display: block;
+  margin: 0 0 7px;
+  color: #d9e0dc;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+}
+
+.ff-login-page .ff-login-input-wrap {
   position: relative;
 }
 
-.ff-login-input-icon {
+.ff-login-page .ff-login-input-icon {
   position: absolute;
   z-index: 1;
   top: 50%;
-  left: 14px;
-  width: 16px;
-  height: 16px;
-  color: #829596;
+  left: 15px;
+  width: 17px;
+  height: 17px;
+  color: #bdc9c6;
   pointer-events: none;
   transform: translateY(-50%);
 }
@@ -156,157 +177,163 @@
   display: block;
   width: 100%;
   height: var(--login-control-height);
-  border: 0 !important;
-  border-radius: 13px !important;
-  background: #e0e0e0 !important;
-  padding: 0 15px 0 42px !important;
-  color: #324649 !important;
+  border: 1px solid rgba(226, 237, 235, 0.28) !important;
+  border-radius: 10px !important;
+  background: rgba(8, 19, 23, 0.54) !important;
+  padding: 0 15px 0 44px !important;
+  color: #f4f5f2 !important;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
   box-shadow:
-    inset 2px 2px 4px #c8c8c8,
-    inset -2px -2px 4px #fcfcfc !important;
-  transition: box-shadow 160ms ease, color 160ms ease;
+    inset 0 2px 7px rgba(0, 0, 0, 0.27),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
-.ff-login-input::placeholder {
-  color: #9aa6a6 !important;
+.ff-login-page .ff-login-input::placeholder {
+  color: #aebbb8 !important;
   opacity: 1;
 }
 
 .ff-login-page .ff-login-input:focus {
+  border-color: rgba(164, 205, 195, 0.78) !important;
+  background: rgba(7, 20, 23, 0.76) !important;
   box-shadow:
-    inset 2px 2px 4px #c8c8c8,
-    inset -2px -2px 4px #fcfcfc,
-    0 0 0 2px rgba(23, 139, 145, 0.4),
-    0 0 12px rgba(23, 139, 145, 0.18) !important;
+    inset 0 2px 7px rgba(0, 0, 0, 0.25),
+    0 0 0 3px rgba(121, 179, 164, 0.2) !important;
 }
 
-.ff-login-input:disabled {
+.ff-login-page .ff-login-input:disabled {
   cursor: not-allowed;
   opacity: 0.72;
 }
 
-.ff-login-password-input {
-  padding-right: 48px !important;
+.ff-login-page .ff-login-password-input {
+  padding-right: 50px !important;
 }
 
-.ff-login-toggle {
+.ff-login-page .ff-login-toggle {
   position: absolute;
   top: 50%;
   right: 7px;
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border: 0 !important;
-  border-radius: 9px !important;
+  border-radius: 8px !important;
   background: transparent !important;
-  color: #718486;
+  color: #c3cfcc;
   cursor: pointer;
   transform: translateY(-50%);
 }
 
-.ff-login-toggle:hover {
-  color: var(--login-teal-dark);
+.ff-login-page .ff-login-toggle:hover {
+  color: #ffffff;
 }
 
-.ff-login-toggle:focus-visible {
-  outline: 2px solid var(--login-teal);
+.ff-login-page .ff-login-toggle:focus-visible {
+  outline: 2px solid #b8d6cd;
   outline-offset: 1px;
 }
 
-.ff-login-toggle:disabled {
+.ff-login-page .ff-login-toggle:disabled {
   cursor: not-allowed;
+}
+
+.ff-login-page .ff-login-form [id$="-form-item-message"] {
+  color: #ffd5c7;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .ff-login-page .ff-login-submit {
   display: inline-flex;
   width: 100%;
-  min-height: var(--login-control-height);
-  height: var(--login-control-height);
+  min-height: 50px;
+  height: 50px;
   align-items: center;
   justify-content: center;
-  margin-top: 3px;
-  border: 0 !important;
-  border-radius: 13px !important;
-  background: var(--login-bg) !important;
+  margin-top: 4px;
+  border: 1px solid rgba(227, 242, 237, 0.25) !important;
+  border-radius: 10px !important;
+  background: var(--login-teal) !important;
   padding: 0 18px !important;
-  color: var(--login-ink) !important;
+  color: #ffffff !important;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.13em;
   cursor: pointer;
   box-shadow:
-    3px 3px 6px #c8c8c8,
-    -3px -3px 6px rgba(255, 255, 255, 0.85) !important;
-  transition: background-color 200ms ease, color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+    0 8px 18px rgba(4, 14, 16, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13) !important;
+  transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .ff-login-page .ff-login-submit:hover:not(:disabled) {
-  background: var(--login-teal) !important;
-  color: #ffffff !important;
+  background: var(--login-teal-hover) !important;
+  box-shadow:
+    0 10px 21px rgba(4, 14, 16, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.17) !important;
   transform: translateY(-1px);
 }
 
 .ff-login-page .ff-login-submit:active:not(:disabled) {
-  box-shadow:
-    inset 2px 2px 4px rgba(25, 58, 60, 0.3),
-    inset -2px -2px 4px rgba(255, 255, 255, 0.25) !important;
+  box-shadow: inset 0 2px 5px rgba(3, 15, 17, 0.28) !important;
   transform: translateY(0);
 }
 
-.ff-login-submit:focus-visible {
-  outline: 3px solid rgba(23, 139, 145, 0.55);
+.ff-login-page .ff-login-submit:focus-visible {
+  outline: 3px solid #c4ddd4;
   outline-offset: 4px;
 }
 
-.ff-login-submit:disabled {
+.ff-login-page .ff-login-submit:disabled {
   cursor: wait;
   opacity: 0.82;
 }
 
-.ff-login-error {
+.ff-login-page .ff-login-error {
   min-height: 0;
   margin-top: 0;
-  color: #a23f42;
+  color: #ffd5c7;
   font-size: 12px;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.ff-login-error:not(:empty) {
-  margin-top: 7px;
-}
-
-.ff-login-support-wrap {
-  margin-top: 8px;
-  text-align: center;
-}
-
-.ff-login-support {
-  color: #657779;
-  font-size: 10px;
   line-height: 1.4;
+  text-align: center;
+}
+
+.ff-login-page .ff-login-error:not(:empty) {
+  margin-top: 10px;
+}
+
+.ff-login-page .ff-login-support-wrap {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.ff-login-page .ff-login-support {
+  color: #d2ddda;
+  font-size: 12px;
+  line-height: 1.5;
   text-decoration: underline;
-  text-decoration-color: #a1b0af;
+  text-decoration-color: rgba(210, 221, 218, 0.58);
   text-underline-offset: 3px;
 }
 
-.ff-login-support:hover {
-  color: var(--login-teal-dark);
+.ff-login-page .ff-login-support:hover {
+  color: #ffffff;
   text-decoration-color: currentColor;
 }
 
-.ff-login-support:focus-visible {
+.ff-login-page .ff-login-support:focus-visible {
   border-radius: 2px;
-  outline: 2px solid var(--login-teal);
+  outline: 2px solid #c4ddd4;
   outline-offset: 3px;
 }
 
-.ff-login-status {
+.ff-login-page .ff-login-status {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -320,11 +347,11 @@
   animation: ff-login-rotate 1200ms ease-in-out both;
 }
 
-.ff-login-card--shake-1 {
+.ff-login-page .ff-login-card--shake-1 {
   animation: ff-login-shake-a 300ms ease-in-out;
 }
 
-.ff-login-card--shake-0 {
+.ff-login-page .ff-login-card--shake-0 {
   animation: ff-login-shake-b 300ms ease-in-out;
 }
 
@@ -345,174 +372,62 @@
   40%, 80% { transform: translateX(8px); }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .ff-login-page {
-    padding: 40px 20px;
+    place-items: center;
+    padding: 28px 16px;
+    background-image:
+      linear-gradient(180deg, rgba(8, 17, 21, 0.3), rgba(8, 17, 21, 0.48)),
+      url("/images/login-financial-lobby-mobile.webp");
+    background-position: center;
   }
 
   .ff-login-page .ff-login-card {
-    container-type: inline-size;
-    width: calc(100vw - 40px);
-    height: calc(100vw - 40px);
-    min-height: 0;
-    aspect-ratio: 1;
-    border-radius: 50% !important;
-    padding: 4vw 12vw 8vw !important;
-    box-shadow:
-      4px 4px 8px #c8c8c8,
-      -4px -4px 8px #ffffff,
-      inset 1px 1px 2px rgba(255, 255, 255, 0.36) !important;
+    width: min(100%, 440px);
+    border-radius: 22px !important;
+    padding: 34px clamp(22px, 7vw, 34px) 30px !important;
   }
 
-  .ff-login-brand img,
-  .ff-login-brand svg {
-    width: 48px;
-    height: 48px;
-  }
-
-  .ff-login-brand > div:first-child {
-    margin-bottom: 2px;
-  }
-
-  .ff-login-page .ff-login-product {
-    font-size: clamp(10px, 2.85vw, 14px);
-  }
-
-  .ff-login-page .ff-login-tagline {
-    font-size: clamp(9px, 2.4vw, 12px);
+  .ff-login-page .ff-login-brand > div:first-child {
+    margin-bottom: 7px;
   }
 
   .ff-login-page .ff-login-brand .ff-login-company {
-    margin-top: 4px;
-    font-size: clamp(17px, 4.65vw, 25px);
+    margin-top: 13px;
   }
 
-  .ff-login-content {
-    margin-top: 2.8cqw;
-  }
-
-  .ff-login-form {
-    gap: 1.6cqw;
-  }
-
-  .ff-login-form > div {
-    min-width: 0;
-  }
-
-  .ff-login-form > div > * + * {
-    margin-top: 3px !important;
-  }
-
-  .ff-login-form [id$="-form-item-message"] {
-    font-size: clamp(10px, 2.7vw, 12px);
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-  }
-
-  .ff-login-page .ff-login-input {
-    height: var(--login-control-height);
-    font-size: clamp(12px, 3.2vw, 14px);
-    padding-left: 30px !important;
-    border-radius: 10px !important;
-  }
-
-  .ff-login-input-icon {
-    left: 10px;
-    width: 13px;
-    height: 13px;
-  }
-
-  .ff-login-toggle {
-    right: 3px;
-    width: 28px;
-    height: 28px;
-  }
-
-  .ff-login-page .ff-login-submit {
-    min-height: var(--login-control-height);
-    height: var(--login-control-height);
-    font-size: clamp(12px, 3.2vw, 14px);
-    margin-top: 1px;
-    border-radius: 10px !important;
-  }
-
-  .ff-login-support-wrap {
-    margin-top: 1.5cqw;
-    line-height: 1;
-  }
-
-  .ff-login-support {
-    font-size: clamp(9px, 2.4vw, 12px);
-  }
-
-  .ff-login-error {
-    min-width: 0;
-    font-size: clamp(10px, 2.8vw, 12px);
-    overflow-wrap: anywhere;
-  }
-
-  .ff-login-error:not(:empty) {
-    margin-top: 4px;
-  }
-
-  .ff-login-page {
-    --login-control-height: 34px;
+  .ff-login-page .ff-login-content {
+    margin-top: 25px;
   }
 }
 
-@media (max-width: 319px) {
+@media (max-width: 380px) {
   .ff-login-page {
-    --login-control-height: 32px;
+    padding: 20px 16px;
   }
 
   .ff-login-page .ff-login-card {
-    height: auto;
-    min-height: 360px;
-    aspect-ratio: auto;
-    border-radius: 999px !important;
-    padding: 48px 24px !important;
+    padding: 29px 22px 25px !important;
   }
 
-  .ff-login-page .ff-login-input {
-    height: 32px;
-    font-size: 12px;
+  .ff-login-page .ff-login-content {
+    margin-top: 21px;
   }
 
-  .ff-login-page .ff-login-submit {
-    min-height: var(--login-control-height);
-    height: var(--login-control-height);
-    font-size: 12px;
-  }
-
-  .ff-login-page .ff-login-product {
-    font-size: 11px;
-  }
-
-  .ff-login-page .ff-login-tagline {
-    font-size: 9px;
-  }
-
-  .ff-login-page .ff-login-brand .ff-login-company {
-    font-size: 17px;
-  }
-
-  .ff-login-support {
-    font-size: 9px;
+  .ff-login-page .ff-login-form {
+    gap: 13px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ff-login-page .ff-login-card--rotating {
+  .ff-login-page .ff-login-card--rotating,
+  .ff-login-page .ff-login-card--shake-1,
+  .ff-login-page .ff-login-card--shake-0 {
     animation-duration: 1ms;
   }
 
-  .ff-login-card--shake-1,
-  .ff-login-card--shake-0 {
-    animation-duration: 1ms;
-  }
-
-  .ff-login-input,
-  .ff-login-submit {
+  .ff-login-page .ff-login-input,
+  .ff-login-page .ff-login-submit {
     transition-duration: 1ms;
   }
 }

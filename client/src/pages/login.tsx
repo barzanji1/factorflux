@@ -8,7 +8,7 @@ import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { staffLoginSchema } from "@shared/staff-auth";
@@ -108,20 +108,21 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormControl>
+                      <FormLabel htmlFor="ff-login-email" className="ff-login-label">Email address</FormLabel>
                         <div className="ff-login-input-wrap">
                           <User className="ff-login-input-icon" aria-hidden="true" />
+                          <FormControl>
                           <Input
                             {...field}
+                            id="ff-login-email"
                             type="email"
                             placeholder="Email Address"
                             className="ff-login-input ff-login-email-input"
-                            aria-label="Email address"
                             autoComplete="email"
                             disabled={isLoading}
                           />
+                          </FormControl>
                         </div>
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -132,18 +133,20 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormControl>
+                      <FormLabel htmlFor="ff-login-password" className="ff-login-label">Password</FormLabel>
                         <div className="ff-login-input-wrap">
                           <Lock className="ff-login-input-icon" aria-hidden="true" />
+                          <FormControl>
                           <Input
                             {...field}
+                            id="ff-login-password"
                             type={showPassword ? "text" : "password"}
                             placeholder="Password"
                             className="ff-login-input ff-login-password-input"
-                            aria-label="Password"
                             autoComplete="current-password"
                             disabled={isLoading}
                           />
+                          </FormControl>
                           <button
                             type="button"
                             className="ff-login-toggle"
@@ -159,7 +162,6 @@ export default function LoginPage() {
                             )}
                           </button>
                         </div>
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
