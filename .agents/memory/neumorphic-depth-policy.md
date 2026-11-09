@@ -17,7 +17,7 @@ The login page is an exception: the user replaced its circular neumorphic design
 
 The login reference requires a dark, clear navy center, localized cyan/silver upper-left reflections, and warm amber lower-right edge lighting. Inputs are dark glass; the button is rich teal, not gray-teal.
 
-**Why:** The user repeatedly rejected both a solid dark card and an evenly cloudy silver-gray surface. The reference's material depends on contrast between its dark clear center and localized reflections, not globally brightening the panel.
+**Why:** The user repeatedly rejected both a solid dark card and an evenly cloudy silver-gray surface, then explicitly called the dark-clear material with localized cyan/amber reflections "excellent." Preserve that approved material while discussing sizing or placement separately.
 
 **How to apply:** Preserve the existing architectural background while refining the glass surfaces; keep decorative layers pointer-transparent and form content crisp. Follow the user's explicit compact sizing rather than scaling the panel to the reference image's pixel bounds; the user rejected the oversized interpretation.
 
