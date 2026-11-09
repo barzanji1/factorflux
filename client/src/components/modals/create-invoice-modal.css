@@ -3,7 +3,7 @@
   border-radius: 20px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: -10px -10px 22px #fff, 10px 10px 22px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-create-invoice-dialog textarea,
@@ -13,7 +13,7 @@
   border-radius: 12px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-create-invoice-dialog textarea {
@@ -34,7 +34,7 @@
   border-radius: 14px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-create-invoice-select-content [data-highlighted],

@@ -8,7 +8,7 @@
   border-left: 4px solid var(--notice-color) !important;
   border-radius: 16px !important;
   padding: 16px !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff !important;
   overflow-wrap: anywhere;
 }
 .neu-notice.neu-notice.neu-notice[data-neu-notice="ack"] { --notice-color: #b66a16; }
@@ -37,7 +37,7 @@
   color: #333 !important;
   border: 0 !important;
   border-radius: 12px !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff !important;
 }
 .neu-notice.neu-notice.neu-notice input[type="checkbox"],
 .neu-notice.neu-notice.neu-notice [role="checkbox"] {
@@ -53,7 +53,7 @@
   border-radius: 5px !important;
   background: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: inset 2px 2px 4px #b8b8b8, inset -2px -2px 4px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
   cursor: pointer;
 }
 .neu-notice input[type="checkbox"]:checked::after {

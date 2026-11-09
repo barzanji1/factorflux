@@ -14,7 +14,7 @@ body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog {
   color: #333 !important;
   border: 0 !important;
   border-radius: 16px !important;
-  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .operations-neu-page.operations-neu-page.operations-neu-page main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
@@ -31,7 +31,7 @@ body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog [role="comb
   border-radius: 12px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .operations-neu-page main input::placeholder,
@@ -46,7 +46,7 @@ body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog button:not(
   border-radius: 12px !important;
   background-color: #e0e0e0 !important;
   color: #444 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 .operations-neu-page main button:hover:not(:disabled),
@@ -57,7 +57,7 @@ body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog button:hove
 
 .operations-neu-page main button:active:not(:disabled),
 .operations-neu-dialog button:active:not(:disabled) {
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .operations-neu-page main button.operations-neu-accent,
@@ -65,7 +65,7 @@ body:has(.operations-neu-page) [role="dialog"].operations-neu-dialog button:hove
 body:has(.operations-neu-page) [role="dialog"] button.operations-neu-accent {
   background: #27aab8 !important;
   color: #fff !important;
-  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 .operations-neu-page main button.operations-neu-accent:hover:not(:disabled),
 .operations-neu-dialog button.operations-neu-accent:hover:not(:disabled) {
@@ -102,7 +102,7 @@ body:has(.operations-neu-page) [role="dialog"] button.operations-neu-accent {
 .operations-neu-page main .operations-neu-badge {
   border: 0 !important;
   background: #e0e0e0 !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 .operations-neu-page main .operations-neu-badge.ff-badge-draft { color: #475569 !important; }
 .operations-neu-page main .operations-neu-badge.ff-badge-pending { color: #92400e !important; }
@@ -120,7 +120,7 @@ body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menu"]
   border-radius: 14px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 .operations-neu-menu [role="menuitem"],
 body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="option"],
@@ -134,7 +134,7 @@ body:has(.operations-neu-page) [data-radix-popper-content-wrapper] [role="menuit
   border: 0 !important;
   border-radius: 50% !important;
   background: #e0e0e0 !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 body:has(.operations-neu-page) [data-sonner-toaster] [data-sonner-toast],
@@ -144,14 +144,14 @@ body:has(.operations-neu-page) [data-radix-toast-viewport] [role="alert"] {
   border-radius: 14px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .operations-neu-page.operations-neu-page.operations-neu-page .ff-top-nav input.ff-neu-top-search:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 @media (max-width: 767px) {

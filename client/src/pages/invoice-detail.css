@@ -10,7 +10,7 @@
   border-radius: 12px;
   background: #e0e0e0;
   color: #333;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-invoice-neu-dialog {
@@ -18,7 +18,7 @@
   border-radius: 20px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: -10px -10px 22px #fff, 10px 10px 22px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-invoice-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
@@ -33,7 +33,7 @@
   border-radius: 50% !important;
   color: #5b6967 !important;
   background: #e0e0e0 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
   opacity: 1 !important;
 }
 
@@ -46,7 +46,7 @@
   border-radius: 16px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-invoice-neu-dialog :is(textarea, .ff-invoice-select-trigger) {
@@ -54,7 +54,7 @@
   border-radius: 12px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-invoice-neu-select-content {
@@ -63,7 +63,7 @@
   border-radius: 14px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-invoice-neu-select-content [data-highlighted] {
@@ -76,7 +76,7 @@
   border: 0 !important;
   border-radius: 20px !important;
   background: #e0e0e0 !important;
-  box-shadow: -10px -10px 22px #fff, 10px 10px 22px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-invoice-review-dialog :is(textarea, .ff-invoice-select-trigger) {
@@ -84,7 +84,7 @@
   border-radius: 12px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-invoice-broker-panel {
@@ -97,5 +97,5 @@
   border-radius: 12px !important;
   background: #e0e0e0 !important;
   color: #333 !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }

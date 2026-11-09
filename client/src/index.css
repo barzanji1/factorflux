@@ -633,9 +633,9 @@
   --ff-r-md: 12px;
   --ff-r-lg: 16px;
   --ff-r-xl: 20px;
-  --ff-shadow-xs: -3px -3px 7px #ffffff, 3px 3px 7px #b8b8b8;
-  --ff-shadow-sm: -4px -4px 9px #ffffff, 4px 4px 9px #b8b8b8;
-  --ff-shadow-md: -6px -6px 14px #ffffff, 6px 6px 14px #b8b8b8;
+  --ff-shadow-xs: -2px -2px 4px #ffffff, 2px 2px 4px #c8c8c8;
+  --ff-shadow-sm: -4px -4px 8px #ffffff, 4px 4px 8px #c8c8c8;
+  --ff-shadow-md: -4px -4px 8px #ffffff, 4px 4px 8px #c8c8c8;
 }
 
 body {
@@ -652,7 +652,7 @@ body {
 }
 .ff-card-interactive:hover, .qc-card-hover:hover {
   color: #168d99;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 .ff-btn-primary, .qc-button-primary {
   border: 0;
@@ -665,7 +665,7 @@ body {
 .ff-btn-primary:hover, .qc-button-primary:hover { background: #e0e0e0; color: #087f8c; }
 .ff-btn-primary:active, .qc-button-primary:active,
 .ff-btn-secondary:active, .qc-button-secondary:active,
-.ff-btn-danger:active { box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff; }
+.ff-btn-danger:active { box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff; }
 .ff-btn-secondary, .qc-button-secondary {
   border: 0;
   border-radius: 12px;
@@ -687,11 +687,11 @@ body {
   border: 0;
   border-radius: 12px;
   background: #e0e0e0;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 .ff-input:focus, .qc-topbar-search:focus {
   border-color: transparent;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff, 0 0 0 2px #8abeb8;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff, 0 0 0 2px #8abeb8;
 }
 .ff-data-table tbody tr:nth-child(odd),
 .ff-data-table tbody tr:nth-child(even) { background: transparent; }
@@ -714,7 +714,7 @@ body {
   border-radius: 12px !important;
   background: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 .ff-btn-primary:hover, .qc-button-primary:hover,
 [data-button-variant="default"]:hover:not(:disabled) { background: #e0e0e0 !important; color:#087f8c!important; }
@@ -725,14 +725,14 @@ body {
   border-radius: 12px !important;
   background: #e0e0e0 !important;
   color: #596d70 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 .ff-btn-danger, [data-button-variant="destructive"] {
   background: #e0e0e0 !important;
   color: #a3483e !important;
   border: 0 !important;
   border-radius: 12px !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 .ff-btn-danger:hover, [data-button-variant="destructive"]:hover:not(:disabled) { background: #e0e0e0 !important; color:#a3483e!important; }
 .ff-input, .qc-topbar-search {
@@ -740,11 +740,11 @@ body {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 .ff-input:focus, .qc-topbar-search:focus {
   border-color: transparent !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff, 0 0 0 2px #8abeb8 !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff, 0 0 0 2px #8abeb8 !important;
 }
 .ff-data-table thead th {
   background: #d5d8d7;
@@ -779,7 +779,7 @@ body {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 .ff-portal-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
 .ff-portal-shell textarea,
@@ -825,7 +825,7 @@ body {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease,
@@ -835,14 +835,14 @@ body {
 
 .bevel-button:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-sidebar-button {
   border: 0;
   border-radius: 12px;
   background: #e0e0e0;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
   color: #344244;
   text-shadow: none;
 }
@@ -855,11 +855,11 @@ body {
 .ff-sidebar-button[aria-current="page"] {
   background: #e0e0e0;
   color: #168d99;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-sidebar-button:active {
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
   transform: translateY(1px);
 }
 
@@ -888,7 +888,7 @@ body {
 [data-state="on"] {
   background-color: #e0e0e0;
   color: #168d99;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 *:focus-visible {
@@ -973,7 +973,7 @@ body {
 .ff-app-shell :is([class~="bg-blue-600"], [class~="bg-blue-700"]) {
   background-color: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 .ff-app-shell :is([class~="hover:bg-blue-600"], [class~="hover:bg-blue-700"]):hover {
   background-color: #e0e0e0 !important;
@@ -995,10 +995,10 @@ body {
   border: 0;
   border-radius: 16px !important;
   background: #e0e0e0 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: var(--neu-convex) !important;
 }
 .ff-app-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]) {
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+  box-shadow: var(--neu-convex) !important;
 }
 .ff-portal-shell :is([class~="shadow-sm"], [class~="shadow-md"], [class~="shadow-lg"]) { box-shadow:2px 2px 0 #808080,-1px -1px 0 #fff!important; }
 
@@ -1374,7 +1374,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 16px !important;
   background: #e0e0e0;
-  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-audit-detail table {
@@ -1393,7 +1393,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 16px !important;
   background: #e0e0e0 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-followups-surface > :first-child,
@@ -1412,20 +1412,20 @@ div:has(> table.ff-data-table) {
   margin: 0 10px 10px;
   border-radius: 14px;
   background: #e0e0e0;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 .ff-followup-step {
   border: 0 !important;
   background: #e0e0e0 !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 .ff-followups-page .ff-followups-surface,
 .ff-followups-page .ff-card {
   border: 0;
   background-color: #e0e0e0;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-followups-page :is(input, textarea, button[role="combobox"]).ff-followups-field,
@@ -1433,7 +1433,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-followups-page input:not([type="checkbox"]):not([type="radio"]),
@@ -1458,7 +1458,7 @@ div:has(> table.ff-data-table) {
 .ff-followups-template-card {
   border: 0 !important;
   background: #e0e0e0 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-followups-automation-row > div:first-child:hover {
@@ -1511,7 +1511,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 16px !important;
   background: #e0e0e0 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-reports-page .ff-card > :first-child,
@@ -1534,7 +1534,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 16px;
   background: #e0e0e0;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-reports-tab {
@@ -1542,13 +1542,13 @@ div:has(> table.ff-data-table) {
   border-radius: 12px;
   background: #e0e0e0;
   color: #465a56;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .ff-reports-tab.is-active {
   background: #e0e0e0;
   color: #087d8d;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-reports-section-header {
@@ -1569,7 +1569,7 @@ div:has(> table.ff-data-table) {
 
 .ff-reports-bucket {
   background: #e0e0e0;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 .ff-reports-page input:not([type="checkbox"]):not([type="radio"]),
@@ -1578,7 +1578,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-reports-page .ff-data-table tbody tr:nth-child(odd),
@@ -1593,7 +1593,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 16px !important;
   background: #e0e0e0 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-admin-surface > :first-child,
@@ -1616,7 +1616,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 16px;
   background: #e0e0e0;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-admin-tab {
@@ -1624,13 +1624,13 @@ div:has(> table.ff-data-table) {
   border-radius: 12px;
   background: #e0e0e0;
   color: #465a56;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #c1c1c1;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .ff-admin-tab.is-active {
   background: #e0e0e0;
   color: #087d8d;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-admin-role-admin {
@@ -1664,7 +1664,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-admin-section-header {
@@ -1677,7 +1677,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 14px;
   background: #e0e0e0;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 .ff-admin-hours {
@@ -1687,7 +1687,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 999px;
   background: #e0e0e0;
-  box-shadow: inset 2px 2px 4px #b8b8b8, inset -2px -2px 4px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-admin-hours > span {
@@ -1701,7 +1701,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 16px !important;
   background: #e0e0e0 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-payroll-surface > :first-child,
@@ -1733,7 +1733,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-payroll-avatar {
@@ -1747,7 +1747,7 @@ div:has(> table.ff-data-table) {
   border-radius: 50%;
   background: #d7e9e6;
   color: #287a7d;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
   font-size: 11px;
   font-weight: 800;
 }
@@ -1762,7 +1762,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 14px;
   background: #e0e0e0;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 .ff-payroll-section-header {
@@ -1777,7 +1777,7 @@ div:has(> table.ff-data-table) {
   border-radius: 10px;
   background: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
   font-weight: 700;
 }
 
@@ -1788,7 +1788,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 16px !important;
   background: #e0e0e0 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-expenses-surface > :first-child,
@@ -1820,7 +1820,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-expenses-category-travel {
@@ -1846,7 +1846,7 @@ div:has(> table.ff-data-table) {
   border: 1px dashed #9eafaa;
   border-radius: 14px;
   background: #e0e0e0;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 .ff-expenses-upload input[type="file"] {
@@ -1854,26 +1854,26 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 10px;
   background: #e0e0e0;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-expenses-approve {
   background: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .ff-expenses-reject {
   background: #e0e0e0 !important;
   color: #a3483e !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 .ff-expenses-page a.bevel-button {
   border: 0 !important;
   border-radius: 10px !important;
   background: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 .ff-vault-surface,
@@ -1881,7 +1881,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 16px !important;
   background: #e0e0e0 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .ff-vault-surface > :first-child,
@@ -1914,7 +1914,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-vault-table {
@@ -1954,14 +1954,14 @@ div:has(> table.ff-data-table) {
   border-radius: 8px;
   background: #e0e0e0;
   letter-spacing: .08em;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 .ff-rules-surface {
   border: 0;
   border-radius: 16px !important;
   background: #e0e0e0;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-rules-page input:not([type="checkbox"]):not([type="radio"]),
@@ -1973,7 +1973,7 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-rule-card {
@@ -1981,7 +1981,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 16px;
   background: #e0e0e0;
-  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-rule-card:hover {
@@ -2035,7 +2035,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 16px !important;
   background: #e0e0e0;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-workflow-page input:not([type="checkbox"]):not([type="radio"]),
@@ -2047,14 +2047,14 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-workflow-stage-number {
   border: 0;
   background: #d7e9e6;
   color: #147c82;
-  box-shadow: inset 2px 2px 5px #b3ceca, inset -2px -2px 5px #f6ffff;
+  box-shadow: inset 2px 2px 4px #b3ceca, inset -2px -2px 4px #f6ffff;
 }
 
 .ff-workflow-stage-icon,
@@ -2062,7 +2062,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 10px;
   background: #e0e0e0;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .ff-workflow-auto {
@@ -2094,11 +2094,11 @@ div:has(> table.ff-data-table) {
   border-radius: 50%;
   background: #e0e0e0;
   color: #4b625d;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .ff-workflow-icon-button:active:not(:disabled) {
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 
 .ff-workflow-connector {
@@ -2110,14 +2110,14 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 12px;
   background: #e0e0e0;
-  box-shadow: inset 3px 3px 6px #b8b8b8, inset -3px -3px 6px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 
 .ff-earl-chat {
   border: 0;
   border-radius: 18px;
   background: #e0e0e0;
-  box-shadow: -7px -7px 16px #fff, 7px 7px 16px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-earl-header {
@@ -2127,7 +2127,7 @@ div:has(> table.ff-data-table) {
 
 .ff-earl-avatar {
   border: 0;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .ff-earl-assistant-avatar {
@@ -2150,7 +2150,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   background: #e0e0e0;
   color: #414141;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-earl-starter {
@@ -2158,7 +2158,7 @@ div:has(> table.ff-data-table) {
   border-radius: 12px;
   background: #e0e0e0;
   color: #45605c;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .ff-earl-starter:hover {
@@ -2170,14 +2170,14 @@ div:has(> table.ff-data-table) {
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 5px 5px 10px #b8b8b8, inset -5px -5px 10px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-earl-icon-button {
   border: 0 !important;
   border-radius: 50% !important;
   background: #e0e0e0 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 .ff-earl-emoji-picker {
@@ -2185,7 +2185,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 16px;
   background: #e0e0e0;
-  box-shadow: -5px -5px 12px #fff, 5px 5px 12px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .ff-earl-emoji-option {
@@ -2197,7 +2197,7 @@ div:has(> table.ff-data-table) {
   border: 0;
   border-radius: 50%;
   background: #e0e0e0;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 .ff-earl-emoji-option:hover { color:#087f8c; }
 

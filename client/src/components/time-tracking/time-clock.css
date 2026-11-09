@@ -1,7 +1,7 @@
 .ff-time-clock-trigger {
   border: 0 !important;
   background: #e0e0e0 !important;
-  box-shadow: 4px 4px 9px #c1c5c2, -4px -4px 9px #fff !important;
+  box-shadow: 3px 3px 6px #c8c8c8, -3px -3px 6px #fff !important;
   transition: color .18s ease, transform .18s ease, box-shadow .18s ease !important;
 }
 .ff-time-clock-trigger:hover { color: #168f99 !important; }
@@ -50,7 +50,7 @@
   border-radius: 14px;
   padding: 13px;
   background: #e0e0e0;
-  box-shadow: inset 3px 3px 7px #c3c7c4, inset -3px -3px 7px #fff;
+  box-shadow: inset 3px 3px 6px #c8c8c8, inset -3px -3px 6px #fff;
 }
 .ff-time-clock-total {
   border-top: 1px solid rgba(169,180,174,.42);
@@ -84,7 +84,7 @@
   border-radius: 12px;
   color: #929d98;
   font-size: 11px;
-  box-shadow: inset 2px 2px 5px #c3c7c4, inset -2px -2px 5px #fff;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff;
 }
 .ff-time-clock-empty svg { color: #84b8b2; }
 .ff-time-clock-skeleton,

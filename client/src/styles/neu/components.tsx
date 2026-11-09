@@ -58,13 +58,13 @@ export const NeuButton = forwardRef<HTMLButtonElement, NeuButtonProps>(
           : variant === "destructive"
             ? "bg-[#e0e0e0] text-[#a3483e] hover:text-[#a3483e]"
             : variant === "secondary"
-              ? "bg-[#d5d5d5] text-[#444444] shadow-[-4px_-4px_9px_#ffffff,4px_4px_9px_#c1c1c1] hover:text-[#168d99]"
+              ? "bg-[#d5d5d5] text-[#444444] hover:text-[#168d99]"
               : variant === "ghost"
                 ? "bg-transparent text-[#444444] shadow-none hover:bg-[#d5d5d5] hover:text-[#168d99]"
                 : variant === "link"
                   ? "bg-transparent text-[#168d99] shadow-none underline-offset-4 hover:underline"
-                  : "bg-[#e0e0e0] text-[#333333] hover:text-[#168d99] active:shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
-        variant !== "ghost" && variant !== "link" ? neuTokenClasses.convex : "",
+                  : "bg-[#e0e0e0] text-[#333333] hover:text-[#168d99]",
+        variant !== "ghost" && variant !== "link" ? [neuTokenClasses.button, neuTokenClasses.buttonPressed] : "",
         "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0",
         neuTokenClasses.focus,
         className,
@@ -81,7 +81,7 @@ export const NeuInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
       ref={ref}
       className={cn(
         "min-h-11 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 text-sm !text-[#333333] placeholder:text-[#888888]",
-        "!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        neuTokenClasses.input,
         neuTokenClasses.focus,
         className,
       )}
@@ -97,7 +97,7 @@ export const NeuTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttribute
       ref={ref}
       className={cn(
         "min-h-24 w-full !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-3 text-sm !text-[#333333] placeholder:text-[#888888]",
-        "!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        neuTokenClasses.input,
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27aab8]",
         className,
       )}
@@ -124,7 +124,7 @@ export const NeuSelect = forwardRef<HTMLSelectElement, NeuSelectProps>(
       ref={ref}
       className={cn(
         "min-h-11 w-full appearance-auto !rounded-xl !border-0 !bg-[#e0e0e0] px-4 py-2.5 pr-10 text-sm !text-[#333333]",
-        "!shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
+        neuTokenClasses.input,
         neuTokenClasses.focus,
         className,
       )}
@@ -188,7 +188,7 @@ export const NeuTabList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
     <div
       ref={ref}
       role="tablist"
-      className={cn("flex flex-wrap gap-2 rounded-2xl bg-[#e0e0e0] p-2 shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]", className)}
+      className={cn("flex flex-wrap gap-2 rounded-2xl bg-[#e0e0e0] p-2", neuTokenClasses.flat, className)}
       {...props}
     />
   ),
@@ -233,8 +233,8 @@ export const NeuTab = forwardRef<HTMLButtonElement, NeuTabProps>(
         className={cn(
           "min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition-[transform,box-shadow,color] duration-150 focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]",
           selected
-            ? "bg-[#e0e0e0] text-[#27aab8] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#ffffff]"
-            : "bg-[#e0e0e0] text-[#333333] shadow-[-4px_-4px_9px_#ffffff,4px_4px_9px_#c1c1c1] hover:text-[#27aab8]",
+            ? cn("bg-[#e0e0e0] text-[#27aab8]", neuTokenClasses.concave)
+            : cn("bg-[#e0e0e0] text-[#333333] hover:text-[#27aab8]", neuTokenClasses.button),
           className,
         )}
         onClick={(event) => {
@@ -266,7 +266,7 @@ export const NeuTabPanel = forwardRef<HTMLDivElement, NeuTabPanelProps>(
         aria-labelledby={`${baseId}-tab-${value}`}
         tabIndex={0}
         hidden={selectedValue !== value}
-        className={cn("mt-5 rounded-2xl bg-[#e0e0e0] p-5 text-[#333333] shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]", className)}
+        className={cn("mt-5 rounded-2xl bg-[#e0e0e0] p-5 text-[#333333] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#27aab8]", neuTokenClasses.flat, className)}
         {...props}
       />
     );
@@ -278,7 +278,7 @@ function NeuTableContent({ className, children, tableRef, ...props }: TableHTMLA
   const tableChildren = useSafePaginatedTableChildren(children);
   return (
     <>
-      <div className="overflow-x-auto rounded-2xl bg-[#e0e0e0] shadow-[4px_4px_9px_#c1c1c1,-4px_-4px_9px_#ffffff]">
+      <div className={cn("overflow-x-auto rounded-2xl bg-[#e0e0e0]", neuTokenClasses.flat)}>
         <table ref={tableRef} className={cn("w-full border-collapse text-left text-sm text-[#333333]", className)} {...props}>{tableChildren}</table>
       </div>
       <SafeTablePaginationControls />
@@ -340,7 +340,8 @@ export const NeuBadge = forwardRef<HTMLSpanElement, NeuBadgeProps>(
     <span
       ref={ref}
       className={cn(
-        "inline-flex items-center rounded-full bg-[#e0e0e0] px-3 py-1 text-xs font-semibold shadow-[-3px_-3px_7px_#ffffff,3px_3px_7px_#c1c1c1]",
+        "inline-flex items-center rounded-full bg-[#e0e0e0] px-3 py-1 text-xs font-semibold",
+        neuTokenClasses.flat,
         tone === "accent" && "text-[#27aab8]",
         tone === "success" && "text-[#347d69]",
         tone === "warning" && "text-[#9b6a22]",

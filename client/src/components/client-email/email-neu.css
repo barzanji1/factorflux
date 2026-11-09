@@ -20,7 +20,7 @@
   border: 0 !important;
   border-radius: 12px !important;
   background: #e0e0e0 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .ff-app-shell .email-neu button,
@@ -33,25 +33,25 @@
 .email-neu-dialog button:not(:disabled):hover {
   background-color: #e0e0e0 !important;
   color: #087f8c !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 .ff-app-shell .email-neu button:not(:disabled):active,
 .email-neu-dialog button:not(:disabled):active {
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .email-neu section {
   border-color: transparent !important;
   border-radius: 1.25rem;
   background: var(--email-surface) !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8;
 }
 
 .email-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"] {
   right:12px!important;top:12px!important;width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;
   border:0!important;border-radius:50%!important;background:#e0e0e0!important;color:#677b77!important;
-  box-shadow:-3px -3px 7px #fff,3px 3px 7px #b8b8b8!important;
+  box-shadow:-3px -3px 6px #fff,3px 3px 6px #c8c8c8!important;
 }
 .email-neu-dialog > button[class*="absolute"][class*="right-4"][class*="top-4"]:hover { color:#087f8c!important; }
 
@@ -68,7 +68,7 @@
   border-radius: .8rem !important;
   background: #e0e0e0 !important;
   color: #344244 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .email-neu textarea {
@@ -80,14 +80,14 @@
   border-radius: .7rem;
   background-color: #e0e0e0;
   color: #344244;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .email-neu button[class*="bg-[#087f8e]"],
 .email-neu button[class*="bg-[#27aab8]"] {
   background-color: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 .email-neu button[class*="text-[#8d433a]"],
@@ -124,7 +124,7 @@
   border-radius: .8rem !important;
   background: #e0e0e0 !important;
   color: #344244 !important;
-  box-shadow: inset 4px 4px 8px #b8b8b8, inset -4px -4px 8px #fff !important;
+  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
 }
 
 .email-neu-dialog button:not([aria-label="Close"]) {
@@ -132,14 +132,14 @@
   border-radius: .75rem;
   background-color: #e0e0e0;
   color: #344244;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
 }
 
 .email-neu-dialog button[class*="bg-[#087f8e]"],
 .email-neu-dialog button[class*="bg-[#27aab8]"] {
   background-color: #e0e0e0 !important;
   color: #168d99 !important;
-  box-shadow: -4px -4px 9px #fff, 4px 4px 9px #c1c1c1 !important;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8 !important;
 }
 
 .email-neu-toast {
@@ -147,7 +147,7 @@
   border-radius: 1rem !important;
   background: #e0e0e0 !important;
   color: #344244 !important;
-  box-shadow: -6px -6px 14px #fff, 6px 6px 14px #b8b8b8 !important;
+  box-shadow: -4px -4px 8px #fff, 4px 4px 8px #c8c8c8 !important;
 }
 
 .email-neu-dialog > button.ff-btn-secondary:has(> span.sr-only) {
@@ -161,7 +161,7 @@
   border-radius: 999px;
   background: #e0e0e0 !important;
   color: #168f9b !important;
-  box-shadow: -3px -3px 7px #fff, 3px 3px 7px #b8b8b8;
+  box-shadow: -3px -3px 6px #fff, 3px 3px 6px #c8c8c8;
   opacity: 1;
 }
 

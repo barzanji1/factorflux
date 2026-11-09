@@ -56,3 +56,4 @@
 - [Backup diagnostic privacy](backup-diagnostic-privacy.md) — redacted stderr and binary/TCP evidence are allowed in failure logs; never persist credentials, raw SQL, or provider responses.
 - [Backup portability](backup-portability.md) — native-free SQL export avoids development-loader failures; unsupported schemas must fail closed and require restore-tested support.
 - [Browser verification context](browser-verification-context.md) — select the application port and preserve a secure origin before treating blank signed-in pages as app regressions.
+- [Neumorphic depth](neumorphic-depth-policy.md) — subtle global shadows; older one-off utilities are compacted at CSS build time without changing interaction states.

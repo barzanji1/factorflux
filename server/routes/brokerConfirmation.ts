@@ -36,7 +36,7 @@ export const confirmationSettingsSchema = z.object({
 function page(title: string, content: string): string {
   const pageClass = /^(Confirmation unavailable|Unable to record response)$/.test(title) ? " page-error" : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" href="/images/tpf-logo.png"><title>${escape(title)} — Trucking Pros Financial</title><style>
-    :root{color-scheme:light;--surface:#e0e0e0;--ink:#394541;--muted:#68736e;--teal:#27aab8;--teal-deep:#168f99;--shadow:7px 7px 16px #c1c5c2,-7px -7px 16px #fff;--inset:inset 5px 5px 10px #c1c5c2,inset -5px -5px 10px #fff}
+    :root{color-scheme:light;--surface:#e0e0e0;--ink:#394541;--muted:#68736e;--teal:#27aab8;--teal-deep:#168f99;--shadow:4px 4px 8px #c8c8c8,-4px -4px 8px #fff;--inset:inset 3px 3px 6px #c8c8c8,inset -3px -3px 6px #fff;--input-inset:inset 2px 2px 4px #c8c8c8,inset -2px -2px 4px #fff}
     *{box-sizing:border-box}
     body{min-height:100vh;margin:0;padding:clamp(16px,5vw,48px) 14px;background:var(--surface);color:var(--ink);font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     main{width:min(100%,620px);margin:0 auto;overflow:hidden;border-radius:20px;background:var(--surface);box-shadow:var(--shadow)}
@@ -53,10 +53,10 @@ function page(title: string, content: string): string {
     .invoice-details td{color:var(--ink);font-weight:600}
     form{margin-top:22px}
     label{display:block;margin:0 0 7px;font-size:14px;font-weight:650}
-    textarea{display:block;width:100%;min-height:112px;margin:8px 0 18px;padding:13px 14px;border:0;border-radius:12px;background:var(--surface);box-shadow:var(--inset);color:var(--ink);font:inherit;resize:vertical}
-    button,a.button{display:inline-flex;min-height:50px;align-items:center;justify-content:center;border:0;border-radius:12px;background:var(--teal);box-shadow:4px 4px 9px #c1c5c2,-4px -4px 9px #fff;color:#fff;padding:12px 22px;font:inherit;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
+    textarea{display:block;width:100%;min-height:112px;margin:8px 0 18px;padding:13px 14px;border:0;border-radius:12px;background:var(--surface);box-shadow:var(--input-inset);color:var(--ink);font:inherit;resize:vertical}
+    button,a.button{display:inline-flex;min-height:50px;align-items:center;justify-content:center;border:0;border-radius:12px;background:var(--teal);box-shadow:3px 3px 6px #c8c8c8,-3px -3px 6px #fff;color:#fff;padding:12px 22px;font:inherit;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
     button:hover,a.button:hover{background:var(--teal-deep)}
-    button:active,a.button:active{transform:translateY(1px);box-shadow:inset 3px 3px 7px rgba(24,93,97,.28),inset -3px -3px 7px rgba(255,255,255,.25)}
+    button:active,a.button:active{transform:translateY(1px);box-shadow:inset 2px 2px 4px rgba(24,93,97,.28),inset -2px -2px 4px rgba(255,255,255,.25)}
     :focus-visible{outline:3px solid #147b84;outline-offset:3px}
     .muted{margin-top:20px;color:var(--muted);font-size:14px}
     .result{margin:4px 0 0;padding:24px;border-radius:16px;background:var(--surface);box-shadow:var(--shadow)}
