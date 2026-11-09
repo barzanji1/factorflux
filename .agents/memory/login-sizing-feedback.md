@@ -20,3 +20,9 @@ Preserve the approved smaller login card and its material when changing the back
 **Why:** After requesting floor placement over the former lobby, the user replaced that scene with the actual TPF office photo and explicitly asked to keep the glass card exactly as-is.
 
 **How to apply:** Do not reintroduce the generated lobby or change the card to accommodate a background-only request. Keep short-screen and mobile layouts usable.
+
+Over the dusk building photo, use light translucent white glass rather than the former dark navy card.
+
+**Why:** The user found the dark card blended into the background and explicitly requested light frosted glass for contrast.
+
+**How to apply:** Preserve the approved card footprint and teal button; do not restore dark opaque card fills during later contrast refinements.
