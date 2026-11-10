@@ -91,10 +91,6 @@ async function loadInsights(entity: InsightEntity | "loads", entityId?: string |
   return response.json() as Promise<PageInsightsData>;
 }
 
-function StatSkeleton() {
-  return <div className="h-[88px] animate-pulse rounded-2xl bg-[#d6dfdc] shadow-[inset_4px_4px_8px_#bcc6c3,inset_-4px_-4px_8px_#f2f7f5]" />;
-}
-
 export function PageInsights({ entity, entityId, clientId, title = "Operational pulse", enabled = true, section }: Props) {
   const gradientId = `insights-${useId().replace(/:/g, "")}`;
   const queryClient = useQueryClient();
@@ -140,16 +136,41 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
     format === "currency" ? money.format(amount) : format === "percent" ? `${number.format(amount)}%` : number.format(amount);
 
   return (
-    <section className="mb-5 space-y-3" aria-label={`${title} insights`} data-insights-entity={entity}>
+    <section className="mb-5 space-y-3" aria-label={`${title} insights`} aria-busy={query.isPending} data-insights-entity={entity}>
       <div className="flex items-end justify-between gap-3">
         <div>
           {entity !== "client-email" && <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#63807a]">Full {labels.total.toLowerCase()} · refreshes every minute</p>}
           <h2 className="text-lg font-bold tracking-tight text-[#354b47]">{title}</h2>
         </div>
-        {query.isFetching && !query.isPending && <span className="text-[11px] text-[#71827e]">Updating</span>}
+        {query.isPending ? <span role="status" className="text-[11px] text-[#71827e]">Loading insights…</span>
+          : query.isFetching && <span className="text-[11px] text-[#71827e]">Updating</span>}
       </div>
       {query.isPending ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[0, 1, 2].map((item) => <StatSkeleton key={item} />)}</div>
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+            {[
+              { label: labels.total, detail: labels.totalDetail },
+              { label: "Open items", detail: `Open ${labels.total.toLowerCase()}` },
+              { label: "Activity", detail: "Waiting for current data" },
+            ].map(({ label, detail }) => (
+              <NeuStatCard key={label} label={label} value={<span className="insight-number">—</span>}
+                detail={detail} className="insight-stat min-h-[88px] p-3" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2" aria-hidden="true">
+            {[labels.series, `${labels.series} trend`].map(label => (
+              <NeuCard key={label} pressed className="insight-chart min-w-0 p-3 sm:p-4">
+                <div className="mb-2">
+                  <p className="text-xs font-bold text-[#3d5751]">{label}</p>
+                  <p className="text-[10px] text-[#75847f]">Waiting for current data</p>
+                </div>
+                <div className="flex h-[210px] items-center justify-center text-xs text-[#75847f]">
+                  Loading chart…
+                </div>
+              </NeuCard>
+            ))}
+          </div>
+        </>
       ) : query.isError ? (
         <NeuNotice severity="block" role="alert" className="flex flex-wrap items-center justify-between gap-3">
           <span className="flex items-center gap-2 text-sm text-[#76594e]"><AlertCircle className="h-4 w-4" /> Insights are temporarily unavailable.</span>

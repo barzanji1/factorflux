@@ -176,15 +176,6 @@ export default function CalendarPage() {
           </div>
         </NeuCard>
 
-        {query.isLoading && (
-          <NeuCard aria-label="Loading calendar events" className="overflow-hidden p-3">
-            <div className="grid grid-cols-7 gap-3" aria-hidden="true">
-              {Array.from({ length: view === "month" ? 14 : 7 }, (_, index) =>
-                <div key={index} className="min-h-24 animate-pulse rounded-xl bg-[#d4d4d4]" />,
-              )}
-            </div>
-          </NeuCard>
-        )}
         {query.isError && (
           <NeuNotice severity="block" role="alert" className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -194,8 +185,9 @@ export default function CalendarPage() {
             <NeuButton onClick={() => query.refetch()} className="min-h-10 px-4">Try again</NeuButton>
           </NeuNotice>
         )}
-        {!query.isLoading && !query.isError && (
-          <NeuCard className="overflow-hidden p-2 sm:p-3">
+        {!query.isError && (
+          <NeuCard className="relative overflow-hidden p-2 sm:p-3" aria-busy={query.isLoading} aria-label="Calendar events">
+            {query.isLoading && <p role="status" className="absolute right-3 top-0 text-[10px] text-[#71827e]">Loading events…</p>}
             {view === "month" && (
               <div className="grid grid-cols-7 border-b border-[#c9c9c9] text-center">
                 {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day =>

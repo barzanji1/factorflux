@@ -61,3 +61,4 @@
 - [Dedicated liquid glass](liquid-glass-panel-policy.md) — reusable material/ripple/content layers; verify independently, preserve building scene, and remap SVG IDs in transition clones.
 - [Login transition boundary](login-transition-boundary.md) — success fragments continue across routing so the authenticated dashboard appears underneath; cancellation must not redirect later.
 - [Login sizing feedback](login-sizing-feedback.md) — smaller means a real proportional reduction, not only recentering or retaining a superseded pixel target.
+- [Navigation loading continuity](navigation-loading-policy.md) — prevent large gray placeholder flashes; preserve recognizable page structure and test pending frames during real sidebar clicks.

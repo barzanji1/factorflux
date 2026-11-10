@@ -97,6 +97,23 @@ try {
   for (let i = 0; i < 30 && await evaluate("location.pathname") === "/login"; i++) await delay(250);
   if (await evaluate("location.pathname") === "/login") throw new Error("Existing development test credentials did not authenticate; no account changes made");
   const results = [];
+  const navigationCheck = process.env.NAVIGATION_VERIFY === "1";
+  if (navigationCheck) {
+    // Slow real read requests in this browser only so transient UI stays visible.
+    // No fixture data, auth bypass, or changes to server behavior.
+    await evaluate(`(() => {
+      const original = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
+        if ((!init?.method || init.method === 'GET') &&
+            (url.pathname.endsWith('/stats') || url.pathname === '/api/calendar/events')) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+        return original(input, init);
+      };
+      window.__navigationTimeOrigin = performance.timeOrigin;
+    })()`);
+  }
   for (const requestedRoute of routes) {
     let route = requestedRoute;
     if (requestedRoute.endsWith("/:first")) {
@@ -110,7 +127,51 @@ try {
       route = `/${entity}/${encodeURIComponent(firstId)}`;
     }
     uncaught = 0; exceptions = [];
-    await evaluate(`(()=>{history.pushState({},'',${JSON.stringify(route)});dispatchEvent(new PopStateEvent('popstate'));})()`);
+    if (navigationCheck) {
+      const labels = { "/calendar": "Calendar", "/invoices": "Invoices", "/tasks": "Tasks" };
+      if (!labels[route]) throw new Error("Navigation verification requires a supported sidebar route");
+      await pointerClick(`aside button[aria-label="${labels[route]}"]`);
+      for (let i = 0; i < 40; i++) {
+        if (await evaluate("Boolean(document.querySelector('[data-insights-entity]'))")) break;
+        await delay(50);
+      }
+      await delay(50);
+      const pendingState = await evaluate(`(() => {
+        const insights = document.querySelector('[data-insights-entity]');
+        const calendar = document.querySelector('[aria-label="Calendar events"]');
+        return {
+          path: location.pathname,
+          sameDocument: performance.timeOrigin === window.__navigationTimeOrigin,
+          busy: insights?.getAttribute('aria-busy') === 'true',
+          stats: insights?.querySelectorAll('.insight-stat').length,
+          grayBlocks: insights?.querySelectorAll('.animate-pulse').length,
+          calendarBusy: calendar?.getAttribute('aria-busy') === 'true',
+          calendarTop: calendar?.getBoundingClientRect().top,
+          calendarDates: calendar?.querySelectorAll('button[aria-label^="Add event on"]').length
+        };
+      })()`);
+      if (pendingState.path !== route || !pendingState.sameDocument || !pendingState.busy ||
+          pendingState.stats !== 3 || pendingState.grayBlocks !== 0) {
+        const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65 });
+        await writeFile(`${out}/${route.slice(1)}-failure.jpg`, Buffer.from(image.data, "base64"));
+        throw new Error(`Sidebar loading-state regression on ${route}: ${JSON.stringify(pendingState)}`);
+      }
+      if (route === "/calendar" && (!pendingState.calendarBusy || pendingState.calendarDates < 28)) {
+        throw new Error("Calendar grid disappeared while events were loading");
+      }
+      const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65 });
+      await writeFile(`${out}/${route.slice(1)}-loading.jpg`, Buffer.from(image.data, "base64"));
+      await delay(2100);
+      if (route === "/calendar") {
+        const finalTop = await evaluate("document.querySelector('[aria-label=\"Calendar events\"]').getBoundingClientRect().top");
+        if (Math.abs(finalTop - pendingState.calendarTop) > 4) {
+          throw new Error(`Calendar shifted ${Math.round(finalTop - pendingState.calendarTop)}px after insights loaded`);
+        }
+      }
+      console.log(JSON.stringify({ sidebarNavigation: route, pendingLayoutStable: true, grayBlocks: 0 }));
+    } else {
+      await evaluate(`(()=>{history.pushState({},'',${JSON.stringify(route)});dispatchEvent(new PopStateEvent('popstate'));})()`);
+    }
     for (let i = 0; i < 60; i++) {
       if (await evaluate("!!document.querySelector('[data-insights-entity], aside, [data-sidebar=\"sidebar\"]')")) break;
       await delay(150);
