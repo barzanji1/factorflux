@@ -44,6 +44,10 @@ interface Ripple {
   id: number;
   x: number;
   y: number;
+  size: number;
+  strength: number;
+  duration: number;
+  pressed: boolean;
 }
 
 interface SceneGeometry {
@@ -54,7 +58,7 @@ interface SceneGeometry {
 }
 
 const CONTROL_TARGET = "input, textarea, select, button, a, label, [role='button'], [role='textbox'], [contenteditable], [data-liquid-glass-no-ripple]";
-const RIPPLE_SIZE = 72;
+const TRACE_SIZE = 72;
 
 /**
  * A reusable glass lens. SVG filtering is confined to the optional scene
@@ -72,6 +76,8 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
       refraction = 26,
       onPointerMove,
       onPointerEnter,
+      onPointerDown,
+      onPointerLeave,
       ...divProps
     },
     forwardedRef,
@@ -79,6 +85,7 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
     const reactId = useId();
     const filterId = `lg-refraction-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
     const lastRipple = useRef({ x: -1000, y: -1000, at: 0 });
+    const pointerSample = useRef<{ x: number; y: number; at: number } | null>(null);
     const nextRippleId = useRef(0);
     const panelRef = useRef<HTMLDivElement | null>(null);
     const rippleTimers = useRef(new Map<number, number>());
@@ -206,17 +213,34 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
       setRipples((current) => current.filter((item) => item.id !== id));
     };
 
-    const emitRipple = (event: ReactPointerEvent<HTMLDivElement>, force = false) => {
-      if (!enableRipples || reduceMotion.current || event.pointerType === "touch" || event.defaultPrevented) return;
-      if ((event.target as Element).closest(CONTROL_TARGET)) return;
+    const emitRipple = (event: ReactPointerEvent<HTMLDivElement>, mode: "move" | "enter" | "press" = "move") => {
+      if (!enableRipples || reduceMotion.current || event.defaultPrevented) return;
+      if (event.pointerType === "touch" && mode !== "press") return;
+      if (mode === "press" && event.button !== 0) return;
+      if ((event.target as Element).closest(CONTROL_TARGET)) {
+        pointerSample.current = null;
+        return;
+      }
       const bounds = event.currentTarget.getBoundingClientRect();
       const x = event.clientX - bounds.left;
       const y = event.clientY - bounds.top;
       const previous = lastRipple.current;
       const now = performance.now();
-      if (!force && (Math.hypot(x - previous.x, y - previous.y) < 18 || now - previous.at < 90)) return;
+      const sample = pointerSample.current;
+      const speed = sample
+        ? Math.min(1.6, Math.hypot(x - sample.x, y - sample.y) / Math.max(8, now - sample.at))
+        : 0;
+      pointerSample.current = { x, y, at: now };
+      if (mode === "move" && (Math.hypot(x - previous.x, y - previous.y) < 12 || now - previous.at < 65)) return;
       lastRipple.current = { x, y, at: now };
-      const ripple = { id: nextRippleId.current++, x, y };
+      const pressed = mode === "press";
+      const ripple = {
+        id: nextRippleId.current++,
+        x, y, pressed,
+        size: pressed ? 96 : Math.min(80, TRACE_SIZE - 8 + speed * 10),
+        strength: pressed ? 0.78 : Math.min(0.65, 0.32 + speed * 0.22 + (event.buttons & 1 ? 0.12 : 0)),
+        duration: pressed ? 780 : 560 + Math.round(speed * 55),
+      };
       const oldest = ripples.length >= 3 ? ripples[0].id : null;
       if (oldest !== null) {
         const timer = rippleTimers.current.get(oldest);
@@ -224,7 +248,7 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
         rippleTimers.current.delete(oldest);
       }
       setRipples((current) => [...current.filter((item) => item.id !== oldest), ripple].slice(-3));
-      rippleTimers.current.set(ripple.id, window.setTimeout(() => removeRipple(ripple.id), 700));
+      rippleTimers.current.set(ripple.id, window.setTimeout(() => removeRipple(ripple.id), ripple.duration + 100));
     };
 
     const sceneStyle: CSSProperties | undefined = scene
@@ -247,7 +271,16 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
         }}
         onPointerEnter={(event) => {
           onPointerEnter?.(event);
-          emitRipple(event, true);
+          pointerSample.current = null;
+          emitRipple(event, "enter");
+        }}
+        onPointerDown={(event) => {
+          onPointerDown?.(event);
+          emitRipple(event, "press");
+        }}
+        onPointerLeave={(event) => {
+          onPointerLeave?.(event);
+          pointerSample.current = null;
         }}
       >
         <svg className="liquid-glass-panel__filter-defs" aria-hidden="true" focusable="false">
@@ -342,8 +375,13 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
           {ripples.map((ripple) => (
             <span
               className="liquid-glass-panel__ripple"
+              data-ripple-kind={ripple.pressed ? "press" : "trace"}
               key={ripple.id}
-              style={{ left: ripple.x, top: ripple.y, width: RIPPLE_SIZE, height: RIPPLE_SIZE }}
+              style={{
+                left: ripple.x, top: ripple.y, width: ripple.size, height: ripple.size,
+                "--lg-wave-strength": ripple.strength,
+                "--lg-wave-duration": `${ripple.duration}ms`,
+              } as CSSProperties}
               onAnimationEnd={() => removeRipple(ripple.id)}
             >
               {scene && (
@@ -358,8 +396,8 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
                       ? `100% 100%, ${sceneGeometry?.backgroundSize ?? "cover"}`
                       : sceneGeometry?.backgroundSize ?? "cover",
                     backgroundPosition: scene.overlay
-                      ? `0 0, ${rippleBackgroundPosition(ripple.x, ripple.y, sceneGeometry?.backgroundPosition)}`
-                      : rippleBackgroundPosition(ripple.x, ripple.y, sceneGeometry?.backgroundPosition),
+                      ? `0 0, ${rippleBackgroundPosition(ripple.x, ripple.y, ripple.size, sceneGeometry?.backgroundPosition)}`
+                      : rippleBackgroundPosition(ripple.x, ripple.y, ripple.size, sceneGeometry?.backgroundPosition),
                     filter: `${scene.filter ? `${scene.filter} ` : ""}url(#${rippleFilterId})`,
                   }}
                 />
@@ -480,11 +518,11 @@ function resolveScenePosition(position: string, leftoverX: number, leftoverY: nu
   return [resolveAxis(xToken, leftoverX), resolveAxis(yToken, leftoverY)];
 }
 
-function rippleBackgroundPosition(x: number, y: number, position = "0px 0px"): string {
+function rippleBackgroundPosition(x: number, y: number, size: number, position = "0px 0px"): string {
   const [left = "0px", top = "0px"] = position.split(/\s+/);
   const subtract = (coordinate: string, offset: number) => {
     const parsed = Number.parseFloat(coordinate);
     return `${parsed - offset}px`;
   };
-  return `${subtract(left, x - RIPPLE_SIZE / 2)} ${subtract(top, y - RIPPLE_SIZE / 2)}`;
+  return `${subtract(left, x - size / 2)} ${subtract(top, y - size / 2)}`;
 }

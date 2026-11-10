@@ -7,7 +7,7 @@ The user now explicitly requests a dedicated reusable liquid-glass component, su
 
 **Why:** The user rejected incremental gradients and overrides on the old login card and wants the optical properties represented as a controlled material, not merely a translucent box.
 
-**How to apply:** Keep independent material, restrained pointer-water, and unfiltered content layers. Pointer waves should resemble small, subtle water tracing, not broad expanding rings; keep the dramatic sign-in transition separate. Decorative layers must be pointer-transparent; controls must not trigger ambient waves. Preserve authentication, validation, routing, and the existing real TPF building scene. Use the supplied Liquid Glass Freight Login image as a card-only reference, not permission to replace the building with its lobby.
+**How to apply:** Keep independent material, restrained pointer-water, and unfiltered content layers. Pointer waves should resemble small, subtle water tracing, not broad expanding rings; movement speed may change their strength and clicks/taps should give a stronger response. Keep the dramatic sign-in transition separate. Decorative layers must be pointer-transparent; controls must not trigger ambient waves. Preserve authentication, validation, routing, and the existing real TPF building scene. Use the supplied Liquid Glass Freight Login image as a card-only reference, not permission to replace the building with its lobby.
 
 Verify the material independently before integrating form content. Compare at the reference's 1024 × 683 viewport. Avoid neon halos, opaque charcoal fills, and generic heavy frost.
 

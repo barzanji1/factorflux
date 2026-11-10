@@ -132,7 +132,7 @@
   mix-blend-mode: soft-light;
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.12);
-  animation: liquid-glass-ripple var(--lg-ripple-duration) cubic-bezier(0.18, 0.7, 0.26, 1) both;
+  animation: liquid-glass-ripple var(--lg-wave-duration, var(--lg-ripple-duration)) cubic-bezier(0.18, 0.7, 0.26, 1) both;
   will-change: transform, opacity;
 }
 
@@ -182,7 +182,7 @@
 
 @keyframes liquid-glass-ripple {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.12); }
-  14% { opacity: 0.45; }
+  14% { opacity: var(--lg-wave-strength, 0.45); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
