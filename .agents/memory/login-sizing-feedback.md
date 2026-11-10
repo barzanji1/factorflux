@@ -25,7 +25,7 @@ The user set the smaller card footprint and prohibited card pseudo-element refle
 
 **Why:** The user wants clear dimensional glass without losing the existing dusk effect on the building. Brightening the entire background to make the card more visible was explicitly corrected.
 
-**How to apply:** Refine the card's material, not the background filter, geometry, text hierarchy, teal button, or existing water-ripple interactions. Follow the user's detailed frosted-window prompt: nearly transparent white tint with strong backdrop blur/saturation, subtle downward sheen, thin bright border and only one inset top catch; no heavy shadows or layered luminous rims. Inputs are transparent and slightly more frosted, with white text and half-opacity placeholders. Login logo and brand text are white. The teal button is the only solid-colored surface. Do not claim native Apple refraction from simple CSS blur.
+**How to apply:** Refine the card's material, not the background filter, geometry, text hierarchy, teal button, or existing water-ripple interactions. The user's latest exact specification supersedes the earlier gradient: card background rgba(255, 255, 255, 0.12), backdrop blur(20px) saturate(180%), border 1.5px solid rgba(255, 255, 255, 0.3), with no additional card background images. Inputs use rgba(255, 255, 255, 0.1), white text and half-opacity placeholders. Login logo and brand text are white. No heavy shadows or layered luminous rims. Do not claim native Apple refraction from simple CSS blur.
 
 Over the dusk building photo, use light translucent white glass rather than the former dark navy card.
 
