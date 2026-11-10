@@ -6,6 +6,7 @@ import { pathToPermission } from "@/lib/routePermissions";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { NeuButton, NeuCard, NeuPageShell } from "@/styles/neu";
 import { NeuNotice } from "@/components/shared/NeuNotice";
+import { AppShell } from "@/components/layout/AppShell";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -17,7 +18,23 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   console.log("ProtectedRoute - isLoading:", isLoading, "isAuthenticated:", isAuthenticated);
 
-  if (isLoading || (isAuthenticated && user?.role !== "admin" && (!permissionsReadyForRoute || (!permissionsLoaded && !permissionsError)))) {
+  const checkingRouteAccess = isAuthenticated && !isLoading && user?.role !== "admin"
+    && (!permissionsReadyForRoute || (!permissionsLoaded && !permissionsError));
+
+  if (checkingRouteAccess) {
+    // Keep navigation in the current design while destination permissions refresh.
+    // The destination itself must remain unmounted until access is confirmed.
+    return (
+      <AppShell title="Loading page…" neu>
+        <NeuCard className="flex items-center gap-3 p-5" role="status" aria-live="polite">
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[#27aab8]" aria-hidden="true" />
+          <p className="text-sm text-[#596d70]">Checking page access…</p>
+        </NeuCard>
+      </AppShell>
+    );
+  }
+
+  if (isLoading) {
     return (
       <NeuPageShell className="ff-institutional-root flex min-h-screen items-center justify-center p-6">
         <NeuCard className="p-6 text-center" role="status" aria-live="polite">
