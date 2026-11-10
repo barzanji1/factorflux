@@ -2,7 +2,7 @@
 // Usage: TEST_URL=https://<dev-host>/login node scripts/test-liquid-glass.mjs
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
@@ -60,7 +60,7 @@ try {
     await cdp("Input.dispatchMouseEvent", { type: "mousePressed", ...rect, button: "left", clickCount: 1 });
     await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", ...rect, button: "left", clickCount: 1 });
   };
-  const count = () => evaluate("document.querySelectorAll('.liquid-glass-panel__ripple').length");
+  const count = () => evaluate("document.querySelectorAll('.liquid-glass-panel__ripple, .staff-login-ripple').length");
   await cdp("Page.enable");
   await cdp("Emulation.setDeviceMetricsOverride", { width: 1024, height: 683, deviceScaleFactor: 1, mobile: false });
   await cdp("Page.navigate", { url });
@@ -121,17 +121,20 @@ try {
   }
   assert(edgeChanges > 30, "SVG filter is defined but is not visibly refracting the scene.");
   assert(centerChanges < edgeChanges * 0.1, "Refraction is affecting the clear center rather than only the perimeter.");
+  const staffRipples = await evaluate("Boolean(document.querySelector('.ff-login-card'))");
   await move(r.x + 20, r.y + 90);
   await sleep(60);
   assert(await count() > 0, "Pointer did not emit a ripple.");
-  assert(await evaluate("parseFloat(getComputedStyle(document.querySelector('.liquid-glass-panel__ripple')).width) <= 80"), "Pointer trace is too large.");
+  assert(await evaluate("parseFloat(getComputedStyle(document.querySelector('.liquid-glass-panel__ripple, .staff-login-ripple')).width) <= 80"), "Pointer trace is too large.");
+  if (staffRipples) assert.equal(await evaluate("document.querySelector('.staff-login-ripple').children.length"), 3);
   for (let i = 0; i < 8; i++) {
     await sleep(125);
     await move(r.x + 20 + i * 45 % (r.width - 40), r.y + 85 + i % 2 * 35);
-    assert(await count() <= 3, "Ripple count exceeded GPU-conscious bound.");
+    assert(await count() <= (staffRipples ? 4 : 3), "Ripple count exceeded GPU-conscious bound.");
   }
   await sleep(1050);
   assert.equal(await count(), 0, "Ripple layers did not expire.");
+  if (!staffRipples) {
   await move(r.x + 20, r.y + 80);
   await sleep(150);
   await move(r.x + 32, r.y + 80);
@@ -140,16 +143,23 @@ try {
   await move(r.x + 180, r.y + 80);
   const fastStrength = await evaluate("Number([...document.querySelectorAll('.liquid-glass-panel__ripple')].at(-1).style.getPropertyValue('--lg-wave-strength'))");
   assert(fastStrength > slowStrength, "Ripple strength does not respond to pointer speed.");
+  }
   await move(r.x + 20, r.y + 80);
   await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: r.x + 20, y: r.y + 80, button: "left", clickCount: 1 });
   await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: r.x + 20, y: r.y + 80, button: "left", clickCount: 1 });
-  assert(await evaluate("Boolean(document.querySelector('[data-ripple-kind=press]'))"), "Glass click did not create a responsive ripple.");
-  assert(await count() <= 3);
+  assert(await evaluate("Boolean(document.querySelector('[data-ripple-kind=press], .staff-login-ripple--press'))"), "Glass click did not create a responsive ripple.");
+  assert(await count() <= (staffRipples ? 4 : 3));
+  if (staffRipples) {
+    await sleep(180);
+    await mkdir("generated-artifacts/login-ripple", { recursive: true });
+    const frame = await cdp("Page.captureScreenshot", { format: "jpeg", quality: 85 });
+    await writeFile("generated-artifacts/login-ripple/press.jpg", Buffer.from(frame.data, "base64"));
+  }
   await sleep(1000);
   await cdp("Emulation.setTouchEmulationEnabled", { enabled: true });
   await cdp("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: r.x + 25, y: r.y + 75 }] });
   await cdp("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  assert(await evaluate("Boolean(document.querySelector('[data-ripple-kind=press]'))"), "Glass tap did not create a ripple.");
+  assert(await evaluate("Boolean(document.querySelector('[data-ripple-kind=press], .staff-login-ripple--press'))"), "Glass tap did not create a ripple.");
   await cdp("Emulation.setTouchEmulationEnabled", { enabled: false });
   await sleep(1000);
   const isLogin = await evaluate("Boolean(document.querySelector('#ff-login-email'))");
@@ -196,7 +206,7 @@ try {
     await sleep(800);
     assert.equal(await evaluate("window.__cancelledReveal"), false);
   }
-  console.log(JSON.stringify({ passed: true, url: new URL(url).pathname, refractionPixelCheck: {edgeChanges, centerChanges}, checks: ["layer isolation", "rendered perimeter refraction", "SVG texture", "unique definitions", "pointer pass-through", "bounded ripple cleanup", "movement-speed response", "click and touch ripples", "control interaction", "reduced motion", "mobile layout", ...(isLogin ? ["credential-free transition", "SVG clone remapping", "transition cancellation"] : [])] }, null, 2));
+  console.log(JSON.stringify({ passed: true, url: new URL(url).pathname, refractionPixelCheck: {edgeChanges, centerChanges}, checks: ["layer isolation", "rendered perimeter refraction", "SVG texture", "unique definitions", "pointer pass-through", "bounded ripple cleanup", ...(staffRipples ? ["three-ring groups", "login-only effect"] : ["movement-speed response"]), "click and touch ripples", "control interaction", "reduced motion", "mobile layout", ...(isLogin ? ["credential-free transition", "SVG clone remapping", "transition cancellation"] : [])] }, null, 2));
 } finally {
   socket?.close();
   browser.kill("SIGTERM");

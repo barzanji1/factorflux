@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-ripple";
 import { LiquidGlassPanel } from "@/components/liquid-glass/LiquidGlassPanel";
+import { useStaffLoginRipples } from "@/hooks/use-staff-login-ripples";
 import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
@@ -12,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { staffLoginSchema } from "@shared/staff-auth";
 import "./login.css";
+import "./staff-login-ripples.css";
 
 const loginSchema = staffLoginSchema;
 
@@ -25,6 +27,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [shakeCount, setShakeCount] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const transitionBusy = useRef(false);
+  const authenticationBusy = useRef(false);
+  authenticationBusy.current = isLoading;
+  useStaffLoginRipples(cardRef, false, transitionBusy, authenticationBusy);
   const transitionRef = useRef<LoginSuccessTransition | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -45,6 +52,7 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    authenticationBusy.current = true;
     setIsLoading(true);
     setError("");
 
@@ -52,6 +60,7 @@ export default function LoginPage() {
       const success = await login(data.username, data.password);
       if (!mounted.current) return;
       if (success) {
+        transitionBusy.current = true;
         const card = mainRef.current?.querySelector<HTMLElement>(".ff-login-card") ?? null;
         const button = mainRef.current?.querySelector<HTMLElement>(".ff-login-submit") ?? null;
         transitionRef.current = playLoginSuccess(card, () => setLocation("/"), button);
@@ -71,6 +80,8 @@ export default function LoginPage() {
     <main ref={mainRef} className="ff-login-page">
       <div className="ff-login-stage">
         <LiquidGlassPanel
+          ref={cardRef}
+          enableRipples={false}
           className={`ff-login-card${shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
           aria-busy={isLoading}
           scene={{

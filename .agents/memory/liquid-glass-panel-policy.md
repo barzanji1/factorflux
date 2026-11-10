@@ -26,3 +26,9 @@ SVG definitions must remain valid in credential-free transition clones after the
 **Why:** Stripping all IDs makes SVG-based glass disappear during navigation, while retaining original IDs creates collisions with the still-mounted login.
 
 **How to apply:** Remap only decorative SVG definition IDs and their URL references in transition clones. Continue removing form identifiers and credentials.
+
+Keep login-only ripple requests separate from the reusable panel's default pointer behavior and its material preview.
+
+**Why:** The user explicitly scoped their supplied ripple interactions to the login card only.
+
+**How to apply:** A login-specific effect must not change other panels, the architectural backdrop, authentication, or the separate sign-in success transition.
