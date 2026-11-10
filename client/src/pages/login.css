@@ -35,7 +35,7 @@
 .ff-login-page:not(.ff-login-transition)::before,
 .ff-login-transition-background::before {
   background-image: url("/assets/tpf-building.jpg");
-  background-position: center;
+  background-position: center 46%;
   background-size: cover;
   background-repeat: no-repeat;
   filter: brightness(0.35) saturate(0.7) contrast(1.1);
