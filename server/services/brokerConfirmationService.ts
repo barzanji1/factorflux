@@ -9,6 +9,7 @@ import { sendEmailTracked } from "../emailService";
 import { emailDetailsTable, emailDisplayName, wrapEmail } from "../emailTemplate.js";
 import { BROKER_PUBLIC_ORIGIN, brokerReceiptLinks, brokerReceiptActions } from "./brokerConfirmationPresentation";
 import { brokerCollectionsService, confirmCollectionVpInTransaction, recordCollectionReceiptSend, startBrokerCollectionsScheduler } from "./brokerCollections";
+import { brokerPaperwork, brokerPaperworkBody } from "./brokerPaperwork";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = typeof db | Tx;
@@ -146,8 +147,9 @@ export function createBrokerConfirmationService({
         ["Load", invoice.loadNumber || "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`],
         ["Carrier", emailDisplayName(row.carrierName) || "Not provided"],
       ];
-      const text = `Trucking Pros Financial\n${details.map(([label, value]) => `${label}: ${value}`).join("\n")}\nConfirm Receipt: ${confirmationUrl}\nDispute: ${disputeUrl}\nOpening a link does not confirm receipt. Please use the button on the page.`;
-      const html = wrapEmail(subject, `<p>Please confirm that you received this invoice, or report a dispute.</p>${emailDetailsTable(details as Array<[string, string]>)}${brokerReceiptActions(invoice.brokerConfirmationToken)}`);
+      const paperwork = brokerPaperworkBody(invoice.brokerConfirmationToken, await brokerPaperwork(tx, invoice));
+      const text = `Trucking Pros Financial\n${details.map(([label, value]) => `${label}: ${value}`).join("\n")}\nConfirm Receipt: ${confirmationUrl}\nDispute: ${disputeUrl}\nOpening a link does not confirm receipt. Please use the button on the page.${paperwork.text}`;
+      const html = wrapEmail(subject, `<p>Please confirm that you received this invoice, or report a dispute.</p>${emailDetailsTable(details as Array<[string, string]>)}${paperwork.html}${brokerReceiptActions(invoice.brokerConfirmationToken)}`);
       const [acceptedSends] = await tx.select({ count: sql<string>`count(*)` }).from(brokerConfirmationEvents)
         .where(and(eq(brokerConfirmationEvents.invoiceId, id), inArray(brokerConfirmationEvents.event, ["sent", "reminder_sent"])));
       // Failed/uncertain manual attempts must reuse a key; only committed acceptance advances it.
@@ -205,7 +207,7 @@ export function createBrokerConfirmationService({
         if (!previous) await event(tx, match.id, "opened", { kind: "broker", id: row.brokerEmail || "broker" }, "Confirmation page opened; receipt has NOT been confirmed.", now());
       }
       return {
-        invoiceId: row.invoice.id, invoiceNumber: row.invoice.invoiceNumber, carrierInvoiceNumber: row.invoice.carrierInvoiceNumber,
+        invoiceId: row.invoice.id, loadId: row.invoice.loadId, invoiceNumber: row.invoice.invoiceNumber, carrierInvoiceNumber: row.invoice.carrierInvoiceNumber,
         loadNumber: row.invoice.loadNumber, amount: row.invoice.amount, carrier: row.carrierName,
         status: row.invoice.brokerConfirmationStatus,
       };

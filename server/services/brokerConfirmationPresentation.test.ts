@@ -29,3 +29,14 @@ test("receipt and reminder bodies keep one TPF wrapper, inline logo and styled a
     assert.ok(prepared.attachments?.some(attachment => attachment.content_id === EMAIL_LOGO_CID));
   }
 });
+
+test("branding preserves the actual primary and secondary button cells, not only the outer header", () => {
+  const token = "00000000-0000-4000-8000-000000000001";
+  const html = prepareBrandedEmail({ subject: "Receipt", html: wrapEmail("Receipt", brokerReceiptActions(token)) }).html;
+  const actionTable = html.match(/<table data-tpf-actions="1"[\s\S]*?<\/table>/)?.[0];
+  assert.ok(actionTable);
+  assert.match(actionTable, /bgcolor="#27aab8"[^>]*>[\s\S]*?href="https:\/\/factorflux\.io\/api\/broker-confirm\//);
+  assert.match(actionTable, /bgcolor="#f5f5f5"[^>]*>[\s\S]*?href="https:\/\/factorflux\.io\/api\/broker-dispute\//);
+  assert.match(actionTable, />Confirm Receipt<\/a>/);
+  assert.match(actionTable, />Dispute<\/a>/);
+});

@@ -10,10 +10,12 @@ import { db, pool } from "../db";
 import {
   brokers, clients, users, invoices, tasks, brokerConfirmationEvents, eventLedger,
   insertInvoiceSchema, insertTaskSchema, brokerConfirmationSettings,
+  documents,
 } from "../../shared/schema";
 import { createBrokerConfirmationService, confirmationAction, fundedAgeDays, getConfirmationAgingRows, getConfirmationInvoiceScope } from "./brokerConfirmationService";
 import { registerBrokerConfirmationRoutes, confirmationSettingsSchema } from "../routes/brokerConfirmation";
 import { runInvoicePreflight } from "./invoicePreflight";
+import { brokerPaperwork, brokerPaperworkBody } from "./brokerPaperwork";
 
 const DAY = 86_400_000;
 const config = { maxReminders: 3, reminderDays: [3, 7, 14] as [number, number, number], publicBaseUrl: "https://factorflux.co" };
@@ -89,6 +91,31 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
         status: "funded", fundedAt: new Date(clock.getTime() - 49 * 3_600_000), submittedBy: userId,
         assignedTo: userId, assignedFollowupAgentId: userId, ...overrides }).returning())[0];
     const stored = async (id: number) => (await tx.select().from(invoices).where(eq(invoices.id, id)))[0];
+
+    await t.test("receipt emails include only this invoice's paperwork, with escaped download links", async () => {
+      const invoice = await newInvoice("paperwork");
+      const unrelated = await newInvoice("other-paperwork");
+      await tx.insert(documents).values([
+        ...(["rate_confirmation", "bol", "lumper_receipt", "other"] as const).map(type => ({
+          invoiceId: invoice.id, filename: `${suffix}-${type}.pdf`,
+          originalName: `${type} & paperwork.pdf`, mimeType: "application/pdf", size: 100,
+          s3Key: `fixtures/${suffix}/${type}.pdf`, documentType: type, uploadedBy: userId,
+        })),
+        { invoiceId: unrelated.id, filename: "unrelated.pdf", originalName: "unrelated.pdf",
+          mimeType: "application/pdf", size: 100, documentType: "bol", uploadedBy: userId },
+        { invoiceId: invoice.id, filename: "identity.pdf", originalName: "private-identity.pdf",
+          mimeType: "application/pdf", size: 100, documentType: "driver_id", uploadedBy: userId },
+      ]);
+      const files = await brokerPaperwork(tx, invoice);
+      assert.equal(files.length, 4);
+      assert.ok(files.every(file => !/unrelated|identity/.test(file.name)));
+      const body = brokerPaperworkBody(invoice.brokerConfirmationToken, files);
+      assert.match(body.html, /&amp; paperwork/);
+      await service.sendForInvoice(invoice.id, { kind: "agent", id: userId });
+      const mail = accepted.at(-1)!;
+      for (const file of files) assert.ok(mail.html?.includes(`/documents/${file.id}`));
+      assert.doesNotMatch(mail.html!, /private-identity|unrelated\.pdf/);
+    });
 
     await t.test("scheduled initial send excludes 24h and exactly 48h, and includes over 48h", async () => {
       const young = await newInvoice("delay-24h", { fundedAt: new Date(clock.getTime() - DAY) });
@@ -300,6 +327,49 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
       try {
         const address = server.address(); assert.ok(address && typeof address !== "string");
         const root = `http://127.0.0.1:${address.port}`;
+        {
+        // Follow the actual email Dispute href, and prove neither GET nor a
+        // Confirm form's CSRF token can submit the other action.
+        const disputed = await newInvoice("http-dispute-from-email");
+        await service.sendForInvoice(disputed.id, { kind: "agent", id: userId });
+        const emailHtml = accepted.at(-1)!.html!;
+        const disputeHref = emailHtml.match(/href="(https:\/\/factorflux\.io\/api\/broker-dispute\/[^"]+)"/)![1];
+        const disputeUrl = root + new URL(disputeHref).pathname;
+        const disputePage = await fetch(disputeUrl);
+        const disputeHtml = await disputePage.text();
+        assert.match(disputeHtml, /Submit Dispute/);
+        assert.match(disputeHtml, new RegExp(`action="/api/broker-dispute/${disputed.brokerConfirmationToken}"`));
+        assert.equal((await stored(disputed.id)).brokerConfirmationStatus, "sent");
+        const disputeCsrf = disputeHtml.match(/name="csrf" value="([a-f0-9]+)"/)![1];
+        const disputeCookie = disputePage.headers.get("set-cookie")!.split(";")[0];
+        const crossAction = await fetch(`${root}/api/broker-confirm/${disputed.brokerConfirmationToken}`, {
+          method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: disputeCookie },
+          body: new URLSearchParams({ csrf: disputeCsrf }),
+        });
+        assert.equal(crossAction.status, 403);
+        const disputeResponse = await fetch(disputeUrl, {
+          method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: disputeCookie },
+          body: new URLSearchParams({ csrf: disputeCsrf, reason: "Fixture: incorrect paperwork" }),
+        });
+        assert.equal(disputeResponse.status, 200);
+        assert.match(await disputeResponse.text(), /Dispute recorded/);
+        assert.equal((await stored(disputed.id)).brokerConfirmationStatus, "disputed");
+        assert.equal((await stored(disputed.id)).brokerConfirmedAt, null);
+        assert.equal((await fetch(`${root}/api/broker-confirm/${invoice.brokerConfirmationToken}/documents/2147483647`)).status, 404);
+        const [paper] = await tx.insert(documents).values({
+          invoiceId: invoice.id, filename: `${suffix}-download.pdf`, originalName: "Rate Confirmation.pdf",
+          mimeType: "application/pdf", size: 100, documentType: "rate_confirmation",
+          s3Key: `fixtures/${suffix}/rate.pdf`, uploadedBy: userId,
+        }).returning();
+        const downloadPath = `/documents/${paper.id}`;
+        const download = await fetch(`${root}/api/broker-confirm/${invoice.brokerConfirmationToken}${downloadPath}`, { redirect: "manual" });
+        assert.equal(download.status, 302, "valid invoice-token link issues a short-lived download without staff login");
+        assert.match(download.headers.get("location")!, /X-Amz-Expires=300/);
+        assert.equal(download.headers.get("referrer-policy"), "no-referrer");
+        assert.equal((await fetch(`${root}/api/broker-confirm/${disputed.brokerConfirmationToken}${downloadPath}`, { redirect: "manual" })).status, 404,
+          "a different active invoice's token cannot download this paperwork");
+        assert.equal((await stored(invoice.id)).brokerConfirmationStatus, "sent", "downloads do not confirm receipt");
+        }
         const url = `${root}/api/broker-confirm/${invoice.brokerConfirmationToken}`;
         const first = await fetch(url);
         assert.equal(first.status, 200);
@@ -318,6 +388,10 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
         const successHtml = await response.text();
         assert.match(successHtml, /Thank you/);
         assert.match(successHtml, /<svg/);
+        assert.equal((await stored(invoice.id)).brokerConfirmationStatus, "confirmed");
+        const opposite = await fetch(`${root}/api/broker-dispute/${invoice.brokerConfirmationToken}`);
+        assert.equal(opposite.status, 409);
+        assert.match(await opposite.text(), /has not changed that response/);
         assert.equal((await stored(invoice.id)).brokerConfirmationStatus, "confirmed");
         assert.equal((await fetch(`${root}/api/invoices/${invoice.id}/broker-confirmation`)).status, 401);
         assert.equal((await fetch(`${root}/api/invoices/${invoice.id}/broker-confirmation`, { headers: { "x-fixture-user": otherId } })).status, 403);

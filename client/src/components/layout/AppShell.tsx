@@ -1,7 +1,6 @@
 "use client";
 
 import { ReactNode } from "react";
-import "@/styles/neu/dashboard.css";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { NeuPageShell } from "@/styles/neu";

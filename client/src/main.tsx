@@ -1,8 +1,9 @@
 import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import { sentryDataCollection, scrubSentryBreadcrumb, scrubSentryEvent } from "@shared/sentry-privacy";
-import App from "./App";
 import "./index.css";
+import "@/styles/neu/dashboard.css";
+import App from "./App";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

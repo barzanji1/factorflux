@@ -61,7 +61,12 @@ export function textToEmailBody(text) {
 
 function bodyFragment(html) {
   const body = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? html;
-  return body.replace(/<!doctype[^>]*>|<\/?(?:html|body)\b[^>]*>|<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
+  // Trusted, flat action tables already contain mail-client-safe button paint.
+  // Reformatting their cells makes the white primary label invisible.
+  const actions = [];
+  const protectedBody = body.replace(/<table\b[^>]*data-tpf-actions="1"[^>]*>[\s\S]*?<\/table>/gi,
+    table => `TPF_ACTION_TABLE_${actions.push(table) - 1}_END`);
+  return protectedBody.replace(/<!doctype[^>]*>|<\/?(?:html|body)\b[^>]*>|<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
     .replace(/>(Hi|Dear|Hello)\s+([^<]+),</g, (_match, greeting, name) => `>${greeting} ${emailDisplayName(name)},<`)
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
     // Remove the previous per-message brand bars/footer, retaining actual content.
@@ -76,7 +81,8 @@ function bodyFragment(html) {
     })
     .replace(/<table\b[^>]*>/gi, '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;margin:20px 0">')
     .replace(/<(th|td)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_match, tag, value) =>
-      `<${tag} align="left" style="padding:10px;border:1px solid #e5e7eb;vertical-align:top;overflow-wrap:anywhere;${tag === "th" ? "font-weight:normal;background:#f9fafb" : ""}">${tag === "td" ? `<strong>${value}</strong>` : value}</${tag}>`);
+      `<${tag} align="left" style="padding:10px;border:1px solid #e5e7eb;vertical-align:top;overflow-wrap:anywhere;${tag === "th" ? "font-weight:normal;background:#f9fafb" : ""}">${tag === "td" ? `<strong>${value}</strong>` : value}</${tag}>`)
+    .replace(/TPF_ACTION_TABLE_(\d+)_END/g, (_match, index) => actions[Number(index)]);
 }
 
 export function wrapEmail(subject, bodyHtml) {

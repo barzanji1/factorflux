@@ -1,10 +1,10 @@
 ---
-name: Institutional-finance visual scope
-description: The approved Agent Dashboard is the visual reference across authenticated pages, with strict layout and behavior preservation.
+name: Neumorphic workspace visual scope
+description: One stable neumorphic theme across authenticated pages; no competing institutional reskins.
 ---
 
-Use the approved Agent Dashboard as the institutional-finance visual source of truth across authenticated Workspace, Communications, Funding, Operations, Risk, Recovery, and Admin pages, including nested details, forms, and dialogs. Do not introduce a different design direction.
+Use one consistent neumorphic system across authenticated Workspace, Communications, Funding, Operations, Risk, Recovery, and Admin pages, including loading states, nested details, forms, and dialogs. Do not restore the competing institutional-finance reskins.
 
-**Why:** The user approved the dashboard and then explicitly expanded that exact visual language system-wide. This supersedes the earlier dashboard-only styling restriction.
+**Why:** The user subsequently reported an old-system flash on every sidebar navigation and explicitly requested that only the neumorphic system load. This supersedes the earlier institutional-finance styling approval.
 
-**How to apply:** Preserve existing layouts, dimensions, positioning, sidebar groupings, workflows, permissions, financial logic, charts, data behavior, and carousel/card-flip motion. Extend only visual materials and control styling. Keep the approved dashboard appearance intact, and leave the architectural-glass login and public/customer-facing output outside the internal theme.
+**How to apply:** Keep theme selection independent of whether page data or dashboard descendants have mounted. Preserve layouts, sidebar groupings, workflows, permissions, financial logic, charts, and carousel/card-flip motion. Leave the glass login and public/customer-facing output outside the internal theme.

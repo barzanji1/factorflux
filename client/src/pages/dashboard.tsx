@@ -16,7 +16,6 @@ import type {
 import { pathToPermission } from "@/lib/routePermissions";
 import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
 import { NeuNotice } from "@/components/shared/NeuNotice";
-import "@/styles/ff-financial-dashboard.css";
 
 const countKinds = [
   ["email_bounced", "Bounced email"],
