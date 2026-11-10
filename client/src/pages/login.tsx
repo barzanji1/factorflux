@@ -77,8 +77,8 @@ export default function LoginPage() {
             src: "/assets/tpf-building.jpg",
             position: "center 46%",
             size: "cover",
-            filter: "brightness(0.43) saturate(0.76) contrast(1.05)",
-            overlay: "linear-gradient(135deg, rgba(19, 45, 63, 0.24), rgba(25, 51, 72, 0.48))",
+            filter: "brightness(0.62) saturate(0.76) contrast(1.05)",
+            overlay: "linear-gradient(135deg, rgba(19, 45, 63, 0.15), rgba(25, 51, 72, 0.3))",
             containerRef: mainRef,
           }}
         >

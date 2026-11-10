@@ -31,12 +31,12 @@
   background-position: center 46%;
   background-size: cover;
   background-repeat: no-repeat;
-  filter: brightness(0.43) saturate(0.76) contrast(1.05);
+  filter: brightness(0.62) saturate(0.76) contrast(1.05);
 }
 
 .ff-login-page:not(.ff-login-transition)::after,
 .ff-login-transition-background::after {
-  background: linear-gradient(135deg, rgba(19, 45, 63, 0.24), rgba(25, 51, 72, 0.48));
+  background: linear-gradient(135deg, rgba(19, 45, 63, 0.15), rgba(25, 51, 72, 0.3));
 }
 
 .ff-login-page:not(.ff-login-transition)::before,

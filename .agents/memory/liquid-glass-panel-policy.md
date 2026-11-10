@@ -11,6 +11,12 @@ The user now explicitly requests a dedicated reusable liquid-glass component, su
 
 Verify the material independently before integrating form content. Compare at the reference's 1024 × 683 viewport. Avoid neon halos, opaque charcoal fills, and generic heavy frost.
 
+The dusk treatment must leave the real building clearly visible, not near-black.
+
+**Why:** The user repeatedly found the background too dark after small brightness increases.
+
+**How to apply:** When asked to lighten dusk, adjust both photographic brightness and excessive overlay darkening; keep the aligned scene replay consistent with the visible background. Preserve the evening blue tone and the existing image placement.
+
 **Why:** The user explicitly requires independent optical verification and screenshot comparison rather than another unverified login-only CSS tweak.
 
 **How to apply:** Keep previews tied to the same component source, not drift-prone duplicate implementations. Chromium does not reliably support SVG URL filters in backdrop-filter; explicit aligned scene replay with an SVG displacement texture is the supported simulation for this architectural photo. Do not claim native Apple rendering or physical ray tracing.
