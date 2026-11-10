@@ -1,7 +1,7 @@
 .liquid-glass-panel {
   --lg-radius: 30px;
   --lg-edge: rgba(234, 246, 251, 0.78);
-  --lg-ripple-duration: 840ms;
+  --lg-ripple-duration: 620ms;
   position: relative;
   isolation: isolate;
   display: block;
@@ -113,8 +113,6 @@
 
 .liquid-glass-panel__ripple {
   position: absolute;
-  width: 192px;
-  height: 192px;
   border-radius: 50%;
   background: radial-gradient(
     circle closest-side,
@@ -163,7 +161,7 @@
     #000 88% 92%,
     transparent 97%
   );
-  opacity: 0.72;
+  opacity: 0.5;
   pointer-events: none;
 }
 
@@ -184,7 +182,7 @@
 
 @keyframes liquid-glass-ripple {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.12); }
-  14% { opacity: 0.76; }
+  14% { opacity: 0.45; }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 

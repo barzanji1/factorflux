@@ -54,6 +54,7 @@ interface SceneGeometry {
 }
 
 const CONTROL_TARGET = "input, textarea, select, button, a, label, [role='button'], [role='textbox'], [contenteditable], [data-liquid-glass-no-ripple]";
+const RIPPLE_SIZE = 72;
 
 /**
  * A reusable glass lens. SVG filtering is confined to the optional scene
@@ -213,7 +214,7 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
       const y = event.clientY - bounds.top;
       const previous = lastRipple.current;
       const now = performance.now();
-      if (!force && (Math.hypot(x - previous.x, y - previous.y) < 34 || now - previous.at < 120)) return;
+      if (!force && (Math.hypot(x - previous.x, y - previous.y) < 18 || now - previous.at < 90)) return;
       lastRipple.current = { x, y, at: now };
       const ripple = { id: nextRippleId.current++, x, y };
       const oldest = ripples.length >= 3 ? ripples[0].id : null;
@@ -223,7 +224,7 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
         rippleTimers.current.delete(oldest);
       }
       setRipples((current) => [...current.filter((item) => item.id !== oldest), ripple].slice(-3));
-      rippleTimers.current.set(ripple.id, window.setTimeout(() => removeRipple(ripple.id), 920));
+      rippleTimers.current.set(ripple.id, window.setTimeout(() => removeRipple(ripple.id), 700));
     };
 
     const sceneStyle: CSSProperties | undefined = scene
@@ -280,7 +281,7 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
             )}
             <filter id={rippleFilterId} x="-12%" y="-12%" width="124%" height="124%" colorInterpolationFilters="sRGB">
               <feImage href={RIPPLE_MAP} x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="waveMap" />
-              <feDisplacementMap in="SourceGraphic" in2="waveMap" scale="38" xChannelSelector="R" yChannelSelector="G" />
+              <feDisplacementMap in="SourceGraphic" in2="waveMap" scale="12" xChannelSelector="R" yChannelSelector="G" />
             </filter>
           </defs>
         </svg>
@@ -342,7 +343,7 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
             <span
               className="liquid-glass-panel__ripple"
               key={ripple.id}
-              style={{ left: ripple.x, top: ripple.y }}
+              style={{ left: ripple.x, top: ripple.y, width: RIPPLE_SIZE, height: RIPPLE_SIZE }}
               onAnimationEnd={() => removeRipple(ripple.id)}
             >
               {scene && (
@@ -485,5 +486,5 @@ function rippleBackgroundPosition(x: number, y: number, position = "0px 0px"): s
     const parsed = Number.parseFloat(coordinate);
     return `${parsed - offset}px`;
   };
-  return `${subtract(left, x - 96)} ${subtract(top, y - 96)}`;
+  return `${subtract(left, x - RIPPLE_SIZE / 2)} ${subtract(top, y - RIPPLE_SIZE / 2)}`;
 }

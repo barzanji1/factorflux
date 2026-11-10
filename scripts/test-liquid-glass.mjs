@@ -124,6 +124,7 @@ try {
   await move(r.x + 20, r.y + 90);
   await sleep(60);
   assert(await count() > 0, "Pointer did not emit a ripple.");
+  assert(await evaluate("parseFloat(getComputedStyle(document.querySelector('.liquid-glass-panel__ripple')).width) <= 80"), "Pointer trace is too large.");
   for (let i = 0; i < 8; i++) {
     await sleep(125);
     await move(r.x + 20 + i * 45 % (r.width - 40), r.y + 85 + i % 2 * 35);
