@@ -25,7 +25,7 @@ The user set the smaller card footprint and prohibited card pseudo-element refle
 
 **Why:** The user wants clear dimensional glass without losing the existing dusk effect on the building. Brightening the entire background to make the card more visible was explicitly corrected.
 
-**How to apply:** Refine the card's material and edge lighting, not the background filter, geometry, text hierarchy, teal button, or existing water-ripple interactions. Do not claim native Apple refraction from simple CSS blur.
+**How to apply:** Refine the card's material, not the background filter, geometry, text hierarchy, teal button, or existing water-ripple interactions. The building's roof and windows must remain discernible through the card; a uniformly blurred dark panel with a glowing outline is explicitly rejected. Use restrained edge lighting rather than layered luminous rims. Do not claim native Apple refraction from simple CSS blur.
 
 Over the dusk building photo, use light translucent white glass rather than the former dark navy card.
 
