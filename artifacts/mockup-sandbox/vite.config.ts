@@ -47,8 +47,10 @@ export default defineConfig({
       : []),
   ],
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(import.meta.dirname, 'src'),
+      '@factorflux/liquid-glass': path.resolve(import.meta.dirname, '../../client/src/components/liquid-glass/LiquidGlassPanel.tsx'),
     },
   },
   root: path.resolve(import.meta.dirname),
@@ -63,6 +65,10 @@ export default defineConfig({
     allowedHosts: true,
     fs: {
       strict: true,
+      allow: [
+        path.resolve(import.meta.dirname),
+        path.resolve(import.meta.dirname, '../../client/src/components/liquid-glass'),
+      ],
     },
   },
   preview: {

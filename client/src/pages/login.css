@@ -1,6 +1,6 @@
 .ff-login-page {
-  --login-ink: #344244;
-  --login-muted: #667573;
+  --login-ink: #f4f8fa;
+  --login-muted: rgba(230, 240, 245, 0.76);
   --login-teal: #168d99;
   --login-control-height: 48px;
   position: relative;
@@ -54,22 +54,22 @@
 .ff-login-page *::before,
 .ff-login-page *::after { box-sizing: border-box; }
 
+/* The panel owns every optical material effect; this rule only sets its footprint. */
 .ff-login-page .ff-login-card {
-  position: relative;
-  display: flex;
+  --lg-radius: 23px;
   width: 100%;
   max-width: 420px;
+  min-height: 450px;
   margin-inline: auto;
+}
+
+.ff-login-page .ff-login-card > .liquid-glass-panel__content {
+  display: flex;
+  min-height: 450px;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  overflow: hidden;
-  border: 0 !important;
-  border-radius: 20px !important;
-  background: #f0f0f0 !important;
-  padding: 34px 36px 30px;
-  box-shadow: -4px -4px 8px rgba(255, 255, 255, 0.25), 4px 4px 8px rgba(14, 28, 39, 0.25) !important;
-  color: var(--login-ink);
+  padding: 26px 34px 24px;
 }
 
 .ff-login-page.ff-login-transition {
@@ -111,41 +111,31 @@
   will-change: width, height, opacity;
 }
 
-.ff-login-page .ff-login-card > .ff-login-brand,
-.ff-login-page .ff-login-card > .ff-login-content {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  border: 0;
-  background: transparent !important;
-  padding: 0 !important;
-  color: inherit;
-}
-
 .ff-login-page .ff-login-brand {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
-  gap: 0 !important;
+  gap: 0;
   text-align: center;
 }
 
 .ff-login-page .ff-login-brand img {
   width: 58px;
   height: 54px;
-  filter: none !important;
+  filter: none;
 }
 
 .ff-login-page .ff-login-brand > div:first-child { margin-bottom: 7px; }
 
 .ff-login-page .ff-login-product {
-  margin: 0 !important;
-  color: #263638;
+  margin: 0;
+  color: #f8fbfc;
   font-size: 29px;
   font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1.08;
+  text-shadow: 0 1px 3px rgba(10, 23, 33, 0.24);
 }
 
 .ff-login-page .ff-login-registered {
@@ -164,14 +154,15 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin: 8px 0 0 !important;
-  color: #60716f;
+  margin: 8px 0 0;
+  color: rgba(244, 249, 251, 0.88);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.19em;
   white-space: nowrap;
   line-height: 1.4;
   text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(10, 23, 33, 0.24);
 }
 
 .ff-login-page .ff-login-tagline::before,
@@ -179,18 +170,19 @@
   width: 30px;
   height: 1px;
   flex: 0 1 auto;
-  background: #b8c4c0;
+  background: rgba(225, 239, 246, 0.66);
   content: "";
 }
 
 .ff-login-page .ff-login-brand .ff-login-company {
-  margin: 9px 0 0 !important;
-  color: #344244;
+  margin: 9px 0 0;
+  color: #f7fafb;
   font-family: inherit;
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 1.3;
+  text-shadow: 0 1px 3px rgba(10, 23, 33, 0.24);
   text-wrap: balance;
 }
 
@@ -199,10 +191,15 @@
   flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
-  margin-top: 24px;
+  margin-top: 21px;
 }
 
-.ff-login-page .ff-login-form { display: flex; flex-direction: column; gap: 14px; }
+.ff-login-page .ff-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .ff-login-page .ff-login-form > div { min-width: 0; }
 .ff-login-page .ff-login-form > div > * + * { margin-top: 4px; }
 
@@ -227,10 +224,10 @@
   position: absolute;
   z-index: 1;
   top: 50%;
-  left: 15px;
+  left: 16px;
   width: 17px;
   height: 17px;
-  color: #73817f;
+  color: rgba(241, 249, 252, 0.9);
   pointer-events: none;
   transform: translateY(-50%);
 }
@@ -240,29 +237,33 @@
   width: 100%;
   height: var(--login-control-height);
   min-height: var(--login-control-height);
-  border: 0 !important;
-  border-radius: 12px !important;
-  background: #e0e0e0 !important;
-  padding: 0 15px 0 44px !important;
-  color: #344244 !important;
+  border: 1px solid rgba(238, 248, 252, 0.34);
+  border-radius: 999px;
+  outline: none;
+  background: rgba(218, 235, 244, 0.105);
+  padding: 0 18px 0 45px;
+  color: #f7fafc;
   font-family: inherit;
   font-size: 14px;
-  text-shadow: none;
-  outline: none;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff !important;
-  transition: box-shadow 160ms ease;
+  text-shadow: 0 1px 2px rgba(8, 22, 31, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(18, 41, 55, 0.1);
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
-.ff-login-page .ff-login-input::placeholder { color: #7c8987 !important; opacity: 1; text-shadow: none; }
+.ff-login-page .ff-login-input::placeholder {
+  color: rgba(246, 250, 252, 0.86);
+  opacity: 1;
+  text-shadow: 0 1px 2px rgba(8, 22, 31, 0.22);
+}
 
 .ff-login-page .ff-login-input:focus {
-  border-color: transparent !important;
-  background: #e0e0e0 !important;
-  box-shadow: inset 2px 2px 4px #c8c8c8, inset -2px -2px 4px #fff, 0 0 0 2px #8abeb8 !important;
+  border-color: rgba(246, 252, 255, 0.7);
+  background: rgba(221, 239, 247, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 0 0 2px rgba(193, 228, 237, 0.26);
 }
 
 .ff-login-page .ff-login-input:disabled { cursor: not-allowed; opacity: 0.65; }
-.ff-login-page .ff-login-password-input { padding-right: 48px !important; }
+.ff-login-page .ff-login-password-input { padding-right: 48px; }
 
 .ff-login-page .ff-login-toggle {
   position: absolute;
@@ -272,23 +273,25 @@
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 0 !important;
-  border-radius: 8px !important;
-  background: transparent !important;
-  color: #667573;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  padding: 0;
+  color: rgba(242, 249, 252, 0.86);
   cursor: pointer;
   transform: translateY(-50%);
 }
 
 .ff-login-page .ff-login-toggle svg { width: 17px; height: 17px; stroke-width: 1.8; }
-.ff-login-page .ff-login-toggle:hover { color: #168d99; }
-.ff-login-page .ff-login-toggle:focus-visible { outline: 2px solid #8abeb8; outline-offset: 1px; }
+.ff-login-page .ff-login-toggle:hover { color: #fff; }
+.ff-login-page .ff-login-toggle:focus-visible { outline: 2px solid rgba(224, 245, 249, 0.9); outline-offset: 1px; }
 .ff-login-page .ff-login-toggle:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .ff-login-page .ff-login-form [id$="-form-item-message"] {
-  color: #a3483e;
+  color: #ffd8ce;
   font-size: 11px;
   line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(8, 22, 31, 0.25);
 }
 
 .ff-login-page .ff-login-submit {
@@ -298,58 +301,49 @@
   height: 48px;
   align-items: center;
   justify-content: center;
-  margin-top: 5px;
-  border: 0 !important;
-  border-radius: 12px !important;
-  background: linear-gradient(180deg, #24a7a5 0%, #168d99 54%, #087d89 100%) !important;
-  padding: 0 14px !important;
-  color: #fff !important;
+  margin-top: 4px;
+  border: 1px solid rgba(150, 238, 239, 0.76);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #26aeb0 0%, #168f99 55%, #087d89 100%);
+  padding: 0 16px;
+  color: #fff;
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.11em;
   cursor: pointer;
-  box-shadow: -3px -3px 7px rgba(255, 255, 255, 0.76), 4px 5px 9px rgba(73, 92, 91, 0.28) !important;
-  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  box-shadow: 0 8px 18px rgba(3, 22, 31, 0.21), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  transition: transform 160ms ease, opacity 160ms ease;
 }
 
-.ff-login-page .ff-login-submit:hover:not(:disabled) {
-  background: linear-gradient(180deg, #2eaeaa 0%, #188f99 54%, #087d89 100%) !important;
-  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.76), 3px 4px 7px rgba(73, 92, 91, 0.25) !important;
-  transform: translateY(-1px);
-}
-
-.ff-login-page .ff-login-submit:active:not(:disabled) {
-  box-shadow: inset 2px 2px 4px rgba(2, 58, 64, 0.3), inset -2px -2px 4px rgba(255, 255, 255, 0.22) !important;
-  transform: translateY(1px);
-}
-
-.ff-login-page .ff-login-submit:focus-visible { outline: 2px solid #8abeb8; outline-offset: 3px; }
+.ff-login-page .ff-login-submit:hover:not(:disabled) { transform: translateY(-1px); }
+.ff-login-page .ff-login-submit:active:not(:disabled) { transform: translateY(1px); }
+.ff-login-page .ff-login-submit:focus-visible { outline: 2px solid rgba(224, 245, 249, 0.9); outline-offset: 3px; }
 .ff-login-page .ff-login-submit:disabled { cursor: wait; opacity: 0.72; }
 
 .ff-login-page .ff-login-error {
   min-height: 0;
   margin-top: 0;
-  color: #8e3c33;
+  color: #ffd8ce;
   font-size: 11px;
   line-height: 1.4;
   text-align: center;
 }
 
 .ff-login-page .ff-login-error:not(:empty) { margin-top: 8px; }
-.ff-login-page .ff-login-support-wrap { margin-top: 18px; text-align: center; }
+.ff-login-page .ff-login-support-wrap { margin-top: 15px; text-align: center; }
 
 .ff-login-page .ff-login-support {
-  color: #596d70;
+  color: rgba(241, 248, 251, 0.84);
   font-size: 12px;
   line-height: 1.4;
   text-decoration: underline;
-  text-decoration-color: #9caeaa;
+  text-decoration-color: rgba(235, 246, 250, 0.48);
   text-underline-offset: 2px;
 }
 
-.ff-login-page .ff-login-support:hover { color: #087f8c; text-decoration-color: currentColor; }
-.ff-login-page .ff-login-support:focus-visible { border-radius: 2px; outline: 2px solid #8abeb8; outline-offset: 3px; }
+.ff-login-page .ff-login-support:hover { color: #fff; text-decoration-color: currentColor; }
+.ff-login-page .ff-login-support:focus-visible { border-radius: 2px; outline: 2px solid rgba(224, 245, 249, 0.9); outline-offset: 3px; }
 
 .ff-login-page .ff-login-status {
   position: absolute;
@@ -385,30 +379,42 @@
 @media (max-width: 600px) {
   .ff-login-page { padding: 22px 16px; }
   .ff-login-page .ff-login-stage { width: min(100%, 420px); }
-  .ff-login-page .ff-login-card { padding: 30px clamp(22px, 7vw, 34px) 26px; }
+  .ff-login-page .ff-login-card { min-height: 448px; }
+  .ff-login-page .ff-login-card > .liquid-glass-panel__content {
+    min-height: 448px;
+    padding: 25px clamp(22px, 7vw, 34px) 23px;
+  }
   .ff-login-page .ff-login-product { font-size: 27px; }
   .ff-login-page .ff-login-brand img { width: 54px; height: 50px; }
   .ff-login-page .ff-login-brand > div:first-child { margin-bottom: 6px; }
   .ff-login-page .ff-login-tagline { gap: 8px; font-size: 9px; letter-spacing: 0.17em; }
   .ff-login-page .ff-login-tagline::before,
   .ff-login-page .ff-login-tagline::after { width: clamp(14px, 5vw, 23px); }
-  .ff-login-page .ff-login-brand .ff-login-company { margin-top: 8px !important; font-size: 18px; }
-  .ff-login-page .ff-login-content { margin-top: 21px; }
-  .ff-login-page .ff-login-form { gap: 13px; }
-  .ff-login-page .ff-login-support-wrap { margin-top: 15px; }
+  .ff-login-page .ff-login-brand .ff-login-company { margin-top: 8px; font-size: 18px; }
+  .ff-login-page .ff-login-content { margin-top: 19px; }
+  .ff-login-page .ff-login-form { gap: 12px; }
+  .ff-login-page .ff-login-support-wrap { margin-top: 13px; }
   .ff-login-page .ff-login-support { font-size: 12px; line-height: 1.5; }
 }
 
 @media (max-width: 380px) {
   .ff-login-page { padding: 16px 12px; }
-  .ff-login-page .ff-login-card { padding: 26px 20px 23px; }
-  .ff-login-page .ff-login-content { margin-top: 18px; }
-  .ff-login-page .ff-login-form { gap: 12px; }
+  .ff-login-page .ff-login-card { min-height: 440px; }
+  .ff-login-page .ff-login-card > .liquid-glass-panel__content {
+    min-height: 440px;
+    padding: 22px 20px 21px;
+  }
+  .ff-login-page .ff-login-content { margin-top: 17px; }
+  .ff-login-page .ff-login-form { gap: 11px; }
 }
 
 @media (max-height: 600px) {
   .ff-login-page { padding-block: 16px; }
-  .ff-login-page .ff-login-card { padding-block: 22px; }
+  .ff-login-page .ff-login-card { min-height: 430px; }
+  .ff-login-page .ff-login-card > .liquid-glass-panel__content {
+    min-height: 430px;
+    padding-block: 20px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

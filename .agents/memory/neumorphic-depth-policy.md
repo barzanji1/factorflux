@@ -9,8 +9,8 @@ Keep neumorphic shadows subtle across the system: raised cards approximately 4px
 
 **How to apply:** Preserve focus indicators, colored status glows, layout dimensions, and behavior. Older arbitrary Tailwind shadow literals are also compacted during CSS processing; evaluate their emitted CSS, not only their source spelling. Keep this transformation idempotent so already compact shared tokens are not reduced repeatedly. Do not replace it with attribute selectors that infer the current state from an element's entire class string: an `active:` inset class must not make the default state inset.
 
-The login now belongs to the same neumorphic system as the authenticated pages, not a separate glass theme.
+The login is again an explicit exception to the neumorphic system used inside the application.
 
-**Why:** The user explicitly abandoned glassmorphism and wants the login to feel like a preview of the dashboard and invoice forms.
+**Why:** After the solid neumorphic iteration, the user requested a dedicated reusable liquid-glass component instead of further card overrides.
 
-**How to apply:** Use a solid white/light-gray raised card with approximately 20px corners, shared inset form inputs, a raised teal-gradient button, and dark branding text. The user corrected the logo mark back to its original teal colors; do not recolor the mark dark. No transparency, backdrop filters, or glass decorations on the card or controls. Keep the real TPF building as a separate cinematic dusk backdrop at about 35% brightness with slightly reduced saturation and a dark blue gradient. Do not restore the older circular login or former glass/lobby references.
+**How to apply:** Follow [the dedicated panel policy](liquid-glass-panel-policy.md) for login only. Keep the original teal logo colors and the real TPF building's cinematic dusk treatment. Do not extend login glass effects to internal pages or restore the generated lobby.

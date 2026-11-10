@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-ripple";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { LiquidGlassPanel } from "@/components/liquid-glass/LiquidGlassPanel";
 import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import { useForm } from "react-hook-form";
@@ -72,11 +70,19 @@ export default function LoginPage() {
   return (
     <main ref={mainRef} className="ff-login-page">
       <div className="ff-login-stage">
-        <Card
+        <LiquidGlassPanel
           className={`ff-login-card${shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
           aria-busy={isLoading}
+          scene={{
+            src: "/assets/tpf-building.jpg",
+            position: "center 46%",
+            size: "cover",
+            filter: "brightness(0.35) saturate(0.76) contrast(1.05)",
+            overlay: "linear-gradient(135deg, rgba(19, 45, 63, 0.24), rgba(25, 51, 72, 0.48))",
+            containerRef: mainRef,
+          }}
         >
-          <CardHeader className="ff-login-brand">
+          <header className="ff-login-brand">
             <div className="flex justify-center">
               <FactorFluxLogo
                 linkToDashboard={false}
@@ -89,8 +95,8 @@ export default function LoginPage() {
             <p className="ff-login-product">FactorFlux</p>
             <p className="ff-login-tagline">Freight Factoring OS</p>
             <p className="ff-login-company">Trucking Pros Financial</p>
-          </CardHeader>
-          <CardContent className="ff-login-content">
+          </header>
+          <section className="ff-login-content">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="ff-login-form">
                 <FormField
@@ -102,7 +108,7 @@ export default function LoginPage() {
                         <div className="ff-login-input-wrap">
                           <Mail className="ff-login-input-icon" aria-hidden="true" />
                           <FormControl>
-                          <Input
+                          <input
                             {...field}
                             id="ff-login-email"
                             type="email"
@@ -127,7 +133,7 @@ export default function LoginPage() {
                         <div className="ff-login-input-wrap">
                           <Lock className="ff-login-input-icon" aria-hidden="true" />
                           <FormControl>
-                          <Input
+                          <input
                             {...field}
                             id="ff-login-password"
                             type={showPassword ? "text" : "password"}
@@ -157,7 +163,7 @@ export default function LoginPage() {
                   )}
                 />
 
-                <Button
+                <button
                   type="submit"
                   className="ff-login-submit"
                   disabled={isLoading}
@@ -171,7 +177,7 @@ export default function LoginPage() {
                   ) : (
                     "SIGN IN"
                   )}
-                </Button>
+                </button>
               </form>
             </Form>
 
@@ -183,8 +189,8 @@ export default function LoginPage() {
                 Contact IT support for credential issues
               </a>
             </div>
-          </CardContent>
-        </Card>
+          </section>
+        </LiquidGlassPanel>
       </div>
       <div className="ff-login-status" role="status" aria-live="polite" aria-atomic="true">
         {isLoading ? "Signing in…" : ""}

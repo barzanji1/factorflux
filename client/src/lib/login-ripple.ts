@@ -13,7 +13,7 @@ interface CardMetrics {
   borderRadius: string;
 }
 
-function cloneWithoutCredentials(node: Node): Node {
+function cloneWithoutCredentials(node: Node, decorativeIds: Map<string, string>): Node {
   if (node.nodeType === Node.TEXT_NODE) {
     return document.createTextNode(node.textContent ?? "");
   }
@@ -32,6 +32,16 @@ function cloneWithoutCredentials(node: Node): Node {
     if (deniedAttributes.has(attribute.name.toLowerCase()) || /^on/i.test(attribute.name)) {
       clone.removeAttribute(attribute.name);
     }
+  }
+  // Retain only remapped SVG definition IDs. Never carry form IDs/values into
+  // the overlay; unique filter IDs keep the material intact after route unmount.
+  if (node instanceof SVGElement && node.id && decorativeIds.has(node.id)) {
+    clone.id = decorativeIds.get(node.id)!;
+  }
+  for (const attribute of Array.from(clone.attributes)) {
+    const replaced = attribute.value.replace(/url\(["']?#([^"')]+)["']?\)/g, (match, id: string) =>
+      decorativeIds.has(id) ? `url(#${decorativeIds.get(id)})` : match);
+    if (replaced !== attribute.value) clone.setAttribute(attribute.name, replaced);
   }
 
   const tagName = node.tagName.toLowerCase();
@@ -62,7 +72,7 @@ function cloneWithoutCredentials(node: Node): Node {
   if (tagName === "textarea") return clone;
 
   for (const child of Array.from(node.childNodes)) {
-    clone.appendChild(cloneWithoutCredentials(child));
+    clone.appendChild(cloneWithoutCredentials(child, decorativeIds));
   }
 
   return clone;
@@ -199,7 +209,11 @@ export function playLoginSuccess(
       padding: originalCardStyle.padding,
       borderRadius: originalCardStyle.borderRadius,
     };
-    const safeCard = cloneWithoutCredentials(card) as HTMLElement;
+    const decorativeIds = new Map(
+      Array.from(card.querySelectorAll<SVGElement>("svg [id]")).map((element, index) =>
+        [element.id, `login-reveal-${index}-${element.id}`] as const),
+    );
+    const safeCard = cloneWithoutCredentials(card, decorativeIds) as HTMLElement;
     safeCard.classList.add("ff-login-transition-card");
     applyCardGeometry(safeCard, cardRect.left, cardRect.top, cardRect.width, cardRect.height, cardMetrics);
 

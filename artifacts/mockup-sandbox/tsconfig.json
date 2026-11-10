@@ -14,6 +14,7 @@
     "allowImportingTsExtensions": true,
     "types": ["node", "vite/client"],
     "paths": {
+      "@factorflux/liquid-glass": ["../../client/src/components/liquid-glass/LiquidGlassPanel.tsx"],
       "@/*": ["./src/*"]
     }
   }

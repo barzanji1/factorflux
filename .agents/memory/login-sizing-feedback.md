@@ -21,8 +21,8 @@ Preserve the approved smaller login footprint when changing only the background.
 
 **How to apply:** Do not reintroduce the generated lobby or change the card to accommodate a background-only request. Keep short-screen and mobile layouts usable.
 
-The user has explicitly abandoned the glass direction in favor of the system's neumorphic design.
+The current login material is governed by the dedicated liquid-glass panel request.
 
-**Why:** “The whole point: when someone sees the login page and then sees the dashboard after signing in, it should feel like the same system.”
+**Why:** The user superseded the solid neumorphic iteration with a separate reusable optical component and explicitly prohibited further stacking of old card overrides.
 
-**How to apply:** Follow [the neumorphic policy](neumorphic-depth-policy.md). Earlier Apple/Lumia/liquid-glass references, transparency requirements, and exact glass CSS values are superseded. Keep the real building backdrop rather than a generated lobby.
+**How to apply:** Follow [the dedicated panel policy](liquid-glass-panel-policy.md). Preserve the smaller footprint and real building backdrop rather than reintroducing a generated lobby.
