@@ -134,7 +134,7 @@
 .ff-login-page .ff-login-brand img {
   width: 58px;
   height: 54px;
-  filter: brightness(0) saturate(100%) invert(23%) sepia(14%) saturate(773%) hue-rotate(132deg) brightness(92%) contrast(88%) !important;
+  filter: none !important;
 }
 
 .ff-login-page .ff-login-brand > div:first-child { margin-bottom: 7px; }
