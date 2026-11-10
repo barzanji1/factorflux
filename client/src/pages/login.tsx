@@ -100,6 +100,26 @@ export default function LoginPage() {
           aria-busy={isLoading}
           onPointerMove={handleCardPointerMove}
         >
+          <svg className="ff-login-lens-light" viewBox="0 0 400 450" preserveAspectRatio="none" fill="none" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="login-lens-cool" x1="0" y1="170" x2="120" y2="0" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#b0f4ff" stopOpacity="0" />
+                <stop offset=".48" stopColor="#b0f4ff" stopOpacity=".2" />
+                <stop offset=".7" stopColor="#fff" stopOpacity=".85" />
+                <stop offset="1" stopColor="#b0f4ff" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="login-lens-warm" x1="280" y1="450" x2="400" y2="310" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#a4f5ff" stopOpacity="0" />
+                <stop offset=".55" stopColor="#b9f6ff" stopOpacity=".6" />
+                <stop offset=".8" stopColor="#ffe1b7" stopOpacity=".7" />
+                <stop offset="1" stopColor="#fff" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d="M 2 180 C 0 88 9 73 50 58 C 84 46 83 13 120 1" stroke="url(#login-lens-cool)" strokeWidth="7" opacity=".2" />
+            <path d="M 2 180 C 0 88 9 73 50 58 C 84 46 83 13 120 1" stroke="url(#login-lens-cool)" strokeWidth="1.2" />
+            <path d="M 280 449 C 328 432 367 449 383 411 C 395 383 390 349 399 310" stroke="url(#login-lens-warm)" strokeWidth="8" opacity=".18" />
+            <path d="M 280 449 C 328 432 367 449 383 411 C 395 383 390 349 399 310" stroke="url(#login-lens-warm)" strokeWidth="1.2" />
+          </svg>
           <CardHeader className="ff-login-brand">
             <div className="flex justify-center">
               <FactorFluxLogo
