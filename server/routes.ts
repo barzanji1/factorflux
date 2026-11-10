@@ -829,7 +829,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // callbacks are intentionally excluded before this protected API boundary.
   const publicApiPath = (pathname: string) =>
     /^\/api\/broker-(?:confirm|dispute)\/[^/]+$/.test(pathname)
-    || /^\/api\/broker-confirm\/[^/]+\/documents\/[1-9]\d*$/.test(pathname)
     || pathname === "/api/webhooks/resend"
     || pathname === "/api/auth/login"
     || pathname === "/api/auth/logout"

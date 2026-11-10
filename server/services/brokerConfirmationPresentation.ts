@@ -15,7 +15,7 @@ export function brokerReceiptActions(token: string): string {
   const links = brokerReceiptLinks(token);
   // Inline styles and presentation tables work in mail clients without CSS
   // support. Separate full-width rows remain comfortable tap targets on phones.
-  return `<table data-tpf-actions="1" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:24px 0">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:24px 0">
 <tr><td align="center" bgcolor="#27aab8" style="background:#27aab8;border-radius:12px">
 <a href="${escapeEmailHtml(links.confirm)}" style="display:block;padding:15px 20px;min-height:20px;line-height:24px;font:700 16px Arial,Helvetica,sans-serif;color:#ffffff;text-align:center;text-decoration:none">Confirm Receipt</a></td></tr>
 <tr><td height="12" style="height:12px;font-size:0;line-height:0">&nbsp;</td></tr>

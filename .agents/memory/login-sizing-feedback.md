@@ -21,11 +21,11 @@ Preserve the approved smaller login card and its material when changing the back
 
 **How to apply:** Do not reintroduce the generated lobby or change the card to accommodate a background-only request. Keep short-screen and mobile layouts usable.
 
-The user supplied a liquid-glass spec with a 420px max-width card and no card pseudo-element reflections; this supersedes the earlier ~547px footprint. They subsequently supplied an Apple Liquid Glass reference and repeatedly requested further material refinements.
+Latest: the user supplied an exact liquid-glass spec ("do NOT deviate") with a 420px max-width card, no card pseudo-elements, and specified input values; this supersedes the earlier ~547px footprint.
 
-**Why:** The user repeatedly rejected flat gray/blue panels despite low fill opacity. Their later requests prioritize the perceived transparency and dimensional glass edges over the original material values.
+**Why:** the user explicitly dictated the values.
 
-**How to apply:** Preserve the card dimensions, branding, and no-pseudo-reflection boundary. Refine the material without changing the building's dusk treatment or its brightness unless asked separately. Judge the rendered result, not just the nominal opacity.
+**How to apply:** keep those values verbatim; don't re-add reflections or enlarge the card.
 
 Over the dusk building photo, use light translucent white glass rather than the former dark navy card.
 

@@ -13,7 +13,6 @@ import { collectionActionSchema, collectionSettingsSchema, type CollectionQueue,
 import { sendResendEmail, ResendDeliveryError, type ResendEmailParams } from "../resendTransport.js";
 import { emailDetailsTable, wrapEmail } from "../emailTemplate.js";
 import { brokerReceiptActions, brokerReceiptLinks } from "./brokerConfirmationPresentation";
-import { brokerPaperwork, brokerPaperworkBody } from "./brokerPaperwork";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = Pick<typeof db, "select" | "insert" | "update" | "transaction" | "execute">;
@@ -304,12 +303,11 @@ export function createBrokerCollectionsService({
           const text = `Trucking Pros Financial\n${message}\nInvoice: ${invoice.invoiceNumber}\nLoad: ${invoice.loadNumber ?? "Not provided"}\nAmount: $${Number(invoice.amount).toFixed(2)}${receiptLinks}`;
           if (state.mode === "live") {
             if (send === sendResendEmail && process.env.NODE_ENV !== "production") throw new CollectionError(503, PREVIEW_LIVE_EMAIL_NOTICE, "preview_live_blocked");
-            const paperwork = brokerPaperworkBody(invoice.brokerConfirmationToken, await brokerPaperwork(tx, invoice));
             // Reuse the old initial confirmation intent, preventing duplicate +48h sends across rollout/recovery.
             const key = state.phase === "vp" && number === 1 ? `broker-confirm/${invoice.brokerConfirmationToken}/initial` :
               `broker-collections/${invoice.brokerConfirmationToken}/${state.generation}/${due.step}`;
-            providerMessageId = await send({ to: recipient, subject, text: text + paperwork.text, idempotencyKey: key,
-              html: wrapEmail(subject, `<p>${message}</p>${emailDetailsTable([["Invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"], ["Load", invoice.loadNumber ?? "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`]])}${paperwork.html}${receiptHtml}<p>Please reply to this email with any questions.</p>`),
+            providerMessageId = await send({ to: recipient, subject, text, idempotencyKey: key,
+              html: wrapEmail(subject, `<p>${message}</p>${emailDetailsTable([["Invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"], ["Load", invoice.loadNumber ?? "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`]])}${receiptHtml}<p>Please reply to this email with any questions.</p>`),
               emailLog: { entityType: "invoice", entityId: invoiceId, templateName: `broker_collections_${state.phase}`, sentByUserId: null } });
             if (!providerMessageId) throw new CollectionError(502, "Provider did not return an acceptance ID.");
             await tx.update(settingsTable).set({ nextSendAt: new Date(now().getTime() + 2000) }).where(eq(settingsTable.id, 1));

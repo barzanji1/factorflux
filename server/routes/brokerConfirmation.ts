@@ -12,10 +12,6 @@ import {
 import { SYSTEM_EMAIL_REPLY_TO } from "../resendTransport.js";
 import { isProductionAppOrigin } from "../../shared/production-urls.js";
 import { BROKER_PUBLIC_ORIGIN } from "../services/brokerConfirmationPresentation";
-import { brokerPaperwork } from "../services/brokerPaperwork";
-import { getSignedDownloadUrl } from "../services/s3Service";
-import path from "node:path";
-import fs from "node:fs";
 
 type Dependencies = {
   requireAuth: RequestHandler;
@@ -172,30 +168,6 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
     res.json(await getConfirmationAgingRows(await getConfirmationInvoiceScope(req.user, db), db));
   }));
 
-  // Bearer-token access is limited to the active invoice's load paperwork.
-  // Document access never records a confirmation.
-  app.get("/api/broker-confirm/:token/documents/:documentId", async (req, res) => {
-    publicHeaders(res);
-    res.setHeader("Referrer-Policy", "no-referrer");
-    try {
-      const token = tokenSchema.parse(req.params.token);
-      const documentId = idSchema.parse(req.params.documentId);
-      const invoice = await service.publicInvoice(token);
-      const files = await brokerPaperwork(db, { id: invoice.invoiceId, loadId: invoice.loadId, brokerConfirmationToken: token });
-      const file = files.find(item => item.id === documentId);
-      if (!file) throw new ConfirmationError(404, "Paperwork not found for this invoice.");
-      if (file.s3Key) return void res.redirect(await getSignedDownloadUrl(file.s3Key, file.name, 300));
-      const root = path.resolve(process.cwd(), "uploads");
-      const candidates = [file.filename, `${file.filename}.pdf`].map(name => path.resolve(root, name));
-      const local = candidates.find(name => name.startsWith(root + path.sep) && fs.existsSync(name));
-      if (!local) throw new ConfirmationError(404, "This file is currently unavailable. Please contact Trucking Pros Financial.");
-      res.download(local, file.name);
-    } catch (error) {
-      const status = error instanceof z.ZodError ? 404 : error instanceof ConfirmationError ? error.status : 500;
-      res.status(status).send(page("Confirmation unavailable", `<p>${escape(error instanceof ConfirmationError ? error.message : "Paperwork is currently unavailable. Please contact Trucking Pros Financial.")}</p>`));
-    }
-  });
-
   // GET is deliberately non-confirming. Only an explicit, CSRF-protected POST records receipt/dispute.
   for (const mode of ["confirm", "dispute"] as const) {
     const route = `/api/broker-${mode}/:token`;
@@ -205,16 +177,11 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
         const token = tokenSchema.parse(req.params.token);
         const invoice = await service.publicInvoice(token, true);
         if (["confirmed", "disputed"].includes(invoice.status)) {
-          const requested = mode === "confirm" ? "confirmed" : "disputed";
-          if (invoice.status !== requested) {
-            return void res.status(409).send(page("Response already recorded",
-              `<p>Receipt of invoice ${escape(invoice.invoiceNumber)} was already ${escape(invoice.status)}. Opening this ${mode === "dispute" ? "dispute" : "confirmation"} link has not changed that response. Please contact Trucking Pros Financial to request a correction.</p><p class="muted">Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p>`));
-          }
           return void res.send(page(invoice.status === "confirmed" ? "Thank you" : "Dispute recorded",
             `<section class="result" aria-label="Response recorded"><div class="success-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12.5 4.5 4.5L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><p class="result-copy">${invoice.status === "confirmed" ? "Receipt of this invoice has been confirmed." : "Your dispute has been recorded. Please contact Trucking Pros Financial."}</p><p class="invoice-ref">Invoice ${escape(invoice.invoiceNumber)}</p><p class="muted">Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p></section>`));
         }
         const csrf = randomBytes(32).toString("hex");
-        const cookie = `ff-broker-${mode}-${invoice.invoiceId}`;
+        const cookie = `ff-broker-confirm-${invoice.invoiceId}`;
         res.cookie(cookie, csrf, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: `/api/broker-${mode}/${token}`, maxAge: 30 * 60_000 });
         const summary = [["Invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"],
           ["Load", invoice.loadNumber || "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`], ["Carrier", invoice.carrier || "Not provided"]];
@@ -231,7 +198,7 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
         const token = tokenSchema.parse(req.params.token);
         const input = z.object({ csrf: z.string().regex(/^[a-f0-9]{64}$/), reason: z.string().trim().max(2000).optional() }).parse(req.body);
         const invoice = await service.publicInvoice(token);
-        const cookieName = `ff-broker-${mode}-${invoice.invoiceId}=`;
+        const cookieName = `ff-broker-confirm-${invoice.invoiceId}=`;
         const cookie = req.headers.cookie?.split(";").map(value => value.trim()).find(value => value.startsWith(cookieName))?.slice(cookieName.length);
         if (!cookie || cookie.length !== input.csrf.length || !timingSafeEqual(Buffer.from(cookie), Buffer.from(input.csrf))) {
           throw new ConfirmationError(403, "Please reopen the email link and use the confirmation button.");
