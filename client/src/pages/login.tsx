@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { staffLoginSchema } from "@shared/staff-auth";
 import "./login.css";
+import "./login-glass.css";
 
 const loginSchema = staffLoginSchema;
 
@@ -50,11 +51,14 @@ export default function LoginPage() {
 
   // Ambient fingertip ripple: one small ring per meaningful pointer movement over the card.
   const handleCardPointerMove = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType === "touch") return;
+    if (event.pointerType === "touch" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const card = event.currentTarget;
     const rect = card.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
+    card.style.setProperty("--rim-glint-x", `${x}px`);
+    card.style.setProperty("--rim-glint-y", `${y}px`);
+    card.style.setProperty("--rim-glint-opacity", "0.9");
     const last = lastRipple.current;
     const now = performance.now();
     if (Math.hypot(x - last.x, y - last.y) < 56 || now - last.time < 140) return;
@@ -98,7 +102,12 @@ export default function LoginPage() {
           className={`ff-login-card${shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
           aria-busy={isLoading}
           onPointerMove={handleCardPointerMove}
+          onPointerLeave={(event) => {
+            event.currentTarget.style.setProperty("--rim-glint-opacity", "0");
+          }}
         >
+          <span className="ff-login-glass-edge" aria-hidden="true" />
+          <span className="ff-login-glass-glint" aria-hidden="true" />
           <CardHeader className="ff-login-brand">
             <div className="flex justify-center">
               <FactorFluxLogo
