@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-ripple";
+import { preloadPage } from "@/lib/lazy-page";
 import { LiquidGlassPanel } from "@/components/liquid-glass/LiquidGlassPanel";
 import { useStaffLoginRipples } from "@/hooks/use-staff-login-ripples";
 import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
@@ -60,6 +61,7 @@ export default function LoginPage() {
       const success = await login(data.username, data.password);
       if (!mounted.current) return;
       if (success) {
+        preloadPage("/");
         transitionBusy.current = true;
         const card = mainRef.current?.querySelector<HTMLElement>(".ff-login-card") ?? null;
         const button = mainRef.current?.querySelector<HTMLElement>(".ff-login-submit") ?? null;

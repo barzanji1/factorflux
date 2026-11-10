@@ -28,7 +28,6 @@ import {
   cashApplications,
   paymentApplicationLines,
   exceptions,
-  tasks,
   brokerAuthorityChecks,
   carrierAuthorityChecks,
   brokerAuthorityAlerts,
@@ -37,9 +36,7 @@ import {
   type CarrierAuthorityCheck,
   type InsertBrokerAuthorityCheck,
   type BrokerAuthorityAlert,
-  type InsertBrokerAuthorityAlert,
   type ComplianceIntegrationRun,
-  type InsertComplianceIntegrationRun,
   type PayoutSettings,
   type InsertPayoutSettings,
   type Payout,
@@ -49,7 +46,6 @@ import {
   type User,
   type UpsertUser,
   type TimeEntry,
-  type InsertTimeEntry,
   type Client,
   type InsertClient,
   type Debtor,
@@ -96,9 +92,7 @@ import {
   type InvoiceDocReview,
   type InsertInvoiceDocReview,
   userPermissions,
-  ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
-  type PermissionKey,
 } from "@shared/schema";
 import { db } from "./db";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
@@ -116,7 +110,7 @@ async function triggerBrokerCreditForInvoices(invoiceIds: number[]): Promise<voi
     console.warn("[brokerCredit] trigger lookup failed:", error instanceof Error ? error.message : error);
   }
 }
-import { eq, desc, like, or, and, count, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, desc, like, or, and, count, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 type AuthorityCheckSnapshot = Omit<BrokerAuthorityCheck, "entityType"> & {

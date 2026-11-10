@@ -30,8 +30,6 @@ import {
   Shield,
   Plus,
   Search,
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
   Clock,
   CheckCircle2,

@@ -10,10 +10,17 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 
 const url = process.env.TEST_URL;
 assert(url, "Provide TEST_URL for the login or isolated material preview.");
+const targetUrl = new URL(url);
+const localPreview = targetUrl.hostname === process.env.REPLIT_DEV_DOMAIN;
 const profile = await mkdtemp(path.join(tmpdir(), "liquid-glass-check-"));
 const port = 9234;
 const browser = spawn(process.env.CHROME_BIN || "chromium", [
   "--headless", "--no-sandbox", "--disable-dev-shm-usage",
+  ...(localPreview ? [
+    `--host-resolver-rules=MAP ${targetUrl.hostname} 127.0.0.1`,
+    "--no-proxy-server",
+    ...(targetUrl.protocol === "http:" ? [`--unsafely-treat-insecure-origin-as-secure=${targetUrl.origin}`] : []),
+  ] : []),
   `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "about:blank",
 ], { stdio: "ignore" });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

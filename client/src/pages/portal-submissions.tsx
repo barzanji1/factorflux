@@ -278,14 +278,6 @@ export default function PortalSubmissionsPage() {
     params.set("carrierId", String(id));
     setLocation(`${pathname}?${params.toString()}`);
   };
-  const closeInlineChat = () => {
-    setInlineCarrier(null);
-    const [pathname, queryString = ""] = location.split("?");
-    const params = new URLSearchParams(queryString);
-    params.delete("carrierId");
-    const query = params.toString();
-    setLocation(query ? `${pathname}?${query}` : pathname);
-  };
 
   const registrationMutation = useMutation({
     mutationFn: async ({ id, action, reason }: { id: number; action: "approve" | "reject"; reason?: string }) => {

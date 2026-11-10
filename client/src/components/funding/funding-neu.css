@@ -221,13 +221,6 @@ body:has(.funding-neu-page) [data-radix-toast-viewport] [role="alert"] {
   box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
 }
 
-.funding-neu-toast {
-  border: 0 !important;
-  border-radius: 14px !important;
-  background: var(--ff-institutional-surface, #e0e0e0) !important;
-  color: var(--ff-institutional-ink, #333) !important;
-  box-shadow: var(--ff-institutional-shadow, -4px -4px 8px #fff, 4px 4px 8px #c8c8c8) !important;
-}
 
 body:has(.funding-neu-page) [role="dialog"] {
   border: 0 !important;

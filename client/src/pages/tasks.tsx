@@ -7,7 +7,7 @@ import { z } from "zod";
 import {
   Briefcase, CalendarDays, Check,
   CheckSquare, ChevronDown, ChevronRight, Clock3, Edit3, FileText,
-  ListTodo, Loader2, Pause, Play, Plus, Search, SlidersHorizontal, Target,
+  ListTodo, Loader2, Pause, Play, Plus, Search, SlidersHorizontal,
   Trash2, UserRound, X,
 } from "lucide-react";
 import Sidebar from "@/components/layout/sidebar";

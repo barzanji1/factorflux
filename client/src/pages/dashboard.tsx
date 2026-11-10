@@ -145,12 +145,10 @@ export default function Dashboard() {
   const isFetching = followupsQuery.isFetching || activityQuery.isFetching || alertsQuery.isFetching || financialQuery.isFetching;
 
   const followupsMatches = matchesViewer(followupsQuery.data, user);
-  const activityMatches = matchesViewer(activityQuery.data?.pages[0], user);
   const alertsMatches = matchesViewer(alertsQuery.data, user);
   const financialMatches = matchesViewer(financialQuery.data, user);
 
   const followupsData = followupsMatches ? followupsQuery.data : undefined;
-  const activityData = activityMatches ? activityQuery.data?.pages[0] : undefined;
   const alertsData = alertsMatches ? alertsQuery.data : undefined;
   const financialData = financialMatches ? financialQuery.data : undefined;
   const orderedFollowups = useMemo(

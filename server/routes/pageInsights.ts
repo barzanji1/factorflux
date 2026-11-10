@@ -20,7 +20,7 @@ export function registerPageInsightRoutes(app: Express, dependencies: {
     const definition = insightDefinitions[entity];
     app.get(`/api/${entity}/stats`,
       // Documents already has a richer existing contract; keep it unless explicitly opted in.
-      (req, res, next) => entity !== "documents" || req.query.insights === "1" ? next() : next("route"),
+      (req, _res, next) => entity !== "documents" || req.query.insights === "1" ? next() : next("route"),
       dependencies.requireAuth,
       entity === "invoices" ? dependencies.requireInvoiceRead :
         definition.permission === "all_authenticated" ? (_req, _res, next) => next() : dependencies.requireModulePermission(definition.permission),

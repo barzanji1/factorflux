@@ -627,8 +627,7 @@ function ReminderTimeline({
         <div className="relative space-y-0">
           {/* Vertical connector line */}
           <div className="absolute left-[15px] top-5 bottom-5 w-px bg-slate-200 dark:bg-slate-700" />
-          {reminders.map((r, idx) => {
-            const isLast  = idx === reminders.length - 1;
+          {reminders.map((r) => {
             const canSkip = r.status === "scheduled" || r.status === "paused";
             const canCancel = r.status === "scheduled" || r.status === "paused" || r.status === "skipped";
             const canRestore = r.status === "canceled" || r.status === "skipped";

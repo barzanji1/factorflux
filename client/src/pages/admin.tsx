@@ -268,7 +268,7 @@ export default function Admin() {
     });
   }, [preflightSettings]);
 
-  const { data: docReqs = [], isLoading: docsLoading } = useQuery<DocRequirement[]>({
+  const { data: docReqs = [] } = useQuery<DocRequirement[]>({
     queryKey: ["/api/admin/doc-requirements"],
   } as any);
 
@@ -320,11 +320,6 @@ export default function Admin() {
   const { data: portalUsers = [], isLoading: portalLoading } = useQuery<PortalUserRow[]>({
     queryKey: ["/api/carrier-portal/users"],
     enabled: activeTab === "portal",
-  });
-  const { data: portalSubmissionCount } = useQuery<unknown[], Error, { count: number }>({
-    queryKey: ["/api/carrier-portal/submissions"],
-    enabled: activeTab === "portal",
-    select: (data) => ({ count: data.length }),
   });
   const approvePortalMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -1006,7 +1001,6 @@ export default function Admin() {
                         ) : (
                           <div className="space-y-2">
                             {stageDocs.map((doc, relIdx) => {
-                              const absIdx = effectiveDocItems.findIndex((d, gi) => d.stage === stage && effectiveDocItems.filter((x) => x.stage === stage).indexOf(d) === relIdx && gi >= 0);
                               const globalIdx = effectiveDocItems.map((d, i) => ({ d, i })).filter(({ d }) => d.stage === stage)[relIdx]?.i ?? -1;
                               return (
                                 <div key={relIdx} className="ff-admin-surface flex items-start gap-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">

@@ -36,7 +36,6 @@ import {
   Package,
   Star,
   Mail,
-  Sparkles,
   LifeBuoy,
   LayoutDashboard,
   Upload,

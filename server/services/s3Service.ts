@@ -110,7 +110,6 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
 export async function downloadToTemp(key: string, destPath: string): Promise<void> {
   if (!BUCKET) throw new Error("AWS_S3_BUCKET is not configured");
   const { createWriteStream } = await import("fs");
-  const { Readable } = await import("stream");
   const client = getClient();
   const { Body } = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
   if (!Body) throw new Error(`[S3] Empty body for key: ${key}`);

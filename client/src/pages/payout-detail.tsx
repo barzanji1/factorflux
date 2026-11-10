@@ -17,8 +17,8 @@ import { Badge, Button } from "@/components/admin-neu/adapters";
 import { NeuCard } from "@/styles/neu/components";
 
 import {
-  Banknote, ReceiptText, CheckCircle2, Clock, DollarSign,
-  TrendingUp, Activity, MessageSquare, PlayCircle, ArrowRight,
+  Banknote, ReceiptText, CheckCircle2, DollarSign,
+  TrendingUp, PlayCircle, ArrowRight,
   Building2, Percent,
 } from "lucide-react";
 

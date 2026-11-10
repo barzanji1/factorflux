@@ -5,9 +5,7 @@ import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Link } from "wouter";
 import {
   AGING_COLUMNS,
-  agingReportCsv,
   agingReportFiltersSchema,
-  type AgingReportFilters,
   type GroupedAgingReport,
 } from "@shared/aging-report";
 import { RecoveryButton as Button, RecoveryInput as Input, RecoveryTabs as Win95Tabs, RecoveryTabList as Win95TabsList, RecoveryTab as Win95TabsTrigger, RecoveryTable, RecoveryCard } from "@/components/recovery/recovery-controls";
@@ -50,17 +48,6 @@ function fundedDate(value: string) {
   }).format(date);
 }
 
-function saveCsv(report: GroupedAgingReport, filters: AgingReportFilters) {
-  const blob = new Blob([agingReportCsv(report)], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `Trucking_Pros_Financial_aging_${filters.view}_${filters.startDate ?? "all"}_${filters.endDate ?? "all"}.csv`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
 
 function moneyFieldError(value: unknown) {
   if (value === "" || value == null) return undefined;

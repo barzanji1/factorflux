@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import Picker from "@emoji-mart/react";
-import emojiData from "@emoji-mart/data";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, ArrowLeft, Hash, MessageCircle, MoreHorizontal, Plus, Send, Smile, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,28 +35,7 @@ type Channel = {
 type Message = ChatMessage;
 type EmojiSelection = { id?: string; native?: string };
 
-const tpfEmojiDefinitions = [
-  { id: "tpf-logo", name: "TPF Logo", keywords: ["tpf", "logo"], skins: [{ src: "/emojis/tpf-logo.png" }] },
-  { id: "ff-logo", name: "FactorFlux Logo", keywords: ["factorflux", "ff", "logo"], skins: [{ src: "/emojis/ff-logo.png" }] },
-  { id: "tpf4life", name: "TPF 4Life", keywords: ["tpf", "4life"], skins: [{ src: "/emojis/tpf4life.png" }] },
-  { id: "gm-tpf", name: "GM TPF", keywords: ["good morning", "tpf", "wave"], skins: [{ src: "/emojis/gm-tpf.png" }] },
-  { id: "tpf-truck", name: "TPF Truck", keywords: ["tpf", "truck"], skins: [{ src: "/emojis/tpf-truck.png" }] },
-  { id: "funded", name: "Funded", keywords: ["funded", "money", "dollar"], skins: [{ src: "/emojis/funded.png" }] },
-  { id: "invoice", name: "Invoice", keywords: ["invoice", "document"], skins: [{ src: "/emojis/invoice.png" }] },
-  { id: "approved", name: "Approved", keywords: ["approved", "check"], skins: [{ src: "/emojis/approved.png" }] },
-];
-
-const emojiPickerData = {
-  ...emojiData,
-  categories: [
-    { id: "tpf", name: "TPF", emojis: tpfEmojiDefinitions.map((emoji) => emoji.id) },
-    ...emojiData.categories,
-  ],
-  emojis: {
-    ...Object.fromEntries(tpfEmojiDefinitions.map((emoji) => [emoji.id, emoji])),
-    ...emojiData.emojis,
-  },
-};
+const Picker = lazy(() => import("@/components/team-chat/EmojiPicker"));
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
@@ -745,7 +722,7 @@ function ChatPanel({ active }: ChatPanelProps) {
             <div className="mt-2 rounded-xl bg-[#e0e0e0] p-2 shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#fff]"><div className="relative flex items-center gap-2">
               <MentionAutocomplete value={draft} onChange={(value) => { setDraft(value); draftsByChannelRef.current[String(selected.id)] = value; }} users={mentionUsers} onDirectoryRefresh={() => { void refreshMentionUsers(selected.id); }} onSubmit={submitMessage} placeholder={`Message ${selected.directName || selected.name}...`} textareaRef={(node) => { textareaRef.current = node; }} data-testid="chat-message-composer" className="!min-h-10 flex-1 resize-none overflow-hidden !border-0 !bg-transparent px-2 py-2 text-sm !text-[#333] outline-none placeholder:!text-[#888] !shadow-none focus-visible:!outline-none" />
               <GifPicker key={String(selected.id)} onSelect={sendGif} />
-              <div ref={emojiPickerRef} className="shrink-0"><NeuButton type="button" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="!min-h-9 !w-9 !rounded-lg !p-0 text-[#27aab8]"><Smile className="h-4 w-4" /></NeuButton>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 max-h-[min(420px,calc(100dvh-26rem))] w-[min(352px,calc(100vw-2.5rem))] max-w-full overflow-auto rounded-2xl bg-[#e0e0e0] p-2 shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] [--rgb-background:224,224,224] [--rgb-input:224,224,224] [--rgb-color:51,51,51] [--rgb-accent:39,170,184] [&_em-emoji-picker]:!w-full"><Picker data={emojiPickerData} dynamicWidth onEmojiSelect={insertEmoji} categories={["tpf", "frequent", "people", "nature", "foods", "activity", "places", "objects", "symbols"]} categoryIcons={{ tpf: { src: "/emojis/tpf-logo.png" } }} previewPosition="none" skinTonePosition="search" width="100%" height={380} /></div>}</div><NeuButton variant="accent" onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="!min-h-9 !w-9 !rounded-lg !p-0"><Send className="h-4 w-4" /></NeuButton></div></div>
+              <div ref={emojiPickerRef} className="shrink-0"><NeuButton type="button" onClick={() => setEmojiPickerOpen((open) => !open)} aria-label="Choose emoji" aria-expanded={emojiPickerOpen} className="!min-h-9 !w-9 !rounded-lg !p-0 text-[#27aab8]"><Smile className="h-4 w-4" /></NeuButton>{emojiPickerOpen && <div className="absolute bottom-[calc(100%+0.65rem)] right-0 z-40 max-h-[min(420px,calc(100dvh-26rem))] w-[min(352px,calc(100vw-2.5rem))] max-w-full overflow-auto rounded-2xl bg-[#e0e0e0] p-2 shadow-[-7px_-7px_16px_#fff,7px_7px_16px_#b8b8b8] [--rgb-background:224,224,224] [--rgb-input:224,224,224] [--rgb-color:51,51,51] [--rgb-accent:39,170,184] [&_em-emoji-picker]:!w-full"><Suspense fallback={<div role="status" className="p-4 text-sm">Loading emojis…</div>}><Picker onEmojiSelect={insertEmoji} /></Suspense></div>}</div><NeuButton variant="accent" onClick={submitMessage} disabled={!draft.trim()} aria-label="Send message" title="Send message" className="!min-h-9 !w-9 !rounded-lg !p-0"><Send className="h-4 w-4" /></NeuButton></div></div>
             </div>
             </div> : <div className="flex flex-1 flex-col items-center justify-center text-center text-[#666]"><Users className="mb-3 h-12 w-12 text-[#8bbfc1]" /><h2 className="font-bold text-[#333]">Your team, in sync</h2><p className="mt-1 max-w-xs text-xs">Choose a channel or start a direct message to begin.</p></div>}
           </NeuCard>

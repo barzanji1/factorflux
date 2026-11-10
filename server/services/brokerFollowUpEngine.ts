@@ -35,8 +35,7 @@ import {
   paymentApplicationLines,
   type CadenceConfig,
 } from "../../shared/schema";
-import { eq, and, lte, inArray, ne } from "drizzle-orm";
-import { storage } from "../storage";
+import { eq, and, inArray } from "drizzle-orm";
 import { sendEmailTracked } from "../emailService";
 import { paymentInstructions, configuredPaymentBody, textToEmailBody, emailDisplayName } from "../emailTemplate.js";
 import { brokerCollectionsService, collectionRunHttpStatus } from "./brokerCollections";
@@ -150,7 +149,7 @@ function fallbackSubject(
 function fallbackBody(
   type: string,
   seqNumber: number,
-  weekNum: number,
+  _weekNum: number,
   invoiceNumber: string,
   amount: string,
   loadNumber: string | null | undefined,
@@ -587,135 +586,6 @@ export async function processScheduledReminders() {
 }
 
 // Retained only as historical implementation context; never scheduled or exported.
-async function processLegacyScheduledReminders(): Promise<{ sent: number; skipped: number; stopped: number }> {
-  const now = new Date();
-  let sent    = 0;
-  let skipped = 0;
-  let stopped = 0;
-
-  // Recover reminders left in-flight if a worker stopped after claiming one.
-  await db.update(brokerFollowUpReminders)
-    .set({ status: "scheduled", updatedAt: now })
-    .where(and(
-      eq(brokerFollowUpReminders.status, "sending"),
-      lte(brokerFollowUpReminders.updatedAt, new Date(now.getTime() - 30 * 60 * 1000)),
-    ));
-
-  // Fetch due reminders with their parent follow-up data
-  const dueReminders = await db
-    .select({
-      reminderId:     brokerFollowUpReminders.id,
-      followUpId:     brokerFollowUpReminders.followUpId,
-      reminderType:   brokerFollowUpReminders.reminderType,
-      sequenceNumber: brokerFollowUpReminders.sequenceNumber,
-      subject:        brokerFollowUpReminders.subject,
-      body:           brokerFollowUpReminders.body,
-      invoiceId:      brokerFollowUps.invoiceId,
-      cadenceConfig:  brokerFollowUps.cadenceConfig,
-      brokerId:        invoices.brokerId,
-      debtorId:       invoices.debtorId,
-      invoiceNumber:  invoices.invoiceNumber,
-    })
-    .from(brokerFollowUpReminders)
-    .innerJoin(brokerFollowUps, eq(brokerFollowUpReminders.followUpId, brokerFollowUps.id))
-    .innerJoin(invoices,        eq(brokerFollowUps.invoiceId, invoices.id))
-    .where(
-      and(
-        eq(brokerFollowUpReminders.status, "scheduled"),
-        lte(brokerFollowUpReminders.scheduledSendAt, now),
-      ),
-    );
-
-  for (const r of dueReminders) {
-    // ── Auto-stop check ────────────────────────────────────────────────────────
-    const stopReason = await checkAndStopCadence(r.followUpId, r.invoiceId);
-    if (stopReason) {
-      console.log(`[reminderScheduler] auto-stopped follow-up ${r.followUpId} — reason: ${stopReason}`);
-      stopped++;
-      continue;
-    }
-
-    // ── Cadence globally paused check ──────────────────────────────────────────
-    const cfg = r.cadenceConfig as CadenceConfig | null;
-    if (cfg?.paused) {
-      await db.update(brokerFollowUpReminders)
-        .set({ status: "paused", updatedAt: new Date() })
-        .where(eq(brokerFollowUpReminders.id, r.reminderId));
-      skipped++;
-      continue;
-    }
-
-    // Claim atomically so overlapping scheduler/admin runs cannot send twice.
-    const [claimed] = await db.update(brokerFollowUpReminders)
-      .set({ status: "sending", updatedAt: new Date() })
-      .where(and(
-        eq(brokerFollowUpReminders.id, r.reminderId),
-        eq(brokerFollowUpReminders.status, "scheduled"),
-      ))
-      .returning({ id: brokerFollowUpReminders.id });
-    if (!claimed) continue;
-
-    // ── Try to send email ──────────────────────────────────────────────────────
-    let emailSent  = false;
-    let messageId: string | undefined;
-    if (r.brokerId || r.debtorId) {
-      try {
-        const [contact] = r.brokerId
-          ? await db.select({ email: brokers.email }).from(brokers).where(eq(brokers.id, r.brokerId))
-          : await db.select({ email: debtors.email }).from(debtors).where(eq(debtors.id, r.debtorId!));
-
-        if (contact?.email) {
-          const result = await sendEmailTracked({
-            to:      contact.email,
-            emailLog: { entityType: "followup", entityId: r.followUpId, templateName: "broker_followup",
-              followupReminderId: r.reminderId, sentByUserId: null },
-            subject: r.subject,
-            text: configuredPaymentBody(r.body),
-            html: textToEmailBody(configuredPaymentBody(r.body)),
-          });
-          emailSent = result.success;
-          messageId  = result.messageId;
-        }
-      } catch (_) { /* email failure is non-fatal */ }
-    }
-
-    await db.update(brokerFollowUpReminders)
-      .set({
-        status:            "sent",
-        actualSendAt:      new Date(),
-        providerMessageId: messageId ?? null,
-        deliveryStatus:    messageId ? "pending" : "sent",
-        updatedAt:         new Date(),
-      })
-      .where(and(
-        eq(brokerFollowUpReminders.id, r.reminderId),
-        eq(brokerFollowUpReminders.status, "sending"),
-      ));
-
-    // Write audit event
-    try {
-      await db.insert(eventLedger).values({
-        entityType:  "invoice",
-        entityId:    r.invoiceId,
-        eventType:   "broker_followup_reminder_sent",
-        actorType:   "system",
-        actorId:     "system",
-        payloadJson: {
-          followUpId:     r.followUpId,
-          reminderId:     r.reminderId,
-          reminderType:   r.reminderType,
-          sequenceNumber: r.sequenceNumber,
-          emailSent,
-          invoiceNumber:  r.invoiceNumber,
-        },
-      });
-    } catch (_) { /* best-effort */ }
-
-    sent++;
-  }
-
-  return { sent, skipped, stopped };
-}
 
 /**
  * Start the background reminder scheduler.

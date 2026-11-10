@@ -28,7 +28,7 @@ import EntityNotes from "@/components/shared/EntityNotes";
 import { CarrierFinancialOverview } from "@/components/carriers/carrier-financial-overview";
 import { SafePaginatedTable } from "@/components/safe-table-pagination";
 import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
-import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, Phone, Plus, ShieldCheck, Truck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, Phone, Plus, ShieldCheck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
 
 function ProfileSection(props: Parameters<typeof BaseProfileSection>[0]) {
   return <BaseProfileSection {...props} neuStyle />;

@@ -37,7 +37,6 @@ export default function Landing() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6 text-center">
               <DollarSign className="w-12 h-12 text-success mx-auto mb-4" />
@@ -47,7 +46,6 @@ export default function Landing() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6 text-center">
               <Users className="w-12 h-12 text-warning mx-auto mb-4" />
@@ -57,7 +55,6 @@ export default function Landing() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6 text-center">
               <Truck className="w-12 h-12 text-secondary mx-auto mb-4" />

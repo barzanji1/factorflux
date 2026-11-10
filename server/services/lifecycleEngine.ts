@@ -11,7 +11,6 @@ import { db } from "../db";
 import { storage } from "../storage";
 import {
   invoices,
-  documents,
   payouts,
   paymentApplicationLines,
   exceptions,
@@ -112,11 +111,6 @@ const guardHasAmount: Guard = async ({ invoice }) =>
   invoice.amount && parseFloat(invoice.amount) > 0 ? null
     : { code: "no_amount", message: "Invoice amount must be greater than zero", severity: "error" };
 
-const guardHasAnyDocument: Guard = async ({ invoiceId }) => {
-  const [doc] = await db.select({ id: documents.id }).from(documents)
-    .where(eq(documents.invoiceId, invoiceId)).limit(1);
-  return doc ? null : { code: "no_documents", message: "At least one document must be uploaded before submitting", severity: "error" };
-};
 
 // guardHasRequiredDocs and guardHasApprovalDocs now delegate to DB-driven rules
 // from docValidation.ts so admins can configure the checklist without code changes.
@@ -393,15 +387,6 @@ const fxReleaseReserve: SideEffect = async ({ invoiceId }) => {
 };
 
 /** Create rejection exception record */
-const fxCreateRejectionException: SideEffect = async ({ invoiceId, actorId, reason, invoice }) => {
-  await storage.createException({
-    type: "other", severity: "high",
-    entityType: "invoice", entityId: invoiceId, entityRef: invoice.invoiceNumber,
-    title: `Invoice rejected: ${invoice.invoiceNumber}`,
-    description: reason ?? "Invoice was rejected during review",
-    status: "open", createdBy: actorId,
-  } as any);
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRANSITION DEFINITIONS  (ordered — only eligible transitions are shown)

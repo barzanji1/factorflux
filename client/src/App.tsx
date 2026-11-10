@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { lazyPage } from "@/lib/lazy-page";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { CustomerBrandHead } from "@/components/brand/customer-brand-head";
 import { queryClient } from "./lib/queryClient";
@@ -6,74 +7,78 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PermissionWatcher } from "@/components/PermissionWatcher";
 import { useTheme } from "@/hooks/useTheme";
-import NotFound from "@/pages/not-found";
-import AccessDenied from "@/pages/access-denied";
-import Landing from "@/pages/landing";
-import Dashboard from "@/pages/dashboard";
-import NeuPreview from "@/pages/neu-preview";
-import Invoices from "@/pages/invoices";
-import Clients from "@/pages/clients";
-import Documents from "@/pages/documents";
-import CreditChecks from "@/pages/credit-checks";
-import Admin from "@/pages/admin";
-import Activities from "@/pages/activities";
-import Reports from "@/pages/reports";
-import FuelAdvanceTracking from "@/pages/fuel-advance-tracking";
-import FuelAdvanceDetail from "@/pages/fuel-advance-detail";
-import Profile from "@/pages/profile";
-import Settings from "@/pages/settings";
-import DownloadPage from "@/pages/download";
-import FollowUp from "@/pages/follow-up";
-import Collections from "@/pages/collections";
-import Vault from "@/pages/vault";
-import Factoring from "@/pages/factoring";
-import FundingQueue from "@/pages/funding-queue";
-import Tasks from "@/pages/tasks";
-import TaskDetail from "@/pages/task-detail";
-import Brokers from "@/pages/brokers";
-import LoginPage from "@/pages/login";
-import Help from "@/pages/help";
-import Payouts from "@/pages/payouts";
-import CashApplication from "@/pages/cash-application";
-import Exceptions from "@/pages/exceptions";
-import AuditLog from "@/pages/audit-log";
-import FmcsaAuthority from "@/pages/fmcsa-authority";
-import InvoiceDetail from "@/pages/invoice-detail";
-import DocumentRules from "@/pages/document-rules";
-import WorkflowBuilder from "@/pages/workflow-builder";
-import BrokerDetail from "@/pages/broker-detail";
-import ClientDetail from "@/pages/client-detail";
-import CarrierOnboarding from "@/pages/carrier-onboarding";
-import PayoutDetail from "@/pages/payout-detail";
-import LoadDetail from "@/pages/load-detail";
-import Lockbox from "@/pages/lockbox";
-import HeldQueue from "@/pages/held";
-import Dispatchers from "@/pages/dispatchers";
-import Trucks from "@/pages/trucks";
-import BankTransfers from "@/pages/bank-transfers";
-import Payroll from "@/pages/payroll";
-import BulkInvoices from "@/pages/bulk-invoices";
-import ReleaseLetters from "@/pages/release-letters";
-import AIAssistant from "@/pages/ai-assistant";
-import PortalLanding from "@/pages/portal/index";
-import PortalRegister from "@/pages/portal/register";
-import PortalLogin from "@/pages/portal/login";
-import PortalDashboard from "@/pages/portal/dashboard";
-import PortalSubmit from "@/pages/portal/submit";
-import PortalSubmissions from "@/pages/portal/submissions";
-import PortalProfile from "@/pages/portal/profile";
-import PortalSubmissionsPage from "@/pages/portal-submissions";
-import CalendarPage from "@/pages/calendar";
-import Expenses from "@/pages/expenses";
-import LegacyTicketRedirect from "@/pages/legacy-ticket-redirect";
-import PortalChat from "@/pages/portal/chat";
-import { TeamChatWorkspace } from "@/pages/chat";
-import ClientEmailPage from "@/pages/client-email";
-import ItSupport from "@/pages/it-support";
-import "@/styles/ff-institutional-workspace.css";
+const NotFound = lazyPage([], () => import("@/pages/not-found"));
+const AccessDenied = lazyPage([], () => import("@/pages/access-denied"));
+const Landing = lazyPage(["/landing"], () => import("@/pages/landing"));
+const Dashboard = lazyPage(["/"], () => import("@/pages/dashboard"));
+const NeuPreview = lazyPage(["/neu-preview"], () => import("@/pages/neu-preview"));
+const Invoices = lazyPage(["/invoices"], () => import("@/pages/invoices"));
+const Clients = lazyPage(["/clients", "/carriers"], () => import("@/pages/clients"));
+const Documents = lazyPage(["/documents"], () => import("@/pages/documents"));
+const CreditChecks = lazyPage(["/credit-checks"], () => import("@/pages/credit-checks"));
+const Admin = lazyPage(["/admin"], () => import("@/pages/admin"));
+const Activities = lazyPage(["/activities"], () => import("@/pages/activities"));
+const Reports = lazyPage(["/reports"], () => import("@/pages/reports"));
+const FuelAdvanceTracking = lazyPage(["/fuel-advance"], () => import("@/pages/fuel-advance-tracking"));
+const FuelAdvanceDetail = lazyPage(["/fuel-advance/:id"], () => import("@/pages/fuel-advance-detail"));
+const Profile = lazyPage(["/profile"], () => import("@/pages/profile"));
+const Settings = lazyPage(["/settings"], () => import("@/pages/settings"));
+const DownloadPage = lazyPage(["/download"], () => import("@/pages/download"));
+const FollowUp = lazyPage(["/follow-up", "/followups"], () => import("@/pages/follow-up"));
+const Collections = lazyPage(["/collections"], () => import("@/pages/collections"));
+const Vault = lazyPage(["/vault"], () => import("@/pages/vault"));
+const Factoring = lazyPage(["/factoring"], () => import("@/pages/factoring"));
+const FundingQueue = lazyPage(["/sheets"], () => import("@/pages/funding-queue"));
+const Tasks = lazyPage(["/tasks"], () => import("@/pages/tasks"));
+const TaskDetail = lazyPage(["/tasks/:id"], () => import("@/pages/task-detail"));
+const Brokers = lazyPage(["/brokers"], () => import("@/pages/brokers"));
+const LoginPage = lazyPage(["/login"], () => import("@/pages/login"));
+const Help = lazyPage(["/help"], () => import("@/pages/help"));
+const Payouts = lazyPage(["/payouts"], () => import("@/pages/payouts"));
+const CashApplication = lazyPage(["/cash-application"], () => import("@/pages/cash-application"));
+const Exceptions = lazyPage(["/exceptions"], () => import("@/pages/exceptions"));
+const AuditLog = lazyPage(["/audit-log"], () => import("@/pages/audit-log"));
+const FmcsaAuthority = lazyPage(["/fmcsa-authority"], () => import("@/pages/fmcsa-authority"));
+const InvoiceDetail = lazyPage(["/invoices/:id"], () => import("@/pages/invoice-detail"));
+const DocumentRules = lazyPage(["/document-rules"], () => import("@/pages/document-rules"));
+const WorkflowBuilder = lazyPage(["/workflow-builder"], () => import("@/pages/workflow-builder"));
+const BrokerDetail = lazyPage(["/brokers/:id"], () => import("@/pages/broker-detail"));
+const ClientDetail = lazyPage(["/clients/:id", "/carriers/:id"], () => import("@/pages/client-detail"));
+const CarrierOnboarding = lazyPage(["/carrier-onboarding", "/carriers/new", "/carriers/:id/edit"], () => import("@/pages/carrier-onboarding"));
+const PayoutDetail = lazyPage(["/payouts/:id"], () => import("@/pages/payout-detail"));
+const LoadDetail = lazyPage(["/loads/:id"], () => import("@/pages/load-detail"));
+const Lockbox = lazyPage(["/lockbox"], () => import("@/pages/lockbox"));
+const HeldQueue = lazyPage(["/held"], () => import("@/pages/held"));
+const Dispatchers = lazyPage(["/dispatchers"], () => import("@/pages/dispatchers"));
+const Trucks = lazyPage(["/trucks"], () => import("@/pages/trucks"));
+const BankTransfers = lazyPage(["/bank-transfers"], () => import("@/pages/bank-transfers"));
+const Payroll = lazyPage(["/payroll"], () => import("@/pages/payroll"));
+const BulkInvoices = lazyPage(["/bulk-invoices"], () => import("@/pages/bulk-invoices"));
+const ReleaseLetters = lazyPage(["/release-letters"], () => import("@/pages/release-letters"));
+const AIAssistant = lazyPage(["/ai-assistant"], () => import("@/pages/ai-assistant"));
+const PortalLanding = lazyPage(["/portal"], () => import("@/pages/portal/index"));
+const PortalRegister = lazyPage(["/portal/register"], () => import("@/pages/portal/register"));
+const PortalLogin = lazyPage(["/portal/login"], () => import("@/pages/portal/login"));
+const PortalDashboard = lazyPage(["/portal/dashboard"], () => import("@/pages/portal/dashboard"));
+const PortalSubmit = lazyPage(["/portal/submit"], () => import("@/pages/portal/submit"));
+const PortalSubmissions = lazyPage(["/portal/submissions"], () => import("@/pages/portal/submissions"));
+const PortalProfile = lazyPage(["/portal/profile"], () => import("@/pages/portal/profile"));
+const PortalSubmissionsPage = lazyPage(["/portal-submissions"], () => import("@/pages/portal-submissions"));
+const CalendarPage = lazyPage(["/calendar"], () => import("@/pages/calendar"));
+const Expenses = lazyPage(["/expenses"], () => import("@/pages/expenses"));
+const LegacyTicketRedirect = lazyPage(["/tickets", "/tickets/:id", "/carrier-messages"], () => import("@/pages/legacy-ticket-redirect"));
+const PortalChat = lazyPage(["/portal/chat"], () => import("@/pages/portal/chat"));
+const ClientEmailPage = lazyPage(["/client-email", "/email-log"], () => import("@/pages/client-email"));
+const ItSupport = lazyPage(["/it-support"], () => import("@/pages/it-support"));
+const ProtectedRoute = lazy(() => import("@/components/ProtectedRoute").then(module => ({ default: module.ProtectedRoute })));
+const TeamChatWorkspace = lazy(() => import("@/pages/chat").then(module => ({ default: module.TeamChatWorkspace })));
+const RouteLoading = lazy(() => import("@/components/layout/route-loading"));
+
+function StartupIndicator() {
+  return <div role="status" className="grid min-h-screen place-items-center text-sm text-teal-700">Loading…</div>;
+}
 
 function Router() {
   useTheme(); // Initialize theme
@@ -403,7 +408,7 @@ function Router() {
     return (
       <>
         <PermissionWatcher />
-        {routes}
+        <Suspense fallback={<StartupIndicator />}>{routes}</Suspense>
       </>
     );
   }
@@ -412,9 +417,11 @@ function Router() {
     <div className={`${location === "/" || location === "/invoices" || location.startsWith("/invoices/") || location === "/clients" || location === "/brokers" || location === "/documents" || location === "/tasks" || location === "/help" || location === "/calendar" || location === "/chat" || location === "/bulk-invoices" || location === "/portal-submissions" || /^\/(?:clients|carriers|brokers)\/\d+\/?$/.test(location) ? "ff-neu-root" : "ff-app-shell"} ff-financial-dashboard-shell ff-institutional-root relative flex h-screen flex-col overflow-hidden`}>
       <PermissionWatcher />
       <div className={chatPageActive ? "hidden" : "relative min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
-        {routes}
+        <Suspense fallback={<Suspense fallback={<StartupIndicator />}><RouteLoading /></Suspense>}>
+          {routes}
+        </Suspense>
       </div>
-      <TeamChatWorkspace />
+      {user && <Suspense fallback={null}><TeamChatWorkspace /></Suspense>}
     </div>
   );
 }
@@ -426,7 +433,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <CustomerBrandHead />
-          <Router />
+          <Suspense fallback={<StartupIndicator />}><Router /></Suspense>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

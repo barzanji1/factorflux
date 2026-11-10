@@ -14,7 +14,6 @@ import { sendResendEmail, ResendDeliveryError, type ResendEmailParams } from "..
 import { emailDetailsTable, wrapEmail } from "../emailTemplate.js";
 import { brokerReceiptActions, brokerReceiptLinks } from "./brokerConfirmationPresentation";
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = Pick<typeof db, "select" | "insert" | "update" | "transaction" | "execute">;
 type Invoice = typeof invoices.$inferSelect;
 type State = typeof states.$inferSelect;

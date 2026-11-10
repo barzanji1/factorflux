@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { Express, RequestHandler } from "express";
-import { and, asc, eq, or, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db as applicationDb } from "../db";
 import { brokerConfirmationSettings, brokers, invoices, tasks, users } from "../../shared/schema";

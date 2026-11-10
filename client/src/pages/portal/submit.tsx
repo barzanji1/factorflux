@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CheckCircle, CheckCircle2, FileText, Loader2, Search, Upload, X } from "lucide-react";
+import { CheckCircle, CheckCircle2, Loader2, Search, Upload, X } from "lucide-react";
 import PortalLayout from "@/components/layout/portal-layout";
 import { LoadTypeToggleGroup } from "@/components/load-type";
 import { Button } from "@/components/ui/button";

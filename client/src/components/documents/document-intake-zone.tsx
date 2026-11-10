@@ -485,7 +485,7 @@ export default function DocumentIntakeZone({ entityType, entityId, onUploadCompl
           open={reviewDocId !== null}
           neuStyle={neuStyle}
           onOpenChange={(open) => { if (!open) setReviewDocId(null); }}
-          onReviewComplete={(status, invoiceId) => {
+          onReviewComplete={(_status, invoiceId) => {
             if (invoiceId) {
               qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "document-status"] });
               qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "detail"] });

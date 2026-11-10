@@ -39,7 +39,6 @@ import {
   MapPin,
   Search,
   CheckCircle2,
-  Sparkles,
   FileText,
   Truck,
   CircleDollarSign,

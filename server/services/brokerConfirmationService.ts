@@ -340,24 +340,8 @@ export async function getConfirmationAgingRows(scope?: ReturnType<typeof eq>, st
   });
 }
 
-let timer: ReturnType<typeof setInterval> | undefined;
 export function startBrokerConfirmationScheduler() {
   startBrokerCollectionsScheduler();
 }
 
 // Legacy scheduler implementation is intentionally not exported or started.
-function startLegacyBrokerConfirmationScheduler() {
-  if (timer) return;
-  // Preview/testing must never automatically send real broker mail.
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[brokerConfirmation] Preview mail paused; publish to enable broker confirmation emails.");
-    return;
-  }
-  const run = () => brokerConfirmationService.runScheduled().then(result => {
-    for (const failure of result.errors) console.error(`[brokerConfirmation] Invoice ${failure.invoiceId}: ${failure.message}`);
-  }).catch(error => console.error("[brokerConfirmation] Scheduler error:", error instanceof Error ? error.message : "Unknown error"));
-  timer = setInterval(run, 15 * 60_000);
-  timer.unref();
-  void run(); // Catch up after restarts; invoice locks and delivery keys prevent parallel duplicates.
-  console.log("[brokerConfirmation] Scheduler started — interval 15min");
-}

@@ -21,10 +21,9 @@ import {
   clientVault,
   brokerFollowUps,
   brokerFollowUpReminders,
-  activities,
   creditChecks,
 } from "../../shared/schema";
-import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { decryptVault } from "./vaultCrypto";
 
 // ─── Stage definitions ─────────────────────────────────────────────────────

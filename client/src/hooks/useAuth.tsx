@@ -1,6 +1,5 @@
 import React, { createContext, ReactNode, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { queryClient } from "../lib/queryClient";
 
 interface User {
   id: string;

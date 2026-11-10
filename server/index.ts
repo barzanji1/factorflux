@@ -2,14 +2,13 @@ import { Sentry, sentryRequestHandler } from "./instrumentation";
 import express, { type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import pg from "pg";
+import compression from "compression";
 import path from "path";
 import fs from "fs";
 
 import { registerRoutes } from "./routes";
 import { apiNotFound } from "./apiNotFound";
-import { setupVite } from "./vite";
-import { serveStatic } from "./static";
+import { serveStatic, serveStaticAssets } from "./static";
 import { log } from "./log";
 import { startAuthorityScheduler } from "./services/authorityScheduler";
 import { recoverStuckOcrJobs } from "./services/jobQueue";
@@ -41,14 +40,18 @@ if (!process.env.NEON_DATABASE_URL) {
 }
 
 const PgSession = connectPgSimple(session);
-const pgPool = new pg.Pool({ connectionString: process.env.NEON_DATABASE_URL });
 
 const isProduction = process.env.NODE_ENV === "production";
+
+if (isProduction) {
+  app.use(compression({ threshold: 1024 }));
+  serveStaticAssets(app);
+}
 
 app.use(
   session({
     store: new PgSession({
-      pool: pgPool,
+      conString: process.env.NEON_DATABASE_URL,
       tableName: "sessions",
       // Prune expired sessions every hour
       pruneSessionInterval: 60 * 60,
@@ -77,29 +80,11 @@ app.use("/uploads", express.static(uploadsDir));
 app.use((req, res, next) => {
   const start = Date.now();
   const reqPath = req.path.replace(/^(\/api\/broker-(?:confirm|dispute)\/)[^/]+$/, "$1[redacted]");
-  let capturedJsonResponse: Record<string, any> | undefined;
-
-  const originalResJson = res.json.bind(res);
-  res.json = function (bodyJson: any, ...args: any[]) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson(bodyJson, ...(args as []));  
-  } as typeof res.json;
-
   res.on("finish", () => {
     const duration = Date.now() - start;
 
     if (reqPath.startsWith("/api")) {
-      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
-
-      if (capturedJsonResponse) {
-      logLine += ` :: ${JSON.stringify(capturedJsonResponse, (key, value) => key === "brokerConfirmationToken" || key === "apiKey" ? undefined : value)}`;
-      }
-
-      if (logLine.length > 200) {
-        logLine = `${logLine.slice(0, 199)}…`;
-      }
-
-      log(logLine);
+      log(`${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`);
     }
   });
 
@@ -116,6 +101,10 @@ export async function startServer(
   const isDev = process.env.NODE_ENV === "development";
 
   if (isDev) {
+    // Do not let the production bundler hoist Vite's config/plugin imports.
+    // The source module is only resolved by the development tsx process.
+    const developmentServerModule = "./vite";
+    const { setupVite }: typeof import("./vite") = await import(developmentServerModule);
     await setupVite(app, server);
   } else {
     serveStatic(app);

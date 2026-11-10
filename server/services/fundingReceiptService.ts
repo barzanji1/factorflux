@@ -4,10 +4,8 @@ import { tpfPdfHeader, tpfPdfFooter } from "./tpfPdfBranding";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
-  clients,
   eventLedger,
   fundingReceipts,
-  invoices,
   s3CleanupQueue,
   type FundingReceipt,
 } from "../../shared/schema";

@@ -62,3 +62,4 @@
 - [Login transition boundary](login-transition-boundary.md) — success fragments continue across routing so the authenticated dashboard appears underneath; cancellation must not redirect later.
 - [Login sizing feedback](login-sizing-feedback.md) — smaller means a real proportional reduction, not only recentering or retaining a superseded pixel target.
 - [Navigation loading continuity](navigation-loading-policy.md) — prevent large gray placeholder flashes; preserve recognizable page structure and test pending frames during real sidebar clicks.
+- [Performance audit safety](performance-audit-safety.md) — verify implicit JSX/build usage before deleting code; report complete route startup separately from whole-site bundle size.

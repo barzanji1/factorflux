@@ -249,7 +249,7 @@ export default function ReleaseLetters() {
   const sendMutation = useMutation({
     mutationFn: ({ id, email }: { id: number; email: string }) =>
       apiRequest("POST", `/api/release-letters/${id}/send`, { email: email || undefined }),
-    onSuccess: (_, vars) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/release-letters"] });
       setSendDialogId(null);
       setSendEmailState("");

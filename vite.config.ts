@@ -1,12 +1,16 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { performanceReport } from "./scripts/vite-performance-report";
+import { deduplicateUiAliases } from "./scripts/vite-deduplicate-ui";
 
 export default defineConfig({
   plugins: [
     react(),
-    runtimeErrorOverlay(),
+    performanceReport(),
+    ...(process.env.NODE_ENV !== "production"
+      ? [(await import("@replit/vite-plugin-runtime-error-modal")).default()]
+      : []),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -17,7 +21,9 @@ export default defineConfig({
       : []),
   ],
   resolve: {
+    dedupe: ["react", "react-dom", "@tanstack/react-query"],
     alias: {
+      ...deduplicateUiAliases(),
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),

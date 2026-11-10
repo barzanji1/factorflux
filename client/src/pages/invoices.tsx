@@ -21,7 +21,6 @@ import {
 import InvoiceModal from "@/components/modals/invoice-modal";
 import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
 import type { Invoice } from "@shared/schema";
-import { cn } from "@/lib/utils";
 import { LOAD_TYPES, LOAD_TYPE_LABELS, type LoadType } from "@shared/load-types";
 import { LoadTypeBadge } from "@/components/load-type";
 import { useAuth } from "@/hooks/useAuth";

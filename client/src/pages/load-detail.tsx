@@ -16,10 +16,6 @@ import { PageInsights } from "@/components/PageInsights";
 import "@/components/admin-neu/admin-neu-page.css";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
-function fmt(v: string | number | null | undefined, prefix = "") {
-  if (v == null || v === "") return "—";
-  return `${prefix}${v}`;
-}
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
@@ -44,14 +40,6 @@ function DataRow({ label, value, mono = false }: { label: string; value: React.R
   );
 }
 
-function EmptyState({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-[#999]">
-      <div className="text-[#999]">{icon}</div>
-      <p className="text-sm text-[#777]">{label}</p>
-    </div>
-  );
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LoadDetail() {

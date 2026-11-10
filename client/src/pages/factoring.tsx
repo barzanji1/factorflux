@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import type { Invoice } from "@shared/schema";
-import { Search, Eye, AlertTriangle, SquareCheck, Square, ChevronRight } from "lucide-react";
+import { Search, AlertTriangle, SquareCheck, Square, ChevronRight } from "lucide-react";
 import "@/components/funding/funding-neu.css";
 import { NeuPageShell, NeuTable, NeuTableHeader, NeuTableHead, NeuTableBody, NeuTableRow, NeuTableCell, NeuTabs, NeuTabList, NeuTab } from "@/styles/neu/components";
 import { NeuButton } from "@/styles/neu";

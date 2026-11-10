@@ -3,11 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useRiskToast as useToast } from "@/components/risk/risk-controls";
 import { useAuth } from "@/hooks/useAuth";
-import { formatDistanceToNow, format, differenceInDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { PageInsights } from "@/components/PageInsights";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
-import { CardContent } from "@/components/ui/card";
 import { RiskCard as Card, RiskButton as Button, RiskInput as Input, RiskDialogContent as DialogContent, RiskSelectContent as SelectContent, RiskSelectTrigger as SelectTrigger, RiskStatCard, RiskBadge, RiskTable } from "@/components/risk/risk-controls";
 import { NeuPageShell } from "@/styles/neu/components";
 import { NeuNotice } from "@/components/shared/NeuNotice";
@@ -33,7 +32,6 @@ import {
   DollarSign,
   BarChart3,
   Search,
-  Trash2,
   Filter,
 } from "lucide-react";
 
@@ -77,16 +75,6 @@ function DaysBadge({ days }: { days: number }) {
   );
 }
 
-const HOLD_REASONS = [
-  "Missing documents",
-  "Disputed freight charges",
-  "FMCSA verification failure",
-  "Duplicate invoice",
-  "Carrier setup incomplete",
-  "Credit limit exceeded",
-  "Manual hold",
-  "Other",
-];
 
 // ─── Release Dialog ───────────────────────────────────────────────────────────
 
@@ -176,7 +164,6 @@ function ReleaseDialog({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function HeldQueue() {
-  const { toast } = useToast();
   const { user } = useAuth();
   const canRelease = user?.role === "manager" || user?.role === "admin";
   const [search, setSearch] = useState("");
@@ -194,14 +181,6 @@ export default function HeldQueue() {
   const avgDays = held.length
     ? held.reduce((s, inv) => s + daysOnHold(inv.heldAt), 0) / held.length
     : 0;
-  const reasonCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const inv of held) {
-      const r = inv.heldReason ?? "Unknown";
-      counts[r] = (counts[r] ?? 0) + 1;
-    }
-    return counts;
-  }, [held]);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {

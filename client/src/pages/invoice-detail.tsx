@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   ArrowLeft, CheckCircle2, Circle, FileText, DollarSign, AlertTriangle,
-  CreditCard, Clock, TrendingUp, Package, User, Building2, Calendar,
+  CreditCard, Clock, TrendingUp, User, Building2, Calendar,
   ExternalLink, FileCheck, ReceiptText, Banknote, ShieldAlert, Activity,
   ChevronRight, ArrowRight, Lock, TriangleAlert, Zap, XCircle, Info,
   PlayCircle, ClipboardCheck, MessageSquare, Pencil, ShieldCheck,
@@ -122,51 +122,6 @@ interface FundingReceipt {
 
 // ─── Stage pipeline ───────────────────────────────────────────────────────────
 
-function StagePipeline({ current }: { current: FactoringStage }) {
-  const currentIdx = FACTORING_STAGES.indexOf(current);
-  return (
-    <div className="overflow-x-auto">
-      <div className="flex min-w-[700px] items-start gap-0 py-2">
-        {FACTORING_STAGES.map((stage, idx) => {
-          const done   = idx < currentIdx;
-          const active = idx === currentIdx;
-          const meta   = STAGE_META[stage];
-          const isLast = idx === FACTORING_STAGES.length - 1;
-          return (
-            <div key={stage} className="flex flex-1 items-start">
-              <div className="flex flex-col items-center gap-1.5 flex-1">
-                <div className="relative flex w-full items-center">
-                  <div className={cn("h-0.5 flex-1", idx === 0 ? "invisible" : done || active ? "bg-blue-500" : "bg-slate-200 dark:bg-slate-700")} />
-                  <div className={cn(
-                    "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                    done   && "border-0 bg-[#e0e0e0] text-[#27aab8] shadow-[-4px_-4px_9px_#ffffff,4px_4px_9px_#c1c1c1]",
-                    active && "border-0 bg-[#e0e0e0] text-[#27aab8] shadow-[inset_5px_5px_10px_#b8b8b8,inset_-5px_-5px_10px_#ffffff]",
-                    !done && !active && "border-0 bg-[#e0e0e0] text-[#999] shadow-none",
-                  )}>
-                    {done ? <CheckCircle2 className="h-4 w-4" /> : active ? <span className="text-[11px] font-bold">{idx + 1}</span> : <Circle className="h-3 w-3" />}
-                  </div>
-                  <div className={cn("h-0.5 flex-1", isLast ? "invisible" : done ? "bg-blue-500" : "bg-slate-200 dark:bg-slate-700")} />
-                </div>
-                <div className="flex flex-col items-center gap-0.5 text-center">
-                  <span className={cn("text-[11px] font-semibold leading-tight",
-                    active ? "text-[#247d85]" : done ? "text-[#5b8889]" : "text-[#999]",
-                  )}>
-                    {meta.label}
-                  </span>
-                  {active && (
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 max-w-[90px] leading-snug">
-                      {meta.description}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -227,7 +182,6 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 // ─── Lifecycle Actions Card ───────────────────────────────────────────────────
 
 function LifecycleActionsCard({
-  invoiceId,
   transitions,
   isLoading,
   userRole,
@@ -587,7 +541,6 @@ export default function InvoiceDetail() {
     void qc.invalidateQueries({ queryKey: ["/api/invoices", invoiceId, "timeline"] });
   }, [qc, invoiceId, detail?.status]);
 
-  const { data: debtors = [] } = useQuery<any[]>({ queryKey: ["/api/debtors"], enabled: editOpen });
   const { data: brokers = [] } = useQuery<any[]>({
     queryKey: ["/api/brokers", "all"],
     queryFn: async () => {

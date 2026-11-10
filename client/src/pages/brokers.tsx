@@ -275,14 +275,6 @@ export default function Brokers() {
     setIsBrokerDialogOpen(true);
   };
 
-  const getBrokerBadge = (status: string) => {
-    switch (status) {
-      case "active":    return "ff-badge ff-badge-paid";
-      case "inactive":  return "ff-badge ff-badge-draft";
-      case "suspended": return "ff-badge ff-badge-rejected";
-      default:          return "ff-badge ff-badge-draft";
-    }
-  };
 
   const getPaymentTermsLabel = (terms: string) => {
     switch (terms) {

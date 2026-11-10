@@ -10,7 +10,7 @@ const out = process.env.NEU_SMOKE_OUTPUT || "generated-artifacts/neu-rollout";
 // Keep the development hostname/Host header, while selecting the workflow's
 // known application port rather than an unrelated port on Preview's proxy.
 const host = process.env.REPLIT_DEV_DOMAIN;
-const base = `http://${host}:5000`;
+const base = process.env.NEU_SMOKE_BASE_URL || `http://${host}:5000`;
 let routes = process.env.NEU_SMOKE_ROUTES?.split(",").filter(Boolean) || ["/client-email", "/client-email?tab=log", "/email-log", "/factoring", "/sheets", "/payouts",
   "/cash-application", "/lockbox", "/fuel-advance", "/bank-transfers", "/dispatchers", "/trucks", "/release-letters",
   "/credit-checks", "/fmcsa-authority", "/held", "/audit-log", "/followups", "/reports", "/admin", "/payroll",
@@ -82,6 +82,15 @@ try {
   };
   await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await navigate("/login");
+  if (process.env.PRODUCTION_PERFORMANCE_VERIFY === "1") {
+    const startup = await evaluate(`performance.getEntriesByType('resource')
+      .filter(entry => new URL(entry.name).pathname.endsWith('.js'))
+      .map(entry => ({ file: new URL(entry.name).pathname, bytes: entry.decodedBodySize, compressedBytes: entry.encodedBodySize }))`);
+    const operational = startup.filter(entry => /\/(?:dashboard|invoices|carriers|brokers|reports|EmojiPicker|BarChart)-/.test(entry.file));
+    if (operational.length) throw new Error("Login loaded operational page or chart/emoji bundles");
+    await writeFile(`${out}/login-startup.json`, JSON.stringify(startup, null, 2));
+    console.log(JSON.stringify({ loginJavaScriptFiles: startup.length, noOperationalBundlesOnLogin: true }));
+  }
   for (let i = 0; i < 150 && !await evaluate("!!document.querySelector('input[type=email]')"); i++) await delay(200);
   if (!await evaluate("!!document.querySelector('input[type=email]')")) {
     const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65 });
@@ -166,7 +175,7 @@ try {
       window.fetch = async (input, init) => {
         const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
         if (url.pathname.startsWith('/api/') && (!init?.method || init.method === 'GET')) {
-          await new Promise(resolve => setTimeout(resolve, 1200));
+          await new Promise(resolve => setTimeout(resolve, ${process.env.PRODUCTION_PERFORMANCE_VERIFY === "1" ? 0 : 1200}));
         }
         return original(input, init);
       };
@@ -658,6 +667,36 @@ try {
   const mobile = await evaluate(`({width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+2,modalCount:document.querySelectorAll('[role=dialog]').length})`);
   const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65, captureBeyondViewport: false });
   await writeFile(`${out}/email-mobile.jpg`, Buffer.from(image.data, "base64"));
+  if (process.env.PRODUCTION_PERFORMANCE_VERIFY === "1") {
+    await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+    await navigate("/expenses");
+    const buttonFound = await evaluate(`(() => {
+      const button = Array.from(document.querySelectorAll('button')).find(button => /\\b(?:New|Add|Create)\\s+Expense\\b/i.test(button.textContent));
+      button?.setAttribute('data-performance-expense-open', '');
+      return Boolean(button);
+    })()`);
+    if (!buttonFound) throw new Error("Expense creation control missing");
+    await pointerClick("[data-performance-expense-open]");
+    await delay(400);
+    if (!await evaluate("Boolean(document.querySelector('[role=dialog]'))")) throw new Error("Expense dialog did not open");
+    const selectFound = await evaluate(`(() => {
+      const button = document.querySelector('[role=dialog] button[role=combobox]');
+      button?.setAttribute('data-performance-expense-select', '');
+      return Boolean(button);
+    })()`);
+    if (selectFound) {
+      await pointerClick("[data-performance-expense-select]");
+      await delay(150);
+      if (!await evaluate("Boolean(document.querySelector('[role=listbox]'))")) throw new Error("Expense selector did not open");
+      await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
+    }
+    await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
+    await delay(400);
+    if (await evaluate("Boolean(document.querySelector('[role=dialog][data-state=open]'))")) throw new Error("Expense dialog did not close");
+    console.log(JSON.stringify({ expenseDialogOpenClose: true, expenseSelectorChecked: selectFound, noExpenseSubmitted: true }));
+  }
   await writeFile(`${out}/browser-results.json`, JSON.stringify({ results, mobile, notices, sheets }, null, 2));
   if (results.some(result => !result.skipped && !result.ok) || mobile.overflow) process.exitCode = 1;
 } catch (error) {

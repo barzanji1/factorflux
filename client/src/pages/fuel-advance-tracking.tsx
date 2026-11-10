@@ -58,7 +58,6 @@ export default function FuelAdvanceTracking() {
   const { data: carriers = [] } = useQuery({ queryKey: ["/api/clients", { all: true }], queryFn: () => fetchAll("/api/clients?all=true") });
   const { data: brokers = [] } = useQuery({ queryKey: ["/api/brokers", { all: true }], queryFn: () => fetchAll("/api/brokers?all=true") });
   const { data: loads = [] } = useQuery({ queryKey: ["/api/loads", { all: true }], queryFn: () => fetchAll("/api/loads?all=true") });
-  const carrier = carriers.find((item: RecordValue) => String(item.id) === form.carrierId);
   const maxAdvance = Number(form.rate || 0) * 0.5;
   const fees = Number(form.advanceAmount || 0) * Number(form.faPercent || 0) / 100;
   const filtered = useMemo(

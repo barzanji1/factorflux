@@ -1,3 +1,4 @@
+import "@/styles/ff-institutional-workspace.css";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 import { Redirect, useLocation } from "wouter";

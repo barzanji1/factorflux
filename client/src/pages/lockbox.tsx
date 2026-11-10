@@ -44,8 +44,6 @@ import {
   Trash2,
   Link2,
   X,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import "@/components/funding/funding-neu.css";
 import { FundingStatCard } from "@/components/funding/funding-stat-card";
@@ -143,7 +141,6 @@ function MatchModal({
   const [search, setSearch] = useState("");
   const [selectedLines, setSelectedLines] = useState<MatchLine[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("ach");
-  const [expandedInvoice, setExpandedInvoice] = useState<number | null>(null);
   const [applyAmounts, setApplyAmounts] = useState<Record<number, string>>({});
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({

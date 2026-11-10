@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, type ReactNode } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,7 +37,7 @@ import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
 import ChargebackReport from "@/components/reports/chargeback-report";
 import AgingReport from "@/components/reports/aging-report";
 import { CustomizeColumns, useReportColumns, type ReportColumn, type SavedTemplate } from "@/components/reports/report-customization";
-import { Link, useSearch } from "wouter";
+import { useSearch } from "wouter";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -558,27 +558,7 @@ async function fetchPerformanceJson<T>(url: string, signal: AbortSignal): Promis
   if (!response.ok) throw new Error(`${response.status}: ${data.message || "Unable to load report"}`);
   return data as T;
 }
-type ArRow = {
-  carrierId?: number; brokerId?: number; id?: number; carrierName?: string; brokerName?: string;
-  totalInvoices?: number; invoiceCount?: number; totalFundedAmount?: number; totalFunded?: number;
-  totalOutstanding?: number; outstanding?: number; reserveHeld?: number; totalReserve?: number;
-  totalCollected?: number; collected?: number; chargebackExposure?: number;
-  aging?: Record<string, number>; invoices?: Array<Record<string, unknown>>;
-};
-type ArResponse = { totals: { totalOutstanding: number; reserveHeld: number; totalCollected: number; chargebackExposure: number }; results: ArRow[] };
-const money = (row: ArRow, ...keys: string[]) => Number(keys.map(k => (row as Record<string, unknown>)[k]).find(v => v != null) ?? 0);
-const arValue = (row: ArRow, bucket: string) => Number(row.aging?.[bucket] ?? (row as Record<string, unknown>)[bucket] ?? 0);
 
-function ReportToolbar({ start, end, onDates, children }: { start: string; end: string; onDates: (s: string, e: string) => void; children?: ReactNode }) {
-  return <div className="ff-card ff-reports-surface flex flex-wrap items-end justify-between gap-3 p-3">
-    <div className="flex flex-wrap items-end gap-2">
-      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">From</label><Input type="date" value={start} onChange={e => onDates(e.target.value, end)} className="h-8 w-36 text-xs" /></div>
-      <span className="mb-2 text-xs text-slate-400">to</span>
-      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Through</label><Input type="date" value={end} onChange={e => onDates(start, e.target.value)} className="h-8 w-36 text-xs" /></div>
-      {children}
-    </div>
-  </div>;
-}
 
 function InvoiceDrilldown({ open, onOpenChange, title, invoices }: { open: boolean; onOpenChange: (v: boolean) => void; title: string; invoices?: Array<Record<string, unknown>> }) {
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="ff-reports-surface max-w-4xl overflow-hidden p-0">

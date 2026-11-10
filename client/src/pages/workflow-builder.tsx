@@ -13,12 +13,12 @@ import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
-  GripVertical, Settings2, Zap, ChevronRight, CheckCircle2,
-  FileText, Clock, AlertTriangle, Eye, EyeOff, Save,
+  GripVertical, Zap, ChevronRight, CheckCircle2,
+  FileText, Clock, AlertTriangle, EyeOff, Save,
   RotateCcw, Info, ChevronDown, ChevronUp, ArrowUp, ArrowDown,
   Shield, ClipboardCheck, Wallet, ReceiptText, BarChart2,
-  Package, FileCheck, Layers, Sparkles, Undo2, Redo2,
-  ToggleLeft, ToggleRight, Hash, Database, CheckCheck,
+  Package, Layers, Undo2, Redo2,
+  ToggleLeft, ToggleRight, Hash, CheckCheck,
 } from "lucide-react";
 
 // ─── Stage definitions ────────────────────────────────────────────────────────
@@ -66,10 +66,6 @@ const AUTO_ADVANCE_OPTIONS = [
 
 // ─── Color maps ───────────────────────────────────────────────────────────────
 
-const COLOR_DOT: Record<StageColor, string> = {
-  slate: "bg-slate-400", amber: "bg-amber-500", blue: "bg-blue-500", violet: "bg-violet-500",
-  orange: "bg-orange-500", teal: "bg-teal-500", indigo: "bg-indigo-500", emerald: "bg-emerald-500",
-};
 const COLOR_BG: Record<StageColor, string> = {
   slate:   "bg-slate-50   border-slate-200   dark:bg-slate-900/30   dark:border-slate-700",
   amber:   "bg-amber-50   border-amber-200   dark:bg-amber-950/20   dark:border-amber-900/40",

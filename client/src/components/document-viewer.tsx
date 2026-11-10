@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,7 +32,6 @@ interface DocumentViewerProps {
 }
 
 export default function DocumentViewer({ isOpen, onClose, entityType, entityId }: DocumentViewerProps) {
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

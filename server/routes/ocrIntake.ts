@@ -17,7 +17,7 @@ export function registerOcrIntakeRoutes(
   app: Express, auth: RequestHandler, upload: RequestHandler,
   compensate: (key: string, reason: string) => Promise<boolean>,
 ) {
-  app.post("/api/invoices/ocr-intake", auth, (req, res, next) => {
+  app.post("/api/invoices/ocr-intake", auth, (_req, res, next) => {
     const trace = newOcrTrace();
     withOcrTrace(trace, () => {
       const finish = startOcrStage("File Receive/Validation");

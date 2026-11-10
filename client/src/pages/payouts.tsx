@@ -124,7 +124,7 @@ export default function Payouts() {
   const [detailPayout, setDetailPayout] = useState<PayoutRow | null>(null);
 
   // ── Queries ──
-  const { data: settings, isLoading: settingsLoading } = useQuery<PayoutSettings>({
+  const { data: settings } = useQuery<PayoutSettings>({
     queryKey: ["/api/payout-settings"],
   });
 

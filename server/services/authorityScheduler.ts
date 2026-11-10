@@ -131,7 +131,7 @@ function buildChangeSummary(
   prev: StatusFields | null,
   next: StatusFields,
   checkStatus: string,
-  prevStatus: string | null,
+  _prevStatus: string | null,
 ): string {
   if (!prev) return "First check — no previous data.";
   if (checkStatus === "error") return "FMCSA request error — unable to retrieve current data.";

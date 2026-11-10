@@ -23,6 +23,7 @@ import {
 } from "./services/s3Service";
 import PDFDocument from "pdfkit";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
+import { listExpenses } from "./services/expenseListing";
 import { registerPageInsightRoutes } from "./routes/pageInsights";
 import { complianceIntegrationRuns } from "@shared/schema";
 import { readAuditPage } from "./services/auditPage";
@@ -31,7 +32,7 @@ import { customerLogoPath } from "./customerBranding";
 import { giphy, GiphyError } from "./services/giphy";
 import { registerItSupportRoutes } from "./routes/itSupport";
 import { z } from "zod";
-import { eq, and, asc, desc, sql, count, ilike, or, inArray, notInArray, gt, gte, lte, lt, isNull, ne } from "drizzle-orm";
+import { eq, and, asc, desc, sql, count, ilike, or, inArray, gt, gte, lte, lt, isNull, ne } from "drizzle-orm";
 
 import { storage } from "./storage";
 import { staffEmailSchema, staffLoginSchema } from "../shared/staff-auth";
@@ -88,8 +89,6 @@ import {
   insertTaskSchema,
   insertBrokerSchema,
   insertBrokerBranchSchema,
-  insertBrokerFollowUpSchema,
-  insertBrokerFollowUpReminderSchema,
   insertLockboxEntrySchema,
   brokerFollowUpReminders,
   brokerFollowUpTemplates,
@@ -106,7 +105,6 @@ import {
   fuelAdvances,
   invoices,
   invoiceChargebackEvents,
-  invoiceRefunds,
   payouts,
   fundingReceipts,
   docRequirements,
@@ -140,10 +138,7 @@ import {
   insertPayrollDeductionSchema,
   bulkInvoiceBatches,
   bulkInvoiceItems,
-  insertBulkInvoiceBatchSchema,
-  insertBulkInvoiceItemSchema,
   releaseLetters,
-  insertReleaseLetterSchema,
   aiChatLogs,
   timeEntries,
   expenses,
@@ -1213,7 +1208,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, email, subject, message } = contactSchema.parse(req.body);
 
       const supportEmail = "dosh@truckingprosfinancial.com";
-      const FROM = "Support@Truckingprosfinancial.com";
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
@@ -1290,7 +1284,6 @@ ${message}
         message,
       });
 
-      const FROM = "Support@Truckingprosfinancial.com";
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
@@ -3038,7 +3031,7 @@ ${message}
     }
   };
   app.patch("/api/preflight/alerts/:id", requireManagerOrAdmin, patchPreflightAlert);
-  app.patch("/api/preflight/alerts", requireManagerOrAdmin, (req: any, res: any, next: any) => {
+  app.patch("/api/preflight/alerts", requireManagerOrAdmin, (req: any, _res: any, next: any) => {
     req.params.id = String(req.body?.id ?? req.body?.alertId ?? "");
     next();
   }, patchPreflightAlert);
@@ -5080,10 +5073,9 @@ ${message}
       const to = expenseDateFilter(req.query.to ?? req.query.endDate ?? req.query.dateTo, true);
       if (from) conditions.push(gte(expenses.expenseDate, from));
       if (to) conditions.push(lte(expenses.expenseDate, to));
-      const rows = await db.select().from(expenses)
-        .where(conditions.length ? and(...conditions) : undefined)
-        .orderBy(desc(expenses.expenseDate), desc(expenses.createdAt));
-      res.json(await Promise.all(rows.map(expenseOutput)));
+      const page = z.coerce.number().int().min(1).default(1).parse(req.query.page);
+      const pageSize = z.coerce.number().int().min(1).max(100).default(DEFAULT_PAGE_SIZE).parse(req.query.pageSize);
+      res.json(await listExpenses(conditions, page, pageSize, req.query.all === "true"));
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to fetch expenses" });
     }
@@ -6629,7 +6621,7 @@ Trucking Pros Financial Team
   // ── Workflow Config ─────────────────────────────────────────────────────────
 
   // Get the current workflow pipeline config (default or saved)
-  app.get("/api/workflow-config", requireAuth, async (req: any, res) => {
+  app.get("/api/workflow-config", requireAuth, async (_req: any, res) => {
     try {
       const [config] = await db
         .select()
@@ -6771,18 +6763,19 @@ Trucking Pros Financial Team
         .orderBy(...(paging ? paging.order : [tasks.createdAt]))
         .$dynamic();
       const tasksData = await (paging ? taskQuery.limit(paging.limit).offset(paging.offset) : taskQuery);
-      // Fetch attribution names separately to avoid duplicate aliases in Drizzle's
-      // select object while retaining the compact list query.
-      const enriched = await Promise.all(tasksData.map(async (task) => {
-        const [updater] = task.progressUpdatedAt && task.progressUpdatedBy
-          ? await db.select({ firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
-            .from(users).where(eq(users.id, task.progressUpdatedBy)).limit(1)
-          : [];
-        const [creator] = task.createdBy
-          ? await db.select({ firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
-            .from(users).where(eq(users.id, task.createdBy)).limit(1)
-          : [];
-        return { ...task, progressUpdater: updater ?? null, creator: creator ?? null };
+      // One batch lookup instead of up to two database round trips per task.
+      const attributionIds = [...new Set(tasksData.flatMap(task => [
+        task.progressUpdatedAt ? task.progressUpdatedBy : null, task.createdBy,
+      ]).filter((id): id is string => Boolean(id)))];
+      const attributionUsers = attributionIds.length
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+          .from(users).where(inArray(users.id, attributionIds))
+        : [];
+      const names = new Map(attributionUsers.map(({ id, ...name }) => [id, name]));
+      const enriched = tasksData.map(task => ({
+        ...task,
+        progressUpdater: task.progressUpdatedAt && task.progressUpdatedBy ? names.get(task.progressUpdatedBy) ?? null : null,
+        creator: task.createdBy ? names.get(task.createdBy) ?? null : null,
       }));
       res.json(enriched);
     } catch (error) {
@@ -9035,11 +9028,10 @@ Trucking Pros Financial Team
     }
     if (reportId === "monthly-sales-journal") {
       const payoutRows = await db.select().from(payouts);
-      const byInvoice = new Map(allInvoices.map(i => [i.id, i]));
       const months = new Map<string, { funded: number; fees: number; reserves: number; count: number }>();
       for (const payout of payoutRows) {
         if (payout.paymentStatus === "pending_advance" || !payout.advancePaidAt) continue;
-        const invoice = byInvoice.get(payout.invoiceId), date = payout.advancePaidAt;
+        const date = payout.advancePaidAt;
         const key = businessDate(date).slice(0, 7), row = months.get(key) || { funded: 0, fees: 0, reserves: 0, count: 0 };
         row.funded += Number(payout.advanceAmount); row.fees += Number(payout.feeAmount); row.reserves += Number(payout.reserveAmount); row.count++; months.set(key, row);
       }
@@ -10210,16 +10202,14 @@ Trucking Pros Financial Team
 
       // Fetch broker email if brokerId present
       let brokerEmail: string | null = null;
-      let brokerName = "Broker";
       if (letter.brokerId) {
         const [broker] = await db.select().from(brokers).where(eq(brokers.id, letter.brokerId)).limit(1);
-        if (broker) { brokerEmail = broker.email; brokerName = broker.name; }
+        if (broker) { brokerEmail = broker.email; }
       }
       // Override with provided email if passed
       const toEmail = req.body?.email ?? brokerEmail;
       if (!toEmail) return res.status(400).json({ message: "No broker email available. Add email to broker profile or pass email in body." });
 
-      const FROM = "Support@Truckingprosfinancial.com";
       const subject = `Release Letter — ${letter.letterType.charAt(0).toUpperCase() + letter.letterType.slice(1)}`;
       const html = `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:24px;">
         <h2 style="color:#1a1a1a;">Release Letter</h2>

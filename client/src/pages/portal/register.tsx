@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { Truck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +26,6 @@ const schema = z.object({
 type RegisterForm = z.infer<typeof schema>;
 
 export default function PortalRegister() {
-  const [, setLocation] = useLocation();
   const [showPw, setShowPw] = useState(false);
   const [done, setDone] = useState(false);
 

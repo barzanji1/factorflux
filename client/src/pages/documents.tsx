@@ -5,8 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination";
 import {
   AlertTriangle,
-  Brain,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Download,
@@ -21,8 +19,6 @@ import {
   BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useServerArrayPage } from "@/hooks/use-server-array-page";
 import { apiRequest } from "@/lib/queryClient";

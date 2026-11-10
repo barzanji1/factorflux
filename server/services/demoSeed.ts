@@ -28,7 +28,7 @@ import {
   docFieldCandidates,
   docReviews,
 } from "../../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 const DEMO_LOAD_NUMBER = "DEMO-2024-001";

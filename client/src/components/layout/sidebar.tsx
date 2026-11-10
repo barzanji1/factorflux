@@ -1,3 +1,5 @@
+import { preloadPage } from "@/lib/lazy-page";
+import "@/styles/ff-financial-dashboard.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getSidebarState, subscribeSidebarState, setSidebarHovered, toggleSidebarSection, requestSidebarFocus, consumeSidebarFocus } from "./sidebar-state";
 import { useQuery } from "@tanstack/react-query";
@@ -8,7 +10,7 @@ import { FactorFluxLogo } from "@/components/brand/factorflux-logo";
 import {
   LayoutDashboard, FileText, Archive, Building2,
   BarChart3, Lock, Fuel, TrendingUp, ListTodo,
-  LifeBuoy, Settings2, Wallet, ShieldCheck,
+  LifeBuoy, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
   RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, MessageCircle,
   ChevronDown, Pin, PinOff,
@@ -152,25 +154,7 @@ const navSections: NavSection[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const defaultUser: CurrentUser = {
-  id: "1",
-  firstName: "Admin",
-  lastName: "User",
-  email: "admin@tpf.com",
-  role: "admin",
-  profileImageUrl: "/uploads/c20bf48700fe065a95d9858e806bf4ce",
-  jobTitle: "System Administrator",
-};
 
-function getUserData(): CurrentUser {
-  if (typeof window === "undefined") return defaultUser;
-  const saved = window.localStorage.getItem("currentUser");
-  if (saved) {
-    try { return { ...defaultUser, ...JSON.parse(saved) }; }
-    catch { return defaultUser; }
-  }
-  return defaultUser;
-}
 
 function isRouteActive(current: string, href: string) {
   const currentPath = current.split("?")[0];
@@ -402,6 +386,8 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                       key={item.name}
                       type="button"
                       onClick={() => navigateTo(item.href)}
+                      onPointerEnter={() => preloadPage(item.href)}
+                      onFocus={() => preloadPage(item.href)}
                       aria-current={active ? "page" : undefined}
                       title={expanded ? undefined : item.name}
                       aria-label={item.name}

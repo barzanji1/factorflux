@@ -37,7 +37,6 @@ import {
   RefreshCw,
   AlertTriangle,
   CheckCircle,
-  XCircle,
   Clock,
   Search,
   Building2,
@@ -45,7 +44,6 @@ import {
   History,
   Bell,
   KeyRound,
-  Info,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
