@@ -1,0 +1,73 @@
+/*
+ * Authenticated loading presentation. Both shared Skeletons and older inline
+ * placeholders use animate-pulse; do not let those flash gray/beveled blocks.
+ * Keep their dimensions so loading never collapses a table or form.
+ * Status animations opt out explicitly; public/login/portal pages are excluded.
+ */
+:is(
+  .ff-institutional-root.ff-institutional-root.ff-institutional-root,
+  body:has(.ff-institutional-root) [role="dialog"],
+  body:has(.ff-institutional-root) [role="alertdialog"]
+) :is(
+  .animate-pulse:not([data-ff-status-pulse]),
+  .ff-neu-metric-skeleton,
+  .ff-neu-chart-skeleton,
+  .ff-neu-skeleton-card,
+  .ff-activity-skeleton,
+  .ff-action-skeleton-icon,
+  .ff-action-skeleton-line,
+  .ff-action-skeleton-value,
+  .ff-action-back-skeleton
+) {
+  animation: none !important;
+}
+
+:is(
+  .ff-institutional-root.ff-institutional-root.ff-institutional-root,
+  body:has(.ff-institutional-root) [role="dialog"],
+  body:has(.ff-institutional-root) [role="alertdialog"]
+) :is(
+  .animate-pulse:not([data-ff-status-pulse]):empty,
+  .animate-pulse:not([data-ff-status-pulse]) :empty,
+  .ff-neu-metric-skeleton :empty,
+  .ff-neu-chart-skeleton :empty,
+  .ff-neu-skeleton-card :empty,
+  .ff-activity-skeleton :empty,
+  .ff-action-skeleton-icon,
+  .ff-action-skeleton-line,
+  .ff-action-skeleton-value,
+  .ff-action-back-skeleton :empty
+) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+/* A small, still loading mark, not a flashing slab or a fake data value.
+ * Only div/span/i placeholders get it; never table rows or structural cells.
+ * No motion is needed, including under prefers-reduced-motion.
+ */
+:is(
+  .ff-institutional-root.ff-institutional-root.ff-institutional-root,
+  body:has(.ff-institutional-root) [role="dialog"],
+  body:has(.ff-institutional-root) [role="alertdialog"]
+) :is(
+  div.animate-pulse:not([data-ff-status-pulse]):empty,
+  span.animate-pulse:not([data-ff-status-pulse]):empty,
+  .animate-pulse:not([data-ff-status-pulse]) :is(div, span):empty,
+  .ff-neu-metric-skeleton span,
+  .ff-neu-chart-skeleton span,
+  .ff-activity-skeleton :is(i, span),
+  .ff-action-skeleton-icon,
+  .ff-action-skeleton-line,
+  .ff-action-skeleton-value,
+  .ff-action-back-skeleton i
+) {
+  background-image: linear-gradient(
+    90deg, transparent, rgba(8, 127, 135, .24), transparent
+  ) !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: min(28px, 65%) 2px !important;
+}

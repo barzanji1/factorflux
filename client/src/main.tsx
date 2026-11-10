@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react";
 import { sentryDataCollection, scrubSentryBreadcrumb, scrubSentryEvent } from "@shared/sentry-privacy";
 import App from "./App";
 import "./index.css";
+import "./styles/loading-continuity.css";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

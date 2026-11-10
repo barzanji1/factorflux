@@ -1,7 +1,7 @@
 // Browser smoke checks use the normal login form and existing development-only
 // test credentials. No credential, session cookie or client contents are logged.
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -11,7 +11,7 @@ const out = process.env.NEU_SMOKE_OUTPUT || "generated-artifacts/neu-rollout";
 // known application port rather than an unrelated port on Preview's proxy.
 const host = process.env.REPLIT_DEV_DOMAIN;
 const base = `http://${host}:5000`;
-const routes = process.env.NEU_SMOKE_ROUTES?.split(",").filter(Boolean) || ["/client-email", "/client-email?tab=log", "/email-log", "/factoring", "/sheets", "/payouts",
+let routes = process.env.NEU_SMOKE_ROUTES?.split(",").filter(Boolean) || ["/client-email", "/client-email?tab=log", "/email-log", "/factoring", "/sheets", "/payouts",
   "/cash-application", "/lockbox", "/fuel-advance", "/bank-transfers", "/dispatchers", "/trucks", "/release-letters",
   "/credit-checks", "/fmcsa-authority", "/held", "/audit-log", "/followups", "/reports", "/admin", "/payroll",
   "/expenses", "/vault", "/document-rules", "/workflow-builder"];
@@ -97,6 +97,51 @@ try {
   for (let i = 0; i < 30 && await evaluate("location.pathname") === "/login"; i++) await delay(250);
   if (await evaluate("location.pathname") === "/login") throw new Error("Existing development test credentials did not authenticate; no account changes made");
   const results = [];
+  const allNavigationCheck = process.env.ALL_NAVIGATION_VERIFY === "1";
+  let menuItems = [];
+  if (allNavigationCheck) {
+    const isolation = await evaluate(`(() => {
+      const root = document.querySelector('.ff-institutional-root');
+      const fixture = document.createElement('div');
+      fixture.style.cssText = 'position:fixed;left:-9999px;top:0';
+      fixture.innerHTML = '<div class="animate-pulse h-12 bg-[#d2d2d2]"></div><div data-ff-status-pulse class="animate-pulse" style="background:orange">Overdue</div>';
+      root.append(fixture);
+      const outside = fixture.firstChild.cloneNode();
+      document.body.append(outside);
+      const loading = getComputedStyle(fixture.firstChild);
+      const status = getComputedStyle(fixture.lastChild);
+      const publicStyle = getComputedStyle(outside);
+      const result = {
+        quietLoading: loading.animationName === 'none' && loading.backgroundColor === 'rgba(0, 0, 0, 0)',
+        statusPreserved: status.animationName !== 'none' && status.backgroundColor === 'rgb(255, 165, 0)',
+        publicUntouched: publicStyle.animationName !== 'none' && publicStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
+      };
+      fixture.remove(); outside.remove();
+      return result;
+    })()`);
+    if (!Object.values(isolation).every(Boolean)) throw new Error(`Loading isolation regression: ${JSON.stringify(isolation)}`);
+    console.log(JSON.stringify({ loadingIsolation: isolation }));
+    const source = await readFile("client/src/components/layout/sidebar.tsx", "utf8");
+    const renderedLabels = await evaluate("Array.from(document.querySelectorAll('aside button[aria-label]'), el => el.getAttribute('aria-label'))");
+    menuItems = [...source.matchAll(/\{\s*name:\s*"([^"]+)",\s*href:\s*"([^"]+)"/g)]
+      .map(([, label, route]) => ({ label, route }))
+      .filter(item => renderedLabels.includes(item.label));
+    if (menuItems.length < 25) throw new Error("Expected the complete development-admin sidebar");
+    routes = menuItems.map(item => item.route);
+    if (process.env.NEU_SMOKE_ROUTES) routes = routes.filter(route => process.env.NEU_SMOKE_ROUTES.split(",").includes(route));
+    // Slow all actual reads so each page's own loading branch can be inspected.
+    await evaluate(`(() => {
+      const original = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
+        if (url.pathname.startsWith('/api/') && (!init?.method || init.method === 'GET')) {
+          await new Promise(resolve => setTimeout(resolve, 1200));
+        }
+        return original(input, init);
+      };
+      window.__navigationTimeOrigin = performance.timeOrigin;
+    })()`);
+  }
   const navigationCheck = process.env.NAVIGATION_VERIFY === "1";
   if (navigationCheck) {
     // Slow real read requests in this browser only so transient UI stays visible.
@@ -127,7 +172,35 @@ try {
       route = `/${entity}/${encodeURIComponent(firstId)}`;
     }
     uncaught = 0; exceptions = [];
-    if (navigationCheck) {
+    if (allNavigationCheck) {
+      const item = menuItems.find(item => item.route === route);
+      await pointerClick(`aside button[aria-label="${item.label}"]`);
+      await delay(150);
+      const loading = await evaluate(`(() => {
+        const root = document.querySelector('.ff-institutional-root');
+        const placeholders = root?.querySelectorAll('.animate-pulse:not([data-ff-status-pulse]):empty, .animate-pulse:not([data-ff-status-pulse]) :empty, .ff-neu-metric-skeleton span, .ff-neu-chart-skeleton span, .ff-activity-skeleton :is(i,span), .ff-action-skeleton-icon, .ff-action-skeleton-line, .ff-action-skeleton-value') ?? [];
+        const visible = [...placeholders].filter(el => {
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        });
+        const opaque = visible.filter(el => {
+          const c = getComputedStyle(el).backgroundColor;
+          // White material cards are the current design, not gray skeleton slabs.
+          return c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)' && c !== 'rgb(255, 255, 255)';
+        });
+        return { path: location.pathname + location.search, placeholders: visible.length,
+          grayBlocks: opaque.length,
+          opaqueStyles: opaque.map(el => ({className: typeof el.className === 'string' ? el.className : el.tagName, color:getComputedStyle(el).backgroundColor})),
+          sameDocument: performance.timeOrigin === window.__navigationTimeOrigin };
+      })()`);
+      if (!loading.sameDocument || loading.grayBlocks) {
+        throw new Error(`Loading presentation regression: ${JSON.stringify(loading)}`);
+      }
+      const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65 });
+      await writeFile(`${out}/${item.label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}-loading.jpg`, Buffer.from(image.data, "base64"));
+      await delay(1800);
+      console.log(JSON.stringify({ sidebar: item.label, route, ...loading }));
+    } else if (navigationCheck) {
       const labels = { "/calendar": "Calendar", "/invoices": "Invoices", "/tasks": "Tasks" };
       if (!labels[route]) throw new Error("Navigation verification requires a supported sidebar route");
       await pointerClick(`aside button[aria-label="${labels[route]}"]`);
@@ -188,7 +261,7 @@ try {
     })`);
     const ok = !status.notFound && !status.accessDenied && !status.overlays && uncaught === 0 && status.path !== "/login" && status.sidebar;
     results.push({ route, ...status, uncaught, exceptions, ok });
-    if (process.env.NEU_SMOKE_ROUTES || ["/client-email?tab=log", "/sheets", "/admin", "/reports"].includes(route)) {
+    if (allNavigationCheck || process.env.NEU_SMOKE_ROUTES || ["/client-email?tab=log", "/sheets", "/admin", "/reports"].includes(route)) {
       const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65, captureBeyondViewport: false });
       await writeFile(`${out}/${route.split("?")[0].slice(1).replaceAll("/", "-") || "dashboard"}.jpg`, Buffer.from(image.data, "base64"));
     }

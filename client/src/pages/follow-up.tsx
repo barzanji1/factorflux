@@ -643,7 +643,7 @@ function ReminderTimeline({
                 )}
               >
                 {/* Step dot */}
-                <div className={cn(
+                <div data-ff-status-pulse className={cn(
                   "ff-followup-step relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e0e0e0] text-[10px] font-bold",
                   r.status === "sent"     ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300" :
                   r.status === "canceled" ? "border-red-300 bg-red-50 text-red-400 dark:bg-red-950/20" :
