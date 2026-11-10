@@ -343,34 +343,6 @@ export const LiquidGlassPanel = forwardRef<HTMLDivElement, LiquidGlassPanelProps
         )}
         <div className="liquid-glass-panel__surface" aria-hidden="true" />
         <div className="liquid-glass-panel__sheen" aria-hidden="true" />
-        <svg className="liquid-glass-panel__reflections" viewBox="0 0 520 510" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id={`${filterId}-silver`} x1="4" y1="225" x2="180" y2="0" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#b4dced" stopOpacity="0" />
-              <stop offset=".35" stopColor="#b4dced" stopOpacity=".18" />
-              <stop offset=".57" stopColor="#f1fbff" stopOpacity=".8" />
-              <stop offset=".75" stopColor="#b9e9fa" stopOpacity=".28" />
-              <stop offset="1" stopColor="#e2f8ff" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id={`${filterId}-warm`} x1="332" y1="510" x2="520" y2="310" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#c6e9fb" stopOpacity="0" />
-              <stop offset=".4" stopColor="#badbec" stopOpacity=".24" />
-              <stop offset=".7" stopColor="#fff1d8" stopOpacity=".75" />
-              <stop offset=".87" stopColor="#ffe0b0" stopOpacity=".25" />
-              <stop offset="1" stopColor="#d9edf9" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <g stroke={`url(#${filterId}-silver)`}>
-            <path d="M 2 225 C 3 140 15 103 69 88 C 122 73 135 22 180 1" strokeWidth="18" opacity=".13" />
-            <path d="M 2 225 C 3 140 15 103 69 88 C 122 73 135 22 180 1" strokeWidth="3" opacity=".5" />
-            <path d="M 2 225 C 3 140 15 103 69 88 C 122 73 135 22 180 1" strokeWidth=".8" />
-          </g>
-          <g stroke={`url(#${filterId}-warm)`}>
-            <path d="M 332 509 C 410 493 458 508 489 463 C 515 424 509 364 519 310" strokeWidth="19" opacity=".12" />
-            <path d="M 332 509 C 410 493 458 508 489 463 C 515 424 509 364 519 310" strokeWidth="3" opacity=".5" />
-            <path d="M 332 509 C 410 493 458 508 489 463 C 515 424 509 364 519 310" strokeWidth=".8" />
-          </g>
-        </svg>
         <div className="liquid-glass-panel__ripples" aria-hidden="true">
           {ripples.map((ripple) => (
             <span
