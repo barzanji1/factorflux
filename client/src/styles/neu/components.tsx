@@ -386,7 +386,7 @@ export const NeuPageShell = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEle
   ({ className, ...props }, ref) => (
     <main
       ref={ref}
-      className={cn("min-h-[100dvh] overflow-y-auto bg-[#e0e0e0] text-[#333333]", className)}
+      className={cn("relative min-h-[100dvh] overflow-y-auto bg-[#e0e0e0] text-[#333333]", className)}
       {...props}
     />
   ),

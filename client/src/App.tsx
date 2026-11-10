@@ -409,9 +409,9 @@ function Router() {
   }
 
   return (
-    <div className={`${location === "/" || location === "/invoices" || location.startsWith("/invoices/") || location === "/clients" || location === "/brokers" || location === "/documents" || location === "/tasks" || location === "/help" || location === "/calendar" || location === "/chat" || location === "/bulk-invoices" || location === "/portal-submissions" || /^\/(?:clients|carriers|brokers)\/\d+\/?$/.test(location) ? "ff-neu-root" : "ff-app-shell"} ff-financial-dashboard-shell ff-institutional-root flex h-screen flex-col overflow-hidden`}>
+    <div className={`${location === "/" || location === "/invoices" || location.startsWith("/invoices/") || location === "/clients" || location === "/brokers" || location === "/documents" || location === "/tasks" || location === "/help" || location === "/calendar" || location === "/chat" || location === "/bulk-invoices" || location === "/portal-submissions" || /^\/(?:clients|carriers|brokers)\/\d+\/?$/.test(location) ? "ff-neu-root" : "ff-app-shell"} ff-financial-dashboard-shell ff-institutional-root relative flex h-screen flex-col overflow-hidden`}>
       <PermissionWatcher />
-      <div className={chatPageActive ? "hidden" : "min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
+      <div className={chatPageActive ? "hidden" : "relative min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
         {routes}
       </div>
       <TeamChatWorkspace />

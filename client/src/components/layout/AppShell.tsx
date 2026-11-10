@@ -29,7 +29,7 @@ export function AppShell({ children, title, subtitle, group, neu = false, action
             <div className="mx-auto w-full max-w-[1680px]">{children}</div>
           </NeuPageShell>
         ) : (
-          <main className="custom-scrollbar min-h-0 flex-1 overflow-auto">
+          <main className="custom-scrollbar relative min-h-0 flex-1 overflow-auto">
             <div className="mx-auto w-full max-w-[1680px] p-3 sm:p-4 xl:p-6">
               {children}
             </div>

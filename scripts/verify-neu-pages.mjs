@@ -93,6 +93,37 @@ try {
   await send("Input.insertText", { text: process.env.DEV_ADMIN_EMAIL });
   await pointerClick("input[type=password]");
   await send("Input.insertText", { text: process.env.DEV_ADMIN_PASSWORD });
+  if (process.env.LAYOUT_VERIFY === "1") {
+    await evaluate(`(() => {
+      window.__layoutFrames = [];
+      window.__layoutSnapshot = () => {
+        const shell = document.querySelector('.ff-financial-dashboard-shell');
+        const r = shell?.getBoundingClientRect();
+        const rect = el => {
+          if (!el) return null;
+          const b = el.getBoundingClientRect(), s = getComputedStyle(el);
+          return {className:el.className, top:b.top, bottom:b.bottom, height:b.height,
+            scrollHeight:el.scrollHeight, heightStyle:s.height,minHeight:s.minHeight,display:s.display};
+        };
+        return {path:location.pathname, viewport:innerHeight, documentHeight:document.documentElement.scrollHeight,
+          scrollY, shell:rect(shell), route:rect(shell?.children[0]),
+          app:rect(document.querySelector('.ff-neu-app-shell')), main:rect(document.querySelector('.ff-neu-app-shell main')),
+          bad:!!shell && (document.documentElement.scrollHeight > innerHeight + 2 || Math.abs(r.top) > 2 || Math.abs(r.bottom - innerHeight) > 2)};
+      };
+      let end = 0, watching = false;
+      const frame = () => {
+        const sample = window.__layoutSnapshot();
+        if (sample.bad && window.__layoutFrames.length < 8) window.__layoutFrames.push(sample);
+        if (performance.now() < end) requestAnimationFrame(frame);
+        else watching = false;
+      };
+      window.__watchLayout = (duration = 4000) => {
+        end = performance.now() + duration;
+        if (!watching) {watching = true; requestAnimationFrame(frame);}
+      };
+      window.__watchLayout(6000);
+    })()`);
+  }
   await pointerClick("button[type=submit]");
   for (let i = 0; i < 30 && await evaluate("location.pathname") === "/login"; i++) await delay(250);
   if (await evaluate("location.pathname") === "/login") throw new Error("Existing development test credentials did not authenticate; no account changes made");
@@ -161,6 +192,7 @@ try {
   }
   for (const requestedRoute of routes) {
     let route = requestedRoute;
+    if (process.env.LAYOUT_VERIFY === "1") await evaluate("window.__watchLayout()");
     if (requestedRoute.endsWith("/:first")) {
       const entity = requestedRoute.split("/")[1];
       const firstId = await evaluate(`(async()=>{const response=await fetch('/api/${entity}?limit=15',{credentials:'include'});if(!response.ok)return null;const payload=await response.json();const rows=Array.isArray(payload)?payload:payload.data??payload.items??payload.${entity}??[];return Array.isArray(rows)&&rows[0]?.id!=null?String(rows[0].id):null;})()`);
@@ -260,6 +292,39 @@ try {
       horizontalOverflow:document.documentElement.scrollWidth > innerWidth + 2
     })`);
     const ok = !status.notFound && !status.accessDenied && !status.overlays && uncaught === 0 && status.path !== "/login" && status.sidebar;
+    if (process.env.LAYOUT_VERIFY === "1") {
+      const beforeScroll = await evaluate(`(() => {
+        const el = [...document.querySelectorAll('main')].find(el => {
+          const s=getComputedStyle(el),r=el.getBoundingClientRect();
+          return r.height>0 && /auto|scroll/.test(s.overflowY);
+        });
+        return el ? {top:el.scrollTop, excess:el.scrollHeight-el.clientHeight} : null;
+      })()`);
+      await send("Input.dispatchMouseEvent", { type:"mouseWheel", x:900, y:800, deltaX:0, deltaY:1800 });
+      await delay(300);
+      if (beforeScroll?.excess > 50 && beforeScroll.top === 0) {
+        const scrolled = await evaluate("[...document.querySelectorAll('main, main *')].some(el => el.scrollTop > 0)");
+        if (!scrolled) throw new Error("Content scrolling stopped working after layout containment");
+      }
+      const layout = await evaluate("window.__layoutSnapshot()");
+      const frames = await evaluate("window.__layoutFrames");
+      console.log(JSON.stringify({layout, transitionFailures:frames}));
+      const image = await send("Page.captureScreenshot", { format:"jpeg", quality:75 });
+      await writeFile(`${out}/${route.slice(1) || 'dashboard'}-layout.jpg`, Buffer.from(image.data,"base64"));
+      if (layout.bad || frames.length) {
+        const overflow = await evaluate(`Array.from(document.body.querySelectorAll('*')).filter(el => {
+          const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+          return r.bottom > innerHeight + 2 && s.display !== 'none' &&
+            (s.position === 'fixed' || s.position === 'absolute' || !document.querySelector('.ff-financial-dashboard-shell')?.contains(el));
+        }).slice(0,20).map(el => {
+          const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+          return {tag:el.tagName,className:typeof el.className==='string'?el.className:'svg',
+            position:s.position,top:r.top,bottom:r.bottom,height:r.height,visibility:s.visibility};
+        })`);
+        console.log(JSON.stringify({overflow}));
+        throw new Error("Viewport layout overflow detected");
+      }
+    }
     results.push({ route, ...status, uncaught, exceptions, ok });
     if (allNavigationCheck || process.env.NEU_SMOKE_ROUTES || ["/client-email?tab=log", "/sheets", "/admin", "/reports"].includes(route)) {
       const image = await send("Page.captureScreenshot", { format: "jpeg", quality: 65, captureBeyondViewport: false });
