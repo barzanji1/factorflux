@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-ripple";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { staffLoginSchema } from "@shared/staff-auth";
 import "./login.css";
-import "./login-glass.css";
 
 const loginSchema = staffLoginSchema;
 
@@ -30,8 +29,6 @@ export default function LoginPage() {
   const mainRef = useRef<HTMLElement>(null);
   const transitionRef = useRef<LoginSuccessTransition | null>(null);
   const mounted = useRef(true);
-  const lastRipple = useRef({ x: -999, y: -999, time: 0 });
-
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -48,26 +45,6 @@ export default function LoginPage() {
       password: "",
     },
   });
-
-  // Ambient fingertip ripple: one small ring per meaningful pointer movement over the card.
-  const handleCardPointerMove = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType === "touch" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const card = event.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const last = lastRipple.current;
-    const now = performance.now();
-    if (Math.hypot(x - last.x, y - last.y) < 56 || now - last.time < 140) return;
-    lastRipple.current = { x, y, time: now };
-    const ripple = document.createElement("span");
-    ripple.className = "ff-login-hover-ripple";
-    ripple.setAttribute("aria-hidden", "true");
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-    ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
-    card.appendChild(ripple);
-  };
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -98,28 +75,7 @@ export default function LoginPage() {
         <Card
           className={`ff-login-card${shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
           aria-busy={isLoading}
-          onPointerMove={handleCardPointerMove}
         >
-          <svg className="ff-login-lens-light" viewBox="0 0 400 450" preserveAspectRatio="none" fill="none" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="login-lens-cool" x1="0" y1="170" x2="120" y2="0" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#b0f4ff" stopOpacity="0" />
-                <stop offset=".48" stopColor="#b0f4ff" stopOpacity=".2" />
-                <stop offset=".7" stopColor="#fff" stopOpacity=".85" />
-                <stop offset="1" stopColor="#b0f4ff" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="login-lens-warm" x1="280" y1="450" x2="400" y2="310" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#a4f5ff" stopOpacity="0" />
-                <stop offset=".55" stopColor="#b9f6ff" stopOpacity=".6" />
-                <stop offset=".8" stopColor="#ffe1b7" stopOpacity=".7" />
-                <stop offset="1" stopColor="#fff" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d="M 2 180 C 0 88 9 73 50 58 C 84 46 83 13 120 1" stroke="url(#login-lens-cool)" strokeWidth="7" opacity=".2" />
-            <path d="M 2 180 C 0 88 9 73 50 58 C 84 46 83 13 120 1" stroke="url(#login-lens-cool)" strokeWidth="1.2" />
-            <path d="M 280 449 C 328 432 367 449 383 411 C 395 383 390 349 399 310" stroke="url(#login-lens-warm)" strokeWidth="8" opacity=".18" />
-            <path d="M 280 449 C 328 432 367 449 383 411 C 395 383 390 349 399 310" stroke="url(#login-lens-warm)" strokeWidth="1.2" />
-          </svg>
           <CardHeader className="ff-login-brand">
             <div className="flex justify-center">
               <FactorFluxLogo
