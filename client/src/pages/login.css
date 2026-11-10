@@ -31,7 +31,7 @@
   background-position: center 46%;
   background-size: cover;
   background-repeat: no-repeat;
-  filter: brightness(0.35) saturate(0.76) contrast(1.05);
+  filter: brightness(0.43) saturate(0.76) contrast(1.05);
 }
 
 .ff-login-page:not(.ff-login-transition)::after,
