@@ -65,7 +65,9 @@ export default function LoginPage() {
         transitionBusy.current = true;
         const card = mainRef.current?.querySelector<HTMLElement>(".ff-login-card") ?? null;
         const button = mainRef.current?.querySelector<HTMLElement>(".ff-login-submit") ?? null;
-        transitionRef.current = playLoginSuccess(card, () => setLocation("/"), button);
+        transitionRef.current = playLoginSuccess(card, () => setLocation("/"), button, {
+          isDestinationReady: () => Boolean(document.querySelector('[data-testid="agent-dashboard"]')),
+        });
       } else {
         setError("Invalid email or password. Please try again.");
         setShakeCount((count) => count + 1);

@@ -6,7 +6,8 @@ export interface LoginSuccessTransition {
 const RING_DELAYS = [0, 110, 220, 330];
 const REVEAL_DELAY = 700;
 const REVEAL_CLEANUP_DELAY = 550;
-const HARD_CLEANUP_DELAY = 1350;
+const DESTINATION_WAIT_LIMIT = 8000;
+const HARD_CLEANUP_DELAY = REVEAL_DELAY + DESTINATION_WAIT_LIMIT + REVEAL_CLEANUP_DELAY + 100;
 
 interface CardMetrics {
   padding: string;
@@ -126,10 +127,14 @@ export function playLoginSuccess(
   card: HTMLElement | null,
   onReveal: () => void,
   origin?: HTMLElement | null,
+  options: { isDestinationReady?: () => boolean } = {},
 ): LoginSuccessTransition {
   let active = true;
   let navigated = false;
   let overlay: HTMLDivElement | null = null;
+  let destinationObserver: MutationObserver | null = null;
+  let readinessFrame: number | null = null;
+  let fading = false;
   const timers = new Set<number>();
 
   const clearTimers = () => {
@@ -141,6 +146,10 @@ export function playLoginSuccess(
     if (!active) return;
     active = false;
     clearTimers();
+    destinationObserver?.disconnect();
+    destinationObserver = null;
+    if (readinessFrame !== null) window.cancelAnimationFrame(readinessFrame);
+    readinessFrame = null;
     document.removeEventListener("visibilitychange", onVisibilityChange);
     overlay?.remove();
     overlay = null;
@@ -164,19 +173,50 @@ export function playLoginSuccess(
     }
   };
 
-  // Navigate while the overlay still covers the screen, then fade it out so the
-  // dashboard appears underneath without a hard cut.
+  const fadeOut = () => {
+    if (!active || fading) return;
+    fading = true;
+    destinationObserver?.disconnect();
+    destinationObserver = null;
+    if (readinessFrame !== null) window.cancelAnimationFrame(readinessFrame);
+    readinessFrame = null;
+    overlay?.classList.add("is-revealing");
+    later(cleanup, REVEAL_CLEANUP_DELAY);
+  };
+
+  const checkDestination = () => {
+    if (!active || fading || readinessFrame !== null) return;
+    if (options.isDestinationReady && !options.isDestinationReady()) return;
+    // Allow the destination commit and its lazy CSS to paint before uncovering it.
+    readinessFrame = window.requestAnimationFrame(() => {
+      readinessFrame = window.requestAnimationFrame(() => {
+        readinessFrame = null;
+        if (!options.isDestinationReady || options.isDestinationReady()) fadeOut();
+      });
+    });
+  };
+
+  // Navigate on the original ripple schedule, but do not expose a cold route's
+  // loading fallback. Authentication and permission checks still run normally.
   const reveal = () => {
     if (!active || navigated) return;
-    overlay?.classList.add("is-revealing");
     navigateOnce();
-    later(cleanup, REVEAL_CLEANUP_DELAY);
+    if (!active) return;
+    if (!options.isDestinationReady) {
+      fadeOut();
+      return;
+    }
+    destinationObserver = new MutationObserver(checkDestination);
+    destinationObserver.observe(document.body, { childList: true, subtree: true });
+    checkDestination();
+    // Never trap a user behind decoration if a route fails to load.
+    later(fadeOut, DESTINATION_WAIT_LIMIT);
   };
 
   const onVisibilityChange = () => {
     if (document.visibilityState !== "hidden") return;
     if (!navigated) reveal();
-    else cleanup();
+    cleanup();
   };
 
   const handle: LoginSuccessTransition = {
