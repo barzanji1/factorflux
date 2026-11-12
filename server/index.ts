@@ -79,7 +79,7 @@ app.use("/uploads", express.static(uploadsDir));
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const reqPath = req.path.replace(/^(\/api\/broker-(?:confirm|dispute)\/)[^/]+$/, "$1[redacted]");
+  const reqPath = req.path.replace(/^(\/api\/broker-(?:confirm|dispute)\/)[^/]+(?=\/|$)/, "$1[redacted]");
   res.on("finish", () => {
     const duration = Date.now() - start;
 

@@ -7,7 +7,8 @@ import {
 } from "../../shared/schema";
 import { sendEmailTracked } from "../emailService";
 import { emailDetailsTable, emailDisplayName, wrapEmail } from "../emailTemplate.js";
-import { BROKER_PUBLIC_ORIGIN, brokerReceiptLinks, brokerReceiptActions } from "./brokerConfirmationPresentation";
+import { BROKER_PUBLIC_ORIGIN, brokerReceiptLinks, brokerReceiptActions, brokerPaperworkHtml, brokerPaperworkText } from "./brokerConfirmationPresentation";
+import { brokerInvoicePaperwork } from "./brokerConfirmationDocuments";
 import { brokerCollectionsService, confirmCollectionVpInTransaction, recordCollectionReceiptSend, startBrokerCollectionsScheduler } from "./brokerCollections";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -146,8 +147,9 @@ export function createBrokerConfirmationService({
         ["Load", invoice.loadNumber || "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`],
         ["Carrier", emailDisplayName(row.carrierName) || "Not provided"],
       ];
-      const text = `Trucking Pros Financial\n${details.map(([label, value]) => `${label}: ${value}`).join("\n")}\nConfirm Receipt: ${confirmationUrl}\nDispute: ${disputeUrl}\nOpening a link does not confirm receipt. Please use the button on the page.`;
-      const html = wrapEmail(subject, `<p>Please confirm that you received this invoice, or report a dispute.</p>${emailDetailsTable(details as Array<[string, string]>)}${brokerReceiptActions(invoice.brokerConfirmationToken)}`);
+      const paperwork = await brokerInvoicePaperwork(tx, id, invoice.brokerConfirmationToken);
+      const text = `Trucking Pros Financial\n${details.map(([label, value]) => `${label}: ${value}`).join("\n")}${brokerPaperworkText(paperwork)}\nConfirm Receipt: ${confirmationUrl}\nDispute: ${disputeUrl}\nOpening a link does not confirm receipt. Please use the button on the page.`;
+      const html = wrapEmail(subject, `<p>Please confirm that you received this invoice, or report a dispute.</p>${emailDetailsTable(details as Array<[string, string]>)}${brokerPaperworkHtml(paperwork)}${brokerReceiptActions(invoice.brokerConfirmationToken)}`);
       const [acceptedSends] = await tx.select({ count: sql<string>`count(*)` }).from(brokerConfirmationEvents)
         .where(and(eq(brokerConfirmationEvents.invoiceId, id), inArray(brokerConfirmationEvents.event, ["sent", "reminder_sent"])));
       // Failed/uncertain manual attempts must reuse a key; only committed acceptance advances it.
@@ -237,10 +239,10 @@ export function createBrokerConfirmationService({
   }
 
   async function brokerRespond(token: string, status: "confirmed" | "disputed", notes: string) {
-    const [row] = await store.select({ invoice: invoices, email: brokers.email }).from(invoices)
+    const [row] = await store.select({ invoice: invoices, email: brokers.email, name: brokers.name }).from(invoices)
       .leftJoin(brokers, eq(invoices.brokerId, brokers.id)).where(eq(invoices.brokerConfirmationToken, token));
     if (!row) throw new ConfirmationError(404, "This confirmation link is invalid.");
-    return resolve(row.invoice.id, status, { kind: "broker", id: row.email || "broker" }, notes, token);
+    return resolve(row.invoice.id, status, { kind: "broker", id: `${row.name || "Broker"}${row.email ? ` <${row.email.trim()}>` : ""}` }, notes, token);
   }
 
   async function details(id: number) {
@@ -257,7 +259,10 @@ export function createBrokerConfirmationService({
       .where(eq(brokerConfirmationEvents.invoiceId, id)).orderBy(asc(brokerConfirmationEvents.createdAt), asc(brokerConfirmationEvents.id));
     const { email, fundedAt, ...safe } = row;
     const previewMailDisabled = send === sendEmailTracked && process.env.NODE_ENV !== "production";
-    return { ...safe, emailOnFile: !!email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
+    const response = [...events].reverse().find(event => event.event === "confirmed" || event.event === "disputed");
+    return { ...safe, respondedAt: response?.createdAt ?? null, respondedBy: response?.actor ?? null,
+      disputedAt: response?.event === "disputed" ? response.createdAt : null,
+      emailOnFile: !!email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
       canResend: !previewMailDisabled && !!fundedAt && !["confirmed", "disputed"].includes(row.status),
       deliveryNotice: previewMailDisabled ? "Broker confirmation mail is disabled in Preview. Publish first so the email links reach the updated public confirmation pages."
         : !fundedAt ? "Fund this invoice before sending a broker receipt request." : null,

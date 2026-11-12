@@ -9,6 +9,12 @@ Broker receipt and dispute links open public pages. Record the response only aft
 
 **How to apply:** Preserve this policy when changing broker email templates or public endpoints. An opened-link event is not evidence of confirmed receipt.
 
+Broker paperwork links must remain usable throughout the follow-up period. Use invoice-scoped bearer download links and generate short-lived storage signatures when opened; redact tokens in nested download request logs too.
+
+**Why:** Brokers may review paperwork days or weeks after the email arrives, beyond a storage signature's lifetime. Those bearer links grant document access and must not leak through request logs.
+
+**How to apply:** Never email short-lived storage URLs as the only paperwork link. Preserve invoice ownership checks and exclude private carrier identity/setup documents.
+
 Keep the existing Autoscale deployment for the broker confirmation rollout.
 
 **Why:** The user chose “Leave deployment unchanged” after being informed that Autoscale pauses background timers when idle and cannot guarantee 15-minute execution.

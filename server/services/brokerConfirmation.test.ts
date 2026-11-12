@@ -8,7 +8,7 @@ import express from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import {
-  brokers, clients, users, invoices, tasks, brokerConfirmationEvents, eventLedger,
+  brokers, clients, users, invoices, documents, tasks, brokerConfirmationEvents, eventLedger,
   insertInvoiceSchema, insertTaskSchema, brokerConfirmationSettings,
 } from "../../shared/schema";
 import { createBrokerConfirmationService, confirmationAction, fundedAgeDays, getConfirmationAgingRows, getConfirmationInvoiceScope } from "./brokerConfirmationService";
@@ -89,6 +89,13 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
         status: "funded", fundedAt: new Date(clock.getTime() - 49 * 3_600_000), submittedBy: userId,
         assignedTo: userId, assignedFollowupAgentId: userId, ...overrides }).returning())[0];
     const stored = async (id: number) => (await tx.select().from(invoices).where(eq(invoices.id, id)))[0];
+    const paperwork = async (invoiceId: number) => tx.insert(documents).values(
+      (["rate_confirmation", "bol", "lumper_receipt", "other", "driver_id"] as const).map(documentType => ({
+        invoiceId, clientId: carrier.id, uploadedBy: userId, documentType,
+        originalName: `${documentType}-fixture.pdf`, filename: `${suffix}-${documentType}.pdf`,
+        mimeType: "application/pdf", size: 100, s3Key: `fixture/${suffix}/${documentType}.pdf`,
+      })),
+    ).returning();
 
     await t.test("scheduled initial send excludes 24h and exactly 48h, and includes over 48h", async () => {
       const young = await newInvoice("delay-24h", { fundedAt: new Date(clock.getTime() - DAY) });
@@ -161,6 +168,7 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
 
     await t.test("automatic initial send is accepted once, has both links and all invoice identifiers", async () => {
       const invoice = await newInvoice("initial");
+      const docs = await paperwork(invoice.id);
       const before = accepted.length;
       const result = await service.runScheduled({ invoiceIds: [invoice.id] });
       assert.equal(result.errors.length, 0);
@@ -169,6 +177,8 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
       assert.match(mail.html!, /Confirm Receipt/); assert.match(mail.html!, /Dispute/);
       assert.match(mail.html!, /data-tpf-email="1"/);
       assert.match(mail.html!, /https:\/\/factorflux\.io\/api\/broker-confirm\//);
+      assert.match(mail.html!, /<td align="center" bgcolor="#27aab8"[^>]*>\s*<a[^>]*>Confirm Receipt<\/a>/);
+      for (const doc of docs) assert.equal(mail.html!.includes(`/documents/${doc.id}/download`), doc.documentType !== "driver_id");
       assert.ok(!mail.html!.includes("https://factorflux.co/"));
       for (const value of [invoice.invoiceNumber, invoice.carrierInvoiceNumber!, invoice.loadNumber!, "1000.00", carrier.name]) assert.ok(mail.html!.includes(value));
       assert.ok(mail.idempotencyKey?.endsWith("/initial"));
@@ -286,6 +296,10 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
     });
     await t.test("public GET is non-confirming; CSRF-protected POST works; agent scope and manager-only reassignment enforced", async () => {
       const invoice = await newInvoice("http");
+      const docs = await paperwork(invoice.id);
+      const otherInvoice = await newInvoice("http-other");
+      const foreignDocs = await paperwork(otherInvoice.id);
+      const signed: string[] = [];
       await service.sendForInvoice(invoice.id, { kind: "agent", id: userId });
       const app = express(); app.use(express.json()); app.use(express.urlencoded({ extended: false }));
       const auth: express.RequestHandler = (req: any, res, next) => {
@@ -295,12 +309,25 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
       };
       const manager: express.RequestHandler = (req: any, res, next) => auth(req, res, () => req.user.role === "manager" ? next() : res.status(403).end());
       registerBrokerConfirmationRoutes(app, { store: tx, service, requireAuth: auth, requireManagerOrAdmin: manager,
+        signedDownload: async (key, name, seconds) => {
+          signed.push(key); assert.equal(seconds, 60); assert.ok(name?.endsWith(".pdf"));
+          return "https://example.test/fixture-download";
+        },
         canAccessInvoice: async (req, id) => { const row = await stored(id); return !!row && (req.user.role === "manager" || row.submittedBy === req.user.id || row.assignedFollowupAgentId === req.user.id); } });
       const server = app.listen(0);
       try {
         const address = server.address(); assert.ok(address && typeof address !== "string");
         const root = `http://127.0.0.1:${address.port}`;
         const url = `${root}/api/broker-confirm/${invoice.brokerConfirmationToken}`;
+        const download = (token: string, id: number) => `${root}/api/broker-confirm/${token}/documents/${id}/download`;
+        const file = await fetch(download(invoice.brokerConfirmationToken, docs[0].id), { redirect: "manual" });
+        assert.equal(file.status, 302); assert.equal(file.headers.get("location"), "https://example.test/fixture-download");
+        assert.equal(signed.length, 1); assert.equal(signed[0], docs[0].s3Key);
+        assert.equal((await fetch(download(invoice.brokerConfirmationToken, foreignDocs[0].id))).status, 404);
+        assert.equal((await fetch(download(invoice.brokerConfirmationToken, docs[4].id))).status, 404, "private carrier documents stay private");
+        assert.equal((await fetch(download(randomUUID(), docs[0].id))).status, 404);
+        assert.equal((await fetch(download(otherInvoice.brokerConfirmationToken, foreignDocs[0].id))).status, 404, "unsent tokens cannot download");
+        assert.equal((await stored(invoice.id)).brokerConfirmationStatus, "sent", "downloads never record a response");
         const first = await fetch(url);
         assert.equal(first.status, 200);
         const html = await first.text(); assert.match(html, /Opening this page has not confirmed receipt/);
@@ -323,6 +350,8 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
         assert.equal((await fetch(`${root}/api/invoices/${invoice.id}/broker-confirmation`, { headers: { "x-fixture-user": otherId } })).status, 403);
         const detail = await (await fetch(`${root}/api/invoices/${invoice.id}/broker-confirmation`, { headers: { "x-fixture-user": userId } })).json() as Record<string, unknown>;
         assert.equal(detail.status, "confirmed"); assert.equal("brokerConfirmationToken" in detail, false);
+        assert.equal(detail.respondedAt, clock.toISOString());
+        assert.match(String(detail.respondedBy), /CONFIRMATION FIXTURE.*confirmation-fixture@example.test/);
         assert.equal((await fetch(`${root}/api/invoices/${invoice.id}/broker-confirmation/assignment`, { method: "PATCH", headers: { "Content-Type": "application/json", "x-fixture-user": userId }, body: JSON.stringify({ agentId: otherId }) })).status, 403);
         assert.equal((await fetch(`${root}/api/invoices/${invoice.id}/broker-confirmation/mark-confirmed`, { method: "POST", headers: { "Content-Type": "application/json", "x-fixture-user": userId }, body: JSON.stringify({ notes: "" }) })).status, 400);
         assert.equal((await fetch(`${root}/api/broker-confirm/${randomUUID()}`)).status, 404);
@@ -338,6 +367,46 @@ test("database and HTTP confirmation lifecycle (transactional fixtures; zero rea
         const disputeResponse = await fetch(disputeUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: disputeCookie },
           body: new URLSearchParams({ csrf: disputeCsrf, reason: "Wrong invoice amount" }) });
         assert.equal(disputeResponse.status, 200);
+        assert.match(await disputeResponse.text(), /Dispute recorded/i);
+        const disputeDetail = await service.details(disputed.id);
+        assert.equal(disputeDetail.status, "disputed"); assert.equal(disputeDetail.disputedAt?.getTime(), clock.getTime());
+        assert.match(disputeDetail.respondedBy!, /confirmation-fixture@example.test/);
+        assert.equal((await stored(disputed.id)).status, "funded", "receipt response never overwrites financial status");
+        for (const [row, winning] of [[invoice, "confirm"], [disputed, "dispute"]] as const) {
+          const losing = winning === "confirm" ? "dispute" : "confirm";
+          const loserUrl = `${root}/api/broker-${losing}/${row.brokerConfirmationToken}`;
+          assert.equal((await fetch(loserUrl)).status, 409, "opposite response page is blocked");
+          // CSRF minted on a pending invoice, then both actions attempted:
+          // covered separately below to ensure POST cannot override either.
+          const terminal = await stored(row.id);
+          assert.equal(terminal.brokerConfirmationStatus, winning === "confirm" ? "confirmed" : "disputed");
+        }
+        for (const winning of ["confirm", "dispute"] as const) {
+          const row = await newInvoice(`first-wins-${winning}`);
+          await service.sendForInvoice(row.id, { kind: "agent", id: userId });
+          const forms = new Map<string, { url: string; csrf: string; cookie: string }>();
+          for (const action of ["confirm", "dispute"]) {
+            const actionUrl = `${root}/api/broker-${action}/${row.brokerConfirmationToken}`;
+            const form = await fetch(actionUrl); const body = await form.text();
+            forms.set(action, { url: actionUrl, csrf: body.match(/name="csrf" value="([a-f0-9]+)"/)![1],
+              cookie: form.headers.get("set-cookie")!.split(";")[0] });
+          }
+          const submit = (action: string) => {
+            const form = forms.get(action)!;
+            return fetch(form.url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: form.cookie },
+              body: new URLSearchParams({ csrf: form.csrf, reason: "Fixture response" }) });
+          };
+          assert.equal((await submit(winning)).status, 200);
+          assert.equal((await submit(winning)).status, 200, "repeat same response is idempotent");
+          const rejected = await submit(winning === "confirm" ? "dispute" : "confirm");
+          assert.equal(rejected.status, 409); assert.match(await rejected.text(), /already been/);
+          const log = (await service.details(row.id)).events.filter(event => ["confirmed", "disputed"].includes(event.event));
+          assert.equal(log.length, 1); assert.equal(log[0].event, winning === "confirm" ? "confirmed" : "disputed");
+          assert.equal(log[0].createdAt.getTime(), clock.getTime()); assert.match(log[0].actor, /confirmation-fixture@example.test/);
+          const audit = await tx.select().from(eventLedger).where(and(eq(eventLedger.entityId, row.id),
+            eq(eventLedger.eventType, `broker_confirmation_${log[0].event}`)));
+          assert.equal(audit.length, 1);
+        }
         const [urgent] = await tx.select().from(tasks).where(eq(tasks.confirmationInvoiceId, disputed.id));
         assert.equal(urgent.priority, "urgent"); assert.match(urgent.description!, /Wrong invoice amount/);
         assert.equal((await fetch(`${root}/api/broker-confirmation-settings`, { method: "PATCH",

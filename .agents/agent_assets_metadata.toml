@@ -288,3 +288,17 @@ mtime_ms = 1794243434794
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/c5a1490e-daa9-4e50-9b85-9e7982b0a94f/b5e8eb73-79c8-4c37-a712-8d1fedf82581"
 storage_version_token = "1794243445963472"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "1r7BgbEqQXsJbX0NNOU5-"
+uri = "file://generated-artifacts/broker-email/preview.html"
+type = "html"
+title = "Corrected broker confirmation email"
+description = "Sample email with visible Confirm Receipt and Dispute buttons and paperwork download links. Uses sample data only."
+logical_id = "6856d999-2291-4b00-8db4-98030bbe0b5f"
+content_hash = "sha256:41c87ba33675683886f48c1842baa55a66300a4bfd7219570d79ca6671a894dd"
+size = 9900
+mtime_ms = 1794498751324
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:e603594c-e028-4700-8f9c-83ea4151f86f/6856d999-2291-4b00-8db4-98030bbe0b5f/a4f5c107-c858-4d1f-a9ee-dac43b6ebea3"
+storage_version_token = "1794498903420848"
+content_type = "text/html"

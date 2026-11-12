@@ -60,6 +60,13 @@ export function textToEmailBody(text) {
 }
 
 function bodyFragment(html) {
+  // Branded action tables already contain email-safe inline colors. Do not
+  // normalize their cells: white button text would disappear on a white cell.
+  const presentationTables = [];
+  html = html.replace(/<table\b(?=[^>]*\bdata-tpf-actions="broker-receipt")[^>]*>[\s\S]*?<\/table>/gi, table => {
+    const index = presentationTables.push(table.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")) - 1;
+    return `<!--tpf-presentation-${index}-->`;
+  });
   const body = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? html;
   return body.replace(/<!doctype[^>]*>|<\/?(?:html|body)\b[^>]*>|<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
     .replace(/>(Hi|Dear|Hello)\s+([^<]+),</g, (_match, greeting, name) => `>${greeting} ${emailDisplayName(name)},<`)
@@ -76,7 +83,8 @@ function bodyFragment(html) {
     })
     .replace(/<table\b[^>]*>/gi, '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;margin:20px 0">')
     .replace(/<(th|td)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_match, tag, value) =>
-      `<${tag} align="left" style="padding:10px;border:1px solid #e5e7eb;vertical-align:top;overflow-wrap:anywhere;${tag === "th" ? "font-weight:normal;background:#f9fafb" : ""}">${tag === "td" ? `<strong>${value}</strong>` : value}</${tag}>`);
+      `<${tag} align="left" style="padding:10px;border:1px solid #e5e7eb;vertical-align:top;overflow-wrap:anywhere;${tag === "th" ? "font-weight:normal;background:#f9fafb" : ""}">${tag === "td" ? `<strong>${value}</strong>` : value}</${tag}>`)
+    .replace(/<!--tpf-presentation-(\d+)-->/g, (_match, index) => presentationTables[Number(index)]);
 }
 
 export function wrapEmail(subject, bodyHtml) {

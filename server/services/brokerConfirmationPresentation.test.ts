@@ -24,6 +24,9 @@ test("receipt and reminder bodies keep one TPF wrapper, inline logo and styled a
     assert.match(prepared.html, /bgcolor="#27aab8"/);
     assert.match(prepared.html, /bgcolor="#ffffff"/);
     assert.match(prepared.html, /bgcolor="#f5f5f5"/);
+    // Assert the ACTION cell, not the unrelated teal brand header.
+    assert.match(prepared.html, /<td align="center" bgcolor="#27aab8"[^>]*>\s*<a href="https:\/\/factorflux\.io\/api\/broker-confirm\/fixture-token"[^>]*color:#ffffff[^>]*>Confirm Receipt<\/a>/);
+    assert.match(prepared.html, /<td align="center" bgcolor="#f5f5f5"[^>]*>\s*<a href="https:\/\/factorflux\.io\/api\/broker-dispute\/fixture-token"[^>]*>Dispute<\/a>/);
     assert.match(prepared.html, /Trucking Pros Financial/);
     assert.ok(!prepared.html.includes("FactorFlux"));
     assert.ok(prepared.attachments?.some(attachment => attachment.content_id === EMAIL_LOGO_CID));

@@ -1,9 +1,11 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import path from "node:path";
+import { access as fileAccess } from "node:fs/promises";
 import type { Express, RequestHandler } from "express";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db as applicationDb } from "../db";
-import { brokerConfirmationSettings, brokers, invoices, tasks, users } from "../../shared/schema";
+import { brokerConfirmationSettings, brokers, documents, invoices, tasks, users } from "../../shared/schema";
 import {
   brokerConfirmationService as brokerService, ConfirmationError, escapeConfirmationHtml as escape,
   getConfirmationAgingRows, getConfirmationInvoiceScope,
@@ -11,7 +13,8 @@ import {
 } from "../services/brokerConfirmationService";
 import { SYSTEM_EMAIL_REPLY_TO } from "../resendTransport.js";
 import { isProductionAppOrigin } from "../../shared/production-urls.js";
-import { BROKER_PUBLIC_ORIGIN } from "../services/brokerConfirmationPresentation";
+import { BROKER_PUBLIC_ORIGIN, BROKER_PAPERWORK_TYPES } from "../services/brokerConfirmationPresentation";
+import { getSignedDownloadUrl } from "../services/s3Service";
 
 type Dependencies = {
   requireAuth: RequestHandler;
@@ -19,6 +22,7 @@ type Dependencies = {
   canAccessInvoice: (req: any, invoiceId: number) => Promise<boolean>;
   store?: ConfirmationStore;
   service?: typeof brokerService;
+  signedDownload?: typeof getSignedDownloadUrl;
 };
 const idSchema = z.coerce.number().int().positive();
 const tokenSchema = z.string().uuid();
@@ -168,6 +172,40 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
     res.json(await getConfirmationAgingRows(await getConfirmationInvoiceScope(req.user, db), db));
   }));
 
+  // Durable email URLs authorize only paperwork belonging to this token's invoice.
+  // Generate the short-lived storage URL when clicked, not when the email is sent.
+  app.get("/api/broker-confirm/:token/documents/:documentId/download", async (req, res) => {
+    publicHeaders(res);
+    try {
+      const token = tokenSchema.parse(req.params.token);
+      const documentId = idSchema.parse(req.params.documentId);
+      const invoice = await service.publicInvoice(token);
+      const [document] = await db.select().from(documents).where(and(
+        eq(documents.id, documentId), eq(documents.invoiceId, invoice.invoiceId),
+      ));
+      if (!document || !(BROKER_PAPERWORK_TYPES as readonly string[]).includes(document.documentType)) {
+        throw new ConfirmationError(404, "Invoice document not found.");
+      }
+      if (document.s3Key) {
+        return void res.redirect(await (deps.signedDownload ?? getSignedDownloadUrl)(document.s3Key, document.originalName, 60));
+      }
+      const uploads = path.resolve(process.cwd(), "uploads");
+      const filename = path.resolve(uploads, document.filename);
+      if (!filename.startsWith(`${uploads}${path.sep}`)) throw new ConfirmationError(404, "Invoice document not found.");
+      let local = filename;
+      try { await fileAccess(local); } catch {
+        local = `${filename}.pdf`;
+        try { await fileAccess(local); } catch { throw new ConfirmationError(404, "Invoice document file is unavailable."); }
+      }
+      res.download(local, document.originalName, error => {
+        if (error && !res.headersSent) res.status(404).end();
+      });
+    } catch (error) {
+      const status = error instanceof z.ZodError ? 404 : error instanceof ConfirmationError ? error.status : 500;
+      res.status(status).send(page("Confirmation unavailable", `<p>${escape(error instanceof ConfirmationError ? error.message : "This document is unavailable. Please contact Trucking Pros Financial.")}</p>`));
+    }
+  });
+
   // GET is deliberately non-confirming. Only an explicit, CSRF-protected POST records receipt/dispute.
   for (const mode of ["confirm", "dispute"] as const) {
     const route = `/api/broker-${mode}/:token`;
@@ -177,6 +215,9 @@ export function registerBrokerConfirmationRoutes(app: Express, deps: Dependencie
         const token = tokenSchema.parse(req.params.token);
         const invoice = await service.publicInvoice(token, true);
         if (["confirmed", "disputed"].includes(invoice.status)) {
+          const requested = mode === "confirm" ? "confirmed" : "disputed";
+          if (invoice.status !== requested) throw new ConfirmationError(409,
+            `Receipt has already been ${invoice.status}. The first response is final. Contact Trucking Pros Financial to make a correction.`);
           return void res.send(page(invoice.status === "confirmed" ? "Thank you" : "Dispute recorded",
             `<section class="result" aria-label="Response recorded"><div class="success-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12.5 4.5 4.5L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><p class="result-copy">${invoice.status === "confirmed" ? "Receipt of this invoice has been confirmed." : "Your dispute has been recorded. Please contact Trucking Pros Financial."}</p><p class="invoice-ref">Invoice ${escape(invoice.invoiceNumber)}</p><p class="muted">Contact: ${escape(SYSTEM_EMAIL_REPLY_TO)}</p></section>`));
         }

@@ -12,7 +12,8 @@ import { collectionActionSchema, collectionSettingsSchema, type CollectionQueue,
   type CollectionRunResult, type CollectionRunError } from "../../shared/broker-collections";
 import { sendResendEmail, ResendDeliveryError, type ResendEmailParams } from "../resendTransport.js";
 import { emailDetailsTable, wrapEmail } from "../emailTemplate.js";
-import { brokerReceiptActions, brokerReceiptLinks } from "./brokerConfirmationPresentation";
+import { brokerReceiptActions, brokerReceiptLinks, brokerPaperworkHtml, brokerPaperworkText } from "./brokerConfirmationPresentation";
+import { brokerInvoicePaperwork } from "./brokerConfirmationDocuments";
 
 type Store = Pick<typeof db, "select" | "insert" | "update" | "transaction" | "execute">;
 type Invoice = typeof invoices.$inferSelect;
@@ -299,14 +300,16 @@ export function createBrokerCollectionsService({
             `Payment status request — ${invoice.invoiceNumber} (day ${[20, 35, 40][number - 1]})`;
           const message = state.phase === "vp" ? "Please confirm you received the invoice and supporting paperwork." :
             `Has payment been sent? It has been ${[20, 35, 40][number - 1]} days since paperwork was verified. Please reply with payment status and remittance details.`;
-          const text = `Trucking Pros Financial\n${message}\nInvoice: ${invoice.invoiceNumber}\nLoad: ${invoice.loadNumber ?? "Not provided"}\nAmount: $${Number(invoice.amount).toFixed(2)}${receiptLinks}`;
+          const paperwork = state.phase === "vp" || invoice.confirmationSentAt
+            ? await brokerInvoicePaperwork(tx, invoiceId, invoice.brokerConfirmationToken) : [];
+          const text = `Trucking Pros Financial\n${message}\nInvoice: ${invoice.invoiceNumber}\nLoad: ${invoice.loadNumber ?? "Not provided"}\nAmount: $${Number(invoice.amount).toFixed(2)}${brokerPaperworkText(paperwork)}${receiptLinks}`;
           if (state.mode === "live") {
             if (send === sendResendEmail && process.env.NODE_ENV !== "production") throw new CollectionError(503, PREVIEW_LIVE_EMAIL_NOTICE, "preview_live_blocked");
             // Reuse the old initial confirmation intent, preventing duplicate +48h sends across rollout/recovery.
             const key = state.phase === "vp" && number === 1 ? `broker-confirm/${invoice.brokerConfirmationToken}/initial` :
               `broker-collections/${invoice.brokerConfirmationToken}/${state.generation}/${due.step}`;
             providerMessageId = await send({ to: recipient, subject, text, idempotencyKey: key,
-              html: wrapEmail(subject, `<p>${message}</p>${emailDetailsTable([["Invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"], ["Load", invoice.loadNumber ?? "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`]])}${receiptHtml}<p>Please reply to this email with any questions.</p>`),
+              html: wrapEmail(subject, `<p>${message}</p>${emailDetailsTable([["Invoice", invoice.invoiceNumber], ["Carrier invoice", invoice.carrierInvoiceNumber || "Not provided"], ["Load", invoice.loadNumber ?? "Not provided"], ["Amount", `$${Number(invoice.amount).toFixed(2)}`]])}${brokerPaperworkHtml(paperwork)}${receiptHtml}<p>Please reply to this email with any questions.</p>`),
               emailLog: { entityType: "invoice", entityId: invoiceId, templateName: `broker_collections_${state.phase}`, sentByUserId: null } });
             if (!providerMessageId) throw new CollectionError(502, "Provider did not return an acceptance ID.");
             await tx.update(settingsTable).set({ nextSendAt: new Date(now().getTime() + 2000) }).where(eq(settingsTable.id, 1));

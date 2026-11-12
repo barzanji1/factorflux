@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import express from "express";
 import { db, pool } from "../db";
-import { brokers, clients, users, invoices, notifications, emailLog,
+import { brokers, clients, users, invoices, documents, notifications, emailLog,
   brokerCollectionStates as states, brokerCollectionEvents as events,
   brokerCollectionSettings as settings, brokerConfirmationSettings } from "../../shared/schema";
 import { COLLECTION_DAY as DAY, createBrokerCollectionsService, ensureCollectionState, nextCollectionAction, PREVIEW_LIVE_EMAIL_NOTICE } from "./brokerCollections";
@@ -78,6 +78,13 @@ for (const mode of ["dry_run", "live"] as const) test(`${mode}: funded → +48h/
       escalationRecipient: async () => f.alan });
     await service.updateSettings(f.admin, { enabled: true, mode, ...(mode === "live" ? { confirmLive: true } : {}) });
     const invoice = await f.invoice();
+    const docs = await tx.insert(documents).values(
+      (["rate_confirmation", "bol", "lumper_receipt", "other"] as const).map(documentType => ({
+        invoiceId: invoice.id, clientId: invoice.clientId, uploadedBy: f.employee, documentType,
+        originalName: `${documentType}-fixture.pdf`, filename: `${invoice.id}-${documentType}.pdf`,
+        mimeType: "application/pdf", size: 100, s3Key: `fixture/collections/${invoice.id}/${documentType}.pdf`,
+      })),
+    ).returning();
     await ensureCollectionState(tx, invoice, clock);
     const tickAt = async (at: number) => { clock = new Date(at); return service.tick({ invoiceIds: [invoice.id] }); };
     assert.equal((await tickAt(funded.getTime() + 2 * DAY - 1)).processed, 0);
@@ -114,6 +121,14 @@ for (const mode of ["dry_run", "live"] as const) test(`${mode}: funded → +48h/
       assert(captured.every(payload => payload.from.includes("notifications@truckingprosfinancial.com") && payload.reply_to === "dosh@truckingprosfinancial.com"));
       assert(captured[0].html.includes("Trucking Pros Financial"));
       assert(captured[0].html.includes("/api/broker-confirm/"));
+      for (const payload of captured.slice(0, 2)) {
+        assert.match(payload.html, /<td align="center" bgcolor="#27aab8"[^>]*>\s*<a[^>]*>Confirm Receipt<\/a>/);
+        assert.match(payload.html, /href="https:\/\/factorflux\.io\/api\/broker-dispute\//);
+      }
+      for (const payload of captured) for (const doc of docs) {
+        assert(payload.html.includes(`/documents/${doc.id}/download`));
+        assert(payload.text.includes(`/documents/${doc.id}/download`));
+      }
       const logs = await tx.select().from(emailLog).where(and(eq(emailLog.entityType, "invoice"), eq(emailLog.entityId, String(invoice.id))));
       assert.equal(logs.length, 5, "every real-transport send goes through the shared Email Log");
     }
