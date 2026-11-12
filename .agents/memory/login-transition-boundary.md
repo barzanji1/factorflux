@@ -1,16 +1,22 @@
 ---
-name: Login transition boundary
-description: Why successful login motion continues across navigation without delaying authentication.
+name: Login entry and navigation
+description: No fullscreen sign-in effects; avoid initial and destination loading flashes.
 ---
 
-The success transition is now a water ripple from the Sign In button (concentric rings, ~1.2s) that replaced the earlier glass shatter at the user's request. Navigate while the overlay still covers the screen, then fade the overlay so the dashboard appears underneath.
+Do not reintroduce the outward Sign In ripple, a cloned glass card, or a fullscreen success overlay. Keep the card-local hover effects separate and unchanged.
 
-**Why:** The visual effect has to survive the login page unmounting; keeping it owned only by that page would cut it off at navigation.
+**Why:** The user explicitly removed the outward ripple because it was affecting the page after repeated reports of sign-in glitches.
 
-**How to apply:** Keep transition cleanup independent of the login route after navigation begins, but cancel it if the user leaves before the reveal. Never delay or bypass authentication or permission checks to drive the animation. Preserve a reduced-motion path that reaches the dashboard without animation. The overlay clone must never carry credentials.
+**How to apply:** Authenticate normally, prepare the destination while the real login form stays steady, and navigate without decorative success animation. Preserve cancellation when the user leaves and all server/route permission checks.
 
-Do not uncover the destination on a fixed animation deadline alone. Navigation may proceed on schedule, but fade the login overlay only after the dashboard has committed and had a paint opportunity, with a bounded fallback for failed loads.
+The login page intentionally loads eagerly. Anonymous home visits should enter login without first mounting the authenticated loading shell.
 
-**Why:** A production sign-in succeeded while the lazy dashboard still loaded after the old overlay cleanup deadline, exposing a visible loading flash. Preloading alone did not eliminate the race on a cold connection.
+**Why:** The user reported the brief “Loading…” screen before the sign-in form. Making login lazy introduced a visible startup state despite loading approximately the same total login dependencies.
 
-**How to apply:** Preserve readiness-aware reveal and its timeout when changing route splitting or login motion. Verify frame-by-frame on a cold/throttled production build, not only the final dashboard.
+**How to apply:** Keep authenticated pages lazy and treat cached-session hints only as entry-page selection, never authentication. Preserve remembered-session and deep-link behavior.
+
+Awaiting a route import alone does not guarantee that its first React.lazy mount avoids a Suspense fallback. A prepared component must choose its resolved implementation once per mount, not switch types on later renders.
+
+**Why:** A cold/throttled production-build check still exposed loading frames after awaited imports; changing implementation types after mount would instead reset form state.
+
+**How to apply:** Verify both startup and sign-in frame-by-frame on the production build, including reduced-motion/mobile paths. Check route guards and form-state continuity when changing lazy loading.

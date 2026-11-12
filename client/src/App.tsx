@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { lazyPage } from "@/lib/lazy-page";
+import { PreparedStaffRoute as ProtectedRoute } from "@/lib/staff-entry";
+import LoginPage from "@/pages/login";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { CustomerBrandHead } from "@/components/brand/customer-brand-head";
 import { queryClient } from "./lib/queryClient";
@@ -34,7 +36,6 @@ const FundingQueue = lazyPage(["/sheets"], () => import("@/pages/funding-queue")
 const Tasks = lazyPage(["/tasks"], () => import("@/pages/tasks"));
 const TaskDetail = lazyPage(["/tasks/:id"], () => import("@/pages/task-detail"));
 const Brokers = lazyPage(["/brokers"], () => import("@/pages/brokers"));
-const LoginPage = lazyPage(["/login"], () => import("@/pages/login"));
 const Help = lazyPage(["/help"], () => import("@/pages/help"));
 const Payouts = lazyPage(["/payouts"], () => import("@/pages/payouts"));
 const CashApplication = lazyPage(["/cash-application"], () => import("@/pages/cash-application"));
@@ -72,7 +73,6 @@ const LegacyTicketRedirect = lazyPage(["/tickets", "/tickets/:id", "/carrier-mes
 const PortalChat = lazyPage(["/portal/chat"], () => import("@/pages/portal/chat"));
 const ClientEmailPage = lazyPage(["/client-email", "/email-log"], () => import("@/pages/client-email"));
 const ItSupport = lazyPage(["/it-support"], () => import("@/pages/it-support"));
-const ProtectedRoute = lazy(() => import("@/components/ProtectedRoute").then(module => ({ default: module.ProtectedRoute })));
 const TeamChatWorkspace = lazy(() => import("@/pages/chat").then(module => ({ default: module.TeamChatWorkspace })));
 const RouteLoading = lazy(() => import("@/components/layout/route-loading"));
 

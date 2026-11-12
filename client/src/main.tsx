@@ -4,6 +4,17 @@ import { sentryDataCollection, scrubSentryBreadcrumb, scrubSentryEvent } from "@
 import App from "./App";
 import "./index.css";
 import "./styles/loading-continuity.css";
+import { initialStaffPath } from "./lib/staff-entry";
+
+// Only select the anonymous entry page here. Server authentication and route
+// permission checks remain the authority for all protected content.
+try {
+  const entry = initialStaffPath(location.pathname, localStorage.getItem("isAuthenticated"), localStorage.getItem("user"));
+  if (entry !== location.pathname) history.replaceState(history.state, "", entry);
+} catch {
+  // Storage can be unavailable in private/restricted browsers.
+  if (location.pathname === "/") history.replaceState(history.state, "", "/login");
+}
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

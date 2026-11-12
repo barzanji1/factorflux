@@ -193,70 +193,10 @@ try {
   await sleep(250);
   assert(await evaluate("document.documentElement.scrollWidth <= 390"), "Mobile layout overflows.");
   if (isLogin) {
-    // Exercise only the visual helper, not auth or application routing.
-    await evaluate(`(async () => {
-      const {playLoginSuccess}=await import('/src/lib/login-ripple.ts');
-      window.__glassReveal=false;
-      window.__glassTransition=playLoginSuccess(document.querySelector('.ff-login-card'),()=>{window.__glassReveal=true},document.querySelector('.ff-login-submit'));
-    })()`);
-    const overlay = await evaluate(`(() => {
-      const o=document.querySelector('.ff-login-transition');
-      const allIds=[...document.querySelectorAll('[id]')].map(x=>x.id);
-      const references=[...o.querySelectorAll('*')].flatMap(x=>[...x.attributes].flatMap(a=>[...a.value.matchAll(/url\\(["']?#([^"')]+)["']?\\)/g)].map(m=>m[1])));
-      return {safe:[...o.querySelectorAll('input')].every(x=>!x.value&&!x.hasAttribute('id')),unique:new Set(allIds).size===allIds.length,filters:references.every(id=>Boolean(o.querySelector('[id="'+id+'"]')))};
-    })()`);
-    assert(overlay.safe && overlay.unique && overlay.filters, "Transition leaked input state or lost its SVG filters.");
-    await sleep(1450);
-    assert.equal(await evaluate("window.__glassReveal"), true);
-    assert.equal(await evaluate("Boolean(document.querySelector('.ff-login-transition'))"), false);
-    await evaluate(`(async () => {const {playLoginSuccess}=await import('/src/lib/login-ripple.ts');window.__cancelledReveal=false;const t=playLoginSuccess(document.querySelector('.ff-login-card'),()=>{window.__cancelledReveal=true});t.cancel()})()`);
-    await sleep(800);
-    assert.equal(await evaluate("window.__cancelledReveal"), false);
-    await evaluate(`(async () => {
-      const {playLoginSuccess}=await import('/src/lib/login-ripple.ts');
-      window.__destinationReady=false;window.__readyNavigation=false;
-      window.__readyTransition=playLoginSuccess(document.querySelector('.ff-login-card'),
-        ()=>{window.__readyNavigation=true},document.querySelector('.ff-login-submit'),
-        {isDestinationReady:()=>window.__destinationReady});
-    })()`);
-    await sleep(1500);
-    assert.equal(await evaluate("window.__readyNavigation"), true, "Readiness must not delay navigation.");
-    assert.equal(await evaluate("document.querySelector('.ff-login-transition')?.classList.contains('is-revealing')"), false,
-      "A cold destination must remain covered after the old fixed deadline.");
-    await evaluate("window.__destinationReady=true;document.body.appendChild(document.createComment('destination committed'))");
-    await sleep(750);
-    assert.equal(await evaluate("Boolean(document.querySelector('.ff-login-transition'))"), false,
-      "Ready destination must be revealed and decoration removed.");
-    await evaluate(`(async () => {
-      const {playLoginSuccess}=await import('/src/lib/login-ripple.ts');window.__abortedNavigation=false;
-      const transition=playLoginSuccess(document.querySelector('.ff-login-card'),
-        ()=>{window.__abortedNavigation=true},null,{isDestinationReady:()=>false});
-      transition.cancel();
-    })()`);
-    await sleep(800);
-    assert.equal(await evaluate("window.__abortedNavigation"), false);
-    await evaluate(`(async () => {
-      const {playLoginSuccess}=await import('/src/lib/login-ripple.ts');
-      window.__fallbackNavigation=false;
-      playLoginSuccess(document.querySelector('.ff-login-card'),()=>{window.__fallbackNavigation=true},
-        null,{isDestinationReady:()=>false});
-    })()`);
-    await sleep(9500);
-    assert.equal(await evaluate("window.__fallbackNavigation"), true);
-    assert.equal(await evaluate("Boolean(document.querySelector('.ff-login-transition'))"), false,
-      "A failed destination must not leave a permanent login overlay.");
-    await cdp("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
-    await evaluate(`(async () => {
-      const {playLoginSuccess}=await import('/src/lib/login-ripple.ts');
-      window.__reducedNavigation=false;
-      playLoginSuccess(document.querySelector('.ff-login-card'),()=>{window.__reducedNavigation=true},
-        null,{isDestinationReady:()=>false});
-    })()`);
-    await sleep(150);
-    assert.equal(await evaluate("window.__reducedNavigation"), true);
-    assert.equal(await evaluate("Boolean(document.querySelector('.ff-login-transition'))"), false);
+    assert.equal(await evaluate("document.querySelectorAll('.ff-login-transition, .ff-login-transition-ring').length"), 0,
+      "Login must not mount a fullscreen ripple transition.");
   }
-  console.log(JSON.stringify({ passed: true, url: new URL(url).pathname, refractionPixelCheck: {edgeChanges, centerChanges}, checks: ["layer isolation", "rendered perimeter refraction", "SVG texture", "unique definitions", "pointer pass-through", "bounded ripple cleanup", ...(staffRipples ? ["three-ring groups", "login-only effect"] : ["movement-speed response"]), "click and touch ripples", "control interaction", "reduced motion", "mobile layout", ...(isLogin ? ["credential-free transition", "SVG clone remapping", "transition cancellation", "cold-route reveal readiness", "failed-route overlay timeout", "reduced-motion navigation"] : [])] }, null, 2));
+  console.log(JSON.stringify({ passed: true, url: new URL(url).pathname, refractionPixelCheck: {edgeChanges, centerChanges}, checks: ["layer isolation", "rendered perimeter refraction", "SVG texture", "unique definitions", "pointer pass-through", "bounded ripple cleanup", ...(staffRipples ? ["three-ring groups", "login-only effect"] : ["movement-speed response"]), "click and touch ripples", "control interaction", "reduced motion", "mobile layout", ...(isLogin ? ["no fullscreen ripple transition"] : [])] }, null, 2));
 } finally {
   socket?.close();
   browser.kill("SIGTERM");

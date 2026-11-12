@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { playLoginSuccess, type LoginSuccessTransition } from "@/lib/login-ripple";
-import { preloadPage } from "@/lib/lazy-page";
+import { loadPage } from "@/lib/lazy-page";
+import { loadStaffRoute } from "@/lib/staff-entry";
 import { LiquidGlassPanel } from "@/components/liquid-glass/LiquidGlassPanel";
 import { useStaffLoginRipples } from "@/hooks/use-staff-login-ripples";
 import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
@@ -33,14 +33,11 @@ export default function LoginPage() {
   const authenticationBusy = useRef(false);
   authenticationBusy.current = isLoading;
   useStaffLoginRipples(cardRef, false, transitionBusy, authenticationBusy);
-  const transitionRef = useRef<LoginSuccessTransition | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      const transition = transitionRef.current;
-      if (transition && !transition.hasNavigated) transition.cancel();
     };
   }, []);
 
@@ -61,13 +58,11 @@ export default function LoginPage() {
       const success = await login(data.username, data.password);
       if (!mounted.current) return;
       if (success) {
-        preloadPage("/");
-        transitionBusy.current = true;
-        const card = mainRef.current?.querySelector<HTMLElement>(".ff-login-card") ?? null;
-        const button = mainRef.current?.querySelector<HTMLElement>(".ff-login-submit") ?? null;
-        transitionRef.current = playLoginSuccess(card, () => setLocation("/"), button, {
-          isDestinationReady: () => Boolean(document.querySelector('[data-testid="agent-dashboard"]')),
-        });
+        // Keep the real form steady while the destination loads. No copied
+        // glass panel, fullscreen overlay, or expanding success ripples.
+        await Promise.all([loadPage("/"), loadStaffRoute()]);
+        if (!mounted.current) return;
+        startTransition(() => setLocation("/"));
       } else {
         setError("Invalid email or password. Please try again.");
         setShakeCount((count) => count + 1);

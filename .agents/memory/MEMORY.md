@@ -59,7 +59,7 @@
 - [Browser verification context](browser-verification-context.md) — select the application port and preserve a secure origin before treating blank signed-in pages as app regressions.
 - [Neumorphic depth](neumorphic-depth-policy.md) — subtle global shadows; older one-off utilities are compacted at CSS build time without changing interaction states.
 - [Dedicated liquid glass](liquid-glass-panel-policy.md) — reusable material/ripple/content layers; verify independently, preserve building scene, and remap SVG IDs in transition clones.
-- [Login transition boundary](login-transition-boundary.md) — success fragments continue across routing so the authenticated dashboard appears underneath; cancellation must not redirect later.
+- [Login entry policy](login-transition-boundary.md) — no fullscreen success ripple or cloned-card overlay; show login directly and prepare the destination before navigation.
 - [Login sizing feedback](login-sizing-feedback.md) — smaller means a real proportional reduction, not only recentering or retaining a superseded pixel target.
 - [Navigation loading continuity](navigation-loading-policy.md) — prevent large gray placeholder flashes; preserve recognizable page structure and test pending frames during real sidebar clicks.
 - [Performance audit safety](performance-audit-safety.md) — verify implicit JSX/build usage before deleting code; report complete route startup separately from whole-site bundle size.
