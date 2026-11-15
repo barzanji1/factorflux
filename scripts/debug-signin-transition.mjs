@@ -52,8 +52,10 @@ browser.stdio[4].on("data", chunk => {
             responseHeaders: event.responseHeaders.filter(h => !["content-length", "content-encoding"].includes(h.name.toLowerCase())),
             body: Buffer.from(JSON.stringify(result)).toString("base64") });
         } else {
-          if (delayPermissions) await wait(400);
-          if (permissionOverride !== null) {
+          const permissionsRequest = new URL(event.request.url).pathname === "/api/auth/permissions";
+          if (permissionsRequest && delayPermissions) await wait(400);
+          if (!permissionsRequest && process.env.SIGNIN_DELAY_DATA === "1") await wait(700);
+          if (permissionsRequest && permissionOverride !== null) {
             await send("Fetch.fulfillRequest", { requestId: event.requestId,
               responseCode: permissionOverride === "error" ? 503 : 200,
               responseHeaders: [{ name: "Content-Type", value: "application/json" }],
@@ -92,10 +94,20 @@ const click = async selector => {
     const rail = await evaluate("(()=>{const r=document.querySelector('aside').getBoundingClientRect();return{x:r.x+20,y:r.y+150}})()");
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...rail });
     await wait(250);
-    await evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center',behavior:'instant'})`);
-    await wait(80);
   }
-  const point = await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+  await evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center',behavior:'instant'})`);
+  await wait(80);
+  let point;
+  for (let i = 0; i < 40; i++) {
+    const target = await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)return null;const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;return{x,y,hit:e.contains(document.elementFromPoint(x,y))}})()`);
+    if (target?.hit) { point = { x: target.x, y: target.y }; break; }
+    await wait(50);
+  }
+  if (!point) {
+    console.log(JSON.stringify({ blocked: selector, geometry: await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});const r=e?.getBoundingClientRect();const h=r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2):null;return{path:location.pathname,box:r?{x:r.x,y:r.y,w:r.width,h:r.height}:null,hit:h?.className,card:e?.closest('.ff-action-card')?.className,bodyPointer:getComputedStyle(document.body).pointerEvents,holding:document.documentElement.dataset.pageTransition,animations:document.getAnimations().map(a=>a.animationName).filter(Boolean).slice(0,8)}})()`) }));
+    await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/blocked-pointer.jpg`, Buffer.from(r.data, "base64")));
+  }
+  assert(point, `Pointer target blocked: ${selector}`);
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
   await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", clickCount: 1 });
@@ -180,9 +192,77 @@ try {
     await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/failed-signin.jpg`, Buffer.from(r.data, "base64")));
   }
   const navigation = [];
+  if (process.env.SIGNIN_VERIFY_CARDS === "1") {
+    if (process.env.SIGNIN_DEBUG_FOCUS === "1") await evaluate(`(()=>{
+      window.__cardFocusCalls=[];const original=HTMLElement.prototype.focus;
+      HTMLElement.prototype.focus=function(...args){
+        const card=this.closest('[data-testid^="action-card-"]');
+        const entry=card?{target:this.className,flipped:card.classList.contains('is-flipped'),hidden:this.closest('[aria-hidden]')?.getAttribute('aria-hidden'),inert:!!this.closest('[inert]'),visibility:getComputedStyle(this).visibility,ms:Math.round(performance.now())}:null;
+        const result=original.apply(this,args);if(entry){entry.succeeded=document.activeElement===this;window.__cardFocusCalls.push(entry)}return result;
+      };
+    })()`);
+    const cards = [];
+    for (const id of process.env.SIGNIN_CARDS_FAST === "1" ? [] : ["invoices", "fund", "followups", "chargebacks", "reports", "earl"]) {
+      const selector = `[data-testid="action-card-${id}"]`;
+      await evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center',behavior:'instant'})`);
+      await wait(250);
+      await click(`${selector} .ff-action-front-button`);
+      await wait(700);
+      const state = await evaluate(`(()=>{const c=document.querySelector(${JSON.stringify(selector)}),b=c.querySelector('.ff-action-back'),r=b.getBoundingClientRect(),g=b.querySelector('[data-action-go]'),a=g?.getBoundingClientRect();return{id:${JSON.stringify(id)},flipped:c.classList.contains('is-flipped'),busy:c.getAttribute('aria-busy'),backVisible:getComputedStyle(b).visibility,backInert:b.inert,goHit:!g||g.contains(document.elementFromPoint(a.x+a.width/2,a.y+a.height/2)),focusBack:b.contains(document.activeElement),focusClass:document.activeElement.className,transform:getComputedStyle(b).transform}})()`);
+      cards.push(state);
+      if (process.env.SIGNIN_DEBUG_FOCUS === "1") console.log(JSON.stringify({ focus: await evaluate("window.__cardFocusCalls"), activeTag: await evaluate("document.activeElement.tagName"), manual: await evaluate(`(()=>{const b=document.querySelector('${selector} .ff-action-close');b.focus();return document.activeElement===b})()`) }));
+      if (process.env.SIGNIN_ASSERT_CARDS === "1") assert(state.flipped && state.busy === "false" && !state.backInert && state.goHit && state.focusBack, `Card failed: ${JSON.stringify(state)}`);
+      await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/card-${id}.jpg`, Buffer.from(r.data, "base64")));
+      await click(`${selector} .ff-action-close`);
+      await wait(650);
+    }
+    console.log(JSON.stringify({ cards }));
+    if (process.env.SIGNIN_VERIFY_EXTRA_LINKS === "1") {
+      const fund = '[data-testid="action-card-fund"]';
+      const ready = async path => {
+        for (let i = 0; i < 250; i++) {
+          if (await evaluate(`location.pathname===${JSON.stringify(path)}&&document.documentElement.dataset.pageTransition!=='holding'&&!!document.querySelector('main')&&${path === "/" ? "!!" : "!"}document.querySelector('[data-testid=agent-dashboard]')`)) return;
+          await wait(30);
+        }
+        throw new Error(`Link/history transition failed: ${path}`);
+      };
+      const length = await evaluate("history.length");
+      await click(`${fund} .ff-action-front-button`); await wait(750);
+      await click(`${fund} [data-action-go]`);
+      await ready("/sheets");
+      assert.equal(await evaluate("history.length"), length + 1);
+      await evaluate("history.back()"); await ready("/");
+      await evaluate("history.forward()"); await ready("/sheets");
+      await evaluate("history.back()"); await ready("/");
+      assert.equal(await evaluate("history.length"), length + 1, "Traversal added history entries");
+      const first = '[data-testid="action-card-invoices"]';
+      await click(`${first} .ff-action-front-button`);
+      // Suppress the normal completion event to exercise the safety timer.
+      await evaluate(`document.querySelector('${first} .ff-action-rotator').addEventListener('transitionend',e=>e.stopImmediatePropagation(),{once:true,capture:true})`);
+      await wait(850);
+      assert.equal(await evaluate(`document.querySelector('${first}').getAttribute('aria-busy')`), "false");
+      await click(`${first} .ff-action-close`); await wait(750);
+      // Closing restores keyboard focus to the front control.
+      assert(await evaluate(`document.activeElement===document.querySelector('${first} .ff-action-front-button')`), "Closing did not restore front-button focus");
+      await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+      await wait(750);
+      assert(await evaluate(`document.querySelector('${first}').classList.contains('is-flipped')`));
+      await click(`${first} .ff-action-close`); await wait(750);
+      await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+      const point = await evaluate(`(()=>{const r=document.querySelector('${first} .ff-action-front-button').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+      await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
+      await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await wait(850);
+      assert(await evaluate(`document.querySelector('${first}').classList.contains('is-flipped')`), "Touch compatibility click double-flipped the card");
+      await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+      await click(`${first} .ff-action-close`); await wait(750);
+      console.log(JSON.stringify({ cardLink: true, backForward: true, boundedAnimationLock: true, keyboard: true, touch: true }));
+    }
+  }
   if (process.env.SIGNIN_VERIFY_NAVIGATION === "1") {
     delayPermissions = true;
-    await send("Fetch.enable", { patterns: [{ urlPattern: "*/api/auth/permissions", requestStage: "Request" }] });
+    await send("Fetch.enable", { patterns: [{ urlPattern: process.env.SIGNIN_DELAY_DATA === "1" ? "*/api/*" : "*/api/auth/permissions", requestStage: "Request" }] });
     const labels = await evaluate("Array.from(document.querySelectorAll('aside button[aria-label]'), el=>el.getAttribute('aria-label'))");
     const source = await readFile("client/src/components/layout/sidebar.tsx", "utf8");
     const routes = process.env.SIGNIN_ALL_ROUTES === "1"
@@ -197,6 +277,8 @@ try {
         (function sample(){window.__navigationFrames.push({
           path:location.pathname,loading:!!document.querySelector('[data-route-loading]'),
           checking:document.body.innerText.includes('Checking page access'),
+          holding:document.documentElement.dataset.pageTransition==='holding',
+          loadingCopy:document.querySelector('main')?.innerText.match(/\\bLoading\\b[^\\n]*/g)?.slice(0,3)||[],
         sidebarWidth:document.querySelector('aside')?.getBoundingClientRect().width,
           documentHeight:document.documentElement.scrollHeight
         });if(window.__navigationActive&&window.__navigationEpoch===epoch)requestAnimationFrame(sample)})()})()`);
@@ -206,14 +288,22 @@ try {
         await wait(50);
       }
       assert.equal(await evaluate("location.pathname"), path.split("?")[0], `${label} never opened`);
+      for (let i = 0; i < 100; i++) {
+        if (await evaluate("document.documentElement.dataset.pageTransition!=='holding'")) break;
+        await wait(25);
+      }
       await wait(150);
       const samples = await evaluate("window.__navigationActive=false;window.__navigationFrames");
       const detail = { label, frames: samples.length,
         fallbackFrames: samples.filter(f => f.loading || f.checking).length,
+        dataLoadingFrames: samples.filter(f => !f.holding && f.loadingCopy.length).length,
+        loadingCopy: [...new Set(samples.filter(f => !f.holding).flatMap(f => f.loadingCopy))],
+        heldFrames: samples.filter(f => f.holding).length,
         overflowFrames: samples.filter(f => f.documentHeight > 900).length };
       navigation.push(detail);
       assert.equal(detail.fallbackFrames, 0, `${label} exposed an intermediate loading page`);
       assert.equal(detail.overflowFrames, 0, `${label} overflowed the document`);
+      if (process.env.SIGNIN_ASSERT_DATA_NOFLASH === "1") assert.equal(detail.dataLoadingFrames, 0, `${label} showed a data-loading flash`);
     }
     if (process.env.SIGNIN_TEST_EMPLOYEE === "1") {
       const previousPath = await evaluate("location.pathname");
@@ -234,6 +324,18 @@ try {
     }
     await send("Fetch.disable");
     await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/navigation.jpg`, Buffer.from(r.data, "base64")));
+  }
+  if (process.env.SIGNIN_VERIFY_FUEL === "1") {
+    const fuel = await evaluate(`(async()=>{
+      const list=await fetch('/api/fuel-advances',{credentials:'include'});const rows=await list.json();
+      const id=Array.isArray(rows)&&rows.length?rows[0].id:2147483647;
+      const detail=await fetch('/api/fuel-advances/'+id,{credentials:'include'});
+      return{listStatus:list.status,listValid:Array.isArray(rows),detailStatus:detail.status,hadExistingRecord:Array.isArray(rows)&&rows.length>0};
+    })()`);
+    assert.equal(fuel.listStatus, 200);
+    assert(fuel.listValid);
+    assert.equal(fuel.detailStatus, fuel.hadExistingRecord ? 200 : 404);
+    console.log(JSON.stringify({ fuelAdvanceReads: fuel }));
   }
   const report = {
     origin: base, slowNetwork: process.env.SIGNIN_SLOW_NETWORK === "1", responses, failures, exceptionCount, navigation,

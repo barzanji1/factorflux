@@ -181,7 +181,7 @@ export default function Dashboard() {
     : financialQuery.error;
   const canVisit = (path: string) => {
     const permission = pathToPermission(path);
-    return !permission || permissions.includes(permission);
+    return user?.role === "admin" || !permission || permissions.includes(permission);
   };
   const agentName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || user?.name || "Agent";
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Link } from "wouter";
 import {
   ChartNoAxesCombined,
@@ -46,15 +46,67 @@ export function FloatingActionGrid({ data, isLoading, error, onRetry, canVisit, 
   const transitionLocks = useRef(new Set<string>());
   const touchClicks = useRef<Record<string, number>>({});
   const touchMoved = useRef(false);
-  useEffect(() => {
-    document.querySelectorAll<HTMLElement>(".ff-action-face[aria-hidden]").forEach(face => {
+  const section = useRef<HTMLElement>(null);
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const focusAfterFlip = useRef<string | null>(null);
+  const focusFrame = useRef<number | null>(null);
+  const tiltFrame = useRef<number | null>(null);
+  const pendingTilt = useRef<{ element: HTMLElement; x: number; y: number } | null>(null);
+  useLayoutEffect(() => {
+    section.current?.querySelectorAll<HTMLElement>(".ff-action-face[aria-hidden]").forEach(face => {
       face.inert = face.getAttribute("aria-hidden") === "true";
     });
-  }, [faces]);
+    const id = focusAfterFlip.current;
+    if (!id || faces[id]?.isAnimating) return;
+    const card = section.current?.querySelector<HTMLElement>(`[data-testid="action-card-${id}"]`);
+    const target = faces[id]?.isFlipped ? '[data-action-go], .ff-action-close' : '.ff-action-front-button';
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
+    // In the no-animation path, allow inert/visibility and the pointer's
+    // default focus action to settle before restoring keyboard focus.
+    const restoreFocus = (remaining: number) => {
+      focusFrame.current = null;
+      if (!card?.isConnected || (document.activeElement !== document.body && !card.contains(document.activeElement))) return;
+      const control = card.querySelector<HTMLElement>(target);
+      if (!control) return;
+      if (getComputedStyle(control).visibility === "visible" && !control.closest("[inert]")) control.focus({ preventScroll: true });
+      if (document.activeElement !== control && remaining > 0) {
+        focusFrame.current = requestAnimationFrame(() => restoreFocus(remaining - 1));
+      }
+    };
+    focusFrame.current = requestAnimationFrame(() => restoreFocus(12));
+    focusAfterFlip.current = null;
+  }, [faces, error]);
+  useEffect(() => {
+    const root = section.current;
+    const cancelled = (event: TransitionEvent) => {
+      if (!(event.target instanceof HTMLElement) || !event.target.matches(".ff-action-rotator") || event.propertyName !== "transform") return;
+      const id = event.target.closest<HTMLElement>("[data-testid]")?.dataset.testid?.replace("action-card-", "");
+      if (id) finishFlip(id);
+    };
+    root?.addEventListener("transitioncancel", cancelled);
+    return () => root?.removeEventListener("transitioncancel", cancelled);
+  }, [error]);
+  useEffect(() => () => {
+    timers.current.forEach(clearTimeout);
+    if (tiltFrame.current !== null) cancelAnimationFrame(tiltFrame.current);
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
+  }, []);
+  const finishFlip = (id: string) => {
+    if (!transitionLocks.current.delete(id)) return;
+    clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+    setFaces(previous => ({ ...previous, [id]: { ...previous[id], isAnimating: false } }));
+  };
   const flip = (id: string) => {
     if (transitionLocks.current.has(id)) return;
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
     const animate = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (animate) transitionLocks.current.add(id);
+    focusAfterFlip.current = id;
+    if (animate) {
+      transitionLocks.current.add(id);
+      // transitionend is not guaranteed after a motion preference/style change.
+      timers.current.set(id, setTimeout(() => finishFlip(id), 700));
+    }
     setFaces(previous => ({
       ...previous,
       [id]: { isFlipped: !previous[id]?.isFlipped, isAnimating: animate },
@@ -65,13 +117,6 @@ export function FloatingActionGrid({ data, isLoading, error, onRetry, canVisit, 
     if (Date.now() - (touchClicks.current[id] ?? 0) < 700) return;
     flip(id);
   };
-  const finishFlip = (id: string, element: HTMLElement) => {
-    if (!transitionLocks.current.delete(id)) return;
-    setFaces(previous => ({ ...previous, [id]: { ...previous[id], isAnimating: false } }));
-    element.querySelector<HTMLElement>(faces[id]?.isFlipped
-      ? '[data-action-go], .ff-action-close' : '.ff-action-front-button')?.focus({ preventScroll: true });
-  };
-
   if (error) {
     return (
       <section className="ff-action-section" aria-label="Dashboard actions" data-testid="action-grid">
@@ -94,13 +139,22 @@ export function FloatingActionGrid({ data, isLoading, error, onRetry, canVisit, 
 
   const onMouseMove = (event: MouseEvent<HTMLElement>) => {
     if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(-8, Math.min(8, ((event.clientX - bounds.left) / bounds.width - 0.5) * 16));
-    const y = Math.max(-8, Math.min(8, ((event.clientY - bounds.top) / bounds.height - 0.5) * -16));
-    event.currentTarget.style.setProperty("--tilt-x", `${y}deg`);
-    event.currentTarget.style.setProperty("--tilt-y", `${x}deg`);
+    pendingTilt.current = { element: event.currentTarget, x: event.clientX, y: event.clientY };
+    if (tiltFrame.current !== null) return;
+    tiltFrame.current = requestAnimationFrame(() => {
+      tiltFrame.current = null;
+      const pointer = pendingTilt.current;
+      pendingTilt.current = null;
+      if (!pointer || !pointer.element.isConnected || pointer.element.classList.contains("is-flipped")) return;
+      const bounds = pointer.element.getBoundingClientRect();
+      const x = Math.max(-8, Math.min(8, ((pointer.x - bounds.left) / bounds.width - 0.5) * 16));
+      const y = Math.max(-8, Math.min(8, ((pointer.y - bounds.top) / bounds.height - 0.5) * -16));
+      pointer.element.style.setProperty("--tilt-x", `${y}deg`);
+      pointer.element.style.setProperty("--tilt-y", `${x}deg`);
+    });
   };
   const resetTilt = (event: MouseEvent<HTMLElement>) => {
+    if (pendingTilt.current?.element === event.currentTarget) pendingTilt.current = null;
     event.currentTarget.style.setProperty("--tilt-x", "0deg");
     event.currentTarget.style.setProperty("--tilt-y", "0deg");
   };
@@ -112,7 +166,7 @@ export function FloatingActionGrid({ data, isLoading, error, onRetry, canVisit, 
   };
 
   return (
-    <section className="ff-action-section" aria-label="Dashboard actions" data-testid="action-grid">
+    <section ref={section} className="ff-action-section" aria-label="Dashboard actions" data-testid="action-grid">
       <div className="ff-action-grid">
         {cards.map((card, index) => {
           const Icon = card.icon;
@@ -132,7 +186,7 @@ export function FloatingActionGrid({ data, isLoading, error, onRetry, canVisit, 
             >
               <div className="ff-action-tilt">
               <div className="ff-action-rotator" onTransitionEnd={event => {
-                if (event.target === event.currentTarget && event.propertyName === "transform") finishFlip(card.id, event.currentTarget);
+                if (event.target === event.currentTarget && event.propertyName === "transform") finishFlip(card.id);
               }}>
                 <NeuCard className="ff-action-face ff-action-front" aria-hidden={isFlipped}>
                   <button type="button" className={`ff-action-front-button tint-${card.tint}`}
@@ -173,7 +227,11 @@ export function FloatingActionGrid({ data, isLoading, error, onRetry, canVisit, 
                     <div className="ff-action-back-footer">
                       {!allowed && <span className="ff-action-denied"><LockKeyhole aria-hidden="true" /> You don’t have access to this page.</span>}
                       {allowed ? <Link href={destination} data-action-go={card.id} className="ff-action-go" aria-label={`Go to ${card.title}`} onClick={event => {
-                        if (transitionLocks.current.has(card.id)) event.preventDefault();
+                        if (transitionLocks.current.has(card.id)) { event.preventDefault(); return; }
+                        if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                          event.preventDefault();
+                          onNavigate(destination);
+                        }
                       }}>Go →</Link> : <span className="ff-action-go" aria-disabled="true">Go →</span>}
                     </div>
                   </div>

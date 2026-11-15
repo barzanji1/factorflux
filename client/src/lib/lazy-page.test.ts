@@ -4,6 +4,16 @@ import { createElement, Suspense } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { lazyComponent, lazyPage, loadPage, preloadPage } from "./lazy-page";
 
+test("literal create routes preload their own component rather than a generic detail page", async () => {
+  const loaded: string[] = [];
+  lazyPage(["/specificity-fixture/:id"], async () => { loaded.push("detail"); return { default: () => null }; });
+  lazyPage(["/specificity-fixture/new"], async () => { loaded.push("create"); return { default: () => null }; });
+  await loadPage("/specificity-fixture/new?from=dashboard");
+  assert.deepEqual(loaded, ["create"]);
+  await loadPage("/specificity-fixture/17");
+  assert.deepEqual(loaded, ["create", "detail"]);
+});
+
 test("route intent reuses imports, handles detail paths and does not import unrelated pages", async () => {
   const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { connection: {} } });

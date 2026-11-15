@@ -44,3 +44,23 @@ Wait for mutation completion and stable pointer hit targets between dialog actio
 **Why:** Query invalidation can remove a row before an awaited mutation handler finishes; dialog focus restoration and scroll anchoring can also move the next button. Fast harness clicks otherwise miss controls or interact while a previous operation is still completing.
 
 **How to apply:** Observe pending/disabled state, allow React to commit input updates, and verify stable bounds plus elementFromPoint before sending pointer events. Background actions must not clear a newly opened unrelated composer.
+
+For a reduced-motion flip, `aria-hidden=false` and `inert=false` do not guarantee that the destination control is focusable yet.
+
+**Why:** Browser checks found a focus call failing while the control's computed visibility was still hidden, despite the flipped class already being present. Normal animated flips masked the timing problem.
+
+**How to apply:** Restore focus only once computed visibility/inert state permits it, with bounded frame retries and without stealing focus from another control. Test both animated and non-animated paths.
+
+Browser-owned page transitions can retain the old painted snapshot while the DOM underneath already contains destination loading states.
+
+**Why:** Animation-frame sampling pauses during part of the native update callback; raw DOM loading text alone is not evidence of a visible flash.
+
+**How to apply:** Test actual delayed responses and the first revealed destination frame, distinguish held snapshots from visible loading frames, and preserve a bounded slow-request fallback.
+
+**Browser-test cautions:** Back/forward changes the address before prepared content commits; wait for the destination's DOM marker as well as transition completion. Scroll every pointer target into view before hit-testing, including cards after history restoration.
+
+**Why:** Missing or off-screen controls produced false failures while the application correctly retained the source page during preparation.
+
+For direct CDP Enter activation, include the carriage-return `text` with `key`/`code`.
+
+**Why:** A focused native button did not activate with the incomplete synthetic key event; adding the character reproduced normal keyboard activation.

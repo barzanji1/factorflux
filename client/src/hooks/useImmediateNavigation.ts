@@ -3,15 +3,14 @@ import { flushSync } from "react-dom";
 import { useLocation } from "wouter";
 
 /**
- * For user-initiated shell navigation only. Commit the destination before the
- * click handler returns, rather than leaving the previous page in the DOM
- * until React's scheduled work runs. Do not use from render/effects (Redirect).
- * Wouter still owns history, matching, query strings and back/forward behavior.
+ * User-initiated shell navigation. Preserve the shared router's preparation
+ * promise so callers can track pending navigation; final location commits are
+ * synchronous. Do not use from render/effects (Redirect).
  */
 export function useImmediateNavigation() {
   const [location, navigate] = useLocation();
   const navigateImmediately = useCallback<typeof navigate>((...args) => {
-    flushSync(() => navigate(...args));
+    return flushSync(() => navigate(...args));
   }, [navigate]);
   return [location, navigateImmediately] as const;
 }

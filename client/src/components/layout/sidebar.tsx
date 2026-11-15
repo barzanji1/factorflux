@@ -1,4 +1,4 @@
-import { loadPage, preloadPage } from "@/lib/lazy-page";
+import { preloadPage } from "@/lib/lazy-page";
 import "@/styles/ff-financial-dashboard.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getSidebarState, subscribeSidebarState, setSidebarHovered, toggleSidebarSection, requestSidebarFocus, consumeSidebarFocus } from "./sidebar-state";
@@ -168,7 +168,7 @@ function isRouteActive(current: string, href: string) {
 
 export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading, prepareRoute } = useAuth();
+  const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigationSequence = useRef(0);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
@@ -302,11 +302,14 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     const sequence = ++navigationSequence.current;
     setPendingPath(href);
     try {
-      // Keep the current page and sidebar steady until code and fresh access
-      // permissions are ready. The destination guard still enforces access.
-      const [, commitAccess] = await Promise.all([loadPage(href), prepareRoute(href)]);
+      // The shared router now prepares code/access for every navigation source.
+      // Preserve the rail's scroll/focus before it commits the destination.
+      if (navRef.current) {
+        sidebarScrollPositions[scrollPositionKey] = navRef.current.scrollTop;
+        if (!mobile && navRef.current.contains(document.activeElement)) requestSidebarFocus(href.split("?")[0]);
+      }
+      await setLocation(href);
       if (sequence !== navigationSequence.current) return;
-      commitAccess();
     } catch (error) {
       if (sequence !== navigationSequence.current) return;
       setPendingPath(null);
@@ -314,11 +317,6 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
       return;
     }
     setPendingPath(null);
-    if (navRef.current) {
-      sidebarScrollPositions[scrollPositionKey] = navRef.current.scrollTop;
-      if (!mobile && navRef.current.contains(document.activeElement)) requestSidebarFocus(href.split("?")[0]);
-    }
-    setLocation(href);
     onNavigate?.();
   };
 

@@ -34,6 +34,7 @@ import { giphy, GiphyError } from "./services/giphy";
 import { registerItSupportRoutes } from "./routes/itSupport";
 import { z } from "zod";
 import { eq, and, asc, desc, sql, count, ilike, or, inArray, gt, gte, lte, lt, isNull, ne } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { storage } from "./storage";
 import { staffEmailSchema, staffLoginSchema } from "../shared/staff-auth";
@@ -7217,6 +7218,7 @@ Trucking Pros Financial Team
   });
 
   // Fuel advances
+  const fuelAuthorizedAgent = alias(users, "fuel_authorized_agent");
   app.get("/api/fuel-advances", requireModulePermission("fuel_advance"), async (_req, res) => {
     try {
       const fuelAdvancesData = await db
@@ -7225,13 +7227,13 @@ Trucking Pros Financial Team
           processedByName: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
           carrierJoinedName: clients.name,
           brokerName: brokers.name,
-          authorizedAgentName: sql<string>`concat_ws(' ', ${userTable.firstName}, ${userTable.lastName})`,
+          authorizedAgentName: sql<string>`concat_ws(' ', ${fuelAuthorizedAgent.firstName}, ${fuelAuthorizedAgent.lastName})`,
         })
         .from(fuelAdvances)
         .leftJoin(users, eq(fuelAdvances.processedBy, users.id))
         .leftJoin(clients, eq(fuelAdvances.carrierId, clients.id))
         .leftJoin(brokers, eq(fuelAdvances.brokerId, brokers.id))
-        .leftJoin(userTable, eq(fuelAdvances.authorizedAgent, userTable.id))
+        .leftJoin(fuelAuthorizedAgent, eq(fuelAdvances.authorizedAgent, fuelAuthorizedAgent.id))
         .orderBy(desc(fuelAdvances.advanceDate));
 
       res.json(fuelAdvancesData.map(({ fuelAdvance, ...joined }) => ({
@@ -7252,13 +7254,13 @@ Trucking Pros Financial Team
           processedByName: sql<string>`concat_ws(' ', ${users.firstName}, ${users.lastName})`,
           carrierJoinedName: clients.name,
           brokerName: brokers.name,
-          authorizedAgentName: sql<string>`concat_ws(' ', ${userTable.firstName}, ${userTable.lastName})`,
+          authorizedAgentName: sql<string>`concat_ws(' ', ${fuelAuthorizedAgent.firstName}, ${fuelAuthorizedAgent.lastName})`,
         })
         .from(fuelAdvances)
         .leftJoin(users, eq(fuelAdvances.processedBy, users.id))
         .leftJoin(clients, eq(fuelAdvances.carrierId, clients.id))
         .leftJoin(brokers, eq(fuelAdvances.brokerId, brokers.id))
-        .leftJoin(userTable, eq(fuelAdvances.authorizedAgent, userTable.id))
+        .leftJoin(fuelAuthorizedAgent, eq(fuelAdvances.authorizedAgent, fuelAuthorizedAgent.id))
         .where(eq(fuelAdvances.id, id))
         .limit(1);
 

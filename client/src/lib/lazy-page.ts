@@ -1,6 +1,6 @@
 import { createElement, lazy, useState, type ComponentProps, type ComponentType } from "react";
 
-const preloads: Array<{ paths: RegExp[]; load: () => Promise<unknown> }> = [];
+const preloads: Array<{ paths: Array<{ pattern: RegExp; parameters: number }>; load: () => Promise<unknown> }> = [];
 
 /** Preserve lazy loading, but mount already-prepared components synchronously. */
 export function lazyComponent<T extends ComponentType<any>>(loader: () => Promise<{ default: T }>) {
@@ -27,9 +27,12 @@ export function lazyComponent<T extends ComponentType<any>>(loader: () => Promis
 export function lazyPage<T extends ComponentType<any>>(paths: string[], loader: () => Promise<{ default: T }>) {
   const deferred = lazyComponent(loader);
   preloads.push({
-    paths: paths.map(path => new RegExp(`^${path.split("/").map(segment =>
-      segment.startsWith(":") ? "[^/]+" : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    ).join("/")}/?$`)),
+    paths: paths.map(path => ({
+      parameters: path.split("/").filter(segment => segment.startsWith(":")).length,
+      pattern: new RegExp(`^${path.split("/").map(segment =>
+        segment.startsWith(":") ? "[^/]+" : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      ).join("/")}/?$`),
+    })),
     load: deferred.load,
   });
   return deferred.Component;
@@ -46,6 +49,16 @@ export function preloadPage(href: string) {
 /** Required navigation preparation, unlike optional pointer-intent prefetch. */
 export function loadPage(href: string): Promise<unknown> {
   const path = href.split(/[?#]/)[0];
-  const page = preloads.find(page => page.paths.some(pattern => pattern.test(path)));
-  return page ? page.load() : Promise.resolve();
+  // Literal /carriers/new must beat /carriers/:id, regardless of declaration order.
+  let selected: (typeof preloads)[number] | undefined;
+  let specificity = Infinity;
+  for (const page of preloads) {
+    for (const candidate of page.paths) {
+      if (candidate.parameters < specificity && candidate.pattern.test(path)) {
+        selected = page;
+        specificity = candidate.parameters;
+      }
+    }
+  }
+  return selected ? selected.load() : Promise.resolve();
 }

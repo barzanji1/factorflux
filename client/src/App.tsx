@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { lazyPage } from "@/lib/lazy-page";
 import { PreparedStaffRoute as ProtectedRoute } from "@/lib/staff-entry";
 import LoginPage from "@/pages/login";
-import { Switch, Route, Redirect, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation, Router as LocationRouter } from "wouter";
+import { NavigationCoordinator, useSeamlessLocation, useSeamlessSearch } from "@/lib/seamless-navigation";
+import "@/styles/navigation-transitions.css";
 import { CustomerBrandHead } from "@/components/brand/customer-brand-head";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -431,8 +433,10 @@ function Router() {
 
 function App() {
   return (
+    <LocationRouter hook={useSeamlessLocation} searchHook={useSeamlessSearch}>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <NavigationCoordinator />
         <TooltipProvider>
           <Toaster />
           <CustomerBrandHead />
@@ -440,6 +444,7 @@ function App() {
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
+    </LocationRouter>
   );
 }
 
