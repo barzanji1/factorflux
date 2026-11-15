@@ -3,6 +3,7 @@ import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
+import { SQL_CHUNK_BYTES, sqlInsertChunks } from "./sqlBackupRows";
 
 export const BACKUP_TIMEOUT_MS = 1_800_000;
 
@@ -51,6 +52,9 @@ export async function* exportDatabaseSql(client: pg.Client): AsyncGenerator<stri
     await client.query("SET LOCAL bytea_output = 'hex'");
     await client.query("SET LOCAL extra_float_digits = 3");
     await client.query("SET LOCAL standard_conforming_strings = on");
+    // Export is a one-pass scan. JIT compilation of wide quoting expressions
+    // costs more than it saves and can repeat across cursor fetches.
+    await client.query("SET LOCAL jit = off");
     // The supported format covers this app's ordinary tables, enums, sequences,
     // functions, constraints, indexes and triggers. Explicitly refuse objects
     // that require a more general restore planner or privileged role handling.
@@ -204,29 +208,63 @@ export async function* exportDatabaseSql(client: pg.Client): AsyncGenerator<stri
     logProgress();
     for (const t of tables.rows) {
       const cols = columns.rows.filter(c => c.table_oid === t.oid);
+      const columnsSql = cols.map(c => identifier(c.name)).join(",");
       const rowExpr = cols.length
         ? cols.map(c => `quote_nullable(${identifier(c.name)}::text)`).join(` || ',' || `) : "''";
-      await client.query(`DECLARE tpf_backup_rows NO SCROLL CURSOR FOR SELECT ${rowExpr} AS values_sql FROM ${qualified(t.schema,t.name)}`);
+      const tableStarted = Date.now();
+      let tableRows = 0, fetches = 0, fetchMs = 0, maxFetchMs = 0, outputBytes = 0;
+      let operation = "declare";
+      const tableProgress = (event: string) => console.info("[backup] SQL table progress", {
+        event, tableOrdinal: tablesCompleted + 1, tablesTotal: tables.rows.length,
+        tableRows, rowsExported, fetches, fetchMs, maxFetchMs, outputBytes,
+        operation, tableElapsedMs: Date.now() - tableStarted, elapsedMs: Date.now() - startedAt,
+      });
+      tableProgress("start");
+      const heartbeat = setInterval(() => tableProgress("heartbeat"), 10_000);
+      heartbeat.unref();
       try {
+        await client.query(`DECLARE tpf_backup_rows NO SCROLL CURSOR FOR SELECT ${rowExpr} AS values_sql FROM ${qualified(t.schema,t.name)}`);
+        // Start conservatively for wide rows; grow only for narrow data.
+        // Fetches remain capped at 1,000 rows and target ~256 KiB.
+        let fetchSize = 250;
         while (true) {
-          const batch = await client.query<{ values_sql: string }>("FETCH FORWARD 250 FROM tpf_backup_rows");
+          operation = "fetch";
+          const fetchStarted = Date.now();
+          const batch = await client.query<{ values_sql: string }>(`FETCH FORWARD ${fetchSize} FROM tpf_backup_rows`);
+          const duration = Date.now() - fetchStarted;
+          fetches++;
+          fetchMs += duration;
+          maxFetchMs = Math.max(maxFetchMs, duration);
           if (!batch.rows.length) break;
-          for (const row of batch.rows) {
-            rowsExported++;
-            yield cols.length
-              ? `INSERT INTO ${qualified(t.schema,t.name)} (${cols.map(c=>identifier(c.name)).join(",")}) OVERRIDING SYSTEM VALUE VALUES (${row.values_sql});\n`
-              : `INSERT INTO ${qualified(t.schema,t.name)} DEFAULT VALUES;\n`;
+          operation = "write";
+          for (const chunk of sqlInsertChunks(qualified(t.schema,t.name), columnsSql, batch.rows)) {
+            outputBytes += Buffer.byteLength(chunk);
+            yield chunk;
           }
+          rowsExported += batch.rows.length;
+          tableRows += batch.rows.length;
+          // A short fetch proves the cursor is exhausted; avoid an extra
+          // network round trip for every small or empty table.
+          if (batch.rows.length < fetchSize) break;
+          const valueBytes = batch.rows.reduce((n, row) => n + Buffer.byteLength(row.values_sql), 0);
+          fetchSize = Math.max(250, Math.min(1000, Math.floor(256 * 1024 / Math.max(1, valueBytes / batch.rows.length))));
         }
-      } finally { await client.query("CLOSE tpf_backup_rows"); }
+        operation = "close";
+        await client.query("CLOSE tpf_backup_rows");
+        operation = "complete";
+        tableProgress("complete");
+      } finally { clearInterval(heartbeat); }
       tablesCompleted++;
       if (tablesCompleted % 10 === 0 || tablesCompleted === tables.rows.length) logProgress();
     }
     step = "sequence-state";
-    for (const s of sequences.rows) {
-      const state = await client.query<{ value: string; called: boolean }>(
-        `SELECT last_value::text AS value,is_called AS called FROM ${qualified(s.schema,s.name)}`);
-      yield `SELECT pg_catalog.setval(${literal(qualified(s.schema,s.name))},${literal(state.rows[0].value)},${state.rows[0].called});\n`;
+    // Read all sequence states in one request, not one remote query each.
+    if (sequences.rows.length) {
+      const states = await client.query<{ name: string; value: string; called: boolean }>(
+        sequences.rows.map(s => `SELECT ${literal(qualified(s.schema,s.name))}::text AS name,last_value::text AS value,is_called AS called FROM ${qualified(s.schema,s.name)}`).join(" UNION ALL "));
+      for (const state of states.rows) {
+        yield `SELECT pg_catalog.setval(${literal(state.name)},${literal(state.value)},${state.called});\n`;
+      }
     }
     for (const c of constraints.rows)
       yield `ALTER TABLE ${qualified(c.schema,c.table)} ADD CONSTRAINT ${identifier(c.name)} ${c.definition};\n`;
@@ -264,7 +302,7 @@ export async function dumpDatabaseSql(destination: string, databaseUrl: string, 
       controller.abort();
       void close();
     }, timeoutMs);
-    await pipeline(Readable.from(exportDatabaseSql(client)), createGzip(),
+    await pipeline(Readable.from(exportDatabaseSql(client), { objectMode: false, highWaterMark: SQL_CHUNK_BYTES }), createGzip(),
       createWriteStream(destination,{mode:0o600,flags:"wx"}), {signal:controller.signal});
   } catch (error) {
     if (controller.signal.aborted) throw new SqlBackupError("SQL_EXPORT_TIMEOUT");

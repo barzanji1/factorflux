@@ -59,21 +59,40 @@ test("native-free backup restores schema, data, sequences and triggers into an e
       ALTER TABLE business."odd table" DISABLE TRIGGER logged;
       CREATE TABLE public.cursor_fixture (id integer, value text);
       INSERT INTO public.cursor_fixture SELECT n, repeat('fixture',20) FROM generate_series(1,601) n;
+      CREATE TABLE public.empty_columns ();
+      INSERT INTO public.empty_columns DEFAULT VALUES;
+      INSERT INTO public.empty_columns DEFAULT VALUES;
     `);
-    // Eleven tables exercise the 10-table checkpoint and final partial group.
+    // Twelve tables exercise the 10-table checkpoint and final partial group.
     for (let n=0; n<7; n++) await source.query(`CREATE TABLE public.progress_${n} (id integer)`);
     const progress = t.mock.method(console, "info", () => {});
     const destination = path.join(directory,"backup.sql.gz");
     const connection = `postgresql://backup_fixture@localhost/backup_source?host=${encodeURIComponent(socket)}`;
     // No native client is used by this path, even with PATH deliberately empty.
     const oldPath = process.env.PATH;
+    const query = pg.Client.prototype.query;
+    const queries = t.mock.method(pg.Client.prototype, "query", query);
     try {
       process.env.PATH = "/nonexistent";
       await dumpDatabaseSql(destination,connection);
     } finally { process.env.PATH = oldPath; }
-    assert.deepEqual(progress.mock.calls.map(call => call.arguments[1]?.tablesCompleted), [0,10,11]);
-    assert.equal(progress.mock.calls.at(-1)?.arguments[1]?.rowsExported,604);
-    for (const call of progress.mock.calls) {
+    const commands = queries.mock.calls.map(call => call.arguments[0]).filter((sql): sql is string => typeof sql === "string");
+    assert.ok(commands.includes("SET LOCAL jit = off"));
+    assert.ok(commands.some(sql => /^FETCH FORWARD 1000 FROM/.test(sql)));
+    assert.equal(commands.filter(sql => /^SELECT .*last_value::text/.test(sql)).length,1);
+    queries.mock.restore();
+    const checkpoints = progress.mock.calls.filter(call => call.arguments[0] === "[backup] SQL export progress");
+    const tableProgress = progress.mock.calls.filter(call => call.arguments[0] === "[backup] SQL table progress");
+    assert.deepEqual(checkpoints.map(call => call.arguments[1]?.tablesCompleted), [0,10,12]);
+    assert.equal(checkpoints.at(-1)?.arguments[1]?.rowsExported,606);
+    assert.equal(tableProgress.length,24);
+    for (const call of tableProgress) {
+      assert.deepEqual(Object.keys(call.arguments[1]).sort(), [
+        "event","tableOrdinal","tablesTotal","tableRows","rowsExported","fetches","fetchMs","maxFetchMs",
+        "outputBytes","operation","tableElapsedMs","elapsedMs",
+      ].sort());
+    }
+    for (const call of checkpoints) {
       assert.deepEqual(Object.keys(call.arguments[1]).sort(),
         ["elapsedMs","phase","rowsExported","tablesCompleted","tablesTotal"].sort());
       assert.equal(call.arguments[0], "[backup] SQL export progress");
@@ -88,6 +107,7 @@ test("native-free backup restores schema, data, sequences and triggers into an e
     await restored.connect();
     assert.deepEqual((await restored.query("SELECT * FROM public.cursor_fixture ORDER BY id")).rows,
       (await source.query("SELECT * FROM public.cursor_fixture ORDER BY id")).rows);
+    assert.equal((await restored.query("SELECT count(*)::int AS n FROM public.empty_columns")).rows[0].n,2);
     const select = `SELECT id::text,parent_id,label,kind::text,items,payload,encode(bytes,'hex') AS bytes,
       precise::text,at::text,missing,special::text FROM business."odd table"`;
     assert.deepEqual((await restored.query(select)).rows,(await source.query(select)).rows);
@@ -106,7 +126,9 @@ test("native-free backup restores schema, data, sequences and triggers into an e
       const appUrl = new URL(configured);
       if (appUrl.hostname.endsWith(".neon.tech")) appUrl.hostname=appUrl.hostname.replace(/-pooler(?=\.)/,"");
       const appFile=path.join(directory,"app.sql.gz");
+      const appStarted=Date.now();
       await dumpDatabaseSql(appFile,appUrl.toString());
+      const appExportMs=Date.now()-appStarted;
       await admin.query("CREATE DATABASE app_restored");
       const appSql=gunzipSync(await readFile(appFile));
       const appRestore=path.join(directory,"app-restore.sql");
@@ -125,7 +147,7 @@ test("native-free backup restores schema, data, sequences and triggers into an e
         for (const table of tables.rows) {
           rows+=Number((await appRestored.query(`SELECT count(*)::text AS n FROM ${identifier(table.schema)}.${identifier(table.name)}`)).rows[0].n);
         }
-        console.log(JSON.stringify({verification:"configured-app-readonly-export-local-restore",tables:tables.rows.length,rows,gzipBytes:(await readFile(appFile)).length}));
+        console.log(JSON.stringify({verification:"configured-app-readonly-export-local-restore",tables:tables.rows.length,rows,gzipBytes:(await readFile(appFile)).length,exportMs:appExportMs}));
       } finally { await appRestored.end(); }
     }
     // Unsupported schema must be reported as failure, never a partial success.

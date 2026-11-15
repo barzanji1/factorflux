@@ -30,3 +30,18 @@ production exports exceeding their deadline; that made the problem worse.
 
 **How to apply:** Compare requested durations with the current effective limit
 before editing, and retain the credential-safe table progress logging.
+
+Keep exporter writes byte-bounded and group already-quoted rows before gzip;
+avoid one asynchronous compression write per record and one remote query per
+sequence. Disable JIT only within the read-only export transaction.
+
+**Why:** Profiling the configured database showed substantial cursor round-trip
+and per-row streaming overhead. Grouping reduced both elapsed time and CPU
+without increasing the timeout or losing restore fidelity. Production timing
+can differ substantially from development, so a local speedup is not proof
+that nightly production backups have recovered.
+
+**How to apply:** Preserve bounded-memory backpressure, server-side value
+quoting, short-fetch exhaustion handling, and ordinal-only fetch/output
+heartbeats. Verify schema/data/sequence restoration in an isolated database
+and distinguish local measurements from post-publish production evidence.

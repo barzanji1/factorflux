@@ -6,18 +6,26 @@ required to create a backup. The source uses the app's configured external Neon
 connection, converted to a direct connection instead of the transaction pooler.
 
 The exporter uses a dedicated read-only, repeatable-read transaction and a
-250-row server cursor per table. It streams SQL through gzip into a private
+bounded server cursor per table. It streams SQL through gzip into a private
 temporary file, then uploads to the existing S3 backup prefix. Upload, retention
 (last 30 backups), advisory locking, and Resend failure alerts are unchanged.
 Failure prevents upload and retention cleanup. Temporary files are removed.
 The shared export timeout is 1,800,000 ms (30 minutes), including for CLI,
 scheduled, and manual admin backups. Individual statements retain their
 separate 60-second limit.
-SQL rows are yielded individually from bounded cursor batches directly into
-the backpressure-aware gzip pipeline, never accumulated into a whole dump.
+Fetches start at 250 rows and grow only for narrow data, targeting 256 KiB
+with a maximum of 1,000 rows. Server-quoted values are grouped into INSERTs of
+at most 100 rows or 64 KiB (a single larger row remains intact). This avoids
+repeating column lists and asynchronous gzip writes for every row. The readable
+stream has a 64 KiB byte-based buffer; it never accumulates a whole dump.
+JIT is disabled only in the export transaction to avoid compiling one-pass
+quoting expressions. Sequence states are read together in one query.
 Progress is logged at table-data start, every 10 completed tables, and the last
 table: completed/total tables, exported row count, and elapsed milliseconds only.
-No table names, SQL, row contents, or connection details are logged.
+Each table also logs start/completion and a 10-second heartbeat with an ordinal,
+operation, row count, fetch timings and output byte counts, so slow fetches can
+be distinguished from slow output/compression. No table names, SQL, row contents,
+or connection details are logged.
 
 Supported: ordinary and unlogged tables, column types/defaults/collations,
 enums, serial and identity sequences (including their current state), functions,
@@ -49,6 +57,17 @@ managed role grants afterward. SQL files contain confidential app data and must
 not be logged, added to Git, or shared as review artifacts.
 
 ## Verification
+
+Bounded read-only performance probes (no backup uploaded, no row contents logged):
+
+```sh
+npx tsx scripts/profile-sql-export.ts
+npx tsx scripts/profile-sql-export.ts --stream
+```
+
+The first probes two batches in each of the first ten tables with JIT on/off.
+The second streams the export through gzip to a discard sink, counts queries
+and chunks, and aborts after 150 seconds. Both use only a read-only transaction.
 
 ```sh
 npx tsx --test server/services/sqlBackup.test.ts
