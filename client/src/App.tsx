@@ -84,6 +84,9 @@ function Router() {
   useTheme(); // Initialize theme
   const [location, navigate] = useLocation();
   const { user, permissions, permissionsLoaded, isLoading } = useAuth();
+  useEffect(() => {
+    if (location !== "/login") document.documentElement.removeAttribute("data-login-entry");
+  }, [location]);
   const chatPageActive = location === "/chat" && !!user && !isLoading &&
     (user.role === "admin" || (permissionsLoaded && permissions.includes("chat")));
   const [accessDenied, setAccessDenied] = useState(false);

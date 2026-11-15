@@ -36,8 +36,10 @@ export default function LoginPage() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
+    performance.mark("staff-login:mounted");
     return () => {
       mounted.current = false;
+      performance.mark("staff-login:unmounted");
     };
   }, []);
 
@@ -55,12 +57,21 @@ export default function LoginPage() {
     setError("");
 
     try {
+      performance.mark("staff-login:submit");
+      // Download public application code during authentication, not afterwards.
+      // Observe failures immediately, but report them only if login succeeds.
+      const destination = Promise.all([loadPage("/"), loadStaffRoute()])
+        .then(() => ({ error: null }), error => ({ error }));
       const success = await login(data.username, data.password);
+      performance.mark("staff-login:authentication-finished");
+      if (!mounted.current) performance.mark("staff-login:abandoned");
       if (!mounted.current) return;
       if (success) {
         // Keep the real form steady while the destination loads. No copied
         // glass panel, fullscreen overlay, or expanding success ripples.
-        await Promise.all([loadPage("/"), loadStaffRoute()]);
+        const prepared = await destination;
+        performance.mark("staff-login:destination-ready");
+        if (prepared.error) throw prepared.error;
         if (!mounted.current) return;
         startTransition(() => setLocation("/"));
       } else {

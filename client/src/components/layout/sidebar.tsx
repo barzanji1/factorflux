@@ -1,4 +1,4 @@
-import { preloadPage } from "@/lib/lazy-page";
+import { loadPage, preloadPage } from "@/lib/lazy-page";
 import "@/styles/ff-financial-dashboard.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getSidebarState, subscribeSidebarState, setSidebarHovered, toggleSidebarSection, requestSidebarFocus, consumeSidebarFocus } from "./sidebar-state";
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import ItSupportBell from "@/components/it-support/ItSupportBell";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,7 +168,11 @@ function isRouteActive(current: string, href: string) {
 
 export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading } = useAuth();
+  const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading, prepareRoute } = useAuth();
+  const { toast } = useToast();
+  const navigationSequence = useRef(0);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  useEffect(() => () => { ++navigationSequence.current; }, []);
   const userRole = authUser?.role ?? "employee";
   const isAdmin = userRole === "admin";
   const canUsePortalSubmissions = !!authUser && (isAdmin || (!authLoading && permissions.includes("portal_submissions")));
@@ -292,7 +297,23 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     });
   }, [notificationChannels, authUser?.id]);
 
-  const navigateTo = (href: string) => {
+  const navigateTo = async (href: string) => {
+    if (href === location && !pendingPath) return;
+    const sequence = ++navigationSequence.current;
+    setPendingPath(href);
+    try {
+      // Keep the current page and sidebar steady until code and fresh access
+      // permissions are ready. The destination guard still enforces access.
+      const [, commitAccess] = await Promise.all([loadPage(href), prepareRoute(href)]);
+      if (sequence !== navigationSequence.current) return;
+      commitAccess();
+    } catch (error) {
+      if (sequence !== navigationSequence.current) return;
+      setPendingPath(null);
+      toast({ title: "Page could not open", description: error instanceof Error ? error.message : "Please retry.", variant: "destructive" });
+      return;
+    }
+    setPendingPath(null);
     if (navRef.current) {
       sidebarScrollPositions[scrollPositionKey] = navRef.current.scrollTop;
       if (!mobile && navRef.current.contains(document.activeElement)) requestSidebarFocus(href.split("?")[0]);
@@ -389,6 +410,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                       onPointerEnter={() => preloadPage(item.href)}
                       onFocus={() => preloadPage(item.href)}
                       aria-current={active ? "page" : undefined}
+                      aria-busy={pendingPath === item.href}
                       title={expanded ? undefined : item.name}
                       aria-label={item.name}
                       className={cn(
@@ -400,10 +422,10 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                            : "text-[#1f1f1f]"
                       )}
                     >
-                      <Icon className={cn(
+                      {pendingPath === item.href ? <RotateCcw className="h-[14px] w-[14px] shrink-0 animate-spin" aria-label="Opening page" /> : <Icon className={cn(
                         "h-[14px] w-[14px] shrink-0 transition-colors",
                          active ? "text-[#087c8d]" : "text-[#454545] group-hover:text-[#087c8d]"
-                      )} />
+                      )} />}
                        {expanded && <span className="truncate text-[13px] font-semibold leading-none tracking-[-0.01em]">
                         {item.name}
                       </span>}

@@ -4,6 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>Trucking Pros Financial</title>
+    <script>
+      // Select only the initial paint, never authentication or route access.
+      (function () {
+        var loginEntry = location.pathname === "/login";
+        if (location.pathname === "/") {
+          try {
+            loginEntry = localStorage.getItem("isAuthenticated") !== "true" || !localStorage.getItem("user");
+          } catch (_) { loginEntry = true; }
+        }
+        if (!loginEntry) return;
+        document.documentElement.dataset.loginEntry = "";
+        var image = document.createElement("link");
+        image.rel = "preload";
+        image.as = "image";
+        image.href = "/assets/tpf-building.jpg";
+        image.fetchPriority = "high";
+        document.head.appendChild(image);
+      })();
+    </script>
+    <style>
+      /* Paint the existing login scene before the application module executes. */
+      html[data-login-entry] body { margin: 0; background: #243d4b; }
+      html[data-login-entry] #root:empty {
+        position: relative; isolation: isolate; min-height: 100vh; min-height: 100dvh;
+      }
+      html[data-login-entry] #root:empty::before,
+      html[data-login-entry] #root:empty::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+      }
+      html[data-login-entry] #root:empty::before {
+        background: url("/assets/tpf-building.jpg") center 46% / cover no-repeat;
+        filter: brightness(0.62) saturate(0.76) contrast(1.05);
+      }
+      html[data-login-entry] #root:empty::after {
+        background: linear-gradient(135deg, rgba(19, 45, 63, 0.15), rgba(25, 51, 72, 0.3));
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Space+Mono:wght@400;700&amp;display=swap" />
