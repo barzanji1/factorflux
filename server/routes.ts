@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { registerChargebackResolutionRoutes } from "./routes/chargebackResolutions";
 import { registerEntityNoteRoutes } from "./routes/entityNotes";
+import { registerAnnouncementRoutes } from "./routes/announcements";
 import { isSelfTimeTrackingRequest } from "./timeTrackingAccess";
 import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
@@ -836,6 +837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     || pathname.startsWith("/api/carrier-registration/");
   const permissionGroups: Array<[string, string]> = [
     ["/api/agent-dashboard", "all_authenticated"],
+    ["/api/announcements", "all_authenticated"],
     ["/api/email-log", "all_authenticated"],
     ["/api/email-broadcasts", "client_email"],
     ["/api/confirmation-follow-ups", "followups"],
@@ -4079,6 +4081,7 @@ ${message}
   });
 
   registerEntityNoteRoutes(app, requireAuth);
+  registerAnnouncementRoutes(app, requireAuth);
 
   // ─── Invoice timeline (merged events) ────────────────────────────────────
   app.get("/api/invoices/:id/timeline", requireAuth, async (req, res) => {

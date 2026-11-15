@@ -849,6 +849,36 @@ export const itSupportNotifications = pgTable("it_support_notifications", {
 }, (table) => [index("it_support_notifications_recipient_idx").on(table.userId, table.type, table.read)]);
 
 // Notifications table
+export const announcements = pgTable("announcements", {
+  id: serial("id").primaryKey(),
+  authorId: varchar("author_id").references(() => users.id, { onDelete: "set null" }),
+  authorName: text("author_name").notNull(),
+  message: text("message").notNull(),
+  severity: varchar("severity", { enum: ["green", "amber", "red"] }).notNull(),
+  status: varchar("status", { enum: ["pending", "approved", "rejected"] }).notNull(),
+  persistent: boolean("persistent").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  postedAt: timestamp("posted_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  rejectionReason: text("rejection_reason"),
+  version: integer("version").default(1).notNull(),
+}, table => [
+  index("announcements_feed_idx").on(table.status, table.severity, table.postedAt),
+  index("announcements_author_idx").on(table.authorId, table.createdAt),
+  check("announcements_severity_check", sql`${table.severity} in ('green','amber','red')`),
+  check("announcements_status_check", sql`${table.status} in ('pending','approved','rejected')`),
+  check("announcements_expiry_check", sql`(${table.persistent} and ${table.expiresAt} is null) or (not ${table.persistent} and ${table.expiresAt} is not null)`),
+]);
+
+export const announcementDismissals = pgTable("announcement_dismissals", {
+  announcementId: integer("announcement_id").references(() => announcements.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [primaryKey({ columns: [table.userId, table.announcementId] })]);
+
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),

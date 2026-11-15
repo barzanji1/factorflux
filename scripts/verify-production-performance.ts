@@ -45,12 +45,14 @@ await new Promise<void>(resolve => server.once("listening", resolve));
 const port = (server.address() as { port: number }).port;
 try {
   const signInOnly = process.env.SIGNIN_TRANSITION_VERIFY === "1";
-  const child = spawn(process.execPath, [signInOnly ? "scripts/debug-signin-transition.mjs" : "scripts/verify-neu-pages.mjs"], {
+  const announcementsOnly = process.env.ANNOUNCEMENTS_UI_VERIFY === "1";
+  const child = spawn(process.execPath, [announcementsOnly ? "scripts/verify-announcements-ui.mjs" : signInOnly ? "scripts/debug-signin-transition.mjs" : "scripts/verify-neu-pages.mjs"], {
     stdio: "inherit",
     env: {
       ...process.env,
       NEU_SMOKE_BASE_URL: `http://${process.env.REPLIT_DEV_DOMAIN}:${port}`,
       SIGNIN_TEST_URL: `http://${process.env.REPLIT_DEV_DOMAIN}:${port}`,
+      ANNOUNCEMENT_TEST_URL: `http://${process.env.REPLIT_DEV_DOMAIN}:${port}`,
       NEU_SMOKE_OUTPUT: process.env.NEU_SMOKE_OUTPUT || "generated-artifacts/performance/browser",
       ALL_NAVIGATION_VERIFY: "1", LAYOUT_VERIFY: "1", PRODUCTION_PERFORMANCE_VERIFY: "1",
     },

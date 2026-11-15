@@ -9,6 +9,7 @@
 - [Carrier onboarding secrets](carrier-onboarding-secrets.md) — SSNs and bank credentials are encrypted server-side, omitted from API responses, and preserved when blank on edit.
 - [Manager report scope](manager-report-scope.md) — until explicit teams exist, manager reporting scope is self plus active users created by that manager.
 - [Agent Dashboard policy](agent-dashboard-policy.md) — default work queue, not project management; managers see all queues, without broadening personnel-report permissions.
+- [Announcement moderation](announcement-moderation-policy.md) — agent edits need fresh approval; expiry starts at publication, while personal dismissals survive updates.
 - [Institutional-finance scope](dashboard-visual-policy.md) — approved dashboard materials extend across authenticated pages; preserve geometry, workflows, and motion; exclude login/public pages.
 - [IT Support policy](it-support-policy.md) — software-only requests, single designated handler, and separate role-aware alerts; leave operational Tickets unchanged.
 - [Two-role factoring workflow](two-role-factoring-workflow.md) — agents create/correct/submit only; managers review, reject, fund, collect, and settle.

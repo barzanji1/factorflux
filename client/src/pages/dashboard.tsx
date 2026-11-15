@@ -16,6 +16,7 @@ import type {
 import { pathToPermission } from "@/lib/routePermissions";
 import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
 import { NeuNotice } from "@/components/shared/NeuNotice";
+import { Announcements } from "@/components/dashboard/Announcements";
 import "@/styles/ff-financial-dashboard.css";
 
 const countKinds = [
@@ -205,6 +206,8 @@ export default function Dashboard() {
     >
       <div className="ff-neu-dashboard" data-testid="agent-dashboard">
         <p role="status" className="sr-only" aria-live="polite">{refreshStatus}</p>
+
+        <Announcements />
 
         <FinancialSummary
           data={financialData}

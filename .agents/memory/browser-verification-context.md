@@ -38,3 +38,9 @@ Navigation checks must exercise a real pointer over the expanded sidebar and sam
 **Why:** Programmatic navigation tests passed while missing a visible expanded-to-collapsed rail jump. They never exercised hover state during page remounts.
 
 **How to apply:** Move the pointer into the rail, wait for expansion, click with pointer events, and check width and surface colors in successive animation frames. Also check keyboard activation, focus continuity, and normal collapse.
+
+Wait for mutation completion and stable pointer hit targets between dialog actions, not merely for the affected row to disappear.
+
+**Why:** Query invalidation can remove a row before an awaited mutation handler finishes; dialog focus restoration and scroll anchoring can also move the next button. Fast harness clicks otherwise miss controls or interact while a previous operation is still completing.
+
+**How to apply:** Observe pending/disabled state, allow React to commit input updates, and verify stable bounds plus elementFromPoint before sending pointer events. Background actions must not clear a newly opened unrelated composer.
