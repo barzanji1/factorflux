@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pause, Play, RefreshCw, Search, ShieldAlert, StopCircle, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { CollectionRunFailure, runBrokerCollections } from "@/lib/brokerCollections";
+import { collectionEventTitle } from "@/lib/collection-event-details";
+import { CollectionEventDetails } from "./collection-event-details";
 import { RecoveryBadge, RecoveryButton as Button, RecoveryCard as Card, RecoveryInput as Input, RecoverySelect as Select, RecoveryDialogContent as DialogContent, RecoveryTable } from "@/components/recovery/recovery-controls";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NeuNotice } from "@/components/shared/NeuNotice";
@@ -216,12 +218,12 @@ export default function CollectionsAutomation() {
             : <div className="space-y-3">
                <div className="rounded-xl bg-[#e0e0e0] p-3 text-xs text-[#444] shadow-[inset_4px_4px_8px_#b8b8b8,inset_-4px_-4px_8px_#fff]"><strong>{detail.data?.row.broker || "Broker not listed"}</strong> · {phaseLabel(detail.data!.row)} · {detail.data?.row.mode === "dry_run" ? "SIMULATED (not sent)" : "LIVE"}<div className="mt-1">VP confirmed: {dateLabel(detail.data?.row.vpConfirmedAt ?? null)} · Workflow paid: {dateLabel(detail.data?.row.paidAt ?? null)}</div></div>
               {!detail.data?.events.length ? <p className="py-4 text-center text-xs text-[#666]">No audit events recorded.</p>
-                 : <div className="space-y-2">{detail.data.events.map(event => <article key={event.id} className="rounded-xl bg-[#e0e0e0] p-3 text-xs shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
-                  <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[#333]">{event.step} · {event.phase.toUpperCase()}</strong><RecoveryBadge tone={event.mode === "dry_run" || outcomeLabel(event) === "SIMULATED" ? "warning" : "neutral"} className="px-2 py-1 text-[10px] uppercase">{outcomeLabel(event)}</RecoveryBadge></div>
-                  <div className="mt-1 text-[#555]">Occurred {dateLabel(event.occurredAt)}{event.scheduledAt && ` · Scheduled ${dateLabel(event.scheduledAt)}`}{event.recipient && ` · To ${event.recipient}`}</div>
-                  {event.providerMessageId && <div className="mt-1 font-mono text-[10px] text-[#555]">Provider ID: {event.providerMessageId}</div>}
-                  {event.error && <div className="mt-1 text-[#a12b22]">Error: {event.error}</div>}
-                   {event.details !== null && event.details !== undefined && <details className="mt-2"><summary className="cursor-pointer font-bold text-[#168d99]">Event details</summary><pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-[#e0e0e0] p-2 font-mono text-[10px] shadow-[inset_3px_3px_6px_#b8b8b8,inset_-3px_-3px_6px_#fff]">{typeof event.details === "string" ? event.details : JSON.stringify(event.details, null, 2)}</pre></details>}
+                 : <div className="space-y-2">{detail.data.events.map(event => <article key={event.id} className="min-w-0 rounded-xl bg-[#e0e0e0] p-3 text-xs shadow-[-4px_-4px_9px_#fff,4px_4px_9px_#c1c1c1]">
+                  <div className="flex flex-wrap items-center justify-between gap-2"><strong className="min-w-0 text-[#333] [overflow-wrap:anywhere]">{collectionEventTitle(event)} · {event.phase.toUpperCase()}</strong><RecoveryBadge tone={event.mode === "dry_run" || outcomeLabel(event) === "SIMULATED" ? "warning" : "neutral"} className="px-2 py-1 text-[10px] uppercase">{outcomeLabel(event)}</RecoveryBadge></div>
+                  <div className="mt-1 text-[#555] [overflow-wrap:anywhere]">Occurred {dateLabel(event.occurredAt)}{event.scheduledAt && ` · Scheduled ${dateLabel(event.scheduledAt)}`}{event.recipient && ` · To ${event.recipient}`}</div>
+                  {event.providerMessageId && <div className="mt-1 font-mono text-[10px] text-[#555] [overflow-wrap:anywhere]">Provider ID: {event.providerMessageId}</div>}
+                  {event.error && <div className="mt-1 text-[#a12b22] [overflow-wrap:anywhere]">Error: {event.error}</div>}
+                  <CollectionEventDetails details={event.details} />
                 </article>)}</div>}
             </div>}
         </DialogContent>
