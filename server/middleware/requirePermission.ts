@@ -27,9 +27,6 @@ export async function auditAuthorizationDenial(req: Request, user: any, permissi
   }
 }
 
-// Short alias for route-specific authorization middleware.
-export const auditDenial = auditAuthorizationDenial;
-
 export async function authenticateCurrentUser(req: Request, res: Response, next: NextFunction) {
   const stored = sessionUser(req);
   if (!stored?.id) return res.status(401).json({ message: "Authentication required" });

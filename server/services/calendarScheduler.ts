@@ -101,8 +101,3 @@ export function startCalendarScheduler(intervalMs = 60_000) {
   processCalendarNotifications().catch((e) => console.warn("[calendarScheduler] initial run error:", e?.message));
   handle = setInterval(() => processCalendarNotifications().catch((e) => console.warn("[calendarScheduler] tick error:", e?.message)), intervalMs);
 }
-
-export function stopCalendarScheduler() {
-  if (handle) clearInterval(handle);
-  handle = null;
-}

@@ -9,7 +9,7 @@ import { sendEmailTracked } from "../emailService";
 import { emailDetailsTable, emailDisplayName, wrapEmail } from "../emailTemplate.js";
 import { BROKER_PUBLIC_ORIGIN, brokerReceiptLinks, brokerReceiptActions, brokerPaperworkHtml, brokerPaperworkText } from "./brokerConfirmationPresentation";
 import { brokerInvoicePaperwork } from "./brokerConfirmationDocuments";
-import { brokerCollectionsService, confirmCollectionVpInTransaction, recordCollectionReceiptSend, startBrokerCollectionsScheduler } from "./brokerCollections";
+import { brokerCollectionsService, confirmCollectionVpInTransaction, recordCollectionReceiptSend } from "./brokerCollections";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = typeof db | Tx;
@@ -345,8 +345,5 @@ export async function getConfirmationAgingRows(scope?: ReturnType<typeof eq>, st
   });
 }
 
-export function startBrokerConfirmationScheduler() {
-  startBrokerCollectionsScheduler();
-}
 
 // Legacy scheduler implementation is intentionally not exported or started.

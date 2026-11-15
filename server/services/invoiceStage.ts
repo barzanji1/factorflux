@@ -55,27 +55,6 @@ export const STAGE_META: Record<
   final_settlement: { label: "Final Settlement",    description: "Reserve released — invoice fully settled",         color: "emerald", step: 8 },
 };
 
-// ─── Stage derivation from invoice status ─────────────────────────────────
-
-export function stageFromInvoiceStatus(status: string): FactoringStage {
-  switch (status) {
-    case "submitted":
-    case "docs_pending":
-      return "document_intake";
-    case "under_review":
-      return "verification";
-    case "approved":
-      return "approval";
-    case "funded":
-      return "advance";
-    case "settled":
-    case "paid":
-      return "final_settlement";
-    default:
-      return "document_intake";
-  }
-}
-
 // ─── Advance the factoring stage ──────────────────────────────────────────
 
 export async function advanceInvoiceStage(

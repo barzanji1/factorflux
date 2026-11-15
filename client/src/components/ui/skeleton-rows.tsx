@@ -20,13 +20,3 @@ export function SkeletonRows({ rows = 5, cols = 4 }: { rows?: number; cols?: num
     </div>
   );
 }
-
-export function SkeletonCard() {
-  return (
-    <div className="rounded-[20px] border border-[hsl(var(--border))] bg-white dark:bg-[hsl(var(--card))] p-4 space-y-3">
-      <Skeleton className="h-4 w-24 rounded-lg" />
-      <Skeleton className="h-8 w-32 rounded-lg" />
-      <Skeleton className="h-3 w-16 rounded-lg" />
-    </div>
-  );
-}

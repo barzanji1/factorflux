@@ -67,5 +67,4 @@ export function getExtractionProvider(): ExtractionProvider {
   console.log(`[OCR Registry] Provider loaded: ${instance.displayName} (key=${instance.key})`);
   return instance;
 }
-export function resetExtractionProvider(): void { instance = null; }
 export type { ExtractionProvider, ExtractionResult, PageResult, OcrProvider, OcrResult, OcrFields } from "./types";

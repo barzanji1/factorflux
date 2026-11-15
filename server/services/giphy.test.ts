@@ -69,7 +69,9 @@ test("GIF config is chat-authorized, not logged, and shared renderer covers chan
   assert.match(routes, /await giphy\.validateMessage\(req\.body\.body\)/);
   assert.match(await fs.readFile("server/index.ts", "utf8"), /key === "apiKey" \? undefined/);
   assert.match(await fs.readFile("client/src/components/team-chat/MessageBody.tsx", "utf8"), /InlineGif/);
-  for (const path of ["client/src/pages/chat.tsx", "client/src/components/team-chat/ThreadPanel.tsx"]) {
-    assert.match(await fs.readFile(path, "utf8"), /<GifPicker/);
-  }
+  assert.match(await fs.readFile("client/src/pages/chat.tsx", "utf8"), /<GifPicker/);
+  assert.match(await fs.readFile("client/src/components/team-chat/ChatMessageItem.tsx", "utf8"), /<MessageBody/);
+  const threadTypes = await fs.readFile("client/src/components/team-chat/ThreadPanel.tsx", "utf8");
+  assert.match(threadTypes, /export type ChatMessage/);
+  assert.doesNotMatch(threadTypes, /export function ThreadPanel/);
 });

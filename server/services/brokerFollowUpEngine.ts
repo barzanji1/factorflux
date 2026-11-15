@@ -10,15 +10,11 @@
  *   3. Overdue N   — sent N days after the due date (configurable, default 3 & 7)
  *   4. Weekly N    — sent weekly after the last overdue step (configurable count)
  *
- * All reminder instances are stored in `broker_follow_up_reminders` and
- * processed by a background scheduler (startReminderScheduler).
+ * Historical reminder instances are stored in `broker_follow_up_reminders`.
  *
  * Templates: subject/body are resolved from `broker_follow_up_templates` at
  * schedule-build time, with hardcoded strings as fallback if no template exists.
  *
- * Auto-Stop: checkAndStopCadence() cancels all pending reminders when the
- * invoice reaches a terminal state (paid, settled, exception, cash-applied,
- * or agent-suppressed).
  */
 
 import { db } from "../db";
@@ -31,8 +27,6 @@ import {
   brokers,
   debtors,
   eventLedger,
-  exceptions,
-  paymentApplicationLines,
   type CadenceConfig,
 } from "../../shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
@@ -317,91 +311,6 @@ async function scheduleReminders(
   }
 }
 
-// ─── Auto-stop: check & cancel pending reminders ──────────────────────────────
-
-/**
- * Checks if the invoice for a given follow-up has reached a terminal state.
- * If so, cancels all pending/scheduled reminders and logs to the event ledger.
- *
- * @returns The stop reason string if stopped, null if cadence should continue.
- */
-export async function checkAndStopCadence(
-  followUpId: number,
-  invoiceId: number,
-): Promise<string | null> {
-  const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
-  if (!inv) return null;
-
-  let stopReason: string | null = null;
-
-  // 1. Invoice paid or settled
-  if (inv.status === "paid" || inv.status === "settled") {
-    stopReason = "invoice_paid";
-  }
-
-  // 2. Final settlement factoring stage
-  if (!stopReason && inv.factoringStage === "final_settlement") {
-    stopReason = "invoice_settled";
-  }
-
-  // 3. Open exception raised against this invoice
-  if (!stopReason) {
-    const [exc] = await db
-      .select({ id: exceptions.id })
-      .from(exceptions)
-      .where(
-        and(
-          eq(exceptions.entityType, "invoice"),
-          eq(exceptions.entityId, invoiceId),
-          eq(exceptions.status, "open"),
-        ),
-      )
-      .limit(1);
-    if (exc) stopReason = "exception_raised";
-  }
-
-  // 4. Fully-applied cash (payment line exists for this invoice)
-  if (!stopReason) {
-    const [line] = await db
-      .select({ id: paymentApplicationLines.id })
-      .from(paymentApplicationLines)
-      .where(eq(paymentApplicationLines.invoiceId, invoiceId))
-      .limit(1);
-    if (line) stopReason = "cash_applied";
-  }
-
-  if (!stopReason) return null;
-
-  // Cancel all pending/scheduled reminders for this follow-up
-  await db
-    .update(brokerFollowUpReminders)
-    .set({
-      status:     "canceled",
-      stopReason,
-      updatedAt:  new Date(),
-    })
-    .where(
-      and(
-        eq(brokerFollowUpReminders.followUpId, followUpId),
-        inArray(brokerFollowUpReminders.status, ["scheduled", "paused"]),
-      ),
-    );
-
-  // Log to event ledger
-  try {
-    await db.insert(eventLedger).values({
-      entityType:  "invoice",
-      entityId:    invoiceId,
-      eventType:   "broker_followup_auto_stopped",
-      actorType:   "system",
-      actorId:     "system",
-      payloadJson: { followUpId, stopReason, invoiceStatus: inv.status, factoringStage: inv.factoringStage },
-    });
-  } catch (_) { /* best-effort */ }
-
-  return stopReason;
-}
-
 /**
  * Agent-initiated suppress: cancels all pending reminders for a follow-up
  * and logs the agent who suppressed it.
@@ -573,40 +482,10 @@ export async function triggerBrokerFollowUp(
 
 // ─── Background scheduler: process due reminders ─────────────────────────────
 
-let _schedulerHandle: NodeJS.Timeout | null = null;
-
 /**
- * Check for scheduled reminders whose `scheduledSendAt` has passed and send them.
- * Skips reminders belonging to paused follow-ups.
- * Runs checkAndStopCadence() before sending each reminder.
+ * Delegate reminder processing to the active broker collections service.
  */
 export async function processScheduledReminders() {
   const result = await brokerCollectionsService.tick();
   return { ...result, stopped: 0, statusCode: collectionRunHttpStatus(result) };
-}
-
-// Retained only as historical implementation context; never scheduled or exported.
-
-/**
- * Start the background reminder scheduler.
- * Runs every 15 minutes; safe to call multiple times (idempotent).
- */
-export function startReminderScheduler(intervalMs = 15 * 60 * 1000): void {
-  if (_schedulerHandle) return;
-  processScheduledReminders().catch(e =>
-    console.warn("[reminderScheduler] initial run error:", e?.message),
-  );
-  _schedulerHandle = setInterval(() => {
-    processScheduledReminders().catch(e =>
-      console.warn("[reminderScheduler] tick error:", e?.message),
-    );
-  }, intervalMs);
-  console.log(`[reminderScheduler] started — interval ${intervalMs / 60000}min`);
-}
-
-export function stopReminderScheduler(): void {
-  if (_schedulerHandle) {
-    clearInterval(_schedulerHandle);
-    _schedulerHandle = null;
-  }
 }
