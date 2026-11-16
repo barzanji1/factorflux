@@ -1,6 +1,6 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
-export const DASHBOARD_STALE_TIME = 30_000;
+export const DASHBOARD_STALE_TIME = 60_000;
 
 export function isDashboardQuery(key: QueryKey) {
   const endpoint = key[0];

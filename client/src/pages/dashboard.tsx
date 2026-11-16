@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
+import { useStaffIdentity } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
+import { refreshPageOnMount } from "@/lib/page-cache-policy";
 import { FinancialSummary, WorkShortcuts, type FinancialDashboardData } from "@/components/dashboard/FinancialOverview";
 import { FloatingActionGrid } from "@/components/dashboard/FloatingActionGrid";
 import { NeuBadge, NeuButton, NeuCard, NeuTable } from "@/styles/neu";
@@ -109,10 +110,10 @@ function identityMismatch(data: { viewer: { id: string; role: string } } | undef
 
 export default function Dashboard() {
   const [, go] = useLocation();
-  const { user, permissions } = useAuth();
+  const { user, permissions } = useStaffIdentity();
   const userId = user?.id ?? "unauthenticated";
   const userRole = user?.role ?? "unknown";
-  const queryOptions = { staleTime: DASHBOARD_STALE_TIME, refetchOnMount: true, refetchOnWindowFocus: true, retry: false, enabled: Boolean(user?.id && user?.role) };
+  const queryOptions = { staleTime: DASHBOARD_STALE_TIME, refetchOnMount: refreshPageOnMount, refetchOnWindowFocus: true, retry: false, enabled: Boolean(user?.id && user?.role) };
   const followupsQuery = useQuery<DashboardFollowUps>({
     queryKey: ["/api/agent-dashboard/followups", userId, userRole],
     queryFn: ({ signal }) => fetchSection<DashboardFollowUps>("followups", signal),
@@ -142,7 +143,7 @@ export default function Dashboard() {
     ...queryOptions,
   });
   const [refreshStatus, setRefreshStatus] = useState("");
-  const isFetching = followupsQuery.isFetching || activityQuery.isFetching || alertsQuery.isFetching || financialQuery.isFetching;
+  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const followupsMatches = matchesViewer(followupsQuery.data, user);
   const alertsMatches = matchesViewer(alertsQuery.data, user);
@@ -160,6 +161,7 @@ export default function Dashboard() {
     : undefined;
 
   const refreshAll = async () => {
+    setManualRefreshing(true);
     setRefreshStatus("Refreshing dashboard data…");
     const results = await Promise.allSettled([
       followupsQuery.refetch(),
@@ -169,6 +171,7 @@ export default function Dashboard() {
     ]);
     const failed = results.filter(result => result.status === "rejected" || result.value.isError).length;
     setRefreshStatus(failed ? `${failed} section${failed === 1 ? "" : "s"} could not refresh.` : "Refresh complete.");
+    setManualRefreshing(false);
   };
 
   const followupsLoading = !user?.id || !user.role || followupsQuery.isLoading;
@@ -196,11 +199,11 @@ export default function Dashboard() {
         aria-label="Refresh dashboard"
         title="Refresh dashboard"
         onClick={refreshAll}
-        disabled={isFetching || !user?.id || !user.role}
+        disabled={manualRefreshing || !user?.id || !user.role}
         data-testid="dashboard-refresh"
         className="ff-neu-dashboard-refresh h-9 w-9 shrink-0 rounded-full p-0"
       >
-        <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+        <RefreshCw className="h-4 w-4" />
       </NeuButton>}
     >
       <div className="ff-neu-dashboard" data-testid="agent-dashboard" data-dashboard-loading={financialLoading ? "" : undefined}>

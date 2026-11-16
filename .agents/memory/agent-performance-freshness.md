@@ -3,8 +3,8 @@ name: Agent Performance freshness
 description: Required freshness and reset scope when employees or report dates change.
 ---
 
-Switching or revisiting an employee/date context must obtain fresh server data and reset every dependent control, not just the invoice detail dialog.
+Employee/date contexts must stay isolated and reset every dependent control, not just the invoice detail dialog. Cached revisits within the same context now follow the shared show-first policy: display real cached data immediately and refresh silently after 30 seconds.
 
-**Why:** The user reported continued stale employee and calendar views after a detail-only reset. Distinct cache keys alone do not establish freshness when the app keeps queries fresh indefinitely.
+**Why:** The user reported stale employee/date controls after a detail-only reset, then explicitly superseded application-wide loading behavior with timestamped caching and silent refreshes.
 
-**How to apply:** Audit the selector, both dates, rows, details, exports, and warning controls together. Do not display cached output as current during a refresh. Keep this freshness policy scoped to Agent Performance rather than changing caching throughout the app. Late warning saves must not clear a newer draft.
+**How to apply:** Audit the selector, both dates, rows, details, exports, and warning controls together. Never show another employee/date context's data as a placeholder. Do not blank successful cached rows, options, or warnings merely because a background fetch is running. Late warning saves must not clear a newer draft.

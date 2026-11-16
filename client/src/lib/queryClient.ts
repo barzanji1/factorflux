@@ -1,5 +1,7 @@
 import { MutationCache, QueryCache, QueryClient, QueryFunction } from "@tanstack/react-query";
 import { invalidateDashboard, withDashboardInvalidation } from "./dashboard-freshness";
+import { PAGE_RETAIN_MS, PAGE_STALE_MS, refreshPageOnMount } from "./page-cache-policy";
+import { clearPageSnapshots } from "./page-snapshot";
 
 export class HttpError extends Error {
   readonly status: number;
@@ -174,7 +176,9 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: PAGE_STALE_MS,
+      gcTime: PAGE_RETAIN_MS,
+      refetchOnMount: refreshPageOnMount,
       retry: false,
     },
     mutations: {
@@ -182,5 +186,10 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export function clearStaffDataCache() {
+  queryClient.clear();
+  clearPageSnapshots(queryClient);
+}
 
 installFetchInterceptor();

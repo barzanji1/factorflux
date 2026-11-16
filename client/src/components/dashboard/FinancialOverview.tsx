@@ -110,7 +110,7 @@ function FinancialCharts({ months }: { months: FinancialDashboardData["months"] 
                     labelStyle={{ color: "#55615d", fontWeight: 700 }}
                     contentStyle={{ border: 0, borderRadius: 12, background: "#e0e0e0", boxShadow: "4px 4px 8px #c8c8c8, -4px -4px 8px #fff" }}
                   />
-                  <Bar dataKey="collected" shape={<CylinderBar />} maxBarSize={34} />
+                  <Bar isAnimationActive={false} dataKey="collected" shape={<CylinderBar />} maxBarSize={34} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -146,8 +146,8 @@ function FinancialCharts({ months }: { months: FinancialDashboardData["months"] 
                     labelStyle={{ color: "#55615d", fontWeight: 700 }}
                     contentStyle={{ border: 0, borderRadius: 12, background: "#e0e0e0", boxShadow: "4px 4px 8px #c8c8c8, -4px -4px 8px #fff" }}
                   />
-                  <Area type="monotone" dataKey="invoiced" stroke="#27aab8" strokeWidth={2.5} fill="url(#invoiced-area-fill)" />
-                  <Area type="monotone" dataKey="collected" stroke="#4fd1c5" strokeWidth={2.5} fill="url(#collected-area-fill)" />
+                  <Area isAnimationActive={false} type="monotone" dataKey="invoiced" stroke="#27aab8" strokeWidth={2.5} fill="url(#invoiced-area-fill)" />
+                  <Area isAnimationActive={false} type="monotone" dataKey="collected" stroke="#4fd1c5" strokeWidth={2.5} fill="url(#collected-area-fill)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

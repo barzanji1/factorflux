@@ -1,5 +1,5 @@
 import { useParams, useLocation } from "wouter";
-import { PageInsights } from "@/components/PageInsights";
+import { PageInsights, usePrimeRecordInsights } from "@/components/PageInsights";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import ChargebackLifecycle from "@/components/invoices/chargeback-lifecycle";
@@ -423,6 +423,7 @@ export default function InvoiceDetail() {
   });
   const qc = useQueryClient();
   const invoiceId = Number(id);
+  usePrimeRecordInsights("invoices", invoiceId);
   const isManager = user?.role === "manager" || user?.role === "admin";
 
   const [selectedTransition, setSelectedTransition] = useState<AvailableTransition | null>(null);

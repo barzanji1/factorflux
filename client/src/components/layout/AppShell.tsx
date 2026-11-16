@@ -5,6 +5,7 @@ import "@/styles/neu/dashboard.css";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { NeuPageShell } from "@/styles/neu";
+import { PageSnapshotFrame } from "@/components/loading/PageSnapshotFrame";
 
 interface AppShellProps {
   children: ReactNode;
@@ -31,7 +32,7 @@ export function AppShell({ children, title, subtitle, group, neu = false, action
         ) : (
           <main className="custom-scrollbar relative min-h-0 flex-1 overflow-auto">
             <div className="mx-auto w-full max-w-[1680px] p-3 sm:p-4 xl:p-6">
-              {children}
+              <PageSnapshotFrame>{children}</PageSnapshotFrame>
             </div>
           </main>
         )}

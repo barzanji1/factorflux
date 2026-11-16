@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import { PageSnapshotScope } from "@/components/loading/PageSnapshotFrame";
 import { lazyPage } from "@/lib/lazy-page";
 import { PreparedStaffRoute as ProtectedRoute } from "@/lib/staff-entry";
 import LoginPage from "@/pages/login";
@@ -10,7 +11,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { AuthProvider, useStaffIdentity } from "@/hooks/useAuth";
 import { PermissionWatcher } from "@/components/PermissionWatcher";
 import { useTheme } from "@/hooks/useTheme";
 import { StartupSplash } from "@/components/loading/StartupSplash";
@@ -84,7 +85,7 @@ const RouteLoading = lazy(() => import("@/components/layout/route-loading"));
 function Router() {
   useTheme(); // Initialize theme
   const [location, navigate] = useLocation();
-  const { user, permissionsLoaded, isLoading } = useAuth();
+  const { user, permissionsLoaded, isLoading } = useStaffIdentity();
   useEffect(() => {
     if (location !== "/login") document.documentElement.removeAttribute("data-login-entry");
   }, [location]);
@@ -422,9 +423,9 @@ function Router() {
       <PermissionWatcher />
       <StaffSidebarHost key={user?.id ?? "anonymous"} enabled={!!user && !isLoading}>
       <div data-route-viewport style={chatPageActive ? undefined : { minHeight: "100%" }} className={chatPageActive ? "hidden" : "relative min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
-        <Suspense fallback={<Suspense fallback={<StartupSplash />}><RouteLoading /></Suspense>}>
+        <PageSnapshotScope><Suspense fallback={<Suspense fallback={<StartupSplash />}><RouteLoading /></Suspense>}>
           {routes}
-        </Suspense>
+        </Suspense></PageSnapshotScope>
       </div>
       {user && <Suspense fallback={null}><TeamChatWorkspace /></Suspense>}
       </StaffSidebarHost>

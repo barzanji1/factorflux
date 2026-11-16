@@ -9,6 +9,12 @@ Use the user's show-first, fetch-second policy across staff pages. Render a data
 
 **How to apply:** Only an uncached first visit may show gray placeholders matching content geometry. Replace them with complete data content in one swap; no page-content spinners, loading text, or progressive chart fill. Cached charts and infographics render immediately and refresh in place without skeleton swaps. Start independent page requests together, preserve authorization and account isolation, and test rapid sidebar navigation in the compiled production build.
 
+Reserve stable chart slots, including empty-data slots where charts were previously omitted.
+
+**Why:** The user explicitly accepted fixed chart slots so first-visit placeholders can reserve predictable geometry before conditional chart definitions arrive.
+
+**How to apply:** Preserve those slots during loading and empty-data states rather than collapsing the chart area or independently deferring charts.
+
 Viewport containment is a separate requirement from loading paint. An overflow-hidden shell does not reliably clip absolutely positioned descendants whose containing block is outside that shell; keep the viewport and scrolling-content containers positioned.
 
 **Why:** Invisible screen-reader labels extended the document below the visible application, creating a blank bottom region despite apparently correct shell dimensions. Restyling skeletons could not fix this.

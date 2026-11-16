@@ -1,5 +1,6 @@
 import { useParams, useLocation } from "wouter";
-import { PageInsights } from "@/components/PageInsights";
+import { PageInsights, usePrimeRecordInsights } from "@/components/PageInsights";
+import { PageSnapshotFrame } from "@/components/loading/PageSnapshotFrame";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -109,6 +110,7 @@ const TRANSITIONS: Array<{ from: string[]; to: string; label: string; desc: stri
 export default function PayoutDetail() {
   const { id } = useParams<{ id: string }>();
   const payoutId = Number(id);
+  usePrimeRecordInsights("payouts", payoutId);
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -149,7 +151,7 @@ export default function PayoutDetail() {
           subtitle="Advance, fee, and reserve breakdown with disbursement tracking"
           group="Workspace"
         />
-        <main className="custom-scrollbar flex-1 overflow-auto bg-[#e0e0e0]">
+        <main className="custom-scrollbar relative flex-1 overflow-auto bg-[#e0e0e0]"><PageSnapshotFrame>
           <PageInsights entity="payouts" entityId={payoutId} title="Payout activity" />
           <div className="mx-auto w-full max-w-[1400px] p-6 xl:p-8">
             <RecordDetail
@@ -332,7 +334,7 @@ export default function PayoutDetail() {
             />
             {payout && <EntityNotes key={`payout:${payoutId}`} entityType="payout" entityId={payoutId} />}
           </div>
-        </main>
+        </PageSnapshotFrame></main>
       </div>
     </div>
   );

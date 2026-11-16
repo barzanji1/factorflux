@@ -9,6 +9,7 @@ import type { PageInsights as PageInsightsData, InsightEntity } from "@shared/pa
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import "./page-insights.css";
+import { PAGE_RETAIN_MS, refreshPageOnMount } from "@/lib/page-cache-policy";
 
 type Props = {
   entity: InsightEntity | "loads";
@@ -112,13 +113,9 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
     });
   }, [entity, queryClient]);
   const query = useQuery({
-    queryKey: ["page-insights", entity, entityId ?? null, clientId ?? null, section ?? null],
-    queryFn: ({ signal }) => loadInsights(entity, entityId, clientId, signal, section),
+    ...insightQueryOptions(entity, entityId, clientId, section),
     enabled: enabled && (entity !== "vault" || clientId !== undefined && clientId !== ""),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-    gcTime: 60_000,
-    retry: 1,
+    refetchInterval: 30_000,
   });
   const data = query.data as ExtendedInsights | undefined;
   const labels = entityLabels[entity] ?? { total: "Operational items", series: "Activity by period", breakdown: "Records by status", totalDetail: "Records in this operational view" };
@@ -142,8 +139,6 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
           {entity !== "client-email" && <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#63807a]">Full {labels.total.toLowerCase()} · refreshes every minute</p>}
           <h2 className="text-lg font-bold tracking-tight text-[#354b47]">{title}</h2>
         </div>
-        {query.isPending ? <span role="status" className="text-[11px] text-[#71827e]">Loading insights…</span>
-          : query.isFetching && <span className="text-[11px] text-[#71827e]">Updating</span>}
       </div>
       {query.isPending ? (
         <>
@@ -151,21 +146,21 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
             {[
               { label: labels.total, detail: labels.totalDetail },
               { label: "Open items", detail: `Open ${labels.total.toLowerCase()}` },
-              { label: "Activity", detail: "Waiting for current data" },
+              { label: "Activity", detail: "" },
             ].map(({ label, detail }) => (
               <NeuStatCard key={label} label={label} value={<span className="insight-number">—</span>}
                 detail={detail} className="insight-stat min-h-[88px] p-3" />
             ))}
           </div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2" aria-hidden="true">
-            {[labels.series, `${labels.series} trend`].map(label => (
+            {[labels.series, `${labels.series} trend`, labels.breakdown, "Summary"].map(label => (
               <NeuCard key={label} pressed className="insight-chart min-w-0 p-3 sm:p-4">
                 <div className="mb-2">
                   <p className="text-xs font-bold text-[#3d5751]">{label}</p>
-                  <p className="text-[10px] text-[#75847f]">Waiting for current data</p>
+                  <div aria-hidden="true" style={{ height: 14 }} />
                 </div>
                 <div className="flex h-[210px] items-center justify-center text-xs text-[#75847f]">
-                  Loading chart…
+                   <span aria-hidden="true" style={{ display: "block", width: "100%", height: 210, borderRadius: 8, background: "#d8d8d8" }} />
                 </div>
               </NeuCard>
             ))}
@@ -188,7 +183,7 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
             <NeuStatCard label={data.keyMetric.label} value={<span className="insight-number">{value(data.keyMetric.value, data.keyMetric.format)}</span>} detail={data.keyMetric.format === "currency" ? "Recorded value" : "Recorded activity"} className="insight-stat min-h-[88px] p-3" />
           </div>}
           {data.charts !== undefined ? data.charts.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2" style={{ gridAutoRows: 278 }}>
               {data.charts.map((chart, chartIndex) => {
                 const chartId = `${gradientId}-custom-${chartIndex}`;
                 const xKey = chart.xKey ?? "name";
@@ -198,7 +193,7 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
                   <div className="h-[210px] w-full" role="img" aria-label={chart.title}>
                     <ResponsiveContainer width="100%" height="100%">
                       {chart.kind === "donut" ? <PieChart>
-                        <Pie data={chart.data} dataKey={firstSeries?.key ?? "value"} nameKey={xKey} innerRadius={52} outerRadius={78} paddingAngle={2} stroke="none">
+                        <Pie isAnimationActive={false} data={chart.data} dataKey={firstSeries?.key ?? "value"} nameKey={xKey} innerRadius={52} outerRadius={78} paddingAngle={2} stroke="none">
                           {chart.data.map((item, index) => <Cell key={`${String(item[xKey] ?? index)}-${index}`} fill={chart.series[index]?.color ?? colors[index % colors.length]} />)}
                         </Pie>
                         <Tooltip formatter={(v, _name, item) => [chartValue(Number(v), firstSeries?.format), String(item?.payload?.[xKey] ?? firstSeries?.label ?? "Records")]} />
@@ -208,22 +203,23 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
                         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
                         <YAxis tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 9 }} />
                         <Tooltip formatter={(v, name) => { const series = chart.series.find(item => item.key === name); return [chartValue(Number(v), series?.format), series?.label ?? String(name)]; }} />
-                        {chart.series.map((series, index) => <Area key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.5} fill={`url(#${chartId}-${index})`} />)}
+                        {chart.series.map((series, index) => <Area isAnimationActive={false} key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.5} fill={`url(#${chartId}-${index})`} />)}
                       </AreaChart> : <BarChart data={chart.data} margin={{ top: 12, right: 4, left: -18, bottom: 0 }}>
                         <CartesianGrid vertical={false} stroke="#8c9995" strokeOpacity={0.18} />
                         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
                         <YAxis tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 9 }} />
                         <Tooltip formatter={(v, name) => { const series = chart.series.find(item => item.key === name); return [chartValue(Number(v), series?.format), series?.label ?? String(name)]; }} />
-                        {chart.series.map(series => <Bar key={series.key} dataKey={series.key} name={series.label} shape={<InsightCylinderBar fill={series.color} />} maxBarSize={25} />)}
+                        {chart.series.map(series => <Bar isAnimationActive={false} key={series.key} dataKey={series.key} name={series.label} shape={<InsightCylinderBar fill={series.color} />} maxBarSize={25} />)}
                       </BarChart>}
                     </ResponsiveContainer>
                   </div>
                   {chart.kind === "donut" && <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[#697a75]">{chart.data.map((item, index) => <span key={`${String(item[xKey] ?? index)}-legend`} className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-full" style={{ backgroundColor: chart.series[index]?.color ?? colors[index % colors.length] }} />{String(item[xKey] ?? "Item")}: {chartValue(Number(item[firstSeries?.key ?? "value"] ?? 0), firstSeries?.format)}</span>)}</div>}
                 </NeuCard>;
               })}
+              {Array.from({ length: Math.max(0, 4 - data.charts.length) }, (_, index) => <EmptyChartSlot key={`empty-${index}`} />)}
             </div>
-          ) : <NeuCard pressed className="p-4 text-sm text-[#657671]">No operational charts are available for this view yet.</NeuCard> : (data.series.length > 0 || data.breakdown.length > 0) && (
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+           ) : <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{Array.from({ length: 4 }, (_, i) => <EmptyChartSlot key={i} />)}</div> : (
+             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2" style={{ gridAutoRows: 278 }}>
               {data.series.length > 0 && (
                 <NeuCard pressed className="insight-chart min-w-0 p-3 sm:p-4">
                   <div className="mb-2"><p className="text-xs font-bold text-[#3d5751]">{data.seriesLabel ?? labels.series}</p><p className="text-[10px] text-[#75847f]">Full dataset by period</p></div>
@@ -234,7 +230,7 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
                         <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
                         <YAxis tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 9 }} />
                         <Tooltip formatter={(v, name) => [name === "amount" ? money.format(Number(v)) : number.format(Number(v)), name === "amount" ? "Amount" : "Records"]} />
-                        <Bar dataKey="count" shape={<InsightCylinderBar />} maxBarSize={25} />
+                        <Bar isAnimationActive={false} dataKey="count" shape={<InsightCylinderBar />} maxBarSize={25} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -251,7 +247,7 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
                         <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
                         <YAxis tickFormatter={(v) => value(Number(v), data.keyMetric.format)} tickLine={false} axisLine={false} width={58} tick={{ fill: "#76837f", fontSize: 9 }} />
                         <Tooltip formatter={(v) => [value(Number(v), data.keyMetric.format), data.keyMetric.format === "currency" ? "Amount" : "Records"]} />
-                        <Area type="monotone" dataKey={data.keyMetric.format === "currency" ? "amount" : "count"} stroke="#248f92" strokeWidth={2.5} fill={`url(#${gradientId})`} />
+                        <Area isAnimationActive={false} type="monotone" dataKey={data.keyMetric.format === "currency" ? "amount" : "count"} stroke="#248f92" strokeWidth={2.5} fill={`url(#${gradientId})`} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -263,7 +259,7 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
                   <div className="h-[210px] w-full" role="img" aria-label="Operational records by status or type">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={data.breakdown} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={2} stroke="none">
+                        <Pie isAnimationActive={false} data={data.breakdown} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={2} stroke="none">
                           {data.breakdown.map((item, index) => <Cell key={`${item.name}-${index}`} fill={colors[index % colors.length]} />)}
                         </Pie>
                         <Tooltip formatter={(v) => number.format(Number(v))} />
@@ -275,15 +271,39 @@ export function PageInsights({ entity, entityId, clientId, title = "Operational 
                   </div>
                 </NeuCard>
               )}
+               {Array.from({ length: 4 - (data.series.length ? 2 : 0) - (data.breakdown.length ? 1 : 0) }, (_, i) => <EmptyChartSlot key={`empty-${i}`} />)}
             </div>
-          )}
-          {data.charts === undefined && data.series.length === 0 && data.breakdown.length === 0 && (
-            <NeuCard pressed className="p-4 text-sm text-[#657671]">No operational history is available for this view yet.</NeuCard>
           )}
         </>
       ) : null}
     </section>
   );
+}
+
+function insightQueryOptions(entity: Props["entity"], entityId?: string | number, clientId?: string | number, section?: string) {
+  return {
+    queryKey: ["page-insights", entity, entityId == null ? null : String(entityId), clientId == null ? null : String(clientId), section ?? null],
+    queryFn: ({ signal }: { signal: AbortSignal }) => loadInsights(entity, entityId, clientId, signal, section),
+    staleTime: 60_000,
+    refetchOnMount: refreshPageOnMount,
+    gcTime: PAGE_RETAIN_MS,
+    retry: 1,
+  };
+}
+
+/** URL-known record statistics must not wait for the record-body request. */
+export function usePrimeRecordInsights(entity: Props["entity"], entityId?: string | number) {
+  const client = useQueryClient();
+  useEffect(() => {
+    if (entityId === undefined || entityId === "" || typeof entityId === "number" && !Number.isFinite(entityId)) return;
+    void client.prefetchQuery(insightQueryOptions(entity, entityId));
+  }, [client, entity, entityId]);
+}
+
+function EmptyChartSlot() {
+  return <NeuCard pressed className="insight-chart min-w-0 p-3 sm:p-4" data-chart-empty>
+    <div className="h-[242px] flex items-center justify-center text-xs text-[#75847f]">No activity for this chart yet.</div>
+  </NeuCard>;
 }
 
 export default PageInsights;

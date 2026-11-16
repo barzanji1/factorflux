@@ -1,4 +1,4 @@
-import { NeuCard } from "@/styles/neu";
+import { FirstVisitSkeleton } from "./PageSnapshotFrame";
 import "./loading.css";
 
 export type PageSkeletonProps = {
@@ -15,21 +15,7 @@ export function PageSkeleton({ title, status = true }: PageSkeletonProps) {
         <span className="ff-loading-placeholder ff-loading-placeholder--title" />
         <span className="ff-loading-placeholder ff-loading-placeholder--medium" />
       </div>
-      <div className="ff-loading-page__cards" aria-hidden="true">
-        {[0, 1, 2].map(item => (
-          <NeuCard key={item} className="ff-loading-page__card" style={{ backgroundColor: "hsl(var(--card))" }}>
-            <span className="ff-loading-placeholder ff-loading-placeholder--short" />
-            <span className="ff-loading-placeholder ff-loading-placeholder--value" />
-            <span className="ff-loading-placeholder ff-loading-placeholder--medium" />
-          </NeuCard>
-        ))}
-      </div>
-      <NeuCard className="ff-loading-page__panel" style={{ backgroundColor: "hsl(var(--card))" }} aria-hidden="true">
-        <span className="ff-loading-placeholder ff-loading-placeholder--title" />
-        {[0, 1, 2, 3].map(item => (
-          <span key={item} className={`ff-loading-placeholder ${item === 0 ? "ff-loading-placeholder--wide" : "ff-loading-placeholder--full"}`} />
-        ))}
-      </NeuCard>
+      <FirstVisitSkeleton dashboard={title === "Agent Dashboard"} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { PageSnapshotFrame } from "@/components/loading/PageSnapshotFrame";
 import React, {
   createContext,
   forwardRef,
@@ -383,12 +384,12 @@ export const NeuStatCard = forwardRef<HTMLDivElement, NeuStatCardProps>(
 NeuStatCard.displayName = "NeuStatCard";
 
 export const NeuPageShell = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, children, ...props }, ref) => (
     <main
       ref={ref}
       className={cn("relative min-h-[100dvh] overflow-y-auto bg-[#e0e0e0] text-[#333333]", className)}
       {...props}
-    />
+    ><PageSnapshotFrame>{children}</PageSnapshotFrame></main>
   ),
 );
 NeuPageShell.displayName = "NeuPageShell";

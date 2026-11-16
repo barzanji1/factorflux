@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import EntityNotes from "@/components/shared/EntityNotes";
-import { PageInsights } from "@/components/PageInsights";
+import { PageInsights, usePrimeRecordInsights } from "@/components/PageInsights";
 import "@/components/admin-neu/admin-neu-page.css";
 
 type Task = {
@@ -24,6 +24,7 @@ const name = (person?: { firstName?: string; lastName?: string } | null) => pers
 
 export default function TaskDetail() {
   const [, params] = useRoute("/tasks/:id");
+  usePrimeRecordInsights("tasks", params?.id);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();

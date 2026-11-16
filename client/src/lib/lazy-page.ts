@@ -1,6 +1,6 @@
 import { createElement, lazy, useState, type ComponentProps, type ComponentType } from "react";
 
-const preloads: Array<{ paths: Array<{ pattern: RegExp; parameters: number }>; load: () => Promise<unknown> }> = [];
+const preloads: Array<{ urls: string[]; paths: Array<{ pattern: RegExp; parameters: number }>; load: () => Promise<unknown> }> = [];
 
 /** Preserve lazy loading, but mount already-prepared components synchronously. */
 export function lazyComponent<T extends ComponentType<any>>(loader: () => Promise<{ default: T }>) {
@@ -27,6 +27,7 @@ export function lazyComponent<T extends ComponentType<any>>(loader: () => Promis
 export function lazyPage<T extends ComponentType<any>>(paths: string[], loader: () => Promise<{ default: T }>) {
   const deferred = lazyComponent(loader);
   preloads.push({
+    urls: paths,
     paths: paths.map(path => ({
       parameters: path.split("/").filter(segment => segment.startsWith(":")).length,
       pattern: new RegExp(`^${path.split("/").map(segment =>
@@ -36,6 +37,30 @@ export function lazyPage<T extends ComponentType<any>>(paths: string[], loader: 
     load: deferred.load,
   });
   return deferred.Component;
+}
+
+/** Warm staff chunks between interactions, without fetching page data. */
+export function warmStaffPages() {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (connection?.saveData || connection?.effectiveType?.includes("2g")) return () => {};
+  let cancelled = false;
+  const pages = preloads.filter(page => page.urls.some(url => !/^\/(?:login|portal(?:\/|$)|neu-preview)/.test(url)));
+  let next = 0;
+  const idle = () => new Promise<void>(resolve => {
+    if ("requestIdleCallback" in window) window.requestIdleCallback(() => resolve(), { timeout: 1000 });
+    else setTimeout(resolve, 50);
+  });
+  const worker = async () => {
+    while (!cancelled && next < pages.length) {
+      await idle();
+      if (cancelled) return;
+      const page = pages[next++];
+      if (page) await page.load().catch(() => undefined);
+    }
+  };
+  // Let first-page API responses and rendering take priority.
+  const start = setTimeout(() => { void worker(); void worker(); }, 1500);
+  return () => { cancelled = true; clearTimeout(start); };
 }
 
 export function preloadPage(href: string) {
