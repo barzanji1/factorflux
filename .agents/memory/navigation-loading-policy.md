@@ -1,13 +1,13 @@
 ---
 name: Navigation loading continuity
-description: Avoid large gray placeholder flashes and layout jumps during sidebar navigation.
+description: Show-first staff loading policy, cached snapshots, first-visit skeletons, and persistent navigation.
 ---
 
-Keep page structure and the current design visible while destination data loads; do not replace recognizable content with large gray blocks. Coverage must include every internal page, not only Calendar or pages using shared insights.
+Use the user's show-first, fetch-second policy across staff pages. Render a data-independent shell immediately, show cached real data on revisits, mark cache entries stale after 60 seconds, and refresh entries older than 30 seconds quietly in the background.
 
-**Why:** The user repeatedly described initial loading placeholders as the old system flashing during sidebar navigation. Their Calendar screenshot identified a skeleton/layout issue distinct from route permission checks, and they explicitly clarified that it happens on every page.
+**Why:** The user explicitly replaced previous loading/deferral approaches with this application-wide architecture. Earlier requests to suppress gray placeholders no longer apply to uncached first visits.
 
-**How to apply:** Keep loading geometry close to the loaded view, retain data-independent structure such as calendar dates, and show explicit loading labels rather than fabricated zero values. Verify real sidebar clicks with deliberately slow requests, including the pending frame—not just a screenshot taken after loading finishes. Preserve access checks and data freshness.
+**How to apply:** Only an uncached first visit may show gray placeholders matching content geometry. Replace them with complete data content in one swap; no page-content spinners, loading text, or progressive chart fill. Cached charts and infographics render immediately and refresh in place without skeleton swaps. Start independent page requests together, preserve authorization and account isolation, and test rapid sidebar navigation in the compiled production build.
 
 Viewport containment is a separate requirement from loading paint. An overflow-hidden shell does not reliably clip absolutely positioned descendants whose containing block is outside that shell; keep the viewport and scrolling-content containers positioned.
 
@@ -15,11 +15,11 @@ Viewport containment is a separate requirement from loading paint. An overflow-h
 
 **How to apply:** Check document height, window scroll position, and shell bounds during real sign-in and navigation, not only the loaded page's appearance. Keep inner-content scrolling functional and preserve accessible labels rather than deleting them.
 
-Loading states must be deliberate and immediately visible: an inline FactorFlux logo splash before application JavaScript, and lightweight structural placeholders while authenticated destinations prepare or fetch data. Apply navigation feedback to card links, notifications, programmatic navigation and browser history as well as the sidebar.
+Keep route-level code splitting, but do not separately lazy-load or defer charts and infographics. Preserve the login page, email templates, and the existing neumorphic theme and component styling.
 
-**Why:** After prior attempts hid loading states behind data-readiness waits, the user explicitly requested an inline logo splash, immediate dashboard skeletons, hover-prefetched routes, and immediate page-transition skeletons. This supersedes the earlier direction to hide all first-data placeholders. The neumorphic theme must not change.
+**Why:** The user made these explicit boundaries part of the show-first loading overhaul.
 
-**How to apply:** Keep the current shell usable while destination code prepares; revalidate the previously verified permission snapshot in the background without weakening server-side authorization. Display loading structure only over content that actually waits. Reveal mounted page structure without waiting for API completion. Preserve reduced motion, cancellation, permission revocation, and history/query-string behavior. Verify delayed production assets/APIs and cached repeat visits rather than relying on development's module cache.
+**How to apply:** Keep the current shell usable while destination code prepares; revalidate the previously verified permission snapshot in the background without weakening server-side authorization. Preserve reduced motion, cancellation, permission revocation, and history/query-string behavior. Measure click-to-structural-shell against the user's 100 ms target separately from data completion; verify delayed production assets/APIs and cached repeat visits rather than relying on development's module cache.
 
 Do not use whole-window native view-transition snapshots for ordinary staff page navigation. Reserve them for the explicit login fade.
 
