@@ -14,3 +14,9 @@ Report the initial visible route's full JavaScript dependency closure separately
 **Why:** A lazy login adds dependencies after the entry loads. Code splitting can reduce startup substantially while increasing whole-site compressed output.
 
 **How to apply:** Measure emitted file bytes and compression consistently, disclose both startup and total sizes, and verify the production resource graph rather than development-server module requests.
+
+Do not equate loading-state continuity checks with fast navigation. When the user reports deployed delays, measure the live site's click-to-route and click-to-populated-content times, including repeat visits with no new chunk requests, before proposing more placeholders.
+
+**Why:** Local compiled-bundle checks passed for layout continuity while the user still experienced production navigation delays. A clean layout assertion does not establish a latency budget, and a cached route can still wait on a network prerequisite.
+
+**How to apply:** Separate code downloads, authorization preparation, page-data requests, and main-thread work. State the test location, cache conditions, and what “rendered” means; do not present local harness timings as deployed-site measurements.
