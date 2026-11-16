@@ -336,6 +336,16 @@ try {
     assert(fuel.listValid);
     assert.equal(fuel.detailStatus, fuel.hadExistingRecord ? 200 : 404);
     console.log(JSON.stringify({ fuelAdvanceReads: fuel }));
+    await click('aside button[aria-label="Fuel Advance"]');
+    for (let i = 0; i < 200; i++) {
+      if (await evaluate("location.pathname==='/fuel-advance'&&document.documentElement.dataset.pageTransition!=='holding'&&!!document.querySelector('main')")) break;
+      await wait(30);
+    }
+    const fuelPage = await evaluate("({path:location.pathname,text:document.querySelector('main')?.innerText||'',holding:document.documentElement.dataset.pageTransition==='holding'})");
+    assert.equal(fuelPage.path, "/fuel-advance");
+    assert.equal(fuelPage.holding, false);
+    assert(!/Failed to fetch fuel advances|Something went wrong/i.test(fuelPage.text));
+    await send("Page.captureScreenshot", { format: "jpeg", quality: 80 }).then(r => writeFile(`${output}/fuel-advances.jpg`, Buffer.from(r.data, "base64")));
   }
   const report = {
     origin: base, slowNetwork: process.env.SIGNIN_SLOW_NETWORK === "1", responses, failures, exceptionCount, navigation,

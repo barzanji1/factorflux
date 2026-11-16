@@ -25,6 +25,7 @@ type Props = {
   onRetry: () => void;
   agentName: string;
   children?: ReactNode;
+  beforeCharts?: ReactNode;
 };
 
 type WorkShortcutsProps = {
@@ -188,7 +189,7 @@ function MetricSkeleton() {
   return <div className="ff-neu-metric-skeleton" aria-hidden="true"><span /><span /><span /></div>;
 }
 
-export function FinancialSummary({ data, isLoading, error, onRetry, agentName, children }: Props) {
+export function FinancialSummary({ data, isLoading, error, onRetry, agentName, children, beforeCharts }: Props) {
   const metricCards = data ? metrics.map(metric => {
     const Icon = metric.icon;
     const value = data.kpis[metric.key];
@@ -231,6 +232,7 @@ export function FinancialSummary({ data, isLoading, error, onRetry, agentName, c
           data && metricCards ? <KpiCarousel items={metricCards} speedPixelsPerSecond={30} /> : null}
       </section>
       {children}
+      {beforeCharts}
       {isLoading && <FinancialChartsLoading />}
       {data && <FinancialCharts months={data.months} />}
       {error && !isLoading && <section className="mt-7" role="status"><p className="ff-neu-eyebrow">Financial Overview</p><p className="mt-2 text-sm text-[#8a6558]">Financial charts are unavailable until the summary can be loaded.</p></section>}

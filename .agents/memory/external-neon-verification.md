@@ -9,6 +9,10 @@ This project’s application data uses its configured external Neon connection. 
 
 **How to apply:** For application-record verification, run a small project script through the existing database module and return only non-sensitive metadata. Never print connection strings, password hashes, or secret values.
 
+Publish does not execute schema migrations against this external connection. Apply reviewed, authorized SQL migrations explicitly to the verified application database, using a transaction and bounded lock/statement timeouts.
+
+**Why:** Replit’s automatic publish-time schema diff covers managed databases, not this external Neon database. Having a migration file in the repository does not mean it has been applied there.
+
 Check the external Neon's actual server major version before choosing backup tooling; the installed Replit PostgreSQL tools can lag behind it.
 
 **Why:** The external server was PostgreSQL 18 while the installed client was 16 and available managed toolchains stopped at 17. An older `pg_dump` refuses to dump a newer server.

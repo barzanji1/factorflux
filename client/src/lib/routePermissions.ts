@@ -34,7 +34,9 @@ export const ROUTE_PERMISSION_MAP: Record<string, string> = {
   "/calendar": "calendar",
   "/expenses": "expenses",
   "/tickets": "tickets",
-  "/chat": "chat",
+  // Staff-wide announcements live here. Conversation access is gated
+  // separately in TeamChatWorkspace and remains protected by the API.
+  "/chat": "",
   // The Email route hosts Log for every authenticated employee. Compose is
   // gated inside ClientEmailPage with the client_email permission.
   "/client-email": "",

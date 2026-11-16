@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { z } from "zod";
 import { ANNOUNCEMENT_PAGE_SIZE } from "../../shared/announcements";
-import { AnnouncementError, listAnnouncements, mutateAnnouncement, type AnnouncementOperation, type AnnouncementStore } from "../services/announcements";
+import { AnnouncementError, getAnnouncement, listAnnouncements, mutateAnnouncement, type AnnouncementOperation, type AnnouncementStore } from "../services/announcements";
 
 const idSchema = z.coerce.number().int().positive();
 const listInput = z.object({
@@ -11,13 +11,14 @@ const listInput = z.object({
 }).strict();
 
 export function registerAnnouncementRoutes(app: Express, auth: RequestHandler, store?: AnnouncementStore) {
-  const handler = (action: "list" | AnnouncementOperation): RequestHandler => async (req: any, res) => {
+  const handler = (action: "list" | "detail" | AnnouncementOperation): RequestHandler => async (req: any, res) => {
     res.setHeader("Cache-Control", "no-store");
     try {
       if (action === "list") {
         const { view, offset, limit } = listInput.parse(req.query);
         return void res.json(await listAnnouncements(req.user.id, view, offset, limit, store));
       }
+      if (action === "detail") return void res.json(await getAnnouncement(req.user.id, idSchema.parse(req.params.id), store));
       const id = action === "create" ? undefined : idSchema.parse(req.params.id);
       const result = await mutateAnnouncement(action, req.user.id, req.body, id, store);
       res.status(action === "create" ? 201 : 200).json(result);
@@ -30,6 +31,7 @@ export function registerAnnouncementRoutes(app: Express, auth: RequestHandler, s
   };
   app.get("/api/announcements", auth, handler("list"));
   app.post("/api/announcements", auth, handler("create"));
+  app.get("/api/announcements/:id", auth, handler("detail"));
   app.patch("/api/announcements/:id", auth, handler("edit"));
   app.delete("/api/announcements/:id", auth, handler("delete"));
   for (const action of ["dismiss", "approve", "reject"] as const) {

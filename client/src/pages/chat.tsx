@@ -22,6 +22,7 @@ import { ChatMessageItem } from "@/components/team-chat/ChatMessageItem";
 import { ChatAvatar } from "@/components/team-chat/ChatAvatar";
 import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuSelect } from "@/styles/neu/components";
 import { NeuNotice } from "@/components/shared/NeuNotice";
+import { TeamAnnouncementWorkspace } from "@/components/team-announcements";
 
 type Channel = {
   id: string | number;
@@ -671,6 +672,7 @@ function ChatPanel({ active }: ChatPanelProps) {
       </header>
       {preferenceError && <NeuNotice severity="block" role="alert" className="mb-2 flex shrink-0 items-start gap-2 text-xs"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{preferenceError}</span></NeuNotice>}
       {notificationPreferenceError && <NeuNotice severity="block" role="alert" className="mb-2 flex shrink-0 items-start gap-2 text-xs"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{notificationPreferenceError}</span></NeuNotice>}
+      <TeamAnnouncementWorkspace active={active} />
       <div className="flex min-h-0 w-full flex-1 gap-4">
         <NeuCard className={cn("flex w-full min-w-0 flex-col overflow-hidden p-3 md:w-[270px] md:shrink-0", mobileShowChannels ? "flex" : "hidden md:flex")}>
           <div className="mb-3 flex items-center justify-between gap-2 px-1">
@@ -775,6 +777,7 @@ export function TeamChatWorkspace() {
     user.role === "admin" ||
     (permissionsLoaded && permissions.includes("chat"))
   );
+  const canUseAnnouncements = !!user && !isLoading && (user.role === "admin" || permissionsLoaded);
   const isInternalRoute = location !== "/login" && location !== "/portal" && !location.startsWith("/portal/");
   const active = location.split("?")[0] === "/chat";
 
@@ -788,7 +791,7 @@ export function TeamChatWorkspace() {
     return () => window.removeEventListener("team-chat:open", openChat);
   }, [setLocation, canUseChat, isInternalRoute]);
 
-  if (!canUseChat || !isInternalRoute) return null;
+  if (!canUseAnnouncements || !isInternalRoute || (!canUseChat && !active)) return null;
 
   return (
     <div className={cn(
@@ -799,7 +802,10 @@ export function TeamChatWorkspace() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {active && <TopNav title="Team Chat" subtitle="Conversations across your team" group="Workspace" neu />}
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#e0e0e0]">
-          <ChatPanel active={active} />
+          {canUseChat ? <ChatPanel active={active} /> : <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <TeamAnnouncementWorkspace active={active} />
+            <NeuNotice severity="info" className="text-sm">Team Announcements are available to all staff. Chat conversations are not enabled for your account.</NeuNotice>
+          </div>}
         </main>
       </div>
     </div>

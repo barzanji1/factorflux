@@ -6,9 +6,9 @@ import { eq, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import { announcements, announcementDismissals, notifications, users } from "../../shared/schema";
 import {
-  ANNOUNCEMENT_LIFETIME_MS, announcementInput, announcementWordCount, type Announcement,
+  ANNOUNCEMENT_LIFETIME_MS, announcementInput, announcementWordCount, announcementHeadline, type Announcement,
 } from "../../shared/announcements";
-import { listAnnouncements, mutateAnnouncement, type AnnouncementStore } from "./announcements";
+import { getAnnouncement, listAnnouncements, mutateAnnouncement, type AnnouncementStore } from "./announcements";
 import { registerAnnouncementRoutes } from "../routes/announcements";
 
 after(() => pool.end());
@@ -39,22 +39,29 @@ async function fixture(run: (tx: Tx, ids: Record<"author" | "peer" | "manager" |
 test("word limit uses consistent whitespace counting and rejects forged fields", () => {
   assert.equal(announcementWordCount(" \n hello\tteam \r\n"), 2);
   assert.equal(announcementWordCount(" \n\t "), 0);
-  assert.equal(announcementInput.safeParse(input("a ".repeat(100))).success, true);
-  assert.equal(announcementInput.safeParse(input("a ".repeat(101))).success, false);
+  assert.equal(announcementInput.safeParse(input("a ".repeat(50))).success, true);
+  assert.equal(announcementInput.safeParse(input("a ".repeat(51))).success, false);
+  assert.equal(announcementInput.safeParse({ message: "a ".repeat(50), headline: "Different title" }).success, false);
+  assert.equal(announcementInput.safeParse({ headline: "Team meeting tomorrow" }).success, true);
+  assert.equal(announcementInput.safeParse({ headline: "word ".repeat(26) }).success, false);
+  assert.equal(announcementWordCount(announcementHeadline("word ".repeat(40))), 25);
+  assert.equal(announcementInput.safeParse({ headline: "Hello", highlightColor: "javascript:red" }).success, false);
   for (const bad of [
     input("  "), { ...input(), severity: "blue" }, { ...input(), status: "approved" },
     { ...input(), authorId: "somebody-else" }, { ...input(), expiresAt: null }, { ...input(), persistent: "false" },
   ]) assert.equal(announcementInput.safeParse(bad).success, false);
 });
 
-test("agents submit privately; reviewers publish; severity/recency sorting and pagination work", async () => fixture(async (tx, ids) => {
+test("every active staff member publishes immediately; shared feed and pagination work", async () => fixture(async (tx, ids) => {
   const draft = await mutateAnnouncement("create", ids.author, input("Agent submission"), undefined, tx) as Announcement;
-  assert.equal(draft.status, "pending");
+  assert.equal(draft.status, "approved");
   assert.equal(draft.authorId, ids.author);
   assert.equal(draft.authorName, "author Fixture");
-  assert.equal(draft.postedAt, null);
+  assert.ok(draft.postedAt);
+  assert.equal(draft.reviewedBy, null);
   assert.equal(new Date(draft.expiresAt!).getTime() - new Date(draft.createdAt).getTime(), ANNOUNCEMENT_LIFETIME_MS);
-  assert.equal((await listAnnouncements(ids.peer, "active", 0, 15, tx)).total, 0);
+  assert.equal((await listAnnouncements(ids.peer, "active", 0, 15, tx)).total, 1);
+  assert.equal((await getAnnouncement(ids.peer, draft.id, tx)).headline, "Agent submission");
   assert.deepEqual((await listAnnouncements(ids.author, "mine", 0, 15, tx)).items.map(row => row.id), [draft.id]);
   assert.equal((await listAnnouncements(ids.peer, "mine", 0, 15, tx)).total, 0);
   await assert.rejects(listAnnouncements(ids.author, "pending", 0, 15, tx), /Only admins and managers/);
@@ -68,20 +75,46 @@ test("agents submit privately; reviewers publish; severity/recency sorting and p
   const red2 = await mutateAnnouncement("create", ids.admin, input("Urgent later", "red"), undefined, tx) as Announcement;
   await tx.update(announcements).set({ postedAt: new Date(Date.now() - 10000) }).where(eq(announcements.id, red1.id));
   const page1 = await listAnnouncements(ids.peer, "active", 0, 2, tx);
-  assert.deepEqual(page1.items.map(row => row.id), [red2.id, red1.id]);
-  assert.equal(page1.total, 4);
+  assert.deepEqual(page1.items.map(row => row.id), [red2.id, amber.id], "color does not override posting recency");
+  assert.equal(page1.total, 5);
   assert.equal(page1.nextOffset, 2);
   assert.equal(page1.canReview, false);
   const page2 = await listAnnouncements(ids.peer, "active", 2, 2, tx);
-  assert.deepEqual(page2.items.map(row => row.id), [amber.id, green.id]);
-  assert.equal(page2.nextOffset, null);
-  assert.equal((await listAnnouncements(ids.manager, "pending", 0, 15, tx)).items[0].id, draft.id);
+  assert.deepEqual(page2.items.map(row => row.id), [green.id, draft.id]);
+  assert.equal(page2.nextOffset, 4);
+  assert.deepEqual((await listAnnouncements(ids.peer, "active", 4, 2, tx)).items.map(row => row.id), [red1.id]);
+  assert.equal((await listAnnouncements(ids.manager, "pending", 0, 15, tx)).total, 0);
   assert.equal(page1.items[0].canManage, false);
   assert.equal((await listAnnouncements(ids.admin, "all", 0, 15, tx)).total, 5);
 }));
 
-test("approval, reapproval after edits, stale reviews and author rejection notifications are atomic", async () => fixture(async (tx, ids) => {
+test("headline-only posts, optional highlights, ownership and administrator removals are enforced", async () => fixture(async (tx, ids) => {
+  const live = await mutateAnnouncement("create", ids.author, { headline: "Office closed Monday", highlightColor: "blue" }, undefined, tx) as Announcement;
+  assert.equal(live.message, live.headline);
+  assert.equal(live.highlightColor, "blue");
+  assert.equal(live.expiresAt, null);
+  assert.equal(live.persistent, true);
+  const peer = await getAnnouncement(ids.peer, live.id, tx);
+  assert.equal(peer.canEdit, false);
+  assert.equal(peer.canDelete, false);
+  const admin = await getAnnouncement(ids.admin, live.id, tx);
+  assert.equal(admin.canEdit, false);
+  assert.equal(admin.canDelete, true);
+  await assert.rejects(mutateAnnouncement("delete", ids.manager, { version: live.version }, live.id, tx), /Only the author or an admin/);
+  await assert.rejects(mutateAnnouncement("edit", ids.admin, { headline: "Changed", version: live.version }, live.id, tx), /Only the author/);
+  const changed = await mutateAnnouncement("edit", ids.author, { headline: "Office closed Tuesday", message: "Please plan ahead.", version: live.version }, live.id, tx) as Announcement;
+  assert.equal(changed.status, "approved");
+  assert.equal(changed.postedAt, live.postedAt);
+  assert.equal(changed.authorName, live.authorName);
+  await assert.rejects(mutateAnnouncement("delete", ids.author, { version: live.version }, live.id, tx), /changed/);
+  await mutateAnnouncement("delete", ids.admin, { version: changed.version }, live.id, tx);
+  await assert.rejects(getAnnouncement(ids.peer, live.id, tx), /removed/);
+  assert.equal((await listAnnouncements(ids.peer, "active", 0, 15, tx)).total, 0);
+}));
+
+test("legacy moderation history remains; author edits publish without approval and preserve authorship", async () => fixture(async (tx, ids) => {
   const draft = await mutateAnnouncement("create", ids.author, input(), undefined, tx) as Announcement;
+  await tx.update(announcements).set({ status: "pending", postedAt: null }).where(eq(announcements.id, draft.id));
   const approved = await mutateAnnouncement("approve", ids.manager, { version: draft.version }, draft.id, tx) as Announcement;
   assert.equal(approved.status, "approved");
   assert.equal(approved.reviewedBy, ids.manager);
@@ -91,10 +124,11 @@ test("approval, reapproval after edits, stale reviews and author rejection notif
   await assert.rejects(mutateAnnouncement("reject", ids.admin, { version: approved.version }, draft.id, tx), /already been reviewed/);
   await assert.rejects(mutateAnnouncement("edit", ids.peer, { ...input("Stolen"), version: approved.version }, draft.id, tx), /Only the author/);
   const edited = await mutateAnnouncement("edit", ids.author, { ...input("Revised", "red", true), version: approved.version }, draft.id, tx) as Announcement;
-  assert.equal(edited.status, "pending", "an approved message cannot be changed without reapproval");
+  assert.equal(edited.status, "approved", "staff edits publish immediately under the new Team Announcement policy");
   assert.equal(edited.reviewedAt, null);
   assert.equal(edited.expiresAt, null);
-  assert.equal((await listAnnouncements(ids.peer, "active", 0, 15, tx)).total, 0);
+  assert.equal((await listAnnouncements(ids.peer, "active", 0, 15, tx)).total, 1);
+  await tx.update(announcements).set({ status: "pending", postedAt: null }).where(eq(announcements.id, edited.id));
   const rejected = await mutateAnnouncement("reject", ids.admin, { version: edited.version, reason: "Please clarify the date." }, edited.id, tx) as Announcement;
   assert.equal(rejected.status, "rejected");
   assert.equal(rejected.rejectionReason, "Please clarify the date.");
@@ -105,23 +139,22 @@ test("approval, reapproval after edits, stale reviews and author rejection notif
   assert.equal(alerts[0].actionUrl, "/?announcements=mine");
   await assert.rejects(mutateAnnouncement("reject", ids.manager, { version: edited.version }, edited.id, tx), /changed/);
   const resubmitted = await mutateAnnouncement("edit", ids.author, { ...input("Clarified"), version: rejected.version }, rejected.id, tx) as Announcement;
-  assert.equal(resubmitted.status, "pending");
+  assert.equal(resubmitted.status, "approved");
   assert.equal(resubmitted.rejectionReason, null);
-  const adminEdit = await mutateAnnouncement("edit", ids.admin, { ...input("Reviewed correction"), version: resubmitted.version }, resubmitted.id, tx) as Announcement;
-  assert.equal(adminEdit.status, "approved");
-  assert.equal(adminEdit.authorId, ids.author, "reviewer edits must not steal authorship");
+  await assert.rejects(mutateAnnouncement("edit", ids.admin, { ...input("Reviewed correction"), version: resubmitted.version }, resubmitted.id, tx), /Only the author/);
+  assert.equal(resubmitted.authorId, ids.author);
 }));
 
-test("dismissals are personal/idempotent, survive edits, expire automatically and cascade on deletion", async () => fixture(async (tx, ids) => {
+test("active announcements remain staff-wide despite legacy dismissals; expire and delete correctly", async () => fixture(async (tx, ids) => {
   const live = await mutateAnnouncement("create", ids.manager, input("Persistent bulletin", "green", true), undefined, tx) as Announcement;
   assert.equal(live.expiresAt, null);
   await mutateAnnouncement("dismiss", ids.author, { version: live.version }, live.id, tx);
   await mutateAnnouncement("dismiss", ids.author, { version: live.version }, live.id, tx);
   assert.equal((await tx.select().from(announcementDismissals)).length, 1);
-  assert.equal((await listAnnouncements(ids.author, "active", 0, 15, tx)).total, 0);
+  assert.equal((await listAnnouncements(ids.author, "active", 0, 15, tx)).total, 1);
   assert.equal((await listAnnouncements(ids.peer, "active", 0, 15, tx)).total, 1);
   const updated = await mutateAnnouncement("edit", ids.manager, { ...input("Updated bulletin", "red", true), version: live.version }, live.id, tx) as Announcement;
-  assert.equal((await listAnnouncements(ids.author, "active", 0, 15, tx)).total, 0);
+  assert.equal((await listAnnouncements(ids.author, "active", 0, 15, tx)).total, 1);
   await assert.rejects(mutateAnnouncement("delete", ids.peer, { version: updated.version }, live.id, tx), /Only the author/);
   await mutateAnnouncement("delete", ids.admin, { version: updated.version }, live.id, tx);
   assert.equal((await tx.select().from(announcementDismissals)).length, 0);
@@ -129,14 +162,17 @@ test("dismissals are personal/idempotent, survive edits, expire automatically an
   await tx.update(announcements).set({ expiresAt: new Date(Date.now() - 1) }).where(eq(announcements.id, expiring.id));
   assert.equal((await listAnnouncements(ids.peer, "active", 0, 15, tx)).total, 0);
   assert.equal((await listAnnouncements(ids.admin, "mine", 0, 15, tx)).total, 1);
+  await assert.rejects(getAnnouncement(ids.peer, expiring.id, tx), /no longer active/);
   await assert.rejects(mutateAnnouncement("dismiss", ids.peer, { version: expiring.version }, expiring.id, tx), /no longer live/);
   const pending = await mutateAnnouncement("create", ids.author, input("Pending"), undefined, tx) as Announcement;
+  await tx.update(announcements).set({ status: "pending" }).where(eq(announcements.id, pending.id));
   await assert.rejects(mutateAnnouncement("dismiss", ids.peer, { version: pending.version }, pending.id, tx), /no longer live/);
   await mutateAnnouncement("delete", ids.author, { version: pending.version }, pending.id, tx);
 }));
 
 test("failed notification insert rolls back the rejection itself", async () => fixture(async (tx, ids) => {
   const draft = await mutateAnnouncement("create", ids.author, input(), undefined, tx) as Announcement;
+  await tx.update(announcements).set({ status: "pending", postedAt: null }).where(eq(announcements.id, draft.id));
   await tx.execute(sql.raw(`
     CREATE FUNCTION pg_temp.fail_announcement_notification() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN RAISE EXCEPTION 'TEST_NOTIFICATION_FAILURE'; END; $$;
@@ -171,16 +207,19 @@ test("HTTP routes enforce authentication, current database roles, input limits a
     assert.equal((await request("?limit=1000")).status, 400);
     assert.equal((await request("?offset=-1")).status, 400);
     assert.equal((await request("", ids.author, "POST", { ...input(), status: "approved" })).status, 400);
-    assert.equal((await request("", ids.author, "POST", input("word ".repeat(101)))).status, 400);
+    assert.equal((await request("", ids.author, "POST", input("word ".repeat(51)))).status, 400);
     const created = await request("", ids.author, "POST", input("HTTP pending"));
     assert.equal(created.status, 201);
     const item = await created.json() as Announcement;
-    assert.equal(item.status, "pending", "forged cached admin role must not publish");
+    assert.equal(item.status, "approved", "all active staff can publish without a review");
+    assert.equal(item.canEdit, true);
+    assert.equal((await request(`/${item.id}`, ids.peer)).status, 200);
     assert.equal((await request(`/${item.id}/approve`, ids.author, "POST", { version: item.version })).status, 403);
     assert.equal((await request(`/${item.id}`, ids.peer, "PATCH", { ...input(), version: item.version })).status, 403);
+    assert.equal((await request(`/${item.id}`, ids.peer, "DELETE", { version: item.version })).status, 403, "cached admin role cannot bypass owner/admin removal checks");
     const approve = await request(`/${item.id}/approve`, ids.manager, "POST", { version: item.version });
     const reject = await request(`/${item.id}/reject`, ids.admin, "POST", { version: item.version });
-    assert.equal(approve.status, 200);
+    assert.equal(approve.status, 409);
     assert.equal(reject.status, 409);
     const mine = await request("?view=mine");
     assert.match(mine.headers.get("cache-control")!, /no-store/);

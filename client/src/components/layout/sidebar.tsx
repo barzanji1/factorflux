@@ -91,7 +91,7 @@ const navSections: NavSection[] = [
       { name: "Tasks",             href: "/tasks",              icon: ListTodo,        permission: "tasks"              },
       { name: "IT Support",        href: "/it-support",         icon: LifeBuoy,         permission: "", staffVisible: true },
       { name: "Calendar",          href: "/calendar",            icon: CalendarDays,   permission: "dashboard"          },
-      { name: "Team Chat",         href: "/chat",               icon: MessageCircle,  permission: "chat"               },
+      { name: "Team Chat",         href: "/chat",               icon: MessageCircle,  permission: "chat", staffVisible: true },
       { name: "Bulk Invoices",     href: "/bulk-invoices",      icon: Layers,          permission: "bulk_invoices"      },
       { name: "Portal Submissions",href: "/portal-submissions", icon: Globe,           permission: "portal_submissions" },
     ],

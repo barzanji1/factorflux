@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import type { Announcement, AnnouncementInput, AnnouncementPage, AnnouncementView } from "@shared/announcements";
 import { ANNOUNCEMENT_PAGE_SIZE } from "@shared/announcements";
@@ -24,8 +24,18 @@ export function useAnnouncements(view: AnnouncementView, enabled = true) {
     queryFn: ({ pageParam }) => request<AnnouncementPage>(`/api/announcements?view=${view}&offset=${pageParam}&limit=${ANNOUNCEMENT_PAGE_SIZE}`),
     getNextPageParam: page => page.nextOffset,
     staleTime: 0,
-    refetchInterval: enabled ? 30000 : false,
+    refetchInterval: enabled ? 5000 : false,
     refetchOnWindowFocus: "always",
+  });
+}
+
+export function useAnnouncement(id: number | null) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["/api/announcements", user?.id, user?.role, "detail", id],
+    enabled: !!user?.id && id !== null,
+    queryFn: () => request<Announcement>(`/api/announcements/${id}`),
+    staleTime: 0, refetchInterval: 5000, retry: false,
   });
 }
 

@@ -854,6 +854,8 @@ export const announcements = pgTable("announcements", {
   authorId: varchar("author_id").references(() => users.id, { onDelete: "set null" }),
   authorName: text("author_name").notNull(),
   message: text("message").notNull(),
+  headline: text("headline"),
+  highlightColor: varchar("highlight_color", { enum: ["teal", "green", "amber", "red", "blue", "purple"] }),
   severity: varchar("severity", { enum: ["green", "amber", "red"] }).notNull(),
   status: varchar("status", { enum: ["pending", "approved", "rejected"] }).notNull(),
   persistent: boolean("persistent").default(false).notNull(),
@@ -870,6 +872,7 @@ export const announcements = pgTable("announcements", {
   index("announcements_author_idx").on(table.authorId, table.createdAt),
   check("announcements_severity_check", sql`${table.severity} in ('green','amber','red')`),
   check("announcements_status_check", sql`${table.status} in ('pending','approved','rejected')`),
+  check("announcements_highlight_check", sql`${table.highlightColor} is null or ${table.highlightColor} in ('teal','green','amber','red','blue','purple')`),
   check("announcements_expiry_check", sql`(${table.persistent} and ${table.expiresAt} is null) or (not ${table.persistent} and ${table.expiresAt} is not null)`),
 ]);
 

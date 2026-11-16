@@ -85,12 +85,12 @@ function StartupIndicator() {
 function Router() {
   useTheme(); // Initialize theme
   const [location, navigate] = useLocation();
-  const { user, permissions, permissionsLoaded, isLoading } = useAuth();
+  const { user, permissionsLoaded, isLoading } = useAuth();
   useEffect(() => {
     if (location !== "/login") document.documentElement.removeAttribute("data-login-entry");
   }, [location]);
   const chatPageActive = location === "/chat" && !!user && !isLoading &&
-    (user.role === "admin" || (permissionsLoaded && permissions.includes("chat")));
+    (user.role === "admin" || permissionsLoaded);
   const [accessDenied, setAccessDenied] = useState(false);
   useEffect(() => {
     const handleAccessDenied = () => setAccessDenied(true);
