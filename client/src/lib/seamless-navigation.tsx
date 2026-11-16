@@ -40,17 +40,24 @@ const controller = createNavigationController({
   },
   render: commit => flushSync(commit),
   async present(commit, href, from, isCurrent) {
-    if (publicPage(from) || publicPage(href) || pathname(href) === pathname(from) ||
-      typeof document.startViewTransition !== "function") {
+    const staffSignIn = pathname(from) === "/login" && pathname(href) === "/";
+    const root = document.documentElement;
+    if (((publicPage(from) || publicPage(href)) && !staffSignIn) ||
+      pathname(href) === pathname(from) ||
+      typeof document.startViewTransition !== "function" ||
+      (staffSignIn && matchMedia("(prefers-reduced-motion: reduce)").matches)) {
       activeTransition?.skipTransition();
       activeTransition = undefined;
-      delete document.documentElement.dataset.pageTransition;
+      delete root.dataset.pageTransition;
+      delete root.dataset.loginTransition;
       commit();
       return;
     }
     const previous = new Set(queryClient.getQueryCache().findAll({ type: "active" }).map(query => query.queryHash));
     activeTransition?.skipTransition();
-    document.documentElement.dataset.pageTransition = "holding";
+    root.dataset.pageTransition = "holding";
+    if (staffSignIn) root.dataset.loginTransition = "fade";
+    else delete root.dataset.loginTransition;
     let transition: ReturnType<Document["startViewTransition"]>;
     try {
       transition = document.startViewTransition(async () => {
@@ -58,12 +65,21 @@ const controller = createNavigationController({
         await settleDestination(previous, isCurrent);
       });
     } catch {
-      delete document.documentElement.dataset.pageTransition;
+      delete root.dataset.pageTransition;
+      delete root.dataset.loginTransition;
       commit();
       return;
     }
     activeTransition = transition;
-    void transition.finished.catch(() => undefined);
+    const finish = () => {
+      if (activeTransition !== transition) return;
+      activeTransition = undefined;
+      delete root.dataset.pageTransition;
+      delete root.dataset.loginTransition;
+    };
+    // Keep the login-only duration active until the actual fade finishes,
+    // not merely until the dashboard mounts behind the native snapshot.
+    void transition.finished.then(finish, finish);
     void transition.ready.catch(() => undefined);
     try {
       // Native snapshots retain the last painted page, not a cloned React tree.
@@ -71,8 +87,7 @@ const controller = createNavigationController({
       await transition.updateCallbackDone;
     } finally {
       if (activeTransition === transition) {
-        delete document.documentElement.dataset.pageTransition;
-        activeTransition = undefined;
+        delete root.dataset.pageTransition;
       }
     }
     // A newer navigation or reduced-motion policy may skip the animation.

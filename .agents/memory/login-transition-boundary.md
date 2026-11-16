@@ -1,13 +1,13 @@
 ---
 name: Login entry and navigation
-description: No fullscreen sign-in effects; avoid initial and destination loading flashes.
+description: Subtle native sign-in crossfade, no fullscreen decorative effects, and no startup or destination loading flashes.
 ---
 
-Do not reintroduce the outward Sign In ripple, a cloned glass card, or a fullscreen success overlay. Keep the card-local hover effects separate and unchanged.
+Successful staff sign-in may use a subtle native opacity crossfade into the prepared dashboard. Do not reintroduce the outward Sign In ripple, a cloned glass card, or a fullscreen success overlay. Keep the card-local hover effects separate and unchanged.
 
-**Why:** The user explicitly removed the outward ripple because it was affecting the page after repeated reports of sign-in glitches.
+**Why:** The user removed the outward ripple after repeated sign-in glitches, then explicitly requested a smooth, gradual fade because the production sign-on felt abrupt. The new fade request supersedes the earlier no-animation direction, not the ban on ripples or copied overlays.
 
-**How to apply:** Authenticate normally, prepare the destination while the real login form stays steady, and navigate without decorative success animation. Preserve cancellation when the user leaves and all server/route permission checks.
+**How to apply:** Authenticate normally and prepare the destination while the real form stays steady. Scope the longer opacity transition to staff login into the dashboard; keep ordinary navigation timing unchanged. Retain the login snapshot until initial destination data settles within a bounded wait. Keep transition styling alive through animation completion, clean it up on interruption, and skip animation for reduced motion or unsupported browsers. Preserve cancellation and every server/route permission check.
 
 The login page intentionally loads eagerly. Anonymous home visits should enter login without first mounting the authenticated loading shell.
 

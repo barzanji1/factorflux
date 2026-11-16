@@ -126,6 +126,9 @@ try {
   if (process.env.SIGNIN_REDUCED_MOTION === "1") await send("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-reduced-motion", value: "reduce" }],
   });
+  if (process.env.SIGNIN_NO_VIEW_TRANSITION === "1") await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: "document.startViewTransition = undefined;",
+  });
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `(()=>{
     window.__entryFrames=[];let count=0;
     const sample=()=>{
@@ -166,6 +169,11 @@ try {
       const r=card?.getBoundingClientRect();
       window.__signinFrames.push({
         ms:Math.round(performance.now()-start),path:location.pathname,
+        loginFade:document.documentElement.dataset.loginTransition==='fade',
+        holding:document.documentElement.dataset.pageTransition==='holding',
+        oldPageOpacity:document.documentElement.dataset.loginTransition==='fade'?Number(getComputedStyle(document.documentElement,'::view-transition-old(root)').opacity):null,
+        newPageOpacity:document.documentElement.dataset.loginTransition==='fade'?Number(getComputedStyle(document.documentElement,'::view-transition-new(root)').opacity):null,
+        fadeDuration:document.documentElement.dataset.loginTransition==='fade'?getComputedStyle(document.documentElement,'::view-transition-new(root)').animationDuration:null,
         overlay:!!overlay,opacity:overlay?Number(getComputedStyle(overlay).opacity):null,
         outwardRings:document.querySelectorAll('.ff-login-transition-ring').length,
         card:!!card,cardHeight:r?.height,cardTop:r?.top,
@@ -371,6 +379,18 @@ try {
   assert.equal(report.finalPath, "/", "Sign-in did not reach the dashboard.");
   assert(report.firstDashboard, "Dashboard never rendered after sign-in.");
   assert.equal(frames.at(-1)?.overlay, false, "Login decoration remained over the dashboard.");
+  assert.equal(frames.at(-1)?.loginFade, false, "Sign-in fade state was not cleaned up.");
+  if (process.env.SIGNIN_EXPECT_FADE === "1") {
+    const fading = frames.filter(frame => frame.loginFade && !frame.holding);
+    if (process.env.SIGNIN_REDUCED_MOTION === "1" || process.env.SIGNIN_NO_VIEW_TRANSITION === "1") {
+      assert.equal(fading.length, 0, "Reduced-motion or unsupported browser unexpectedly animated.");
+    } else {
+      assert(fading.length >= 8, "Successful sign-in did not crossfade gradually.");
+      assert(fading.some(frame => frame.fadeDuration?.split(',').some(duration => duration.trim() === "0.65s")), "Login used the fast navigation duration instead of its gentle fade.");
+      assert(fading.some(frame => frame.oldPageOpacity > 0.05 && frame.oldPageOpacity < 0.95), "The old login did not fade through intermediate opacity.");
+      assert(fading.some(frame => frame.newPageOpacity > 0.05 && frame.newPageOpacity < 0.95), "The dashboard did not fade through intermediate opacity.");
+    }
+  }
   if (process.env.SIGNIN_EXPECT_NO_EFFECT === "1") {
     assert(frames.every(frame => !frame.overlay && frame.outwardRings === 0), "A removed sign-in effect still appeared.");
     assert(report.entryFrames.every(frame => !frame.loading && !frame.shell), "Anonymous entry flashed a loading screen.");
