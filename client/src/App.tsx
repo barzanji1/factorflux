@@ -13,6 +13,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PermissionWatcher } from "@/components/PermissionWatcher";
 import { useTheme } from "@/hooks/useTheme";
+import { StartupSplash } from "@/components/loading/StartupSplash";
+import { NavigationPending } from "@/components/loading/NavigationPending";
 const NotFound = lazyPage([], () => import("@/pages/not-found"));
 const AccessDenied = lazyPage([], () => import("@/pages/access-denied"));
 const Landing = lazyPage(["/landing"], () => import("@/pages/landing"));
@@ -77,10 +79,6 @@ const ClientEmailPage = lazyPage(["/client-email", "/email-log"], () => import("
 const ItSupport = lazyPage(["/it-support"], () => import("@/pages/it-support"));
 const TeamChatWorkspace = lazy(() => import("@/pages/chat").then(module => ({ default: module.TeamChatWorkspace })));
 const RouteLoading = lazy(() => import("@/components/layout/route-loading"));
-
-function StartupIndicator() {
-  return <div role="status" className="grid min-h-screen place-items-center text-sm text-teal-700">Loading…</div>;
-}
 
 function Router() {
   useTheme(); // Initialize theme
@@ -413,7 +411,7 @@ function Router() {
     return (
       <>
         <PermissionWatcher />
-        <Suspense fallback={<StartupIndicator />}>{routes}</Suspense>
+        <Suspense fallback={<StartupSplash />}>{routes}</Suspense>
       </>
     );
   }
@@ -422,7 +420,7 @@ function Router() {
     <div className={`${location === "/" || location === "/invoices" || location.startsWith("/invoices/") || location === "/clients" || location === "/brokers" || location === "/documents" || location === "/tasks" || location === "/help" || location === "/calendar" || location === "/chat" || location === "/bulk-invoices" || location === "/portal-submissions" || /^\/(?:clients|carriers|brokers)\/\d+\/?$/.test(location) ? "ff-neu-root" : "ff-app-shell"} ff-financial-dashboard-shell ff-institutional-root relative flex h-screen flex-col overflow-hidden`}>
       <PermissionWatcher />
       <div className={chatPageActive ? "hidden" : "relative min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
-        <Suspense fallback={<Suspense fallback={<StartupIndicator />}><RouteLoading /></Suspense>}>
+        <Suspense fallback={<Suspense fallback={<StartupSplash />}><RouteLoading /></Suspense>}>
           {routes}
         </Suspense>
       </div>
@@ -437,10 +435,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NavigationCoordinator />
+        <NavigationPending />
         <TooltipProvider>
           <Toaster />
           <CustomerBrandHead />
-          <Suspense fallback={<StartupIndicator />}><Router /></Suspense>
+          <Suspense fallback={<StartupSplash />}><Router /></Suspense>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

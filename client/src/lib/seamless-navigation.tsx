@@ -2,7 +2,6 @@ import { useLayoutEffect, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { queryClient } from "./queryClient";
 import { loadPage } from "./lazy-page";
 import { createNavigationController, navigationPath as pathname, navigationSearch, type NavigationOptions } from "./navigation-controller";
 
@@ -12,23 +11,13 @@ let writing = false;
 let listening = false;
 let subscribers = 0;
 let activeTransition: { skipTransition(): void } | undefined;
-
-// Wait only for newly mounted, uncached destination queries. Existing chat
-// polling and background refreshes must never hold navigation hostage.
-async function settleDestination(previous: Set<string>, isCurrent: () => boolean) {
-  const deadline = performance.now() + 1500;
-  let quiet = 0;
-  while (isCurrent() && performance.now() < deadline) {
-    const pending = queryClient.getQueryCache().findAll({ type: "active" }).some(query =>
-      !previous.has(query.queryHash) && query.state.data === undefined &&
-      (query.state.fetchStatus === "fetching" || query.state.fetchStatus === "paused"));
-    // A few older pages still use local fetch state instead of React Query.
-    const localLoading = [...document.querySelectorAll("main [role='status']")].some(element =>
-      /^(?:loading|fetching|please wait)\b/i.test(element.textContent?.trim() ?? ""));
-    quiet = pending || localLoading ? 0 : quiet + 1;
-    if (quiet >= 2) return;
-    await new Promise(resolve => setTimeout(resolve, 20));
-  }
+let pendingHref: string | null = null;
+const pendingListeners = new Set<() => void>();
+export function usePendingNavigation() {
+  return useSyncExternalStore(listener => {
+    pendingListeners.add(listener);
+    return () => { pendingListeners.delete(listener); };
+  }, () => pendingHref, () => null);
 }
 
 const controller = createNavigationController({
@@ -39,7 +28,12 @@ const controller = createNavigationController({
     finally { writing = false; }
   },
   render: commit => flushSync(commit),
-  async present(commit, href, from, isCurrent) {
+  pending(href) {
+    if (pendingHref === href) return;
+    pendingHref = href;
+    for (const listener of pendingListeners) listener();
+  },
+  async present(commit, href, from) {
     const staffSignIn = pathname(from) === "/login" && pathname(href) === "/";
     const root = document.documentElement;
     if (((publicPage(from) || publicPage(href)) && !staffSignIn) ||
@@ -53,16 +47,16 @@ const controller = createNavigationController({
       commit();
       return;
     }
-    const previous = new Set(queryClient.getQueryCache().findAll({ type: "active" }).map(query => query.queryHash));
     activeTransition?.skipTransition();
     root.dataset.pageTransition = "holding";
     if (staffSignIn) root.dataset.loginTransition = "fade";
     else delete root.dataset.loginTransition;
     let transition: ReturnType<Document["startViewTransition"]>;
     try {
-      transition = document.startViewTransition(async () => {
+      transition = document.startViewTransition(() => {
         commit();
-        await settleDestination(previous, isCurrent);
+        // Reveal the destination's structural loading state immediately.
+        // Data queries run independently; polling must never delay a page.
       });
     } catch {
       delete root.dataset.pageTransition;

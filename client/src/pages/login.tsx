@@ -23,6 +23,10 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { login } = useAuth();
+  const warmDestination = () => {
+    // Download code on form intent; protected data still requires authentication.
+    void Promise.all([loadPage("/"), loadStaffRoute()]).catch(() => undefined);
+  };
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -119,7 +123,7 @@ export default function LoginPage() {
           </header>
           <section className="ff-login-content">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="ff-login-form">
+              <form onSubmit={form.handleSubmit(onSubmit)} onFocusCapture={warmDestination} className="ff-login-form">
                 <FormField
                   control={form.control}
                   name="username"

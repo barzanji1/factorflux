@@ -8,11 +8,12 @@ function deferred<T>() {
   const promise = new Promise<T>((ok, fail) => { resolve = ok; reject = fail; });
   return { promise, resolve, reject };
 }
-function fixture() {
+function fixture(pending?: (href: string | null) => void) {
   const events: string[] = [];
   const writes: Array<[string, NavigationOptions]> = [];
   const failures: unknown[] = [];
   const controller = createNavigationController({
+    pending,
     read: () => "/invoices",
     write: (href, options) => { writes.push([href, options]); events.push("history"); },
     render: commit => commit(),
@@ -22,6 +23,55 @@ function fixture() {
   controller.subscribe(() => events.push(`paint:${controller.snapshot()}`));
   return { controller, events, writes, failures };
 }
+test("loading feedback starts before route preparation and clears on commit", async () => {
+  const values: Array<string | null> = [];
+  const { controller } = fixture(value => values.push(value));
+  const prepared = deferred<void>();
+  controller.configure(() => prepared.promise);
+  values.length = 0;
+  const opening = controller.navigate("/brokers");
+  assert.deepEqual(values, ["/brokers"]);
+  prepared.resolve();
+  await opening;
+  assert.equal(controller.snapshot(), "/brokers");
+  assert.equal(values.at(-1), null);
+});
+test("an older request cannot dismiss the latest page's loading feedback", async () => {
+  const values: Array<string | null> = [];
+  const { controller } = fixture(value => values.push(value));
+  const old = deferred<void>(), latest = deferred<void>();
+  controller.configure(href => href === "/brokers" ? old.promise : latest.promise);
+  const first = controller.navigate("/brokers");
+  const second = controller.navigate("/documents");
+  old.resolve();
+  await first;
+  assert.equal(values.at(-1), "/documents");
+  latest.resolve();
+  await second;
+  assert.equal(values.at(-1), null);
+});
+test("failed, cancelled, and source-page requests clear loading feedback", async () => {
+  const values: Array<string | null> = [];
+  const { controller } = fixture(value => values.push(value));
+  controller.configure(async () => { throw new Error("Network unavailable"); });
+  await controller.navigate("/brokers");
+  assert.equal(values.at(-1), null);
+  const prepared = deferred<void>();
+  const stop = controller.configure(() => prepared.promise);
+  const abandoned = controller.navigate("/documents");
+  stop();
+  assert.equal(values.at(-1), null);
+  prepared.resolve();
+  await abandoned;
+  const waiting = deferred<void>();
+  controller.configure(() => waiting.promise);
+  const pending = controller.navigate("/brokers");
+  await controller.navigate("/invoices");
+  assert.equal(values.at(-1), null);
+  waiting.resolve();
+  await pending;
+  assert.equal(controller.snapshot(), "/invoices");
+});
 test("routing preserves query delimiters, encoded values and fragments", () => {
   assert.equal(navigationPath("/reports?tab=aging#totals"), "/reports");
   assert.equal(navigationSearch("/help?search=why?now#answer?ignored"), "?search=why?now");

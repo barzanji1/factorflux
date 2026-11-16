@@ -406,6 +406,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                       type="button"
                       onClick={() => navigateTo(item.href)}
                       onPointerEnter={() => preloadPage(item.href)}
+                      onPointerDown={() => preloadPage(item.href)}
                       onFocus={() => preloadPage(item.href)}
                       aria-current={active ? "page" : undefined}
                       aria-busy={pendingPath === item.href}

@@ -15,6 +15,7 @@ export function createNavigationController(deps: {
   write: (href: string, options: NavigationOptions) => void;
   render: (commit: Commit) => void;
   present: (commit: Commit, href: string, from: string, isCurrent: () => boolean) => Promise<void>;
+  pending?: (href: string | null) => void;
   error: (error: unknown) => void;
 }) {
   let current: string | undefined;
@@ -24,10 +25,12 @@ export function createNavigationController(deps: {
   const snapshot = () => current ??= deps.read();
   const configure = (next: Prepare) => {
     ++sequence;
+    deps.pending?.(null);
     prepare = next;
     return () => {
       if (prepare === next) {
         ++sequence;
+        deps.pending?.(null);
         prepare = async () => {};
       }
     };
@@ -35,7 +38,11 @@ export function createNavigationController(deps: {
   const navigate = async (href: string, options: NavigationOptions = {}, traversed = false) => {
     const from = snapshot();
     const request = ++sequence;
-    if (href === from) return;
+    if (href === from) {
+      deps.pending?.(null);
+      return;
+    }
+    deps.pending?.(href);
     try {
       const commitAccess = await prepare(href, from);
       if (request !== sequence) return;
@@ -45,6 +52,7 @@ export function createNavigationController(deps: {
         deps.render(() => {
           if (!traversed) deps.write(href, options);
           current = href;
+          deps.pending?.(null);
           listeners.forEach(listener => listener());
         });
       }, href, from, () => request === sequence);
@@ -52,6 +60,8 @@ export function createNavigationController(deps: {
       if (request !== sequence) return;
       if (traversed) deps.write(from, { replace: true });
       deps.error(error);
+    } finally {
+      if (request === sequence) deps.pending?.(null);
     }
   };
   return {

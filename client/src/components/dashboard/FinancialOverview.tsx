@@ -14,6 +14,7 @@ import { ArrowRight, CircleDollarSign, ClipboardCheck, Clock3, RotateCcw, Trendi
 import { NeuBadge, NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { KpiCarousel } from "./KpiCarousel";
+import { DashboardOverviewSkeleton } from "@/components/loading/DashboardOverviewSkeleton";
 import type { DashboardFinancial } from "@shared/agent-dashboard";
 
 export type FinancialDashboardData = DashboardFinancial;
@@ -76,10 +77,6 @@ export function CylinderBar(props: { x?: number; y?: number; width?: number; hei
       <ellipse cx={x + width / 2} cy={y + height} rx={width / 2} ry={Math.max(1, radius * 0.52)} fill="#167f86" opacity="0.38" />
     </g>
   );
-}
-
-function ChartSkeleton() {
-  return <div className="ff-neu-chart-skeleton" aria-label="Loading financial chart"><span /><span /><span /><span /><span /></div>;
 }
 
 function FinancialCharts({ months }: { months: FinancialDashboardData["months"] }) {
@@ -162,18 +159,7 @@ function FinancialCharts({ months }: { months: FinancialDashboardData["months"] 
 }
 
 function FinancialChartsLoading() {
-  return (
-    <section className="mt-7" aria-labelledby="financial-overview-heading" data-testid="financial-overview-loading" aria-label="Loading financial overview">
-      <div className="mb-4">
-        <p className="ff-neu-eyebrow">Capital in motion</p>
-        <h2 id="financial-overview-heading" className="ff-neu-section-title">Financial Overview</h2>
-      </div>
-      <div className="grid gap-5 xl:grid-cols-[1fr_1.15fr]">
-        <NeuCard pressed className="ff-neu-chart-card"><ChartSkeleton /></NeuCard>
-        <NeuCard pressed className="ff-neu-chart-card"><ChartSkeleton /></NeuCard>
-      </div>
-    </section>
-  );
+  return <DashboardOverviewSkeleton part="charts" />;
 }
 
 const metrics = [
@@ -183,10 +169,6 @@ const metrics = [
   { key: "aging60Plus", label: "Aging 60+", href: "/reports?tab=aging", icon: Clock3 },
   { key: "fundedThisWeek", label: "Funded This Week", href: "/invoices?status=funded", icon: TrendingUp, money: true },
 ] as const;
-
-function MetricSkeleton() {
-  return <div className="ff-neu-metric-skeleton" aria-hidden="true"><span /><span /><span /></div>;
-}
 
 export function FinancialSummary({ data, isLoading, error, onRetry, agentName, children }: Props) {
   const metricCards = data ? metrics.map(metric => {
@@ -226,7 +208,7 @@ export function FinancialSummary({ data, isLoading, error, onRetry, agentName, c
             {data && <span className="ff-neu-live-dot" aria-label="Live data" />}
           </div>
         </div>
-        {isLoading ? <div className="ff-neu-metrics-viewport"><div className="ff-neu-metrics-track">{metrics.map(metric => <MetricSkeleton key={metric.key} />)}</div></div> :
+        {isLoading ? <DashboardOverviewSkeleton part="metrics" /> :
           error ? <NeuNotice severity="block" role="alert" className="flex items-center justify-between gap-3"><span>Financial summary could not be loaded.</span><NeuButton onClick={onRetry} className="!min-h-9 !px-3"><RotateCcw className="h-4 w-4" /> Retry</NeuButton></NeuNotice> :
           data && metricCards ? <KpiCarousel items={metricCards} speedPixelsPerSecond={30} /> : null}
       </section>

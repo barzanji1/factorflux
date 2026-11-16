@@ -43,15 +43,21 @@ test("remembered sessions and deep links do not paint a login scene", () => {
   assert.equal(entry("/", null, null, true).dataset.loginEntry, "");
 });
 
-test("critical startup paint matches the actual login background without a loading overlay", () => {
-  const css = readFileSync("client/src/pages/login.css", "utf8");
-  for (const value of [
-    "brightness(0.62) saturate(0.76) contrast(1.05)",
-    "linear-gradient(135deg, rgba(19, 45, 63, 0.15), rgba(25, 51, 72, 0.3))",
-  ]) {
-    assert.ok(html.includes(value));
-    assert.ok(css.includes(value));
-  }
-  assert.match(html, /#root:empty::before/);
-  assert.doesNotMatch(html, /Loading|spinner/);
+test("a self-contained logo splash exists before application JavaScript", () => {
+  const root = html.slice(html.indexOf('<div id="root">'), html.indexOf('<script type="module"'));
+  assert.match(root, /class="ff-startup-splash"/);
+  assert.match(root, /role="status"/);
+  assert.match(root, /<svg[^>]*data-ff-startup-mark/);
+  assert.match(root, /<polygon[^>]*points=/);
+  assert.match(html, /\.ff-startup-splash\s*\{/);
+  assert.doesNotMatch(html, /#root:empty::before/);
+  assert.ok(html.indexOf(".ff-startup-splash {") < html.indexOf('<div id="root">'));
+});
+test("React startup fallback matches the inline splash rather than flashing bare loading text", () => {
+  const component = readFileSync("client/src/components/loading/StartupSplash.tsx", "utf8");
+  assert.match(component, /ff-startup-splash/);
+  assert.match(component, /data-ff-startup-mark/);
+  const app = readFileSync("client/src/App.tsx", "utf8");
+  assert.doesNotMatch(app, /StartupIndicator|>Loading…</);
+  assert.match(app, /fallback=\{<StartupSplash \/>/);
 });

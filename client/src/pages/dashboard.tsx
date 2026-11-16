@@ -204,7 +204,7 @@ export default function Dashboard() {
         <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
       </NeuButton>}
     >
-      <div className="ff-neu-dashboard" data-testid="agent-dashboard">
+      <div className="ff-neu-dashboard" data-testid="agent-dashboard" data-dashboard-loading={financialLoading ? "" : undefined}>
         <p role="status" className="sr-only" aria-live="polite">{refreshStatus}</p>
 
         <TeamAnnouncementBanner compact />

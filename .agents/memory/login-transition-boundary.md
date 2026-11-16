@@ -7,11 +7,11 @@ Successful staff sign-in may use a subtle native opacity crossfade into the prep
 
 **Why:** The user removed the outward ripple after repeated sign-in glitches, then explicitly requested a smooth, gradual fade because the production sign-on felt abrupt. The new fade request supersedes the earlier no-animation direction, not the ban on ripples or copied overlays.
 
-**How to apply:** Authenticate normally and prepare the destination while the real form stays steady. Scope the longer opacity transition to staff login into the dashboard; keep ordinary navigation timing unchanged. Retain the login snapshot until initial destination data settles within a bounded wait. Keep transition styling alive through animation completion, clean it up on interruption, and skip animation for reduced motion or unsupported browsers. Preserve cancellation and every server/route permission check.
+**How to apply:** Authenticate normally and prepare destination code while the real form stays steady. Scope the longer opacity transition to staff login into the dashboard; keep ordinary navigation timing unchanged. Reveal a structural dashboard skeleton immediately rather than holding the login snapshot for API completion. Keep transition styling alive through animation completion, clean it up on interruption, and skip animation for reduced motion or unsupported browsers. Preserve cancellation and every server/route permission check.
 
 The login page intentionally loads eagerly. Anonymous home visits should enter login without first mounting the authenticated loading shell.
 
-**Why:** The user reported the brief “Loading…” screen before the sign-in form. Making login lazy introduced a visible startup state despite loading approximately the same total login dependencies.
+**Why:** The user reported a bare “Loading…” screen before sign-in. They subsequently explicitly requested a pure HTML/CSS FactorFlux logo splash before JavaScript loads; that intentional branded state is allowed, not an unstyled loading flash.
 
 **How to apply:** Keep authenticated pages lazy and treat cached-session hints only as entry-page selection, never authentication. Preserve remembered-session and deep-link behavior.
 

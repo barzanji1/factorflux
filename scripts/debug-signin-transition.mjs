@@ -52,6 +52,11 @@ browser.stdio[4].on("data", chunk => {
             responseHeaders: event.responseHeaders.filter(h => !["content-length", "content-encoding"].includes(h.name.toLowerCase())),
             body: Buffer.from(JSON.stringify(result)).toString("base64") });
         } else {
+          const interceptedPath = new URL(event.request.url).pathname;
+          if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") {
+            if (interceptedPath.startsWith("/api/agent-dashboard/")) await wait(1800);
+            if (/^\/assets\/index-[\w-]+\.js$/.test(interceptedPath)) await wait(700);
+          }
           const permissionsRequest = new URL(event.request.url).pathname === "/api/auth/permissions";
           if (permissionsRequest && delayPermissions) await wait(400);
           if (!permissionsRequest && process.env.SIGNIN_DELAY_DATA === "1") await wait(700);
@@ -89,7 +94,7 @@ const evaluate = async expression => {
   assert(!result.exceptionDetails, "Browser evaluation failed.");
   return result.result.value;
 };
-const click = async selector => {
+const click = async (selector, hoverDelay = 0) => {
   if (selector.startsWith("aside")) {
     const rail = await evaluate("(()=>{const r=document.querySelector('aside').getBoundingClientRect();return{x:r.x+20,y:r.y+150}})()");
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...rail });
@@ -109,17 +114,24 @@ const click = async selector => {
   }
   assert(point, `Pointer target blocked: ${selector}`);
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+  if (hoverDelay) await wait(hoverDelay);
+  const clickTime = await evaluate("performance.now()");
   await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", clickCount: 1 });
+  return clickTime;
 };
 try {
   await mkdir(output, { recursive: true });
   const target = await send("Target.createTarget", { url: "about:blank" }, false);
   session = (await send("Target.attachToTarget", { targetId: target.targetId, flatten: true }, false)).sessionId;
   await send("Page.enable"); await send("Runtime.enable"); await send("Network.enable");
-  if (process.env.SIGNIN_TEST_EMPLOYEE === "1") await send("Fetch.enable", {
-    patterns: [{ urlPattern: "*/api/auth/login", requestStage: "Response" }],
-  });
+  const initialInterceptions = [];
+  if (process.env.SIGNIN_TEST_EMPLOYEE === "1") initialInterceptions.push({ urlPattern: "*/api/auth/login", requestStage: "Response" });
+  if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") initialInterceptions.push(
+    { urlPattern: "*/assets/index-*.js", requestStage: "Request" },
+    { urlPattern: "*/api/agent-dashboard/*", requestStage: "Request" },
+  );
+  if (initialInterceptions.length) await send("Fetch.enable", { patterns: initialInterceptions });
   await send("Emulation.setDeviceMetricsOverride", {
     width: process.env.SIGNIN_MOBILE === "1" ? 390 : 1365, height: 900, deviceScaleFactor: 1, mobile: false,
   });
@@ -130,10 +142,13 @@ try {
     source: "document.startViewTransition = undefined;",
   });
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `(()=>{
+    performance.setResourceTimingBufferSize(5000);
     window.__entryFrames=[];let count=0;
     const sample=()=>{
       const login=!!document.querySelector('#ff-login-email');
       window.__entryFrames.push({ms:Math.round(performance.now()),login,loading:document.body?.innerText.trim()==='Loading…',
+        splash:!!document.querySelector('.ff-startup-splash'),
+        logoReady:!!document.querySelector('.ff-startup-splash svg')||!!document.querySelector('.ff-startup-splash img')?.naturalWidth,
         criticalScene:document.documentElement.hasAttribute('data-login-entry'),
         background:document.body?getComputedStyle(document.body).backgroundColor:null,
         shell:!!document.querySelector('.ff-financial-dashboard-shell')});
@@ -144,8 +159,13 @@ try {
     offline: false, latency: 150, downloadThroughput: 150000, uploadThroughput: 750000, connectionType: "cellular4g",
   });
   await send("Page.navigate", { url: `${base}${process.env.SIGNIN_ENTRY_PATH || "/login"}` });
+  let splashCaptured = false;
   for (let i = 0; i < 120; i++) {
     if (await evaluate("!!document.querySelector('#ff-login-email')")) break;
+    if (!splashCaptured && process.env.SIGNIN_VERIFY_LOADING_STATES === "1" && await evaluate("!!document.querySelector('.ff-startup-splash svg')")) {
+      await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/startup-splash.jpg`, Buffer.from(r.data, "base64")));
+      splashCaptured = true;
+    }
     await wait(100);
   }
   assert(await evaluate("!!document.querySelector('#ff-login-email')"), "Login did not load.");
@@ -178,6 +198,8 @@ try {
         outwardRings:document.querySelectorAll('.ff-login-transition-ring').length,
         card:!!card,cardHeight:r?.height,cardTop:r?.top,
         shell:!!shell,dashboard:!!dashboard,
+        dashboardLoading:!!document.querySelector('[data-dashboard-loading]'),
+        dashboardSkeleton:!!document.querySelector('[data-dashboard-overview-loading]'),
         loading:!!document.querySelector('[data-route-loading]'),
         documentHeight:document.documentElement.scrollHeight,
         bodyBackground:getComputedStyle(document.body).backgroundColor
@@ -186,6 +208,15 @@ try {
     };requestAnimationFrame(sample);
   })()`);
   await click(".ff-login-submit");
+  if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") {
+    for (let i = 0; i < 100; i++) {
+      if (await evaluate("!!document.querySelector('[data-dashboard-overview-loading]')&&!document.documentElement.dataset.loginTransition")) {
+        await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/dashboard-loading.jpg`, Buffer.from(r.data, "base64")));
+        break;
+      }
+      await wait(50);
+    }
+  }
   await wait(10500);
   const frames = await evaluate("window.__signinFrames");
   console.log(JSON.stringify({ signInCheck: {
@@ -284,13 +315,17 @@ try {
         window.__navigationEpoch=(window.__navigationEpoch||0)+1;const epoch=window.__navigationEpoch;
         (function sample(){window.__navigationFrames.push({
           path:location.pathname,loading:!!document.querySelector('[data-route-loading]'),
+          pending:!!document.querySelector('[data-navigation-pending]'),
           checking:document.body.innerText.includes('Checking page access'),
           holding:document.documentElement.dataset.pageTransition==='holding',
           loadingCopy:document.querySelector('main')?.innerText.match(/\\bLoading\\b[^\\n]*/g)?.slice(0,3)||[],
         sidebarWidth:document.querySelector('aside')?.getBoundingClientRect().width,
           documentHeight:document.documentElement.scrollHeight
         });if(window.__navigationActive&&window.__navigationEpoch===epoch)requestAnimationFrame(sample)})()})()`);
-      await click(selector);
+      const clickTime = await click(selector, process.env.SIGNIN_VERIFY_LOADING_STATES === "1" ? 250 : 0);
+      if (label === "Invoices" && process.env.SIGNIN_VERIFY_LOADING_STATES === "1") {
+        await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/navigation-pending.jpg`, Buffer.from(r.data, "base64")));
+      }
       for (let i = 0; i < 200; i++) {
         if (await evaluate(`location.pathname===${JSON.stringify(path.split("?")[0])}`)) break;
         await wait(50);
@@ -303,12 +338,19 @@ try {
       await wait(150);
       const samples = await evaluate("window.__navigationActive=false;window.__navigationFrames");
       const detail = { label, frames: samples.length,
+        pendingFrames: samples.filter(f => f.pending).length,
         fallbackFrames: samples.filter(f => f.loading || f.checking).length,
         dataLoadingFrames: samples.filter(f => !f.holding && f.loadingCopy.length).length,
         loadingCopy: [...new Set(samples.filter(f => !f.holding).flatMap(f => f.loadingCopy))],
         heldFrames: samples.filter(f => f.holding).length,
         overflowFrames: samples.filter(f => f.documentHeight > 900).length };
+      if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") {
+        const prefix = `/assets/${path.split("/")[1]}-`;
+        detail.intentPrefetched = await evaluate(`performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname.startsWith(${JSON.stringify(prefix)})&&r.name.endsWith('.js')&&r.startTime<${clickTime})`);
+        assert(detail.intentPrefetched, `${label} did not request its chunk before the sidebar click`);
+      }
       navigation.push(detail);
+      if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") assert(detail.pendingFrames > 0, `${label} gave no immediate loading feedback`);
       assert.equal(detail.fallbackFrames, 0, `${label} exposed an intermediate loading page`);
       assert.equal(detail.overflowFrames, 0, `${label} overflowed the document`);
       if (process.env.SIGNIN_ASSERT_DATA_NOFLASH === "1") assert.equal(detail.dataLoadingFrames, 0, `${label} showed a data-loading flash`);
@@ -398,6 +440,17 @@ try {
   }
   if (process.env.SIGNIN_EXPECT_CONTINUITY === "1") {
     assert.equal(report.uncoveredLoadingFrames, 0, "Login uncovered the loading route before the dashboard committed.");
+  }
+  if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") {
+    assert(report.entryFrames.some(frame => frame.splash && frame.logoReady && !frame.login), "Inline logo splash was not visible before the application loaded.");
+    const structural = frames.find(frame => frame.dashboard && frame.dashboardSkeleton && frame.dashboardLoading);
+    assert(structural, "Dashboard did not reveal a structural skeleton while its API was delayed.");
+    const populated = frames.find(frame => frame.dashboard && !frame.dashboardLoading);
+    assert(populated && populated.ms - structural.ms > 500, "Dashboard presentation waited for its delayed data.");
+    const requests = report.resources.filter(resource => /^\/api\/agent-dashboard\/(?:followups|activity|alerts|financial)$/.test(resource.path));
+    assert(new Set(requests.map(request => request.path)).size === 4, "The four dashboard section requests were not observed.");
+    const starts = requests.map(request => request.start);
+    assert(Math.max(...starts) - Math.min(...starts) < 250, "Dashboard requests did not start in parallel.");
   }
 } finally {
   browser.kill("SIGTERM");
