@@ -48,9 +48,17 @@
 .ff-login-page *::before,
 .ff-login-page *::after { box-sizing: border-box; }
 
-/* The panel owns every optical material effect; this rule only sets its footprint. */
+/* The panel owns the optical layers; login sets its footprint and material tokens. */
 .ff-login-page .ff-login-card {
   --lg-radius: 23px;
+  --lg-center-tint: rgba(13, 34, 56, 0.12);
+  --lg-rim-upper-left-reflection: rgba(202, 222, 237, 0.82);
+  --lg-rim-lower-right-reflection: rgba(228, 180, 139, 0.58);
+  --login-field-fill: rgba(17, 39, 57, 0.24);
+  --login-field-focus-fill: rgba(22, 45, 64, 0.32);
+  --login-field-border: rgba(214, 232, 242, 0.5);
+  --login-support-ink: rgba(248, 251, 253, 0.96);
+  --login-support-underline: rgba(238, 246, 250, 0.72);
   width: 100%;
   max-width: 420px;
   min-height: 450px;
@@ -192,10 +200,10 @@
   width: 100%;
   height: var(--login-control-height);
   min-height: var(--login-control-height);
-  border: 1px solid rgba(238, 248, 252, 0.34);
+  border: 1px solid var(--login-field-border, rgba(238, 248, 252, 0.34));
   border-radius: 999px;
   outline: none;
-  background: rgba(218, 235, 244, 0.105);
+  background: var(--login-field-fill, rgba(218, 235, 244, 0.105));
   padding: 0 18px 0 45px;
   color: #f7fafc;
   font-family: inherit;
@@ -213,7 +221,7 @@
 
 .ff-login-page .ff-login-input:focus {
   border-color: rgba(246, 252, 255, 0.7);
-  background: rgba(221, 239, 247, 0.15);
+  background: var(--login-field-focus-fill, rgba(221, 239, 247, 0.15));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 0 0 2px rgba(193, 228, 237, 0.26);
 }
 
@@ -289,11 +297,11 @@
 .ff-login-page .ff-login-support-wrap { margin-top: 15px; text-align: center; }
 
 .ff-login-page .ff-login-support {
-  color: rgba(241, 248, 251, 0.84);
+  color: var(--login-support-ink, rgba(241, 248, 251, 0.84));
   font-size: 12px;
   line-height: 1.4;
   text-decoration: underline;
-  text-decoration-color: rgba(235, 246, 250, 0.48);
+  text-decoration-color: var(--login-support-underline, rgba(235, 246, 250, 0.48));
   text-underline-offset: 2px;
 }
 

@@ -2,6 +2,9 @@
   --lg-radius: 30px;
   --lg-edge: rgba(234, 246, 251, 0.78);
   --lg-ripple-duration: 620ms;
+  --lg-center-tint: transparent;
+  --lg-rim-upper-left-reflection: rgba(255, 255, 255, 0.96);
+  --lg-rim-lower-right-reflection: rgba(255, 225, 191, 0.84);
   position: relative;
   isolation: isolate;
   display: block;
@@ -51,6 +54,7 @@
   z-index: 2;
   border-radius: inherit;
   background:
+    radial-gradient(ellipse 72% 68% at 50% 46%, var(--lg-center-tint, transparent), transparent 100%),
     radial-gradient(ellipse 90% 72% at 50% 40%, rgba(218, 237, 246, 0.105), transparent 100%),
     linear-gradient(142deg, rgba(182, 212, 227, 0.085), rgba(142, 177, 195, 0.028) 54%, rgba(225, 240, 246, 0.075));
   -webkit-backdrop-filter: blur(4px) saturate(138%) brightness(1.08);
@@ -73,8 +77,8 @@
   border: 2px solid transparent;
   border-radius: inherit;
   background:
-    radial-gradient(ellipse 36% 13% at 4% 0%, rgba(255, 255, 255, 0.96), transparent 100%) border-box,
-    radial-gradient(ellipse 30% 13% at 96% 100%, rgba(255, 225, 191, 0.84), transparent 100%) border-box,
+    radial-gradient(ellipse 36% 13% at 4% 0%, var(--lg-rim-upper-left-reflection, rgba(255, 255, 255, 0.96)), transparent 100%) border-box,
+    radial-gradient(ellipse 30% 13% at 96% 100%, var(--lg-rim-lower-right-reflection, rgba(255, 225, 191, 0.84)), transparent 100%) border-box,
     radial-gradient(ellipse 19% 12% at 100% 2%, rgba(255, 248, 229, 0.44), transparent 100%) border-box,
     linear-gradient(145deg,
       rgba(255, 255, 255, 0.94) 0%,
