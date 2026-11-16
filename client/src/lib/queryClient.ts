@@ -1,4 +1,5 @@
 import { MutationCache, QueryCache, QueryClient, QueryFunction } from "@tanstack/react-query";
+import { invalidateDashboard, withDashboardInvalidation } from "./dashboard-freshness";
 
 export class HttpError extends Error {
   readonly status: number;
@@ -77,8 +78,11 @@ function installFetchInterceptor() {
   if (target[FETCH_INTERCEPTOR_KEY]) return;
 
   const originalFetch = window.fetch.bind(window);
+  const fetchWithFreshDashboard = withDashboardInvalidation(
+    originalFetch, window.location.origin, () => invalidateDashboard(queryClient),
+  );
   const interceptedFetch: typeof window.fetch = async (...args) => {
-    const response = await originalFetch(...args);
+    const response = await fetchWithFreshDashboard(...args);
     const requestUrl = typeof args[0] === "string"
       ? args[0]
       : args[0] instanceof URL

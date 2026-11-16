@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
+import RouteLoading from "@/components/layout/route-loading";
 import TopNav from "@/components/layout/top-nav";
 import { Card, CardContent, CardHeader, CardTitle, Button, AdminPageShell } from "@/components/admin-neu/adapters";
 import { Progress } from "@/components/ui/progress";
@@ -53,7 +54,7 @@ export default function TaskDetail() {
       toast({ title: "Error", description: error instanceof Error ? error.message : "Could not save progress", variant: "destructive" });
     } finally { setSaving(false); queryClient.invalidateQueries({ queryKey: ["/api/tasks", params?.id] }); }
   };
-  if (isLoading) return <div className="flex min-h-[100dvh] items-center justify-center bg-[#e0e0e0] p-10"><Card className="w-full max-w-4xl space-y-4 p-6"><div className="h-6 w-1/2 animate-pulse rounded bg-[#d2d2d2]" /><div className="h-32 animate-pulse rounded-xl bg-[#d2d2d2]" /></Card></div>;
+  if (isLoading) return <RouteLoading title="Task Details" />;
   if (isError || !task) return <div className="flex min-h-[100dvh] items-center justify-center bg-[#e0e0e0] p-6"><Card className="max-w-md p-8 text-center text-[#a3483e]">Task not found or unavailable.</Card></div>;
   return <div className="ff-admin-page flex min-h-[100dvh] bg-[#e0e0e0]"><Sidebar /><div className="flex min-w-0 flex-1 flex-col overflow-hidden"><TopNav title="Task Details" subtitle="Track task progress" group="Workspace" /><AdminPageShell className="flex-1 overflow-auto !min-h-0 p-6"><div className="mx-auto max-w-4xl space-y-6"><PageInsights entity="tasks" entityId={task.id} title="Task activity" />
     <Button variant="outline" onClick={() => navigate("/tasks")}>Back to tasks</Button>

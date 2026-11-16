@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
+import RouteLoading from "@/components/layout/route-loading";
 import TopNav from "@/components/layout/top-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +19,7 @@ export default function FuelAdvanceDetail() {
       return r.json();
     },
   });
-  if (isLoading) return <div className="p-8">Loading fuel advance…</div>;
+  if (isLoading) return <RouteLoading title="Fuel advance" />;
   if (!data) return <div className="p-8">Fuel advance not found.</div>;
   const money = (v: any) => v === null || v === undefined || v === ""
     ? "—"

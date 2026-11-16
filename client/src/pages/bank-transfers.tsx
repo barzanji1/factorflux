@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TableLoadingRows } from "@/components/loading/TableLoadingRows";
 import { PageInsights } from "@/components/PageInsights";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -343,11 +344,7 @@ export default function BankTransfers() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                        Loading…
-                      </TableCell>
-                    </TableRow>
+                    <TableLoadingRows columns={7} />
                   ) : filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">

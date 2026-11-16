@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TableLoadingRows } from "@/components/loading/TableLoadingRows";
 import { PageInsights } from "@/components/PageInsights";
 import { AdminPageShell, Button, Input, Badge, Card, CardContent, DialogContent, SelectContent, useAdminToast, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, StatCard } from "@/components/admin-neu/adapters";
 import "@/components/admin-neu/admin-neu-page.css";
@@ -349,7 +350,7 @@ export default function Payroll() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-12 text-muted-foreground">Loading…</TableCell></TableRow>
+                    <TableLoadingRows columns={8} />
                   ) : filtered.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-12 text-muted-foreground">No payroll entries found.</TableCell></TableRow>
                   ) : filtered.map((e) => (

@@ -496,7 +496,7 @@ export default function InvoiceDetail() {
       if (!r.ok) throw new Error("Failed to fetch funding receipts");
       return r.json();
     },
-    enabled: !isNaN(invoiceId) && !!detail,
+    enabled: !isNaN(invoiceId),
   });
 
   useEffect(() => {

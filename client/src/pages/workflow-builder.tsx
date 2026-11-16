@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { SectionLoading } from "@/components/loading/SectionLoading";
 import { AdminPageShell, Card, Badge, Button, DialogContent, Input, useAdminToast } from "@/components/admin-neu/adapters";
 import "@/components/admin-neu/admin-neu-page.css";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -898,9 +899,8 @@ export default function WorkflowBuilder() {
               {/* ── Right: preview panel ─────────────────────────────────────── */}
               <div className="space-y-4">
                 {configLoading ? (
-                  <div className="ff-workflow-surface flex items-center gap-2 p-4 text-[12px] text-slate-400">
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                    Loading saved config…
+                  <div className="ff-workflow-surface">
+                    <SectionLoading label="Loading saved configuration" rows={8} />
                   </div>
                 ) : (
                   <PipelinePreview stages={stages} stageCounts={stageCounts} />

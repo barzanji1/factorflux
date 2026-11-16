@@ -36,7 +36,10 @@ const controller = createNavigationController({
   async present(commit, href, from) {
     const staffSignIn = pathname(from) === "/login" && pathname(href) === "/";
     const root = document.documentElement;
-    if (((publicPage(from) || publicPage(href)) && !staffSignIn) ||
+    // Only sign-in needs a whole-window snapshot. On staff navigation that
+    // snapshot intercepts hover/focus and makes the live sidebar collapse.
+    // Prepared pages already have immediate content-only loading feedback.
+    if (!staffSignIn ||
       pathname(href) === pathname(from) ||
       typeof document.startViewTransition !== "function" ||
       (staffSignIn && matchMedia("(prefers-reduced-motion: reduce)").matches)) {

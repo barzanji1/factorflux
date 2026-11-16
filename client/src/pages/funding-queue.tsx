@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { SectionLoading } from "@/components/loading/SectionLoading";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -289,7 +290,7 @@ export default function FundingQueue() {
         <div className="flex gap-2 lg:col-span-2"><Input aria-label="Date from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /><Input aria-label="Date to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></div>
       </Card>
       <Card className="ff-card ff-table-container ff-sheets-surface overflow-hidden border border-slate-200 bg-white dark:border-slate-800 dark:bg-[hsl(var(--card))]">
-        {isLoading ? <div className="flex items-center justify-center gap-2 p-16 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Loading Sheets…</div> : isError ? <div className="p-16 text-center text-sm text-red-600">Unable to load Sheets. Check your filters and try again.</div> : !rows.length ? <div className="p-16 text-center"><FileText className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="font-semibold text-slate-700 dark:text-slate-200">No invoices match these filters</p><p className="mt-1 text-sm text-slate-500">New submissions will appear here when available.</p></div> :
+        {isLoading ? <SectionLoading label="Loading Sheets" rows={8} /> : isError ? <div className="p-16 text-center text-sm text-red-600">Unable to load Sheets. Check your filters and try again.</div> : !rows.length ? <div className="p-16 text-center"><FileText className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="font-semibold text-slate-700 dark:text-slate-200">No invoices match these filters</p><p className="mt-1 text-sm text-slate-500">New submissions will appear here when available.</p></div> :
               <div className="overflow-x-auto">
                 <NeuTable className="ff-data-table min-w-[1550px]">
                   <thead>

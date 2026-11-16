@@ -20,3 +20,9 @@ Loading states must be deliberate and immediately visible: an inline FactorFlux 
 **Why:** After prior attempts hid loading states behind data-readiness waits, the user explicitly requested an inline logo splash, immediate dashboard skeletons, hover-prefetched routes, and immediate page-transition skeletons. This supersedes the earlier direction to hide all first-data placeholders. The neumorphic theme must not change.
 
 **How to apply:** Keep the current shell usable while a destination's code and fresh permissions prepare; display loading structure only over its content area. Reveal mounted page structure without waiting for API completion. Preserve reduced motion, cancellation, fresh authorization, and history/query-string behavior. Verify deliberately delayed production assets and APIs, including the pending frame, rather than relying on development's module cache.
+
+Do not use whole-window native view-transition snapshots for ordinary staff page navigation. Reserve them for the explicit login fade.
+
+**Why:** A production-build pointer test caught a 156px sidebar collapse during whole-window transitions: snapshot overlays interrupt the live sidebar's hover/focus behavior. The shared pending content state does not require a whole-window animation.
+
+**How to apply:** Keep navigation feedback content-only and measure sidebar width after actual pointer clicks while assets and API responses are delayed. Preserve normal hover expansion when the user deliberately enters or leaves the rail.

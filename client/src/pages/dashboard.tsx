@@ -14,6 +14,7 @@ import type {
   DashboardSection,
 } from "@shared/agent-dashboard";
 import { pathToPermission } from "@/lib/routePermissions";
+import { DASHBOARD_STALE_TIME } from "@/lib/dashboard-freshness";
 import { TeamActivityFeed } from "@/components/dashboard/TeamActivityFeed";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { TeamAnnouncementBanner } from "@/components/team-announcements";
@@ -111,7 +112,7 @@ export default function Dashboard() {
   const { user, permissions } = useAuth();
   const userId = user?.id ?? "unauthenticated";
   const userRole = user?.role ?? "unknown";
-  const queryOptions = { staleTime: 15_000, refetchOnMount: "always" as const, refetchOnWindowFocus: true, retry: false, enabled: Boolean(user?.id && user?.role) };
+  const queryOptions = { staleTime: DASHBOARD_STALE_TIME, refetchOnMount: true, refetchOnWindowFocus: true, retry: false, enabled: Boolean(user?.id && user?.role) };
   const followupsQuery = useQuery<DashboardFollowUps>({
     queryKey: ["/api/agent-dashboard/followups", userId, userRole],
     queryFn: ({ signal }) => fetchSection<DashboardFollowUps>("followups", signal),
@@ -139,8 +140,6 @@ export default function Dashboard() {
     queryKey: ["/api/agent-dashboard/financial", userId, userRole],
     queryFn: ({ signal }) => fetchFinancial(signal),
     ...queryOptions,
-    staleTime: 60_000,
-    refetchOnMount: true,
   });
   const [refreshStatus, setRefreshStatus] = useState("");
   const isFetching = followupsQuery.isFetching || activityQuery.isFetching || alertsQuery.isFetching || financialQuery.isFetching;

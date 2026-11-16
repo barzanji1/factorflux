@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SectionLoading } from "@/components/loading/SectionLoading";
 import { PageInsights } from "@/components/PageInsights";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { AdminPageShell, Button, Input, Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, DialogContent, AlertDialogContent, SelectContent, useAdminToast, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/admin-neu/adapters";
@@ -335,10 +336,7 @@ export default function VaultPage() {
                 </CardHeader>
                 <CardContent>
                   {vaultLoading ? (
-                    <div className="flex items-center justify-center py-10 gap-2 text-slate-500">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Loading vault entries...
-                    </div>
+                    <SectionLoading label="Loading vault entries" />
                   ) : vaultEntries.length === 0 ? (
                     <div className="text-center py-10">
                       <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />

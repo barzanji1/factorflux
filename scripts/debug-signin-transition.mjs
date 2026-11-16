@@ -53,6 +53,11 @@ browser.stdio[4].on("data", chunk => {
             body: Buffer.from(JSON.stringify(result)).toString("base64") });
         } else {
           const interceptedPath = new URL(event.request.url).pathname;
+          if (interceptedPath === "/api/__dashboard_freshness_probe" && process.env.SIGNIN_VERIFY_FRESHNESS === "1") {
+            // Browser-only response: never creates/updates/deletes live records.
+            await send("Fetch.fulfillRequest", { requestId: event.requestId, responseCode: event.request.method === "PUT" ? 409 : 204 });
+            return;
+          }
           if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") {
             if (interceptedPath.startsWith("/api/agent-dashboard/")) await wait(1800);
             if (/^\/assets\/index-[\w-]+\.js$/.test(interceptedPath)) await wait(700);
@@ -115,6 +120,8 @@ const click = async (selector, hoverDelay = 0) => {
   assert(point, `Pointer target blocked: ${selector}`);
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
   if (hoverDelay) await wait(hoverDelay);
+  const finalTarget = await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,hit:e.contains(document.elementFromPoint(${point.x},${point.y})),actual:document.elementFromPoint(${point.x},${point.y})?.closest('button')?.getAttribute('aria-label')}:null})()`);
+  if (!finalTarget?.hit) console.log(JSON.stringify({ movedPointerTarget: selector, before: point, after: finalTarget }));
   const clickTime = await evaluate("performance.now()");
   await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", clickCount: 1 });
@@ -308,18 +315,30 @@ try {
       ? [...source.matchAll(/\{\s*name:\s*"([^"]+)",\s*href:\s*"([^"]+)"/g)]
         .map(([, label, route]) => [label, route]).filter(([label]) => labels.includes(label))
       : [["Invoices", "/invoices"], ["Carriers", "/clients"], ["Brokers", "/brokers"], ["Documents", "/documents"], ["Calendar", "/calendar"]];
+    const appSource = await readFile("client/src/App.tsx", "utf8");
+    const modules = new Map([...appSource.matchAll(/lazyPage\((\[[^\]]*\]),\s*\(\)\s*=>\s*import\("@\/pages\/([^"]+)"\)/g)]
+      .flatMap(([, paths, module]) => JSON.parse(paths).map(route => [route, module])));
+    modules.set("/chat", "chat");
+    if (process.env.SIGNIN_ALL_ROUTES === "1") {
+      // Test an actual dashboard return, not only its initial same-address click.
+      routes.push(["Agent Dashboard", "/"]);
+    }
     for (const [label, path] of routes) {
       const selector = `aside button[aria-label="${label}"]`;
       assert(await evaluate(`!!document.querySelector(${JSON.stringify(selector)})`), `${label} navigation missing`);
+      const previousPath = await evaluate("location.pathname");
       await evaluate(`(()=>{window.__navigationFrames=[];window.__navigationActive=true;
         window.__navigationEpoch=(window.__navigationEpoch||0)+1;const epoch=window.__navigationEpoch;
         (function sample(){window.__navigationFrames.push({
+          ms:performance.now(),
           path:location.pathname,loading:!!document.querySelector('[data-route-loading]'),
           pending:!!document.querySelector('[data-navigation-pending]'),
           checking:document.body.innerText.includes('Checking page access'),
           holding:document.documentElement.dataset.pageTransition==='holding',
           loadingCopy:document.querySelector('main')?.innerText.match(/\\bLoading\\b[^\\n]*/g)?.slice(0,3)||[],
         sidebarWidth:document.querySelector('aside')?.getBoundingClientRect().width,
+          mainHeight:document.querySelector('main')?.getBoundingClientRect().height,
+          contentHeight:document.querySelector('[data-route-viewport]')?.getBoundingClientRect().height,
           documentHeight:document.documentElement.scrollHeight
         });if(window.__navigationActive&&window.__navigationEpoch===epoch)requestAnimationFrame(sample)})()})()`);
       const clickTime = await click(selector, process.env.SIGNIN_VERIFY_LOADING_STATES === "1" ? 250 : 0);
@@ -330,29 +349,43 @@ try {
         if (await evaluate(`location.pathname===${JSON.stringify(path.split("?")[0])}`)) break;
         await wait(50);
       }
+      if (await evaluate("location.pathname") !== path.split("?")[0]) {
+        console.log(JSON.stringify({ navigationFailure: label, responses: responses.slice(-8),
+          state: await evaluate(`({path:location.pathname,pending:document.querySelector('[data-navigation-pending]')?.getAttribute('aria-label'),alerts:Array.from(document.querySelectorAll('[role="alert"]')).map(e=>e.textContent),active:document.activeElement?.getAttribute('aria-label')})`) }));
+        await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/navigation-failure.jpg`, Buffer.from(r.data, "base64")));
+      }
       assert.equal(await evaluate("location.pathname"), path.split("?")[0], `${label} never opened`);
       for (let i = 0; i < 100; i++) {
         if (await evaluate("document.documentElement.dataset.pageTransition!=='holding'")) break;
         await wait(25);
       }
-      await wait(150);
-      const samples = await evaluate("window.__navigationActive=false;window.__navigationFrames");
+      await wait(process.env.SIGNIN_ALL_ROUTES === "1" ? 1000 : 150);
+      const samples = (await evaluate("window.__navigationActive=false;window.__navigationFrames")).filter(frame => frame.ms >= clickTime);
       const detail = { label, frames: samples.length,
         pendingFrames: samples.filter(f => f.pending).length,
         fallbackFrames: samples.filter(f => f.loading || f.checking).length,
         dataLoadingFrames: samples.filter(f => !f.holding && f.loadingCopy.length).length,
         loadingCopy: [...new Set(samples.filter(f => !f.holding).flatMap(f => f.loadingCopy))],
         heldFrames: samples.filter(f => f.holding).length,
-        overflowFrames: samples.filter(f => f.documentHeight > 900).length };
-      if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") {
-        const prefix = `/assets/${path.split("/")[1]}-`;
+        overflowFrames: samples.filter(f => f.documentHeight > 900).length,
+        collapsedFrames: samples.filter(f => f.mainHeight != null && f.mainHeight < 300).length,
+        sidebarWidthChange: Math.max(...samples.map(f => f.sidebarWidth ?? 0)) - Math.min(...samples.map(f => f.sidebarWidth ?? 0)),
+      };
+      if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1" && path.split("?")[0] !== previousPath) {
+        const prefix = `/assets/${modules.get(path.split("?")[0])?.split("/").at(-1) ?? path.split("/")[1]}-`;
         detail.intentPrefetched = await evaluate(`performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname.startsWith(${JSON.stringify(prefix)})&&r.name.endsWith('.js')&&r.startTime<${clickTime})`);
         assert(detail.intentPrefetched, `${label} did not request its chunk before the sidebar click`);
       }
       navigation.push(detail);
-      if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1") assert(detail.pendingFrames > 0, `${label} gave no immediate loading feedback`);
+      if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1" && path.split("?")[0] !== previousPath) assert(detail.pendingFrames > 0, `${label} gave no immediate loading feedback`);
       assert.equal(detail.fallbackFrames, 0, `${label} exposed an intermediate loading page`);
       assert.equal(detail.overflowFrames, 0, `${label} overflowed the document`);
+      assert.equal(detail.collapsedFrames, 0, `${label} collapsed the content viewport`);
+      assert(detail.sidebarWidthChange <= 1, `${label} changed sidebar width by ${detail.sidebarWidthChange}px`);
+      if (process.env.SIGNIN_ALL_ROUTES === "1") {
+        await send("Page.captureScreenshot", { format: "jpeg", quality: 60 })
+          .then(r => writeFile(`${output}/route-${path.split("?")[0].replaceAll("/", "-") || "dashboard"}.jpg`, Buffer.from(r.data, "base64")));
+      }
       if (process.env.SIGNIN_ASSERT_DATA_NOFLASH === "1") assert.equal(detail.dataLoadingFrames, 0, `${label} showed a data-loading flash`);
     }
     if (process.env.SIGNIN_TEST_EMPLOYEE === "1") {
@@ -374,6 +407,32 @@ try {
     }
     await send("Fetch.disable");
     await send("Page.captureScreenshot", { format: "jpeg", quality: 75 }).then(r => writeFile(`${output}/navigation.jpg`, Buffer.from(r.data, "base64")));
+  }
+  if (process.env.SIGNIN_VERIFY_FRESHNESS === "1") {
+    // Run on the mounted dashboard after the all-route walk. Intercept the
+    // synthetic write before it leaves Chromium; real dashboard reads remain
+    // authenticated and use the application API without mocked data.
+    await send("Fetch.enable", { patterns: [{ urlPattern: "*/api/__dashboard_freshness_probe", requestStage: "Request" }] });
+    const sections = ["followups", "activity", "alerts", "financial"];
+    for (let i = 0; i < 200; i++) {
+      if (await evaluate("!!document.querySelector('[data-testid=\"agent-dashboard\"]')&&!document.querySelector('[data-dashboard-loading]')")) break;
+      await wait(50);
+    }
+    assert(await evaluate("!!document.querySelector('[data-testid=\"agent-dashboard\"]')"), "Freshness checks require the dashboard");
+    for (const method of ["POST", "PATCH", "DELETE", "PUT", "GET"]) {
+      const epoch = await evaluate("performance.now()");
+      const status = await evaluate(`fetch('/api/__dashboard_freshness_probe',{method:${JSON.stringify(method)}}).then(r=>r.status)`);
+      const shouldRefresh = !["PUT", "GET"].includes(method);
+      let refreshed = [];
+      for (let i = 0; i < (shouldRefresh ? 200 : 20); i++) {
+        refreshed = await evaluate(`performance.getEntriesByType('resource').filter(r=>r.startTime>=${epoch}&&new URL(r.name).pathname.startsWith('/api/agent-dashboard/')).map(r=>new URL(r.name).pathname.split('/').at(-1))`);
+        if (shouldRefresh && sections.every(section => refreshed.includes(section))) break;
+        await wait(50);
+      }
+      for (const section of sections) assert.equal(refreshed.includes(section), shouldRefresh, `${method} dashboard ${section} invalidation`);
+      navigation.push({ freshnessMethod: method, syntheticStatus: status, refreshedSections: [...new Set(refreshed)] });
+    }
+    await send("Fetch.disable");
   }
   if (process.env.SIGNIN_VERIFY_FUEL === "1") {
     const fuel = await evaluate(`(async()=>{
@@ -447,8 +506,11 @@ try {
     assert(structural, "Dashboard did not reveal a structural skeleton while its API was delayed.");
     const populated = frames.find(frame => frame.dashboard && !frame.dashboardLoading);
     assert(populated && populated.ms - structural.ms > 500, "Dashboard presentation waited for its delayed data.");
-    const requests = report.resources.filter(resource => /^\/api\/agent-dashboard\/(?:followups|activity|alerts|financial)$/.test(resource.path));
-    assert(new Set(requests.map(request => request.path)).size === 4, "The four dashboard section requests were not observed.");
+    // Measure the first sign-in cohort, not later dashboard revisits, periodic
+    // refreshes, or the deliberate write-invalidation checks in the same run.
+    const requests = ["followups", "activity", "alerts", "financial"].map(section =>
+      report.resources.find(resource => resource.path === `/api/agent-dashboard/${section}`));
+    assert(requests.every(Boolean), "The four dashboard section requests were not observed.");
     const starts = requests.map(request => request.start);
     assert(Math.max(...starts) - Math.min(...starts) < 250, "Dashboard requests did not start in parallel.");
   }

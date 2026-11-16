@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import Sidebar from "@/components/layout/sidebar";
+import RouteLoading from "@/components/layout/route-loading";
 import TopNav from "@/components/layout/top-nav";
 import InvoiceModal from "@/components/modals/invoice-modal";
 import { AgingPdfDownload } from "@/components/reports/aging-pdf-download";
@@ -267,7 +268,7 @@ export default function ClientDetail() {
     if (!canUseCarrierChat && profileTab === "messages") setProfileTab("profile");
   }, [canUseCarrierChat, profileTab]);
 
-  if (isLoading) return <div className="flex min-h-[100dvh]"><Sidebar /><main className="flex-1 bg-[#d4d0c8] p-6"><div className="animate-pulse space-y-3"><div className="h-20 bg-[#eef2f1]" /><div className="h-8 bg-[#eef2f1]" /><div className="h-96 bg-[#eef2f1]" /></div></main></div>;
+  if (isLoading) return <RouteLoading title="Carrier profile" />;
   if (!client) return <div className="flex min-h-[100dvh]"><Sidebar /><main className="flex flex-1 flex-col items-center justify-center bg-[#d4d0c8]"><CircleAlert className="mb-2 h-10 w-10 text-[#9c4343]" /><p className="font-bold text-[#263b44]">Carrier record not found</p><Button variant="outline" className="mt-4 rounded-sm" onClick={() => navigate("/clients")}><ArrowLeft className="mr-2 h-4 w-4" />Back to carriers</Button></main></div>;
 
   const physical = { address: first(onboarding, "physicalAddress") || client.address, city: first(onboarding, "physicalCity", "city"), state: first(onboarding, "physicalState", "state"), zip: first(onboarding, "physicalZip", "zipCode") };

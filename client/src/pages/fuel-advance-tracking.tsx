@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { TableLoadingRows } from "@/components/loading/TableLoadingRows";
 import { Link, useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
@@ -166,7 +167,7 @@ export default function FuelAdvanceTracking() {
           <CardHeader className="pb-2"><div className="flex items-center justify-between"><CardTitle className="text-sm">Advance ledger</CardTitle><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search records..." className="h-8 max-w-xs" /></div></CardHeader>
           <CardContent className="p-0"><div className="overflow-x-auto"><NeuTable className="ff-data-table w-full min-w-[1500px] text-left text-[11px]">
             <thead className="bg-[#f0f4f3] text-[9px] uppercase text-[#63767d]"><tr>{["Carrier", "Broker", "Load", "Code", "Rate", "%", "Factored", "Fees", "Method", "DV", "Reference#", "Delivering date", "Date", "Agent", "Paid", "Account", "Actions"].map((heading) => <th key={heading} className="whitespace-nowrap px-2 py-2">{heading}</th>)}</tr></thead>
-            <tbody>{isLoading ? <tr><td colSpan={17} className="p-8 text-center">Loading advances…</td></tr> : filtered.map((row) => <tr key={row.id} className="border-t border-[#e1e6e7]">
+            <tbody>{isLoading ? <TableLoadingRows columns={17} /> : filtered.map((row) => <tr key={row.id} className="border-t border-[#e1e6e7]">
               <td className="px-2 py-2">{valueOf(row, "carrierName", "carrier")}</td><td className="px-2 py-2">{valueOf(row, "brokerName", "broker")}</td>
               <td className="px-2 py-2">{valueOf(row, "loadNumber", "loadId")}</td><td className="px-2 py-2">{valueOf(row, "code")}</td><td className="px-2 py-2">{money(row.rate)}</td>
               <td className="px-2 py-2">{percent(row.faPercent)}</td><td className="px-2 py-2">{money(row.advanceAmount)}</td><td className="px-2 py-2">{money(row.fees)}</td><td className="px-2 py-2"><span className={`ff-badge ${row.paymentMethod === "Wire" ? "ff-badge-pending" : "ff-badge-approved"}`}>{valueOf(row, "paymentMethod")}</span></td>
