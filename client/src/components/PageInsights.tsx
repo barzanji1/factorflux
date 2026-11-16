@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { memo, useEffect, useId } from "react";
+import { useEffect, useId } from "react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -91,7 +91,7 @@ async function loadInsights(entity: InsightEntity | "loads", entityId?: string |
   return response.json() as Promise<PageInsightsData>;
 }
 
-function PageInsightsContent({ entity, entityId, clientId, title = "Operational pulse", enabled = true, section }: Props) {
+export function PageInsights({ entity, entityId, clientId, title = "Operational pulse", enabled = true, section }: Props) {
   const gradientId = `insights-${useId().replace(/:/g, "")}`;
   const queryClient = useQueryClient();
   useEffect(() => {
@@ -286,7 +286,4 @@ function PageInsightsContent({ entity, entityId, clientId, title = "Operational 
   );
 }
 
-// Table data, search controls and unrelated auth refreshes must not repeat the
-// charts' synchronous text/layout measurement. Their own query still updates.
-export const PageInsights = memo(PageInsightsContent);
 export default PageInsights;

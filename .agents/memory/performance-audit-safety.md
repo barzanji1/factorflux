@@ -20,3 +20,9 @@ Do not equate loading-state continuity checks with fast navigation. When the use
 **Why:** Local compiled-bundle checks passed for layout continuity while the user still experienced production navigation delays. A clean layout assertion does not establish a latency budget, and a cached route can still wait on a network prerequisite.
 
 **How to apply:** Separate code downloads, authorization preparation, page-data requests, and main-thread work. State the test location, cache conditions, and what “rendered” means; do not present local harness timings as deployed-site measurements.
+
+Validate completed chart geometry separately from navigation continuity when changing shared rendering behavior.
+
+**Why:** Navigation checks passed before the user reported stalled or missing graphics after a shared-renderer optimization. A mounted page and stable sidebar do not establish that its charts finished rendering.
+
+**How to apply:** Check the compiled build for completed metric values, nonzero SVG dimensions, cylinder caps for positive data, valid SVG references, and resolved infographic loading states. Distinguish legitimate empty data from missing graphics; cover cached revisits and record-detail views too.
