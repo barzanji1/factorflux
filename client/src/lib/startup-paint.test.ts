@@ -29,7 +29,7 @@ test("anonymous entry preloads the unchanged login scene before the application 
     const result = entry(path);
     assert.equal(result.dataset.loginEntry, "");
     assert.equal(result.preloads.length, 1);
-    assert.equal(result.preloads[0].href, "/assets/tpf-building.jpg");
+    assert.equal(result.preloads[0].href, "/assets/tpf-building-refined.jpg");
     assert.equal(result.preloads[0].as, "image");
   }
   assert.ok(html.indexOf("dataset.loginEntry") < html.indexOf('src="/src/main.tsx"'));

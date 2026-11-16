@@ -95,7 +95,7 @@ export default function LoginPage() {
           className={`ff-login-card${shakeCount ? ` ff-login-card--shake-${shakeCount % 2}` : ""}`}
           aria-busy={isLoading}
           scene={{
-            src: "/assets/tpf-building.jpg",
+            src: "/assets/tpf-building-refined.jpg",
             position: "center 46%",
             size: "cover",
             filter: "brightness(0.62) saturate(0.76) contrast(1.05)",
