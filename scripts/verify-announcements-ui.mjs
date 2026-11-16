@@ -203,13 +203,16 @@ try {
   await evaluate("(()=>{const b=[...document.querySelectorAll('aside button')].find(b=>b.getAttribute('aria-label')==='Agent Dashboard'||b.getAttribute('aria-label')==='Dashboard');if(!b)throw Error('Dashboard navigation missing');b.dataset.qaDashboard='true'})()");
   await click('aside button[data-qa-dashboard=true]');
   await until("location.pathname==='/'&&!!document.querySelector('[data-testid=team-announcement-banner]')");
-  const placement = await evaluate("(()=>{const b=document.querySelector('[data-testid=team-announcement-banner]');const f=document.querySelector('#financial-overview-heading')||[...document.querySelectorAll('main section[role=status]')].find(e=>e.innerText.includes('Financial charts are unavailable'));return !!f&&!!(b.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING)})()");
-  assert(placement, "Announcement banner must precede Financial Overview");
+  const placement = await evaluate("(()=>{const d=document.querySelector('[data-testid=agent-dashboard]');const b=d.querySelector('[data-testid=team-announcement-banner]');const q=d.querySelector('section[aria-label=\"Financial key performance indicators\"]');return !!q&&d.querySelector(':scope > section')===b&&!!(b.compareDocumentPosition(q)&Node.DOCUMENT_POSITION_FOLLOWING)&&b.getBoundingClientRect().bottom<=q.getBoundingClientRect().top&&b.getBoundingClientRect().width<d.getBoundingClientRect().width-24})()");
+  assert(placement, "Compact announcement must be first on dashboard, above the queue carousel");
   await until("document.documentElement.dataset.pageTransition!=='holding'");
   await wait(250);
   await send("Page.captureScreenshot", { format: "jpeg", quality: 80 }).then(r => writeFile(`${output}/dashboard-desktop.jpg`, Buffer.from(r.data, "base64")));
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+  await wait(150);
+  assert(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"), "Dashboard mobile overflow");
+  await send("Page.captureScreenshot", { format: "jpeg", quality: 80 }).then(r => writeFile(`${output}/dashboard-mobile.jpg`, Buffer.from(r.data, "base64")));
   await click('[data-testid=team-announcement-banner] button[aria-label^="Open announcement:"]');
   await until("location.pathname==='/chat'&&!!document.querySelector('[data-testid=team-announcement-detail]')");
   await until("document.documentElement.dataset.pageTransition!=='holding'");

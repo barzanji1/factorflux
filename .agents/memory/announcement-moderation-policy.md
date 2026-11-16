@@ -7,7 +7,7 @@ Any staff member can publish Team Announcements immediately from Team Chat. New 
 
 **Why:** The user replaced the earlier moderated feature with “from team chat agents can write updates that will appear as a strip on all agents dashboards” and clarified the 50-word limit.
 
-**How to apply:** Keep posting and management in Team Chat. Show all active posts to staff, with optional author-selected highlights and rotation/navigation for multiple posts. Hide the strip entirely when empty. Do not restore approval or personal-dismissal controls to this shared feed. Staff without conversation access must still reach the noticeboard, without mounting private-chat features or granting chat-message permissions.
+**How to apply:** Keep posting and management in Team Chat. Show all active posts to staff, with optional author-selected highlights and rotation/navigation for multiple posts. On the dashboard, place a compact, non-full-width strip at the very top, above the queue carousel and quick action cards, as the user explicitly clarified. Hide the strip entirely when empty. Do not restore approval or personal-dismissal controls to this shared feed. Staff without conversation access must still reach the noticeboard, without mounting private-chat features or granting chat-message permissions.
 
 Only the original poster edits a post. Posters can remove their own; admins can remove anyone's. Manager status alone does not permit editing or removing another author's announcement. Preserve author identity and posted time.
 

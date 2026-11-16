@@ -50,7 +50,7 @@ function useActiveAnnouncements(enabled = true) {
   return { ...query, items: useUnexpired(items, enabled) };
 }
 
-export function TeamAnnouncementBanner() {
+export function TeamAnnouncementBanner({ compact = false }: { compact?: boolean }) {
   const [, setLocation] = useLocation();
   const { items, isLoading, isError, error, refetch } = useActiveAnnouncements(true);
   const [index, setIndex] = useState(0);
@@ -74,7 +74,7 @@ export function TeamAnnouncementBanner() {
     return () => window.clearInterval(timer);
   }, [items.length, paused, hovered, focused, reducedMotion]);
   if (isLoading) return null;
-  if (isError) return <NeuNotice severity="block" role="alert" className="mb-5 flex items-center gap-3" data-testid="team-announcement-error">
+  if (isError) return <NeuNotice severity="block" role="alert" className={`mb-5 flex items-center gap-3 ${compact ? "max-w-3xl" : ""}`} data-testid="team-announcement-error">
     <AlertCircle className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{error instanceof Error ? error.message : "Team updates are temporarily unavailable."}</span>
     <NeuButton size="sm" variant="secondary" onClick={() => void refetch()} aria-label="Retry loading team announcements"><RefreshCw className="h-3.5 w-3.5" /> Retry</NeuButton>
   </NeuNotice>;
@@ -83,7 +83,7 @@ export function TeamAnnouncementBanner() {
   const goToDetail = () => setLocation(`/chat?announcement=${item.id}`);
   const move = (direction: number) => setIndex(value => (value + direction + items.length) % items.length);
   return <section
-    className="mb-5"
+    className={compact ? "mb-5 max-w-3xl" : "mb-5"}
     data-testid="team-announcement-banner"
     aria-label="Team announcement"
     onMouseEnter={() => setHovered(true)}

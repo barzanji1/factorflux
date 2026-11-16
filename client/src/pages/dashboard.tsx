@@ -207,13 +207,14 @@ export default function Dashboard() {
       <div className="ff-neu-dashboard" data-testid="agent-dashboard">
         <p role="status" className="sr-only" aria-live="polite">{refreshStatus}</p>
 
+        <TeamAnnouncementBanner compact />
+
         <FinancialSummary
           data={financialData}
           isLoading={financialLoading}
           error={financialError}
           agentName={agentName}
           onRetry={() => financialQuery.refetch()}
-          beforeCharts={<TeamAnnouncementBanner />}
           children={<FloatingActionGrid
             data={financialData?.actionGrid}
             isLoading={financialLoading}
