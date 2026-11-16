@@ -307,6 +307,7 @@ try {
     }
   }
   if (process.env.SIGNIN_VERIFY_NAVIGATION === "1") {
+    await evaluate("window.__persistentSidebar=document.querySelector('aside');true");
     delayPermissions = true;
     await send("Fetch.enable", { patterns: [{ urlPattern: process.env.SIGNIN_DELAY_DATA === "1" ? "*/api/*" : "*/api/auth/permissions", requestStage: "Request" }] });
     const labels = await evaluate("Array.from(document.querySelectorAll('aside button[aria-label]'), el=>el.getAttribute('aria-label'))");
@@ -362,6 +363,8 @@ try {
       await wait(process.env.SIGNIN_ALL_ROUTES === "1" ? 1000 : 150);
       const samples = (await evaluate("window.__navigationActive=false;window.__navigationFrames")).filter(frame => frame.ms >= clickTime);
       const detail = { label, frames: samples.length,
+        sidebarStable: await evaluate("document.querySelector('aside')===window.__persistentSidebar&&window.__persistentSidebar.isConnected"),
+        clickToCommitMs: Math.round((samples.find(frame=>frame.path===path.split('?')[0])?.ms ?? clickTime)-clickTime),
         pendingFrames: samples.filter(f => f.pending).length,
         fallbackFrames: samples.filter(f => f.loading || f.checking).length,
         dataLoadingFrames: samples.filter(f => !f.holding && f.loadingCopy.length).length,
@@ -377,7 +380,9 @@ try {
         assert(detail.intentPrefetched, `${label} did not request its chunk before the sidebar click`);
       }
       navigation.push(detail);
-      if (process.env.SIGNIN_VERIFY_LOADING_STATES === "1" && path.split("?")[0] !== previousPath) assert(detail.pendingFrames > 0, `${label} gave no immediate loading feedback`);
+      // Cached/preloaded pages can now commit within one frame: do not force
+      // a visible loading overlay just to make the test observe a placeholder.
+      assert(detail.sidebarStable, `${label} remounted the shared sidebar`);
       assert.equal(detail.fallbackFrames, 0, `${label} exposed an intermediate loading page`);
       assert.equal(detail.overflowFrames, 0, `${label} overflowed the document`);
       assert.equal(detail.collapsedFrames, 0, `${label} collapsed the content viewport`);
@@ -389,20 +394,23 @@ try {
       if (process.env.SIGNIN_ASSERT_DATA_NOFLASH === "1") assert.equal(detail.dataLoadingFrames, 0, `${label} showed a data-loading flash`);
     }
     if (process.env.SIGNIN_TEST_EMPLOYEE === "1") {
-      const previousPath = await evaluate("location.pathname");
       permissionOverride = "error";
       await click('aside button[aria-label="Invoices"]');
       await wait(1200);
-      assert.equal(await evaluate("location.pathname"), previousPath, "Failed access preparation changed the page");
-      assert(await evaluate("document.body.innerText.includes('Page could not open')"), "Access preparation error was silent");
+      assert.equal(await evaluate("location.pathname"), "/invoices", "Background refresh blocked navigation");
+      assert(await evaluate("document.body.innerText.includes('Access refresh delayed')"), "Background refresh error was silent");
+      assert(!await evaluate("document.body.innerText.includes('Checking page access')"), "Background refresh unmounted the working page");
       permissionOverride = "deny";
-      const deniedAt = await evaluate("performance.now()");
-      await click('aside button[aria-label="Invoices"]');
+      await click('aside button[aria-label="Carriers"]');
       await wait(1500);
+      assert(!await evaluate("!!document.querySelector('aside button[aria-label=\"Invoices\"]')"), "Revoked permission remained in the sidebar");
+      const deniedAt = await evaluate("performance.now()");
+      await evaluate("history.pushState({},'', '/invoices');window.dispatchEvent(new Event('pushState'))");
+      await wait(1000);
       const invoiceReads = await evaluate(`performance.getEntriesByType('resource').filter(r=>r.startTime>${deniedAt}&&new URL(r.name).pathname.startsWith('/api/invoices')).length`);
       assert.equal(invoiceReads, 0, "Denied destination mounted and fetched invoice data");
       assert(await evaluate("location.pathname!=='/invoices'||document.body.innerText.includes('Access Denied')"), "Denied destination was not blocked");
-      navigation.push({ failedAccessStayedOnPage: true, revokedAccessBlocked: true });
+      navigation.push({ backgroundFailureKeptPage: true, revokedAccessBlocked: true });
       permissionOverride = null;
     }
     await send("Fetch.disable");

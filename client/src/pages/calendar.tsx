@@ -93,10 +93,11 @@ export default function CalendarPage() {
       return Array.isArray(data) ? data : data.events || [];
     },
   });
-  const users = useQuery<any[]>({ queryKey: ["/api/users"] });
-  const carriers = useQuery<any[]>({ queryKey: ["/api/clients", { all: true }] });
-  const brokers = useQuery<any[]>({ queryKey: ["/api/brokers", { all: true }] });
-  const invoices = useQuery<any[]>({ queryKey: ["/api/invoices", { all: true }] });
+  // These choices are used only by EventDialog, not by the calendar itself.
+  const users = useQuery<any[]>({ queryKey: ["/api/users"], enabled: dialogOpen });
+  const carriers = useQuery<any[]>({ queryKey: ["/api/clients", { all: true }], enabled: dialogOpen });
+  const brokers = useQuery<any[]>({ queryKey: ["/api/brokers", { all: true }], enabled: dialogOpen });
+  const invoices = useQuery<any[]>({ queryKey: ["/api/invoices", { all: true }], enabled: dialogOpen });
   const events = Array.isArray(query.data) ? query.data : [];
   const save = useMutation({
     mutationFn: async (data: CalendarEvent) => {

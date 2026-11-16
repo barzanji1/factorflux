@@ -15,6 +15,7 @@ import { PermissionWatcher } from "@/components/PermissionWatcher";
 import { useTheme } from "@/hooks/useTheme";
 import { StartupSplash } from "@/components/loading/StartupSplash";
 import { NavigationPending } from "@/components/loading/NavigationPending";
+import { StaffSidebarHost } from "@/components/layout/sidebar-host";
 const NotFound = lazyPage([], () => import("@/pages/not-found"));
 const AccessDenied = lazyPage([], () => import("@/pages/access-denied"));
 const Landing = lazyPage(["/landing"], () => import("@/pages/landing"));
@@ -419,12 +420,14 @@ function Router() {
   return (
     <div className={`${location === "/" || location === "/invoices" || location.startsWith("/invoices/") || location === "/clients" || location === "/brokers" || location === "/documents" || location === "/tasks" || location === "/help" || location === "/calendar" || location === "/chat" || location === "/bulk-invoices" || location === "/portal-submissions" || /^\/(?:clients|carriers|brokers)\/\d+\/?$/.test(location) ? "ff-neu-root" : "ff-app-shell"} ff-financial-dashboard-shell ff-institutional-root relative flex h-screen flex-col overflow-hidden`}>
       <PermissionWatcher />
+      <StaffSidebarHost key={user?.id ?? "anonymous"} enabled={!!user && !isLoading}>
       <div data-route-viewport style={chatPageActive ? undefined : { minHeight: "100%" }} className={chatPageActive ? "hidden" : "relative min-h-0 flex-1 overflow-hidden [&>div]:!h-full"}>
         <Suspense fallback={<Suspense fallback={<StartupSplash />}><RouteLoading /></Suspense>}>
           {routes}
         </Suspense>
       </div>
       {user && <Suspense fallback={null}><TeamChatWorkspace /></Suspense>}
+      </StaffSidebarHost>
     </div>
   );
 }

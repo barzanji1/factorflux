@@ -46,7 +46,7 @@ const port = (server.address() as { port: number }).port;
 try {
   const signInOnly = process.env.SIGNIN_TRANSITION_VERIFY === "1";
   const announcementsOnly = process.env.ANNOUNCEMENTS_UI_VERIFY === "1";
-  const child = spawn(process.execPath, [announcementsOnly ? "scripts/verify-announcements-ui.mjs" : signInOnly ? "scripts/debug-signin-transition.mjs" : "scripts/verify-neu-pages.mjs"], {
+  const child = spawn(process.execPath, [process.env.PRODUCTION_BROWSER_SCRIPT || (announcementsOnly ? "scripts/verify-announcements-ui.mjs" : signInOnly ? "scripts/debug-signin-transition.mjs" : "scripts/verify-neu-pages.mjs")], {
     stdio: "inherit",
     env: {
       ...process.env,

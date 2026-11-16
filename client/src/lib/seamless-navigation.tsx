@@ -130,11 +130,13 @@ export function useSeamlessSearch() {
 
 /** Runs under AuthProvider, while the router's location hook stays auth-free. */
 export function NavigationCoordinator() {
-  const { isAuthenticated, user, prepareRoute } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   useLayoutEffect(() => controller.configure(async (href, from) => {
     if (!isAuthenticated || !user || publicPage(from) || publicPage(href) || pathname(href) === pathname(from)) return;
-    const [, commitAccess] = await Promise.all([loadPage(href), prepareRoute(href)]);
-    return commitAccess;
-  }), [isAuthenticated, user?.id, prepareRoute]);
+    // Current permissions are enforced by the route guard and every API.
+    // AuthProvider refreshes the verified snapshot in the background; making
+    // that request a navigation prerequisite added latency even to cached pages.
+    await loadPage(href);
+  }), [isAuthenticated, user?.id]);
   return null;
 }

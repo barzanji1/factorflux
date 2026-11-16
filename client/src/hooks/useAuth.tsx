@@ -1,6 +1,8 @@
 import React, { createContext, ReactNode, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import { useLocation } from "wouter";
+import { createPermissionRefresh, samePermissions } from "@/lib/permission-refresh";
+import { toast } from "@/hooks/use-toast";
 
 interface User {
   id: string;
@@ -24,7 +26,6 @@ interface AuthContextType {
   permissionsReadyForRoute: boolean;
   permissionsError: string | null;
   refreshPermissions: () => Promise<void>;
-  prepareRoute: (href: string) => Promise<() => void>;
   hasPermission: (key: string) => boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -35,7 +36,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 async function fetchPermissions(): Promise<string[]> {
   const res = await fetch("/api/auth/permissions", { credentials: "include", cache: "no-store" });
-  if (!res.ok) throw new Error("Unable to refresh access permissions. Please retry.");
+  if (!res.ok) throw Object.assign(new Error("Unable to refresh access permissions. Please retry."), { status: res.status });
   const data = await res.json();
   if (!Array.isArray(data.permissions) || data.permissions.some((key: unknown) => typeof key !== "string")) {
     throw new Error("The server returned invalid permissions. Please retry.");
@@ -52,61 +53,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [permissionsError, setPermissionsError] = useState<string | null>(null);
-  const [permissionLocation, setPermissionLocation] = useState<string | null>(null);
   const activeUser = useRef<string | undefined>();
   activeUser.current = user?.id;
-  const locationRef = useRef(location);
-  locationRef.current = location;
-  const refreshSequence = useRef(0);
-  const preparationSequence = useRef(0);
-  const [preparedRoute, setPreparedRoute] = useState<{ path: string; userId: string; permissions: string[] } | null>(null);
-  const preparedForLocation = !!preparedRoute && preparedRoute.userId === user?.id && preparedRoute.path === location;
+  const refresh = useRef(createPermissionRefresh<string[]>());
+  const refreshWarningShown = useRef(false);
+  const lastPermissionPath = useRef(location);
 
-  const prepareRoute = useCallback(async (href: string) => {
-    const userId = activeUser.current;
-    if (!userId) throw new Error("Please sign in again.");
-    const sequence = ++preparationSequence.current;
-    const next = await fetchPermissions();
-    return () => {
-      if (activeUser.current !== userId) throw new Error("Your session changed. Please sign in again.");
-      if (sequence !== preparationSequence.current) throw new Error("Access changed while opening this page. Please retry.");
-      // Commit only alongside the chosen navigation, never for an abandoned
-      // click or a page whose code failed to download.
-      ++refreshSequence.current;
-      flushSync(() => {
-        setPermissionsLoading(false);
-        setPreparedRoute({ path: href.split(/[?#]/)[0], userId, permissions: next });
-      });
-    };
+  const clearSession = useCallback(() => {
+    refresh.current.invalidate();
+    activeUser.current = undefined;
+    setUser(null);
+    setIsAuthenticated(false);
+    setPermissions([]);
+    setPermissionsLoaded(false);
+    setPermissionsLoading(false);
+    setPermissionsError(null);
+    localStorage.removeItem("isAuthenticated");
+    localStorage.removeItem("user");
   }, []);
 
   const refreshPermissions = useCallback(async () => {
     const userId = user?.id;
     if (!userId) return;
-    const sequence = ++refreshSequence.current;
-    ++preparationSequence.current;
-    setPreparedRoute(null);
-    const path = locationRef.current;
-    setPermissionsLoading(true);
-    setPermissionsError(null);
-    try {
-      const next = await fetchPermissions();
-      if (activeUser.current !== userId || sequence !== refreshSequence.current) return;
-      setPermissions(next);
+    if (!permissionsLoaded) setPermissionsLoading(true);
+    await refresh.current.run(userId, fetchPermissions, next => {
+      if (activeUser.current !== userId) return;
+      // An unchanged background result must not rerender every auth consumer.
+      setPermissions(previous => samePermissions(previous, next) ? previous : next);
       setPermissionsLoaded(true);
-      setPermissionLocation(path);
-    } catch (error) {
-      if (activeUser.current !== userId || sequence !== refreshSequence.current) return;
+      setPermissionsError(null);
+      setPermissionsLoading(false);
+      refreshWarningShown.current = false;
+    }, error => {
+      if (activeUser.current !== userId) return;
+      if ((error as { status?: number })?.status === 401) {
+        clearSession();
+        return;
+      }
       setPermissionsError(error instanceof Error ? error.message : "Unable to refresh permissions.");
-      setPermissionLocation(path);
-    } finally {
-      if (activeUser.current === userId && sequence === refreshSequence.current) setPermissionsLoading(false);
-    }
-  }, [user?.id]);
+      setPermissionsLoading(false);
+      if (!refreshWarningShown.current) {
+        refreshWarningShown.current = true;
+        toast({ title: "Access refresh delayed", description: "Could not refresh your permissions. Retrying on your next navigation or focus.", variant: "destructive" });
+      }
+    });
+  }, [user?.id, permissionsLoaded, clearSession]);
 
   const hasPermission = (key: string): boolean => {
     if (user?.role === "admin") return true;
-    return (preparedForLocation ? preparedRoute!.permissions : permissions).includes(key);
+    return permissions.includes(key);
   };
 
   const checkAuth = async () => {
@@ -143,7 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const perms = await fetchPermissions();
           setPermissions(perms);
           setPermissionsLoaded(true);
-          setPermissionLocation(locationRef.current);
           setPermissionsError(null);
         }
       } else {
@@ -181,6 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Finish the permission request before publishing authenticated state.
         // Otherwise the route-refresh effect starts a duplicate request.
         const perms = await fetchPermissions();
+        refresh.current.invalidate();
+        refreshWarningShown.current = false;
+        lastPermissionPath.current = "/";
         localStorage.setItem("isAuthenticated", "true");
         localStorage.setItem("user", JSON.stringify(result.user));
         // Wouter's history update is synchronous. Commit the verified session
@@ -190,10 +187,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsAuthenticated(true);
           setPermissions(perms);
           setPermissionsLoaded(true);
-          setPermissionLocation(locationRef.current);
           setPermissionsError(null);
           setPermissionsLoading(false);
-          setPreparedRoute({ path: "/", userId: result.user.id, permissions: perms });
         });
 
         return true;
@@ -206,17 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    ++refreshSequence.current;
-    ++preparationSequence.current;
-    setPreparedRoute(null);
-    activeUser.current = undefined;
-    setUser(null);
-    setIsAuthenticated(false);
-    setPermissions([]);
-    setPermissionLocation(null);
-    setPermissionsError(null);
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("user");
+    clearSession();
     fetch("/api/auth/logout", { method: "POST" }).catch(console.error);
   };
 
@@ -224,22 +209,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  // Initial authentication still requires server verification and permissions.
+  // Later navigations use that verified snapshot while revalidating in parallel.
+  // Every staff API independently enforces current server-side permissions.
   useEffect(() => {
-    if (!preparedForLocation || !preparedRoute) return;
-    setPermissions(preparedRoute.permissions);
-    setPermissionsLoaded(true);
-    setPermissionsLoading(false);
-    setPermissionsError(null);
-    setPermissionLocation(location);
-    setPreparedRoute(null);
-  }, [location, preparedForLocation, preparedRoute]);
-
-  // Revalidate before a newly navigated route makes an access decision.
-  // The synchronous path comparison below also blocks the first render,
-  // before this effect has had a chance to run.
-  useEffect(() => {
-    if (isAuthenticated && !isLoading && permissionLocation !== location && !preparedForLocation) void refreshPermissions();
-  }, [location, permissionLocation, preparedForLocation, isAuthenticated, isLoading, refreshPermissions]);
+    if (!isAuthenticated || isLoading || location === "/login" || lastPermissionPath.current === location) return;
+    lastPermissionPath.current = location;
+    void refreshPermissions();
+  }, [location, isAuthenticated, isLoading, refreshPermissions]);
 
   // Next-navigation refresh works across devices; focus and cross-tab signals
   // additionally refresh an already-open agent page without waiting for polling.
@@ -275,13 +252,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated,
-        permissions: preparedForLocation ? preparedRoute!.permissions : permissions,
-        permissionsLoaded: preparedForLocation || permissionsLoaded,
-        permissionsLoading: !preparedForLocation && (permissionsLoading || (isAuthenticated && permissionLocation !== location)),
-        permissionsReadyForRoute: preparedForLocation || permissionLocation === location,
-        permissionsError: preparedForLocation ? null : permissionsError,
+        permissions,
+        permissionsLoaded,
+        permissionsLoading,
+        permissionsReadyForRoute: permissionsLoaded,
+        permissionsError,
         refreshPermissions,
-        prepareRoute,
         hasPermission,
         login,
         logout,

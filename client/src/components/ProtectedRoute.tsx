@@ -20,7 +20,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   console.log("ProtectedRoute - isLoading:", isLoading, "isAuthenticated:", isAuthenticated);
 
   const checkingRouteAccess = isAuthenticated && !isLoading && user?.role !== "admin"
-    && (!permissionsReadyForRoute || (!permissionsLoaded && !permissionsError));
+    && !permissionsError && (!permissionsReadyForRoute || !permissionsLoaded);
 
   if (checkingRouteAccess) {
     // Keep navigation in the current design while destination permissions refresh.
@@ -50,7 +50,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     console.log("Not authenticated, redirecting to login");
     return <Redirect to="/login" />;
   }
-  if (user?.role !== "admin" && permissionsError) {
+  if (user?.role !== "admin" && permissionsError && !permissionsLoaded) {
     return <NeuPageShell className="ff-institutional-root flex min-h-[100dvh] items-center justify-center p-6">
       <NeuNotice severity="block" role="alert" className="max-w-lg">
         <div className="flex items-start gap-3">

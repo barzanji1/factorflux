@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import ItSupportBell from "@/components/it-support/ItSupportBell";
 import { useToast } from "@/hooks/use-toast";
+import { useSidebarHosted } from "./sidebar-host";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,7 +167,19 @@ function isRouteActive(current: string, href: string) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
+export default function Sidebar(props: SidebarProps) {
+  const hosted = useSidebarHosted();
+  useLayoutEffect(() => {
+    if (hosted && !props.mobile) return hosted(SidebarContent);
+  }, [hosted, props.mobile]);
+  // Existing page layouts and mobile drawers keep their public interface.
+  // In the shared staff frame the desktop rail already exists above the routes.
+  // A slot also keeps standalone pages (which never requested a rail) unchanged.
+  if (hosted && !props.mobile) return null;
+  return <SidebarContent {...props} />;
+}
+
+function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
