@@ -1,0 +1,90 @@
+Make a visual-fidelity correction pass on the existing login page.
+
+REFERENCE:
+- The first/left image is the target.
+- The second/right image is the current implementation.
+- Treat the target as the visual specification, not as inspiration.
+- Preserve the existing authentication behavior, routing, validation, and password visibility functionality.
+- Do not redesign, introduce new elements, or substitute your own aesthetic.
+
+First inspect the existing component, CSS, and background assets. Then implement the changes below.
+
+1. MATCH THE VIEWPORT BEFORE COMPARING
+Render and capture the page at 1536 × 1024, the target image’s dimensions.
+Do not compare screenshots at different aspect ratios and compensate by guessing at spacing.
+After matching the desktop reference, preserve responsive behavior for smaller screens.
+
+2. MATCH THE PANEL GEOMETRY
+At the target viewport, aim for these approximate bounding boxes:
+- Main panel: x 381, y 119, width 775, height 755.
+- Panel corner radius: approximately 48px.
+- Email field: x 466, y 478, width 604, height 71.
+- Password field: x 466, y 567, width 604, height 71.
+- Sign-in button: x 466, y 673, width 604, height 76.
+- Support text: horizontally centered, around y 794.
+
+Use these as visual calibration measurements, not as a reason to hard-code the entire page with absolute positioning. Prefer a centered panel, controlled internal spacing, and shared form widths.
+
+3. FIX THE BRANDING AND TYPE HIERARCHY
+- Increase the teal brand symbol to approximately 96 × 88px, centered near x 768, y 207.
+- Position the FactorFlux wordmark around y 268–306, with approximately 52px bold type.
+- Match the small registered mark shown in the reference.
+- Position “FREIGHT FACTORING OS” around y 343, with approximately 20px type, wide letter spacing, and thin horizontal rules on both sides.
+- Position “Trucking Pros Financial” around y 389–426, with approximately 50px bold type.
+- Match the reference letterforms, weight, line height, and text width. Inspect the available fonts rather than assuming the current font is correct.
+- Keep all text content exactly as shown in the target.
+
+4. CORRECT THE GLASS PANEL
+The current panel is too flat and brown/gray.
+The target is predominantly deep blue-black translucent glass, with:
+- A brighter, thin silver/cyan outline.
+- A soft icy-blue highlight along the upper-left edge.
+- Cyan illumination along the left and bottom edges.
+- A concentrated warm amber glow in the lower-right corner.
+- Subtle internal haze and directional lighting rather than a uniform gray overlay.
+- A soft contact shadow below the panel.
+
+Use layered backgrounds, gradients, inset shadows, and restrained pseudo-elements as needed. Do not apply a single uniform glow around every edge.
+
+5. CORRECT THE INPUTS
+- Make the placeholders and icons brighter, close to white.
+- Use an envelope outline for Email Address, not the current person icon.
+- Match the lock and eye icon sizes and strokes to the target.
+- Input text should be approximately 24px at the target viewport.
+- Use approximately 22px corner radii.
+- Match the thin blue-gray border and translucent dark blue-gray fill.
+- Add subtle internal highlights without making the fields opaque or flat.
+- Match the target’s approximately 18px gap between the two fields.
+- Match the approximately 35px gap from the password field to the button.
+
+6. CORRECT THE BUTTON AND SUPPORT LINK
+- Replace the current pale, muted teal button with the target’s saturated cyan-to-deep-teal treatment.
+- Match the bright thin cyan border, upper-left highlight, and subtle glow.
+- Use approximately 24px corner radii.
+- “SIGN IN” should be approximately 30px, bold, and centered.
+- Make the support link brighter and slightly larger, approximately 22px, in pale cyan with an underline.
+- Match its spacing below the button.
+
+7. FIX THE BACKGROUND, NOT JUST THE FORM
+The target shows a wide, clearly visible office lobby:
+- Floor-to-ceiling windows and a visible truck on the left.
+- Mountains and sunset outside.
+- Warm architectural lighting, seating, and a plant on the right.
+- Reflective floor visible below the panel.
+
+The current background is too dark and has different framing.
+Inspect whether the correct source background asset exists.
+If it does, fix its crop, positioning, scale, and overlay opacity.
+If it does not, explicitly identify this as a fidelity blocker rather than trying to recreate the scene with CSS.
+Do not use the entire target screenshot as the page background, because that would bake in the form and duplicate the UI.
+
+8. VALIDATE WITH SCREENSHOTS
+After implementation:
+- Capture the result at 1536 × 1024.
+- Compare it with the target, ideally using a 50% opacity overlay.
+- Check panel bounds, logo size, text baselines, field bounds, button bounds, and background crop.
+- Fix the largest remaining mismatches before polishing tiny details.
+- Perform another screenshot comparison after corrections.
+- Do not declare it matched based only on reviewing the code.
+
+Make the implementation changes, not merely a list of suggestions. At the end, briefly report the changes made and any remaining asset or font mismatch.

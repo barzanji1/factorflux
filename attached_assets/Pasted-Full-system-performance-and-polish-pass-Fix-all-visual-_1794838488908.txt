@@ -1,0 +1,26 @@
+Full system performance and polish pass. Fix all visual glitches and loading delays across the entire application. Here are the specific issues to address — do not skip any:
+
+Loading and transitions:
+
+Add an HTML splash screen in index.html that shows the FactorFlux logo instantly before any JavaScript loads — no blank white screen or flash on initial page load
+Every sidebar navigation click should be instant and seamless — no layout shifts, no flashes, no content area collapsing, no visual glitches. The sidebar must remain completely static during route changes. Set a minimum height on the content area so it never collapses between page transitions
+Add loading skeletons for every page that show the page layout structure immediately while data loads in the background
+Preload page chunks on sidebar link hover so they are ready before the user clicks
+The login to dashboard transition should feel instant — preload the dashboard chunk during the sign-in animation and show a dashboard skeleton immediately while API data loads
+
+Data freshness:
+
+Dashboard metric cards must show fresh data every time the user navigates to the dashboard — not cached stale numbers. Refetch if data is older than 30 seconds
+Any create, update, or delete action anywhere in the system should invalidate the dashboard cache
+
+API performance:
+
+All API calls on any given page should run in parallel, never sequentially
+No page should block rendering while waiting for API responses — show the layout first, fill in data as it arrives
+
+General:
+
+Test every fix in the production build, not the dev server. Dev server masks loading issues with hot module replacement
+Walk through every page in the sidebar after all changes and confirm zero visual glitches on navigation
+
+CRITICAL: Do NOT modify the neumorphic theme, colors, shadows, component styles, layout design, or any existing visual styling. Do NOT remove or reorganize any CSS files or stylesheets. These are performance and loading behavior fixes ONLY. If you are unsure whether a change affects visual styling, do not make it.

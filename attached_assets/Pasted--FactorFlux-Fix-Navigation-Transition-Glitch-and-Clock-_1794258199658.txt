@@ -1,0 +1,55 @@
+**FactorFlux — Fix Navigation Transition Glitch and Clock In Button**
+
+The new institutional finance design looks good, but two issues need correction.
+
+### 1. Navigation transition glitch
+
+When navigating between pages, the previous page briefly remains visible before the destination appears. This creates a noticeable delay and visual glitch.
+
+Investigate the root cause, including:
+- React Router navigation and route transitions
+- Lazy-loaded components and Suspense boundaries
+- CSS transitions, opacity, and visibility delays
+- Stale component rendering or retained route content
+- Any loading overlays introduced during the visual migration
+
+**Fix requirements:**
+- Page transitions should feel immediate and seamless.
+- Keep the authenticated application shell mounted.
+- Do not display stale page content while the destination is loading.
+- Avoid full-screen loading flashes or blank screens.
+- Preserve existing page state where appropriate.
+- Do not introduce artificial loading delays.
+- Optimize route loading only where necessary.
+
+### 2. Clock In / Clock Out button contrast
+
+In the Time Clock panel, the main action button is blending into the background and appears almost invisible.
+
+- Clock In: solid muted teal `#087F87`, white text.
+- Clock Out: dark navy `#102A38`, white text.
+- Add subtle hover and active states.
+- Ensure disabled and loading states remain clearly distinguishable.
+- Maintain accessible text contrast.
+- Preserve the existing button dimensions, position, and clock-in/out functionality.
+
+### Strict constraints
+
+- Preserve the approved institutional finance design.
+- Do not redesign layouts or components.
+- Do not modify financial calculations, authentication, API routes, or database schemas.
+- Do not remove existing transitions unless they cause the reported glitch.
+- Avoid new dependencies.
+
+### Verification
+
+1. Test navigation across at least 10 different pages.
+2. Test cold and warm navigation.
+3. Confirm no stale page flashes or full-screen loading frames.
+4. Test browser back/forward navigation.
+5. Verify Clock In and Clock Out button states.
+6. Run TypeScript checks, production build, and relevant tests.
+
+Report the actual root cause, files changed, and verification results.
+
+**Goal:** Seamless page navigation and clearly visible clock controls without changing FactorFlux's design or functionality.

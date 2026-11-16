@@ -1,0 +1,70 @@
+# FactorFlux — System-Wide Institutional Finance UI Migration
+
+The Agent Dashboard redesign is approved. Extend its exact visual design language across all remaining authenticated pages.
+
+**Use the existing Agent Dashboard as the source of truth for colors, typography, cards, borders, shadows, navigation, and controls.**
+
+Do not create a new design direction.
+
+### Scope
+
+Apply the approved styling across all pages under:
+
+- Workspace
+- Communications
+- Funding
+- Operations
+- Risk
+- Recovery
+- Admin
+
+Include every page visible in the attached sidebar screenshots, including their nested views, detail pages, forms, and dialogs.
+
+### Visual changes only
+
+- Replace legacy gray neumorphic surfaces with the approved premium white/off-white materials.
+- Match the dashboard's navy sidebar and teal accent system.
+- Standardize card surfaces, borders, shadows, typography, and icon treatments.
+- Update tables, filters, pagination, search fields, dropdowns, forms, modals, drawers, tabs, and buttons.
+- Preserve intentional floating effects and dimensional depth.
+- Maintain clear financial data hierarchy and readable transaction tables.
+- Ensure consistent styling across light and dark surfaces.
+
+### Critical constraints
+
+**DO NOT CHANGE:**
+- Page layouts, dimensions, or component positioning.
+- Existing workflows, functionality, or interactions.
+- Carousel and card flip animations.
+- Navigation structure or sidebar grouping.
+- Financial calculations, API routes, or database schemas.
+- Authentication, authorization, or permissions.
+- Existing data, filters, sorting, pagination, or exports.
+- Charts, reporting logic, or business rules.
+
+Do not remove features, simplify pages, or replace existing components unnecessarily.
+
+### Implementation strategy
+
+1. Audit the current dashboard styles and identify reusable design tokens.
+2. Identify legacy neumorphic styles throughout the application.
+3. Consolidate shared visual tokens where safe, without changing behavior.
+4. Apply the approved styling to all remaining pages.
+5. Ensure nested screens, modals, forms, and drawers receive the same treatment.
+6. Preserve page-specific layouts and interactions.
+7. Avoid duplicate CSS overrides, unnecessary dependencies, and expensive visual effects.
+
+### Verification
+
+- Run TypeScript checks and production build.
+- Run relevant automated tests.
+- Verify navigation and interactive controls.
+- Compare representative pages before and after styling.
+- Check desktop and mobile responsiveness.
+- Confirm no layout shifts or functional regressions.
+
+**Important:** Work through the application in manageable groups. Complete and verify each group before moving to the next.
+
+Report which pages were updated, which remain, and any issues encountered.
+
+**Goal:** One cohesive, sophisticated financial operating system across FactorFlux, using the approved Agent Dashboard as the visual reference while preserving 100% of existing functionality.

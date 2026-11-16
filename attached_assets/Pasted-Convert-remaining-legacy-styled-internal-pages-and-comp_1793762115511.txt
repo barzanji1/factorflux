@@ -1,0 +1,36 @@
+Convert remaining legacy-styled internal pages and components. Use existing Neu components. Keep all functionality unchanged.
+
+MISSED ELEMENTS IN ALREADY-CONVERTED PAGES:
+1. pages/ai-assistant.tsx (Earl) — entity-result cards/badges: beige background and slate borders → NeuCard + NeuBadge
+2. components/broker-confirmation/collections-automation.tsx — hard-bordered panel → NeuCard
+3. components/broker-confirmation/follow-up-queue.tsx — hard-bordered panel + native agent selector → NeuCard + NeuSelect
+4. components/carriers/driver-section.tsx — driver editor inputs/selects/buttons → NeuInput/NeuSelect/NeuButton
+5. components/time-tracking/time-clock.tsx — clock card/controls/badges → NeuCard/NeuButton/NeuBadge
+6. pages/it-support.tsx — Win95 beveled header and containers → NeuCard
+7. components/layout/Topbar.tsx — if this is still rendered anywhere, convert or remove if replaced by top-nav.tsx
+8. components/ProtectedRoute.tsx — loading background → #e0e0e0 neumorphic surface
+9. components/contextual-download.tsx — blue panels → NeuCard, buttons → NeuButton
+10. components/layout/record-detail.tsx — white/glass header and tabs → NeuCard + NeuTabs
+
+UNCONVERTED INTERNAL PAGES:
+11. pages/activities.tsx → NeuPageShell + NeuCard + NeuTable
+12. pages/collections.tsx → NeuPageShell + NeuTable + NeuButtons
+13. pages/exceptions.tsx → NeuPageShell + NeuTable + NeuButtons
+14. pages/settings.tsx → NeuPageShell + NeuCard + NeuTabs + NeuInputs
+15. pages/profile.tsx → NeuPageShell + NeuCard + NeuInputs
+16. pages/load-detail.tsx → NeuPageShell + NeuCard + NeuTabs + NeuBadge
+17. pages/payout-detail.tsx → NeuPageShell + NeuCard + NeuBadge + NeuButtons
+18. pages/task-detail.tsx → NeuPageShell + NeuCard + NeuButtons
+19. pages/tickets.tsx → NeuPageShell + NeuTable + NeuButtons
+20. pages/ticket-detail.tsx → NeuPageShell + NeuCard + NeuTable
+21. pages/carrier-onboarding.tsx → NeuPageShell + NeuCard + NeuInputs (wizard steps → neumorphic stepped progress)
+22. pages/access-denied.tsx → NeuPageShell + NeuCard centered
+23. pages/not-found.tsx → NeuPageShell + NeuCard centered
+
+DEAD CODE — delete, don't convert:
+24. components/win95/index.tsx — delete the entire Win95 component library. Grep for imports first; if nothing imports it, remove the file. If something does, that page was missed and needs converting.
+25. components/dashboard/cutoff-times.tsx, document-upload.tsx, quick-actions.tsx, recent-activity.tsx, recent-invoices.tsx, stats-cards.tsx, SystemHealthCard.tsx — if none are imported by the current dashboard, delete them.
+26. pages/legacy-ticket-redirect.tsx — if still needed, convert the loading placeholder; if transitional and no longer linked, delete.
+27. pages/form-demo.tsx — delete unless actively used for testing.
+
+For each deleted file, confirm no active import references it. Show the diff.

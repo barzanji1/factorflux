@@ -1,0 +1,23 @@
+Redesign invoice notes as a stacked, multi-agent note system on the Invoice Detail page.
+
+DATA:
+- If invoice_notes already exists as a table with invoice_id, user_id, text, created_at — use it. If notes are currently a single text field on the invoice, migrate: create invoice_notes (id, invoice_id, user_id, note_text, created_at, updated_at, edited_at, deleted_at). Backfill any existing single-field notes as a row attributed to the invoice creator.
+
+UI — NOTES SECTION on Invoice Detail:
+- Visual: stacked sticky notes. Each note is a small NeuCard (convex, slightly rotated 1-3 degrees alternating left/right for a physical sticky-note feel). Stacked vertically with slight overlap (negative margin -8px) so they look like a pile. Most recent on top.
+- Each note shows: first ~50 chars of text visible, agent initials avatar (small teal circle), agent name, relative timestamp ("2h ago").
+- Hover on a note: card elevates (shadow deepens), un-rotates to 0 degrees, and expands to show the full text. Shows edit/delete icons in the top-right corner.
+- Click "Edit" → note text becomes a NeuInput textarea (concave), pre-filled. Save (NeuButton teal) / Cancel (NeuButton gray). Saves edit, stores edited_at, shows "(edited)" label. Only the note author can edit.
+- Click "Delete" → inline confirmation "Delete this note?" Yes/No NeuButtons. Soft delete (deleted_at set, hidden from UI, kept in DB). Author and managers can delete.
+- "Add Note" button at the top of the stack → NeuButton teal. Opens a NeuInput textarea (concave) that slides in at the top. Save adds the note to the stack and logs to the invoice timeline ("Dosh added a note").
+
+TIMELINE INTEGRATION:
+- Note creation, edits, and deletions log to the invoice timeline with actor and timestamp.
+- Notes are visible in the Timeline tab as events but the full text stays in the Notes section — timeline just shows "Note added by Dosh" with a link to scroll to it.
+
+PERMISSIONS:
+- All agents can add notes and view all notes on any invoice they can access.
+- Edit: author only.
+- Delete: author + managers/admins.
+
+Neumorphic styling throughout. Also check and restyle any close/X buttons, modals, dropdowns, toasts, and legacy elements on this page. Show the diff.

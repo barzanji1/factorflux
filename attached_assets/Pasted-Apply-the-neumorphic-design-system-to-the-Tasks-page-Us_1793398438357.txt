@@ -1,0 +1,34 @@
+Apply the neumorphic design system to the Tasks page. Use existing components from client/src/styles/neu/. Keep all functionality unchanged.
+
+SHELL:
+- Background: NeuPageShell #e0e0e0.
+
+STAT CARDS (top row, NeuStatCards):
+- Total Tasks, Open, In Progress, Completed Today, Overdue. Large teal numbers, muted labels. Overdue count in red if > 0.
+
+CHARTS (2-column layout below stats, NeuCard concave each):
+- "Task Completion Rate" — 3D cylinder bar chart, completed vs created per week over the last 8 weeks. Two cylinder colors: teal = completed, gray = created. Shows whether the team is keeping up or falling behind.
+- "Tasks by Priority/Type" — donut chart. Segments by priority (high/medium/low) or by type (follow-up, doc request, chargeback, manual). Teal/cyan/gray palette. Center: total open.
+
+FILTER BAR:
+- NeuInput concave for search (by task title, invoice #, carrier/broker name).
+- NeuSelect filters: status (all / open / in progress / completed / overdue), assigned agent, priority, date range.
+- NeuButton "Create Task" (teal accent).
+
+TASK LIST:
+- NeuCards per task (not a flat table — tasks are richer than a table row). Each card shows:
+  - Left: priority indicator (colored dot or bar — red high, yellow medium, gray low).
+  - Title bold, description muted below.
+  - Linked entity (invoice #, carrier, broker) as a clickable NeuBadge.
+  - Assigned agent avatar (initials circle).
+  - Due date, with "overdue" in red NeuBadge if past due.
+  - Right side: status NeuBadge + action NeuButtons (complete, reassign, edit).
+- Cards stack vertically with 12px gap. Sortable by due date, priority, or status.
+- Completed tasks: concave/pressed NeuCard with muted text and strikethrough title. Collapsible "Show completed" section at the bottom.
+
+EMPTY STATE:
+- When no tasks: centered icon + "No open tasks" + "Create one or check back later." Neumorphic surface, no harsh borders.
+
+Pagination → NeuButtons if the list is long, or infinite scroll with a load-more NeuButton.
+
+Show the diff.
