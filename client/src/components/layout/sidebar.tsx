@@ -15,7 +15,7 @@ import {
   RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, MessageCircle,
   ChevronDown, Pin, PinOff,
 } from "lucide-react";
-import { useStaffIdentity } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import ItSupportBell from "@/components/it-support/ItSupportBell";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebarHosted } from "./sidebar-host";
@@ -181,10 +181,10 @@ export default function Sidebar(props: SidebarProps) {
 
 function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading } = useStaffIdentity();
+  const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigationSequence = useRef(0);
-  const pendingPath = useRef<string | null>(null);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
   useEffect(() => () => { ++navigationSequence.current; }, []);
   const userRole = authUser?.role ?? "employee";
   const isAdmin = userRole === "admin";
@@ -311,9 +311,9 @@ function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
   }, [notificationChannels, authUser?.id]);
 
   const navigateTo = async (href: string) => {
-    if (href === location && !pendingPath.current) return;
+    if (href === location && !pendingPath) return;
     const sequence = ++navigationSequence.current;
-    pendingPath.current = href;
+    setPendingPath(href);
     try {
       // The shared router now prepares code/access for every navigation source.
       // Preserve the rail's scroll/focus before it commits the destination.
@@ -325,11 +325,11 @@ function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
       if (sequence !== navigationSequence.current) return;
     } catch (error) {
       if (sequence !== navigationSequence.current) return;
-      pendingPath.current = null;
+      setPendingPath(null);
       toast({ title: "Page could not open", description: error instanceof Error ? error.message : "Please retry.", variant: "destructive" });
       return;
     }
-    pendingPath.current = null;
+    setPendingPath(null);
     onNavigate?.();
   };
 
@@ -422,6 +422,7 @@ function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
                       onPointerDown={() => preloadPage(item.href)}
                       onFocus={() => preloadPage(item.href)}
                       aria-current={active ? "page" : undefined}
+                      aria-busy={pendingPath === item.href}
                       title={expanded ? undefined : item.name}
                       aria-label={item.name}
                       className={cn(
@@ -433,10 +434,10 @@ function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
                            : "text-[#1f1f1f]"
                       )}
                     >
-                      <Icon className={cn(
+                      {pendingPath === item.href ? <RotateCcw className="h-[14px] w-[14px] shrink-0 animate-spin" aria-label="Opening page" /> : <Icon className={cn(
                         "h-[14px] w-[14px] shrink-0 transition-colors",
                          active ? "text-[#087c8d]" : "text-[#454545] group-hover:text-[#087c8d]"
-                      )} />
+                      )} />}
                        {expanded && <span className="truncate text-[13px] font-semibold leading-none tracking-[-0.01em]">
                         {item.name}
                       </span>}

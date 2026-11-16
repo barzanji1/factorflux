@@ -1,10 +1,8 @@
-import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
+import { useLayoutEffect, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { loadPage, warmStaffPages } from "./lazy-page";
-import { queryClient } from "./queryClient";
-import { hasCachedPageSnapshot } from "./page-snapshot";
+import { loadPage } from "./lazy-page";
 import { createNavigationController, navigationPath as pathname, navigationSearch, type NavigationOptions } from "./navigation-controller";
 
 const publicPage = (href: string) => /^\/(?:login|portal(?:\/|$))/.test(href.split(/[?#]/)[0]);
@@ -133,22 +131,12 @@ export function useSeamlessSearch() {
 /** Runs under AuthProvider, while the router's location hook stays auth-free. */
 export function NavigationCoordinator() {
   const { isAuthenticated, user } = useAuth();
-  useEffect(() => isAuthenticated && user ? warmStaffPages() : undefined, [isAuthenticated, user?.id]);
   useLayoutEffect(() => controller.configure(async (href, from) => {
     if (!isAuthenticated || !user || publicPage(from) || publicPage(href) || pathname(href) === pathname(from)) return;
     // Current permissions are enforced by the route guard and every API.
     // AuthProvider refreshes the verified snapshot in the background; making
     // that request a navigation prerequisite added latency even to cached pages.
-    const code = loadPage(href);
-    if (!hasCachedPageSnapshot(queryClient, pathname(href))) {
-      // A cold page's existing structural shell must paint BEFORE synchronous
-      // React/JSX work starts. Microtask-only preparation starved that first
-      // paint on large pages. Cached revisits never take this paint barrier.
-      const painted = document.visibilityState === "visible"
-        ? new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-        : Promise.resolve();
-      await Promise.all([code, painted]);
-    } else await code;
+    await loadPage(href);
   }), [isAuthenticated, user?.id]);
   return null;
 }

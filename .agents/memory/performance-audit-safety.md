@@ -20,21 +20,3 @@ Do not equate loading-state continuity checks with fast navigation. When the use
 **Why:** Local compiled-bundle checks passed for layout continuity while the user still experienced production navigation delays. A clean layout assertion does not establish a latency budget, and a cached route can still wait on a network prerequisite.
 
 **How to apply:** Separate code downloads, authorization preparation, page-data requests, and main-thread work. State the test location, cache conditions, and what “rendered” means; do not present local harness timings as deployed-site measurements.
-
-Validate completed chart geometry separately from navigation continuity when changing shared rendering behavior.
-
-**Why:** Navigation checks passed before the user reported stalled or missing graphics after a shared-renderer optimization. A mounted page and stable sidebar do not establish that its charts finished rendering.
-
-**How to apply:** Check the compiled build for completed metric values, nonzero SVG dimensions, cylinder caps for positive data, valid SVG references, and resolved infographic loading states. Distinguish legitimate empty data from missing graphics; cover cached revisits and record-detail views too.
-
-A mounted structural shell is not necessarily painted before synchronous destination rendering.
-
-**Why:** Cold pages could block the first visible shell even when their chunks were cached and authorization was not awaited; microtask-only navigation preparation gave the browser no paint opportunity.
-
-**How to apply:** Measure browser frames, not only DOM presence. Let the cold-visit shell paint before expensive destination work; keep completed cached visits free of that paint barrier.
-
-Isolate background authentication-request status from stable staff identity rather than freezing chart consumers.
-
-**Why:** Unrelated permission refresh status reached large page trees, while an earlier broad chart-renderer memoization caused missing or stalled graphics.
-
-**How to apply:** Preserve reactive user/role/permission changes and full authentication status for guards and auth controls. Let charts observe their live query data; verify permission revocation as well as unchanged-data background refreshes.

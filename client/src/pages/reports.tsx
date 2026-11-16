@@ -4,7 +4,6 @@ import { format, subMonths } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { PageInsights } from "@/components/PageInsights";
 import { apiRequest } from "@/lib/queryClient";
-import { PAGE_RETAIN_MS, PAGE_STALE_MS, refreshPageOnMount } from "@/lib/page-cache-policy";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   RecoveryPageFrame, RecoveryCard as Card, RecoveryButton as Button, RecoveryInput as Input, RecoveryBadge,
@@ -605,14 +604,13 @@ function AgentPerformanceTab() {
   if (agentId !== "all") params.set("userId", agentId);
   const performancePrefix = ["/api/reports/agent-performance", user?.id, user?.role] as const;
   const warningPrefix = ["/api/warnings", user?.id, user?.role] as const;
-  const freshness = { enabled, staleTime: PAGE_STALE_MS, gcTime: PAGE_RETAIN_MS, refetchOnMount: refreshPageOnMount, placeholderData: undefined };
+  const freshness = { enabled, staleTime: 0, gcTime: 0, refetchOnMount: "always" as const, placeholderData: undefined };
   const query = useQuery<PerformanceRow[] | PerformanceRow>({
     ...freshness, queryKey: [...performancePrefix, start, end, agentId, revision],
     queryFn: ({ signal }) => fetchPerformanceJson(`/api/reports/agent-performance?${params}`, signal),
   });
   const agentOptionsQuery = useQuery<PerformanceRow[]>({
-    // All-agents rows and selector options use the same response/cache entry.
-    ...freshness, queryKey: [...performancePrefix, start, end, "all", revision],
+    ...freshness, queryKey: [...performancePrefix, start, end, "options", revision],
     queryFn: ({ signal }) => fetchPerformanceJson(`/api/reports/agent-performance?${new URLSearchParams({ startDate: start, endDate: end })}`, signal),
   });
   const warningQuery = useQuery<Warning[]>({
@@ -621,13 +619,12 @@ function AgentPerformanceTab() {
     // without discarding historical warnings outside the performance period.
     queryFn: ({ signal }) => fetchPerformanceJson(`/api/warnings${agentId === "all" ? "" : `?${new URLSearchParams({ userId: agentId })}`}`, signal),
   });
-  const initialPending = enabled && (query.isPending || agentOptionsQuery.isPending || warningQuery.isPending);
-  const reportReady = enabled && query.isSuccess && !initialPending;
-  const optionsReady = enabled && agentOptionsQuery.isSuccess && !initialPending;
+  const reportReady = enabled && query.isSuccess && !query.isFetching;
+  const optionsReady = enabled && agentOptionsQuery.isSuccess && !agentOptionsQuery.isFetching;
   const agentOptions = optionsReady && Array.isArray(agentOptionsQuery.data) ? agentOptionsQuery.data : [];
   const rows = reportReady ? (Array.isArray(query.data) ? query.data : query.data ? [query.data] : []) : [];
   const selected = rows.find(row => String(row.userId ?? row.id) === selectedAgentId) ?? null;
-  const warnings = enabled && warningQuery.isSuccess && !initialPending ? warningQuery.data : [];
+  const warnings = enabled && warningQuery.isSuccess && !warningQuery.isFetching ? warningQuery.data : [];
   const clearWarning = () => { setWarningOpen(false); setWarningForm(emptyWarningDraft()); };
   const createWarning = useMutation({
     mutationFn: ({ draft }: { draft: WarningDraft; context: string; session: number }) => apiRequest("POST", "/api/warnings", draft),
@@ -698,7 +695,7 @@ function AgentPerformanceTab() {
       <div key={JSON.stringify([user?.id, user?.role, agentId, end, "from"])}><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">From</label><Input aria-label="From date" data-testid="performance-from-date" type="date" value={start} onChange={e => changeFilters({ start: e.target.value })} className="h-8 w-36 text-xs" /></div>
       <span className="mb-2 text-xs text-slate-400">to</span>
       <div key={JSON.stringify([user?.id, user?.role, agentId, start, "through"])}><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Through</label><Input aria-label="Through date" data-testid="performance-through-date" type="date" value={end} onChange={e => changeFilters({ end: e.target.value })} className="h-8 w-36 text-xs" /></div>
-      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Employee</label><Select value={agentId} open={agentMenuOpen} onOpenChange={setAgentMenuOpen} onValueChange={onAgentChange}><SelectTrigger data-testid="performance-agent-select" disabled={!optionsReady} className="h-8 w-48 text-xs"><SelectValue key={contextKey}>{optionsReady ? (agentId === "all" ? "All Agents" : (() => { const agent = agentOptions.find(r => String(r.userId ?? r.id) === agentId); return agent ? `${agent.firstName ?? ""} ${agent.lastName ?? ""}`.trim() || agent.email : "Employee unavailable"; })()) : "Select employee"}</SelectValue></SelectTrigger><SelectContent key={contextKey}><SelectItem value="all">All Agents</SelectItem>{agentOptions.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div>
+      <div><label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Employee</label><Select value={agentId} open={agentMenuOpen} onOpenChange={setAgentMenuOpen} onValueChange={onAgentChange}><SelectTrigger data-testid="performance-agent-select" disabled={!optionsReady} className="h-8 w-48 text-xs"><SelectValue key={contextKey}>{optionsReady ? (agentId === "all" ? "All Agents" : (() => { const agent = agentOptions.find(r => String(r.userId ?? r.id) === agentId); return agent ? `${agent.firstName ?? ""} ${agent.lastName ?? ""}`.trim() || agent.email : "Employee unavailable"; })()) : "Refreshing agents…"}</SelectValue></SelectTrigger><SelectContent key={contextKey}><SelectItem value="all">All Agents</SelectItem>{agentOptions.map(r => <SelectItem key={String(r.userId ?? r.id)} value={String(r.userId ?? r.id)}>{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email}</SelectItem>)}</SelectContent></Select></div>
       <CustomizeColumns columns={performanceColumns} visible={reportPrefs.visible} onChange={reportPrefs.setVisible} templates={reportPrefs.templates} onSave={reportPrefs.saveTemplate} onApply={applyReportTemplate} onDelete={reportPrefs.deleteTemplate} />
       <Button data-testid="performance-csv" disabled={!reportReady || !rows.length} size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => exportCsv("agent_performance.csv", csv)}><Download className="h-3.5 w-3.5" /> Visible CSV</Button>
       {manager && <Button data-testid="performance-issue-warning" disabled={!reportReady || !optionsReady} size="sm" className="h-8 gap-1.5" onClick={() => { setWarningForm(emptyWarningDraft()); createWarning.reset(); activeWarningSession.current += 1; setWarningSession(activeWarningSession.current); setWarningOpen(true); }}><AlertTriangle className="h-3.5 w-3.5" /> Issue warning</Button>}
@@ -707,7 +704,7 @@ function AgentPerformanceTab() {
     <Card key={contextKey} className="overflow-hidden border border-slate-200 dark:border-slate-700">
       <div className="overflow-x-auto"><RecoveryTable className="ff-data-table w-full min-w-[850px] text-sm">
         <thead><tr className="border-b bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/60">{performanceColumns.filter(c => reportPrefs.visible.includes(c.key)).map(c => <th key={c.key} className="whitespace-nowrap px-4 py-3">{c.label}</th>)}</tr></thead>
-        <tbody className="divide-y">{initialPending ? <SkeletonRows cols={reportPrefs.visible.length} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelectedAgentId(String(r.userId ?? r.id))} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20">
+        <tbody className="divide-y">{enabled && query.isFetching ? <SkeletonRows cols={reportPrefs.visible.length} /> : rows.length ? rows.map((r, i) => <tr key={String(r.userId ?? r.id ?? i)} onClick={() => setSelectedAgentId(String(r.userId ?? r.id))} className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-950/20">
           {reportPrefs.visible.includes("agent") && <td className="px-4 py-3 font-semibold">{`${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || r.email || "Unassigned"}</td>}
           {reportPrefs.visible.includes("role") && <td className="px-4 py-3 capitalize text-slate-500">{r.role ?? "agent"}</td>}
           {reportPrefs.visible.includes("invoices") && <td className="px-4 py-3 tabular-nums">{r.invoicesProcessed ?? r.invoiceCount ?? 0}</td>}
@@ -719,8 +716,8 @@ function AgentPerformanceTab() {
       </RecoveryTable></div>
     </Card>
     <Card key={`warnings:${contextKey}`} data-testid="performance-warnings" className="border border-slate-200 dark:border-slate-700">
-      <CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings · history</CardTitle><span className="text-xs text-slate-500">{initialPending ? "—" : `${warnings.length} recorded`}</span></CardHeader>
-      <CardContent className="space-y-2 p-3">{initialPending ? <div aria-hidden="true" style={{ height: 80, borderRadius: 8, background: "#d8d8d8" }} /> : warnings.length ? warnings.map(w => <div key={w.id} className="ff-card ff-reports-surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-sm">Written warnings · history</CardTitle><span className="text-xs text-slate-500">{enabled && warningQuery.isFetching ? "Refreshing…" : `${warnings.length} recorded`}</span></CardHeader>
+      <CardContent className="space-y-2 p-3">{enabled && warningQuery.isFetching ? <div>Loading warnings…</div> : warnings.length ? warnings.map(w => <div key={w.id} className="ff-card ff-reports-surface flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><span>{w.agentName ?? w.userId}</span><RecoveryBadge className={`${w.severity === "final" ? "ff-badge-rejected" : w.severity === "written" ? "ff-badge-pending" : "ff-badge-draft"} uppercase`}>{w.severity}</RecoveryBadge></div><p className="mt-1 text-xs text-slate-500">{w.reason}</p></div>
         <div className="flex items-center gap-3 text-xs text-slate-500"><span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>{w.acknowledgedAt ? <RecoveryBadge className="ff-badge-funded gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Acknowledged</RecoveryBadge> : String(w.userId) === String(user?.id) ? <Button size="sm" variant="outline" className="h-7" disabled={pendingAcknowledgements.has(w.id)} onClick={() => acknowledge.mutate({ id: w.id, context: contextKey })}>Acknowledge</Button> : <RecoveryBadge className="ff-badge-pending">Pending</RecoveryBadge>}</div>
       </div>) : <div className="px-5 py-10 text-center text-sm text-slate-500">{rangeError ? "Choose a valid date range." : warningQuery.error ? "Warnings unavailable." : "No written warnings in scope."}</div>}

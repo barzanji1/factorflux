@@ -1,9 +1,8 @@
-import React, { createContext, ReactNode, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { createContext, ReactNode, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import { useLocation } from "wouter";
 import { createPermissionRefresh, samePermissions } from "@/lib/permission-refresh";
 import { toast } from "@/hooks/use-toast";
-import { clearStaffDataCache } from "@/lib/queryClient";
 
 interface User {
   id: string;
@@ -34,8 +33,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-type StaffIdentity = Pick<AuthContextType, "user" | "permissions" | "permissionsLoaded" | "isLoading">;
-const StaffIdentityContext = createContext<StaffIdentity | null>(null);
 
 async function fetchPermissions(): Promise<string[]> {
   const res = await fetch("/api/auth/permissions", { credentials: "include", cache: "no-store" });
@@ -63,7 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastPermissionPath = useRef(location);
 
   const clearSession = useCallback(() => {
-    clearStaffDataCache();
     refresh.current.invalidate();
     activeUser.current = undefined;
     setUser(null);
@@ -179,7 +175,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Finish the permission request before publishing authenticated state.
         // Otherwise the route-refresh effect starts a duplicate request.
         const perms = await fetchPermissions();
-        clearStaffDataCache();
         refresh.current.invalidate();
         refreshWarningShown.current = false;
         lastPermissionPath.current = "/";
@@ -251,13 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [isAuthenticated, user?.id, refreshPermissions]);
 
-  // Background permission-request status is not a change of staff identity.
-  // Keep large page trees and the persistent rail subscribed to real identity/
-  // permission changes, without withholding status from auth controls.
-  const staffIdentity = useMemo(() => ({ user, permissions, permissionsLoaded, isLoading }),
-    [user, permissions, permissionsLoaded, isLoading]);
   return (
-    <StaffIdentityContext.Provider value={staffIdentity}><AuthContext.Provider
+    <AuthContext.Provider
       value={{
         user,
         isLoading,
@@ -275,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-    </AuthContext.Provider></StaffIdentityContext.Provider>
+    </AuthContext.Provider>
   );
 }
 
@@ -284,11 +274,5 @@ export function useAuth() {
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context;
-}
-
-export function useStaffIdentity() {
-  const context = useContext(StaffIdentityContext);
-  if (!context) throw new Error("useStaffIdentity must be used within an AuthProvider");
   return context;
 }

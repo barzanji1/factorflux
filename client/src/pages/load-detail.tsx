@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import DocumentIntakeZone from "@/components/documents/document-intake-zone";
 import EntityNotes from "@/components/shared/EntityNotes";
-import { PageInsights, usePrimeRecordInsights } from "@/components/PageInsights";
+import { PageInsights } from "@/components/PageInsights";
 import "@/components/admin-neu/admin-neu-page.css";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -44,7 +44,6 @@ function DataRow({ label, value, mono = false }: { label: string; value: React.R
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LoadDetail() {
   const { id } = useParams<{ id: string }>();
-  usePrimeRecordInsights("loads", id);
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const loadId = parseInt(id ?? "0", 10);

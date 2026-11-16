@@ -27,7 +27,6 @@ import { ClientEmailComposer } from "@/components/client-email/client-email-comp
 import { ClientEmailLog } from "@/components/client-email/client-email-log";
 import EntityNotes from "@/components/shared/EntityNotes";
 import { CarrierFinancialOverview } from "@/components/carriers/carrier-financial-overview";
-import { usePrimeFinancialSummary } from "@/hooks/use-prime-financial-summary";
 import { SafePaginatedTable } from "@/components/safe-table-pagination";
 import { NeuBadge, NeuButton, NeuCard, NeuPageShell, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { ArrowLeft, CheckCircle2, CircleAlert, Download, Edit2, Eye, EyeOff, FileText, Mail, MessageCircle, Phone, Plus, ShieldCheck, UserRound, XCircle, ChevronDown, Trash2, Pencil } from "lucide-react";
@@ -158,7 +157,6 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const clientId = Number(id);
-  usePrimeFinancialSummary("clients", clientId);
   const { user, permissions, isLoading: authLoading, hasPermission } = useAuth();
   const isManager = user?.role === "admin" || user?.role === "manager";
   const canUseCarrierChat = !!user && (

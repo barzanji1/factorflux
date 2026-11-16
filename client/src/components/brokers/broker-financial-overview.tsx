@@ -1,6 +1,5 @@
 import { useId, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { refreshPageOnMount } from "@/lib/page-cache-policy";
 import { Link } from "wouter";
 import { Area, AreaChart, Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
@@ -38,7 +37,7 @@ export function BrokerFinancialOverview({ brokerId }: { brokerId: number }) {
     },
     enabled: Number.isSafeInteger(brokerId) && brokerId > 0,
     staleTime: 60_000,
-    refetchOnMount: refreshPageOnMount,
+    refetchOnMount: "always",
   });
   if (query.isLoading) return <section aria-label="Loading broker financial summary" aria-busy="true">
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">{Array.from({ length: 5 }, (_, index) =>

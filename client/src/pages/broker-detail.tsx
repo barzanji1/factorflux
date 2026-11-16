@@ -11,7 +11,6 @@ import BrokerEditDialog from "@/components/brokers/broker-edit-dialog";
 import DumpStatementTimeline from "@/components/brokers/dump-statement-timeline";
 import EntityNotes from "@/components/shared/EntityNotes";
 import { BrokerFinancialOverview } from "@/components/brokers/broker-financial-overview";
-import { usePrimeFinancialSummary } from "@/hooks/use-prime-financial-summary";
 import { NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell, NeuTableHead, NeuTableHeader, NeuTableRow } from "@/styles/neu/components";
 import { NeuNotice } from "@/components/shared/NeuNotice";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -190,7 +189,6 @@ function CreditScorePanel({ brokerId, canRecalculate }: { brokerId: number; canR
 export default function BrokerDetail() {
   const { id } = useParams<{ id: string }>();
   const brokerId = Number(id);
-  usePrimeFinancialSummary("brokers", brokerId);
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();

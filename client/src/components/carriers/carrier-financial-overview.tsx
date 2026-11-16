@@ -1,6 +1,5 @@
 import { useId } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { refreshPageOnMount } from "@/lib/page-cache-policy";
 import { Link } from "wouter";
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { NeuButton, NeuCard, NeuStatCard } from "@/styles/neu";
@@ -41,7 +40,7 @@ export function CarrierFinancialOverview({ carrierId }: { carrierId: number }) {
     },
     enabled: Number.isSafeInteger(carrierId) && carrierId > 0,
     staleTime: 60_000,
-    refetchOnMount: refreshPageOnMount,
+    refetchOnMount: "always",
   });
   if (isLoading) return <section aria-label="Loading carrier financial summary" aria-busy="true">
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) =>
