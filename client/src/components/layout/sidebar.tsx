@@ -13,12 +13,13 @@ import {
   LifeBuoy, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
   RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, MessageCircle,
-  ChevronDown, Pin, PinOff,
+  ChevronDown, Pin, PinOff, Sun, Moon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import ItSupportBell from "@/components/it-support/ItSupportBell";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebarHosted } from "./sidebar-host";
+import { useTheme } from "@/hooks/useTheme";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ export default function Sidebar(props: SidebarProps) {
 }
 
 function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
+  const { theme, setTheme } = useTheme();
   const [location, setLocation] = useLocation();
   const { permissions, permissionsLoaded, user: authUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -460,6 +462,18 @@ function SidebarContent({ mobile = false, onNavigate }: SidebarProps) {
 
       {/* Footer */}
       <div className="ff-neu-sidebar-footer">
+        <button
+          type="button"
+          className={`ff-neu-pin-button ${expanded ? "" : "justify-center"}`}
+          role="switch"
+          aria-checked={theme === "dark"}
+          aria-label="Dark mode"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {expanded && <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>}
+        </button>
         <button
           type="button"
           className={`ff-neu-pin-button ${expanded ? "" : "justify-center"}`}

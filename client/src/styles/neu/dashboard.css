@@ -88,6 +88,31 @@
 .ff-neu-pin-button:hover,.ff-neu-pin-button[aria-pressed="true"] { color:#168f99; background:rgba(255,255,255,.35); }
 .ff-neu-sidebar-footer > div { padding-inline:5px; }
 .ff-neu-sidebar .ff-neu-sidebar-initials { border:0; }
+
+/* Theme-local overrides for custom properties (the PostCSS palette pass
+   handles literal neutral paint while retaining every authored shadow offset). */
+:is(:root[data-theme="dark"], .dark) .ff-neu-app-shell {
+  --ff-neu-base: #1a1a1a;
+  --ff-neu-ink: #e8e8e8;
+  --neu-convex: 4px 4px 8px rgba(0,0,0,.5), -4px -4px 8px rgba(255,255,255,.05);
+  --neu-concave: inset 3px 3px 6px rgba(0,0,0,.5), inset -3px -3px 6px rgba(255,255,255,.05);
+  background: #0d0d0d !important;
+  color: #e8e8e8 !important;
+}
+:is(:root[data-theme="dark"], .dark) .ff-neu-dashboard {
+  color: #e8e8e8;
+  --neu-convex: 4px 4px 8px rgba(0,0,0,.5), -4px -4px 8px rgba(255,255,255,.05);
+  --neu-concave: inset 3px 3px 6px rgba(0,0,0,.5), inset -3px -3px 6px rgba(255,255,255,.05);
+}
+:is(:root[data-theme="dark"], .dark) .ff-neu-page-shell {
+  background: #0d0d0d !important;
+  color: #e8e8e8 !important;
+}
+:is(:root[data-theme="dark"], .dark) .ff-neu-sidebar {
+  background: #1a1a1a !important;
+  color: #a0a0a0;
+}
+
 @media(max-width:767px) {
   .ff-neu-sidebar,.ff-neu-sidebar-expanded,.ff-neu-sidebar-collapsed { width:248px; flex-basis:248px; }
 }

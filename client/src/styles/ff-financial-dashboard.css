@@ -444,3 +444,30 @@ body:has(.ff-financial-dashboard-shell) [data-radix-dialog-content] {
   color: var(--ff-financial-charcoal) !important;
   box-shadow: 0 6px 18px rgba(16, 42, 56, .13), inset 0 0 0 1px var(--ff-financial-border) !important;
 }
+
+/* Dark workspace paint: theme the local aliases used throughout this sheet.
+   Preserve the teal identity accent and every existing shadow measurement. */
+:is(:root[data-theme="dark"], .dark) .ff-financial-dashboard-shell {
+  --ff-financial-navy: #1a1a1a;
+  --ff-financial-workspace: #0d0d0d;
+  --ff-financial-porcelain: #1a1a1a;
+  --ff-financial-charcoal: #e8e8e8;
+  --ff-financial-slate: #a0a0a0;
+  --ff-financial-border: #333333;
+}
+
+:is(:root[data-theme="dark"], .dark) .ff-financial-dashboard-shell .ff-neu-dashboard {
+  color: #e8e8e8 !important;
+  --neu-convex: 0 2px 8px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.5);
+  --neu-concave: 0 2px 8px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.5);
+}
+
+/* Portaled menus and sheets are outside the dashboard shell subtree. */
+:is(:root[data-theme="dark"], .dark) body:has(.ff-financial-dashboard-shell) {
+  --ff-financial-navy: #1a1a1a;
+  --ff-financial-workspace: #0d0d0d;
+  --ff-financial-porcelain: #1a1a1a;
+  --ff-financial-charcoal: #e8e8e8;
+  --ff-financial-slate: #a0a0a0;
+  --ff-financial-border: #333333;
+}

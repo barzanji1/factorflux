@@ -2239,6 +2239,237 @@ div:has(> table.ff-data-table) {
   }
 }
 
+/* Dark workspace palette. Keep the source light palette and neumorphic
+   geometry intact; only the paint tokens change when the root theme is dark. */
+:is(:root[data-theme="dark"], .dark) {
+  color-scheme: dark;
+
+  --background: 0 0% 5%;
+  --foreground: 0 0% 91%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 91%;
+  --popover: 0 0% 14%;
+  --popover-foreground: 0 0% 91%;
+  --muted: 0 0% 14%;
+  --muted-foreground: 0 0% 63%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --secondary: 0 0% 14%;
+  --secondary-foreground: 0 0% 91%;
+  --accent: 0 0% 14%;
+  --accent-foreground: 185 72% 55%;
+  --surface: 0 0% 10%;
+  /* Semantic/accent hues stay identical to the light palette. */
+  --primary: 184 65% 44%;
+  --primary-dark: 221 83% 42%;
+  --violet: 262 83% 58%;
+  --destructive: 0 72% 46%;
+  --success: 152 60% 30%;
+  --warning: 36 94% 44%;
+  --ring: 184 65% 44%;
+
+  --ff-bg: #0d0d0d;
+  --ff-surface: #1a1a1a;
+  --ff-surface-subtle: #1a1a1a;
+  --ff-surface-tint: #242424;
+  --ff-border: #333333;
+  --ff-border-strong: #444444;
+  --ff-text-0: #e8e8e8;
+  --ff-text-1: #a0a0a0;
+  --ff-text-2: #a0a0a0;
+  --ff-text-3: #777777;
+
+  --ff-raised-highlight: rgba(255, 255, 255, 0.05);
+  --ff-raised-shadow: rgba(0, 0, 0, 0.5);
+  --ff-inset-shadow: rgba(0, 0, 0, 0.5);
+  --ff-panel-header: #242424;
+  --ff-shadow-xs: 0 1px 2px rgba(0,0,0,.5);
+  --ff-shadow-sm: 0 1px 3px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.5);
+  --ff-shadow-md: 0 3px 8px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.5);
+  --ff-shadow-lg: 0 8px 20px rgba(0,0,0,.5), 0 3px 6px rgba(0,0,0,.5);
+  --shadow-sm: var(--ff-shadow-xs);
+  --shadow-md: var(--ff-shadow-md);
+  --shadow-lg: var(--ff-shadow-lg);
+
+  --button-primary-hover: #242424;
+  --button-secondary-hover: #242424;
+  --button-subtle-hover: #242424;
+  --button-destructive-hover: #242424;
+
+  --ff-institutional-navy: #1a1a1a;
+  --ff-institutional-workspace: #0d0d0d;
+  --ff-institutional-surface: #1a1a1a;
+  --ff-institutional-subtle: #1a1a1a;
+  --ff-institutional-tint: #242424;
+  --ff-institutional-ink: #e8e8e8;
+  --ff-institutional-muted: #a0a0a0;
+  --ff-institutional-border: #333333;
+  --ff-institutional-shadow: 0 3px 10px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.5);
+  --ff-shell-bg: #0d0d0d;
+  --ff-shell-surface: #1a1a1a;
+  --ff-shell-muted: #1a1a1a;
+  --ff-shell-rail: #151515;
+  --ff-shell-border: #333333;
+  --ff-shell-ink: #e8e8e8;
+  --ff-shell-copy: #a0a0a0;
+  --ff-shell-teal-light: #242424;
+  --ff-chart-grid: #555555;
+  --ff-chart-muted: #a0a0a0;
+  --ff-chart-legend: #a0a0a0;
+}
+
+:root {
+  --ff-chart-grid: #8c9995;
+  --ff-chart-muted: #76837f;
+  --ff-chart-legend: #697a75;
+}
+
+:is(:root[data-theme="dark"], .dark) .ff-app-shell {
+  --ff-shell-bg: #0d0d0d;
+  --ff-shell-surface: #1a1a1a;
+  --ff-shell-muted: #1a1a1a;
+  --ff-shell-rail: #151515;
+  --ff-shell-border: #333333;
+  --ff-shell-ink: #e8e8e8;
+  --ff-shell-copy: #a0a0a0;
+  --ff-shell-teal-light: #242424;
+  --ff-bg: #0d0d0d;
+  --ff-surface: #1a1a1a;
+  --ff-surface-subtle: #1a1a1a;
+  --ff-surface-tint: #242424;
+  --ff-border: #333333;
+  --ff-text-0: #e8e8e8;
+  --ff-text-1: #a0a0a0;
+  --ff-text-2: #a0a0a0;
+}
+
+/* Legacy authenticated workspace selectors and utility classes. */
+:is(:root[data-theme="dark"], .dark) body,
+:is(:root[data-theme="dark"], .dark) .ff-app-shell,
+:is(:root[data-theme="dark"], .dark) .ff-neu-app-shell {
+  background-color: #0d0d0d;
+  color: #e8e8e8;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root) :is(
+  .text-slate-900, .text-slate-800, .text-slate-700, .text-slate-600,
+  .text-gray-900, .text-gray-800, .text-gray-700, .text-gray-600,
+  .text-\[\#333\], .text-\[\#333333\], .text-\[\#383838\], .text-\[\#444\],
+  .text-\[\#444444\], .text-\[\#555\], .text-\[\#555555\]
+):not([class*="status"]):not([class*="badge"]):not([data-status]) {
+  color: #e8e8e8 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root) :is(
+  .text-slate-500, .text-slate-400, .text-slate-300,
+  .text-gray-500, .text-gray-400, .text-gray-300,
+  .text-\[\#666\], .text-\[\#666666\], .text-\[\#777\], .text-\[\#777777\],
+  .text-\[\#888\], .text-\[\#888888\], .text-\[\#999\], .text-\[\#999999\]
+):not([class*="status"]):not([class*="badge"]):not([data-status]) {
+  color: #a0a0a0 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root)
+  :is(.bg-white, .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100,
+      [class~="bg-[#e0e0e0]"], [class~="bg-[#d5d8d7]"], [class~="bg-[#d7e5e2]"],
+      [class~="bg-[#dedede]"], [class~="bg-[#d5e7e7]"]):not(main):not(.ff-neu-page-shell):not(.ff-neu-main-column):not([class*="badge"]):not([class*="status"]):not([data-status]) {
+  background-color: var(--ff-surface) !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root)
+  :is([class~="hover:bg-slate-50"], [class~="hover:bg-slate-100"], [class~="hover:bg-gray-50"]):hover:not([class*="badge"]):not([class*="status"]):not([data-status]) {
+  background-color: #242424 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root)
+  :is(.border-slate-100, .border-slate-200, .border-gray-100, .border-gray-200) {
+  border-color: #333333 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root) :is(
+  input, textarea, select, [role="combobox"]
+) {
+  background-color: #1a1a1a !important;
+  border-color: #333333 !important;
+  color: #e8e8e8 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root) :is(input, textarea)::placeholder {
+  color: #a0a0a0 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root) .ff-data-table thead th {
+  background-color: #1a1a1a !important;
+  color: #a0a0a0 !important;
+  border-color: #333333 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root) .ff-data-table tbody tr:hover {
+  background-color: #242424 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) :is(.ff-app-shell, .ff-institutional-root) :is(
+  [class~="text-[#3d5751]"], [class~="text-[#75847f]"], [class~="text-[#71827e]"],
+  [class~="text-[#697a75]"], [class~="text-[#657671]"]
+) {
+  color: #a0a0a0 !important;
+}
+
+/* Dialogs, popovers and menu portals are siblings of the app shell. Restrict
+   these paint rules to portals while an authenticated shell is mounted. */
+:is(:root[data-theme="dark"], .dark) body:has(.ff-app-shell) :is(
+  [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"],
+  [data-radix-dialog-content], [data-radix-popover-content],
+  [data-radix-dropdown-menu-content], [data-radix-select-content],
+  [data-sonner-toast]
+) {
+  background-color: #1a1a1a;
+  border-color: #333333;
+  color: #e8e8e8;
+}
+
+:is(:root[data-theme="dark"], .dark) body:has(.ff-app-shell)
+  [data-radix-popper-content-wrapper] :is([role="menuitem"], [role="option"]):is(:hover, :focus, [data-highlighted]) {
+  background-color: #242424 !important;
+  color: #e8e8e8 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) body:has(.ff-app-shell, .ff-institutional-root)
+  :is([role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [data-sonner-toast])
+  :is(.text-slate-900, .text-slate-800, .text-slate-700, .text-gray-900, .text-gray-800, .text-gray-700):not([class*="status"]):not([class*="badge"]) {
+  color: #e8e8e8 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) body:has(.ff-app-shell, .ff-institutional-root)
+  :is([role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [data-sonner-toast])
+  :is(.text-slate-500, .text-slate-400, .text-gray-500, .text-gray-400):not([class*="status"]):not([class*="badge"]) {
+  color: #a0a0a0 !important;
+}
+
+:is(:root[data-theme="dark"], .dark) body:has(.ff-app-shell, .ff-institutional-root)
+  :is([role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [data-sonner-toast])
+  :is(.bg-white, .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100):not([class*="status"]):not([class*="badge"]) {
+  background-color: #242424 !important;
+}
+
+:root[data-theme="dark"] .ff-institutional-root .recharts-default-tooltip {
+  background-color: var(--ff-surface-tint) !important;
+  border-color: var(--ff-border) !important;
+  color: var(--ff-text-0) !important;
+}
+:root[data-theme="dark"] .ff-institutional-root .recharts-tooltip-label {
+  color: var(--ff-text-0);
+}
+:root[data-theme="dark"] .ff-institutional-root .recharts-cartesian-axis-tick text {
+  fill: var(--ff-text-1);
+}
+:root[data-theme="dark"] .ff-institutional-root [data-insights-entity] > div:first-child h2 {
+  color: var(--ff-text-0);
+}
+:root[data-theme="dark"] .ff-institutional-root [data-insights-entity] > div:first-child p {
+  color: var(--ff-text-1);
+}
+
 /* Team Chat header controls remain legible without affecting shared selects. */
 .ff-team-chat .ff-team-chat-header {
   row-gap: 6px;

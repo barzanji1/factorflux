@@ -204,15 +204,15 @@ function PageInsightsContent({ entity, entityId, clientId, title = "Operational 
                         <Tooltip formatter={(v, _name, item) => [chartValue(Number(v), firstSeries?.format), String(item?.payload?.[xKey] ?? firstSeries?.label ?? "Records")]} />
                       </PieChart> : chart.kind === "area" ? <AreaChart data={chart.data} margin={{ top: 12, right: 4, left: -18, bottom: 0 }}>
                         <defs>{chart.series.map((series, index) => <linearGradient key={series.key} id={`${chartId}-${index}`} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={series.color} stopOpacity={0.28} /><stop offset="100%" stopColor={series.color} stopOpacity={0.02} /></linearGradient>)}</defs>
-                        <CartesianGrid vertical={false} stroke="#8c9995" strokeOpacity={0.18} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 9 }} />
+                        <CartesianGrid vertical={false} stroke="var(--ff-chart-grid, #8c9995)" strokeOpacity={0.18} />
+                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 10 }} />
+                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 9 }} />
                         <Tooltip formatter={(v, name) => { const series = chart.series.find(item => item.key === name); return [chartValue(Number(v), series?.format), series?.label ?? String(name)]; }} />
                         {chart.series.map((series, index) => <Area key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.5} fill={`url(#${chartId}-${index})`} />)}
                       </AreaChart> : <BarChart data={chart.data} margin={{ top: 12, right: 4, left: -18, bottom: 0 }}>
-                        <CartesianGrid vertical={false} stroke="#8c9995" strokeOpacity={0.18} />
-                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 9 }} />
+                        <CartesianGrid vertical={false} stroke="var(--ff-chart-grid, #8c9995)" strokeOpacity={0.18} />
+                        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 10 }} />
+                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 9 }} />
                         <Tooltip formatter={(v, name) => { const series = chart.series.find(item => item.key === name); return [chartValue(Number(v), series?.format), series?.label ?? String(name)]; }} />
                         {chart.series.map(series => <Bar key={series.key} dataKey={series.key} name={series.label} shape={<InsightCylinderBar fill={series.color} />} maxBarSize={25} />)}
                       </BarChart>}
@@ -230,9 +230,9 @@ function PageInsightsContent({ entity, entityId, clientId, title = "Operational 
                   <div className="h-[210px] w-full" role="img" aria-label="Activity and amount over time">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={data.series} margin={{ top: 12, right: 4, left: -18, bottom: 0 }}>
-                        <CartesianGrid vertical={false} stroke="#8c9995" strokeOpacity={0.18} />
-                        <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 9 }} />
+                        <CartesianGrid vertical={false} stroke="var(--ff-chart-grid, #8c9995)" strokeOpacity={0.18} />
+                        <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 10 }} />
+                        <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 9 }} />
                         <Tooltip formatter={(v, name) => [name === "amount" ? money.format(Number(v)) : number.format(Number(v)), name === "amount" ? "Amount" : "Records"]} />
                         <Bar dataKey="count" shape={<InsightCylinderBar />} maxBarSize={25} />
                       </BarChart>
@@ -247,9 +247,9 @@ function PageInsightsContent({ entity, entityId, clientId, title = "Operational 
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={data.series} margin={{ top: 12, right: 4, left: -18, bottom: 0 }}>
                         <defs><linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#248f92" stopOpacity={0.28} /><stop offset="100%" stopColor="#248f92" stopOpacity={0.02} /></linearGradient></defs>
-                        <CartesianGrid vertical={false} stroke="#8c9995" strokeOpacity={0.18} />
-                        <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "#76837f", fontSize: 10 }} />
-                        <YAxis tickFormatter={(v) => value(Number(v), data.keyMetric.format)} tickLine={false} axisLine={false} width={58} tick={{ fill: "#76837f", fontSize: 9 }} />
+                        <CartesianGrid vertical={false} stroke="var(--ff-chart-grid, #8c9995)" strokeOpacity={0.18} />
+                        <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 10 }} />
+                        <YAxis tickFormatter={(v) => value(Number(v), data.keyMetric.format)} tickLine={false} axisLine={false} width={58} tick={{ fill: "var(--ff-chart-muted, #76837f)", fontSize: 9 }} />
                         <Tooltip formatter={(v) => [value(Number(v), data.keyMetric.format), data.keyMetric.format === "currency" ? "Amount" : "Records"]} />
                         <Area type="monotone" dataKey={data.keyMetric.format === "currency" ? "amount" : "count"} stroke="#248f92" strokeWidth={2.5} fill={`url(#${gradientId})`} />
                       </AreaChart>

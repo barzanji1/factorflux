@@ -23,6 +23,16 @@
         document.head.appendChild(image);
       })();
     </script>
+    <script>
+      // Apply before styles or React load: never paint the wrong saved palette.
+      (function () {
+        var theme = "light";
+        try { if (localStorage.getItem("theme") === "dark") theme = "dark"; } catch (_) {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <style>
       /* Preserve the anonymous-entry scene preload while the independent startup mark paints. */
       html[data-login-entry] body { margin: 0; background: #243d4b; }
