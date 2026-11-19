@@ -26,7 +26,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, string> = {
   "/followups": "followups",
   "/reports": "reports",
   "/admin": "admin",
-  "/payroll": "payroll",
+  "/payroll": "",
   "/vault": "vault",
   "/document-rules": "rules",
   "/workflow-builder": "workflow_builder",

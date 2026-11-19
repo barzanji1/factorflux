@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { registerChargebackResolutionRoutes } from "./routes/chargebackResolutions";
 import { registerEntityNoteRoutes } from "./routes/entityNotes";
 import { registerAnnouncementRoutes } from "./routes/announcements";
+import { registerContractorPayrollRoutes } from "./routes/contractorPayroll";
 import { isSelfTimeTrackingRequest } from "./timeTrackingAccess";
 import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
@@ -889,6 +890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ["/api/trucks", "trucks"],
     ["/api/drivers", "trucks"],
     ["/api/payroll", "payroll"],
+    ["/api/contractor-payroll", "all_authenticated"],
     ["/api/reports", "reports"],
     ["/api/follow-ups", "followups"],
     ["/api/followups", "followups"],
@@ -968,6 +970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerEmailBroadcastRoutes(app, { requireAuth, requireAdmin });
   registerEmailTemplateRoutes(app, { requireAuth, requireEmailPermission: requireModulePermission("client_email") });
   registerAgentDashboardRoutes(app, requireAuth);
+  registerContractorPayrollRoutes(app, requireAuth);
   registerInvoiceBranchRoutes(app, requireAuth, canAccessBroker);
 
   app.get("/api/test/generate-rate-con", requireAdmin, requireDevelopment, (_req, res) => {
@@ -11268,6 +11271,9 @@ RESPOND:
   });
 
   // ─── Payroll ───────────────────────────────────────────────────────────────
+  // Preserve legacy history, but never expose manual rates/deductions to
+  // contractors or managers. The new self-service statements use their own API.
+  app.use("/api/payroll", requireAdmin);
   app.get("/api/payroll", requireAuth, async (req, res) => {
     try {
       const { employeeId, status, dateFrom, dateTo } = req.query;

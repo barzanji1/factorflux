@@ -10,6 +10,8 @@ import {
   decimal,
   boolean,
   integer,
+  bigint,
+  date,
   primaryKey,
   uniqueIndex,
   check,
@@ -2754,6 +2756,54 @@ export type ChatChannel = typeof chatChannels.$inferSelect;
 export type ChatMember = typeof chatMembers.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
+// Contractor payroll is separate from the retained manual payroll history.
+export const contractorPayrollSettings = pgTable("contractor_payroll_settings", {
+  id: integer("id").primaryKey(),
+  cadence: text("cadence").notNull().default("biweekly"),
+  timezone: text("timezone").notNull().default("UTC"),
+}, t => [check("contractor_payroll_settings_id_check", sql`${t.id}=1`),
+  check("contractor_payroll_settings_cadence_check", sql`${t.cadence} in ('weekly','biweekly','monthly','custom')`)]);
+export const contractorPayrollRates = pgTable("contractor_payroll_rates", {
+  contractorId: varchar("contractor_id").primaryKey().references(() => users.id),
+  rateCents: integer("rate_cents").notNull(),
+  updatedBy: varchar("updated_by").notNull().references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [check("contractor_payroll_rates_rate_cents_check", sql`${t.rateCents}>0 and ${t.rateCents}<=10000000`)]);
+export const contractorPayrollPeriods = pgTable("contractor_payroll_periods", {
+  id: serial("id").primaryKey(), startDate: date("start_date").notNull(), endDate: date("end_date").notNull(),
+  timezone: text("timezone").notNull(), cadence: text("cadence").notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(), endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("draft"),
+  createdBy: varchar("created_by").notNull().references(() => users.id), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lockedBy: varchar("locked_by").references(() => users.id), lockedAt: timestamp("locked_at", { withTimezone: true }),
+});
+export const contractorPayrollApprovals = pgTable("contractor_payroll_approvals", {
+  periodId: integer("period_id").notNull().references(() => contractorPayrollPeriods.id),
+  contractorId: varchar("contractor_id").notNull().references(() => users.id),
+  minutes: integer("minutes").notNull(), snapshot: jsonb("snapshot").notNull(),
+  approvedBy: varchar("approved_by").notNull().references(() => users.id),
+  approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.periodId, t.contractorId] })]);
+export const contractorPayrollStatements = pgTable("contractor_payroll_statements", {
+  id: serial("id").primaryKey(), statementNumber: text("statement_number").notNull().unique(),
+  periodId: integer("period_id").notNull().references(() => contractorPayrollPeriods.id),
+  contractorId: varchar("contractor_id").notNull().references(() => users.id), contractorName: text("contractor_name").notNull(),
+  startDate: date("start_date").notNull(), endDate: date("end_date").notNull(), payDate: date("pay_date").notNull(),
+  minutes: integer("minutes").notNull(), rateCents: integer("rate_cents").notNull(),
+  grossCents: bigint("gross_cents", { mode: "number" }).notNull(), ytdGrossCents: bigint("ytd_gross_cents", { mode: "number" }).notNull(),
+  snapshot: jsonb("snapshot").notNull(), pdfBase64: text("pdf_base64").notNull(), pdfSha256: text("pdf_sha256").notNull(),
+  status: text("status").notNull().default("issued"),
+  issuedBy: varchar("issued_by").notNull().references(() => users.id), issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  voidedBy: varchar("voided_by").references(() => users.id), voidedAt: timestamp("voided_at", { withTimezone: true }), voidReason: text("void_reason"),
+  replacesStatementId: integer("replaces_statement_id").references((): AnyPgColumn => contractorPayrollStatements.id),
+}, t => [uniqueIndex("contractor_payroll_one_issued_idx").on(t.periodId, t.contractorId).where(sql`${t.status}='issued'`),
+  index("contractor_payroll_annual_idx").on(t.contractorId, t.payDate).where(sql`${t.status}='issued'`)]);
+export const contractorPayrollAudit = pgTable("contractor_payroll_audit", {
+  id: serial("id").primaryKey(), action: text("action").notNull(),
+  actorId: varchar("actor_id").notNull().references(() => users.id), actorName: text("actor_name").notNull(),
+  details: jsonb("details").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("contractor_payroll_audit_created_idx").on(t.createdAt, t.id)]);
 
 export const ALL_PERMISSIONS = [
   "dashboard","carriers","invoices","documents","tasks","bulk_invoices","portal_submissions",

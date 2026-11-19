@@ -144,7 +144,7 @@ const navSections: NavSection[] = [
     title: "Admin",
     items: [
       { name: "Admin",            href: "/admin",            icon: ShieldCheck,     permission: "admin",            role: "manager" },
-      { name: "Payroll",          href: "/payroll",          icon: BadgeDollarSign, permission: "payroll",          role: "manager" },
+      { name: "Pay Statements",   href: "/payroll",          icon: BadgeDollarSign, permission: "", staffVisible: true },
       { name: "Expenses",         href: "/expenses",         icon: Receipt,         permission: "expenses" },
       { name: "Vault",            href: "/vault",            icon: Lock,            permission: "vault"                             },
       { name: "Help",             href: "/help",             icon: LifeBuoy,        permission: "help"                              },

@@ -60,7 +60,7 @@ const HeldQueue = lazyPage(["/held"], () => import("@/pages/held"));
 const Dispatchers = lazyPage(["/dispatchers"], () => import("@/pages/dispatchers"));
 const Trucks = lazyPage(["/trucks"], () => import("@/pages/trucks"));
 const BankTransfers = lazyPage(["/bank-transfers"], () => import("@/pages/bank-transfers"));
-const Payroll = lazyPage(["/payroll"], () => import("@/pages/payroll"));
+const Payroll = lazyPage(["/payroll"], () => import("@/pages/contractor-payroll"));
 const BulkInvoices = lazyPage(["/bulk-invoices"], () => import("@/pages/bulk-invoices"));
 const ReleaseLetters = lazyPage(["/release-letters"], () => import("@/pages/release-letters"));
 const AIAssistant = lazyPage(["/ai-assistant"], () => import("@/pages/ai-assistant"));

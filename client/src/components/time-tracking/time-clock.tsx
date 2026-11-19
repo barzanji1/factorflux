@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useImmediateNavigation } from "@/hooks/useImmediateNavigation";
 import { NeuButton as Button, NeuCard as Card, NeuInput as Input } from "@/styles/neu/components";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import "./time-clock.css";
@@ -61,6 +62,7 @@ async function fetchTimeStatus(signal: AbortSignal): Promise<TimeTrackingStatus>
 }
 
 export default function TimeClock() {
+  const [, navigate] = useImmediateNavigation();
   const { user } = useAuth();
   const userId = user?.id;
   const { toast } = useToast();
@@ -242,6 +244,9 @@ export default function TimeClock() {
               </>
             )}
           </section>
+          <Button type="button" variant="ghost" className="mt-3 w-full" onClick={() => { setOpen(false); navigate("/payroll"); }}>
+            View Pay Statements
+          </Button>
 
           <div className="mt-3">
             <label htmlFor={notesId} className="sr-only">Optional session notes</label>
