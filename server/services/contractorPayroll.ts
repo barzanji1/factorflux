@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { PoolClient } from "@neondatabase/serverless";
+import type { PoolClient } from "pg";
 import { z } from "zod";
 import { pool } from "../db";
 import { computeContractorTime, payrollGrossCents } from "./contractorPayrollMath";
