@@ -1,0 +1,22 @@
+Apply the neumorphic design system to the Agent Dashboard. Use the existing components from client/src/styles/neu/. Keep all existing data queries and the 253ms performance optimizations.
+
+PAGE SHELL:
+- NeuPageShell: #e0e0e0 background across the full page.
+- Sidebar: light neumorphic — convex surface, same #e0e0e0 base, teal active indicator. Collapsed by default to icon-only (~60px), expands to ~220px on hover (0.2s ease), pin button at bottom to keep expanded. FF diamond logo at top (collapsed = icon, expanded = icon + "FactorFlux"). Group nav items under collapsible section headers (Factoring, Recovery, Admin, etc.). This sidebar applies to ALL pages, not just the dashboard.
+
+TOP KPI CARDS:
+- Auto-scrolling horizontal carousel of NeuStatCards. Slow scroll left on loop, pause on hover, draggable/swipeable. Show 4-5 on desktop, 2 on mobile. Cards show: Ready to Fund ($), In Review (count), Open Follow-ups (count), Aging 60+ (count), Funded This Week ($). Use real dashboard data, not sample figures.
+
+CHARTS — "Financial Overview" section:
+- Two NeuCards side by side:
+  - Left: "Monthly Collections" bar chart with 3D cylinder bars. CSS 3D transform on bar elements: rounded top cap (ellipse), gradient sides (teal #27aab8 to darker teal), subtle shadow on the base. Use Recharts with a custom bar shape component for the 3D effect.
+  - Right: "Invoiced vs Collected" area chart with gradient fill under the teal line (#4fd1c5 to transparent). Smooth curves (monotone interpolation).
+- Chart backgrounds: NeuCard concave (inset). Axis text: muted #888. Grid lines: subtle, low opacity.
+
+WORK SECTIONS:
+- My Queue, My Follow-ups, Team Activity, Alerts — each in a NeuCard. Use NeuTable for the lists (subtle row dividers, no dark header). NeuBadges for status indicators. Each section loads independently with skeleton placeholders (neumorphic pulsing convex rectangles, not gray blocks).
+
+BOTTOM CARDS:
+- Two NeuCards: "Upcoming Follow-ups" count + "View all →", "Pending Actions" count + "View all →".
+
+Apply the sidebar change globally (all pages get the new sidebar), but only restyle the dashboard content area. Other pages keep Win95 content for now — the sidebar is the shared frame. Show the diff.

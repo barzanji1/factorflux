@@ -1,0 +1,73 @@
+The login card needs to look like a real polished glass panel — like a physical sheet of glass sitting in front of the building. Right now it’s too flat and digital. Make it look like actual glass:
+
+css
+.login-card {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.05) 60%,
+    rgba(255, 255, 255, 0.15) 100%
+  );
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 24px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 1px 0 0 rgba(255, 255, 255, 0.15),
+    inset -1px 0 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+Key to realistic glass — light reflections using pseudo-elements:
+
+css
+/* Main specular highlight — the bright streak across the top */
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -20%;
+  width: 140%;
+  height: 45%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  border-radius: 24px 24px 50% 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Secondary subtle reflection — bottom corner glint */
+.login-card::after {
+  content: '';
+  position: absolute;
+  bottom: -10%;
+  right: -10%;
+  width: 60%;
+  height: 40%;
+  background: radial-gradient(
+    ellipse at 70% 80%,
+    rgba(255, 255, 255, 0.08) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+What makes glass look real:
+
+The gradient background (brighter at top-left, darker at bottom-right) simulates light hitting the surface at an angle
+The ::before pseudo-element is the specular highlight — the bright curved reflection you see on real glass panels
+The inset box-shadows on all four edges simulate the beveled edge of thick glass catching light differently on each side — top edge bright, bottom edge dim
+saturate(1.4) on the backdrop filter makes colors behind the glass slightly more vivid, like real glass does
+The top border being brighter (rgba white 0.35) than the bottom simulates overhead lighting
+
+Make sure the text and inputs have z-index: 2 so they render above the reflection pseudo-elements. Keep all text white with a subtle text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) for readability.

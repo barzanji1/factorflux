@@ -1,0 +1,31 @@
+Two changes: chargeback refund tracking and enhanced report filtering.
+
+1. CHARGEBACK REFUND WORKFLOW:
+- Add chargeback statuses: open → collected → refunded → written_off (add 'refunded' to the existing enum).
+- New action on chargeback detail: "Record Refund" (agent/manager). Opens a form: refund date, refund amount (can be partial), payment reference (check #, ACH trace), refund reason, who approved it. Creates an invoice_chargeback_event with type 'refunded'.
+- When refunded: restore the reserve that was deducted, update the carrier's balance, log to audit_log, add timeline entry "Chargeback refunded — $500 returned to [carrier] on [date], payment ref [#]".
+- Partial refunds: track cumulative refunded amount vs original chargeback amount. Status stays 'open' until fully refunded or written off.
+- Email notification to carrier on refund via Resend (branded TPF template): "Your chargeback of $X on Invoice [#] has been refunded. Amount: $Y. Payment reference: [#]."
+- Chargeback detail page shows full lifecycle: opened → [collections activity] → refunded/collected/written off, with dates, amounts, and actors at each step.
+
+2. CHARGEBACK REPORT ENHANCEMENTS:
+- Add "Refunded" as a status filter option alongside open/collected/written off.
+- New columns in the chargeback table: refund date, refund amount, net chargeback (original - refunded), payment reference.
+- Summary row: total chargebacks, total refunded, total collected, total written off, net outstanding.
+- Each chargeback row expandable to show the full event timeline (opened, reminder sent, payment received, refunded).
+
+3. SHORT PAY REPORT ENHANCEMENTS:
+- Filter by: date range, carrier, broker, min/max amount, status (open/resolved/written off).
+- Add resolution tracking: when a short pay is resolved (broker sends the difference), record it with date, amount, reference. Show resolved vs unresolved.
+- Summary row: total short paid, total recovered, net outstanding.
+
+4. DEDUCTIONS REPORT ENHANCEMENTS:
+- Filter by: date range, carrier, broker, deduction type (fee adjustment, reserve movement, offset), min/max amount.
+- Summary row: total deductions by type.
+
+5. CUSTOMIZABLE REPORTS:
+- On each report tab (Chargeback, Short Pay, Deductions, Aging, Carrier AR, Broker, etc.) add a "Customize Columns" NeuButton that opens a dropdown checklist of all available columns. Agent checks/unchecks which columns to show. Save the selection per user in localStorage (or user_preferences table if one exists) so it persists across sessions.
+- "Export CSV" respects the visible columns only — what you see is what you export.
+- "Save as Template" → name a column/filter combo and recall it from a dropdown. Stored per user. Max 10 saved templates.
+
+Apply neumorphic styling to all new UI elements. Migration for the refunded status and any new columns. Show the diff.

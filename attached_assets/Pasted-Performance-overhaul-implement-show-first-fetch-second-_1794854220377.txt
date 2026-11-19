@@ -1,0 +1,21 @@
+Performance overhaul — implement “show first, fetch second” pattern across the entire application. This replaces all previous loading/deferral approaches. Read this entire prompt before making any changes.
+
+The core principle: never show a blank screen, a loading spinner, or a half-rendered page. The user should always see a complete-looking page at every moment.
+
+Layer 1 — Instant static shell. The sidebar, header, page title, and card/section containers for every page must render immediately with zero data dependencies. This is pure layout — no API calls needed. The page should look structurally complete within milliseconds of clicking a sidebar link. The sidebar must stay mounted and never re-render during navigation.
+
+Layer 2 — Cached data fills in immediately. Implement a simple client-side data cache. When any API call succeeds, store the response with a timestamp. On subsequent visits to that page, render the cached data instantly — do not wait for a fresh API call. The page looks fully loaded with real numbers immediately. Mark cached data as stale after 60 seconds.
+
+Layer 3 — Background refresh. If cached data is older than 30 seconds, fire a background API call to fetch fresh data. When it returns, update the displayed data in place. No loading states, no spinners, no skeleton swap — just quietly update the numbers. If the data hasn’t changed, the user sees nothing happen.
+
+Layer 4 — First visit skeletons. Only on the very first visit to a page when there is zero cached data, show gray placeholder shapes that match the exact size and position of the real content. These are not loading spinners — they are gray rectangles the same dimensions as the charts, numbers, and tables that will appear. When data arrives, replace skeletons with real content in one swap — no progressive loading where some things appear before others.
+
+Layer 5 — Charts and infographics. This is critical. Do NOT lazy load, defer, or separately load chart components. Do NOT show a loading state inside a chart container. Charts, 3D cylinders, and all infographic elements render in one shot once their data is available. Either show the skeleton or show the finished chart — never an intermediate loading state inside the component. If cached data exists, the chart renders immediately with cached data and updates quietly if fresh data differs.
+
+Layer 6 — Parallel API calls. Every API call a page needs must fire simultaneously on mount — permissions, page data, chart data, metric data — all in parallel. Nothing waits for anything else. No waterfalls. No sequential calls.
+
+What to remove: Remove any existing loading spinners, “Loading...” text, or intermediate loading states inside page content areas. Remove any deferred rendering or lazy loading of chart components that was added in previous fixes. Remove any blocking awaits that prevent the page from rendering while data loads. Keep the React.lazy code splitting for route chunks — that is fine. Remove everything else that causes a visible loading state between pages.
+
+What NOT to touch: The neumorphic theme, colors, shadows, component visual styles, sidebar design, login page, and email templates. This is data loading architecture only.
+
+Testing: After all changes, navigate rapidly between every page in the sidebar. Every page should appear structurally complete within 100ms of clicking. Charts and infographics should render with data — not show loading states. Go back to a previously visited page and it should look fully loaded instantly from cache. Verify in the production build, not the dev server.

@@ -1,0 +1,25 @@
+Add edit, delete, and threaded replies to Team Chat. Keep all existing neumorphic styling.
+
+EDIT MESSAGE:
+- Hover on own message reveals a small "⋯" menu (NeuButton, circular, subtle). Options: Edit, Delete.
+- Edit: replaces the message text with a NeuInput concave pre-filled with the current text. "Save" (NeuButton teal) and "Cancel" (NeuButton gray) below it. Enter saves, Escape cancels.
+- Edited messages show a small muted "(edited)" label next to the timestamp. Store the original text and edit timestamp in the DB for audit — don't overwrite.
+- Only the message author can edit. Managers/admins can delete anyone's, but not edit.
+
+DELETE MESSAGE:
+- From the same "⋯" menu. Confirmation: small inline "Delete this message?" with Yes/No NeuButtons — not a modal. Deleted messages are soft-deleted (hidden from UI, retained in DB with deleted_at timestamp and deleted_by user). Show nothing in the chat — don't show "message was deleted" placeholder unless you want to (your call).
+
+THREADED REPLIES:
+- Each message has a small "Reply" link below it (muted text, appears on hover alongside the ⋯ menu).
+- Clicking Reply opens a reply thread inline directly under the parent message — indented slightly with a thin teal left border (like Gmail's thread indent).
+- Replies show the same avatar + name + timestamp + text pattern but smaller font.
+- The reply input appears at the bottom of the thread: NeuInput concave, smaller than the main chat input, "Reply..." placeholder, send NeuButton.
+- Collapsed by default if a thread has replies: show "3 replies" link that expands the thread. Always show the most recent reply preview.
+- Replies are editable and deletable with the same rules as parent messages.
+
+DATA:
+- Add to chat_messages: parent_message_id (nullable FK to self), edited_at (nullable), original_text (nullable, populated on first edit), deleted_at (nullable), deleted_by (nullable FK users).
+- Replies are chat_messages with parent_message_id set. Query them with the parent.
+- Migration: add the four columns. No backfill needed — existing messages have no threads.
+
+Show the diff.

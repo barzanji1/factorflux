@@ -1,0 +1,34 @@
+Apply the neumorphic design system to the Documents page. Use existing components from client/src/styles/neu/. Keep all functionality unchanged.
+
+SHELL:
+- Background: NeuPageShell #e0e0e0.
+- Breadcrumb: muted text on neumorphic surface.
+
+STAT CARDS (top row, NeuStatCards):
+- Total Documents, Pending Review, Processed, Failed OCR, Avg Confidence (%).
+- Large teal numbers, muted labels.
+
+CHARTS (2x2 grid below stats, NeuCard concave background each):
+- "Documents by Type" — 3D cylinder bar chart. One bar per doc type (Rate Confirmation, Freight Invoice, BOL/POD, NOA, Other). Teal gradient cylinders. Shows volume at a glance.
+- "OCR Confidence Distribution" — area chart with gradient fill. X-axis: confidence % buckets (0-50, 50-70, 70-85, 85-95, 95-100). Y-axis: document count. Highlights how much of your paperwork needs manual review vs auto-extracts cleanly.
+- "Upload Volume" — 3D cylinder bar chart by week or month. Shows intake velocity over time.
+- "Processing Status" — donut chart. Segments: Processed (teal), Pending (gray), Failed (red), In Progress (yellow). Center text: total count.
+
+FILTER BAR:
+- NeuInput concave for search (by filename, invoice #, carrier).
+- NeuSelect filters: doc type (all / rate con / invoice / BOL / NOA / other), status (all / processed / pending / failed), date range, confidence range (low/medium/high).
+- NeuButton "Export CSV".
+
+DOCUMENT TABLE:
+- NeuTable. Columns: filename, doc type (NeuBadge with color per type — same as the existing AI classification badges but neumorphic), linked invoice/carrier, confidence bar (thin horizontal bar inside the cell, colored green/yellow/red by confidence), status (NeuBadge), date, actions.
+- View button (eye icon) → NeuButton, must actually open the document (fix from earlier).
+- Download → NeuButton.
+- Retry (on failed OCR) → NeuButton with refresh icon.
+- Pagination → NeuButtons.
+
+DOCUMENT DETAIL (expanded row or side panel if one exists):
+- NeuCard showing: full filename, doc type, OCR text preview (first 200 chars), extracted fields (invoice #, load #, amount, broker — from Textract), confidence per field, linked invoice link. NeuBadges for each field's confidence (green high, yellow medium, red low).
+
+Add GET /api/documents/stats if it doesn't exist — return type breakdown, status counts, confidence distribution, and upload volume by month in one query.
+
+Show the diff.

@@ -1,0 +1,151 @@
+Apply the neumorphic design system to EVERY remaining page listed below. Use existing components from client/src/styles/neu/. Keep all functionality and business logic unchanged on every page.
+
+GLOBAL RULES FOR EVERY PAGE:
+- Background: NeuPageShell #e0e0e0.
+- Sidebar must be present (authenticated layout wrapper) on every page.
+- Default page size: 15 rows on every paginated table, server and client.
+- Every page with numeric data gets stat cards (NeuStatCards, large teal numbers) and at least one chart section (3D cylinder bar charts for volume/amounts, donut charts for status/type breakdowns, area charts for trends — Recharts with the same custom 3D cylinder bar shape from the dashboard). Charts in NeuCard concave containers.
+- Dense layout: 12-16px gaps between sections.
+- All tables → NeuTable (no dark headers, muted uppercase labels, subtle dividers).
+- All buttons → NeuButton (convex gray, teal on hover for primary, gray for secondary, red text for destructive). 
+- All badges → NeuBadge.
+- All inputs/selects → NeuInput concave / NeuSelect concave.
+- All tab strips → NeuTabs (flat container, convex inactive, concave active with teal text).
+- All cards → NeuCard.
+- All close/X buttons → small circular NeuButton (32x32px, convex, ×, teal on hover), top-right 12px from edges.
+- All modals/dialogs → NeuCard container, NeuButtons for actions.
+- All toasts → NeuCard with colored left border (teal success, red error, orange warning).
+- All empty states → centered icon + muted text on neumorphic surface.
+- All pagination → NeuButtons.
+- Stat card labels must be specific to the page content — never "Total Records", "Across the full dataset", "Key operational measure", or "Current activity".
+- Top bar on every page: NeuButton for "+ New", NeuInput concave for search, proper spacing. No old teal-filled buttons.
+- Add GET /api/{entity}/stats endpoint per page if one doesn't exist — one query returning counts, breakdowns, and time-series for charts. Don't create separate endpoints per chart.
+
+STRUCTURAL CHANGE:
+- Merge Email Log INTO Email Client as a tab. Email Client gets two tabs: "Compose" (the send interface) and "Log" (the outbound history table, charts, and filters currently on the Email Log page). Remove "Email Log" as a separate sidebar entry. "Email Client" in the sidebar under Communications covers both. Fix the Email Client route to be inside the authenticated layout wrapper so the sidebar appears.
+
+PAGES TO UPDATE:
+
+1. EMAIL CLIENT (with merged Email Log):
+- Compose tab: NeuCard. To field: NeuInput with entity search autocomplete. Subject: NeuInput. Body: NeuInput textarea concave. Attach: NeuButton. Send: NeuButton teal.
+- Log tab (merged from Email Log): stat cards (Total Sent, Delivered, Bounced, Failed — separate cards, not one "Total Records"). Delivery Rate 3D cylinder chart (delivered vs bounced+failed by week). Volume by Type donut. Filter bar: NeuInput search, NeuSelect status/entity type/date range/agent. NeuTable for email list. Expandable row detail in NeuCard concave. Resend button for failed (manager only).
+- Remove generic labels ("Across the full dataset", "60 SECOND REFRESH" banner). Auto-refresh note as small muted subtitle if needed.
+
+2. FACTORING:
+- Stats: Total Invoices ($), New (count), Docs Pending, Under Review, Approved, Funded ($), Held, Chargebacks.
+- Charts: invoice pipeline funnel or stacked bar by status, daily funding volume 3D cylinders, approval rate area trend.
+- Status filter strip (All/New/Docs Pending/Under Review/Approved/Funded/Chargebacks/Held) → NeuTabs.
+- Invoice table → NeuTable. All badges → NeuBadge.
+
+3. SHEETS (Funding Queue):
+- Stats: Ready to Fund ($), Pending Review, Funded Today ($), Total in Queue.
+- Charts: Daily Funding Volume 3D cylinders (14 days), Queue by Status donut.
+- Load type filter → NeuTabs. Table → NeuTable.
+- Action buttons: Approve → NeuButton teal hover. Hold → NeuButton orange hover. Reject → circular NeuButton red hover.
+- Batch fund actions: "Fund Selected" NeuButton teal, "Select All" neumorphic checkbox.
+- Carrier/broker names: normal case, not ALL CAPS.
+
+4. PAYMENTS:
+- Stats: Total Payments, Applied This Month ($), Unapplied ($), Pending.
+- Charts: Payment Volume 3D cylinders by week, Application Status donut.
+- Apply payment form → NeuCard + NeuInputs + NeuButton teal.
+- Entire page top to bottom — especially the bottom section that still uses legacy styling.
+
+5. LOCKBOX:
+- Stats: Total Entries, Matched, Unmatched, Today's Entries.
+- Charts: Daily Lockbox Volume 3D cylinders, Match Rate donut.
+- Entry table → NeuTable. Match/unmatch actions → NeuButtons.
+
+6. FUEL ADVANCE:
+- Stats: Total Advances ($), Active/Open, Completed, Avg Advance.
+- Charts: Advance Volume 3D cylinders by week, Status donut.
+- Advance Ledger tab strip → NeuTabs. Table → NeuTable.
+- New advance form → NeuCard + NeuInputs + NeuButton.
+
+7. BANK TRANSFERS:
+- Stats: Total Transfers, Pending, Completed ($), Failed.
+- Charts: Transfer Volume 3D cylinders by week, Status donut.
+- Transfer table → NeuTable. Initiate transfer form → NeuCard + NeuInputs + NeuButton teal.
+
+8. DISPATCHERS:
+- Stats: Total Dispatchers, Active.
+- Dispatcher list → NeuTable. Add/edit modal → NeuCard + NeuInputs.
+
+9. TRUCKS:
+- Stats: Total Trucks, Active, Inactive.
+- Truck list → NeuTable. Status badges → NeuBadge. Add/edit modal → NeuCard + NeuInputs.
+
+10. RELEASE LETTERS:
+- Stats: Total Letters, Generated This Month.
+- Letter list → NeuTable. Generate → NeuButton teal. Preview/download → NeuButtons.
+
+11. C/B REVIEWS:
+- Stats: Total Reviews, Pending, Approved, Rejected.
+- Charts: Review Volume 3D cylinders by week, Outcome donut.
+- Review queue → NeuTable. Approve/reject → NeuButtons. Detail → NeuCard.
+
+12. MC CHECK:
+- Stats: Active Entities, Inactive, Unknown, Last Run.
+- Charts: Authority Status donut (active/inactive/unknown), Check Success Rate area trend.
+- Authority Status / Alerts / Run History tabs → NeuTabs.
+- Type/status filter strips → NeuTabs. Entity table → NeuTable. History drawer → NeuCard.
+- Run Now → NeuButton teal.
+
+13. HELD:
+- Stats: Total Held, Avg Hold Duration, Oldest Hold.
+- Charts: Hold Reasons donut, Hold Duration distribution 3D cylinders.
+- Held invoices table → NeuTable. Release/keep → NeuButtons. Hold reason → NeuBadge or expandable text.
+
+14. LOGS (Audit Trail):
+- Stats: Total Events, Today, System Events, User Actions.
+- Charts: Activity Volume 3D cylinders by day, Actions by Type donut.
+- Event log table → NeuTable. Filters (dates, entities, actions, users) → NeuSelects. Export/Refresh → NeuButtons. Expandable row → NeuCard concave.
+
+15. FOLLOWUPS:
+- Stats: Open Manual Tasks, Unacknowledged Automations, Overdue, Email Templates.
+- Charts: Open vs Closed trend area chart, Overdue by Age 3D cylinders.
+- Tab strip (Manual Tasks / Broker Automations / Templates) → NeuTabs.
+- Filter bar → NeuInput + NeuSelect. Task/automation list → NeuTable.
+
+16. REPORTS (all tabs):
+- Report tab strip (Global Reports / Aging / Agent / Agent Performance / Broker / Carrier / Carrier AR / Daily AR / Monthly / Chargeback) → NeuTabs.
+- Each tab: NeuCards for filter sections, NeuTable for data, NeuStatCards for summaries, NeuButtons for export/refresh.
+- Existing charts: ensure containers are NeuCard concave, bars are 3D cylinders.
+- Column customization dropdown → neumorphic. Saved templates → NeuSelect.
+- Agent Performance: fix the stale-state glitch (React key on agent selector and calendar).
+
+17. ADMIN (main page with tabs):
+- Tab strip (Users / Time Tracking / Carrier Portal / Factoring Settings / Doc Requirements / Audit Log) → NeuTabs.
+- Users: NeuTable, permission toggles → neumorphic switches.
+- Time Tracking: NeuTable, charts: hours by agent 3D cylinders, hours by day area trend.
+- Carrier Portal settings → NeuCard + NeuInputs.
+- Factoring Settings → NeuCard with labeled NeuInputs (including chargeback warning days, dump statement interval, rate tolerance).
+- Doc Requirements → NeuTable + add/edit NeuButtons.
+- Audit Log → NeuTable with filters.
+
+18. PAYROLL:
+- Stats: Current Period Total ($), Employees, Deductions.
+- Charts: Payroll by Period 3D cylinders, Deductions Breakdown donut.
+- Payroll entries → NeuTable. Run payroll → NeuButton teal.
+
+19. EXPENSES:
+- Stats: Total Expenses ($), This Month ($), Pending Approval.
+- Charts: Expenses by Category donut, Monthly Spend 3D cylinders.
+- Expense list → NeuTable. Add expense → NeuCard + NeuInputs + NeuButton.
+
+20. VAULT:
+- Document vault → NeuCards or NeuTable. Upload → NeuButton. Categories/folders → collapsible NeuCards.
+
+21. RULES:
+- Rule list → NeuTable or NeuCards. Create/edit → NeuCard form + NeuInputs + condition builder.
+
+22. WORKFLOW BUILDER:
+- Stage list → NeuCards. Stage detail → NeuCard form. Preview → NeuCard. Drag handles stay functional.
+
+23. EARL PANEL:
+- Floating chat panel → NeuCard convex container. Input → NeuInput concave. Send → NeuButton teal. Messages: same pattern as Team Chat. Earl's responses: slight teal-tinted background to distinguish from user messages.
+
+After all pages are complete, do a FINAL GLOBAL PASS:
+- Grep every .tsx file for raw <button>, non-Neu Button/Card/Table/Input/Badge/Tabs imports, inline className overrides (rounded-*, bg-*, shadow-*, border-*) that fight the neumorphic primitives, and any remaining Win95 class names or imports. Report every file that still has legacy styling.
+
+Show the diff for all pages. Report: total files changed, total legacy elements replaced, any pages where functionality was affected (there should be zero).

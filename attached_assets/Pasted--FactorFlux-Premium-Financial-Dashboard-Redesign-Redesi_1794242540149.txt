@@ -1,0 +1,83 @@
+# FactorFlux — Premium Financial Dashboard Redesign
+
+Redesign the **Agent Dashboard's visual appearance only** to match the sophisticated institutional finance aesthetic established by our new login page.
+
+**CRITICAL: This is a visual reskin, NOT a functional or structural redesign.**
+
+### Design language
+
+- Sidebar: deep institutional navy `#102A38`
+- Workspace background: refined off-white `#F5F7F8`
+- Card surfaces: porcelain white `#FFFFFF`
+- Primary accent: muted financial teal `#087F87`
+- Primary text: charcoal `#263D40`
+- Secondary text: slate `#72878A`
+- Borders: subtle cool-gray `#DFE5E8`
+- Shadows: soft, restrained, and realistic
+
+Replace the current washed-out gray neumorphism with premium financial UI styling. Use subtle glass highlights and dimensional depth selectively, not excessive transparency or neon effects.
+
+### Preserve the existing dashboard EXACTLY
+
+- Work at a Glance horizontal KPI carousel, including sliding behavior and navigation arrows.
+- All six floating quick-action cards, their current positions, dimensions, and arrangement.
+- All six card flip animations and front/back interactions.
+- Financial Overview charts and existing data visualizations.
+- Sidebar navigation, grouping, and expand/collapse behavior.
+- Top toolbar, search, notifications, clock-in, profile, and New menu.
+- All existing labels, metrics, content, and functionality.
+
+Do not restructure, reposition, resize, remove, or replace these components.
+
+### Visual refinements
+
+**Sidebar**
+- Deep navy background with crisp, readable navigation labels.
+- Muted teal active-state indicator.
+- Subtle separators and refined hover states.
+- Preserve the current sidebar dimensions.
+
+**Work at a Glance**
+- White KPI cards with subtle borders and light elevation.
+- Stronger hierarchy for financial values.
+- Muted teal icons and restrained accent details.
+- Preserve carousel dimensions and movement.
+
+**Six floating action cards**
+- Keep their signature floating appearance.
+- Replace heavy gray surfaces with porcelain-white materials.
+- Use elegant, layered shadows to maintain depth.
+- Refine icon containers, typography, and card borders.
+- Preserve all existing flip animations, transforms, timing, and interactions.
+- Style both the front and back of each card consistently.
+
+**Top toolbar**
+- Refine search, buttons, notifications, and profile controls.
+- Remove excessive raised neumorphic styling.
+- Use clean surfaces, subtle borders, and professional spacing.
+
+**Financial Overview**
+- Apply the same white-card design language to charts.
+- Improve text contrast and chart readability.
+- Preserve all chart types, data, calculations, and functionality.
+
+### Strict implementation constraints
+
+- Modify styling only: CSS, Tailwind classes, and presentation-related design tokens.
+- Do not change component hierarchy, layout geometry, or event handlers.
+- Do not modify authentication, routes, backend, APIs, database, permissions, or financial logic.
+- Do not introduce new dependencies.
+- Scope changes to the Agent Dashboard and its shell; do not restyle unrelated pages.
+- Preserve existing responsive behavior.
+- Avoid unnecessary animations and expensive visual effects.
+
+### Verification
+
+1. Capture before-and-after screenshots at identical viewport sizes.
+2. Confirm the dashboard layout and component dimensions are unchanged.
+3. Verify carousel navigation and all six card flips.
+4. Verify sidebar, toolbar, and navigation interactions.
+5. Run typecheck, production build, and relevant tests.
+6. Report any failures and unintended visual changes.
+
+**Goal:** Transform FactorFlux into a premium institutional financial operating system while retaining its distinctive interactive dashboard and all existing functionality.

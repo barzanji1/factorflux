@@ -1,0 +1,35 @@
+Apply the neumorphic design system to the Portal Submissions page. Use existing components from client/src/styles/neu/. Keep all functionality unchanged.
+
+SHELL:
+- Background: NeuPageShell #e0e0e0.
+
+TAB STRIP:
+- Submissions / Pending Registrations / Messages → NeuTabs (flat container, convex inactive, concave active with teal text). Keep count badges on tabs as NeuBadge teal pills.
+
+STAT CARDS (top row, NeuStatCards):
+- Total Submissions, Pending Review, Approved, Rejected. Large teal numbers, muted labels.
+
+SUBMISSIONS TAB:
+- NeuTable. Columns: submission ID, carrier name, invoice #, load #, amount, submitted date, status (NeuBadge — pending/approved/rejected/converted), documents count, actions.
+- Action buttons → small NeuButtons: View, Approve, Reject.
+- Click a row → expands or navigates to submission detail.
+- Submission detail: NeuCard with carrier info, submitted documents (NeuCards per doc with View/Download NeuButtons), extracted fields, preflight alerts (NeuBadges), and approve/reject NeuButtons with reason textarea (NeuInput concave).
+
+PENDING REGISTRATIONS TAB:
+- NeuTable. Columns: carrier name, MC #, contact email, phone, submitted date, status (NeuBadge), actions.
+- Action buttons: Approve Registration, Reject, View Details → NeuButtons.
+- Detail view: NeuCard with all submitted carrier info, uploaded documents, verification status.
+
+MESSAGES TAB:
+- Same pattern as Team Chat but scoped to portal messages between carriers and agents.
+- Left panel: conversation list per carrier → NeuCard container, concave active, convex inactive.
+- Right panel: message thread → messages stack vertically, same light styling as Team Chat (avatar, name, timestamp, text). No individual message cards.
+- Reply input at bottom: NeuInput concave + send NeuButton teal.
+
+EMPTY STATES:
+- Each tab: centered icon + "No [submissions/registrations/messages]" text on the neumorphic surface.
+
+FILTERS (on Submissions and Pending Registrations tabs):
+- NeuInput concave for search. NeuSelect for status filter, date range.
+
+No charts needed. Show the diff.

@@ -1,0 +1,30 @@
+Apply the neumorphic design system to the Carrier pages (list + profile detail). Use existing components from client/src/styles/neu/. Keep all functionality unchanged.
+
+CARRIER LIST (/carriers or wherever the list lives):
+- Background: NeuPageShell #e0e0e0.
+- Stat cards at top (total carriers, active, new clients, inactive): NeuStatCards in a row.
+- Search/filter bar: NeuInput (concave) for search, NeuSelect for filters.
+- Carrier table: NeuTable. Status badges → NeuBadge. Action buttons → small NeuButtons.
+- Pagination → NeuButtons.
+
+CARRIER PROFILE/DETAIL:
+- Header card (carrier name, MC, status, contact): NeuCard convex. Status badge → NeuBadge. "Edit" button → NeuButton.
+- Tab strip (whatever tabs exist — Overview, Invoices, Documents, etc.): NeuTabs.
+
+CHARTS & VISUALIZATIONS (this is where the numbers get visual):
+- "Invoice Volume" — 3D cylinder bar chart showing invoices per month for this carrier. Same Recharts custom bar shape as the dashboard (rounded cap, gradient sides, teal color). NeuCard concave background.
+- "Revenue by Load Type" — donut or pie chart showing $ breakdown by OTR/Dump/Hotshot/Other. Teal/cyan/gray palette. Center text shows total $. NeuCard concave.
+- "Aging Snapshot" — horizontal stacked bar showing this carrier's receivables in Current / 1-30 / 31-60 / 61-90 / 90+ buckets. Color-coded green→yellow→orange→red. 3D depth effect on the bars (CSS transform, subtle). NeuCard concave.
+- "Payment Performance" — area chart showing average days-to-pay over the last 6 months. Gradient fill under the teal line. NeuCard concave.
+- Layout: charts in a 2x2 grid below the header, above the tabs. Each chart card has a title and a small "View in Reports →" link.
+
+STAT ROW (between header and charts):
+- Compact NeuStatCards in a row: Total Funded ($), Open AR ($), Avg Days to Pay, Chargeback Rate (%). Numbers are large teal, labels muted.
+
+INVOICES TAB:
+- NeuTable showing this carrier's invoices. Same styling as the main invoice list.
+
+DOCUMENTS TAB:
+- Document cards → NeuCard. View/Download → NeuButton.
+
+All chart data comes from existing endpoints or

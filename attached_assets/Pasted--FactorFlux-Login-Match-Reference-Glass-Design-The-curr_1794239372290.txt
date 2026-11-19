@@ -1,0 +1,30 @@
+**FactorFlux Login — Match Reference Glass Design**
+
+The current login implementation does not match the provided reference image. It looks like a solid dark card rather than premium frosted glass.
+
+Use the attached reference image as the visual target.
+
+**Required visual corrections:**
+
+1. Recreate the large, rounded, translucent glass panel with the same approximate proportions, spacing, and positioning as the reference.
+2. Replace the opaque navy background of the panel with layered translucent gradients and `backdrop-filter: blur(24px) saturate(130%)`.
+3. Add a thin, luminous white-blue glass border with subtle highlights concentrated along the upper-left and lower-right edges.
+4. Introduce soft internal reflections using CSS pseudo-elements and layered gradients. These must be subtle and must not obstruct the form.
+5. Redesign the email and password fields as recessed frosted-glass surfaces with translucent fills, refined borders, and soft inner highlights.
+6. Give the Sign In button a premium deep-teal gradient, thin illuminated edge, and restrained dimensional shadow.
+7. Match the reference's typography, content proportions, alignment, and generous spacing.
+8. Preserve the existing architectural background image exactly.
+
+**Important implementation details:**
+- Use layered CSS gradients, transparency, shadows, and pseudo-elements to create the glass effect.
+- Do not simply increase opacity or add a generic glow around the card.
+- Keep the form content crisp and readable; only the glass surfaces should blur.
+- Keep decorative layers `pointer-events: none`.
+- Ensure the effect works on mobile and desktop.
+- Preserve all authentication logic, validation, routing, and existing functionality.
+- No unnecessary animation libraries or dependencies.
+
+**Verification:**
+Capture a screenshot of the updated login at the same viewport size as the reference and compare the two side by side. Correct the visible differences in panel proportions, transparency, border lighting, inputs, and button styling before finishing.
+
+**Goal:** Reproduce the premium, dimensional, architectural glass appearance of the reference—not a standard dark glassmorphism card.
