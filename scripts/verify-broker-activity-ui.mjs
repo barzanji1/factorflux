@@ -108,6 +108,17 @@ try {
     if(!login.ok)return login.status;const s=await login.json();
     const r=await fetch('/api/broker/invoices/${invoices[0].id}/confirm',{method:'POST',headers:{'Content-Type':'application/json','X-Broker-CSRF':s.csrfToken},body:'{}'});return r.status})()`);
   assert.equal(confirmStatus, 200);
+  const atomic = (await pool.query(`SELECT a.approved_amount,a.historical_amount,
+    (SELECT count(*)::int FROM broker_activity_deliveries d WHERE d.event_id=a.event_id AND d.user_id=$2) AS delivery_count,
+    (SELECT count(*)::int FROM notifications n WHERE n.user_id=$2 AND n.entity_type='broker_response' AND n.entity_id=a.invoice_id) AS alert_count
+    FROM broker_activity_actions a WHERE a.invoice_id=$1`, [invoices[0].id, managerId])).rows;
+  assert.equal(atomic.length, 1, "Activity must exist when the existing response handler returns, without observer polling");
+  assert.equal(atomic[0].approved_amount, "1250.00"); assert.equal(atomic[0].historical_amount, false);
+  assert.equal(atomic[0].delivery_count, 1); assert.equal(atomic[0].alert_count, 1);
+  report.atomicSnapshotOnResponseReturn = true;
+  await pool.query("UPDATE invoices SET amount=1300 WHERE id=$1", [invoices[0].id]);
+  assert.equal((await pool.query("SELECT approved_amount FROM broker_activity_actions WHERE invoice_id=$1", [invoices[0].id])).rows[0].approved_amount, "1250.00");
+  report.snapshotSurvivesLaterInvoiceEdit = true;
   await until("!!document.querySelector('[aria-label$=\"unread notifications\"]')");
   report.notificationMilliseconds = Date.now() - actionStart;
   await until(`(()=>{const r=[...document.querySelectorAll('tbody tr')].find(e=>e.textContent.includes(${JSON.stringify(invoices[0].invoice_number)}));return r?.textContent.includes('Confirmed')&&r.textContent.includes('Portal')})()`);

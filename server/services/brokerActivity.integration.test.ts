@@ -7,7 +7,7 @@ import {
   activityFilters, brokerActivityPage, brokerActivityStats, brokerResponseReport, brokerResponseCsv,
   brokerNotificationPrefs, updateBrokerNotificationPrefs, brokerActivityBrokers, csvCell,
 } from "./brokerActivity";
-import { captureBrokerActivityBatch, deliverBrokerActivityEmails } from "./brokerActivityDelivery";
+import { deliverBrokerActivityEmails } from "./brokerActivityDelivery";
 import { createBrokerConfirmationService } from "./brokerConfirmationService";
 import { registerBrokerActivityRoutes } from "../routes/brokerActivity";
 
@@ -31,6 +31,10 @@ test("Broker Activity: money snapshots, filters, reports, isolated alerts, prefe
   const scope = { userId: admin, isTest: true }, now = new Date();
   let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
   try {
+    assert.equal((await query(`SELECT count(*)::int AS n FROM pg_trigger
+      WHERE tgrelid='public.broker_confirmation_events'::regclass
+      AND tgname='broker_activity_atomic_capture' AND tgenabled IN ('O','A')`)).rows[0].n, 1,
+    "Apply 0059 before testing: capture must be a real database trigger, not an observer");
     for (const [id, role] of [[admin, "admin"], [manager, "manager"], [employee, "employee"]]) {
       await query("INSERT INTO users(id,email,role,first_name,is_test_account) VALUES($1,$2,$3,'Fictional Activity Tester',true)", [id, `${id}@example.test`, role]);
     }
@@ -51,8 +55,11 @@ test("Broker Activity: money snapshots, filters, reports, isolated alerts, prefe
     const service = createBrokerConfirmationService({ now: () => now });
     await service.resolve(confirmed.id, "confirmed", { kind: "broker", id: `Fictional <broker@example.test> [portal:111; broker:${broker}]` }, "");
     await service.brokerRespond(disputed.broker_confirmation_token, "disputed", "Fictional missing paperwork");
-    await captureBrokerActivityBatch(ids);
-    await captureBrokerActivityBatch(ids);
+    // No observer/polling call: the existing Phase 1 transaction must already
+    // have written the amount and notifications when its handler returns.
+    await service.resolve(confirmed.id, "confirmed", { kind: "broker", id: `Fictional <broker@example.test> [portal:111; broker:${broker}]` }, "");
+    await assert.rejects(service.brokerRespond(confirmed.broker_confirmation_token, "disputed", "Must reject"), /already been confirmed/);
+    await assert.rejects(service.brokerRespond(disputed.broker_confirmation_token, "confirmed", ""), /already been disputed/);
     const actions = (await query("SELECT * FROM broker_activity_actions WHERE invoice_id=ANY($1::int[]) ORDER BY event_id", [ids])).rows;
     assert.equal(actions.length, 2);
     assert.equal(actions[0].approved_amount, "1250.00");
@@ -105,19 +112,21 @@ test("Broker Activity: money snapshots, filters, reports, isolated alerts, prefe
     const aborted = await makeInvoice("ABORTED");
     await query("BEGIN");
     await service.resolve(aborted.id, "confirmed", { kind: "broker", id: "Broker <fixture@example.test>" }, "");
-    await captureBrokerActivityBatch([aborted.id]);
+    assert.equal((await query("SELECT count(*)::int AS n FROM broker_activity_actions WHERE invoice_id=$1", [aborted.id])).rows[0].n, 1);
+    assert.equal((await query("SELECT count(*)::int AS n FROM broker_activity_deliveries d JOIN broker_activity_actions a ON a.event_id=d.event_id WHERE a.invoice_id=$1", [aborted.id])).rows[0].n, 2);
     await query("ROLLBACK");
     assert.equal((await query("SELECT count(*)::int AS n FROM broker_activity_actions WHERE invoice_id=$1", [aborted.id])).rows[0].n, 0);
+    assert.equal((await query("SELECT broker_confirmation_status AS status FROM invoices WHERE id=$1", [aborted.id])).rows[0].status, "pending");
+    assert.equal((await query("SELECT count(*)::int AS n FROM broker_confirmation_events WHERE invoice_id=$1", [aborted.id])).rows[0].n, 0);
+    assert.equal((await query("SELECT count(*)::int AS n FROM notifications WHERE user_id=$1 AND entity_id=$2", [admin, aborted.id])).rows[0].n, 0);
     // Staff-entered confirmations do not get falsely labeled Email or send broker alerts.
     const staff = await makeInvoice("STAFF");
     await service.resolve(staff.id, "confirmed", { kind: "agent", id: admin }, "");
-    await captureBrokerActivityBatch([staff.id]);
     assert.equal((await brokerActivityPage(scope, { search: `ACTIVITY-${suffix}-STAFF` })).items[0].method, null);
     assert.equal((await query("SELECT count(*)::int AS n FROM notifications WHERE user_id=$1 AND entity_id=$2", [admin, staff.id])).rows[0].n, 0);
     // Verify local date boundaries, not the database server's UTC calendar.
     const old = await makeInvoice("TIMEZONE", "50.00", broker, new Date("2018-12-31T23:00:00Z"));
     await createBrokerConfirmationService({ now: () => new Date("2019-01-01T01:00:00Z") }).resolve(old.id, "confirmed", { kind: "broker", id: "Legacy <time@example.test>" }, "");
-    await captureBrokerActivityBatch([old.id]);
     assert.equal((await brokerActivityPage(scope, { brokerId: broker, dateFrom: "2018-12-31", dateTo: "2018-12-31", timeZone: "America/Denver" })).total, 1);
     assert.equal((await brokerActivityPage(scope, { brokerId: broker, dateFrom: "2018-12-31", dateTo: "2018-12-31", timeZone: "UTC" })).total, 0);
     await updateBrokerNotificationPrefs(manager, { inApp: false, email: false });

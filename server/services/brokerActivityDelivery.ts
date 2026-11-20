@@ -4,53 +4,6 @@ import { sendEmail } from "../emailService";
 import { escapeEmailHtml, wrapEmail } from "../emailTemplate.js";
 import { BROKER_PUBLIC_ORIGIN } from "./brokerConfirmationPresentation";
 
-// Transactional, idempotent event ingestion. This also repairs uncaptured
-// events without relying on a serial-ID watermark (late commits can have older
-// IDs). A DB trigger, when enabled, makes this repair path a no-op.
-export async function captureBrokerActivityBatch(onlyInvoiceIds: readonly number[] | null = null) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const events = await client.query(`SELECT e.id FROM broker_confirmation_events e
-      WHERE e.event IN ('confirmed','disputed') AND ($1::int[] IS NULL OR e.invoice_id=ANY($1::int[]))
-      AND NOT EXISTS(SELECT 1 FROM broker_activity_actions a WHERE a.event_id=e.id)
-      ORDER BY e.id LIMIT 50 FOR UPDATE OF e SKIP LOCKED`, [onlyInvoiceIds]);
-    for (const { id } of events.rows) {
-      const result = await client.query(`INSERT INTO broker_activity_actions(event_id,invoice_id,broker_id,broker_name,client_name,
-        invoice_number,invoice_amount,approved_amount,status,method,actor,sent_at,acted_at,is_test)
-        SELECT e.id,i.id,i.broker_id,COALESCE(b.name,'Unknown broker'),COALESCE(c.name,'Unknown client'),i.invoice_number,
-        i.amount,CASE WHEN e.event='confirmed' THEN i.amount END,e.event::text,
-        CASE WHEN e.actor ~ '\\[portal:[0-9]+; broker:[0-9]+\\]$' THEN 'portal'
-             WHEN e.actor LIKE 'agent:%' OR e.actor IN ('system','scheduler') THEN NULL ELSE 'email' END,e.actor,
-        i.confirmation_sent_at AT TIME ZONE 'UTC',e.created_at AT TIME ZONE 'UTC',COALESCE(owner.is_test_account,false)
-        FROM broker_confirmation_events e JOIN invoices i ON i.id=e.invoice_id LEFT JOIN brokers b ON b.id=i.broker_id
-        LEFT JOIN clients c ON c.id=i.client_id LEFT JOIN users owner ON owner.id=i.submitted_by
-        WHERE e.id=$1 ON CONFLICT(event_id) DO NOTHING RETURNING *`, [id]);
-      const action = result.rows[0];
-      if (!action?.method) continue; // Do not misattribute staff-entered confirmations to a broker.
-      const recipients = await client.query(`INSERT INTO broker_activity_deliveries(event_id,user_id,email_state)
-        SELECT $1,u.id,CASE WHEN COALESCE(p.email,false) THEN 'queued' ELSE 'skipped' END
-        FROM users u LEFT JOIN broker_notification_preferences p ON p.user_id=u.id
-        WHERE u.role IN ('admin','manager') AND u.status='active' AND COALESCE(u.is_test_account,false)=$2
-        ON CONFLICT(event_id,user_id) DO NOTHING RETURNING id,user_id`, [id, action.is_test]);
-      for (const recipient of recipients.rows) {
-        const pref = await client.query("SELECT in_app FROM broker_notification_preferences WHERE user_id=$1", [recipient.user_id]);
-        if (pref.rows[0]?.in_app === false) continue;
-        const amount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(action.invoice_amount));
-        const message = `${action.broker_name} ${action.status} Invoice #${action.invoice_number} for ${amount}`;
-        const inserted = await client.query(`INSERT INTO notifications(user_id,title,message,type,entity_type,entity_id,action_url,metadata)
-          VALUES($1,$2,$3,$4,'broker_response',$5,$6,$7) RETURNING id`,
-        [recipient.user_id, `Broker invoice ${action.status}`, message, action.status === "confirmed" ? "success" : "warning",
-          action.invoice_id, `/invoices/${action.invoice_id}`, JSON.stringify({ brokerActivityEventId: id, method: action.method })]);
-        await client.query("UPDATE broker_activity_deliveries SET notification_id=$1 WHERE id=$2", [inserted.rows[0].id, recipient.id]);
-      }
-    }
-    await client.query("COMMIT");
-    return events.rowCount || 0;
-  } catch (error) { await client.query("ROLLBACK"); throw error; }
-  finally { client.release(); }
-}
-
 type MailSend = typeof sendEmail;
 export async function deliverBrokerActivityEmails(send: MailSend = sendEmail, allowTest = false, onlyUserId: string | null = null) {
   const lease = randomUUID();
@@ -97,12 +50,23 @@ let started = false;
 export function startBrokerActivityWorker() {
   if (started) return;
   started = true;
-  let busy = false, lastError = 0;
+  let busy = false, lastError = 0, triggerVerified = false;
   const timer = setInterval(async () => {
     if (busy) return;
     busy = true;
     try {
-      await captureBrokerActivityBatch();
+      if (!triggerVerified) {
+        const installed = await pool.query(`SELECT EXISTS(
+          SELECT 1 FROM pg_catalog.pg_trigger
+          WHERE tgrelid=to_regclass('public.broker_confirmation_events')
+          AND tgname='broker_activity_atomic_capture' AND NOT tgisinternal AND tgenabled IN ('O','A')
+          AND tgfoid='public.capture_broker_activity_response()'::regprocedure
+        ) AS installed`);
+        if (!installed.rows[0]?.installed) throw new Error("ATOMIC_CAPTURE_MIGRATION_REQUIRED");
+        triggerVerified = true;
+      }
+      // Snapshots, bell alerts and queued jobs are written by the approved DB
+      // trigger. Never fall back to a late observer that can capture an edit.
       // Never send live broker-action alert emails from Preview or test fixtures.
       if (process.env.NODE_ENV === "production") await deliverBrokerActivityEmails();
     } catch {
