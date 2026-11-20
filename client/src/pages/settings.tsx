@@ -33,6 +33,7 @@ import {
   Save,
 } from "lucide-react";
 import "@/components/admin-neu/admin-neu-page.css";
+import { BrokerNotificationSettings } from "@/pages/broker-activity/notification-settings";
 
 // Validation schemas
 const personalSettingsSchema = z.object({
@@ -433,6 +434,7 @@ export default function Settings() {
 
               {/* Notification Settings */}
               <TabsContent value="notifications">
+                <BrokerNotificationSettings />
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">

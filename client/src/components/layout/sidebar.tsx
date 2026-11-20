@@ -13,7 +13,7 @@ import {
   LifeBuoy, Wallet, ShieldCheck,
   ArrowRightLeft, AlertCircle, Activity, Radio,
   RotateCcw, FileCheck2, Users, Workflow, Headset, Truck, Landmark, BadgeDollarSign, Layers, MailOpen, Globe, Sparkles, CalendarDays, Receipt, MessageCircle,
-  ChevronDown, Pin, PinOff, Sun, Moon,
+  ChevronDown, Pin, PinOff, Sun, Moon, Handshake,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import ItSupportBell from "@/components/it-support/ItSupportBell";
@@ -127,6 +127,7 @@ const navSections: NavSection[] = [
     title: "Risk",
     items: [
       { name: "Brokers",     href: "/brokers",         icon: Building2,  permission: "brokers"    },
+      { name: "Broker Activity", href: "/broker-activity", icon: Handshake, permission: "", role: "manager" },
       { name: "C/B Reviews", href: "/credit-checks",   icon: ShieldCheck,permission: "cb_reviews" },
       { name: "MC Check",    href: "/fmcsa-authority", icon: Radio,      permission: "mc_check"   },
       { name: "Held",        href: "/held",            icon: AlertCircle,permission: "held"       },

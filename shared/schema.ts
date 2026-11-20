@@ -132,6 +132,49 @@ export const clients = pgTable("clients", {
   index("clients_dashboard_new_idx").on(table.createdAt, table.id).where(sql`${table.status} = 'new_client'`),
 ]);
 
+// External broker identities never become staff accounts.
+export const brokerPortalUsers = pgTable("broker_portal_users", {
+  id: serial("id").primaryKey(),
+  brokerId: integer("broker_id").notNull().references(() => brokers.id),
+  companyName: varchar("company_name", { length: 200 }).notNull(),
+  contactName: varchar("contact_name", { length: 150 }).notNull(),
+  email: varchar("email", { length: 254 }).notNull().unique(),
+  phone: varchar("phone", { length: 40 }).notNull(),
+  passwordHash: text("password_hash"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  disabled: boolean("disabled").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const brokerPortalTokens = pgTable("broker_portal_tokens", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  portalUserId: integer("portal_user_id").notNull().references(() => brokerPortalUsers.id, { onDelete: "cascade" }),
+  purpose: varchar("purpose", { length: 20 }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [index("broker_portal_tokens_user_idx").on(table.portalUserId, table.purpose)]);
+export const brokerPortalSessions = pgTable("broker_portal_sessions", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  portalUserId: integer("portal_user_id").notNull().references(() => brokerPortalUsers.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [index("broker_portal_sessions_expiry_idx").on(table.expiresAt)]);
+export const brokerPortalRateLimits = pgTable("broker_portal_rate_limits", {
+  id: serial("id").primaryKey(),
+  bucket: varchar("bucket", { length: 64 }).notNull(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [index("broker_portal_rate_window_idx").on(table.bucket, table.requestedAt)]);
+export const brokerPortalNotes = pgTable("broker_portal_notes", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id").references((): AnyPgColumn => brokerPortalNotes.id),
+  portalUserId: integer("portal_user_id").references(() => brokerPortalUsers.id),
+  staffUserId: varchar("staff_user_id").references(() => users.id),
+  authorName: varchar("author_name", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [index("broker_portal_notes_invoice_idx").on(table.invoiceId, table.createdAt, table.id)]);
+
 // New addition for debtors table
 export const clientEmailLogs = pgTable("client_email_logs", {
   id: serial("id").primaryKey(),
@@ -586,7 +629,8 @@ export const documents = pgTable("documents", {
   invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
   clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }),
   documentCategory: varchar("document_category"),
-  uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploadedByBrokerPortalUserId: integer("uploaded_by_broker_portal_user_id").references(() => brokerPortalUsers.id),
   sourceChannel: varchar("source_channel", {
     enum: ["portal", "manual", "email", "api", "drag_drop"],
   }).default("manual"),
@@ -896,7 +940,10 @@ export const notifications = pgTable("notifications", {
   actionUrl: varchar("action_url"),
   metadata: text("metadata"), // JSON string: emailSubject, emailBody, recipientEmail
   createdAt: timestamp("created_at").defaultNow(),
-}, table => [index("notifications_dashboard_entity_idx").on(table.entityType, table.entityId)]);
+}, table => [
+  index("notifications_dashboard_entity_idx").on(table.entityType, table.entityId),
+  index("notifications_user_unread_idx").on(table.userId, table.read, table.createdAt),
+]);
 
 // One durable alert per aging threshold. Acknowledgement is intentionally
 // retained so collections history remains visible after resolution.
@@ -1002,7 +1049,55 @@ export const brokerConfirmationEvents = pgTable("broker_confirmation_events", {
   actor: varchar("actor").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, table => [index("broker_confirmation_events_invoice_idx").on(table.invoiceId, table.createdAt)]);
+}, table => [
+  index("broker_confirmation_events_invoice_idx").on(table.invoiceId, table.createdAt),
+  index("broker_activity_uncaptured_idx").on(table.id).where(sql`${table.event} IN ('confirmed','disputed')`),
+]);
+
+export const brokerNotificationPreferences = pgTable("broker_notification_preferences", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  inApp: boolean("in_app").notNull().default(true),
+  email: boolean("email").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const brokerActivityActions = pgTable("broker_activity_actions", {
+  eventId: integer("event_id").primaryKey().references(() => brokerConfirmationEvents.id, { onDelete: "cascade" }),
+  invoiceId: integer("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  brokerId: integer("broker_id").references(() => brokers.id, { onDelete: "set null" }),
+  brokerName: varchar("broker_name").notNull(),
+  clientName: varchar("client_name").notNull(),
+  invoiceNumber: varchar("invoice_number").notNull(),
+  invoiceAmount: decimal("invoice_amount", { precision: 12, scale: 2 }).notNull(),
+  approvedAmount: decimal("approved_amount", { precision: 12, scale: 2 }),
+  status: varchar("status", { enum: ["confirmed", "disputed"] }).notNull(),
+  method: varchar("method", { enum: ["email", "portal"] }),
+  actor: varchar("actor").notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  actedAt: timestamp("acted_at", { withTimezone: true }).notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+  historicalAmount: boolean("historical_amount").notNull().default(false),
+  isTest: boolean("is_test").notNull().default(false),
+}, table => [
+  index("broker_activity_invoice_event_idx").on(table.invoiceId, table.eventId),
+  index("broker_activity_broker_date_idx").on(table.brokerId, table.actedAt),
+  index("broker_activity_date_idx").on(table.actedAt),
+]);
+export const brokerActivityDeliveries = pgTable("broker_activity_deliveries", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => brokerActivityActions.eventId, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  notificationId: integer("notification_id").references(() => notifications.id, { onDelete: "set null" }),
+  emailState: varchar("email_state", { enum: ["queued", "sending", "sent", "skipped", "failed"] }).notNull().default("skipped"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  leaseToken: uuid("lease_token"),
+  lastErrorCode: varchar("last_error_code", { length: 40 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex("broker_activity_deliveries_event_id_user_id_key").on(table.eventId, table.userId),
+  index("broker_activity_delivery_queue_idx").on(table.emailState, table.nextAttemptAt),
+]);
 
 export const brokerConfirmationSettings = pgTable("broker_confirmation_settings", {
   id: integer("id").primaryKey().default(1),

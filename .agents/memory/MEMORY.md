@@ -65,3 +65,4 @@
 - [Navigation loading continuity](navigation-loading-policy.md) — prevent large gray placeholder flashes; preserve recognizable page structure and test pending frames during real sidebar clicks.
 - [Performance audit safety](performance-audit-safety.md) — verify implicit JSX/build usage before deleting code; report complete route startup separately from whole-site bundle size.
 - [Contractor payroll](contractor-payroll-policy.md) — 1099-only Pay Statements; admin-run payroll, own-statement rates visible, immutable issuance and audited corrections.
+- [Broker Portal access](broker-portal-access-policy.md) — self-registration requires a verified, uniquely matching existing contact email; company names never authorize access.

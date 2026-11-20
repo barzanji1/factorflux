@@ -32,6 +32,7 @@ const FuelAdvanceTracking = lazyPage(["/fuel-advance"], () => import("@/pages/fu
 const FuelAdvanceDetail = lazyPage(["/fuel-advance/:id"], () => import("@/pages/fuel-advance-detail"));
 const Profile = lazyPage(["/profile"], () => import("@/pages/profile"));
 const Settings = lazyPage(["/settings"], () => import("@/pages/settings"));
+const BrokerActivity = lazyPage(["/broker-activity"], () => import("@/pages/broker-activity"));
 const DownloadPage = lazyPage(["/download"], () => import("@/pages/download"));
 const FollowUp = lazyPage(["/follow-up", "/followups"], () => import("@/pages/follow-up"));
 const Collections = lazyPage(["/collections"], () => import("@/pages/collections"));
@@ -280,6 +281,11 @@ function Router() {
       <Route path="/settings">
         <ProtectedRoute>
           <Settings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/broker-activity">
+        <ProtectedRoute>
+          <BrokerActivity />
         </ProtectedRoute>
       </Route>
       <Route path="/download">

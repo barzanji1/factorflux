@@ -64,6 +64,21 @@
         </div>
       </div>
     </div>
+    <script>
+      if (location.pathname === "/broker" || location.pathname.startsWith("/broker/")) {
+        document.title = "Broker Portal — Trucking Pros Financial";
+        var wordmark = document.querySelector(".ff-startup-splash__wordmark");
+        if (wordmark) wordmark.textContent = "Trucking Pros Financial";
+        var mark = document.querySelector("[data-ff-startup-mark]");
+        if (mark) {
+          var logo = document.createElement("img");
+          logo.src = "/images/tpf-logo.png";
+          logo.alt = "Trucking Pros Financial";
+          logo.className = "ff-startup-splash__mark";
+          mark.replaceWith(logo);
+        }
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

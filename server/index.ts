@@ -17,6 +17,7 @@ import { startBrokerCreditScheduler } from "./services/brokerCreditEngine";
 import { emailActorContext } from "./services/emailContext";
 import { startDatabaseBackupScheduler } from "./services/databaseBackup";
 import { registerHealthRoute } from "./routes/maintenance";
+import { startBrokerActivityWorker } from "./services/brokerActivityDelivery";
 
 const app = express();
 app.use(sentryRequestHandler);
@@ -79,7 +80,9 @@ app.use("/uploads", express.static(uploadsDir));
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const reqPath = req.path.replace(/^(\/api\/broker-(?:confirm|dispute)\/)[^/]+(?=\/|$)/, "$1[redacted]");
+  const reqPath = req.path
+    .replace(/^(\/api\/broker-(?:confirm|dispute)\/)[^/]+(?=\/|$)/, "$1[redacted]")
+    .replace(/^(\/api\/broker\/magic-link\/)[^/]+(?=\/|$)/, "$1[redacted]");
   res.on("finish", () => {
     const duration = Date.now() - start;
 
@@ -141,6 +144,7 @@ export async function startServer(
   startAuthorityScheduler();
   startBrokerCreditScheduler();
   startDatabaseBackupScheduler();
+  startBrokerActivityWorker();
   import("./services/emailBroadcast")
     .then(m => m.startEmailBroadcastWorker())
     .catch(e => console.error("[emailBroadcast] startup error:", e?.message));

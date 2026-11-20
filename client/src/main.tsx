@@ -1,7 +1,6 @@
 import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import { sentryDataCollection, scrubSentryBreadcrumb, scrubSentryEvent } from "@shared/sentry-privacy";
-import App from "./App";
 import "./index.css";
 import "./styles/loading-continuity.css";
 import { initialStaffPath } from "./lib/staff-entry";
@@ -32,8 +31,18 @@ Sentry.init({
   beforeSend: scrubSentryEvent,
 });
 
-createRoot(document.getElementById("root")!).render(
-  <Sentry.ErrorBoundary fallback={<div role="alert">Something went wrong — please refresh.</div>}>
-    <App />
-  </Sentry.ErrorBoundary>
-);
+// Broker entry never imports/mounts staff authentication, permissions, cache,
+// navigation, or the staff-only fetch interceptor.
+const entry = location.pathname === "/broker" || location.pathname.startsWith("/broker/")
+  ? import("./pages/broker")
+  : import("./App");
+entry.then(({ default: Entry }) => {
+  createRoot(document.getElementById("root")!).render(
+    <Sentry.ErrorBoundary fallback={<div role="alert">Something went wrong — please refresh.</div>}>
+      <Entry />
+    </Sentry.ErrorBoundary>
+  );
+}).catch(() => {
+  const root = document.getElementById("root");
+  if (root) root.innerHTML = '<div role="alert">Unable to load the application. Please refresh.</div>';
+});

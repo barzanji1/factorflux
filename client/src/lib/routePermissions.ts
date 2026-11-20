@@ -17,6 +17,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, string> = {
   "/trucks": "trucks",
   "/release-letters": "release_letters",
   "/brokers": "brokers",
+  "/broker-activity": "",
   "/credit-checks": "cb_reviews",
   "/fmcsa-authority": "mc_check",
   "/held": "held",

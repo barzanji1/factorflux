@@ -2,7 +2,7 @@
 // and its normal authentication; this does not start schedulers or bypass auth.
 import express from "express";
 import compression from "compression";
-import { Readable } from "node:stream";
+import { request } from "node:http";
 import { spawn } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
@@ -17,24 +17,31 @@ app.use("/api", async (req, res) => {
   const start = performance.now();
   const endpoint = `/api${req.path}`;
   try {
-    const headers = new Headers();
+    const headers: Record<string, string | string[]> = {};
     for (const [name, value] of Object.entries(req.headers)) {
-      if (value && !["connection", "content-length", "accept-encoding"].includes(name)) headers.set(name, Array.isArray(value) ? value.join(",") : value);
+      if (value && !["connection", "content-length", "accept-encoding"].includes(name)) headers[name] = value;
     }
-    headers.set("accept-encoding", "identity");
-    const response = await fetch(`http://127.0.0.1:5000/api${req.url}`, {
-      method: req.method, headers, redirect: "manual",
-      ...(!["GET", "HEAD"].includes(req.method) ? { body: Readable.toWeb(req) as ReadableStream, duplex: "half" } : {}),
-    } as RequestInit);
-    for (const [name, value] of response.headers) {
-      if (!["content-encoding", "content-length", "transfer-encoding", "set-cookie"].includes(name)) res.setHeader(name, value);
-    }
-    const cookies = response.headers.getSetCookie();
-    if (cookies.length) res.setHeader("set-cookie", cookies);
-    res.status(response.status);
-    const body = Buffer.from(await response.arrayBuffer());
-    if (measured.has(endpoint)) timings.push({ endpoint, status: response.status, milliseconds: Math.round(performance.now() - start), bytes: body.length });
-    res.end(body);
+    headers["accept-encoding"] = "identity";
+    // Native HTTP preserves the browser Host/Origin pair. Node fetch rewrites
+    // Host to localhost, causing legitimate same-origin CSRF checks to fail.
+    await new Promise<void>((resolve, reject) => {
+      const upstream = request({ hostname: "127.0.0.1", port: 5000, path: `/api${req.url}`, method: req.method, headers }, response => {
+        let bytes = 0;
+        for (const [name, value] of Object.entries(response.headers)) {
+          if (value && !["connection", "transfer-encoding"].includes(name)) res.setHeader(name, value);
+        }
+        res.status(response.statusCode ?? 502);
+        response.on("data", chunk => { bytes += chunk.length; });
+        response.on("error", reject);
+        response.on("end", () => {
+          if (measured.has(endpoint)) timings.push({ endpoint, status: response.statusCode ?? 502, milliseconds: Math.round(performance.now() - start), bytes });
+          resolve();
+        });
+        response.pipe(res);
+      });
+      upstream.on("error", reject);
+      req.pipe(upstream);
+    });
   } catch {
     res.status(502).json({ message: "Production verification upstream unavailable" });
   }

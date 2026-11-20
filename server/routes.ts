@@ -3,6 +3,8 @@ import { registerChargebackResolutionRoutes } from "./routes/chargebackResolutio
 import { registerEntityNoteRoutes } from "./routes/entityNotes";
 import { registerAnnouncementRoutes } from "./routes/announcements";
 import { registerContractorPayrollRoutes } from "./routes/contractorPayroll";
+import { registerBrokerPortalRoutes } from "./routes/brokerPortal";
+import { registerBrokerActivityRoutes } from "./routes/brokerActivity";
 import { isSelfTimeTrackingRequest } from "./timeTrackingAccess";
 import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
@@ -825,6 +827,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply a single permission gate to route groups whose handlers historically
   // only checked authentication. Public authentication and carrier/portal
   // callbacks are intentionally excluded before this protected API boundary.
+  registerBrokerPortalRoutes(app, { requireAuth, requireInvoiceRead: requireAnyPermission(["invoices", "factoring"]), canAccessInvoice: employeeCanAccessInvoice });
+  registerBrokerActivityRoutes(app, requireAuth);
   const publicApiPath = (pathname: string) =>
     /^\/api\/broker-(?:confirm|dispute)\/[^/]+$/.test(pathname)
     || /^\/api\/broker-confirm\/[^/]+\/documents\/\d+\/download$/.test(pathname)

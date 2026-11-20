@@ -128,27 +128,30 @@ export default function TopNav({ title, subtitle, group, neu = true, actions }: 
   const { data: notifications = [] } = useQuery<AppNotification[]>({
     queryKey: ["/api/notifications", authUser?.id],
     queryFn: async () => {
-      const res = await fetch("/api/notifications", { credentials: "include" });
+      const managers = authUser?.role === "admin" || authUser?.role === "manager";
+      const res = await fetch(managers ? "/api/internal/notifications" : "/api/notifications", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load notifications");
-      return res.json();
+      const payload = await res.json();
+      return managers ? payload.notifications : payload;
     },
     enabled: !!authUser?.id,
     retry: false,
     staleTime: 20000,
-    refetchInterval: 30000,
+    refetchInterval: authUser?.role === "admin" || authUser?.role === "manager" ? 3000 : 30000,
   });
 
   const { data: unreadCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count", authUser?.id],
     queryFn: async () => {
-      const res = await fetch("/api/notifications/unread-count", { credentials: "include" });
+      const managers = authUser?.role === "admin" || authUser?.role === "manager";
+      const res = await fetch(managers ? "/api/internal/notifications/unread-count" : "/api/notifications/unread-count", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load unread notification count");
       return res.json();
     },
     enabled: !!authUser?.id,
     retry: false,
     staleTime: 20000,
-    refetchInterval: 30000,
+    refetchInterval: authUser?.role === "admin" || authUser?.role === "manager" ? 3000 : 30000,
   });
   const unreadCount = unreadCountData?.count ?? 0;
 
@@ -183,8 +186,9 @@ export default function TopNav({ title, subtitle, group, neu = true, actions }: 
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: number) => {
-      const res = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: "PATCH",
+      const managers = authUser?.role === "admin" || authUser?.role === "manager";
+      const res = await fetch(managers ? `/api/internal/notifications/${notificationId}/read` : `/api/notifications/${notificationId}/read`, {
+        method: managers ? "POST" : "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
@@ -201,8 +205,9 @@ export default function TopNav({ title, subtitle, group, neu = true, actions }: 
 
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/notifications/mark-all-read", {
-        method: "PATCH",
+      const managers = authUser?.role === "admin" || authUser?.role === "manager";
+      const res = await fetch(managers ? "/api/internal/notifications/read-all" : "/api/notifications/mark-all-read", {
+        method: managers ? "POST" : "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
@@ -265,6 +270,7 @@ export default function TopNav({ title, subtitle, group, neu = true, actions }: 
 
     if (url && !isAdminRequestInfo) {
       if (!n.read) markAsReadMutation.mutate(n.id);
+      if (n.entityType === "broker_response") setNotificationMenuOpen(false);
       setLocation(url);
       if (n.entityType === "chat_mention") {
         const params = new URL(url, window.location.origin).searchParams;
