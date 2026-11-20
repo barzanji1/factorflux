@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import ChargebackLifecycle from "@/components/invoices/chargeback-lifecycle";
 import EntityNotes from "@/components/shared/EntityNotes";
+import { FundingProgressPanel } from "@/components/client-funding/FundingProgressPanel";
 import Sidebar from "@/components/layout/sidebar";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import { documentClassification, documentClassificationLabel } from "@shared/document-display";
@@ -770,6 +771,7 @@ export default function InvoiceDetail() {
               <div className="space-y-5">
 
                 {/* ── Header card ────────────────────────────────────────── */}
+                 <FundingProgressPanel invoiceId={invoiceId} />
                  <NeuCard className="overflow-hidden">
                   <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-4">

@@ -67,3 +67,4 @@
 - [Contractor payroll](contractor-payroll-policy.md) — 1099-only Pay Statements; admin-run payroll, own-statement rates visible, immutable issuance and audited corrections.
 - [Broker Portal access](broker-portal-access-policy.md) — self-registration requires a verified, uniquely matching existing contact email; company names never authorize access.
 - [Atomic broker response capture](broker-activity-atomic-capture.md) — user approved a DB trigger, not an observer, to preserve action-time amounts without changing Phase 1 handlers.
+- [Client carrier access](client-carrier-access-policy.md) — verified existing contact email activates; unmatched needs admin approval; Funded tracking reflects completed payment, never initiates it.

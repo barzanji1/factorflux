@@ -15,6 +15,7 @@ import CreateInvoiceModal from "@/components/modals/create-invoice-modal";
 import { CompressionInfo } from "@/components/documents/compression-info";
 import CarrierChatThread from "@/components/carriers/CarrierChatThread";
 import EntityNotes from "@/components/shared/EntityNotes";
+import { FundingProgressPanel } from "@/components/client-funding/FundingProgressPanel";
 import {
   NeuBadge, NeuButton, NeuCard, NeuInput, NeuPageShell, NeuSelect, NeuStatCard,
   NeuTab, NeuTabList, NeuTabPanel, NeuTabs, NeuTable, NeuTableBody, NeuTableCell,
@@ -765,6 +766,7 @@ export default function PortalSubmissionsPage() {
           </DialogHeader>
           {detail && (
             <div className="min-w-0 space-y-4">
+              <FundingProgressPanel key={detail.id} submissionId={detail.id} />
               <NeuCard className="grid min-w-0 grid-cols-1 gap-4 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 {[
                   ["Carrier", detail.companyName || `Portal User #${detail.portalUserId}`],

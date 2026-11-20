@@ -18,6 +18,7 @@ import { emailActorContext } from "./services/emailContext";
 import { startDatabaseBackupScheduler } from "./services/databaseBackup";
 import { registerHealthRoute } from "./routes/maintenance";
 import { startBrokerActivityWorker } from "./services/brokerActivityDelivery";
+import { startClientPushWorker } from "./services/clientPush";
 
 const app = express();
 app.use(sentryRequestHandler);
@@ -145,6 +146,7 @@ export async function startServer(
   startBrokerCreditScheduler();
   startDatabaseBackupScheduler();
   startBrokerActivityWorker();
+  startClientPushWorker();
   import("./services/emailBroadcast")
     .then(m => m.startEmailBroadcastWorker())
     .catch(e => console.error("[emailBroadcast] startup error:", e?.message));

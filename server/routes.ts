@@ -5,6 +5,7 @@ import { registerAnnouncementRoutes } from "./routes/announcements";
 import { registerContractorPayrollRoutes } from "./routes/contractorPayroll";
 import { registerBrokerPortalRoutes } from "./routes/brokerPortal";
 import { registerBrokerActivityRoutes } from "./routes/brokerActivity";
+import { registerClientApiRoutes } from "./routes/clientApi";
 import { isSelfTimeTrackingRequest } from "./timeTrackingAccess";
 import { registerBackupRoute } from "./routes/maintenance";
 import { PRODUCTION_APP_URL, productionAppUrl } from "../shared/production-urls.js";
@@ -829,6 +830,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // callbacks are intentionally excluded before this protected API boundary.
   registerBrokerPortalRoutes(app, { requireAuth, requireInvoiceRead: requireAnyPermission(["invoices", "factoring"]), canAccessInvoice: employeeCanAccessInvoice });
   registerBrokerActivityRoutes(app, requireAuth);
+  registerClientApiRoutes(app, {
+    requireAuth, requireSubmissionAccess: requireModulePermission("portal_submissions"),
+    requireInvoiceRead: requireAnyPermission(["invoices", "factoring"]), canAccessInvoice: employeeCanAccessInvoice,
+    preflight: runPreflightForInvoice, nearAlerts: getPortalSubmissionNearDuplicateAlerts, decide: getPreflightDecision,
+  });
   const publicApiPath = (pathname: string) =>
     /^\/api\/broker-(?:confirm|dispute)\/[^/]+$/.test(pathname)
     || /^\/api\/broker-confirm\/[^/]+\/documents\/\d+\/download$/.test(pathname)

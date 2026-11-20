@@ -2613,6 +2613,8 @@ export const carrierPortalUsers = pgTable("carrier_portal_users", {
   dotNumber: varchar("dot_number"),
   phone: varchar("phone"),
   companyName: varchar("company_name").notNull(),
+  clientContactName: varchar("client_contact_name"),
+  clientEmailVerifiedAt: timestamp("client_email_verified_at", { withTimezone: true }),
   status: varchar("status", { enum: ["pending", "active", "suspended", "rejected"] }).default("pending").notNull(),
   rejectionReason: text("rejection_reason"),
   reviewedAt: timestamp("reviewed_at"),
@@ -2675,6 +2677,7 @@ export type PortalChatMessage = typeof portalChatMessages.$inferSelect;
 export type InsertPortalChatMessage = z.infer<typeof insertPortalChatMessageSchema>;
 
 // ─── Carrier Submissions ───────────────────────────────────────────────────────
+export const clientFundingStatus = pgEnum("client_funding_status", ["received", "under_review", "funded"]);
 export const carrierSubmissions = pgTable("carrier_submissions", {
   id: serial("id").primaryKey(),
   carrierId: integer("carrier_id").references(() => clients.id),
@@ -2694,19 +2697,98 @@ export const carrierSubmissions = pgTable("carrier_submissions", {
   instructionsDetails: text("instructions_details"),
   amount: decimal("amount", { precision: 12, scale: 2 }),
   paymentType: varchar("payment_type", { enum: ["ACH", "check", "wire"] }).default("ACH"),
+  fundingStatus: clientFundingStatus("funding_status").default("received").notNull(),
+  step1ReceivedAt: timestamp("step_1_received_at", { withTimezone: true }).defaultNow().notNull(),
+  step2ReviewedAt: timestamp("step_2_reviewed_at", { withTimezone: true }),
+  step3FundedAt: timestamp("step_3_funded_at", { withTimezone: true }),
+  stepChangedBy: varchar("step_changed_by").references(() => users.id, { onDelete: "set null" }),
+  fundingInvoiceId: integer("funding_invoice_id").references(() => invoices.id, { onDelete: "set null" }),
   status: varchar("status", { enum: ["submitted", "under_review", "approved", "funded", "rejected"] }).default("submitted").notNull(),
   notes: text("notes"),
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
   submittedAt: timestamp("submitted_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, t => [
+  index("carrier_submissions_client_funding_idx").on(t.portalUserId, t.fundingStatus, t.id),
+  index("carrier_submissions_funding_invoice_idx").on(t.fundingInvoiceId),
+]);
 
 export const insertCarrierSubmissionSchema = createInsertSchema(carrierSubmissions).omit({
   id: true, submittedAt: true, createdAt: true,
 });
 export type CarrierSubmission = typeof carrierSubmissions.$inferSelect;
 export type InsertCarrierSubmission = z.infer<typeof insertCarrierSubmissionSchema>;
+
+export const clientEmailVerifications = pgTable("client_email_verifications", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id, { onDelete: "cascade" }).notNull(),
+  email: varchar("email").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("client_verifications_user_idx").on(t.portalUserId, t.createdAt)]);
+
+export const clientRegistrationAttempts = pgTable("client_registration_attempts", {
+  id: serial("id").primaryKey(),
+  ipHash: varchar("ip_hash", { length: 64 }).notNull(),
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("client_registration_ip_time_idx").on(t.ipHash, t.attemptedAt)]);
+
+export const clientFundingEvents = pgTable("client_funding_events", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id").references(() => carrierSubmissions.id, { onDelete: "cascade" }).notNull(),
+  fromStatus: clientFundingStatus("from_status").notNull(),
+  toStatus: clientFundingStatus("to_status").notNull(),
+  reason: text("reason"),
+  actorId: varchar("actor_id").references(() => users.id, { onDelete: "set null" }),
+  actorName: varchar("actor_name").notNull(),
+  changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("client_funding_events_submission_idx").on(t.submissionId, t.id)]);
+
+export const clientSubmissionNotes = pgTable("client_submission_notes", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id").references(() => carrierSubmissions.id, { onDelete: "cascade" }).notNull(),
+  senderType: varchar("sender_type").notNull(),
+  portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id, { onDelete: "set null" }),
+  staffUserId: varchar("staff_user_id").references(() => users.id, { onDelete: "set null" }),
+  authorName: varchar("author_name").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("client_submission_notes_submission_idx").on(t.submissionId, t.id)]);
+
+export const clientPushTokens = pgTable("client_push_tokens", {
+  id: serial("id").primaryKey(),
+  portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id, { onDelete: "cascade" }).notNull(),
+  token: text("token").notNull().unique(),
+  platform: varchar("platform").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("client_push_tokens_user_idx").on(t.portalUserId, t.active)]);
+
+export const clientPushDeliveries = pgTable("client_push_deliveries", {
+  id: serial("id").primaryKey(),
+  dedupeKey: varchar("dedupe_key").notNull().unique(),
+  portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id, { onDelete: "cascade" }).notNull(),
+  submissionId: integer("submission_id").references(() => carrierSubmissions.id, { onDelete: "cascade" }).notNull(),
+  tokenId: integer("token_id").references(() => clientPushTokens.id, { onDelete: "cascade" }).notNull(),
+  title: varchar("title").notNull(),
+  body: text("body").notNull(),
+  state: varchar("state").default("queued").notNull(),
+  attempts: integer("attempts").default(0).notNull(),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  leaseToken: uuid("lease_token"),
+  lastErrorCode: varchar("last_error_code"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("client_push_delivery_queue_idx").on(t.state, t.nextAttemptAt)]);
+
+export const clientUploadIntents = pgTable("client_upload_intents", {
+  s3Key: text("s3_key").primaryKey(),
+  portalUserId: integer("portal_user_id").references(() => carrierPortalUsers.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, t => [index("client_upload_intents_expiry_idx").on(t.expiresAt)]);
 
 // Portal acknowledgements and preflight snapshots are separate from internal
 // invoice acknowledgements because a portal submission is not an invoice yet.
